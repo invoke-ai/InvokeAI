@@ -2,7 +2,7 @@ import warnings
 import math
 from PIL import Image, ImageFilter
 
-class Outcrop(object):
+class Outcrop:
     def __init__(
             self,
             image,

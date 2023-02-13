@@ -230,7 +230,7 @@ def main():
 
     else:
         print(f"reading prompts from {opt.from_file}")
-        with open(opt.from_file, "r") as f:
+        with open(opt.from_file) as f:
             data = f.read().splitlines()
             if (len(data) >= batch_size):
                 data = list(chunk(data, batch_size))

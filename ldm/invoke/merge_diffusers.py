@@ -28,7 +28,7 @@ DEST_MERGED_MODEL_DIR = "merged_models"
 
 
 def merge_diffusion_models(
-    model_ids_or_paths: List[Union[str, Path]],
+    model_ids_or_paths: list[Union[str, Path]],
     alpha: float = 0.5,
     interp: str = None,
     force: bool = False,
@@ -67,7 +67,7 @@ def merge_diffusion_models(
 
 
 def merge_diffusion_models_and_commit(
-    models: List["str"],
+    models: list["str"],
     merged_model_name: str,
     alpha: float = 0.5,
     interp: str = None,
@@ -175,7 +175,7 @@ def _parse_args() -> Namespace:
 class FloatSlider(npyscreen.Slider):
     # this is supposed to adjust display precision, but doesn't
     def translate_value(self):
-        stri = "%3.2f / %3.2f" % (self.value, self.out_of)
+        stri = "{:3.2f} / {:3.2f}".format(self.value, self.out_of)
         l = (len(str(self.out_of))) * 2 + 4
         stri = stri.rjust(l)
         return stri
@@ -371,9 +371,9 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
     def validate_field_values(self) -> bool:
         bad_fields = []
         model_names = self.model_names
-        selected_models = set(
-            (model_names[self.model1.value[0]], model_names[self.model2.value[0]])
-        )
+        selected_models = {
+            model_names[self.model1.value[0]], model_names[self.model2.value[0]]
+        }
         if self.model3.value[0] > 0:
             selected_models.add(model_names[self.model3.value[0] - 1])
         if len(selected_models) < 2:
@@ -389,7 +389,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self) -> List[str]:
+    def get_model_names(self) -> list[str]:
         model_names = [
             name
             for name in self.model_manager.model_names()

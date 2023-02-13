@@ -85,14 +85,14 @@ def get_image_paths(dataroot):
 
 
 def _get_paths_from_images(path):
-    assert os.path.isdir(path), '{:s} is not a valid directory'.format(path)
+    assert os.path.isdir(path), f'{path:s} is not a valid directory'
     images = []
     for dirpath, _, fnames in sorted(os.walk(path)):
         for fname in sorted(fnames):
             if is_image_file(fname):
                 img_path = os.path.join(dirpath, fname)
                 images.append(img_path)
-    assert images, '{:s} has no valid image file'.format(path)
+    assert images, f'{path:s} has no valid image file'
     return images
 
 
@@ -133,7 +133,7 @@ def imssave(imgs, img_path):
             img = img[:, :, [2, 1, 0]]
         new_path = os.path.join(
             os.path.dirname(img_path),
-            img_name + str('_s{:04d}'.format(i)) + '.png',
+            img_name + str(f'_s{i:04d}') + '.png',
         )
         cv2.imwrite(new_path, img)
 
@@ -192,7 +192,7 @@ def mkdirs(paths):
 def mkdir_and_rename(path):
     if os.path.exists(path):
         new_name = path + '_archived_' + get_timestamp()
-        print('Path already exists. Rename it to [{:s}]'.format(new_name))
+        print(f'Path already exists. Rename it to [{new_name:s}]')
         os.replace(path, new_name)
     os.makedirs(path)
 
@@ -564,7 +564,7 @@ def modcrop(img_in, scale):
         H_r, W_r = H % scale, W % scale
         img = img[: H - H_r, : W - W_r, :]
     else:
-        raise ValueError('Wrong img ndim: [{:d}].'.format(img.ndim))
+        raise ValueError(f'Wrong img ndim: [{img.ndim:d}].')
     return img
 
 

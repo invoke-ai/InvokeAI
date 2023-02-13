@@ -75,7 +75,7 @@ WEIGHT_COMMANDS = (
     '!convert_model',
     )
 IMG_PATH_COMMANDS = (
-    '--outdir[=\s]',
+    r'--outdir[=\s]',
     )
 TEXT_PATH_COMMANDS=(
     '!replay',
@@ -84,17 +84,17 @@ IMG_FILE_COMMANDS=(
     '!fix',
     '!fetch',
     '!mask',
-    '--init_img[=\s]','-I',
-    '--init_mask[=\s]','-M',
-    '--init_color[=\s]',
-    '--embedding_path[=\s]',
+    r'--init_img[=\s]','-I',
+    r'--init_mask[=\s]','-M',
+    r'--init_color[=\s]',
+    r'--embedding_path[=\s]',
     )
 
-path_regexp   = '(' + '|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
-weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
-text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + ')\s*\S*$'
+path_regexp   = '(' + '|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + r')\s*\S*$'
+weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + r')\s*\S*$'
+text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + r')\s*\S*$'
 
-class Completer(object):
+class Completer:
     def __init__(self, options, models={}):
         self.options     = sorted(options)
         self.models      = models
@@ -127,11 +127,11 @@ class Completer(object):
                 self.matches = self._path_completions(text, state, IMG_EXTENSIONS,shortcut_ok=do_shortcut)
 
             # looking for a seed
-            elif re.search('(-S\s*|--seed[=\s])\d*$',buffer):
+            elif re.search(r'(-S\s*|--seed[=\s])\d*$',buffer):
                 self.matches= self._seed_completions(text,state)
 
             # looking for an embedding concept
-            elif re.search('<[\w-]*$',buffer):
+            elif re.search(r'<[\w-]*$',buffer):
                 self.matches= self._concept_completions(text,state)
 
             # looking for a model
@@ -257,7 +257,7 @@ class Completer(object):
         self.models = models
         
     def _seed_completions(self, text, state):
-        m = re.search('(-S\s?|--seed[=\s]?)(\d*)',text)
+        m = re.search(r'(-S\s?|--seed[=\s]?)(\d*)',text)
         if m:
             switch  = m.groups()[0]
             partial = m.groups()[1]
@@ -297,7 +297,7 @@ class Completer(object):
         return matches
 
     def _model_completions(self, text, state, ckpt_only=False):
-        m = re.search('(!switch\s+)(\w*)',text)
+        m = re.search(r'(!switch\s+)(\w*)',text)
         if m:
             switch  = m.groups()[0]
             partial = m.groups()[1]
@@ -324,7 +324,7 @@ class Completer(object):
 
     def _path_completions(self, text, state, extensions, shortcut_ok=True, default_dir:str=''):
         # separate the switch from the partial path
-        match = re.search('^(-\w|--\w+=?)(.*)',text)
+        match = re.search(r'^(-\w|--\w+=?)(.*)',text)
         if match is None:
             switch = None
             partial_path = text

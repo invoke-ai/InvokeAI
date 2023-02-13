@@ -284,7 +284,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self) -> Tuple[List[str], int]:
+    def get_model_names(self) -> tuple[list[str], int]:
         conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
         model_names = [
             idx

@@ -97,12 +97,12 @@ def main():
     if opt.infile:
         try:
             if os.path.isfile(opt.infile):
-                infile = open(opt.infile, 'r', encoding='utf-8')
+                infile = open(opt.infile, encoding='utf-8')
             elif opt.infile == '-':  # stdin
                 infile = sys.stdin
             else:
                 raise FileNotFoundError(f'{opt.infile} not found.')
-        except (FileNotFoundError, IOError) as e:
+        except (FileNotFoundError, OSError) as e:
             print(f'{e}. Aborting.')
             sys.exit(-1)
 
@@ -124,7 +124,7 @@ def main():
             )
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(opt,e)
-    except (IOError, KeyError) as e:
+    except (OSError, KeyError) as e:
         print(f'{e}. Aborting.')
         sys.exit(-1)
 
@@ -365,7 +365,7 @@ def main_loop(gen, opt):
 
                     # update rfc metadata
                     if operation == 'postprocess':
-                        tool = re.match('postprocess:(\w+)',opt.last_operation).groups()[0]
+                        tool = re.match(r'postprocess:(\w+)',opt.last_operation).groups()[0]
                         add_postprocessing_to_metadata(
                             opt,
                             opt.input_file_path,
@@ -534,7 +534,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
     elif command.startswith('!replay'):
         file_path = command.replace('!replay','',1).strip()
         if infile is None and os.path.isfile(file_path):
-            infile = open(file_path, 'r', encoding='utf-8')
+            infile = open(file_path, encoding='utf-8')
         completer.add_history(command)
         operation = None
 
@@ -551,8 +551,8 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         completer.clear_history()
         operation = None
 
-    elif re.match('^!(\d+)',command):
-        command_no = re.match('^!(\d+)',command).groups()[0]
+    elif re.match(r'^!(\d+)',command):
+        command_no = re.match(r'^!(\d+)',command).groups()[0]
         command    = completer.get_line(int(command_no))
         completer.set_line(command)
         operation = None
@@ -839,7 +839,7 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
-        if not re.match('^[\w._+:/-]+$',model_name):
+        if not re.match(r'^[\w._+:/-]+$',model_name):
             print('** model name must contain only words, digits and the characters "._+:/-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
@@ -976,7 +976,7 @@ def prepare_image_metadata(
     return filename,formatted_dream_prompt
 
 def choose_postprocess_name(opt,prefix,seed) -> str:
-    match      = re.search('postprocess:(\w+)',opt.last_operation)
+    match      = re.search(r'postprocess:(\w+)',opt.last_operation)
     if match:
         modifier = match.group(1)   # will look like "gfpgan", "upscale", "outpaint" or "embiggen"
     else:

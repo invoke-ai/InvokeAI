@@ -44,8 +44,8 @@ class PipelineIntermediateState:
     step: int
     timestep: int
     latents: torch.Tensor
-    predicted_original: Optional[torch.Tensor] = None
-    attention_map_saver: Optional[AttentionMapSaver] = None
+    predicted_original: torch.Tensor | None = None
+    attention_map_saver: AttentionMapSaver | None = None
 
 
 # copied from configs/stable-diffusion/v1-inference.yaml
@@ -97,7 +97,7 @@ class AddsMaskGuidance:
     mask_latents: torch.FloatTensor
     scheduler: SchedulerMixin
     noise: torch.Tensor
-    _debug: Optional[Callable] = None
+    _debug: Callable | None = None
 
     def __call__(self, step_output: BaseOutput | SchedulerOutput, t: torch.Tensor, conditioning) -> BaseOutput:
         output_class = step_output.__class__  # We'll create a new one with masked data.
@@ -172,7 +172,7 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
     """Convert a generator to a function with a callback and a return value."""
 
     generator_method: Callable[ParamType, ReturnType]
-    callback_arg_type: Type[CallbackType]
+    callback_arg_type: type[CallbackType]
 
     def __call__(self, *args: ParamType.args,
                  callback:Callable[[CallbackType], Any]=None,
@@ -197,10 +197,10 @@ class ConditioningData:
     Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
     images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
     """
-    extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
+    extra: InvokeAIDiffuserComponent.ExtraConditioningInfo | None = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
     """Additional arguments to pass to scheduler.step."""
-    threshold: Optional[ThresholdSettings] = None
+    threshold: ThresholdSettings | None = None
 
     @property
     def dtype(self):
@@ -228,7 +228,7 @@ class InvokeAIStableDiffusionPipelineOutput(StableDiffusionPipelineOutput):
         attention_map_saver (`AttentionMapSaver`): Object containing attention maps that can be displayed to the user
          after generation completes. Optional.
     """
-    attention_map_saver: Optional[AttentionMapSaver]
+    attention_map_saver: AttentionMapSaver | None
 
 
 class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
@@ -271,9 +271,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
-        safety_checker: Optional[StableDiffusionSafetyChecker],
-        feature_extractor: Optional[CLIPFeatureExtractor],
+        scheduler: DDIMScheduler | PNDMScheduler | LMSDiscreteScheduler,
+        safety_checker: StableDiffusionSafetyChecker | None,
+        feature_extractor: CLIPFeatureExtractor | None,
         requires_safety_checker: bool = False,
         precision: str = 'float32',
     ):
@@ -371,9 +371,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 *,
                                 noise: torch.Tensor,
                                 timesteps=None,
-                                additional_guidance: List[Callable] = None, run_id=None,
+                                additional_guidance: list[Callable] = None, run_id=None,
                                 callback: Callable[[PipelineIntermediateState], None] = None
-                                ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+                                ) -> tuple[torch.Tensor, AttentionMapSaver | None]:
         if timesteps is None:
             self.scheduler.set_timesteps(num_inference_steps, device=self.unet.device)
             timesteps = self.scheduler.timesteps
@@ -391,7 +391,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                          *,
                                          noise: torch.Tensor,
                                          run_id: str = None,
-                                         additional_guidance: List[Callable] = None):
+                                         additional_guidance: list[Callable] = None):
         self._adjust_memory_efficient_attention(latents)
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
@@ -410,7 +410,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                    dtype=timesteps.dtype, device=self.unet.device)
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
-            attention_map_saver: Optional[AttentionMapSaver] = None
+            attention_map_saver: AttentionMapSaver | None = None
 
             for i, t in enumerate(self.progress_bar(timesteps)):
                 batched_t.fill_(t)
@@ -437,7 +437,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def step(self, t: torch.Tensor, latents: torch.Tensor,
              conditioning_data: ConditioningData,
              step_index:int, total_step_count:int,
-             additional_guidance: List[Callable] = None):
+             additional_guidance: list[Callable] = None):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
 
@@ -470,7 +470,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         return step_output
 
-    def _unet_forward(self, latents, t, text_embeddings, cross_attention_kwargs: Optional[dict[str,Any]] = None):
+    def _unet_forward(self, latents, t, text_embeddings, cross_attention_kwargs: dict[str,Any] | None = None):
         """predict the noise residual"""
         if is_inpainting_model(self.unet) and latents.size(1) == 4:
             # Pad out normal non-inpainting inputs for an inpainting model.
@@ -489,7 +489,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                          cross_attention_kwargs=cross_attention_kwargs).sample
 
     def img2img_from_embeddings(self,
-                                init_image: Union[torch.FloatTensor, PIL.Image.Image],
+                                init_image: torch.FloatTensor | PIL.Image.Image,
                                 strength: float,
                                 num_inference_steps: int,
                                 conditioning_data: ConditioningData,
@@ -583,7 +583,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         latent_mask = tv_resize(mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR) \
             .to(device=device, dtype=latents_dtype)
 
-        guidance: List[Callable] = []
+        guidance: list[Callable] = []
 
         if is_inpainting_model(self.unet):
             # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
@@ -644,7 +644,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                                      attention_map_saver=screened_attention_map_saver)
 
     @torch.inference_mode()
-    def get_learned_conditioning(self, c: List[List[str]], *, return_tokens=True, fragment_weights=None):
+    def get_learned_conditioning(self, c: list[list[str]], *, return_tokens=True, fragment_weights=None):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
@@ -659,7 +659,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         return self.prompt_fragments_to_embeddings_converter
 
     @torch.inference_mode()
-    def _tokenize(self, prompt: Union[str, List[str]]):
+    def _tokenize(self, prompt: str | list[str]):
         return self.tokenizer(
             prompt,
             padding="max_length",

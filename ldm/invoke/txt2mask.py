@@ -37,7 +37,7 @@ from ldm.invoke.globals import global_cache_dir
 CLIPSEG_MODEL = 'CIDAS/clipseg-rd64-refined'
 CLIPSEG_SIZE = 352
 
-class SegmentedGrayscale(object):
+class SegmentedGrayscale:
     def __init__(self, image:Image, heatmap:torch.Tensor):
         self.heatmap = heatmap
         self.image = image
@@ -66,7 +66,7 @@ class SegmentedGrayscale(object):
         )
         return resized_image.crop((0,0,self.image.width,self.image.height))
 
-class Txt2Mask(object):
+class Txt2Mask:
     '''
     Create new Txt2Mask object. The optional device argument can be one of
     'cuda', 'mps' or 'cpu'.

@@ -25,7 +25,7 @@ class PngWriter:
         dirlist = sorted(os.listdir(self.outdir), reverse=True)
         # find the first filename that matches our pattern or return 000000.0.png
         existing_name = next(
-            (f for f in dirlist if re.match('^(\d+)\..*\.png', f)),
+            (f for f in dirlist if re.match(r'^(\d+)\..*\.png', f)),
             '0000000.0.png',
         )
         basecount = int(existing_name.split('.', 1)[0]) + 1

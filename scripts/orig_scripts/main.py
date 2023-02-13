@@ -279,10 +279,10 @@ class DataModuleFromConfig(pl.LightningDataModule):
             instantiate_from_config(data_cfg)
 
     def setup(self, stage=None):
-        self.datasets = dict(
-            (k, instantiate_from_config(self.dataset_configs[k]))
+        self.datasets = {
+            k: instantiate_from_config(self.dataset_configs[k])
             for k in self.dataset_configs
-        )
+        }
         if self.wrap:
             for k in self.datasets:
                 self.datasets[k] = WrappedDataset(self.datasets[k])
@@ -394,7 +394,7 @@ class SetupCallback(Callback):
             print(OmegaConf.to_yaml(self.config))
             OmegaConf.save(
                 self.config,
-                os.path.join(self.cfgdir, '{}-project.yaml'.format(self.now)),
+                os.path.join(self.cfgdir, f'{self.now}-project.yaml'),
             )
 
             print('Lightning config')
@@ -402,7 +402,7 @@ class SetupCallback(Callback):
             OmegaConf.save(
                 OmegaConf.create({'lightning': self.lightning_config}),
                 os.path.join(
-                    self.cfgdir, '{}-lightning.yaml'.format(self.now)
+                    self.cfgdir, f'{self.now}-lightning.yaml'
                 ),
             )
 
@@ -650,7 +650,7 @@ if __name__ == '__main__':
         )
     if opt.resume:
         if not os.path.exists(opt.resume):
-            raise ValueError('Cannot find {}'.format(opt.resume))
+            raise ValueError(f'Cannot find {opt.resume}')
         if os.path.isfile(opt.resume):
             paths = opt.resume.split('/')
             # idx = len(paths)-paths[::-1].index("logs")+1

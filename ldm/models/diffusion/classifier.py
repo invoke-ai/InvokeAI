@@ -87,7 +87,7 @@ class NoisyLatentImageClassifier(pl.LightningModule):
         for k in keys:
             for ik in ignore_keys:
                 if k.startswith(ik):
-                    print('Deleting key {} from state_dict.'.format(k))
+                    print(f'Deleting key {k} from state_dict.')
                     del sd[k]
         missing, unexpected = (
             self.load_state_dict(sd, strict=False)

@@ -654,5 +654,5 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
 class SwapCrossAttnProcessor(SlicedSwapCrossAttnProcesser):
 
     def __init__(self):
-        super(SwapCrossAttnProcessor, self).__init__(slice_size=int(1e9)) # massive slice size = don't slice
+        super().__init__(slice_size=int(1e9)) # massive slice size = don't slice
 

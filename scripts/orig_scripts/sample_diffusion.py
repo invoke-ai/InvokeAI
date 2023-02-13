@@ -249,7 +249,7 @@ if __name__ == "__main__":
     ckpt = None
 
     if not os.path.exists(opt.resume):
-        raise ValueError("Cannot find {}".format(opt.resume))
+        raise ValueError(f"Cannot find {opt.resume}")
     if os.path.isfile(opt.resume):
         # paths = opt.resume.split("/")
         try:

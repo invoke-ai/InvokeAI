@@ -45,7 +45,7 @@ VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
 }
 
 
-class ModelManager(object):
+class ModelManager:
     def __init__(
         self,
         config: OmegaConf,
@@ -541,7 +541,7 @@ class ModelManager(object):
 
         return pipeline, width, height, model_hash
 
-    def model_name_or_path(self, model_name: Union[str, DictConfig]) -> str | Path:
+    def model_name_or_path(self, model_name: str | DictConfig) -> str | Path:
         if isinstance(model_name, DictConfig) or isinstance(model_name, dict):
             mconfig = model_name
         elif model_name in self.config:
@@ -610,7 +610,7 @@ class ModelManager(object):
 
     def import_diffuser_model(
         self,
-        repo_or_path: Union[str, Path],
+        repo_or_path: str | Path,
         model_name: str = None,
         description: str = None,
         vae: dict = None,
@@ -646,9 +646,9 @@ class ModelManager(object):
 
     def import_ckpt_model(
         self,
-        weights: Union[str, Path],
-        config: Union[str, Path] = "configs/stable-diffusion/v1-inference.yaml",
-        vae: Union[str, Path] = None,
+        weights: str | Path,
+        config: str | Path = "configs/stable-diffusion/v1-inference.yaml",
+        vae: str | Path = None,
         model_name: str = None,
         model_description: str = None,
         commit_to_conf: Path = None,
@@ -813,7 +813,7 @@ class ModelManager(object):
 
     def _choose_diffusers_vae(
         self, model_name: str, vae: str = None
-    ) -> Union[dict, str]:
+    ) -> dict | str:
         # In the event that the original entry is using a custom ckpt VAE, we try to
         # map that VAE onto a diffuser VAE using a hard-coded dictionary.
         # I would prefer to do this differently: We load the ckpt model into memory, swap the
@@ -967,8 +967,8 @@ class ModelManager(object):
         print("** Migration is done. Continuing...")
 
     def _resolve_path(
-        self, source: Union[str, Path], dest_directory: str
-    ) -> Optional[Path]:
+        self, source: str | Path, dest_directory: str
+    ) -> Path | None:
         resolved_path = None
         if str(source).startswith(("http:", "https:", "ftp:")):
             basename = os.path.basename(source)
@@ -1043,8 +1043,8 @@ class ModelManager(object):
         return self.device.type == "cuda"
 
     def _diffuser_sha256(
-        self, name_or_path: Union[str, Path], chunksize=4096
-    ) -> Union[str, bytes]:
+        self, name_or_path: str | Path, chunksize=4096
+    ) -> str | bytes:
         path = None
         if isinstance(name_or_path, Path):
             path = name_or_path
@@ -1075,7 +1075,7 @@ class ModelManager(object):
             f.write(hash)
         return hash
 
-    def _cached_sha256(self, path, data) -> Union[str, bytes]:
+    def _cached_sha256(self, path, data) -> str | bytes:
         dirname = os.path.dirname(path)
         basename = os.path.basename(path)
         base, _ = os.path.splitext(basename)

@@ -74,7 +74,7 @@ class InvokeAIDiffuserComponent:
             # TODO resuscitate attention map saving
             #self.remove_attention_map_saving()
 
-    def override_cross_attention(self, conditioning: ExtraConditioningInfo, step_count: int) -> Dict[str, AttnProcessor]:
+    def override_cross_attention(self, conditioning: ExtraConditioningInfo, step_count: int) -> dict[str, AttnProcessor]:
         """
         setup cross attention .swap control. for diffusers this replaces the attention processor, so
         the previous attention processor is returned so that the caller can restore it later.
@@ -292,7 +292,7 @@ class InvokeAIDiffuserComponent:
         scale = 0.7  # default value from #395
 
         if self.debug_thresholding:
-            std, mean = [i.item() for i in torch.std_mean(latents)]
+            std, mean = (i.item() for i in torch.std_mean(latents))
             outside = torch.count_nonzero((latents < -current_threshold) | (latents > current_threshold))
             print(f"\nThreshold: 𝜎={sigma.item()} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
                   f"  | min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}\n"

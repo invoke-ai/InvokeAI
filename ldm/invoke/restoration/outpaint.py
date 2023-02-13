@@ -2,7 +2,7 @@ import warnings
 import math
 from PIL import Image, ImageFilter
 
-class Outpaint(object):
+class Outpaint:
     def __init__(self, image, generate):
         self.image     = image
         self.generate  = generate

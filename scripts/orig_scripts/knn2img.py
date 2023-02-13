@@ -58,7 +58,7 @@ def load_model_from_config(config, ckpt, verbose=False):
     return model
 
 
-class Searcher(object):
+class Searcher:
     def __init__(self, database, retriever_version='ViT-L/14'):
         assert database in DATABASES
         # self.database = self.load_database(database)
@@ -331,7 +331,7 @@ if __name__ == "__main__":
 
     else:
         print(f"reading prompts from {opt.from_file}")
-        with open(opt.from_file, "r") as f:
+        with open(opt.from_file) as f:
             data = f.read().splitlines()
             data = list(chunk(data, batch_size))
 

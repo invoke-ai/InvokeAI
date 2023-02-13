@@ -17,7 +17,7 @@ class LSUNBase(Dataset):
     ):
         self.data_paths = txt_file
         self.data_root = data_root
-        with open(self.data_paths, 'r') as f:
+        with open(self.data_paths) as f:
             self.image_paths = f.read().splitlines()
         self._length = len(self.image_paths)
         self.labels = {
@@ -40,7 +40,7 @@ class LSUNBase(Dataset):
         return self._length
 
     def __getitem__(self, i):
-        example = dict((k, self.labels[k][i]) for k in self.labels)
+        example = {k: self.labels[k][i] for k in self.labels}
         image = Image.open(example['file_path_'])
         if not image.mode == 'RGB':
             image = image.convert('RGB')

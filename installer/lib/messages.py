@@ -107,7 +107,7 @@ def dest_path(dest=None) -> Path:
         )
 
         console.line()
-        print(f"[orange3]Please select the destination directory for the installation:[/] \[{browse_start}]: ")
+        print(fr"[orange3]Please select the destination directory for the installation:[/] \[{browse_start}]: ")
         selected = prompt(
             f">>> ",
             complete_in_thread=True,
@@ -251,7 +251,7 @@ def windows_long_paths_registry() -> None:
     Display a message about applying the Windows long paths registry fix
     """
 
-    with open(str(Path(__file__).parent / "WinLongPathsEnabled.reg"), "r", encoding="utf-16le") as code:
+    with open(str(Path(__file__).parent / "WinLongPathsEnabled.reg"), encoding="utf-16le") as code:
         syntax = Syntax(code.read(), line_numbers=True)
 
     console.print(

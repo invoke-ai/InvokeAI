@@ -23,7 +23,7 @@ def swish(x):
 #  Define VQVAE classes
 class VectorQuantizer(nn.Module):
     def __init__(self, codebook_size, emb_dim, beta):
-        super(VectorQuantizer, self).__init__()
+        super().__init__()
         self.codebook_size = codebook_size  # number of embeddings
         self.emb_dim = emb_dim  # dimension of embedding
         self.beta = beta  # commitment cost used in loss term, beta * ||z_e(x)-sg[e]||^2
@@ -141,7 +141,7 @@ class Upsample(nn.Module):
 
 class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels=None):
-        super(ResBlock, self).__init__()
+        super().__init__()
         self.in_channels = in_channels
         self.out_channels = in_channels if out_channels is None else out_channels
         self.norm1 = normalize(in_channels)

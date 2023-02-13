@@ -28,7 +28,7 @@ from ldm.modules.image_degradation import (
 def synset2idx(path_to_yaml='data/index_synset.yaml'):
     with open(path_to_yaml) as f:
         di2s = yaml.load(f)
-    return dict((v, k) for k, v in di2s.items())
+    return {v: k for k, v in di2s.items()}
 
 
 class ImageNetBase(Dataset):
@@ -56,11 +56,9 @@ class ImageNetBase(Dataset):
         raise NotImplementedError()
 
     def _filter_relpaths(self, relpaths):
-        ignore = set(
-            [
+        ignore = {
                 'n06596364_9591.JPEG',
-            ]
-        )
+        }
         relpaths = [
             rpath for rpath in relpaths if not rpath.split('/')[-1] in ignore
         ]
@@ -102,7 +100,7 @@ class ImageNetBase(Dataset):
         )
         if not os.path.exists(self.human2integer):
             download(URL, self.human2integer)
-        with open(self.human2integer, 'r') as f:
+        with open(self.human2integer) as f:
             lines = f.read().splitlines()
             assert len(lines) == 1000
             self.human2integer_dict = dict()
@@ -111,7 +109,7 @@ class ImageNetBase(Dataset):
                 self.human2integer_dict[key] = int(value)
 
     def _load(self):
-        with open(self.txt_filelist, 'r') as f:
+        with open(self.txt_filelist) as f:
             self.relpaths = f.read().splitlines()
             l1 = len(self.relpaths)
             self.relpaths = self._filter_relpaths(self.relpaths)
@@ -125,15 +123,15 @@ class ImageNetBase(Dataset):
         self.abspaths = [os.path.join(self.datadir, p) for p in self.relpaths]
 
         unique_synsets = np.unique(self.synsets)
-        class_dict = dict(
-            (synset, i) for i, synset in enumerate(unique_synsets)
-        )
+        class_dict = {
+            synset: i for i, synset in enumerate(unique_synsets)
+        }
         if not self.keep_orig_class_label:
             self.class_labels = [class_dict[s] for s in self.synsets]
         else:
             self.class_labels = [self.synset2idx[s] for s in self.synsets]
 
-        with open(self.human_dict, 'r') as f:
+        with open(self.human_dict) as f:
             human_dict = f.read().splitlines()
             human_dict = dict(line.split(maxsplit=1) for line in human_dict)
 
@@ -191,7 +189,7 @@ class ImageNetTrain(ImageNetBase):
         )
         if not tdu.is_prepared(self.root):
             # prep
-            print('Preparing dataset {} in {}'.format(self.NAME, self.root))
+            print(f'Preparing dataset {self.NAME} in {self.root}')
 
             datadir = self.datadir
             if not os.path.exists(datadir):
@@ -205,7 +203,7 @@ class ImageNetTrain(ImageNetBase):
                     atpath = at.get(self.AT_HASH, datastore=self.root)
                     assert atpath == path
 
-                print('Extracting {} to {}'.format(path, datadir))
+                print(f'Extracting {path} to {datadir}')
                 os.makedirs(datadir, exist_ok=True)
                 with tarfile.open(path, 'r:') as tar:
                     tar.extractall(path=datadir)
@@ -263,7 +261,7 @@ class ImageNetValidation(ImageNetBase):
         )
         if not tdu.is_prepared(self.root):
             # prep
-            print('Preparing dataset {} in {}'.format(self.NAME, self.root))
+            print(f'Preparing dataset {self.NAME} in {self.root}')
 
             datadir = self.datadir
             if not os.path.exists(datadir):
@@ -277,7 +275,7 @@ class ImageNetValidation(ImageNetBase):
                     atpath = at.get(self.AT_HASH, datastore=self.root)
                     assert atpath == path
 
-                print('Extracting {} to {}'.format(path, datadir))
+                print(f'Extracting {path} to {datadir}')
                 os.makedirs(datadir, exist_ok=True)
                 with tarfile.open(path, 'r:') as tar:
                     tar.extractall(path=datadir)
@@ -289,7 +287,7 @@ class ImageNetValidation(ImageNetBase):
                 ):
                     download(self.VS_URL, vspath)
 
-                with open(vspath, 'r') as f:
+                with open(vspath) as f:
                     synset_dict = f.read().splitlines()
                     synset_dict = dict(line.split() for line in synset_dict)
 

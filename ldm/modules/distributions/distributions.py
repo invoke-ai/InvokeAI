@@ -21,7 +21,7 @@ class DiracDistribution(AbstractDistribution):
         return self.value
 
 
-class DiagonalGaussianDistribution(object):
+class DiagonalGaussianDistribution:
     def __init__(self, parameters, deterministic=False):
         self.parameters = parameters
         self.mean, self.logvar = torch.chunk(parameters, 2, dim=1)
@@ -90,10 +90,10 @@ def normal_kl(mean1, logvar1, mean2, logvar2):
 
     # Force variances to be Tensors. Broadcasting helps convert scalars to
     # Tensors, but it does not work for torch.exp().
-    logvar1, logvar2 = [
+    logvar1, logvar2 = (
         x if isinstance(x, torch.Tensor) else torch.tensor(x).to(tensor)
         for x in (logvar1, logvar2)
-    ]
+    )
 
     return 0.5 * (
         -1.0

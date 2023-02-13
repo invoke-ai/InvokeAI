@@ -17,7 +17,7 @@ from ldm.modules.diffusionmodules.util import (
     extract_into_tensor,
 )
 
-class Sampler(object):
+class Sampler:
     def __init__(self, model, schedule='linear', steps=None, device=None, **kwargs):
         self.model = model
         self.ddim_timesteps = None

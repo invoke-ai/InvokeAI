@@ -163,7 +163,7 @@ class CodeFormer(VQAutoEncoder):
                 codebook_size=1024, latent_size=256,
                 connect_list=['32', '64', '128', '256'],
                 fix_modules=['quantize','generator']):
-        super(CodeFormer, self).__init__(512, 64, [1, 2, 2, 4, 4, 8], 'nearest',2, [16], codebook_size)
+        super().__init__(512, 64, [1, 2, 2, 4, 4, 8], 'nearest',2, [16], codebook_size)
 
         if fix_modules is not None:
             for module in fix_modules:

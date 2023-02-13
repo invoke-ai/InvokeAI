@@ -145,7 +145,7 @@ class ArgFormatter(argparse.RawTextHelpFormatter):
             usage = ' '.join([s for s in [prog, action_usage] if s])
             # omit the long line wrapping code
         # prefix with 'usage:'
-        return '%s%s\n\n' % (prefix, usage)
+        return '{}{}\n\n'.format(prefix, usage)
 
 class PagingArgumentParser(argparse.ArgumentParser):
     '''
@@ -159,7 +159,7 @@ class PagingArgumentParser(argparse.ArgumentParser):
     def convert_arg_line_to_args(self, arg_line):
         return shlex.split(arg_line,comments=True)
 
-class Args(object):
+class Args:
     def __init__(self,arg_parser=None,cmd_parser=None):
         '''
         Initialize new Args class. It takes two optional arguments, an argparse
@@ -222,7 +222,7 @@ class Args(object):
                 prompt = ''
                 switches = cmd_string
             else:
-                match = re.match('^(.+?)\s(--?[a-zA-Z].+)',cmd_string)
+                match = re.match(r'^(.+?)\s(--?[a-zA-Z].+)',cmd_string)
                 if match:
                     prompt,switches = match.groups()
                 else:
@@ -1300,7 +1300,7 @@ def legacy_metadata_load(meta,pathname) -> Args:
         dream_prompt = meta['Dream']
         opt.parse_cmd(dream_prompt)
     else:               # if nothing else, we can get the seed
-        match = re.search('\d+\.(\d+)',pathname)
+        match = re.search(r'\d+\.(\d+)',pathname)
         if match:
             seed = match.groups()[0]
             opt.seed = seed

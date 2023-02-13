@@ -102,7 +102,7 @@ class DreamServer(BaseHTTPRequestHandler):
 
             log_file = os.path.join(self.outdir, "legacy_web_log.txt")
             if os.path.exists(log_file):
-                with open(log_file, "r") as log:
+                with open(log_file) as log:
                     for line in log:
                         url, config = line.split(": {", maxsplit=1)
                         config = json.loads("{" + config)
@@ -279,4 +279,4 @@ class DreamServer(BaseHTTPRequestHandler):
 
 class ThreadingDreamServer(ThreadingHTTPServer):
     def __init__(self, server_address):
-        super(ThreadingDreamServer, self).__init__(server_address, DreamServer)
+        super().__init__(server_address, DreamServer)

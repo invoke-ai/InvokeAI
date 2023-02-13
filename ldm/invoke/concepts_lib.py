@@ -12,7 +12,7 @@ from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
 
-class HuggingFaceConceptsLibrary(object):
+class HuggingFaceConceptsLibrary:
     def __init__(self, root=None):
         '''
         Initialize the Concepts object. May optionally pass a root directory.
@@ -24,8 +24,8 @@ class HuggingFaceConceptsLibrary(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
-        self.match_trigger = re.compile('(<[\w\- >]+>)') # trigger is slightly less restrictive than HF concept name
-        self.match_concept = re.compile('<([\w\-]+)>') # HF concept name can only contain A-Za-z0-9_-
+        self.match_trigger = re.compile(r'(<[\w\- >]+>)') # trigger is slightly less restrictive than HF concept name
+        self.match_concept = re.compile(r'<([\w\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self)->list:
         '''
@@ -79,7 +79,7 @@ class HuggingFaceConceptsLibrary(object):
         file = self.get_concept_file(concept_name, 'token_identifier.txt', local_only=True)
         if not file:
             return None
-        with open(file,'r') as f:
+        with open(file) as f:
             trigger = f.readline()
             trigger = trigger.strip()
         self.triggers[concept_name] = trigger
@@ -195,7 +195,7 @@ class HuggingFaceConceptsLibrary(object):
             print(f'ERROR: {str(e)}. This may reflect a network issue. Generation will continue without the concept.')
             os.rmdir(dest)
             return False
-        print('...{:.2f}Kb'.format(bytes/1024))
+        print(f'...{bytes/1024:.2f}Kb')
         return succeeded
 
     def _concept_id(self, concept_name:str)->str:

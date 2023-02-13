@@ -629,14 +629,14 @@ def split_weighted_subprompts(text, skip_normalize=False)->list:
     """
     prompt_parser = re.compile("""
             (?P<prompt>     # capture group for 'prompt'
-            (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
+            (?:\\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\\:'
             )               # end 'prompt'
             (?:             # non-capture group
             :+              # match one or more ':' characters
             (?P<weight>     # capture group for 'weight'
-            -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
+            -?\\d+(?:\\.\\d+)? # match positive or negative integer or decimal number
             )?              # end weight capture group, make optional
-            \s*             # strip spaces after weight
+            \\s*             # strip spaces after weight
             |               # OR
             $               # else, if no ':' then match end of line
             )               # end non-capture group

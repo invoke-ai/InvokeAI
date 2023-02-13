@@ -39,7 +39,7 @@ class ConfigsTestCase(unittest.TestCase):
         caution_img = Image.open(osp.join(assets_web.__path__[0], "caution.png"))
         assert caution_img.width == int(500)
         assert caution_img.height == int(441)
-        assert caution_img.format == str("PNG")
+        assert caution_img.format == "PNG"
 
 
 if __name__ == "__main__":
