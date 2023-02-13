@@ -463,7 +463,7 @@ def main():
                 "** You need to have at least two diffusers models defined in models.yaml in order to merge"
             )
         else:
-            print(f"** A layout error has occurred: {str(e)}")
+            print(f"** Not enough room for the user interface. Try making this window larger.")
         sys.exit(-1)
     except Exception as e:
         print(">> An error occurred:")
