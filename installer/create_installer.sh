@@ -36,6 +36,19 @@ fi
 
 # ----------------------
 
+echo Building the frontend
+
+cd ../invokeai/frontend
+
+yarn install --frozen-lockfile
+yarn build
+
+cd ../../installer
+
+# ----------------------
+
+# ----------------------
+
 echo Building the wheel
 
 # install the 'build' package in the user site packages, if needed
