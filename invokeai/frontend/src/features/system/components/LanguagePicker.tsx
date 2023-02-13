@@ -9,10 +9,10 @@ import { FaLanguage } from 'react-icons/fa';
 
 export default function LanguagePicker() {
   const { t, i18n } = useTranslation();
-
   const LANGUAGES = {
-    en: t('common:langEnglish'),
+    ar: t('common:langArabic'),
     nl: t('common:langDutch'),
+    en: t('common:langEnglish'),
     fr: t('common:langFrench'),
     de: t('common:langGerman'),
     it: t('common:langItalian'),
@@ -35,7 +35,6 @@ export default function LanguagePicker() {
           onClick={() => i18n.changeLanguage(lang)}
           className="modal-close-btn lang-select-btn"
           aria-label={LANGUAGES[lang as keyof typeof LANGUAGES]}
-          tooltip={LANGUAGES[lang as keyof typeof LANGUAGES]}
           size="sm"
           minWidth="200px"
         >
