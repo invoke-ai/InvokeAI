@@ -25,19 +25,20 @@ import torch
 import transformers
 from diffusers import AutoencoderKL
 from diffusers import logging as dlogging
-from diffusers.utils.logging import (get_verbosity, set_verbosity,
-                                     set_verbosity_error)
+from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
-from ldm.invoke.generator.diffusers_pipeline import \
-    StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import (Globals, global_autoscan_dir, global_cache_dir,
-                                global_models_dir)
-from ldm.util import (ask_user, download_with_progress_bar,
-                      instantiate_from_config)
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ldm.invoke.globals import (
+    Globals,
+    global_autoscan_dir,
+    global_cache_dir,
+    global_models_dir,
+)
+from ldm.util import ask_user, download_with_progress_bar, instantiate_from_config
 
 DEFAULT_MAX_MODELS = 2
 VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
@@ -374,8 +375,9 @@ class ModelManager(object):
             print(
                 f">> Converting legacy checkpoint {model_name} into a diffusers model..."
             )
-            from ldm.invoke.ckpt_to_diffuser import \
-                load_pipeline_from_original_stable_diffusion_ckpt
+            from ldm.invoke.ckpt_to_diffuser import (
+                load_pipeline_from_original_stable_diffusion_ckpt,
+            )
 
             if vae_config := self._choose_diffusers_vae(model_name):
                 vae = self._load_vae(vae_config)
@@ -495,8 +497,8 @@ class ModelManager(object):
             safety_checker=None, local_files_only=not Globals.internet_available
         )
         if "vae" in mconfig and mconfig["vae"] is not None:
-            vae = self._load_vae(mconfig["vae"])
-            pipeline_args.update(vae=vae)
+            if vae := self._load_vae(mconfig["vae"]):
+                pipeline_args.update(vae=vae)
         if not isinstance(name_or_path, Path):
             pipeline_args.update(cache_dir=global_cache_dir("diffusers"))
         if using_fp16:
@@ -551,7 +553,7 @@ class ModelManager(object):
                 f'"{model_name}" is not a known model name. Please check your models.yaml file'
             )
 
-        if "path" in mconfig:
+        if "path" in mconfig and mconfig["path"] is not None:
             path = Path(mconfig["path"])
             if not path.is_absolute():
                 path = Path(Globals.root, path).resolve()
@@ -762,7 +764,7 @@ class ModelManager(object):
         model_description = model_description or "Optimized version of {model_name}"
         print(f">> Optimizing {model_name} (30-60s)")
         try:
-            # By passing the specified VAE too the conversion function, the autoencoder
+            # By passing the specified VAE to the conversion function, the autoencoder
             # will be built into the model rather than tacked on afterward via the config file
             vae_model = self._load_vae(vae) if vae else None
             convert_ckpt_to_diffuser(
@@ -789,7 +791,9 @@ class ModelManager(object):
             print(">> Conversion succeeded")
         except Exception as e:
             print(f"** Conversion failed: {str(e)}")
-            print("** If you are trying to convert an inpainting or 2.X model, please indicate the correct config file (e.g. v1-inpainting-inference.yaml)")
+            print(
+                "** If you are trying to convert an inpainting or 2.X model, please indicate the correct config file (e.g. v1-inpainting-inference.yaml)"
+            )
 
         return new_config
 
@@ -1102,7 +1106,12 @@ class ModelManager(object):
 
     def _load_vae(self, vae_config) -> AutoencoderKL:
         vae_args = {}
-        name_or_path = self.model_name_or_path(vae_config)
+        try:
+            name_or_path = self.model_name_or_path(vae_config)
+        except Exception:
+            return None
+        if name_or_path is None:
+            return None
         using_fp16 = self.precision == "float16"
 
         vae_args.update(

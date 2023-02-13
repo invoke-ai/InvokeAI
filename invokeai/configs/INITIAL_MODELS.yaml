@@ -68,7 +68,7 @@ trinart-characters-2_0:
    width: 512
    height: 512
    recommended: False
-ft-mse-improved-autoencoder-840000:
+autoencoder-840000:
    description: StabilityAI improved autoencoder fine-tuned for human faces. Improves legacy .ckpt models (335 MB)
    repo_id: stabilityai/sd-vae-ft-mse-original
    format: ckpt

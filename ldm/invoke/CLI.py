@@ -820,6 +820,18 @@ def edit_model(model_name:str, gen, opt, completer):
         completer.set_line(info[attribute])
         info[attribute] = input(f'{attribute}: ') or info[attribute]
 
+    if info['format'] == 'diffusers':
+        vae = info.get('vae',dict(repo_id=None,path=None,subfolder=None))
+        completer.set_line(vae.get('repo_id') or 'stabilityai/sd-vae-ft-mse')
+        vae['repo_id'] = input('External VAE repo_id: ').strip() or None
+        if not vae['repo_id']:
+            completer.set_line(vae.get('path') or '')
+            vae['path']  = input('Path to a local diffusers VAE model (usually none): ').strip() or None
+        completer.set_line(vae.get('subfolder') or '')            
+        vae['subfolder'] = input('Name of subfolder containing the VAE model (usually none): ').strip() or None
+        info['vae'] = vae
+
+
     if new_name != model_name:
         manager.del_model(model_name)
 
