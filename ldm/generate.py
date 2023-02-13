@@ -223,7 +223,7 @@ class Generate:
         self.model_name  = model or fallback
 
         # for VRAM usage statistics
-        self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
+        self.session_peakmem = torch.cuda.max_memory_allocated(self.device) if self._has_cuda else None
         transformers.logging.set_verbosity_error()
 
         # gets rid of annoying messages about random seed
@@ -321,6 +321,7 @@ class Generate:
             codeformer_fidelity = None,
             save_original    = False,
             upscale          = None,
+            upscale_denoise_str = 0.75,
             # this is specific to inpainting and causes more extreme inpainting
             inpaint_replace  = 0.0,
             # This controls the size at which inpaint occurs (scaled up for inpaint, then back down for the result)
@@ -560,6 +561,7 @@ class Generate:
             if upscale is not None or facetool_strength > 0:
                 self.upscale_and_reconstruct(results,
                                              upscale        = upscale,
+                                             upscale_denoise_str = upscale_denoise_str,
                                              facetool       = facetool,
                                              strength       = facetool_strength,
                                              codeformer_fidelity = codeformer_fidelity,
@@ -590,20 +592,24 @@ class Generate:
         self.print_cuda_stats()
         return results
 
-    def clear_cuda_cache(self):
+    def gather_cuda_stats(self):
         if self._has_cuda():
             self.max_memory_allocated = max(
                 self.max_memory_allocated,
-                torch.cuda.max_memory_allocated()
+                torch.cuda.max_memory_allocated(self.device)
             )
             self.memory_allocated = max(
                 self.memory_allocated,
-                torch.cuda.memory_allocated()
+                torch.cuda.memory_allocated(self.device)
             )
             self.session_peakmem = max(
                 self.session_peakmem,
-                torch.cuda.max_memory_allocated()
+                torch.cuda.max_memory_allocated(self.device)
             )
+
+    def clear_cuda_cache(self):
+        if self._has_cuda():
+            self.gather_cuda_stats()
             torch.cuda.empty_cache()
 
     def clear_cuda_stats(self):
@@ -612,6 +618,7 @@ class Generate:
 
     def print_cuda_stats(self):
         if self._has_cuda():
+            self.gather_cuda_stats()
             print(
                 '>>   Max VRAM used for this generation:',
                 '%4.2fG.' % (self.max_memory_allocated / 1e9),
@@ -633,6 +640,7 @@ class Generate:
             facetool_strength   = 0.0,
             codeformer_fidelity = 0.75,
             upscale             = None,
+            upscale_denoise_str = 0.75,
             out_direction       = None,
             outcrop             = [],
             save_original       = True, # to get new name
@@ -684,6 +692,7 @@ class Generate:
                 codeformer_fidelity = codeformer_fidelity,
                 save_original = save_original,
                 upscale = upscale,
+                upscale_denoise_str = upscale_denoise_str,
                 image_callback = callback,
                 prefix = prefix,
             )
@@ -952,6 +961,7 @@ class Generate:
                                 image_list,
                                 facetool      = 'gfpgan',
                                 upscale       = None,
+                                upscale_denoise_str = 0.75,
                                 strength      =  0.0,
                                 codeformer_fidelity = 0.75,
                                 save_original = False,
@@ -982,7 +992,7 @@ class Generate:
                         if len(upscale) < 2:
                             upscale.append(0.75)
                         image = self.esrgan.process(
-                            image, upscale[1], seed, int(upscale[0]))
+                            image, upscale[1], seed, int(upscale[0]), denoise_str=upscale_denoise_str)
                     else:
                         print(">> ESRGAN is disabled. Image not upscaled.")
             except Exception as e:

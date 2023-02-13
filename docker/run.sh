@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -e
 
-# How to use: https://invoke-ai.github.io/InvokeAI/installation/INSTALL_DOCKER/#run-the-container
-# IMPORTANT: You need to have a token on huggingface.co to be able to download the checkpoints!!!
+# How to use: https://invoke-ai.github.io/InvokeAI/installation/040_INSTALL_DOCKER/
 
-SCRIPTDIR=$(dirname "$0")
+SCRIPTDIR=$(dirname "${BASH_SOURCE[0]}")
 cd "$SCRIPTDIR" || exit 1
 
 source ./env.sh
+
+# Create outputs directory if it does not exist
+[[ -d ./outputs ]] || mkdir ./outputs
 
 echo -e "You are using these values:\n"
 echo -e "Volumename:\t${VOLUMENAME}"
@@ -22,10 +24,18 @@ docker run \
   --name="${REPOSITORY_NAME,,}" \
   --hostname="${REPOSITORY_NAME,,}" \
   --mount=source="${VOLUMENAME}",target=/data \
-  ${MODELSPATH:+-u "$(id -u):$(id -g)"} \
+  --mount type=bind,source="$(pwd)"/outputs,target=/data/outputs \
   ${MODELSPATH:+--mount="type=bind,source=${MODELSPATH},target=/data/models"} \
   ${HUGGING_FACE_HUB_TOKEN:+--env="HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}"} \
   --publish=9090:9090 \
   --cap-add=sys_nice \
   ${GPU_FLAGS:+--gpus="${GPU_FLAGS}"} \
-  "${CONTAINER_IMAGE}" ${1:+$@}
+  "${CONTAINER_IMAGE}" ${@:+$@}
+
+# Remove Trash folder
+for f in outputs/.Trash*; do
+  if [ -e "$f" ]; then
+    rm -Rf "$f"
+    break
+  fi
+done
