@@ -80,10 +80,12 @@ only `.safetensors` and `.ckpt` models, but they can be easily loaded
 into InvokeAI and/or converted into optimized `diffusers` models. Be
 aware that CIVITAI hosts many models that generate NSFW content.
 
-**Note** that InvokeAI 2.3.x does not support directly importing and
-running Stable Diffusion version 2 checkpoint models. You may instead
-convert them into `diffusers` models using the conversion methods
-described below.
+!!! note
+
+    InvokeAI 2.3.x does not support directly importing and
+    running Stable Diffusion version 2 checkpoint models. You may instead
+    convert them into `diffusers` models using the conversion methods
+    described below.
 
 ## Installation
 
@@ -161,10 +163,11 @@ the default model on startup. You can change this later using
 You may also point `!import_model` to a directory containing a set of
 `.ckpt` or `.safetensors` files. They will be imported _en masse_.
 
-Example:
-```console
-invoke> !import_model C:/Users/fred/Downloads/civitai_models/
-```
+!!! example
+
+    ```console
+    invoke> !import_model C:/Users/fred/Downloads/civitai_models/
+    ```
 
 You will be given the option to import all models found in the
 directory, or select which ones to import. If there are subfolders
@@ -313,14 +316,18 @@ up a dialogue that lists the models you have already installed, and
 allows you to load, delete or edit them:
 
 <figure markdown>
+
 ![model-manager](../assets/installing-models/webui-models-1.png)
+
 </figure>
 
 To add a new model, click on **+ Add New** and select to either a
 checkpoint/safetensors model, or a diffusers model:
 
 <figure markdown>
+
 ![model-manager-add-new](../assets/installing-models/webui-models-2.png)
+
 </figure>
 
 In this example, we chose **Add Diffusers**. As shown in the figure
@@ -331,7 +338,9 @@ choose to enter a path to disk, the system will autocomplete for you
 as you type:
 
 <figure markdown>
+
 ![model-manager-add-diffusers](../assets/installing-models/webui-models-3.png)
+
 </figure>
 
 Press **Add Model** at the bottom of the dialogue (scrolled out of
@@ -346,7 +355,9 @@ directory and press the "Search" icon. This will display the
 subfolders, and allow you to choose which ones to import:
 
 <figure markdown>
+
 ![model-manager-add-checkpoint](../assets/installing-models/webui-models-4.png)
+
 </figure>
 
 ## Model Management Startup Options
@@ -371,9 +382,8 @@ invoke.sh --autoconvert /home/fred/stable-diffusion-checkpoints
 
 And here is what the same argument looks like in `invokeai.init`:
 
-```
+```bash
 --outdir="/home/fred/invokeai/outputs
 --no-nsfw_checker
 --autoconvert /home/fred/stable-diffusion-checkpoints
 ```
-
