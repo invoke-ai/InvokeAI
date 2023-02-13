@@ -712,11 +712,11 @@ class ModelManager(object):
             global_models_dir(), Globals.converted_ckpts_dir
         )
 
-        print(">> Checking for unconverted .ckpt files in {weights_directory}")
+        print(f">> Checking for unconverted .ckpt/.safetensors files in {weights_directory}")
         ckpt_files = dict()
         for root, dirs, files in os.walk(weights_directory):
             for f in files:
-                if not f.endswith(".ckpt"):
+                if not f.endswith((".ckpt",".safetensors")):
                     continue
                 basename = Path(f).stem
                 dest = Path(dest_directory, basename)
@@ -727,7 +727,7 @@ class ModelManager(object):
             return
 
         print(
-            f">> New .ckpt file(s) found in {weights_directory}. Optimizing and importing..."
+            f">> New checkpoint file(s) found in {weights_directory}. Optimizing and importing..."
         )
         for ckpt in ckpt_files:
             self.convert_and_import(ckpt, ckpt_files[ckpt])
