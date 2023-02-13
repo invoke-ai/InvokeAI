@@ -751,6 +751,9 @@ class Args(object):
                 !fix applies upscaling/facefixing to a previously-generated image.
                 invoke> !fix 0000045.4829112.png -G1 -U4 -ft codeformer
 
+            *embeddings*
+                invoke> !triggers     -- return all trigger phrases contained in loaded embedding files
+
             *History manipulation*
             !fetch retrieves the command used to generate an earlier image. Provide
             a directory wildcard and the name of a file to write and all the commands
