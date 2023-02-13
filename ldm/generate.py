@@ -223,7 +223,7 @@ class Generate:
         self.model_name  = model or fallback
 
         # for VRAM usage statistics
-        self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
+        self.session_peakmem = torch.cuda.max_memory_allocated(self.device) if self._has_cuda else None
         transformers.logging.set_verbosity_error()
 
         # gets rid of annoying messages about random seed
@@ -592,20 +592,24 @@ class Generate:
         self.print_cuda_stats()
         return results
 
-    def clear_cuda_cache(self):
+    def gather_cuda_stats(self):
         if self._has_cuda():
             self.max_memory_allocated = max(
                 self.max_memory_allocated,
-                torch.cuda.max_memory_allocated()
+                torch.cuda.max_memory_allocated(self.device)
             )
             self.memory_allocated = max(
                 self.memory_allocated,
-                torch.cuda.memory_allocated()
+                torch.cuda.memory_allocated(self.device)
             )
             self.session_peakmem = max(
                 self.session_peakmem,
-                torch.cuda.max_memory_allocated()
+                torch.cuda.max_memory_allocated(self.device)
             )
+
+    def clear_cuda_cache(self):
+        if self._has_cuda():
+            self.gather_cuda_stats()
             torch.cuda.empty_cache()
 
     def clear_cuda_stats(self):
@@ -614,6 +618,7 @@ class Generate:
 
     def print_cuda_stats(self):
         if self._has_cuda():
+            self.gather_cuda_stats()
             print(
                 '>>   Max VRAM used for this generation:',
                 '%4.2fG.' % (self.max_memory_allocated / 1e9),
