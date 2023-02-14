@@ -7,6 +7,7 @@
 # Coauthor: Kevin Turner http://github.com/keturn
 #
 import argparse
+import curses
 import os
 import re
 import shutil
@@ -22,6 +23,7 @@ import npyscreen
 import requests
 from diffusers import AutoencoderKL
 from huggingface_hub import hf_hub_url
+from npyscreen import widget
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
@@ -30,6 +32,7 @@ import invokeai.configs as configs
 from ldm.invoke.devices import choose_precision, choose_torch_device
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import Globals, global_cache_dir, global_config_dir
+from ldm.invoke.config.widgets import MultiSelectColumns
 
 warnings.filterwarnings("ignore")
 import torch
@@ -84,37 +87,52 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         self.starter_model_list = [
             x for x in list(self.initial_models.keys()) if x not in self.existing_models
         ]
+        self.installed_models=dict()
         super().__init__(parentApp, name)
 
     def create(self):
-        starter_model_labels = [
-            "%-30s %-50s" % (x, self.initial_models[x].description)
-            for x in self.starter_model_list
-        ]
+        window_height, window_width = curses.initscr().getmaxyx()
+        starter_model_labels = self._get_starter_model_labels()
         recommended_models = [
             x
             for x in self.starter_model_list
             if self.initial_models[x].get("recommended", False)
         ]
-        previously_installed_models = [
-            x for x in list(self.initial_models.keys()) if x in self.existing_models
-        ]
+        previously_installed_models = sorted(
+            [
+                x for x in list(self.initial_models.keys()) if x in self.existing_models
+            ]
+        )
+        
+        if len(previously_installed_models) > 0:
+            title = self.add_widget_intelligent(
+                npyscreen.TitleText,
+                name="Currently installed starter models. Uncheck to delete:",
+                editable=False,
+                color="CONTROL",
+            )
+            self.nextrely -= 1
+            columns = 3
+            self.previously_installed_models = self.add_widget_intelligent(
+                MultiSelectColumns,
+                columns=columns,
+                values=previously_installed_models,
+                value=[x for x in range(0,len(previously_installed_models))],
+                max_height=len(previously_installed_models)+1 // columns,
+                slow_scroll=True,
+                scroll_exit = True,
+            )
         self.add_widget_intelligent(
             npyscreen.TitleText,
-            name="This is a starter set of Stable Diffusion models from HuggingFace",
+            name="Select from a starter set of Stable Diffusion models from HuggingFace:",
             editable=False,
             color="CONTROL",
         )
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Select models to install:",
-            editable=False,
-            color="LABELBOLD",
-        )
+        self.nextrely -= 2
         self.add_widget_intelligent(npyscreen.FixedText, value="", editable=False),
         self.models_selected = self.add_widget_intelligent(
             npyscreen.MultiSelect,
-            name="Install/Remove Models",
+            name="Install Starter Models",
             values=starter_model_labels,
             value=[
                 self.starter_model_list.index(x)
@@ -124,72 +142,80 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             max_height=len(starter_model_labels) + 1,
             scroll_exit=True,
         )
-        if len(previously_installed_models) > 0:
-            title = self.add_widget_intelligent(
-                npyscreen.TitleText,
-                name=f"These starter models are already installed. Use the command-line or Web UIs to manage them:",
-                editable=False,
-                color="CONTROL",
-            )
-            y_origin = title.rely+1
-
-            # use three columns
-            col_cnt = 3
-            col_width = max([len(x) for x in previously_installed_models])+2
-            rows = ceil(len(previously_installed_models)/col_cnt)
-            previously_installed_models = sorted(previously_installed_models)
-            
-            for i in range(0,len(previously_installed_models)):
-                m = previously_installed_models[i]
-                row = i % rows
-                col = i // rows
-                self.add_widget_intelligent(
-                    npyscreen.FixedText,
-                    value=m,
-                    editable=False,
-                    relx=col_cnt+col*col_width,
-                    rely=y_origin+row
-                )
-            self.nextrely += rows
-            self.autoload_directory = self.add_widget_intelligent(
-                npyscreen.TitleFilename,
-                name='Import all .ckpt/.safetensors files from this directory (<tab> to autocomplete):',
-                select_dir=True,
-                must_exist=True,
-                use_two_lines=False,
-                begin_entry_at=81,
-                value=os.path.expanduser('~'+'/'),
-                scroll_exit=True,
-            )
-            self.autoload_onstartup = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name='Scan this directory each time InvokeAI starts for new models to import.',
-                value=False,
-                scroll_exit=True,
-            )
-            self.nextrely += 1
+        for line in [
+                'Import checkpoint/safetensor models from the directory below.',
+                '(Use <tab> to autocomplete)'
+        ]:
             self.add_widget_intelligent(
                 npyscreen.TitleText,
-                name='In the space below, you may cut and paste URLs, paths to .ckpt/.safetensor files, or HuggingFace diffusers repository names to import:',
+                name=line,
                 editable=False,
                 color="CONTROL",
             )
-            self.model_names = self.add_widget_intelligent(
-                npyscreen.MultiLineEdit,
-                max_width=75,
-                max_height=16,
-                scroll_exit=True,
-                relx=18
+            self.nextrely -= 1
+        self.autoload_directory = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name='Directory:',
+            select_dir=True,
+            must_exist=True,
+            use_two_lines=False,
+            value=os.path.expanduser('~'+'/'),
+            scroll_exit=True,
+        )
+        self.autoload_onstartup = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='Scan this directory each time InvokeAI starts for new models to import.',
+            value=False,
+            scroll_exit=True,
+        )
+        self.nextrely += 1
+        for line in [
+                'In the space below, you may cut and paste URLs, paths to .ckpt/.safetensor files',
+                'or HuggingFace diffusers repository names to import.',
+                '(Use control-V or shift-control-V to paste):'
+        ]:
+            self.add_widget_intelligent(
+                npyscreen.TitleText,
+                name=line,
+                editable=False,
+                color="CONTROL",
             )
-            self.autoload_onstartup = self.add_widget_intelligent(
-                npyscreen.TitleSelectOne,
-                name='Keep files in original format, or convert .ckpt/.safetensors into fast-loading diffusers models:',
-                values=['Original format','Convert to diffusers format'],
-                value=0,
-                scroll_exit=True,
-            )
+            self.nextrely -= 1
+        self.model_names = self.add_widget_intelligent(
+            npyscreen.MultiLineEdit,
+            max_width=75,
+            max_height=8,
+            scroll_exit=True,
+            relx=3
+        )
+        self.autoload_onstartup = self.add_widget_intelligent(
+            npyscreen.TitleSelectOne,
+            name='Keep files in original format, or convert .ckpt/.safetensors into fast-loading diffusers models:',
+            values=['Original format','Convert to diffusers format'],
+            value=0,
+            scroll_exit=True,
+        )
+        self.find_next_editable()
+#        self.set_editing(self.models_selected)
+#        self.display()
+#        self.models_selected.editing=True
+#        self.models_selected.edit()
         
-        self.models_selected.editing = True
+    def _get_starter_model_labels(self):
+        window_height, window_width = curses.initscr().getmaxyx()
+        label_width = 25
+        checkbox_width = 4
+        spacing_width = 2
+        description_width = window_width - label_width - checkbox_width - spacing_width
+        im = self.initial_models
+        names = list(im.keys())
+        descriptions = [im[x].description [0:description_width-3]+'...'
+                        if len(im[x].description) > description_width
+                        else im[x].description
+                        for x in im]
+        return [
+            f"%-{label_width}s %s" % (names[x], descriptions[x]) for x in range(0,len(im))
+        ]
 
     def on_ok(self):
         self.parentApp.setNextForm(None)
@@ -607,12 +633,23 @@ def main():
 
     try:
         select_and_download_models(opt)
+    except AssertionError as e:
+        print(str(e))
+        sys.exit(-1)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
-    except Exception as e:
-        print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
-        print(traceback.format_exc())
-
+    except (widget.NotEnoughSpaceForWidget, Exception) as e:
+        if str(e).startswith("Height of 1 allocated"):
+            print(
+                "** Insufficient vertical space for the interface. Please make your window taller and try again"
+            )
+        elif str(e).startswith('addwstr'):
+            print(
+                '** Insufficient horizontal space for the interface. Please make your window wider and try again.'
+            )
+        else:
+            print(f"** A layout error has occurred: {str(e)}")
+        sys.exit(-1)
 
 # -------------------------------------
 if __name__ == "__main__":
