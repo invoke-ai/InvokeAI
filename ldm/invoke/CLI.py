@@ -1,29 +1,31 @@
-import click
 import os
 import re
-import sys
 import shlex
+import sys
 import traceback
-
 from argparse import Namespace
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import List, Optional, Union
+
+import click
 
 if sys.platform == "darwin":
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
-from ldm.invoke.globals import Globals
+import pyparsing  # type: ignore
+
+import ldm.invoke
 from ldm.generate import Generate
-from ldm.invoke.prompt_parser import PromptParser
-from ldm.invoke.readline import get_completer, Completer
-from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
-from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
+from ldm.invoke.args import (Args, dream_cmd_from_png, metadata_dumps,
+                             metadata_from_png)
+from ldm.invoke.globals import Globals
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from ldm.invoke.model_manager import ModelManager
-
-import ldm.invoke
-import pyparsing  # type: ignore
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
+from ldm.invoke.prompt_parser import PromptParser
+from ldm.invoke.readline import Completer, get_completer
+from ldm.util import url_attachment_name
 
 # global used in multiple functions (fix)
 infile = None
@@ -66,11 +68,11 @@ def main():
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
-    from ldm.generate import Generate
-
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
     import transformers  # type: ignore
+
+    from ldm.generate import Generate
     transformers.logging.set_verbosity_error()
     import diffusers
     diffusers.logging.set_verbosity_error()
@@ -574,10 +576,12 @@ def set_default_output_dir(opt:Args, completer:Completer):
 
 
 def import_model(model_path: str, gen, opt, completer):
-    '''
-    model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path; or
-    (3) a huggingface repository id
-    '''
+    """
+    model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path;
+    (3) a huggingface repository id; or (4) a local directory containing a
+    diffusers model.
+    """
+    model.path = model_path.replace('\\','/') # windows
     model_name = None
 
     if model_path.startswith(('http:','https:','ftp:')):
@@ -653,7 +657,10 @@ def import_checkpoint_list(models: List[Path], gen, opt, completer)->List[str]:
                 print()
     return model_names
 
-def import_diffuser_model(path_or_repo: Union[Path, str], gen, _, completer) -> Optional[str]:
+def import_diffuser_model(
+    path_or_repo: Union[Path, str], gen, _, completer
+) -> Optional[str]:
+    path_or_repo = path_or_repo.replace('\\','/') # windows
     manager = gen.model_manager
     default_name = Path(path_or_repo).stem
     default_description = f'Imported model {default_name}'
@@ -676,17 +683,16 @@ def import_diffuser_model(path_or_repo: Union[Path, str], gen, _, completer) -> 
         return None
     return model_name
 
-def import_ckpt_model(path_or_url: Union[Path, str], gen, opt, completer) -> Optional[str]:
+def import_ckpt_model(
+    path_or_url: Union[Path, str], gen, opt, completer
+) -> Optional[str]:
+    path_or_url = path_or_url.replace('\\','/')
     manager = gen.model_manager
-
-    if not (config_file := _ask_for_config_file(path_or_url, completer)):
-        return
-    if config_file.stem == 'v2-inference-v':
-        print('** InvokeAI cannot run SD 2.X checkpoints directly. Model will be converted into diffusers format')
-        return optimize_model(path_or_url, gen, opt, completer, config_file)
+    is_a_url = str(path_or_url).startswith(('http:','https:'))
+    base_name = Path(url_attachment_name(path_or_url)).name if is_a_url else Path(path_or_url).name
+    default_name = Path(base_name).stem
+    default_description = f"Imported model {default_name}"
     
-    default_name = Path(path_or_url).stem
-    default_description = f'Imported model {default_name}'
     model_name, model_description = _get_model_name_and_desc(
         manager,
         completer,
@@ -776,7 +782,8 @@ def _ask_for_config_file(model_path: Union[str,Path], completer, plural: bool=Fa
     return config_path
 
 
-def optimize_model(model_name_or_path:str, gen, opt, completer, original_config_file: Path=None):
+def optimize_model(model_name_or_path: Union[Path,str], gen, opt, completer):
+    model_name_or_path = model_name_or_path.replace('\\','/') # windows
     manager = gen.model_manager
     ckpt_path = None
 
@@ -1067,6 +1074,7 @@ def get_next_command(infile=None, model_name='no model') -> str:  # command stri
 def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print('\n* --web was specified, starting web server...')
     from invokeai.backend import InvokeAIWebServer
+
     # Change working directory to the stable-diffusion directory
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
