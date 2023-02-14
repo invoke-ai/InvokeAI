@@ -322,25 +322,19 @@ class InvokeAIDiffuserComponent:
 
         num_altered = 0
 
-        # fix for MPS?
-        # def mps_rand_like(latents: torch.Tensor):
-        #     return torch.rand_like(latents, device='cpu').to(latents.device)
-        # rand_like = mps_rand_like if latents.device.type == 'mps' else torch.rand_like
-
-        from ldm.generate import fix_func
-        rand_like = fix_func(torch.rand_like)
+        # MPS torch.rand_like is fine because torch.rand_like is wrapped in generate.py!
 
         if maxval > current_threshold:
             latents = torch.clone(latents)
             maxval = np.clip(maxval * scale, 1, current_threshold)
             num_altered += torch.count_nonzero(latents > maxval)
-            latents[latents > maxval] = rand_like(latents[latents > maxval]) * maxval
+            latents[latents > maxval] = torch.rand_like(latents[latents > maxval]) * maxval
 
         if minval < -current_threshold:
             latents = torch.clone(latents)
             minval = np.clip(minval * scale, -current_threshold, -1)
             num_altered += torch.count_nonzero(latents < minval)
-            latents[latents < minval] = rand_like(latents[latents < minval]) * minval
+            latents[latents < minval] = torch.rand_like(latents[latents < minval]) * minval
 
         if self.debug_thresholding:
             print(f"  | min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})\n"
