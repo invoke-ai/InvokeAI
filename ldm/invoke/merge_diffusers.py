@@ -180,10 +180,8 @@ class FloatSlider(npyscreen.Slider):
         stri = stri.rjust(l)
         return stri
 
-
 class FloatTitleSlider(npyscreen.TitleText):
     _entry_type = FloatSlider
-
 
 class mergeModelsForm(npyscreen.FormMultiPageAction):
     interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid", "add_difference"]

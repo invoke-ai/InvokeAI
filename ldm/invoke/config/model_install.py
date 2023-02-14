@@ -14,6 +14,7 @@ import sys
 import traceback
 import warnings
 from argparse import Namespace
+from math import ceil
 from pathlib import Path
 from tempfile import TemporaryFile
 
@@ -29,7 +30,6 @@ import invokeai.configs as configs
 from ldm.invoke.devices import choose_precision, choose_torch_device
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import Globals, global_cache_dir, global_config_dir
-from ldm.invoke.readline import generic_completer
 
 warnings.filterwarnings("ignore")
 import torch
@@ -45,7 +45,6 @@ Default_config_file = Path(global_config_dir()) / "models.yaml"
 SD_Configs = Path(global_config_dir()) / "stable-diffusion"
 
 Datasets = OmegaConf.load(Dataset_path)
-completer = generic_completer(["yes", "no"])
 
 Config_preamble = """# This file describes the alternative machine learning models
 # available to InvokeAI script.
@@ -56,6 +55,14 @@ Config_preamble = """# This file describes the alternative machine learning mode
 # was trained on.
 """
 
+# -------------------------------------
+def yes_or_no(prompt: str, default_yes=True):
+    default = "y" if default_yes else "n"
+    response = input(f"{prompt} [{default}] ") or default
+    if default_yes:
+        return response[0] not in ("n", "N")
+    else:
+        return response[0] in ("y", "Y")
 
 # -------------------------------------
 def get_root(root: str = None) -> str:
@@ -67,7 +74,7 @@ def get_root(root: str = None) -> str:
         return Globals.root
 
 
-class addRemoveModelsForm(npyscreen.FormMultiPageAction):
+class addModelsForm(npyscreen.FormMultiPageAction):
     def __init__(self, parentApp, name):
         self.initial_models = OmegaConf.load(Dataset_path)
         try:
@@ -118,19 +125,70 @@ class addRemoveModelsForm(npyscreen.FormMultiPageAction):
             scroll_exit=True,
         )
         if len(previously_installed_models) > 0:
-            self.add_widget_intelligent(
+            title = self.add_widget_intelligent(
                 npyscreen.TitleText,
-                name="These starter models are already installed. Use the command-line or Web UIs to manage them:",
+                name=f"These starter models are already installed. Use the command-line or Web UIs to manage them:",
                 editable=False,
                 color="CONTROL",
             )
-            for m in previously_installed_models:
+            y_origin = title.rely+1
+
+            # use three columns
+            col_cnt = 3
+            col_width = max([len(x) for x in previously_installed_models])+2
+            rows = ceil(len(previously_installed_models)/col_cnt)
+            previously_installed_models = sorted(previously_installed_models)
+            
+            for i in range(0,len(previously_installed_models)):
+                m = previously_installed_models[i]
+                row = i % rows
+                col = i // rows
                 self.add_widget_intelligent(
                     npyscreen.FixedText,
                     value=m,
                     editable=False,
-                    relx=10,
+                    relx=col_cnt+col*col_width,
+                    rely=y_origin+row
                 )
+            self.nextrely += rows
+            self.autoload_directory = self.add_widget_intelligent(
+                npyscreen.TitleFilename,
+                name='Import all .ckpt/.safetensors files from this directory (<tab> to autocomplete):',
+                select_dir=True,
+                must_exist=True,
+                use_two_lines=False,
+                begin_entry_at=81,
+                value=os.path.expanduser('~'+'/'),
+                scroll_exit=True,
+            )
+            self.autoload_onstartup = self.add_widget_intelligent(
+                npyscreen.Checkbox,
+                name='Scan this directory each time InvokeAI starts for new models to import.',
+                value=False,
+                scroll_exit=True,
+            )
+            self.nextrely += 1
+            self.add_widget_intelligent(
+                npyscreen.TitleText,
+                name='In the space below, you may cut and paste URLs, paths to .ckpt/.safetensor files, or HuggingFace diffusers repository names to import:',
+                editable=False,
+                color="CONTROL",
+            )
+            self.model_names = self.add_widget_intelligent(
+                npyscreen.MultiLineEdit,
+                max_width=75,
+                max_height=16,
+                scroll_exit=True,
+                relx=18
+            )
+            self.autoload_onstartup = self.add_widget_intelligent(
+                npyscreen.TitleSelectOne,
+                name='Keep files in original format, or convert .ckpt/.safetensors into fast-loading diffusers models:',
+                values=['Original format','Convert to diffusers format'],
+                value=0,
+                scroll_exit=True,
+            )
+        
         self.models_selected.editing = True
 
     def on_ok(self):
@@ -146,8 +204,7 @@ class addRemoveModelsForm(npyscreen.FormMultiPageAction):
         self.parentApp.selected_models = None
         self.editing = False
 
-
-class AddRemoveModelApplication(npyscreen.NPSAppManaged):
+class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self, saved_args=None):
         super().__init__()
         self.models_to_install = None
@@ -156,21 +213,9 @@ class AddRemoveModelApplication(npyscreen.NPSAppManaged):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main = self.addForm(
             "MAIN",
-            addRemoveModelsForm,
+            addModelsForm,
             name="Add/Remove Models",
         )
-
-
-# ---------------------------------------------
-def yes_or_no(prompt: str, default_yes=True):
-    completer.set_options(["yes", "no"])
-    completer.complete_extensions(None)  # turn off path-completion mode
-    default = "y" if default_yes else "n"
-    response = input(f"{prompt} [{default}] ") or default
-    if default_yes:
-        return response[0] not in ("n", "N")
-    else:
-        return response[0] in ("y", "Y")
 
 
 # ---------------------------------------------
@@ -486,7 +531,7 @@ def select_and_download_models(opt: Namespace):
     if opt.default_only:
         models_to_download = default_dataset()
     else:
-        myapplication = AddRemoveModelApplication()
+        myapplication = AddModelApplication()
         myapplication.run()
         models_to_download = dict(map(lambda x: (x, True), myapplication.selected_models)) if myapplication.selected_models else None
 

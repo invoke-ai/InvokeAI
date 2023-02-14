@@ -31,10 +31,9 @@ from transformers import (
 )
 
 import invokeai.configs as configs
-from ldm.invoke.config.initial_model_select import (
+from ldm.invoke.config.model_install import (
     download_from_hf,
     select_and_download_models,
-    yes_or_no,
 )
 from ldm.invoke.globals import Globals, global_config_dir
 from ldm.invoke.readline import generic_completer
@@ -102,6 +101,18 @@ Have fun!
         message += "Please check the logs above and correct any issues."
 
     print(message)
+
+# ---------------------------------------------
+def yes_or_no(prompt: str, default_yes=True):
+    completer.set_options(["yes", "no"])
+    completer.complete_extensions(None)  # turn off path-completion mode
+    default = "y" if default_yes else "n"
+    response = input(f"{prompt} [{default}] ") or default
+    if default_yes:
+        return response[0] not in ("n", "N")
+    else:
+        return response[0] in ("y", "Y")
+
 
 # ---------------------------------------------
 def HfLogin(access_token) -> str:

@@ -58,7 +58,7 @@ if [ "$0" != "bash" ]; then
             exec invokeai-configure --root ${INVOKEAI_ROOT}
             ;;
         6)
-            exec invokeai-initial-models --root ${INVOKEAI_ROOT}
+            exec invokeai-model-install --root ${INVOKEAI_ROOT}
             ;;
 	7)
             echo "Developer Console:"
