@@ -5,14 +5,30 @@ import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { SystemState } from 'features/system/store/systemSlice';
+import {
+  SystemState,
+  setCancelAfter,
+  setCancelType,
+} from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash';
-import { useState, useEffect, useCallback } from 'react';
-import { Spinner } from '@chakra-ui/react';
+import { useEffect, useCallback } from 'react';
+import {
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  ButtonSpinner,
+  ButtonGroup,
+} from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
+import {
+  MdCancel,
+  MdCancelScheduleSend,
+  MdArrowDropDown,
+  MdArrowDropUp,
+} from 'react-icons/md';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -23,6 +39,8 @@ const cancelButtonSelector = createSelector(
       isCancelable: system.isCancelable,
       currentIteration: system.currentIteration,
       totalIterations: system.totalIterations,
+      cancelType: system.cancelOptions.cancelType,
+      cancelAfter: system.cancelOptions.cancelAfter,
     };
   },
   {
@@ -43,18 +61,17 @@ export default function CancelButton(
     isCancelable,
     currentIteration,
     totalIterations,
+    cancelType,
+    cancelAfter,
   } = useAppSelector(cancelButtonSelector);
-  const [cancelAfterIteration, setCancelAfterIteration] = useState<number>(
-    Number.MAX_SAFE_INTEGER
-  );
   const handleClickCancel = useCallback(() => {
     dispatch(cancelProcessing());
-    setCancelAfterIteration(Number.MAX_SAFE_INTEGER);
+    dispatch(setCancelAfter(null));
   }, [dispatch]);
 
   const { t } = useTranslation();
 
-  const isCancelScheduled = cancelAfterIteration !== Number.MAX_SAFE_INTEGER;
+  const isCancelScheduled = cancelAfter === null ? false : true;
 
   useHotkeys(
     'shift+x',
@@ -67,49 +84,74 @@ export default function CancelButton(
   );
 
   useEffect(() => {
-    if (cancelAfterIteration < currentIteration) {
+    if (cancelAfter !== null && cancelAfter < currentIteration) {
       handleClickCancel();
     }
-  }, [cancelAfterIteration, currentIteration, handleClickCancel]);
+  }, [cancelAfter, currentIteration, handleClickCancel]);
 
   return (
-    <>
-      <IAIIconButton
-        icon={<MdCancel />}
-        tooltip={t('parameters:cancel')}
-        aria-label={t('parameters:cancel')}
-        isDisabled={!isConnected || !isProcessing || !isCancelable}
-        onClick={handleClickCancel}
-        styleClass="cancel-btn"
-        {...rest}
-      />
-      <IAIIconButton
-        icon={isCancelScheduled ? <Spinner /> : <MdCancelScheduleSend />}
-        tooltip={
-          isCancelScheduled
-            ? t('parameters:cancelScheduled')
-            : t('parameters:scheduleCancel')
-        }
-        aria-label={
-          isCancelScheduled
-            ? t('parameters:cancelScheduled')
-            : t('parameters:scheduleCancel')
-        }
-        isDisabled={
-          !isConnected ||
-          !isProcessing ||
-          !isCancelable ||
-          currentIteration === totalIterations
-        }
-        onClick={() => {
-          // If a cancel request has already been made, and the user clicks again before the next iteration has been processed, stop the request.
-          if (isCancelScheduled)
-            setCancelAfterIteration(Number.MAX_SAFE_INTEGER);
-          else setCancelAfterIteration(currentIteration);
-        }}
-        styleClass="cancel-btn"
-        {...rest}
-      />
-    </>
+    <ButtonGroup isAttached variant="link">
+      {cancelType === 'immediate' ? (
+        <IAIIconButton
+          icon={<MdCancel />}
+          tooltip={t('parameters:cancel.immediate')}
+          aria-label={t('parameters:cancel.immediate')}
+          isDisabled={!isConnected || !isProcessing || !isCancelable}
+          onClick={handleClickCancel}
+          className="cancel-btn"
+          {...rest}
+        />
+      ) : (
+        <IAIIconButton
+          icon={
+            isCancelScheduled ? <ButtonSpinner /> : <MdCancelScheduleSend />
+          }
+          tooltip={
+            isCancelScheduled
+              ? t('parameters:cancel.isScheduled')
+              : t('parameters:cancel.schedule')
+          }
+          aria-label={
+            isCancelScheduled
+              ? t('parameters:cancel.isScheduled')
+              : t('parameters:cancel.schedule')
+          }
+          isDisabled={
+            !isConnected ||
+            !isProcessing ||
+            !isCancelable ||
+            currentIteration === totalIterations
+          }
+          onClick={() => {
+            // If a cancel request has already been made, and the user clicks again before the next iteration has been processed, stop the request.
+            if (isCancelScheduled) dispatch(setCancelAfter(null));
+            else dispatch(setCancelAfter(currentIteration));
+          }}
+          className="cancel-btn"
+          {...rest}
+        />
+      )}
+      <Menu>
+        {({ isOpen }) => (
+          <>
+            <MenuButton
+              as={IAIIconButton}
+              icon={isOpen ? <MdArrowDropUp /> : <MdArrowDropDown />}
+              className="cancel-options-btn"
+              tooltip={t('parameters:cancel.setType')}
+              {...rest}
+            />
+            <MenuList className="cancel-options-btn-context-menu">
+              <MenuItem onClick={() => dispatch(setCancelType('immediate'))}>
+                {t('parameters:cancel.immediate')}
+              </MenuItem>
+              <MenuItem onClick={() => dispatch(setCancelType('scheduled'))}>
+                {t('parameters:cancel.schedule')}
+              </MenuItem>
+            </MenuList>
+          </>
+        )}
+      </Menu>
+    </ButtonGroup>
   );
 }

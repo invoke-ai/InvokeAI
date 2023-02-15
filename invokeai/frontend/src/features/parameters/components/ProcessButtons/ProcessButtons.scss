@@ -24,6 +24,32 @@
   );
 }
 
+.cancel-options-btn {
+  @include Button(
+    $btn-color: var(--destructive-color),
+    $btn-color-hover: var(--destructive-color-hover),
+    $btn-width: 1rem,
+  );
+  border-color: var(--background-color-secondary);
+  border-left-width: 0.05rem;
+}
+
+.cancel-options-btn-context-menu {
+  z-index: 15;
+  background-color: var(--background-color-secondary);
+  color: var(--text-color-secondary);
+
+  [role='menuitem'] {
+    font-size: 0.9rem;
+    color: var(--text-color-secondary);
+    background-color: var(--background-color-secondary);
+    &:focus {
+      color: var(--text-color);
+      background-color: var(--border-color-light);
+    }
+  }
+}
+
 .loopback-btn {
   &[data-as-checkbox='true'] {
     background-color: var(--btn-btn-base-color);
