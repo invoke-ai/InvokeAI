@@ -52,7 +52,7 @@ class ModelGroup(metaclass=ABCMeta):
 
     @abstractmethod
     def uninstall(self, models: torch.nn.Module):
-        """Remove models to this group."""
+        """Remove models from this group."""
         pass
 
     @abstractmethod

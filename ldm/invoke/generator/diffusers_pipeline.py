@@ -336,6 +336,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
 
     def enable_offload_submodels(self, device: torch.device):
+        """
+        Offload each submodel when it's not in use.
+
+        Useful for low-vRAM situations where the size of the model in memory is a big chunk of
+        the total available resource, and you want to free up as much for inference as possible.
+
+        This requires more moving parts and may add some delay as the U-Net is swapped out for the
+        VAE and vice-versa.
+        """
         models = self._submodels
         if self._model_group is not None:
             self._model_group.uninstall(*models)
@@ -344,6 +353,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self._model_group = group
 
     def disable_offload_submodels(self):
+        """
+        Leave all submodels loaded.
+
+        Appropriate for cases where the size of the model in memory is small compared to the memory
+        required for inference. Avoids the delay and complexity of shuffling the submodels to and
+        from the GPU.
+        """
         models = self._submodels
         if self._model_group is not None:
             self._model_group.uninstall(*models)
@@ -352,9 +368,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self._model_group = group
 
     def offload_all(self):
+        """Offload all this pipeline's models to CPU."""
         self._model_group.offload_current()
 
     def ready(self):
+        """
+        Ready this pipeline's models.
+
+        i.e. pre-load them to the GPU if appropriate.
+        """
         self._model_group.ready()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None):
