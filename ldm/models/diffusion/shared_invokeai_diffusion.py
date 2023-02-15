@@ -18,6 +18,8 @@ from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 class PostprocessingSettings:
     threshold: float
     warmup: float
+    h_symmetry_point: float
+    v_symmetry_point: float
 
 
 class InvokeAIDiffuserComponent:
@@ -30,7 +32,7 @@ class InvokeAIDiffuserComponent:
     * Hybrid conditioning (used for inpainting)
     '''
     debug_thresholding = False
-
+    last_percent_through = 0.0
 
     @dataclass
     class ExtraConditioningInfo:
@@ -56,6 +58,7 @@ class InvokeAIDiffuserComponent:
         self.is_running_diffusers = is_running_diffusers
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
+        self.last_percent_through = 0.0
 
     @contextmanager
     def custom_attention_context(self,
@@ -164,6 +167,7 @@ class InvokeAIDiffuserComponent:
         if postprocessing_settings is not None:
             percent_through = self.calculate_percent_through(sigma, step_index, total_step_count)
             latents = self.apply_threshold(postprocessing_settings, latents, percent_through)
+            latents = self.apply_symmetry(postprocessing_settings, latents, percent_through)
         return latents
 
     def calculate_percent_through(self, sigma, step_index, total_step_count):
@@ -292,8 +296,12 @@ class InvokeAIDiffuserComponent:
         self,
         postprocessing_settings: PostprocessingSettings,
         latents: torch.Tensor,
-        percent_through
+        percent_through: float
     ) -> torch.Tensor:
+
+        if postprocessing_settings.threshold is None or postprocessing_settings.threshold == 0.0:
+            return latents
+
         threshold = postprocessing_settings.threshold
         warmup = postprocessing_settings.warmup
 
@@ -341,6 +349,47 @@ class InvokeAIDiffuserComponent:
                   f"  | {num_altered / latents.numel() * 100:.2f}% values altered")
 
         return latents
+
+    def apply_symmetry(
+        self,
+        postprocessing_settings: PostprocessingSettings,
+        latents: torch.Tensor,
+        percent_through: float
+    ) -> torch.Tensor:
+
+        # Reset our last percent through if this is our first step.
+        if percent_through == 0.0:
+            self.last_percent_through = 0.0
+
+        if postprocessing_settings is None:
+            return latents
+
+        dev = latents.device.type
+
+        latents.to(device='cpu')
+
+        if (
+            postprocessing_settings.h_symmetry_point != 0.0 and
+            self.last_percent_through < postprocessing_settings.h_symmetry_point and
+            percent_through >= postprocessing_settings.h_symmetry_point
+        ):
+            # Horizontal symmetry occurs on the 3rd dimension of the latent
+            width = latents.shape[3]
+            x_flipped = torch.flip(latents, dims=[3])
+            latents = torch.cat([latents[:, :, :, 0:int(width/2)], x_flipped[:, :, :, int(width/2):int(width)]], dim=3)
+
+        if (
+            postprocessing_settings.v_symmetry_point != 0.0 and
+            self.last_percent_through < postprocessing_settings.v_symmetry_point and
+            percent_through >= postprocessing_settings.v_symmetry_point
+        ):
+            # Vertical symmetry occurs on the 2nd dimension of the latent
+            height = latents.shape[2]
+            x_flipped = torch.flip(latents, dims=[2])
+            latents = torch.cat([latents[:, :, :, 0:int(height/2)], x_flipped[:, :, :, int(height/2):int(height)]], dim=2)
+
+        self.last_percent_through = percent_through
+        return latents.to(device=dev)
 
     def estimate_percent_through(self, step_index, sigma):
         if step_index is not None and self.cross_attention_control_context is not None:
