@@ -41,8 +41,8 @@ class Txt2Img2Img(Generator):
                 postprocessing_settings = PostprocessingSettings(
                     threshold=threshold,
                     warmup=0.2,
-                    h_symmetry_point=h_symmetry_point,
-                    v_symmetry_point=v_symmetry_point
+                    h_symmetry_point=h_symmetry_point if (h_symmetry_point >= 0.0 and h_symmetry_point <= 1.0) else 0.0,
+                    v_symmetry_point=v_symmetry_point if (v_symmetry_point >= 0.0 and v_symmetry_point <= 1.0) else 0.0
                 )
             ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
