@@ -36,7 +36,7 @@ echo -e "Container Image:\t${CONTAINER_IMAGE}\n"
 if [[ -n "$(docker volume ls -f name="${VOLUMENAME}" -q)" ]]; then
     echo -e "Volume already exists\n"
 else
-    echo -n "createing docker volume "
+    echo -n "creating docker volume "
     docker volume create "${VOLUMENAME}"
 fi
 

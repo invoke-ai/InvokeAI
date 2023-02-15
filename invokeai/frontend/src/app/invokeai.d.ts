@@ -219,12 +219,23 @@ export declare type InvokeDiffusersModelConfigProps = {
   };
 };
 
+export declare type InvokeModelConversionProps = {
+  model_name: string;
+  save_location: string;
+  custom_location: string | null;
+};
+
 /**
  * These types type data received from the server via socketio.
  */
 
 export declare type ModelChangeResponse = {
   model_name: string;
+  model_list: ModelList;
+};
+
+export declare type ModelConvertedResponse = {
+  converted_model_name: string;
   model_list: ModelList;
 };
 

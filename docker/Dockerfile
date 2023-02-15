@@ -12,7 +12,7 @@ LABEL org.opencontainers.image.authors="mauwii@outlook.de"
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
 
-# Install necesarry packages
+# Install necessary packages
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -78,7 +78,7 @@ RUN python3 -c "from patchmatch import patch_match"
 #####################
 FROM python-base AS runtime
 
-# Create a new User
+# Create a new user
 ARG UNAME=appuser
 RUN useradd \
   --no-log-init \
