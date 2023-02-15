@@ -15,6 +15,7 @@ import {
   addLogEntry,
   generationRequested,
   modelChangeRequested,
+  modelConvertRequested,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -181,6 +182,7 @@ const makeSocketIOEmitters = (
     emitConvertToDiffusers: (
       modelToConvert: InvokeAI.InvokeModelConversionProps
     ) => {
+      dispatch(modelConvertRequested());
       socketio.emit('convertToDiffusers', modelToConvert);
     },
     emitRequestModelChange: (modelName: string) => {

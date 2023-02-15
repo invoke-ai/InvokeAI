@@ -5,6 +5,7 @@ import {
   RadioGroup,
   Text,
   UnorderedList,
+  Tooltip,
 } from '@chakra-ui/react';
 import { convertToDiffusers } from 'app/socketio/actions';
 import { RootState } from 'app/store';
@@ -12,7 +13,6 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
-import { setIsProcessing } from 'features/system/store/systemSlice';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -60,7 +60,6 @@ export default function ModelConvert(props: ModelConvertProps) {
           ? customSaveLocation
           : null,
     };
-    dispatch(setIsProcessing(true));
     dispatch(convertToDiffusers(modelToConvert));
   };
 
@@ -98,12 +97,28 @@ export default function ModelConvert(props: ModelConvertProps) {
 
       <Flex flexDir="column" gap={4}>
         <Flex marginTop="1rem" flexDir="column" gap={2}>
-          <Text fontWeight="bold">Save Location</Text>
+          <Text fontWeight="bold">
+            {t('modelmanager:convertToDiffusersSaveLocation')}
+          </Text>
           <RadioGroup value={saveLocation} onChange={(v) => setSaveLocation(v)}>
             <Flex gap={4}>
-              <Radio value="same">{t('modelmanager:sameFolder')}</Radio>
-              <Radio value="root">{t('modelmanager:invokeRoot')}</Radio>
-              <Radio value="custom">{t('modelmanager:custom')}</Radio>
+              <Radio value="same">
+                <Tooltip label="Save converted model in the same folder">
+                  {t('modelmanager:sameFolder')}
+                </Tooltip>
+              </Radio>
+
+              <Radio value="root">
+                <Tooltip label="Save converted model in the InvokeAI root folder">
+                  {t('modelmanager:invokeRoot')}
+                </Tooltip>
+              </Radio>
+
+              <Radio value="custom">
+                <Tooltip label="Save converted model in a custom folder">
+                  {t('modelmanager:custom')}
+                </Tooltip>
+              </Radio>
             </Flex>
           </RadioGroup>
         </Flex>

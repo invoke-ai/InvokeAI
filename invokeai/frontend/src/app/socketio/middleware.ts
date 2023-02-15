@@ -48,6 +48,7 @@ export const socketioMiddleware = () => {
       onFoundModels,
       onNewModelAdded,
       onModelDeleted,
+      onModelConverted,
       onModelChangeFailed,
       onTempFolderEmptied,
     } = makeSocketIOListeners(store);
@@ -124,6 +125,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('modelDeleted', (data: InvokeAI.ModelDeletedResponse) => {
         onModelDeleted(data);
+      });
+
+      socketio.on('modelConverted', (data: InvokeAI.ModelConvertedResponse) => {
+        onModelConverted(data);
       });
 
       socketio.on('modelChanged', (data: InvokeAI.ModelChangeResponse) => {

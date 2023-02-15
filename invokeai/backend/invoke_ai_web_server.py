@@ -448,7 +448,7 @@ class InvokeAIWebServer:
 
                 new_model_list = self.generate.model_manager.list_models()
                 socketio.emit(
-                    "newModelAdded",
+                    "modelConverted",
                     {"new_model_name": model_name,
                      "model_list": new_model_list, 'update': True},
                 )

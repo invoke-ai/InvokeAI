@@ -365,6 +365,7 @@ const makeSocketIOListeners = (
       const { new_model_name, model_list, update } = data;
       dispatch(setModelList(model_list));
       dispatch(setIsProcessing(false));
+      dispatch(setCurrentStatus(i18n.t('modelmanager:modelAdded')));
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -401,6 +402,30 @@ const makeSocketIOListeners = (
           title: `${i18n.t(
             'modelmanager:modelEntryDeleted'
           )}: ${deleted_model_name}`,
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    },
+    onModelConverted: (data: InvokeAI.ModelConvertedResponse) => {
+      const { converted_model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setCurrentStatus(i18n.t('common:statusModelConverted')));
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(true));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model converted: ${converted_model_name}`,
+          level: 'info',
+        })
+      );
+      dispatch(
+        addToast({
+          title: `${i18n.t(
+            'modelmanager:modelConverted'
+          )}: ${converted_model_name}`,
           status: 'success',
           duration: 2500,
           isClosable: true,

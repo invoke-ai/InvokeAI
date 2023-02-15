@@ -58,5 +58,7 @@
   "statusUpscaling": "Upscaling",
   "statusUpscalingESRGAN": "Upscaling (ESRGAN)",
   "statusLoadingModel": "Loading Model",
-  "statusModelChanged": "Model Changed"
+  "statusModelChanged": "Model Changed",
+  "statusConvertingModel": "Converting Model",
+  "statusModelConverted": "Model Converted"
 }

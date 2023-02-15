@@ -234,6 +234,11 @@ export declare type ModelChangeResponse = {
   model_list: ModelList;
 };
 
+export declare type ModelConvertedResponse = {
+  converted_model_name: string;
+  model_list: ModelList;
+};
+
 export declare type ModelAddedResponse = {
   new_model_name: string;
   model_list: ModelList;
