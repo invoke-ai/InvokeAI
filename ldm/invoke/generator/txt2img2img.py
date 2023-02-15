@@ -21,13 +21,14 @@ class Txt2Img2Img(Generator):
 
     def get_make_image(self, prompt:str, sampler, steps:int, cfg_scale:float, ddim_eta,
                        conditioning, width:int, height:int, strength:float,
-                       step_callback:Optional[Callable]=None, threshold=0.0, warmup=0.2,
-                       h_symmetry_point=0.0, v_symmetry_point=0.0, **kwargs):
+                       step_callback:Optional[Callable]=None, threshold=0.0, warmup=0.2, perlin=0.0,
+                       h_symmetry_point=0.0, v_symmetry_point=0.0, attention_maps_callback=None, **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
         kwargs are 'width' and 'height'
         """
+        self.perlin = perlin
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
@@ -40,7 +41,7 @@ class Txt2Img2Img(Generator):
                 postprocessing_settings = PostprocessingSettings(
                     threshold=threshold,
                     warmup=0.2,
-                    h_symmetry_point=0.0001,
+                    h_symmetry_point=h_symmetry_point,
                     v_symmetry_point=v_symmetry_point
                 )
             ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
@@ -75,7 +76,7 @@ class Txt2Img2Img(Generator):
             if clear_cuda_cache is not None:
                 clear_cuda_cache()
 
-            second_pass_noise = self.get_noise_like(resized_latents)
+            second_pass_noise = self.get_noise_like(resized_latents, override_perlin=True)
 
             # Clear symmetry for the second pass
             from dataclasses import replace
@@ -94,6 +95,9 @@ class Txt2Img2Img(Generator):
                 callback=step_callback)
             set_verbosity(verbosity)
 
+            if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
+                attention_maps_callback(pipeline_output.attention_map_saver)
+
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
 
 
@@ -107,13 +111,13 @@ class Txt2Img2Img(Generator):
 
         return make_image
 
-    def get_noise_like(self, like: torch.Tensor):
+    def get_noise_like(self, like: torch.Tensor, override_perlin: bool=False):
         device = like.device
         if device.type == 'mps':
             x = torch.randn_like(like, device='cpu', dtype=self.torch_dtype()).to(device)
         else:
             x = torch.randn_like(like, device=device, dtype=self.torch_dtype())
-        if self.perlin > 0.0:
+        if self.perlin > 0.0 and override_perlin == False:
             shape = like.shape
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(shape[3], shape[2])
         return x
@@ -151,6 +155,9 @@ class Txt2Img2Img(Generator):
         shape = (1, channels,
                  scaled_height // self.downsampling_factor, scaled_width // self.downsampling_factor)
         if self.use_mps_noise or device.type == 'mps':
-            return torch.randn(shape, dtype=self.torch_dtype(), device='cpu').to(device)
+            tensor = torch.empty(size=shape, device='cpu')
+            tensor = self.get_noise_like(like=tensor).to(device)
         else:
-            return torch.randn(shape, dtype=self.torch_dtype(), device=device)
+            tensor = torch.empty(size=shape, device=device)
+            tensor = self.get_noise_like(like=tensor)
+        return tensor
