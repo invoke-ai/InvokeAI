@@ -68,3 +68,30 @@ class MultiSelectColumns(npyscreen.MultiSelect):
         
     def h_cursor_line_right(self,ch):
         super().h_cursor_line_down(ch)
+
+class TextBox(npyscreen.MultiLineEdit):
+    def update(self, clear=True):
+        if clear: self.clear()
+
+        HEIGHT = self.height
+        WIDTH  = self.width
+        # draw box.
+        self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
+        self.parent.curses_pad.hline(self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH)
+        self.parent.curses_pad.vline(self.rely, self.relx, curses.ACS_VLINE, self.height)
+        self.parent.curses_pad.vline(self.rely, self.relx+WIDTH, curses.ACS_VLINE, HEIGHT)
+        
+        # draw corners
+        self.parent.curses_pad.addch(self.rely, self.relx, curses.ACS_ULCORNER, )
+        self.parent.curses_pad.addch(self.rely, self.relx+WIDTH, curses.ACS_URCORNER, )
+        self.parent.curses_pad.addch(self.rely+HEIGHT, self.relx, curses.ACS_LLCORNER, )
+        self.parent.curses_pad.addch(self.rely+HEIGHT, self.relx+WIDTH, curses.ACS_LRCORNER, )
+        
+        # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
+        (relx,rely,height,width) = (self.relx, self.rely, self.height, self.width)
+        self.relx += 1
+        self.rely += 1
+        self.height -= 1
+        self.width -= 1
+        super().update(clear=False)
+        (self.relx,self.rely,self.height,self.width) = (relx, rely, height, width)
