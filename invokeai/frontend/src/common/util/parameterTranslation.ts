@@ -178,12 +178,16 @@ export const frontendToBackendParameters = (
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
     : seed;
 
-  // parameters common to txt2img and img2img
-  if (['txt2img', 'img2img'].includes(generationMode)) {
-    generationParameters.seamless = seamless;
+  // txt2img exclusive parameters
+  if (generationMode === 'txt2img') {
     generationParameters.hires_fix = hiresFix;
 
     if (hiresFix) generationParameters.strength = hiresStrength;
+  }
+
+  // parameters common to txt2img and img2img
+  if (['txt2img', 'img2img'].includes(generationMode)) {
+    generationParameters.seamless = seamless;
 
     if (shouldRunESRGAN) {
       esrganParameters = {
