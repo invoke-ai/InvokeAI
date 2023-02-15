@@ -364,14 +364,17 @@ class InvokeAIDiffuserComponent:
         if postprocessing_settings is None:
             return latents
 
+        h_symmetry_point = postprocessing_settings.h_symmetry_point
+        v_symmetry_point = postprocessing_settings.v_symmetry_point
+
         dev = latents.device.type
 
         latents.to(device='cpu')
 
         if (
-            postprocessing_settings.h_symmetry_point != 0.0 and
-            self.last_percent_through < postprocessing_settings.h_symmetry_point and
-            percent_through >= postprocessing_settings.h_symmetry_point
+            h_symmetry_point != 0.0 and
+            self.last_percent_through < h_symmetry_point and
+            percent_through >= h_symmetry_point
         ):
             # Horizontal symmetry occurs on the 3rd dimension of the latent
             width = latents.shape[3]
@@ -379,14 +382,14 @@ class InvokeAIDiffuserComponent:
             latents = torch.cat([latents[:, :, :, 0:int(width/2)], x_flipped[:, :, :, int(width/2):int(width)]], dim=3)
 
         if (
-            postprocessing_settings.v_symmetry_point != 0.0 and
-            self.last_percent_through < postprocessing_settings.v_symmetry_point and
-            percent_through >= postprocessing_settings.v_symmetry_point
+            v_symmetry_point != 0.0 and
+            self.last_percent_through < v_symmetry_point and
+            percent_through >= v_symmetry_point
         ):
             # Vertical symmetry occurs on the 2nd dimension of the latent
             height = latents.shape[2]
-            x_flipped = torch.flip(latents, dims=[2])
-            latents = torch.cat([latents[:, :, :, 0:int(height/2)], x_flipped[:, :, :, int(height/2):int(height)]], dim=2)
+            y_flipped = torch.flip(latents, dims=[2])
+            latents = torch.cat([latents[:, :, 0:int(height / 2)], y_flipped[:, :, int(height / 2):int(height)]], dim=2)
 
         self.last_percent_through = percent_through
         return latents.to(device=dev)
