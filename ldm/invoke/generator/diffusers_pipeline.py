@@ -34,7 +34,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ldm.invoke.globals import Globals
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, ThresholdSettings
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
 
 
@@ -199,8 +199,10 @@ class ConditioningData:
     """
     extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
-    """Additional arguments to pass to scheduler.step."""
-    threshold: Optional[ThresholdSettings] = None
+    """
+    Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
+    """
+    postprocessing_settings: Optional[PostprocessingSettings] = None
 
     @property
     def dtype(self):
@@ -301,10 +303,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             textual_inversion_manager=self.textual_inversion_manager
         )
 
-        self._enable_memory_efficient_attention()
 
-
-    def _enable_memory_efficient_attention(self):
+    def _adjust_memory_efficient_attention(self, latents: Torch.tensor):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
@@ -317,7 +317,24 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
                 pass
             else:
-                self.enable_attention_slicing(slice_size='max')
+                if self.device.type == 'cpu' or self.device.type == 'mps':
+                    mem_free = psutil.virtual_memory().free
+                elif self.device.type == 'cuda':
+                    mem_free, _ = torch.cuda.mem_get_info(self.device)
+                else:
+                    raise ValueError(f"unrecognized device {device}")
+                # input tensor of [1, 4, h/8, w/8]
+                # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
+                bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
+                max_size_required_for_baddbmm = \
+                    16 * \
+                    latents.size(dim=2) * latents.size(dim=3) * latents.size(dim=2) * latents.size(dim=3) * \
+                    bytes_per_element_needed_for_baddbmm_duplication
+                if max_size_required_for_baddbmm > (mem_free * 3.3 / 4.0): # 3.3 / 4.0 is from old Invoke code
+                    self.enable_attention_slicing(slice_size='max')
+                else:
+                    self.disable_attention_slicing()
+
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
@@ -377,6 +394,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                          noise: torch.Tensor,
                                          run_id: str = None,
                                          additional_guidance: List[Callable] = None):
+        self._adjust_memory_efficient_attention(latents)
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
         if additional_guidance is None:
@@ -403,6 +421,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                         total_step_count=len(timesteps),
                                         additional_guidance=additional_guidance)
                 latents = step_output.prev_sample
+
+                latents = self.invokeai_diffuser.do_latent_postprocessing(
+                    postprocessing_settings=conditioning_data.postprocessing_settings,
+                    latents=latents,
+                    sigma=batched_t,
+                    step_index=i,
+                    total_step_count=len(timesteps)
+                )
+
                 predicted_original = getattr(step_output, 'pred_original_sample', None)
 
                 # TODO resuscitate attention map saving
@@ -439,7 +466,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
-            threshold=conditioning_data.threshold
         )
 
         # compute the previous noisy sample x_t -> x_t-1
