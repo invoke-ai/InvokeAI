@@ -16,7 +16,7 @@ class Txt2Img(Generator):
     @torch.no_grad()
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
                        conditioning,width,height,step_callback=None,threshold=0.0,warmup=0.2,perlin=0.0,
-                       h_symmetry_point=0.0,v_symmetry_point=0.0,attention_maps_callback=None,
+                       h_symmetry_point=None,v_symmetry_point=None,attention_maps_callback=None,
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
@@ -36,8 +36,8 @@ class Txt2Img(Generator):
                 postprocessing_settings=PostprocessingSettings(
                     threshold=threshold,
                     warmup=warmup,
-                    h_symmetry_point=h_symmetry_point if (h_symmetry_point >= 0.0 and h_symmetry_point <= 1.0) else 0.0,
-                    v_symmetry_point=v_symmetry_point if (v_symmetry_point >= 0.0 and v_symmetry_point <= 1.0) else 0.0
+                    h_symmetry_point=h_symmetry_point,
+                    v_symmetry_point=v_symmetry_point
                 )
             ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 

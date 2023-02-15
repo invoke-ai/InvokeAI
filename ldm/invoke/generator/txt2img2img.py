@@ -22,7 +22,7 @@ class Txt2Img2Img(Generator):
     def get_make_image(self, prompt:str, sampler, steps:int, cfg_scale:float, ddim_eta,
                        conditioning, width:int, height:int, strength:float,
                        step_callback:Optional[Callable]=None, threshold=0.0, warmup=0.2, perlin=0.0,
-                       h_symmetry_point=0.0, v_symmetry_point=0.0, attention_maps_callback=None, **kwargs):
+                       h_symmetry_point=None, v_symmetry_point=None, attention_maps_callback=None, **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
@@ -41,8 +41,8 @@ class Txt2Img2Img(Generator):
                 postprocessing_settings = PostprocessingSettings(
                     threshold=threshold,
                     warmup=0.2,
-                    h_symmetry_point=h_symmetry_point if (h_symmetry_point >= 0.0 and h_symmetry_point <= 1.0) else 0.0,
-                    v_symmetry_point=v_symmetry_point if (v_symmetry_point >= 0.0 and v_symmetry_point <= 1.0) else 0.0
+                    h_symmetry_point=h_symmetry_point,
+                    v_symmetry_point=v_symmetry_point
                 )
             ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
@@ -80,8 +80,8 @@ class Txt2Img2Img(Generator):
 
             # Clear symmetry for the second pass
             from dataclasses import replace
-            new_postprocessing_settings = replace(conditioning_data.postprocessing_settings, h_symmetry_point=0.0)
-            new_postprocessing_settings = replace(new_postprocessing_settings, v_symmetry_point=0.0)
+            new_postprocessing_settings = replace(conditioning_data.postprocessing_settings, h_symmetry_point=None)
+            new_postprocessing_settings = replace(new_postprocessing_settings, v_symmetry_point=None)
             new_conditioning_data = replace(conditioning_data, postprocessing_settings=new_postprocessing_settings)
 
             verbosity = get_verbosity()

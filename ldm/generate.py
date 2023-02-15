@@ -300,8 +300,8 @@ class Generate:
             variation_amount = 0.0,
             threshold        = 0.0,
             perlin           = 0.0,
-            h_symmetry_point = 0.0,
-            v_symmetry_point = 0.0,
+            h_symmetry_point = None,
+            v_symmetry_point = None,
             karras_max       = None,
             outdir         = None,
             # these are specific to img2img and inpaint
