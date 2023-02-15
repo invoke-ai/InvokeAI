@@ -9,6 +9,7 @@ from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
 
 import PIL.Image
 import einops
+import psutil
 import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
@@ -301,7 +302,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self._model_group.install(*self._submodels)
 
 
-    def _adjust_memory_efficient_attention(self, latents: Torch.tensor):
+    def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
@@ -319,7 +320,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 elif self.device.type == 'cuda':
                     mem_free, _ = torch.cuda.mem_get_info(self.device)
                 else:
-                    raise ValueError(f"unrecognized device {device}")
+                    raise ValueError(f"unrecognized device {self.device}")
                 # input tensor of [1, 4, h/8, w/8]
                 # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
                 bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
