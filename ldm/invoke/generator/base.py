@@ -64,6 +64,7 @@ class Generator:
 
     def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
+                 h_symmetry_point=0.0, v_symmetry_point=0.0,
                  safety_checker:dict=None,
                  free_gpu_mem: bool=False,
                  **kwargs):
@@ -81,6 +82,8 @@ class Generator:
             step_callback = step_callback,
             threshold     = threshold,
             perlin        = perlin,
+            h_symmetry_point        = h_symmetry_point,
+            v_symmetry_point        = v_symmetry_point,
             attention_maps_callback = attention_maps_callback,
             **kwargs
         )
