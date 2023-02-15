@@ -28,7 +28,7 @@ from typing_extensions import ParamSpec
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
-from ..offloading import HotSeatModelGroup, SimpleModelGroup
+from ..offloading import HotSeatModelGroup, SimpleModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
@@ -259,6 +259,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
+    _model_group: ModelGroup
 
     ID_LENGTH = 8
 
