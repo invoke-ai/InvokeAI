@@ -83,6 +83,7 @@ export default function ModelListItem(props: ModelListItemProps) {
         >
           {t('modelmanager:load')}
         </Button>
+
         <IAIIconButton
           icon={<EditIcon />}
           size={'sm'}
