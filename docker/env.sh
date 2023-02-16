@@ -2,6 +2,11 @@
 
 # This file is used to set environment variables for the build.sh and run.sh scripts.
 
+# use python v3.10 by default
+if [[ -z "${PYTHON_VERSION}" ]]; then
+    PYTHON_VERSION=3.10
+fi
+
 # Try to detect the container flavor if no PIP_EXTRA_INDEX_URL got specified
 if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
 
