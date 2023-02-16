@@ -176,9 +176,9 @@ const ModelList = () => {
   }, [models, searchText, t, isSelectedFilter]);
 
   return (
-    <Flex flexDirection={'column'} rowGap="2rem" width="50%" minWidth="50%">
-      <Flex justifyContent={'space-between'}>
-        <Text fontSize={'1.4rem'} fontWeight="bold">
+    <Flex flexDirection="column" rowGap="2rem" width="50%" minWidth="50%">
+      <Flex justifyContent="space-between">
+        <Text fontSize="1.4rem" fontWeight="bold">
           {t('modelmanager:availableModels')}
         </Text>
         <AddModel />
@@ -190,10 +190,10 @@ const ModelList = () => {
       />
 
       <Flex
-        flexDirection={'column'}
+        flexDirection="column"
         gap={1}
         maxHeight={window.innerHeight - 360}
-        overflow={'scroll'}
+        overflow="scroll"
         paddingRight="1rem"
       >
         <Flex columnGap="0.5rem">

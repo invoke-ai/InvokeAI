@@ -3,7 +3,7 @@ import SeamlessSettings from './SeamlessSettings';
 
 const ImageToImageOutputSettings = () => {
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <SeamlessSettings />
     </Flex>
   );

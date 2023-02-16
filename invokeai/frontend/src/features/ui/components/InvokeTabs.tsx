@@ -31,32 +31,32 @@ export interface InvokeTabInfo {
 
 export const tabDict: Record<InvokeTabName, InvokeTabInfo> = {
   txt2img: {
-    title: <TextToImageIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <TextToImageIcon fill="black" boxSize="2.5rem" />,
     workarea: <TextToImageWorkarea />,
     tooltip: 'Text To Image',
   },
   img2img: {
-    title: <ImageToImageIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <ImageToImageIcon fill="black" boxSize="2.5rem" />,
     workarea: <ImageToImageWorkarea />,
     tooltip: 'Image To Image',
   },
   unifiedCanvas: {
-    title: <UnifiedCanvasIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <UnifiedCanvasIcon fill="black" boxSize="2.5rem" />,
     workarea: <UnifiedCanvasWorkarea />,
     tooltip: 'Unified Canvas',
   },
   nodes: {
-    title: <NodesIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <NodesIcon fill="black" boxSize="2.5rem" />,
     workarea: <NodesWIP />,
     tooltip: 'Nodes',
   },
   postprocess: {
-    title: <PostprocessingIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <PostprocessingIcon fill="black" boxSize="2.5rem" />,
     workarea: <PostProcessingWIP />,
     tooltip: 'Post Processing',
   },
   training: {
-    title: <TrainingIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <TrainingIcon fill="black" boxSize="2.5rem" />,
     workarea: <TrainingWIP />,
     tooltip: 'Training',
   },
@@ -122,7 +122,7 @@ export default function InvokeTabs() {
           key={key}
           hasArrow
           label={tabDict[key as keyof typeof tabDict].tooltip}
-          placement={'right'}
+          placement="right"
         >
           <Tab>{tabDict[key as keyof typeof tabDict].title}</Tab>
         </Tooltip>
@@ -147,7 +147,7 @@ export default function InvokeTabs() {
     <Tabs
       isLazy
       className="app-tabs"
-      variant={'unstyled'}
+      variant="unstyled"
       defaultIndex={activeTab}
       index={activeTab}
       onChange={(index: number) => {

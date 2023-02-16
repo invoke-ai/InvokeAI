@@ -46,7 +46,7 @@ export default function ThemeChanger() {
             width: '6rem',
           }}
           leftIcon={currentTheme === theme ? <FaCheck /> : undefined}
-          size={'sm'}
+          size="sm"
           onClick={() => handleChangeTheme(theme)}
           key={theme}
         >
@@ -64,7 +64,7 @@ export default function ThemeChanger() {
       triggerComponent={
         <IAIIconButton
           aria-label={t('common:themeLabel')}
-          size={'sm'}
+          size="sm"
           variant="link"
           data-variant="link"
           fontSize={20}
@@ -72,7 +72,7 @@ export default function ThemeChanger() {
         />
       }
     >
-      <VStack align={'stretch'}>{renderThemeOptions()}</VStack>
+      <VStack align="stretch">{renderThemeOptions()}</VStack>
     </IAIPopover>
   );
 }

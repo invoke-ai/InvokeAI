@@ -17,7 +17,7 @@ const ClearCanvasHistoryButtonModal = () => {
       acceptCallback={() => dispatch(clearCanvasHistory())}
       acceptButtonText={t('unifiedcanvas:clearHistory')}
       triggerComponent={
-        <IAIButton size={'sm'} leftIcon={<FaTrash />} isDisabled={isStaging}>
+        <IAIButton size="sm" leftIcon={<FaTrash />} isDisabled={isStaging}>
           {t('unifiedcanvas:clearCanvasHistory')}
         </IAIButton>
       }
