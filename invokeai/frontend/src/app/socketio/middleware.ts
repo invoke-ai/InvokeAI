@@ -48,6 +48,7 @@ export const socketioMiddleware = () => {
       onFoundModels,
       onNewModelAdded,
       onModelDeleted,
+      onModelConverted,
       onModelChangeFailed,
       onTempFolderEmptied,
     } = makeSocketIOListeners(store);
@@ -64,6 +65,7 @@ export const socketioMiddleware = () => {
       emitSearchForModels,
       emitAddNewModel,
       emitDeleteModel,
+      emitConvertToDiffusers,
       emitRequestModelChange,
       emitSaveStagingAreaImageToGallery,
       emitRequestEmptyTempFolder,
@@ -123,6 +125,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('modelDeleted', (data: InvokeAI.ModelDeletedResponse) => {
         onModelDeleted(data);
+      });
+
+      socketio.on('modelConverted', (data: InvokeAI.ModelConvertedResponse) => {
+        onModelConverted(data);
       });
 
       socketio.on('modelChanged', (data: InvokeAI.ModelChangeResponse) => {
@@ -196,6 +202,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/deleteModel': {
         emitDeleteModel(action.payload);
+        break;
+      }
+
+      case 'socketio/convertToDiffusers': {
+        emitConvertToDiffusers(action.payload);
         break;
       }
 

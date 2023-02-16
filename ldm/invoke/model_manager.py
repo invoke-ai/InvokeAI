@@ -888,15 +888,17 @@ class ModelManager(object):
         models_folder_safetensors = Path(search_folder).glob("**/*.safetensors")
 
         ckpt_files = [x for x in models_folder_ckpt if x.is_file()]
-        safetensor_files = [x for x in models_folder_safetensors if x.is_file]
+        safetensor_files = [x for x in models_folder_safetensors if x.is_file()]
 
         files = ckpt_files + safetensor_files
 
         found_models = []
         for file in files:
-            found_models.append(
-                {"name": file.stem, "location": str(file.resolve()).replace("\\", "/")}
-            )
+            location = str(file.resolve()).replace("\\", "/")
+            if 'model.safetensors' not in location and 'diffusion_pytorch_model.safetensors' not in location:
+                found_models.append(
+                    {"name": file.stem, "location": location}
+                )
 
         return search_folder, found_models
 
