@@ -40,9 +40,10 @@ experimental versions later.
     this, open up a command-line window ("Terminal" on Linux and
     Macintosh, "Command" or "Powershell" on Windows) and type `python
     --version`. If Python is installed, it will print out the version
-    number. If it is version `3.9.1` or `3.10.x`, you meet
-    requirements.
-
+    number. If it is version `3.9.*` or `3.10.*`, you meet
+    requirements. We do not recommend using Python 3.11 or higher,
+    as not all the libraries that InvokeAI depends on work properly
+    with this version.
 
     !!! warning "What to do if you have an unsupported version"
 
@@ -50,8 +51,7 @@ experimental versions later.
         and download the appropriate installer package for your
         platform. We recommend [Version
         3.10.9](https://www.python.org/downloads/release/python-3109/),
-        which has been extensively tested with InvokeAI. At this time
-        we do not recommend Python 3.11.
+        which has been extensively tested with InvokeAI.
 
     _Please select your platform in the section below for platform-specific
     setup requirements._
