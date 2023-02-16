@@ -6,7 +6,7 @@ import torch
 
 from .base import Generator
 from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-from ...models.diffusion.shared_invokeai_diffusion import ThresholdSettings
+from ...models.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 
 
 class Txt2Img(Generator):
@@ -33,7 +33,7 @@ class Txt2Img(Generator):
         conditioning_data = (
             ConditioningData(
                 uc, c, cfg_scale, extra_conditioning_info,
-                threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
+                postprocessing_settings = PostprocessingSettings(threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
         def make_image(x_T) -> PIL.Image.Image:

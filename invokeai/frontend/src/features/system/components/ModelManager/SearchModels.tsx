@@ -3,7 +3,16 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import React from 'react';
 
-import { Box, Flex, FormControl, HStack, Text, VStack } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  FormControl,
+  HStack,
+  Radio,
+  RadioGroup,
+  Text,
+  VStack,
+} from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
@@ -135,6 +144,8 @@ export default function SearchModels() {
   );
 
   const [modelsToAdd, setModelsToAdd] = React.useState<string[]>([]);
+  const [modelType, setModelType] = React.useState<string>('v1');
+  const [pathToConfig, setPathToConfig] = React.useState<string>('');
 
   const resetSearchModelHandler = () => {
     dispatch(setSearchFolder(null));
@@ -167,11 +178,19 @@ export default function SearchModels() {
     const modelsToBeAdded = foundModels?.filter((foundModel) =>
       modelsToAdd.includes(foundModel.name)
     );
+
+    const configFiles = {
+      v1: 'configs/stable-diffusion/v1-inference.yaml',
+      v2: 'configs/stable-diffusion/v2-inference-v.yaml',
+      inpainting: 'configs/stable-diffusion/v1-inpainting-inference.yaml',
+      custom: pathToConfig,
+    };
+
     modelsToBeAdded?.forEach((model) => {
       const modelFormat = {
         name: model.name,
         description: '',
-        config: 'configs/stable-diffusion/v1-inference.yaml',
+        config: configFiles[modelType as keyof typeof configFiles],
         weights: model.location,
         vae: '',
         width: 512,
@@ -346,6 +365,55 @@ export default function SearchModels() {
               {t('modelmanager:addSelected')}
             </IAIButton>
           </Flex>
+
+          <Flex
+            gap={4}
+            backgroundColor="var(--background-color)"
+            padding="1rem 1rem"
+            borderRadius="0.2rem"
+            flexDirection="column"
+          >
+            <Flex gap={4}>
+              <Text fontWeight="bold" color="var(--text-color-secondary)">
+                Pick Model Type:
+              </Text>
+              <RadioGroup
+                value={modelType}
+                onChange={(v) => setModelType(v)}
+                defaultValue="v1"
+                name="model_type"
+              >
+                <Flex gap={4}>
+                  <Radio value="v1">{t('modelmanager:v1')}</Radio>
+                  <Radio value="v2">{t('modelmanager:v2')}</Radio>
+                  <Radio value="inpainting">
+                    {t('modelmanager:inpainting')}
+                  </Radio>
+                  <Radio value="custom">{t('modelmanager:customConfig')}</Radio>
+                </Flex>
+              </RadioGroup>
+            </Flex>
+
+            {modelType === 'custom' && (
+              <Flex flexDirection="column" rowGap={2}>
+                <Text
+                  fontWeight="bold"
+                  fontSize="sm"
+                  color="var(--text-color-secondary)"
+                >
+                  {t('modelmanager:pathToCustomConfig')}
+                </Text>
+                <IAIInput
+                  value={pathToConfig}
+                  onChange={(e) => {
+                    if (e.target.value !== '') setPathToConfig(e.target.value);
+                  }}
+                  width="42.5rem"
+                />
+              </Flex>
+            )}
+          </Flex>
+
           <Flex
             rowGap="1rem"
             flexDirection="column"
