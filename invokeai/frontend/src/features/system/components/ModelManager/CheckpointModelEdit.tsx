@@ -27,6 +27,7 @@ import type { InvokeModelConfigProps } from 'app/invokeai';
 import type { RootState } from 'app/store';
 import type { FieldInputProps, FormikProps } from 'formik';
 import { isEqual, pickBy } from 'lodash';
+import ModelConvert from './ModelConvert';
 
 const selector = createSelector(
   [systemSelector],
@@ -101,10 +102,11 @@ export default function CheckpointModelEdit() {
 
   return openModel ? (
     <Flex flexDirection="column" rowGap="1rem" width="100%">
-      <Flex alignItems="center">
+      <Flex alignItems="center" gap={4} justifyContent="space-between">
         <Text fontSize="lg" fontWeight="bold">
           {openModel}
         </Text>
+        <ModelConvert model={openModel} />
       </Flex>
       <Flex
         flexDirection="column"
