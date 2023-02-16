@@ -97,7 +97,7 @@ class ModelGroup(metaclass=ABCMeta):
                f"device={self.execution_device} >"
 
 
-class HotSeatModelGroup(ModelGroup):
+class LazilyLoadedModelGroup(ModelGroup):
     """
     Only one model from this group is loaded on the GPU at a time.
 

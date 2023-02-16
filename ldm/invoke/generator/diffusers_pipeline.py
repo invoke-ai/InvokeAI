@@ -28,7 +28,7 @@ from typing_extensions import ParamSpec
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
-from ..offloading import HotSeatModelGroup, FullyLoadedModelGroup, ModelGroup
+from ..offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
@@ -348,7 +348,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         models = self._submodels
         if self._model_group is not None:
             self._model_group.uninstall(*models)
-        group = HotSeatModelGroup(device)
+        group = LazilyLoadedModelGroup(device)
         group.install(*models)
         self._model_group = group
 
