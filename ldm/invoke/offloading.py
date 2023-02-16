@@ -197,7 +197,7 @@ class HotSeatModelGroup(ModelGroup):
                f"current_model={type(self._current_model_ref()).__name__} >"
 
 
-class SimpleModelGroup(ModelGroup):
+class FullyLoadedModelGroup(ModelGroup):
     """
     A group of models without any implicit loading or unloading.
 
