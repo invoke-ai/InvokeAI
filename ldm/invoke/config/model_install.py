@@ -4,6 +4,14 @@
 # run this script from one with internet connectivity. The
 # two machines must share a common .cache directory.
 
+'''
+This is the npyscreen frontend to the model installation application.
+The work is actually done in a backend file named model_install_backend.py,
+and is kicked off in the beforeEditing() method in a form with 
+the class name "outputForm". This decision allows the output from the
+installation process to be captured and displayed in an attractive form.
+'''
+
 import argparse
 import curses
 import os
@@ -14,22 +22,23 @@ from typing import List
 
 import npyscreen
 import torch
+from pathlib import Path
 from npyscreen import widget
 from omegaconf import OmegaConf
 
 from ..devices import choose_precision, choose_torch_device
 from ..globals import Globals
 from .widgets import MultiSelectColumns, TextBox
-from .model_install_util import (Dataset_path, Default_config_file,
-                                 default_dataset, download_weight_datasets,
-                                 update_config_file, get_root
-                                 )
+from .model_install_backend import (Dataset_path, default_config_file,
+                                    install_requested_models,
+                                    default_dataset, get_root
+                                    )
 
 class addModelsForm(npyscreen.FormMultiPageAction):
     def __init__(self, parentApp, name):
         self.initial_models = OmegaConf.load(Dataset_path)
         try:
-            self.existing_models = OmegaConf.load(Default_config_file)
+            self.existing_models = OmegaConf.load(default_config_file())
         except:
             self.existing_models = dict()
         self.starter_model_list = [
@@ -51,7 +60,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
                 x for x in list(self.initial_models.keys()) if x in self.existing_models
             ]
         )
-        
+        self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
             value='Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields,',
@@ -62,7 +71,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             value='cursor arrows to make a selection, and space to toggle checkboxes.',
             editable=False,
         )
-         
+        self.nextrely += 1
         if len(self.installed_models) > 0:
             self.add_widget_intelligent(
                 npyscreen.TitleFixedText,
@@ -83,10 +92,15 @@ class addModelsForm(npyscreen.FormMultiPageAction):
                 slow_scroll=True,
                 scroll_exit = True,
             )
-            
+            self.purge_deleted = self.add_widget_intelligent(
+                npyscreen.Checkbox,
+                name='Purge deleted models from disk',
+                value=False,
+                scroll_exit=True
+            )
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
-            name="== UNINSTALLED STARTER MODELS ==",
+            name="== UNINSTALLED STARTER MODELS (recommended models selected) ==",
             value="Select from a starter set of Stable Diffusion models from HuggingFace:",
             begin_entry_at=2,
             editable=False,
@@ -99,42 +113,16 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             values=starter_model_labels,
             value=[
                 self.starter_model_list.index(x)
-                for x in self.initial_models
+                for x in self.starter_model_list
                 if x in recommended_models
             ],
             max_height=len(starter_model_labels) + 1,
             relx = 4,
             scroll_exit=True,
         )
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name='== MODEL IMPORT DIRECTORY ==',
-            value='Import all models found in this directory (<tab> autocompletes):',
-            begin_entry_at=2,
-            editable=False,
-            color="CONTROL",
-        )
-        self.autoload_directory = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name='Directory:',
-            select_dir=True,
-            must_exist=True,
-            use_two_lines=False,
-            relx = 4,
-            labelColor='DANGER',
-            scroll_exit=True,
-        )
-        self.autoscan_on_startup = self.add_widget_intelligent(
-            npyscreen.Checkbox,
-            name='Scan this directory each time InvokeAI starts for new models to import.',
-            value=False,
-            relx = 4,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
         for line in [
-                '== INDIVIDUAL MODELS TO IMPORT ==',
-                'Enter list of URLs, paths models or HuggingFace diffusers repository IDs.',
+                '== IMPORT LOCAL AND REMOTE MODELS ==',
+                'Enter URLs, file paths, or HuggingFace diffusers repository IDs separated by spaces.',
                 'Use control-V or shift-control-V to paste:'
         ]:
             self.add_widget_intelligent(
@@ -151,7 +139,29 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             editable=True,
             relx=4
         )
-        self.nextrely += 2
+        self.nextrely += 1
+        self.show_directory_fields= self.add_widget_intelligent(
+            npyscreen.FormControlCheckbox,
+            name='Select a directory for models to import',
+            value=False,
+        )
+        self.autoload_directory = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name='Directory (<tab> autocompletes):',
+            select_dir=True,
+            must_exist=True,
+            use_two_lines=False,
+            labelColor='DANGER',
+            begin_entry_at=34,
+            scroll_exit=True,
+        )
+        self.autoscan_on_startup = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='Scan this directory each time InvokeAI starts for new models to import',
+            value=False,
+            relx = 4,
+            scroll_exit=True,
+        )
         self.convert_models = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
             name='== CONVERT IMPORTED MODELS INTO DIFFUSERS==',
@@ -160,15 +170,12 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             begin_entry_at=4,
             scroll_exit=True,
         )
+        for i in [self.autoload_directory,self.autoscan_on_startup]:
+            self.show_directory_fields.addVisibleWhenSelected(i)
 
     def resize(self):
         super().resize()
         self.models_selected.values = self._get_starter_model_labels()
-        # thought this would dynamically resize the widget, but no luck
-        # self.previously_installed_models.columns = self._get_columns()
-        # self.previously_installed_models.max_height = 2+len(self.installed_models) // self._get_columns()
-        # self.previously_installed_models.make_contained_widgets()
-        # self.previously_installed_models.display()
         
     def _get_starter_model_labels(self)->List[str]:
         window_height, window_width = curses.initscr().getmaxyx()
@@ -177,13 +184,13 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         spacing_width = 2
         description_width = window_width - label_width - checkbox_width - spacing_width
         im = self.initial_models
-        names = list(im.keys())
+        names = self.starter_model_list
         descriptions = [im[x].description [0:description_width-3]+'...'
                         if len(im[x].description) > description_width
                         else im[x].description
-                        for x in im]
+                        for x in names]
         return [
-            f"%-{label_width}s %s" % (names[x], descriptions[x]) for x in range(0,len(im))
+            f"%-{label_width}s %s" % (names[x], descriptions[x]) for x in range(0,len(names))
         ]
 
     def _get_columns(self)->int:
@@ -191,7 +198,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         return 4 if window_width > 240 else 3 if window_width>160 else 2 if window_width>80 else 1
 
     def on_ok(self):
-        self.parentApp.setNextForm('MONITOR_OUTPUT')
+        self.parentApp.setNextForm(None)
         self.editing = False
         self.parentApp.user_cancelled = False
         self.marshall_arguments()
@@ -213,8 +220,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         .convert_to_diffusers: if True, convert legacy checkpoints into diffusers
         '''
         # starter models to install/remove
-        model_names = list(self.initial_models.keys())
-        starter_models = dict(map(lambda x: (model_names[x], True), self.models_selected.value))
+        starter_models = dict(map(lambda x: (self.starter_model_list[x], True), self.models_selected.value))
         if hasattr(self,'previously_installed_models'):
             unchecked = [
                 self.previously_installed_models.values[x]
@@ -224,52 +230,100 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             starter_models.update(
                 map(lambda x: (x, False), unchecked)
             )
+            self.parentApp.purge_deleted_models = self.purge_deleted.value
         self.parentApp.starter_models=starter_models
 
         # load directory and whether to scan on startup
-        self.parentApp.scan_directory = self.autoload_directory.value
-        self.parentApp.autoscan_on_startup = self.autoscan_on_startup.value
+        if self.show_directory_fields.value:
+            self.parentApp.scan_directory = self.autoload_directory.value
+            self.parentApp.autoscan_on_startup = self.autoscan_on_startup.value
+        else:
+            self.parentApp.scan_directory = None
+            self.parentApp.autoscan_on_startup = False
 
         # URLs and the like
         self.parentApp.import_model_paths = self.import_model_paths.value.split()
         self.parentApp.convert_to_diffusers = self.convert_models.value != 0
 
-class Log(object):
-    def __init__(self, writable):
-        self.writable = writable
+# big chunk of dead code
+# was intended to be a status area in which output of installation steps (including tqdm) was logged in real time
+# Problem is that this requires a fork() and pipe, and not sure this will work properly on windows.
+# So not using, but keep this here in case it is useful later
+# class Log(object):
+#     def __init__(self, writable):
+#         self.writable = writable
         
-    def __enter__(self):
-        self._stdout = sys.stdout
-        sys.stdout = self.writable
-        return self
-    def __exit__(self, *args):
-        sys.stdout = self._stdout
+#     def __enter__(self):
+#         self._stdout = sys.stdout
+#         sys.stdout = self.writable
+#         return self
+    
+#     def __exit__(self, *args):
+#         sys.stdout = self._stdout
 
-class outputForm(npyscreen.ActionForm):
-    def create(self):
-        self.buffer = self.add_widget(
-            npyscreen.BufferPager,
-            editable=False,
-        )
+# class outputForm(npyscreen.ActionForm):
+#     def create(self):
+#         self.done = False
+#         self.buffer = self.add_widget(
+#             npyscreen.BufferPager,
+#             editable=False,
+#         )
 
-    def write(self,string):
-        if string != '\n':
-            self.buffer.buffer([string])
+#     def write(self,string):
+#         if string != '\n':
+#             self.buffer.buffer([string])
 
-    def beforeEditing(self):
-        myapplication = self.parentApp
-        with Log(self):
-            print(f'DEBUG: these models will be removed: {[x for x in myapplication.starter_models if not myapplication.starter_models[x]]}')
-            print(f'DEBUG: these models will be installed: {[x for x in myapplication.starter_models if myapplication.starter_models[x]]}')
-            print(f'DEBUG: this directory will be scanned: {myapplication.scan_directory}')
-            print(f'DEBUG: scan at startup time? {myapplication.autoscan_on_startup}')
-            print(f'DEBUG: these things will be downloaded: {myapplication.import_model_paths}')
-            print(f'DEBUG: convert to diffusers? {myapplication.convert_to_diffusers}')
+#     def beforeEditing(self):
+#         if self.done:
+#             return
+#         installApp = self.parentApp
+#         with Log(self):
+#             models_to_remove  = [x for x in installApp.starter_models if not installApp.starter_models[x]]
+#             models_to_install = [x for x in installApp.starter_models if installApp.starter_models[x]]
+#             directory_to_scan = installApp.scan_directory
+#             scan_at_startup = installApp.autoscan_on_startup
+#             potential_models_to_install = installApp.import_model_paths
+#             convert_to_diffusers = installApp.convert_to_diffusers
 
-    def on_ok(self):
-        self.buffer.buffer(['goodbye!'])
-        self.parentApp.setNextForm(None)
-        self.editing = False
+#             print(f'these models will be removed: {models_to_remove}')
+#             print(f'these models will be installed: {models_to_install}')
+#             print(f'this directory will be scanned: {directory_to_scan}')
+#             print(f'these things will be downloaded: {potential_models_to_install}')
+#             print(f'scan at startup time? {scan_at_startup}')
+#             print(f'convert to diffusers? {convert_to_diffusers}')
+#             print(f'\nPress OK to proceed or Cancel.')
+        
+#     def on_cancel(self):
+#         self.buffer.buffer(['goodbye!'])
+#         self.parentApp.setNextForm(None)
+#         self.editing = False
+        
+#     def on_ok(self):
+#         if self.done:
+#             self.on_cancel()
+#             return
+
+#         installApp = self.parentApp
+#         with Log(self):
+#             models_to_remove  = [x for x in installApp.starter_models if not installApp.starter_models[x]]
+#             models_to_install = [x for x in installApp.starter_models if installApp.starter_models[x]]
+#             directory_to_scan = installApp.scan_directory
+#             scan_at_startup = installApp.autoscan_on_startup
+#             potential_models_to_install = installApp.import_model_paths
+#             convert_to_diffusers = installApp.convert_to_diffusers
+
+#             install_requested_models(
+#                 install_initial_models = models_to_install,
+#                 remove_models = models_to_remove,
+#                 scan_directory = Path(directory_to_scan) if directory_to_scan else None,
+#                 external_models = potential_models_to_install,
+#                 scan_at_startup = scan_at_startup,
+#                 convert_to_diffusers = convert_to_diffusers,
+#                 precision = 'float32' if installApp.opt.full_precision else choose_precision(torch.device(choose_torch_device())),
+#                 config_file_path = Path(installApp.opt.config_file) if installApp.opt.config_file else None,
+#             )
+#             self.done = True
+
 
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self, saved_args=None):
@@ -283,54 +337,43 @@ class AddModelApplication(npyscreen.NPSAppManaged):
             addModelsForm,
             name="Add/Remove Models",
         )
-        self.output = self.addForm(
-            'MONITOR_OUTPUT',
-            outputForm,
-            name='Model Install Output'
-        )
+        # self.output = self.addForm(
+        #     'MONITOR_OUTPUT',
+        #     outputForm,
+        #     name='Model Install Output'
+        # )
 
+# --------------------------------------------------------
+def process_and_execute(app: npyscreen.NPSAppManaged):
+    models_to_remove  = [x for x in app.starter_models if not app.starter_models[x]]
+    models_to_install = [x for x in app.starter_models if app.starter_models[x]]
+    directory_to_scan = app.scan_directory
+    scan_at_startup = app.autoscan_on_startup
+    potential_models_to_install = app.import_model_paths
+    convert_to_diffusers = app.convert_to_diffusers
+    
+    install_requested_models(
+        install_initial_models = models_to_install,
+        remove_models = models_to_remove,
+        scan_directory = Path(directory_to_scan) if directory_to_scan else None,
+        external_models = potential_models_to_install,
+        scan_at_startup = scan_at_startup,
+        convert_to_diffusers = convert_to_diffusers,
+        precision = 'float32' if app.opt.full_precision else choose_precision(torch.device(choose_torch_device())),
+        purge_deleted = app.purge_deleted_models,
+        config_file_path = Path(app.opt.config_file) if app.opt.config_file else None,
+    )
+                        
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     if opt.default_only:
         models_to_download = default_dataset()
+        install_requested_models(models_to_download)
     else:
-        myapplication = AddModelApplication()
-        myapplication.run()
-        if not myapplication.user_cancelled:
-            print(f'DEBUG: these models will be removed: {[x for x in myapplication.starter_models if not myapplication.starter_models[x]]}')
-            print(f'DEBUG: these models will be installed: {[x for x in myapplication.starter_models if myapplication.starter_models[x]]}')
-            print(f'DEBUG: this directory will be scanned: {myapplication.scan_directory}')
-            print(f'DEBUG: scan at startup time? {myapplication.autoscan_on_startup}')
-            print(f'DEBUG: these things will be downloaded: {myapplication.import_model_paths}')
-            print(f'DEBUG: convert to diffusers? {myapplication.convert_to_diffusers}')
-        sys.exit(0)
-
-    if not models_to_download:
-        print(
-            '** No models were selected. To run this program again, select "Install initial models" from the invoke script.'
-        )
-        return
-
-    print("** Downloading and installing the selected models.")
-    precision = (
-        "float32"
-        if opt.full_precision
-        else choose_precision(torch.device(choose_torch_device()))
-    )
-    successfully_downloaded = download_weight_datasets(
-        models=models_to_download,
-        access_token=None,
-        precision=precision,
-    )
-
-    update_config_file(successfully_downloaded, opt)
-    if len(successfully_downloaded) < len(models_to_download):
-        print("** Some of the model downloads were not successful")
-
-    print(
-        "\nYour starting models were installed. To find and add more models, see https://invoke-ai.github.io/InvokeAI/installation/050_INSTALLING_MODELS"
-    )
-
+        installApp = AddModelApplication()
+        installApp.opt = opt
+        installApp.run()
+        process_and_execute(installApp)
 
 # -------------------------------------
 def main():
@@ -392,7 +435,7 @@ def main():
                 '** Insufficient horizontal space for the interface. Please make your window wider and try again.'
             )
         else:
-            print(f"** A layout error has occurred: {str(e)}")
+            print(f"** An error has occurred: {str(e)}")
             traceback.print_exc()
         sys.exit(-1)
 

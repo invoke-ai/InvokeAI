@@ -1,35 +1,29 @@
-'''
+"""
 Utility (backend) functions used by model_install.py
-'''
-import argparse
+"""
 import os
 import re
 import shutil
 import sys
-import traceback
 import warnings
-from argparse import Namespace
-from math import ceil
 from pathlib import Path
 from tempfile import TemporaryFile
 
-import npyscreen
 import requests
 from diffusers import AutoencoderKL
 from huggingface_hub import hf_hub_url
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
+from typing import List
 
 import invokeai.configs as configs
-from ldm.invoke.devices import choose_precision, choose_torch_device
-from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import Globals, global_cache_dir, global_config_dir
-from ldm.invoke.config.widgets import MultiSelectColumns
+from ..generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ..globals import Globals, global_cache_dir, global_config_dir
+from ..model_manager import ModelManager
 
 warnings.filterwarnings("ignore")
-import torch
-    
+
 # --------------------------globals-----------------------
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
@@ -37,12 +31,11 @@ Weights_dir = "ldm/stable-diffusion-v1/"
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
 Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
 
-Default_config_file = Path(global_config_dir()) / "models.yaml"
-SD_Configs = Path(global_config_dir()) / "stable-diffusion"
+# initial models omegaconf
+Datasets = None
 
-Datasets = OmegaConf.load(Dataset_path)
-
-Config_preamble = """# This file describes the alternative machine learning models
+Config_preamble = """
+# This file describes the alternative machine learning models
 # available to InvokeAI script.
 #
 # To add a new model, follow the examples below. Each
@@ -50,6 +43,60 @@ Config_preamble = """# This file describes the alternative machine learning mode
 # and the width and height of the images it
 # was trained on.
 """
+
+def default_config_file():
+    return Path(global_config_dir()) / "models.yaml"
+
+def sd_configs():
+    return Path(global_config_dir()) / "stable-diffusion"
+
+def initial_models():
+    global Datasets
+    if Datasets:
+        return Datasets
+    return (Datasets := OmegaConf.load(Dataset_path))
+
+
+def install_requested_models(
+        install_initial_models: List[str] = None,
+        remove_models: List[str] = None,
+        scan_directory: Path = None,
+        external_models: List[str] = None,
+        scan_at_startup: bool = False,
+        convert_to_diffusers: bool = False,
+        precision: str = "float16",
+        purge_deleted: bool = False,
+        config_file_path: Path = None,
+):
+    config_file_path =config_file_path or default_config_file()
+    model_manager = ModelManager(OmegaConf.load(config_file_path),precision=precision)
+    
+    if remove_models and len(remove_models) > 0:
+        print("== DELETING UNCHECKED STARTER MODELS ==")
+        for model in remove_models:
+            print(f'{model}...')
+            model_manager.del_model(model, delete_files=purge_deleted)
+        model_manager.commit(config_file_path)
+    
+    if install_initial_models and len(install_initial_models) > 0:
+        print("== INSTALLING SELECTED STARTER MODELS ==")
+        successfully_downloaded = download_weight_datasets(
+            models=install_initial_models,
+            access_token=None,
+            precision=precision,
+        )  # for historical reasons, we don't use model manager here
+        update_config_file(successfully_downloaded, config_file_path)
+        if len(successfully_downloaded) < len(install_initial_models):
+            print("** Some of the model downloads were not successful")
+
+    if external_models and len(external_models)>0:
+        print("== INSTALLING EXTERNAL MODELS ==")
+        for path_url_or_repo in external_models:
+            model_manager.heuristic_import(
+                path_url_or_repo,
+                convert=convert_to_diffusers,
+                commit_to_conf=config_file_path
+            )
 
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
@@ -60,6 +107,7 @@ def yes_or_no(prompt: str, default_yes=True):
     else:
         return response[0] in ("y", "Y")
 
+
 # -------------------------------------
 def get_root(root: str = None) -> str:
     if root:
@@ -69,11 +117,12 @@ def get_root(root: str = None) -> str:
     else:
         return Globals.root
 
+
 # ---------------------------------------------
 def recommended_datasets() -> dict:
     datasets = dict()
-    for ds in Datasets.keys():
-        if Datasets[ds].get("recommended", False):
+    for ds in initial_models().keys():
+        if initial_models()[ds].get("recommended", False):
             datasets[ds] = True
     return datasets
 
@@ -81,8 +130,8 @@ def recommended_datasets() -> dict:
 # ---------------------------------------------
 def default_dataset() -> dict:
     datasets = dict()
-    for ds in Datasets.keys():
-        if Datasets[ds].get("default", False):
+    for ds in initial_models().keys():
+        if initial_models()[ds].get("default", False):
             datasets[ds] = True
     return datasets
 
@@ -90,7 +139,7 @@ def default_dataset() -> dict:
 # ---------------------------------------------
 def all_datasets() -> dict:
     datasets = dict()
-    for ds in Datasets.keys():
+    for ds in initial_models().keys():
         datasets[ds] = True
     return datasets
 
@@ -102,26 +151,24 @@ def migrate_models_ckpt():
     model_path = os.path.join(Globals.root, Model_dir, Weights_dir)
     if not os.path.exists(os.path.join(model_path, "model.ckpt")):
         return
-    new_name = Datasets["stable-diffusion-1.4"]["file"]
-    print('You seem to have the Stable Diffusion v4.1 "model.ckpt" already installed.')
-    rename = yes_or_no(f'Ok to rename it to "{new_name}" for future reference?')
-    if rename:
-        print(f"model.ckpt => {new_name}")
-        os.replace(
-            os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name)
-        )
+    new_name = initial_models()["stable-diffusion-1.4"]["file"]
+    print('The Stable Diffusion v4.1 "model.ckpt" is already installed. The name will be changed to {new_name} to avoid confusion.')
+    print(f"model.ckpt => {new_name}")
+    os.replace(
+        os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name)
+    )
 
 
 # ---------------------------------------------
 def download_weight_datasets(
-    models: dict, access_token: str, precision: str = "float32"
+    models: List[str], access_token: str, precision: str = "float32"
 ):
     migrate_models_ckpt()
     successful = dict()
-    for mod in models.keys():
+    for mod in models:
         print(f"Downloading {mod}:")
         successful[mod] = _download_repo_or_file(
-            Datasets[mod], access_token, precision=precision
+            initial_models()[mod], access_token, precision=precision
         )
     return successful
 
@@ -255,21 +302,21 @@ def hf_download_with_resume(
 
 
 # ---------------------------------------------
-def update_config_file(successfully_downloaded: dict, opt: dict):
+def update_config_file(successfully_downloaded: dict, config_file: Path):
     config_file = (
-        Path(opt.config_file) if opt.config_file is not None else Default_config_file
+        Path(config_file) if config_file is not None else default_config_file()
     )
 
     # In some cases (incomplete setup, etc), the default configs directory might be missing.
     # Create it if it doesn't exist.
     # this check is ignored if opt.config_file is specified - user is assumed to know what they
     # are doing if they are passing a custom config file from elsewhere.
-    if config_file is Default_config_file and not config_file.parent.exists():
+    if config_file is default_config_file() and not config_file.parent.exists():
         configs_src = Dataset_path.parent
-        configs_dest = Default_config_file.parent
+        configs_dest = default_config_file().parent
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
-    yaml = new_config_file_contents(successfully_downloaded, config_file, opt)
+    yaml = new_config_file_contents(successfully_downloaded, config_file)
 
     try:
         backup = None
@@ -306,7 +353,7 @@ def update_config_file(successfully_downloaded: dict, opt: dict):
 
 # ---------------------------------------------
 def new_config_file_contents(
-    successfully_downloaded: dict, config_file: Path, opt: dict
+        successfully_downloaded: dict, config_file: Path,
 ) -> str:
     if config_file.exists():
         conf = OmegaConf.load(str(config_file.expanduser().resolve()))
@@ -319,10 +366,10 @@ def new_config_file_contents(
         # version of the model was previously defined, and whether the current
         # model is a diffusers (indicated with a path)
         if conf.get(model) and Path(successfully_downloaded[model]).is_dir():
-            offer_to_delete_weights(model, conf[model], opt.yes_to_all)
+            delete_weights(model, conf[model])
 
         stanza = {}
-        mod = Datasets[model]
+        mod = initial_models()[model]
         stanza["description"] = mod["description"]
         stanza["repo_id"] = mod["repo_id"]
         stanza["format"] = mod["format"]
@@ -336,7 +383,7 @@ def new_config_file_contents(
             stanza["weights"] = os.path.relpath(
                 successfully_downloaded[model], start=Globals.root
             )
-            stanza["config"] = os.path.normpath(os.path.join(SD_Configs, mod["config"]))
+            stanza["config"] = os.path.normpath(os.path.join(sd_configs(), mod["config"]))
         if "vae" in mod:
             if "file" in mod["vae"]:
                 stanza["vae"] = os.path.normpath(
@@ -359,20 +406,20 @@ def new_config_file_contents(
 
 
 # ---------------------------------------------
-def offer_to_delete_weights(model_name: str, conf_stanza: dict, yes_to_all: bool):
+def delete_weights(model_name: str, conf_stanza: dict):
     if not (weights := conf_stanza.get("weights")):
         return
     if re.match("/VAE/", conf_stanza.get("config")):
         return
-    if yes_to_all or yes_or_no(
-        f"\n** The checkpoint version of {model_name} is superseded by the diffusers version. Delete the original file {weights}?",
-        default_yes=False,
-    ):
-        weights = Path(weights)
-        if not weights.is_absolute():
-            weights = Path(Globals.root) / weights
+
+    print(
+        f"\n** The checkpoint version of {model_name} is superseded by the diffusers version. Deleting the original file {weights}?"
+    )
+          
+    weights = Path(weights)
+    if not weights.is_absolute():
+        weights = Path(Globals.root) / weights
         try:
             weights.unlink()
         except OSError as e:
             print(str(e))
-

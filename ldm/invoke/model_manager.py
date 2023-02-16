@@ -11,6 +11,7 @@ import gc
 import hashlib
 import io
 import os
+import re
 import sys
 import textwrap
 import time
@@ -699,7 +700,78 @@ class ModelManager(object):
             self.commit(commit_to_conf)
         return True
 
-    def autoconvert_weights(
+    def heuristic_import(
+            self,
+            path_url_or_repo: str,
+            convert: bool= False,
+            commit_to_conf: Path=None,
+    ):
+        model_path = None
+        thing = path_url_or_repo  # to save typing
+        
+        if thing.startswith(('http:','https:','ftp:')):
+            print(f'* {thing} appears to be a URL')
+            model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')  # _resolve_path does a download if needed
+
+        elif Path(thing).is_file() and thing.endswith(('.ckpt','.safetensors')):
+            print(f'* {thing} appears to be a checkpoint file on disk')
+            model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')
+            
+        elif Path(thing).is_dir() and Path(thing, 'model_index.json').exists():
+            print(f'* {thing} appears to be a diffusers file on disk')
+            self.import_diffusers_model(thing, commit_to_conf=commit_to_conf)
+
+        elif Path(thing).is_dir():
+            print(f'* {thing} appears to be a directory. Will scan for models to import')
+            for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
+                self.heuristic_import(m, convert, commit_to_conf=commit_to_conf)
+            return
+
+        elif re.match(r'^[\w.+-]+/[\w.+-]+$', thing):
+            print(f'* {thing} appears to be a HuggingFace diffusers repo_id')
+            self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
+
+        else:
+            print(f"* {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
+
+        # Model_path is set in the event of a legacy checkpoint file.
+        # If not set, we're all done
+        if not model_path:
+            return
+
+        # another round of heuristics to guess the correct config file.
+        model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+        
+        checkpoint = safetensors.torch.load_file(model_path) if model_path.suffix == '.safetensors' else torch.load(model_path)
+        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+        if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
+            print(f'* {thing} appears to be an SD-v2 model; model will be converted to diffusers format')
+            model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
+            convert = True
+        elif re.search('inpaint', model_path, flags=re.IGNORECASE):
+            print(f'* {thing} appears to be an SD-v1 inpainting model')
+            model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+        else:
+            print(f'* {thing} appears to be an SD-v1 model')
+
+        if convert:
+            diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir, model_path.stem)
+            self.convert_and_import(
+                model_path,
+                diffusers_path=diffuser_path,
+                vae=dict(repo_id='stabilityai/sd-vae-ft-mse'),
+                original_config_file=model_config_file,
+                commit_to_conf=commit_to_conf,
+            )
+        else:
+            self.import_ckpt_model(
+                model_path,
+                config=model_config_file,
+                vae=Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt'),
+                commit_to_conf=commit_to_conf,
+            )
+        
+    def autoconvert_weights (
         self,
         conf_path: Path,
         weights_directory: Path = None,
@@ -750,7 +822,6 @@ class ModelManager(object):
         into models.yaml.
         """
         new_config = None
-        import transformers
 
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
 
