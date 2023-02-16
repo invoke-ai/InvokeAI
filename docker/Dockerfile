@@ -52,6 +52,7 @@ RUN \
     python3-dev>=${PYTHON_VERSION}
 
 # prepare pip for buildkit cache
+ARG APPNAME=InvokeAI
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
 ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
 RUN mkdir -p ${PIP_CACHE_DIR}
@@ -79,6 +80,8 @@ RUN python3 -c "from patchmatch import patch_match"
 FROM python-base AS runtime
 
 # Create a new user
+ARG APPDIR=/usr/src
+ARG APPNAME=InvokeAI
 ARG UNAME=appuser
 RUN useradd \
   --no-log-init \
