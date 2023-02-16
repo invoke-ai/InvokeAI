@@ -707,21 +707,19 @@ class ModelManager(object):
             convert: bool= False,
             commit_to_conf: Path=None,
     ):
-        model_path = None
+        model_path: Path = None
         thing = path_url_or_repo  # to save typing
 
-        print(f'here i am; thing={thing}, convert={convert}')
-        
         if thing.startswith(('http:','https:','ftp:')):
-            print(f'* {thing} appears to be a URL')
+            print(f'>> {thing} appears to be a URL')
             model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')  # _resolve_path does a download if needed
 
         elif Path(thing).is_file() and thing.endswith(('.ckpt','.safetensors')):
-            print(f'* {thing} appears to be a checkpoint file on disk')
+            print(f'>> {thing} appears to be a checkpoint file on disk')
             model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')
             
         elif Path(thing).is_dir() and Path(thing, 'model_index.json').exists():
-            print(f'* {thing} appears to be a diffusers file on disk')
+            print(f'>> {thing} appears to be a diffusers file on disk')
             model_name = self.import_diffusers_model(
                 thing,
                 vae=dict(repo_id='stabilityai/sd-vae-ft-mse'),                
@@ -729,39 +727,44 @@ class ModelManager(object):
             )
 
         elif Path(thing).is_dir():
-            print(f'* {thing} appears to be a directory. Will scan for models to import')
+            print(f'>> {thing} appears to be a directory. Will scan for models to import')
             for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
                 print('***',m)
                 self.heuristic_import(str(m), convert, commit_to_conf=commit_to_conf)
             return
 
         elif re.match(r'^[\w.+-]+/[\w.+-]+$', thing):
-            print(f'* {thing} appears to be a HuggingFace diffusers repo_id')
+            print(f'>> {thing} appears to be a HuggingFace diffusers repo_id')
             model_name = self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
             pipeline,_,_,_ = self._load_diffusers_model(self.config[model_name])
 
         else:
-            print(f"* {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
+            print(f">> {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
 
         # Model_path is set in the event of a legacy checkpoint file.
         # If not set, we're all done
         if not model_path:
             return
 
+        if model_path.stem in self.config:  #already imported
+            return
+
         # another round of heuristics to guess the correct config file.
-        model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+        model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
         
         checkpoint = safetensors.torch.load_file(model_path) if model_path.suffix == '.safetensors' else torch.load(model_path)
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-            print(f'* {thing} appears to be an SD-v2 model; model will be converted to diffusers format')
+            print(f'>> {thing} appears to be an SD-v2 model; model will be converted to diffusers format')
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
             convert = True
+            
         elif re.search('inpaint', str(model_path), flags=re.IGNORECASE):
-            print(f'* {thing} appears to be an SD-v1 inpainting model')
+            print(f'>> {thing} appears to be an SD-v1 inpainting model')
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+            
         else:
-            print(f'* {thing} appears to be an SD-v1 model')
+            print(f'>> {thing} appears to be an SD-v1 model')
 
         if convert:
             diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir, model_path.stem)
@@ -776,10 +779,12 @@ class ModelManager(object):
             self.import_ckpt_model(
                 model_path,
                 config=model_config_file,
-                vae=Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt'),
+                vae=str(Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt')),
                 commit_to_conf=commit_to_conf,
             )
-        
+
+    # this is a defunct method, superseded by heuristic_import()
+    # left here during transition
     def autoconvert_weights (
         self,
         conf_path: Path,
@@ -799,7 +804,7 @@ class ModelManager(object):
         ckpt_files = dict()
         for root, dirs, files in os.walk(weights_directory):
             for f in files:
-                if not f.endswith(".ckpt"):
+                if not f.endswith((".ckpt",".safetensors")):
                     continue
                 basename = Path(f).stem
                 dest = Path(dest_directory, basename)

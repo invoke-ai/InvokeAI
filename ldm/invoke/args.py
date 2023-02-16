@@ -528,10 +528,16 @@ class Args(object):
             help='Check for and blur potentially NSFW images. Use --no-nsfw_checker to disable.',
         )
         model_group.add_argument(
+            '--autoimport',
+            default=None,
+            type=str,
+            help='Check the indicated directory for .ckpt/.safetensors weights files at startup and import directly',
+        )
+        model_group.add_argument(
             '--autoconvert',
             default=None,
             type=str,
-            help='Check the indicated directory for .ckpt weights files at startup and import as optimized diffuser models',
+            help='Check the indicated directory for .ckpt/.safetensors weights files at startup and import as optimized diffuser models',
         )
         model_group.add_argument(
             '--patchmatch',

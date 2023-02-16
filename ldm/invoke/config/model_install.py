@@ -100,7 +100,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             )
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
-            name="== UNINSTALLED STARTER MODELS (recommended models selected) ==",
+            name="== STARTER MODELS (recommended ones selected) ==",
             value="Select from a starter set of Stable Diffusion models from HuggingFace:",
             begin_entry_at=2,
             editable=False,
@@ -221,6 +221,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         '''
         # starter models to install/remove
         starter_models = dict(map(lambda x: (self.starter_model_list[x], True), self.models_selected.value))
+        self.parentApp.purge_deleted_models=False
         if hasattr(self,'previously_installed_models'):
             unchecked = [
                 self.previously_installed_models.values[x]
@@ -243,7 +244,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
 
         # URLs and the like
         self.parentApp.import_model_paths = self.import_model_paths.value.split()
-        self.parentApp.convert_to_diffusers = self.convert_models.value == 1
+        self.parentApp.convert_to_diffusers = self.convert_models.value[0] == 1
 
 # big chunk of dead code
 # was intended to be a status area in which output of installation steps (including tqdm) was logged in real time

@@ -142,12 +142,11 @@ def main():
         report_model_error(opt, e)
 
     # try to autoconvert new models
-    # autoimport new .ckpt files
+    if path := opt.autoimport:
+        gen.model_manager.heuristic_import(str(path), convert=False, commit_to_conf=opt.conf)
+        
     if path := opt.autoconvert:
-        gen.model_manager.autoconvert_weights(
-            conf_path=opt.conf,
-            weights_directory=path,
-        )
+        gen.model_manager.heuristic_import(str(path), convert=True, commit_to_conf=opt.conf)
 
     # web server loops forever
     if opt.web or opt.gui:
@@ -581,7 +580,7 @@ def import_model(model_path: str, gen, opt, completer):
     (3) a huggingface repository id; or (4) a local directory containing a
     diffusers model.
     """
-    model.path = model_path.replace('\\','/') # windows
+    model_path = model_path.replace('\\','/') # windows
     model_name = None
 
     if model_path.startswith(('http:','https:','ftp:')):
@@ -653,7 +652,7 @@ def import_checkpoint_list(models: List[Path], gen, opt, completer)->List[str]:
                     print(f'>> Model {model.stem} imported successfully')
                     model_names.append(model_name)
                 else:
-                    printf('** Model {model} failed to import')
+                    print(f'** Model {model} failed to import')
                 print()
     return model_names
 
@@ -709,7 +708,8 @@ def import_ckpt_model(
         vae = input('VAE file for this model (leave blank for none): ').strip() or None
         done = (not vae) or os.path.exists(vae)
     completer.complete_extensions(None)
-
+    config_file = _ask_for_config_file(path_or_url, completer)
+    
     if not manager.import_ckpt_model(
             path_or_url,
             config = config_file,
@@ -786,7 +786,8 @@ def optimize_model(model_name_or_path: Union[Path,str], gen, opt, completer):
     model_name_or_path = model_name_or_path.replace('\\','/') # windows
     manager = gen.model_manager
     ckpt_path = None
-
+    original_config_file = None
+    
     if model_name_or_path == gen.model_name:
         print("** Can't convert the active model. !switch to another model first. **")
         return

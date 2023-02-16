@@ -31,10 +31,8 @@ from transformers import (
 )
 
 import invokeai.configs as configs
-from ldm.invoke.config.model_install import (
-    download_from_hf,
-    select_and_download_models,
-)
+from ldm.invoke.config.model_install_backend import download_from_hf
+from ldm.invoke.config.model_install import select_and_download_models
 from ldm.invoke.globals import Globals, global_config_dir
 from ldm.invoke.readline import generic_completer
 

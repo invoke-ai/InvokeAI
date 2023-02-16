@@ -69,6 +69,9 @@ def install_requested_models(
         config_file_path: Path = None,
 ):
     config_file_path=config_file_path or default_config_file()
+    if not config_file_path.exists():
+        open(config_file_path,'w')
+            
     model_manager= ModelManager(OmegaConf.load(config_file_path),precision=precision)
     
     if remove_models and len(remove_models) > 0:
@@ -84,12 +87,20 @@ def install_requested_models(
             models=install_initial_models,
             access_token=None,
             precision=precision,
-        )  # for historical reasons, we don't use model manager here
+        )  # FIX: for historical reasons, we don't use model manager here
         update_config_file(successfully_downloaded, config_file_path)
         if len(successfully_downloaded) < len(install_initial_models):
             print("** Some of the model downloads were not successful")
 
-    if external_models and len(external_models)>0:
+    # due to above, we have to reload the model manager because conf file
+    # was changed behind its back
+    model_manager= ModelManager(OmegaConf.load(config_file_path),precision=precision)
+
+    external_models = external_models or list()
+    if scan_directory:
+        external_models.append(str(scan_directory))
+
+    if len(external_models)>0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
             try:
@@ -102,6 +113,18 @@ def install_requested_models(
                 sys.exit(-1)
             except Exception:
                 pass
+
+    if scan_at_startup and scan_directory.is_dir():
+        argument = '--autoconvert' if convert_to_diffusers else '--autoimport'
+        initfile = Path(Globals.root, Globals.initfile)
+        replacement = Path(Globals.root, f'{Globals.initfile}.new')
+        with open(initfile,'r') as input:
+            with open(replacement,'w') as output:
+                while line := input.readline():
+                    if not line.startswith(argument):
+                        output.writelines([line])
+                output.writelines([f'{argument} {str(scan_directory)}'])
+        os.replace(replacement,initfile)
             
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
