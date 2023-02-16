@@ -87,7 +87,8 @@ RUN useradd \
   --no-log-init \
   -m \
   -U \
-  "${UNAME}"
+  "${UNAME}" \
+  -u 1000
 
 # create volume directory
 ARG VOLUME_DIR=/data
