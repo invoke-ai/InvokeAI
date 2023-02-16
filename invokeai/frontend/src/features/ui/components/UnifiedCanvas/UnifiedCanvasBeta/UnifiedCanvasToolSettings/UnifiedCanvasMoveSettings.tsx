@@ -5,7 +5,7 @@ import UnifiedCanvasSnapToGrid from './UnifiedCanvasSnapToGrid';
 
 export default function UnifiedCanvasMoveSettings() {
   return (
-    <Flex alignItems={'center'} gap="1rem">
+    <Flex alignItems="center" gap="1rem">
       <UnifiedCanvasShowGrid />
       <UnifiedCanvasSnapToGrid />
       <UnifiedCanvasDarkenOutsideSelection />

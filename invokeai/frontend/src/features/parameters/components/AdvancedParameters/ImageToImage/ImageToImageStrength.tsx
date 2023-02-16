@@ -36,7 +36,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       styleClass={styleClass}
       withInput
       withSliderMarks
-      inputWidth={'5.5rem'}
+      inputWidth="5.5rem"
       withReset
       handleReset={handleImg2ImgStrengthReset}
     />

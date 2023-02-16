@@ -206,7 +206,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
             </div>
 
             <div className="settings-modal-reset">
-              <Heading size={'md'}>{t('settings:resetWebUI')}</Heading>
+              <Heading size="md">{t('settings:resetWebUI')}</Heading>
               <Button colorScheme="red" onClick={handleClickResetWebUI}>
                 {t('settings:resetWebUI')}
               </Button>
@@ -232,8 +232,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         <ModalOverlay bg="blackAlpha.300" backdropFilter="blur(40px)" />
         <ModalContent>
           <ModalBody pb={6} pt={6}>
-            <Flex justifyContent={'center'}>
-              <Text fontSize={'lg'}>
+            <Flex justifyContent="center">
+              <Text fontSize="lg">
                 <Text>{t('settings:resetComplete')}</Text>
               </Text>
             </Flex>
