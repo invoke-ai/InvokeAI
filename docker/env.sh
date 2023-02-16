@@ -46,6 +46,10 @@ REPOSITORY_NAME="${REPOSITORY_NAME-$(basename "$(git rev-parse --show-toplevel)"
 REPOSITORY_NAME="${REPOSITORY_NAME,,}"
 VOLUMENAME="${VOLUMENAME-"${REPOSITORY_NAME}_data"}"
 ARCH="${ARCH-$(uname -m)}"
+if [ $ARCH == "aarch64" ]
+then
+   ARCH=arm64
+fi
 PLATFORM="${PLATFORM-linux/${ARCH}}"
 INVOKEAI_BRANCH="${INVOKEAI_BRANCH-$(git branch --show)}"
 CONTAINER_REGISTRY="${CONTAINER_REGISTRY-"ghcr.io"}"
