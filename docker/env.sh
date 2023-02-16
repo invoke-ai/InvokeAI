@@ -13,10 +13,10 @@ if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
   fi
 
   # Decide which container flavor to build if not specified
-  if [[ -z "$CONTAINER_FLAVOR" ]] && python -c "import torch" &>/dev/null; then
+  if [[ -z "$CONTAINER_FLAVOR" ]] && python3 -c "import torch" &>/dev/null; then
     # Check for CUDA and ROCm
-    CUDA_AVAILABLE=$(python -c "import torch;print(torch.cuda.is_available())")
-    ROCM_AVAILABLE=$(python -c "import torch;print(torch.version.hip is not None)")
+    CUDA_AVAILABLE=$(python3 -c "import torch;print(torch.cuda.is_available())")
+    ROCM_AVAILABLE=$(python3 -c "import torch;print(torch.version.hip is not None)")
     if [[ "${CUDA_AVAILABLE}" == "True" ]]; then
       CONTAINER_FLAVOR="cuda"
     elif [[ "${ROCM_AVAILABLE}" == "True" ]]; then
