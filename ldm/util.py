@@ -318,8 +318,6 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f'DEBUG: after many manipulations, dest={dest}')
-
     header = {"Authorization": f"Bearer {access_token}"} if access_token else {}
     open_mode = "wb"
     exist_size = 0

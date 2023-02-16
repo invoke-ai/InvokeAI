@@ -643,7 +643,7 @@ class ModelManager(object):
         self.add_model(model_name, new_config, True)
         if commit_to_conf:
             self.commit(commit_to_conf)
-        return True
+        return model_name
 
     def import_ckpt_model(
         self,
@@ -709,6 +709,8 @@ class ModelManager(object):
     ):
         model_path = None
         thing = path_url_or_repo  # to save typing
+
+        print(f'here i am; thing={thing}, convert={convert}')
         
         if thing.startswith(('http:','https:','ftp:')):
             print(f'* {thing} appears to be a URL')
@@ -720,17 +722,23 @@ class ModelManager(object):
             
         elif Path(thing).is_dir() and Path(thing, 'model_index.json').exists():
             print(f'* {thing} appears to be a diffusers file on disk')
-            self.import_diffusers_model(thing, commit_to_conf=commit_to_conf)
+            model_name = self.import_diffusers_model(
+                thing,
+                vae=dict(repo_id='stabilityai/sd-vae-ft-mse'),                
+                commit_to_conf=commit_to_conf
+            )
 
         elif Path(thing).is_dir():
             print(f'* {thing} appears to be a directory. Will scan for models to import')
             for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
-                self.heuristic_import(m, convert, commit_to_conf=commit_to_conf)
+                print('***',m)
+                self.heuristic_import(str(m), convert, commit_to_conf=commit_to_conf)
             return
 
         elif re.match(r'^[\w.+-]+/[\w.+-]+$', thing):
             print(f'* {thing} appears to be a HuggingFace diffusers repo_id')
-            self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
+            model_name = self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
+            pipeline,_,_,_ = self._load_diffusers_model(self.config[model_name])
 
         else:
             print(f"* {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
@@ -749,7 +757,7 @@ class ModelManager(object):
             print(f'* {thing} appears to be an SD-v2 model; model will be converted to diffusers format')
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
             convert = True
-        elif re.search('inpaint', model_path, flags=re.IGNORECASE):
+        elif re.search('inpaint', str(model_path), flags=re.IGNORECASE):
             print(f'* {thing} appears to be an SD-v1 inpainting model')
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
         else:
@@ -833,7 +841,7 @@ class ModelManager(object):
             return
 
         model_name = model_name or diffusers_path.name
-        model_description = model_description or "Optimized version of {model_name}"
+        model_description = model_description or f"Optimized version of {model_name}"
         print(f">> Optimizing {model_name} (30-60s)")
         try:
             # By passing the specified VAE to the conversion function, the autoencoder

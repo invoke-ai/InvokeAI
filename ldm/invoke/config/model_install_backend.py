@@ -68,8 +68,8 @@ def install_requested_models(
         purge_deleted: bool = False,
         config_file_path: Path = None,
 ):
-    config_file_path =config_file_path or default_config_file()
-    model_manager = ModelManager(OmegaConf.load(config_file_path),precision=precision)
+    config_file_path=config_file_path or default_config_file()
+    model_manager= ModelManager(OmegaConf.load(config_file_path),precision=precision)
     
     if remove_models and len(remove_models) > 0:
         print("== DELETING UNCHECKED STARTER MODELS ==")
@@ -92,12 +92,17 @@ def install_requested_models(
     if external_models and len(external_models)>0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
-            model_manager.heuristic_import(
-                path_url_or_repo,
-                convert=convert_to_diffusers,
-                commit_to_conf=config_file_path
-            )
-
+            try:
+                model_manager.heuristic_import(
+                    path_url_or_repo,
+                    convert=convert_to_diffusers,
+                    commit_to_conf=config_file_path
+                )
+            except KeyboardInterrupt:
+                sys.exit(-1)
+            except Exception:
+                pass
+            
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
     default = "y" if default_yes else "n"

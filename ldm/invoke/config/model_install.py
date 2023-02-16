@@ -243,7 +243,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
 
         # URLs and the like
         self.parentApp.import_model_paths = self.import_model_paths.value.split()
-        self.parentApp.convert_to_diffusers = self.convert_models.value != 0
+        self.parentApp.convert_to_diffusers = self.convert_models.value == 1
 
 # big chunk of dead code
 # was intended to be a status area in which output of installation steps (including tqdm) was logged in real time
