@@ -29,15 +29,15 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
   if (!shouldDisplayGuides) return null;
 
   return (
-    <Popover trigger={'hover'}>
+    <Popover trigger="hover">
       <PopoverTrigger>
         <Box>{children}</Box>
       </PopoverTrigger>
       <PopoverContent
-        className={`guide-popover-content`}
+        className="guide-popover-content"
         maxWidth="400px"
         onClick={(e) => e.preventDefault()}
-        cursor={'initial'}
+        cursor="initial"
       >
         <PopoverArrow className="guide-popover-arrow" />
         <div className="guide-popover-guide-content">{text}</div>

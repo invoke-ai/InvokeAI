@@ -54,7 +54,7 @@ export default function LanguagePicker() {
           aria-label={t('common:languagePickerLabel')}
           tooltip={t('common:languagePickerLabel')}
           icon={<FaLanguage />}
-          size={'sm'}
+          size="sm"
           variant="link"
           data-variant="link"
           fontSize={26}

@@ -4,7 +4,7 @@ import UnifiedCanvasLimitStrokesToBox from './UnifiedCanvasLimitStrokesToBox';
 
 export default function UnifiedCanvasBaseBrushSettings() {
   return (
-    <Flex gap={'1rem'} alignItems="center">
+    <Flex gap="1rem" alignItems="center">
       <UnifiedCanvasBrushSettings />
       <UnifiedCanvasLimitStrokesToBox />
     </Flex>

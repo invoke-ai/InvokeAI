@@ -36,7 +36,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
         <Line
           key={i}
           points={line.points}
-          stroke={'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
+          stroke="rgb(0,0,0)" // The lines can be any color, just need alpha > 0
           strokeWidth={line.strokeWidth * 2}
           tension={0}
           lineCap="round"

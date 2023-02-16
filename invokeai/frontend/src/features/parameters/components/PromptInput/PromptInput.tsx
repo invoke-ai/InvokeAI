@@ -71,7 +71,7 @@ const PromptInput = () => {
           id="prompt"
           name="prompt"
           placeholder={t('parameters:promptPlaceholder')}
-          size={'lg'}
+          size="lg"
           value={prompt}
           onChange={handleChangePrompt}
           onKeyDown={handleKeyDown}

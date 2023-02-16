@@ -52,16 +52,16 @@ function ModelExistsTag() {
   const { t } = useTranslation();
   return (
     <Box
-      position={'absolute'}
+      position="absolute"
       zIndex={2}
       right={4}
       top={4}
       fontSize="0.7rem"
-      fontWeight={'bold'}
-      backgroundColor={'var(--accent-color)'}
-      padding={'0.2rem 0.5rem'}
+      fontWeight="bold"
+      backgroundColor="var(--accent-color)"
+      padding="0.2rem 0.5rem"
       borderRadius="0.2rem"
-      alignItems={'center'}
+      alignItems="center"
     >
       {t('modelmanager:modelExists')}
     </Box>
@@ -96,7 +96,7 @@ function SearchModelEntry({
         value={model.name}
         label={
           <>
-            <VStack alignItems={'start'}>
+            <VStack alignItems="start">
               <p style={{ fontWeight: 'bold' }}>{model.name}</p>
               <p style={{ fontStyle: 'italic' }}>{model.location}</p>
             </VStack>
@@ -105,9 +105,9 @@ function SearchModelEntry({
         isChecked={modelsToAdd.includes(model.name)}
         isDisabled={existingModels.includes(model.location)}
         onChange={foundModelsChangeHandler}
-        padding={'1rem'}
-        backgroundColor={'var(--background-color)'}
-        borderRadius={'0.5rem'}
+        padding="1rem"
+        backgroundColor="var(--background-color)"
+        borderRadius="0.5rem"
         _checked={{
           backgroundColor: 'var(--accent-color)',
           color: 'var(--text-color)',
@@ -243,12 +243,12 @@ export default function SearchModels() {
     <>
       {searchFolder ? (
         <Flex
-          flexDirection={'column'}
-          padding={'1rem'}
-          backgroundColor={'var(--background-color)'}
+          flexDirection="column"
+          padding="1rem"
+          backgroundColor="var(--background-color)"
           borderRadius="0.5rem"
-          rowGap={'0.5rem'}
-          position={'relative'}
+          rowGap="0.5rem"
+          position="relative"
         >
           <p
             style={{
@@ -271,7 +271,7 @@ export default function SearchModels() {
             aria-label={t('modelmanager:scanAgain')}
             tooltip={t('modelmanager:scanAgain')}
             icon={<BiReset />}
-            position={'absolute'}
+            position="absolute"
             right={16}
             fontSize={18}
             disabled={isProcessing}
@@ -280,7 +280,7 @@ export default function SearchModels() {
           <IAIIconButton
             aria-label={t('modelmanager:clearCheckpointFolder')}
             icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
-            position={'absolute'}
+            position="absolute"
             right={5}
             onClick={resetSearchModelHandler}
           />
@@ -319,8 +319,8 @@ export default function SearchModels() {
         </Formik>
       )}
       {foundModels && (
-        <Flex flexDirection={'column'} rowGap={'1rem'}>
-          <Flex justifyContent={'space-between'} alignItems="center">
+        <Flex flexDirection="column" rowGap="1rem">
+          <Flex justifyContent="space-between" alignItems="center">
             <p>
               {t('modelmanager:modelsFound')}: {foundModels.length}
             </p>
@@ -328,8 +328,8 @@ export default function SearchModels() {
               {t('modelmanager:selected')}: {modelsToAdd.length}
             </p>
           </Flex>
-          <Flex columnGap={'0.5rem'} justifyContent={'space-between'}>
-            <Flex columnGap={'0.5rem'}>
+          <Flex columnGap="0.5rem" justifyContent="space-between">
+            <Flex columnGap="0.5rem">
               <IAIButton
                 isDisabled={modelsToAdd.length === foundModels.length}
                 onClick={addAllToSelected}

@@ -228,13 +228,8 @@ const IAICanvasToolChooserOptions = () => {
           />
         }
       >
-        <Flex
-          minWidth={'15rem'}
-          direction={'column'}
-          gap={'1rem'}
-          width={'100%'}
-        >
-          <Flex gap={'1rem'} justifyContent="space-between">
+        <Flex minWidth="15rem" direction="column" gap="1rem" width="100%">
+          <Flex gap="1rem" justifyContent="space-between">
             <IAISlider
               label={t('unifiedcanvas:brushSize')}
               value={brushSize}

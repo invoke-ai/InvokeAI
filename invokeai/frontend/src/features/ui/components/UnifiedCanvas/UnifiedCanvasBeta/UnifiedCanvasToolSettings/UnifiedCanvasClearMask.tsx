@@ -14,7 +14,7 @@ export default function UnifiedCanvasClearMask() {
 
   return (
     <IAIButton
-      size={'sm'}
+      size="sm"
       leftIcon={<FaTrash />}
       onClick={handleClearMask}
       tooltip={`${t('unifiedcanvas:clearMask')} (Shift+C)`}

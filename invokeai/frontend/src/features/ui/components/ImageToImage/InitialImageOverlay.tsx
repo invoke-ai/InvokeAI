@@ -9,10 +9,10 @@ export default function InitialImageOverlay() {
 
   return initialImage ? (
     <Image
-      fit={'contain'}
+      fit="contain"
       src={typeof initialImage === 'string' ? initialImage : initialImage.url}
-      rounded={'md'}
-      className={'checkerboard'}
+      rounded="md"
+      className="checkerboard"
     />
   ) : null;
 }

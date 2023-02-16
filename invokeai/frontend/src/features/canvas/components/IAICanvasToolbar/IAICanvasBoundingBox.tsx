@@ -269,12 +269,12 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       <Transformer
         anchorCornerRadius={3}
         anchorDragBoundFunc={anchorDragBoundFunc}
-        anchorFill={'rgba(212,216,234,1)'}
+        anchorFill="rgba(212,216,234,1)"
         anchorSize={15}
-        anchorStroke={'rgb(42,42,42)'}
+        anchorStroke="rgb(42,42,42)"
         borderDash={[4, 4]}
         borderEnabled={true}
-        borderStroke={'black'}
+        borderStroke="black"
         draggable={false}
         enabledAnchors={tool === 'move' ? undefined : []}
         flipEnabled={false}

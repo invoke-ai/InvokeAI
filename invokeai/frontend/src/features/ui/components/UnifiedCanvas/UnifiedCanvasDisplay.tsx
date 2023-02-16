@@ -43,7 +43,7 @@ const UnifiedCanvasDisplay = () => {
   }, [dispatch]);
 
   return (
-    <div className={'workarea-single-view'}>
+    <div className="workarea-single-view">
       <div className="workarea-split-view-left">
         <div className="inpainting-main-area">
           <IAICanvasOutpaintingControls />
