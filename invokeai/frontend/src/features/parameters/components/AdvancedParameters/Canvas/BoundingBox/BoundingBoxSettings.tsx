@@ -68,7 +68,7 @@ const BoundingBoxSettings = () => {
   };
 
   return (
-    <Flex direction="column" gap="1rem">
+    <Flex direction="column" gap={2}>
       <IAISlider
         label={t('parameters:width')}
         min={64}
@@ -82,6 +82,7 @@ const BoundingBoxSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetWidth}
+        sliderMarkRightOffset={-7}
       />
       <IAISlider
         label={t('parameters:height')}
@@ -96,6 +97,7 @@ const BoundingBoxSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetHeight}
+        sliderMarkRightOffset={-7}
       />
     </Flex>
   );

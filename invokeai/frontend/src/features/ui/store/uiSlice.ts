@@ -14,6 +14,7 @@ const initialtabsState: UIState = {
   shouldShowImageDetails: false,
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
+  shouldUseSliders: false,
   addNewModelUIOption: null,
 };
 
@@ -66,6 +67,9 @@ export const uiSlice = createSlice({
     ) => {
       state.shouldShowExistingModelsInSearch = action.payload;
     },
+    setShouldUseSliders: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseSliders = action.payload;
+    },
     setAddNewModelUIOption: (state, action: PayloadAction<AddNewModelType>) => {
       state.addNewModelUIOption = action.payload;
     },
@@ -83,6 +87,7 @@ export const {
   setShouldShowImageDetails,
   setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,
+  setShouldUseSliders,
   setAddNewModelUIOption,
 } = uiSlice.actions;
 
