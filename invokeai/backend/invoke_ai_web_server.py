@@ -443,44 +443,47 @@ class InvokeAIWebServer:
 
         @socketio.on('mergeDiffusersModels')
         def merge_diffusers_models(model_merge_info: dict):
-            models_to_merge = model_merge_info['models_to_merge']
-            model_ids_or_paths = [
-                self.generate.model_manager.model_name_or_path(x) for x in models_to_merge]
-            merged_pipe = merge_diffusion_models(
-                model_ids_or_paths, model_merge_info['alpha'], model_merge_info['interp'], model_merge_info['force'])
+            try:
+                models_to_merge = model_merge_info['models_to_merge']
+                model_ids_or_paths = [
+                    self.generate.model_manager.model_name_or_path(x) for x in models_to_merge]
+                merged_pipe = merge_diffusion_models(
+                    model_ids_or_paths, model_merge_info['alpha'], model_merge_info['interp'], model_merge_info['force'])
 
-            dump_path = global_models_dir() / 'merged_models'
-            if model_merge_info['model_merge_save_path'] is not None:
-                dump_path = Path(model_merge_info['model_merge_save_path'])
+                dump_path = global_models_dir() / 'merged_models'
+                if model_merge_info['model_merge_save_path'] is not None:
+                    dump_path = Path(model_merge_info['model_merge_save_path'])
 
-            os.makedirs(dump_path, exist_ok=True)
-            dump_path = dump_path / model_merge_info['merged_model_name']
-            merged_pipe.save_pretrained(dump_path, safe_serialization=1)
+                os.makedirs(dump_path, exist_ok=True)
+                dump_path = dump_path / model_merge_info['merged_model_name']
+                merged_pipe.save_pretrained(dump_path, safe_serialization=1)
 
-            merged_model_config = dict(
-                model_name=model_merge_info['merged_model_name'],
-                description=f'Merge of models {", ".join(models_to_merge)}',
-                commit_to_conf=opt.conf
-            )
+                merged_model_config = dict(
+                    model_name=model_merge_info['merged_model_name'],
+                    description=f'Merge of models {", ".join(models_to_merge)}',
+                    commit_to_conf=opt.conf
+                )
 
-            if vae := self.generate.model_manager.config[models_to_merge[0]].get("vae", None):
+                if vae := self.generate.model_manager.config[models_to_merge[0]].get("vae", None):
+                    print(
+                        f">> Using configured VAE assigned to {models_to_merge[0]}")
+                    merged_model_config.update(vae=vae)
+
+                self.generate.model_manager.import_diffuser_model(
+                    dump_path, **merged_model_config)
+                new_model_list = self.generate.model_manager.list_models()
+
+                socketio.emit(
+                    "modelsMerged",
+                    {"merged_models": models_to_merge,
+                    "merged_model_name": model_merge_info['merged_model_name'],
+                    "model_list": new_model_list, 'update': True},
+                )
+                print(f">> Models Merged: {models_to_merge}")
                 print(
-                    f">> Using configured VAE assigned to {models_to_merge[0]}")
-                merged_model_config.update(vae=vae)
-
-            self.generate.model_manager.import_diffuser_model(
-                dump_path, **merged_model_config)
-            new_model_list = self.generate.model_manager.list_models()
-
-            socketio.emit(
-                "modelsMerged",
-                {"merged_models": models_to_merge,
-                 "merged_model_name": model_merge_info['merged_model_name'],
-                 "model_list": new_model_list, 'update': True},
-            )
-            print(f">> Models Merged: {models_to_merge}")
-            print(
-                f">> New Model Added: {model_merge_info['merged_model_name']}")
+                    f">> New Model Added: {model_merge_info['merged_model_name']}")
+            except Exception as e:
+                self.handle_exceptions(e)
 
         @socketio.on("requestEmptyTempFolder")
         def empty_temp_folder():
