@@ -55,6 +55,10 @@ if [ $ARCH == "aarch64" ]
 then
    ARCH=arm64
 fi
+if [ $ARCH == "x86_64" ]
+then
+   ARCH=amd64
+fi
 PLATFORM="${PLATFORM-linux/${ARCH}}"
 INVOKEAI_BRANCH="${INVOKEAI_BRANCH-$(git branch --show)}"
 CONTAINER_REGISTRY="${CONTAINER_REGISTRY-"ghcr.io"}"
