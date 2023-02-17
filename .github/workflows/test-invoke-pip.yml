@@ -4,18 +4,18 @@ on:
     branches:
       - 'main'
     paths:
-      - '/pyproject.toml'
-      - '/ldm/**'
-      - '/invokeai/backend/**'
-      - '/invokeai/configs/**'
-      - '/invokeai/frontend/dist/**'
+      - 'pyproject.toml'
+      - 'ldm/**'
+      - 'invokeai/backend/**'
+      - 'invokeai/configs/**'
+      - 'invokeai/frontend/dist/**'
   pull_request:
     paths:
-      - '/pyproject.toml'
-      - '/ldm/**'
-      - '/invokeai/backend/**'
-      - '/invokeai/configs/**'
-      - '/invokeai/frontend/dist/**'
+      - 'pyproject.toml'
+      - 'ldm/**'
+      - 'invokeai/backend/**'
+      - 'invokeai/configs/**'
+      - 'invokeai/frontend/dist/**'
     types:
       - 'ready_for_review'
       - 'opened'
