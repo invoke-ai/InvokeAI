@@ -5,6 +5,16 @@ import math
 import npyscreen
 import curses
 
+class IntSlider(npyscreen.Slider):
+    def translate_value(self):
+        stri = "%2d / %2d" % (self.value, self.out_of)
+        l = (len(str(self.out_of))) * 2 + 4
+        stri = stri.rjust(l)
+        return stri
+
+class IntTitleSlider(npyscreen.TitleText):
+    _entry_type = IntSlider
+
 class FloatSlider(npyscreen.Slider):
     # this is supposed to adjust display precision, but doesn't
     def translate_value(self):

@@ -6,10 +6,7 @@
 
 '''
 This is the npyscreen frontend to the model installation application.
-The work is actually done in a backend file named model_install_backend.py,
-and is kicked off in the beforeEditing() method in a form with 
-the class name "outputForm". This decision allows the output from the
-installation process to be captured and displayed in an attractive form.
+The work is actually done in backend code in model_install_backend.py.
 '''
 
 import argparse
@@ -247,9 +244,8 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         self.parentApp.convert_to_diffusers = self.convert_models.value[0] == 1
 
 # big chunk of dead code
-# was intended to be a status area in which output of installation steps (including tqdm) was logged in real time
-# Problem is that this requires a fork() and pipe, and not sure this will work properly on windows.
-# So not using, but keep this here in case it is useful later
+# was intended to be a status area in which output of installation steps (including tqdm) was logged in real time.
+# Not used at the current time but retained for possible future implementation.
 # class Log(object):
 #     def __init__(self, writable):
 #         self.writable = writable
