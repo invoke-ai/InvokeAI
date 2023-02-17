@@ -13,7 +13,7 @@
 [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link]
 
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
-[CI checks on main link]: https://github.com/invoke-ai/InvokeAI/actions/workflows/test-invoke-conda.yml
+[CI checks on main link]:https://github.com/invoke-ai/InvokeAI/actions?query=branch%3Amain
 [discord badge]: https://flat.badgen.net/discord/members/ZmtBAhwWhy?icon=discord
 [discord link]: https://discord.gg/ZmtBAhwWhy
 [github forks badge]: https://flat.badgen.net/github/forks/invoke-ai/InvokeAI?icon=github

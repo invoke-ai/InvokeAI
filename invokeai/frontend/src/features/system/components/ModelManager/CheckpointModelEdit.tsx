@@ -121,7 +121,7 @@ export default function CheckpointModelEdit() {
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap={'0.5rem'} alignItems="start">
+              <VStack rowGap="0.5rem" alignItems="start">
                 {/* Description */}
                 <FormControl
                   isInvalid={!!errors.description && touched.description}
@@ -130,7 +130,7 @@ export default function CheckpointModelEdit() {
                   <FormLabel htmlFor="description" fontSize="sm">
                     {t('modelmanager:description')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="description"
@@ -156,7 +156,7 @@ export default function CheckpointModelEdit() {
                   <FormLabel htmlFor="config" fontSize="sm">
                     {t('modelmanager:config')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="config"
@@ -182,7 +182,7 @@ export default function CheckpointModelEdit() {
                   <FormLabel htmlFor="config" fontSize="sm">
                     {t('modelmanager:modelLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="weights"
@@ -205,7 +205,7 @@ export default function CheckpointModelEdit() {
                   <FormLabel htmlFor="vae" fontSize="sm">
                     {t('modelmanager:vaeLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="vae"
@@ -223,13 +223,13 @@ export default function CheckpointModelEdit() {
                   </VStack>
                 </FormControl>
 
-                <HStack width={'100%'}>
+                <HStack width="100%">
                   {/* Width */}
                   <FormControl isInvalid={!!errors.width && touched.width}>
                     <FormLabel htmlFor="width" fontSize="sm">
                       {t('modelmanager:width')}
                     </FormLabel>
-                    <VStack alignItems={'start'}>
+                    <VStack alignItems="start">
                       <Field id="width" name="width">
                         {({
                           field,
@@ -267,7 +267,7 @@ export default function CheckpointModelEdit() {
                     <FormLabel htmlFor="height" fontSize="sm">
                       {t('modelmanager:height')}
                     </FormLabel>
-                    <VStack alignItems={'start'}>
+                    <VStack alignItems="start">
                       <Field id="height" name="height">
                         {({
                           field,

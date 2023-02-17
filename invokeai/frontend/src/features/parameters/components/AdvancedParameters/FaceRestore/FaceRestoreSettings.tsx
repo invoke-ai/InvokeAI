@@ -63,7 +63,7 @@ const FaceRestoreSettings = () => {
   const { t } = useTranslation();
 
   return (
-    <Flex direction={'column'} gap={2}>
+    <Flex direction="column" gap={2}>
       <IAISelect
         label={t('parameters:type')}
         validValues={FACETOOL_TYPES.concat()}

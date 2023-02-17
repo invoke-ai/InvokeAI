@@ -7,7 +7,7 @@ import VariationAmount from './VariationAmount';
  */
 const VariationsSettings = () => {
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <VariationAmount />
       <SeedWeights />
     </Flex>

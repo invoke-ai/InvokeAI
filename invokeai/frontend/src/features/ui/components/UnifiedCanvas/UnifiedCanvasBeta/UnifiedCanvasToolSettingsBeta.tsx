@@ -28,7 +28,7 @@ export default function UnifiedCanvasToolSettingsBeta() {
   const { tool, layer } = useAppSelector(selector);
 
   return (
-    <Flex height="2rem" minHeight="2rem" maxHeight="2rem" alignItems={'center'}>
+    <Flex height="2rem" minHeight="2rem" maxHeight="2rem" alignItems="center">
       {layer == 'base' && ['brush', 'eraser', 'colorPicker'].includes(tool) && (
         <UnifiedCanvasBaseBrushSettings />
       )}

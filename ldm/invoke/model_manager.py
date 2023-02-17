@@ -26,7 +26,6 @@ import torch
 import transformers
 from diffusers import AutoencoderKL
 from diffusers import logging as dlogging
-from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -49,9 +48,10 @@ class ModelManager(object):
     def __init__(
         self,
         config: OmegaConf,
-        device_type: str = "cpu",
+        device_type: str | torch.device = "cpu",
         precision: str = "float16",
         max_loaded_models=DEFAULT_MAX_MODELS,
+        sequential_offload = False
     ):
         """
         Initialize with the path to the models.yaml config file,
@@ -69,6 +69,7 @@ class ModelManager(object):
         self.models = {}
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
+        self.sequential_offload = sequential_offload
 
     def valid_model(self, model_name: str) -> bool:
         """
@@ -530,7 +531,10 @@ class ModelManager(object):
         dlogging.set_verbosity(verbosity)
         assert pipeline is not None, OSError(f'"{name_or_path}" could not be loaded')
 
-        pipeline.to(self.device)
+        if self.sequential_offload:
+            pipeline.enable_offload_submodels(self.device)
+        else:
+            pipeline.to(self.device)
 
         model_hash = self._diffuser_sha256(name_or_path)
 
@@ -746,7 +750,7 @@ class ModelManager(object):
             return
 
         if model_path.stem in self.config:  #already imported
-            print(f'    > Already imported. Skipping')
+            print('    > Already imported. Skipping')
             return
 
         # another round of heuristics to guess the correct config file.
@@ -755,7 +759,7 @@ class ModelManager(object):
 
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-            print(f'    > SD-v2 model detected; model will be converted to diffusers format')
+            print('    > SD-v2 model detected; model will be converted to diffusers format')
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
             convert = True
             
@@ -765,10 +769,10 @@ class ModelManager(object):
                 state_dict = checkpoint.get('state_dict') or checkpoint
                 in_channels = state_dict['model.diffusion_model.input_blocks.0.0.weight'].shape[1]
                 if in_channels == 9:
-                    print(f'    > SD-v1 inpainting model detected')
+                    print('    > SD-v1 inpainting model detected')
                     model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
                 elif in_channels == 4:
-                    print(f'    > SD-v1 model detected')
+                    print('    > SD-v1 model detected')
                     model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
                 else:
                     print(f'** {thing} does not have an expected number of in_channels ({in_channels}). It will probably break when loaded.')
@@ -1094,12 +1098,12 @@ class ModelManager(object):
         if self.device == "cpu":
             return model
 
-        # diffusers really really doesn't like us moving a float16 model onto CPU
-        verbosity = get_verbosity()
-        set_verbosity_error()
+        if isinstance(model, StableDiffusionGeneratorPipeline):
+            model.offload_all()
+            return model
+
         model.cond_stage_model.device = "cpu"
         model.to("cpu")
-        set_verbosity(verbosity)
 
         for submodel in ("first_stage_model", "cond_stage_model", "model"):
             try:
@@ -1110,6 +1114,10 @@ class ModelManager(object):
 
     def _model_from_cpu(self, model):
         if self.device == "cpu":
+            return model
+
+        if isinstance(model, StableDiffusionGeneratorPipeline):
+            model.ready()
             return model
 
         model.to(self.device)
@@ -1267,7 +1275,7 @@ class ModelManager(object):
         strategy.execute()
 
     @staticmethod
-    def _abs_path(path: Union(str, Path)) -> Path:
+    def _abs_path(path: str | Path) -> Path:
         if path is None or Path(path).is_absolute():
             return path
         return Path(Globals.root, path).resolve()

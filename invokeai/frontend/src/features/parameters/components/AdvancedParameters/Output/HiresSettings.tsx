@@ -49,7 +49,7 @@ const HiresStrength = () => {
       isInteger={false}
       withInput
       withSliderMarks
-      inputWidth={'5.5rem'}
+      inputWidth="5.5rem"
       withReset
       handleReset={handleHiResStrengthReset}
       isSliderDisabled={!hiresFix}
@@ -75,10 +75,10 @@ const HiresSettings = () => {
     dispatch(setHiresFix(e.target.checked));
 
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <IAISwitch
         label={t('parameters:hiresOptim')}
-        fontSize={'md'}
+        fontSize="md"
         isChecked={hiresFix}
         onChange={handleChangeHiresFix}
       />
