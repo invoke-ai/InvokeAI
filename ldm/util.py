@@ -322,7 +322,6 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-
     if dest.exists():
         exist_size = dest.stat().st_size
         header["Range"] = f"bytes={exist_size}-"

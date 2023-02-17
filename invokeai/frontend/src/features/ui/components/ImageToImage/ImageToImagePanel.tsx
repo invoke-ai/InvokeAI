@@ -2,8 +2,6 @@ import { Flex } from '@chakra-ui/react';
 import { Feature } from 'app/features';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import FaceRestoreToggle from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreToggle';
-import ImageFit from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageFit';
-import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
 import ImageToImageOutputSettings from 'features/parameters/components/AdvancedParameters/Output/ImageToImageOutputSettings';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
@@ -17,6 +15,7 @@ import NegativePromptInput from 'features/parameters/components/PromptInput/Nega
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
+import ImageToImageOptions from './ImageToImageOptions';
 
 export default function ImageToImagePanel() {
   const { t } = useTranslation();
@@ -60,11 +59,7 @@ export default function ImageToImagePanel() {
       </Flex>
       <ProcessButtons />
       <MainSettings />
-      <ImageToImageStrength
-        label={t('parameters:img2imgStrength')}
-        styleClass="main-settings-block image-to-image-strength-main-option"
-      />
-      <ImageFit />
+      <ImageToImageOptions />
       <ParametersAccordion accordionInfo={imageToImageAccordions} />
     </InvokeOptionsPanel>
   );

@@ -6,12 +6,12 @@ on:
       - 'update/ci/docker/*'
       - 'update/docker/*'
     paths:
-      - '/pyproject.toml'
-      - '/ldm/**'
-      - '/invokeai/backend/**'
-      - '/invokeai/configs/**'
-      - '/invokeai/frontend/dist/**'
-      - '/docker/Dockerfile'
+      - 'pyproject.toml'
+      - 'ldm/**'
+      - 'invokeai/backend/**'
+      - 'invokeai/configs/**'
+      - 'invokeai/frontend/dist/**'
+      - 'docker/Dockerfile'
     tags:
       - 'v*.*.*'
   workflow_dispatch:

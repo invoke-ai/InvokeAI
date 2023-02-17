@@ -580,7 +580,7 @@ def import_model(model_path: str, gen, opt, completer):
     (3) a huggingface repository id; or (4) a local directory containing a
     diffusers model.
     """
-    model_path = model_path.replace('\\','/') # windows
+    model.path = model_path.replace('\\','/') # windows
     model_name = None
 
     if model_path.startswith(('http:','https:','ftp:')):
@@ -652,7 +652,7 @@ def import_checkpoint_list(models: List[Path], gen, opt, completer)->List[str]:
                     print(f'>> Model {model.stem} imported successfully')
                     model_names.append(model_name)
                 else:
-                    print(f'** Model {model} failed to import')
+                    printf('** Model {model} failed to import')
                 print()
     return model_names
 
@@ -787,7 +787,6 @@ def optimize_model(model_name_or_path: Union[Path,str], gen, opt, completer):
     manager = gen.model_manager
     ckpt_path = None
     original_config_file = None
-    
     if model_name_or_path == gen.model_name:
         print("** Can't convert the active model. !switch to another model first. **")
         return

@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
-import { RootState } from 'app/store';
+import { type RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
@@ -27,9 +27,14 @@ import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
+  type SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { setShouldUseCanvasBetaLayout } from 'features/ui/store/uiSlice';
+import {
+  setShouldUseCanvasBetaLayout,
+  setShouldUseSliders,
+} from 'features/ui/store/uiSlice';
+import { type UIState } from 'features/ui/store/uiTypes';
 import { isEqual, map } from 'lodash';
 import { persistor } from 'persistor';
 import { ChangeEvent, cloneElement, ReactElement } from 'react';
@@ -37,7 +42,7 @@ import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
-  (system, ui) => {
+  (system: SystemState, ui: UIState) => {
     const {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
@@ -47,7 +52,7 @@ const selector = createSelector(
       enableImageDebugging,
     } = system;
 
-    const { shouldUseCanvasBetaLayout } = ui;
+    const { shouldUseCanvasBetaLayout, shouldUseSliders } = ui;
 
     return {
       shouldDisplayInProgressType,
@@ -57,6 +62,7 @@ const selector = createSelector(
       saveIntermediatesInterval,
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
+      shouldUseSliders,
     };
   },
   {
@@ -100,6 +106,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     saveIntermediatesInterval,
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
+    shouldUseSliders,
   } = useAppSelector(selector);
 
   /**
@@ -189,6 +196,14 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 isChecked={shouldUseCanvasBetaLayout}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
+                }
+              />
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={t('settings:useSlidersForAll')}
+                isChecked={shouldUseSliders}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setShouldUseSliders(e.target.checked))
                 }
               />
             </div>
