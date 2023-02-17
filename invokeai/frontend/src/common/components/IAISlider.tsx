@@ -78,7 +78,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     tooltipSuffix = '',
     withSliderMarks = false,
     sliderMarkLeftOffset = 0,
-    sliderMarkRightOffset = -7,
+    sliderMarkRightOffset = -1,
     withInput = false,
     isInteger = false,
     inputWidth = '5.5rem',
@@ -164,6 +164,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     >
       <FormLabel
         className="invokeai__slider-component-label"
+        fontSize="sm"
         {...sliderFormLabelProps}
       >
         {label}

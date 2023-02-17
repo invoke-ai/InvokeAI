@@ -1,6 +1,6 @@
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import IAINumberInput from 'common/components/IAINumberInput';
+import IAISlider from 'common/components/IAISlider';
 import { setThreshold } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 
@@ -11,17 +11,19 @@ export default function Threshold() {
   );
   const { t } = useTranslation();
 
-  const handleChangeThreshold = (v: number) => dispatch(setThreshold(v));
-
   return (
-    <IAINumberInput
+    <IAISlider
       label={t('parameters:noiseThreshold')}
       min={0}
-      max={1000}
-      step={0.1}
-      onChange={handleChangeThreshold}
+      max={1}
+      step={0.005}
+      onChange={(v) => dispatch(setThreshold(v))}
+      handleReset={() => dispatch(setThreshold(0))}
       value={threshold}
-      isInteger={false}
+      withInput
+      withReset
+      withSliderMarks
+      inputWidth="6rem"
     />
   );
 }

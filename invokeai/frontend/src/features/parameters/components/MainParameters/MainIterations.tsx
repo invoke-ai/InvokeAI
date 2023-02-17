@@ -1,39 +1,41 @@
-import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
-import {
-  GenerationState,
-  setIterations,
-} from 'features/parameters/store/generationSlice';
-import { isEqual } from 'lodash';
+import IAISlider from 'common/components/IAISlider';
+import { setIterations } from 'features/parameters/store/generationSlice';
 
 import { useTranslation } from 'react-i18next';
 
-const mainIterationsSelector = createSelector(
-  [(state: RootState) => state.generation],
-  (parameters: GenerationState) => {
-    const { iterations } = parameters;
-
-    return {
-      iterations,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
 export default function MainIterations() {
+  const iterations = useAppSelector(
+    (state: RootState) => state.generation.iterations
+  );
+
+  const shouldUseSliders = useAppSelector(
+    (state: RootState) => state.ui.shouldUseSliders
+  );
+
   const dispatch = useAppDispatch();
-  const { iterations } = useAppSelector(mainIterationsSelector);
   const { t } = useTranslation();
 
   const handleChangeIterations = (v: number) => dispatch(setIterations(v));
 
-  return (
+  return shouldUseSliders ? (
+    <IAISlider
+      label={t('parameters:images')}
+      step={1}
+      min={1}
+      max={16}
+      onChange={handleChangeIterations}
+      handleReset={() => dispatch(setIterations(1))}
+      value={iterations}
+      withInput
+      withReset
+      withSliderMarks
+      sliderMarkRightOffset={-5}
+      sliderNumberInputProps={{ max: 9999 }}
+    />
+  ) : (
     <IAINumberInput
       label={t('parameters:images')}
       step={1}
