@@ -169,7 +169,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
         {label}
       </FormLabel>
 
-      <HStack w={'100%'} gap={2} alignItems="center">
+      <HStack w="100%" gap={2} alignItems="center">
         <Slider
           aria-label={label}
           value={value}
@@ -259,9 +259,9 @@ export default function IAISlider(props: IAIFullSliderProps) {
 
         {withReset && (
           <IAIIconButton
-            size={'sm'}
-            aria-label={'Reset'}
-            tooltip={'Reset'}
+            size="sm"
+            aria-label="Reset"
+            tooltip="Reset"
             icon={<BiReset />}
             onClick={handleResetDisable}
             isDisabled={isResetDisabled}

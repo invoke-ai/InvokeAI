@@ -35,9 +35,9 @@ export default function InitImagePreview() {
       {initialImage && (
         <div className="init-image-preview">
           <Image
-            fit={'contain'}
-            maxWidth={'100%'}
-            maxHeight={'100%'}
+            fit="contain"
+            maxWidth="100%"
+            maxHeight="100%"
             src={
               typeof initialImage === 'string' ? initialImage : initialImage.url
             }

@@ -415,14 +415,14 @@ const CurrentImageButtons = () => {
         >
           <div className="current-image-send-to-popover">
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleClickUseAsInitialImage}
               leftIcon={<FaShare />}
             >
               {t('parameters:sendToImg2Img')}
             </IAIButton>
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleSendToCanvas}
               leftIcon={<FaShare />}
             >
@@ -430,14 +430,14 @@ const CurrentImageButtons = () => {
             </IAIButton>
 
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleCopyImage}
               leftIcon={<FaCopy />}
             >
               {t('parameters:copyImage')}
             </IAIButton>
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleCopyImageLink}
               leftIcon={<FaCopy />}
             >
@@ -445,7 +445,7 @@ const CurrentImageButtons = () => {
             </IAIButton>
 
             <Link download={true} href={currentImage?.url}>
-              <IAIButton leftIcon={<FaDownload />} size={'sm'} w="100%">
+              <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                 {t('parameters:downloadImage')}
               </IAIButton>
             </Link>

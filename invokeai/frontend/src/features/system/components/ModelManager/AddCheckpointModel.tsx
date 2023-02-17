@@ -99,8 +99,8 @@ export default function AddCheckpointModel() {
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap={'0.5rem'}>
-                <Text fontSize={20} fontWeight="bold" alignSelf={'start'}>
+              <VStack rowGap="0.5rem">
+                <Text fontSize={20} fontWeight="bold" alignSelf="start">
                   {t('modelmanager:manual')}
                 </Text>
                 {/* Name */}
@@ -111,7 +111,7 @@ export default function AddCheckpointModel() {
                   <FormLabel htmlFor="name" fontSize="sm">
                     {t('modelmanager:name')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="name"
@@ -138,7 +138,7 @@ export default function AddCheckpointModel() {
                   <FormLabel htmlFor="description" fontSize="sm">
                     {t('modelmanager:description')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="description"
@@ -164,7 +164,7 @@ export default function AddCheckpointModel() {
                   <FormLabel htmlFor="config" fontSize="sm">
                     {t('modelmanager:config')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="config"
@@ -190,7 +190,7 @@ export default function AddCheckpointModel() {
                   <FormLabel htmlFor="config" fontSize="sm">
                     {t('modelmanager:modelLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="weights"
@@ -213,7 +213,7 @@ export default function AddCheckpointModel() {
                   <FormLabel htmlFor="vae" fontSize="sm">
                     {t('modelmanager:vaeLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="vae"
@@ -231,13 +231,13 @@ export default function AddCheckpointModel() {
                   </VStack>
                 </FormControl>
 
-                <HStack width={'100%'}>
+                <HStack width="100%">
                   {/* Width */}
                   <FormControl isInvalid={!!errors.width && touched.width}>
                     <FormLabel htmlFor="width" fontSize="sm">
                       {t('modelmanager:width')}
                     </FormLabel>
-                    <VStack alignItems={'start'}>
+                    <VStack alignItems="start">
                       <Field id="width" name="width">
                         {({
                           field,
@@ -276,7 +276,7 @@ export default function AddCheckpointModel() {
                     <FormLabel htmlFor="height" fontSize="sm">
                       {t('modelmanager:height')}
                     </FormLabel>
-                    <VStack alignItems={'start'}>
+                    <VStack alignItems="start">
                       <Field id="height" name="height">
                         {({
                           field,

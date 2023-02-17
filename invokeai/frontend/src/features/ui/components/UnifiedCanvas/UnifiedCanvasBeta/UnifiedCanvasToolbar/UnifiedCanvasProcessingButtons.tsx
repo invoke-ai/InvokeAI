@@ -25,7 +25,7 @@ export default function UnifiedCanvasProcessingButtons() {
   };
 
   return (
-    <Flex flexDirection={'column'} gap="0.5rem">
+    <Flex flexDirection="column" gap="0.5rem">
       <IAIIconButton
         tooltip={`${t('parameters:showOptionsPanel')} (O)`}
         tooltipProps={{ placement: 'top' }}
@@ -38,7 +38,7 @@ export default function UnifiedCanvasProcessingButtons() {
         <InvokeButton iconButton />
       </Flex>
       <Flex>
-        <CancelButton width={'100%'} height={'40px'} />
+        <CancelButton width="100%" height="40px" />
       </Flex>
     </Flex>
   );

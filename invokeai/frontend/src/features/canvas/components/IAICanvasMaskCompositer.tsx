@@ -163,10 +163,10 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
       width={stageDimensions.width / stageScale}
       fillPatternImage={fillPatternImage}
       fillPatternOffsetY={!isNumber(offset) ? 0 : offset}
-      fillPatternRepeat={'repeat'}
+      fillPatternRepeat="repeat"
       fillPatternScale={{ x: 1 / stageScale, y: 1 / stageScale }}
       listening={true}
-      globalCompositeOperation={'source-in'}
+      globalCompositeOperation="source-in"
       {...rest}
     />
   );
