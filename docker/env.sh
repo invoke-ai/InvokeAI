@@ -2,6 +2,11 @@
 
 # This file is used to set environment variables for the build.sh and run.sh scripts.
 
+# docker is the default container engine, but should work with "podman" (rootless) too!
+if [[ -z "${CONTAINER_ENGINE}" ]]; then
+    CONTAINER_ENGINE="docker"
+fi
+
 # use python v3.10 by default
 if [[ -z "${PYTHON_VERSION}" ]]; then
     PYTHON_VERSION=3.10

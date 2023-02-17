@@ -12,15 +12,21 @@ source ./env.sh
 [[ -d ./outputs ]] || mkdir ./outputs
 
 echo -e "You are using these values:\n"
+echo -e "Container engine:\t${CONTAINER_ENGINE}"
 echo -e "Volumename:\t${VOLUMENAME}"
 echo -e "Invokeai_tag:\t${CONTAINER_IMAGE}"
 echo -e "local Models:\t${MODELSPATH:-unset}\n"
 
-docker run \
+if [[ "${CONTAINER_ENGINE}" == "podman" ]]; then
+   PODMAN_ARGS="--user=appuser:appuser"
+   unset PLATFORM #causes problems
+fi
+
+"${CONTAINER_ENGINE}" run \
   --interactive \
   --tty \
   --rm \
-  --platform="${PLATFORM}" \
+  ${PLATFORM+--platform="${PLATFORM}"} \
   --name="${REPOSITORY_NAME,,}" \
   --hostname="${REPOSITORY_NAME,,}" \
   --mount type=volume,src="${VOLUMENAME}",target=/data,rw \
@@ -29,6 +35,7 @@ docker run \
   ${HUGGING_FACE_HUB_TOKEN:+--env="HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}"} \
   --publish=9090:9090 \
   --cap-add=sys_nice \
+  ${PODMAN_ARGS:+"${PODMAN_ARGS}"} \
   ${GPU_FLAGS:+--gpus="${GPU_FLAGS}"} \
   "${CONTAINER_IMAGE}" ${@:+$@}
 

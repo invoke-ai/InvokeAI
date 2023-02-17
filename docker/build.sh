@@ -22,6 +22,7 @@ DOCKERFILE=${INVOKE_DOCKERFILE:-./Dockerfile}
 
 # print the settings
 echo -e "You are using these values:\n"
+echo -e "Container engine:\t${CONTAINER_ENGINE}"
 echo -e "Dockerfile:\t\t${DOCKERFILE}"
 echo -e "index-url:\t\t${PIP_EXTRA_INDEX_URL:-none}"
 echo -e "Volumename:\t\t${VOLUMENAME}"
@@ -33,15 +34,20 @@ echo -e "Container Flavor:\t${CONTAINER_FLAVOR}"
 echo -e "Container Image:\t${CONTAINER_IMAGE}\n"
 
 # Create docker volume
-if [[ -n "$(docker volume ls -f name="${VOLUMENAME}" -q)" ]]; then
+if [[ -n "$(${CONTAINER_ENGINE} volume ls -f name="${VOLUMENAME}" -q)" ]]; then # Note: newer versions of podman: podman volume exists ${VOLUMENAME} 
     echo -e "Volume already exists\n"
 else
-    echo -n "creating docker volume "
-    docker volume create "${VOLUMENAME}"
+    echo -n "creating ${CONTAINER_ENGINE} volume "
+    "${CONTAINER_ENGINE}" volume create "${VOLUMENAME}"
+    VOLPATH=`"${CONTAINER_ENGINE}" inspect ${VOLUMENAME} | python3 -c "import json, sys; print(json.load(sys.stdin)[0]['Mountpoint'])" `
+    # podman:  now set file permissions volume for rootless appuser
+    if [[ ${CONTAINER_ENGINE} == "podman" ]] ; then
+       podman unshare chown 1000:1000 -R ${VOLPATH}
+    fi
 fi
 
 # Build Container
-DOCKER_BUILDKIT=1 docker build \
+DOCKER_BUILDKIT=1 "${CONTAINER_ENGINE}" build \
     --platform="${PLATFORM:-linux/amd64}" \
     --tag="${CONTAINER_IMAGE:-invokeai}" \
     ${CONTAINER_FLAVOR:+--build-arg="CONTAINER_FLAVOR=${CONTAINER_FLAVOR}"} \
