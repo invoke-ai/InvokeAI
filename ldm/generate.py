@@ -213,7 +213,9 @@ class Generate:
             print('>> xformers not installed')
 
         # model caching system for fast switching
-        self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
+        self.model_manager = ModelManager(mconfig, self.device, self.precision,
+                                          max_loaded_models=max_loaded_models,
+                                          sequential_offload=self.free_gpu_mem)
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         model = model or fallback
@@ -480,7 +482,6 @@ class Generate:
                 self.model.cond_stage_model.device = self.model.device
                 self.model.cond_stage_model.to(self.model.device)
         except AttributeError:
-            print(">> Warning: '--free_gpu_mem' is not yet supported when generating image using model based on HuggingFace Diffuser.")
             pass
 
         try:
