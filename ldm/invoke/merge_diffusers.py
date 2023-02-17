@@ -173,7 +173,6 @@ def _parse_args() -> Namespace:
 
 # ------------------------- GUI HERE -------------------------
 class FloatSlider(npyscreen.Slider):
-    # this is supposed to adjust display precision, but doesn't
     def translate_value(self):
         stri = "%3.2f / %3.2f" % (self.value, self.out_of)
         l = (len(str(self.out_of))) * 2 + 4
@@ -186,7 +185,7 @@ class FloatTitleSlider(npyscreen.TitleText):
 
 
 class mergeModelsForm(npyscreen.FormMultiPageAction):
-    interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid", "add_difference"]
+    interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid"]
 
     def __init__(self, parentApp, name):
         self.parentApp = parentApp
@@ -305,8 +304,8 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         self.alpha = self.add_widget_intelligent(
             FloatTitleSlider,
             name="Weight (alpha) to assign to second and third models:",
-            out_of=1,
-            step=0.05,
+            out_of=1.0,
+            step=0.01,
             lowest=0,
             value=0.5,
             labelColor="CONTROL",
