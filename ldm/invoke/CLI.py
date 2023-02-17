@@ -12,7 +12,6 @@ import click
 if sys.platform == "darwin":
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
-import click  # type: ignore
 import pyparsing  # type: ignore
 
 import ldm.invoke
@@ -625,11 +624,12 @@ def set_default_output_dir(opt: Args, completer: Completer):
 
 
 def import_model(model_path: str, gen, opt, completer):
+    """
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path;
     (3) a huggingface repository id; or (4) a local directory containing a
     diffusers model.
     """
-    model.path = model_path.replace('\\','/') # windows
+    model_path = model_path.replace('\\','/') # windows
     model_name = None
 
     if model_path.startswith(("http:", "https:", "ftp:")):
@@ -712,7 +712,7 @@ def import_checkpoint_list(models: List[Path], gen, opt, completer)->List[str]:
                     print(f'>> Model {model.stem} imported successfully')
                     model_names.append(model_name)
                 else:
-                    printf('** Model {model} failed to import')
+                    print(f'** Model {model} failed to import')
                 print()
     return model_names
 
