@@ -205,7 +205,7 @@ class Generate:
         Globals.full_precision = self.precision=='float32'
 
         if is_xformers_available():
-            if not Globals.disable_xformers:
+            if torch.cuda.is_available() and not Globals.disable_xformers:
                 print('>> xformers memory-efficient attention is available and enabled')
             else:
                 print('>> xformers memory-efficient attention is available but disabled')
