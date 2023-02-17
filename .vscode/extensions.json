@@ -9,6 +9,14 @@
     "ms-python.vscode-pylance",
     "redhat.vscode-yaml",
     "tamasfe.even-better-toml",
-    "eamodio.gitlens"
+    "eamodio.gitlens",
+    "foxundermoon.shell-format",
+    "timonwong.shellcheck",
+    "esbenp.prettier-vscode",
+    "davidanson.vscode-markdownlint",
+    "yzhang.markdown-all-in-one",
+    "bierner.github-markdown-preview",
+    "ms-azuretools.vscode-docker",
+    "mads-hartmann.bash-ide-vscode"
   ]
 }
