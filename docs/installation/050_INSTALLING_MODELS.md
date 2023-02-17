@@ -279,7 +279,7 @@ After you save the modified `models.yaml` file relaunch
 ### Installation via the WebUI
 
 To access the WebUI Model Manager, click on the button that looks like
-a cute in the upper right side of the browser screen. This will bring
+a cube in the upper right side of the browser screen. This will bring
 up a dialogue that lists the models you have already installed, and
 allows you to load, delete or edit them:
 
