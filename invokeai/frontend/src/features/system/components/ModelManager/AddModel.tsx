@@ -87,7 +87,11 @@ export default function AddModel() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent className="modal add-model-modal" fontFamily="Inter">
+        <ModalContent
+          className="modal add-model-modal"
+          fontFamily="Inter"
+          margin="auto"
+        >
           <ModalHeader>{t('modelmanager:addNewModel')}</ModalHeader>
           <ModalCloseButton marginTop="0.3rem" />
           <ModalBody className="add-model-modal-body">

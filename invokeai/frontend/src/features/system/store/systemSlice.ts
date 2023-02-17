@@ -220,6 +220,12 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
     },
+    modelMergingRequested: (state) => {
+      state.currentStatus = i18n.t('common:statusMergingModels');
+      state.isCancelable = false;
+      state.isProcessing = true;
+      state.currentStatusHasSteps = false;
+    },
     setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
       state.saveIntermediatesInterval = action.payload;
     },
@@ -272,6 +278,7 @@ export const {
   setIsCancelable,
   modelChangeRequested,
   modelConvertRequested,
+  modelMergingRequested,
   setSaveIntermediatesInterval,
   setEnableImageDebugging,
   generationRequested,
