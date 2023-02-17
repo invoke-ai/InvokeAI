@@ -711,15 +711,15 @@ class ModelManager(object):
         thing = path_url_or_repo  # to save typing
 
         if thing.startswith(('http:','https:','ftp:')):
-            print(f'>> {thing} appears to be a URL')
+            print(f'  | {thing} appears to be a URL')
             model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')  # _resolve_path does a download if needed
 
         elif Path(thing).is_file() and thing.endswith(('.ckpt','.safetensors')):
-            print(f'>> {thing} appears to be a checkpoint file on disk')
+            print(f'  | {thing} appears to be a checkpoint file on disk')
             model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')
             
         elif Path(thing).is_dir() and Path(thing, 'model_index.json').exists():
-            print(f'>> {thing} appears to be a diffusers file on disk')
+            print(f'  | {thing} appears to be a diffusers file on disk')
             model_name = self.import_diffusers_model(
                 thing,
                 vae=dict(repo_id='stabilityai/sd-vae-ft-mse'),                
@@ -729,17 +729,16 @@ class ModelManager(object):
         elif Path(thing).is_dir():
             print(f'>> {thing} appears to be a directory. Will scan for models to import')
             for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
-                print('***',m)
                 self.heuristic_import(str(m), convert, commit_to_conf=commit_to_conf)
             return
 
         elif re.match(r'^[\w.+-]+/[\w.+-]+$', thing):
-            print(f'>> {thing} appears to be a HuggingFace diffusers repo_id')
+            print(f'  | {thing} appears to be a HuggingFace diffusers repo_id')
             model_name = self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
             pipeline,_,_,_ = self._load_diffusers_model(self.config[model_name])
 
         else:
-            print(f">> {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
+            print(f"** {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
 
         # Model_path is set in the event of a legacy checkpoint file.
         # If not set, we're all done
@@ -747,25 +746,37 @@ class ModelManager(object):
             return
 
         if model_path.stem in self.config:  #already imported
+            print(f'    > Already imported. Skipping')
             return
 
         # another round of heuristics to guess the correct config file.
-        model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
-        
+        model_config_file = None
         checkpoint = safetensors.torch.load_file(model_path) if model_path.suffix == '.safetensors' else torch.load(model_path)
+
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-            print(f'>> {thing} appears to be an SD-v2 model; model will be converted to diffusers format')
+            print(f'    > SD-v2 model detected; model will be converted to diffusers format')
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
             convert = True
             
-        elif re.search('inpaint', str(model_path), flags=re.IGNORECASE):
-            print(f'>> {thing} appears to be an SD-v1 inpainting model')
-            model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+        if not model_config_file: # still trying
+            in_channels = None
+            try:
+                state_dict = checkpoint.get('state_dict') or checkpoint
+                in_channels = state_dict['model.diffusion_model.input_blocks.0.0.weight'].shape[1]
+                if in_channels == 9:
+                    print(f'    > SD-v1 inpainting model detected')
+                    model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+                elif in_channels == 4:
+                    print(f'    > SD-v1 model detected')
+                    model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
+                else:
+                    print(f'** {thing} does not have an expected number of in_channels ({in_channels}). It will probably break when loaded.')
+                    model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
+            except KeyError:
+                print(f'** {thing} does not have the expected  SD-v1 model fields. It will probably break when loaded.')
+                model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
             
-        else:
-            print(f'>> {thing} appears to be an SD-v1 model')
-
         if convert:
             diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir, model_path.stem)
             self.convert_and_import(

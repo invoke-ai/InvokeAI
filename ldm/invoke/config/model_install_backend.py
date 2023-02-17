@@ -56,7 +56,6 @@ def initial_models():
         return Datasets
     return (Datasets := OmegaConf.load(Dataset_path))
 
-
 def install_requested_models(
         install_initial_models: List[str] = None,
         remove_models: List[str] = None,

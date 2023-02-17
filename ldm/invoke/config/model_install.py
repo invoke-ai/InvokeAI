@@ -368,8 +368,11 @@ def process_and_execute(app: npyscreen.NPSAppManaged):
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     if opt.default_only:
-        models_to_download = default_dataset()
-        install_requested_models(models_to_download)
+        models_to_install = default_dataset()
+        install_requested_models(
+            install_initial_models = models_to_install,
+            precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
+        )
     else:
         installApp = AddModelApplication()
         installApp.opt = opt
