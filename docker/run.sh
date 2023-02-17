@@ -29,8 +29,8 @@ fi
   ${PLATFORM+--platform="${PLATFORM}"} \
   --name="${REPOSITORY_NAME,,}" \
   --hostname="${REPOSITORY_NAME,,}" \
-  --mount type=volume,src="${VOLUMENAME}",target=/data,rw \
-  --mount type=bind,source="$(pwd)"/outputs,target=/data/outputs,rw \
+  --mount type=volume,src="${VOLUMENAME}",target=/data \
+  --mount type=bind,source="$(pwd)"/outputs,target=/data/outputs \
   ${MODELSPATH:+--mount="type=bind,source=${MODELSPATH},target=/data/models"} \
   ${HUGGING_FACE_HUB_TOKEN:+--env="HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}"} \
   --publish=9090:9090 \
