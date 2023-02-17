@@ -1,10 +1,12 @@
 {
+  "general": "General",
   "images": "Images",
   "steps": "Steps",
   "cfgScale": "CFG Scale",
   "width": "Width",
   "height": "Height",
   "sampler": "Sampler",
+  "imageToImage": "Image To Image",
   "seed": "Seed",
   "randomizeSeed": "Randomize Seed",
   "shuffle": "Shuffle",

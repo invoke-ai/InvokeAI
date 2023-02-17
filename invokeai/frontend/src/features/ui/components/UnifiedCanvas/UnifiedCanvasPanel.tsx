@@ -20,6 +20,11 @@ export default function UnifiedCanvasPanel() {
   const { t } = useTranslation();
 
   const unifiedCanvasAccordions = {
+    seed: {
+      header: `${t('parameters:seed')}`,
+      feature: Feature.SEED,
+      content: <SeedSettings />,
+    },
     boundingBox: {
       header: `${t('parameters:boundingBoxHeader')}`,
       feature: Feature.BOUNDING_BOX,
@@ -35,16 +40,24 @@ export default function UnifiedCanvasPanel() {
       feature: Feature.INFILL_AND_SCALING,
       content: <InfillAndScalingSettings />,
     },
-    seed: {
-      header: `${t('parameters:seed')}`,
-      feature: Feature.SEED,
-      content: <SeedSettings />,
-    },
     variations: {
       header: `${t('parameters:variations')}`,
       feature: Feature.VARIATIONS,
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
+    },
+  };
+
+  const unifiedCanvasImg2ImgAccordion = {
+    unifiedCanvasImg2Img: {
+      header: `${t('parameters:imageToImage')}`,
+      feature: undefined,
+      content: (
+        <ImageToImageStrength
+          label={t('parameters:img2imgStrength')}
+          styleClass="main-settings-block image-to-image-strength-main-option"
+        />
+      ),
     },
   };
 
@@ -56,10 +69,7 @@ export default function UnifiedCanvasPanel() {
       </Flex>
       <ProcessButtons />
       <MainSettings />
-      <ImageToImageStrength
-        label={t('parameters:img2imgStrength')}
-        styleClass="main-settings-block image-to-image-strength-main-option"
-      />
+      <ParametersAccordion accordionInfo={unifiedCanvasImg2ImgAccordion} />
       <ParametersAccordion accordionInfo={unifiedCanvasAccordions} />
     </InvokeOptionsPanel>
   );
