@@ -84,7 +84,14 @@ readme={content-type="text/markdown", file="README.md"}
 requires-python=">=3.9, <3.11"
 
 [project.optional-dependencies]
-"dev"=["black", "flake8", "flake8-bugbear", "isort", "pre-commit"]
+"dev"=[
+  "black[jupyter]",
+  "flake8",
+  "flake8-black",
+  "flake8-bugbear",
+  "isort",
+  "pre-commit",
+]
 "dist"=["pip-tools", "pipdeptree", "twine"]
 "docs"=[
   "mkdocs-git-revision-date-localized-plugin",
@@ -139,24 +146,25 @@ version={attr="ldm.invoke.__version__"}
 [tool.black]
 exclude='''
 /(
-    .git
-    | .tox
-    | .venv
-    | _build
-    | build
-    | dist
-    | node_modules
+  .git
+  | .tox
+  | .venv
+  | _build
+  | build
+  | dist
+  | node_modules
 )/
 '''
 include='.pyi?$'
 line-length=88
-source=['invokeai/backend', 'ldm/invoke']
+source=["installer", "invokeai/backend", "ldm/invoke"]
 target-version=['py39']
 
 [tool.isort]
-extend_ignore=["scripts"]
 profile="black"
 py_version=39
+skip_gitignore=true
+skip_glob=["scripts/orig_scripts/*"]
 
 [tool.coverage.run]
 branch=true
