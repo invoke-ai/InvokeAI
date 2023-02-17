@@ -214,6 +214,12 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
     },
+    modelConvertRequested: (state) => {
+      state.currentStatus = i18n.t('common:statusConvertingModel');
+      state.isCancelable = false;
+      state.isProcessing = true;
+      state.currentStatusHasSteps = false;
+    },
     setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
       state.saveIntermediatesInterval = action.payload;
     },
@@ -265,6 +271,7 @@ export const {
   setModelList,
   setIsCancelable,
   modelChangeRequested,
+  modelConvertRequested,
   setSaveIntermediatesInterval,
   setEnableImageDebugging,
   generationRequested,

@@ -114,11 +114,11 @@ const IAICanvasStagingAreaToolbar = () => {
 
   return (
     <Flex
-      pos={'absolute'}
-      bottom={'1rem'}
-      w={'100%'}
-      align={'center'}
-      justify={'center'}
+      pos="absolute"
+      bottom="1rem"
+      w="100%"
+      align="center"
+      justify="center"
       filter="drop-shadow(0 0.5rem 1rem rgba(0,0,0))"
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}

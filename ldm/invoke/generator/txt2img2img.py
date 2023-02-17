@@ -11,7 +11,7 @@ from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_
 from ldm.invoke.generator.base import Generator
 from ldm.invoke.generator.diffusers_pipeline import trim_to_multiple_of, StableDiffusionGeneratorPipeline, \
     ConditioningData
-from ldm.models.diffusion.shared_invokeai_diffusion import ThresholdSettings
+from ldm.models.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 
 
 class Txt2Img2Img(Generator):
@@ -36,7 +36,7 @@ class Txt2Img2Img(Generator):
         conditioning_data = (
             ConditioningData(
                 uc, c, cfg_scale, extra_conditioning_info,
-                threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
+                postprocessing_settings = PostprocessingSettings(threshold=threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
         def make_image(x_T):
@@ -47,7 +47,6 @@ class Txt2Img2Img(Generator):
                 conditioning_data=conditioning_data,
                 noise=x_T,
                 callback=step_callback,
-                # TODO: threshold = threshold,
             )
 
             # Get our initial generation width and height directly from the latent output so

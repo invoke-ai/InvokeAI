@@ -7,7 +7,7 @@ from diffusers import logging
 
 from ldm.invoke.generator.base import Generator
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-from ldm.models.diffusion.shared_invokeai_diffusion import ThresholdSettings
+from ldm.models.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 
 
 class Img2Img(Generator):
@@ -33,7 +33,7 @@ class Img2Img(Generator):
         conditioning_data = (
             ConditioningData(
                 uc, c, cfg_scale, extra_conditioning_info,
-                threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
+                postprocessing_settings = PostprocessingSettings(threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
 

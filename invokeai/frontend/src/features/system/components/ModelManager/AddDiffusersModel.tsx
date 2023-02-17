@@ -105,7 +105,7 @@ export default function AddDiffusersModel() {
       >
         {({ handleSubmit, errors, touched }) => (
           <form onSubmit={handleSubmit}>
-            <VStack rowGap={'0.5rem'}>
+            <VStack rowGap="0.5rem">
               <FormItemWrapper>
                 {/* Name */}
                 <FormControl
@@ -115,7 +115,7 @@ export default function AddDiffusersModel() {
                   <FormLabel htmlFor="name" fontSize="sm">
                     {t('modelmanager:name')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="name"
@@ -145,7 +145,7 @@ export default function AddDiffusersModel() {
                   <FormLabel htmlFor="description" fontSize="sm">
                     {t('modelmanager:description')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="description"
@@ -182,7 +182,7 @@ export default function AddDiffusersModel() {
                   <FormLabel htmlFor="path" fontSize="sm">
                     {t('modelmanager:modelLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="path"
@@ -205,7 +205,7 @@ export default function AddDiffusersModel() {
                   <FormLabel htmlFor="repo_id" fontSize="sm">
                     {t('modelmanager:repo_id')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="repo_id"
@@ -242,7 +242,7 @@ export default function AddDiffusersModel() {
                   <FormLabel htmlFor="vae.path" fontSize="sm">
                     {t('modelmanager:vaeLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="vae.path"
@@ -267,7 +267,7 @@ export default function AddDiffusersModel() {
                   <FormLabel htmlFor="vae.repo_id" fontSize="sm">
                     {t('modelmanager:vaeRepoID')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="vae.repo_id"

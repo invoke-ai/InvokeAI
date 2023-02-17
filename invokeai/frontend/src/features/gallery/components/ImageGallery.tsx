@@ -281,7 +281,7 @@ export default function ImageGallery() {
         <Resizable
           minWidth={galleryMinWidth}
           maxWidth={shouldPinGallery ? galleryMaxWidth : window.innerWidth}
-          className={'image-gallery-popup'}
+          className="image-gallery-popup"
           handleStyles={{
             left: {
               width: '15px',
@@ -395,14 +395,14 @@ export default function ImageGallery() {
               {shouldShowButtons ? (
                 <>
                   <IAIButton
-                    size={'sm'}
+                    size="sm"
                     data-selected={currentCategory === 'result'}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   >
                     {t('gallery:generations')}
                   </IAIButton>
                   <IAIButton
-                    size={'sm'}
+                    size="sm"
                     data-selected={currentCategory === 'user'}
                     onClick={() => dispatch(setCurrentCategory('user'))}
                   >
@@ -433,14 +433,14 @@ export default function ImageGallery() {
               <IAIPopover
                 isLazy
                 trigger="hover"
-                placement={'left'}
+                placement="left"
                 triggerComponent={
                   <IAIIconButton
-                    size={'sm'}
+                    size="sm"
                     aria-label={t('gallery:gallerySettings')}
                     icon={<FaWrench />}
                     className="image-gallery-icon-btn"
-                    cursor={'pointer'}
+                    cursor="pointer"
                   />
                 }
               >
@@ -455,7 +455,7 @@ export default function ImageGallery() {
                       label={t('gallery:galleryImageSize')}
                     />
                     <IAIIconButton
-                      size={'sm'}
+                      size="sm"
                       aria-label={t('gallery:galleryImageResetSize')}
                       tooltip={t('gallery:galleryImageResetSize')}
                       onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
@@ -505,8 +505,8 @@ export default function ImageGallery() {
               </IAIPopover>
 
               <IAIIconButton
-                size={'sm'}
-                className={'image-gallery-icon-btn'}
+                size="sm"
+                className="image-gallery-icon-btn"
                 aria-label={t('gallery:pinGallery')}
                 tooltip={`${t('gallery:pinGallery')} (Shift+G)`}
                 onClick={handleSetShouldPinGallery}
