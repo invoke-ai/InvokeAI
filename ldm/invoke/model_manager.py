@@ -798,44 +798,6 @@ class ModelManager(object):
                 commit_to_conf=commit_to_conf,
             )
 
-    # this is a defunct method, superseded by heuristic_import()
-    # left here during transition
-    def autoconvert_weights (
-        self,
-        conf_path: Path,
-        weights_directory: Path = None,
-        dest_directory: Path = None,
-    ):
-        """
-        Scan the indicated directory for .ckpt files, convert into diffuser models,
-        and import.
-        """
-        weights_directory = weights_directory or global_autoscan_dir()
-        dest_directory = dest_directory or Path(
-            global_models_dir(), Globals.converted_ckpts_dir
-        )
-
-        print(">> Checking for unconverted .ckpt files in {weights_directory}")
-        ckpt_files = dict()
-        for root, dirs, files in os.walk(weights_directory):
-            for f in files:
-                if not f.endswith((".ckpt",".safetensors")):
-                    continue
-                basename = Path(f).stem
-                dest = Path(dest_directory, basename)
-                if not dest.exists():
-                    ckpt_files[Path(root, f)] = dest
-
-        if len(ckpt_files) == 0:
-            return
-
-        print(
-            f">> New .ckpt file(s) found in {weights_directory}. Optimizing and importing..."
-        )
-        for ckpt in ckpt_files:
-            self.convert_and_import(ckpt, ckpt_files[ckpt])
-        self.commit(conf_path)
-
     def convert_and_import(
         self,
         ckpt_path: Path,
