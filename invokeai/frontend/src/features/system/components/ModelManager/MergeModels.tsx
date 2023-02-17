@@ -176,6 +176,7 @@ export default function MergeModels() {
                 withReset
                 handleReset={() => setModelMergeAlpha(0.5)}
                 withSliderMarks
+                sliderMarkRightOffset={-7}
               />
               <Text fontSize="0.9rem" color="var(--text-color-secondary)">
                 {t('modelmanager:modelMergeAlphaHelp')}
