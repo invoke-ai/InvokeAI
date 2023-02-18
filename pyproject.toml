@@ -39,7 +39,7 @@ dependencies = [
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "datasets",
-  "diffusers[torch]~=0.11",
+  "diffusers[torch]~=0.13",
   "dnspython==2.2.1",
   "einops",
   "eventlet",

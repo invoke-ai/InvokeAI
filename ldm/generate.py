@@ -457,6 +457,9 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
+        if self.model.lora_manager:
+            prompt = self.model.lora_manager.configure_prompt(prompt)
+
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
             prompt,
@@ -514,6 +517,9 @@ class Generate:
                 'checker':self.safety_checker,
                 'extractor':self.safety_feature_extractor
             } if self.safety_checker else None
+
+            if self.model.lora_manager:
+                self.model.lora_manager.load_lora()
 
             results = generator.generate(
                 prompt,
@@ -927,6 +933,7 @@ class Generate:
 
         self.model_name = model_name
         self._set_sampler()  # requires self.model_name to be set first
+
         return self.model
 
     def load_huggingface_concepts(self, concepts:list[str]):

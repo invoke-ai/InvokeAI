@@ -28,6 +28,7 @@ from typing_extensions import ParamSpec
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
+from ldm.modules.lora_manager import LoraManager
 from ..offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
@@ -292,6 +293,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,
                                                                  text_encoder=self.text_encoder,
                                                                  full_precision=use_full_precision)
+        self.lora_manager = LoraManager(self.unet)
+
         # InvokeAI's interface for text embeddings and whatnot
         self.prompt_fragments_to_embeddings_converter = WeightedPromptFragmentsToEmbeddingsConverter(
             tokenizer=self.tokenizer,
