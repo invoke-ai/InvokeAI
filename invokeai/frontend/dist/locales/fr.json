@@ -66,7 +66,7 @@
     "hotkeys": {
         "keyboardShortcuts": "Raccourcis clavier",
         "appHotkeys": "Raccourcis de l'application",
-        "GeneralHotkeys": "Raccourcis généraux",
+        "generalHotkeys": "Raccourcis généraux",
         "galleryHotkeys": "Raccourcis de la galerie",
         "unifiedCanvasHotkeys": "Raccourcis du Canvas unifié",
         "invoke": {

@@ -438,8 +438,14 @@
         "infillScalingHeader": "Infill and Scaling",
         "img2imgStrength": "Image To Image Strength",
         "toggleLoopback": "Toggle Loopback",
-        "invoke": "Invoke",
-        "cancel": "Cancel",
+        "invoke": "Invoke",  
+        "cancel":
+        {
+          "immediate": "Cancel immediately",
+          "schedule": "Cancel after current iteration",
+          "isScheduled": "Canceling",
+          "setType": "Set cancel type"
+        },
         "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
         "negativePrompts": "Negative Prompts",
         "sendTo": "Send to",

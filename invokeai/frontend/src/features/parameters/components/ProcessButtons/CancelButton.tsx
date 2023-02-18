@@ -94,8 +94,8 @@ export default function CancelButton(
       {cancelType === 'immediate' ? (
         <IAIIconButton
           icon={<MdCancel />}
-          tooltip={t('parameters:cancel.immediate')}
-          aria-label={t('parameters:cancel.immediate')}
+          tooltip={t('parameters.cancel.immediate')}
+          aria-label={t('parameters.cancel.immediate')}
           isDisabled={!isConnected || !isProcessing || !isCancelable}
           onClick={handleClickCancel}
           className="cancel-btn"
@@ -108,13 +108,13 @@ export default function CancelButton(
           }
           tooltip={
             isCancelScheduled
-              ? t('parameters:cancel.isScheduled')
+              ? t('parameters.cancel.isScheduled')
               : t('parameters:cancel.schedule')
           }
           aria-label={
             isCancelScheduled
-              ? t('parameters:cancel.isScheduled')
-              : t('parameters:cancel.schedule')
+              ? t('parameters.cancel.isScheduled')
+              : t('parameters.cancel.schedule')
           }
           isDisabled={
             !isConnected ||
@@ -138,15 +138,15 @@ export default function CancelButton(
               as={IAIIconButton}
               icon={isOpen ? <MdArrowDropUp /> : <MdArrowDropDown />}
               className="cancel-options-btn"
-              tooltip={t('parameters:cancel.setType')}
+              tooltip={t('parameters.cancel.setType')}
               {...rest}
             />
             <MenuList className="cancel-options-btn-context-menu">
               <MenuItem onClick={() => dispatch(setCancelType('immediate'))}>
-                {t('parameters:cancel.immediate')}
+                {t('parameters.cancel.immediate')}
               </MenuItem>
               <MenuItem onClick={() => dispatch(setCancelType('scheduled'))}>
-                {t('parameters:cancel.schedule')}
+                {t('parameters.cancel.schedule')}
               </MenuItem>
             </MenuList>
           </>
