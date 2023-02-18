@@ -13,10 +13,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean \
   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
 
 # Install necessary packages
-RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update \
+RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
     libgl1-mesa-glx=20.3.* \
@@ -41,10 +38,7 @@ ENV PIP_USE_PEP517=1
 FROM python-base AS pyproject-builder
 
 # Install dependencies
-RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update \
+RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
     build-essential=12.9 \
@@ -58,18 +52,16 @@ ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
 RUN mkdir -p ${PIP_CACHE_DIR}
 
 # create virtual environment
-RUN --mount=type=cache,target=${PIP_CACHE_DIR},sharing=locked \
-  python3 -m venv "${APPNAME}" \
+RUN python3 -m venv "${APPNAME}" \
   --upgrade-deps
 
 # copy sources
-COPY --link . .
+COPY . .
 
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-RUN --mount=type=cache,target=${PIP_CACHE_DIR},sharing=locked \
-  "${APPNAME}/bin/pip" install .
+RUN "${APPNAME}/bin/pip" install .
 
 # build patchmatch
 RUN python3 -c "from patchmatch import patch_match"
