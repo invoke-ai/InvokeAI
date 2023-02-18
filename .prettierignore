@@ -1,0 +1,14 @@
+invokeai/frontend/.husky
+invokeai/frontend/patches
+
+# Ignore artifacts:
+build
+coverage
+static
+invokeai/frontend/dist
+
+# Ignore all HTML files:
+*.html
+
+# Ignore deprecated docs
+docs/installation/deprecated_documentation
