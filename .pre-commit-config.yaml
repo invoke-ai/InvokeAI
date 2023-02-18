@@ -36,4 +36,6 @@ repos:
       - id: check-symlinks
       - id: check-toml
       - id: end-of-file-fixer
+      - id: no-commit-to-branch
+        args: ['--branch', 'main']
       - id: trailing-whitespace
