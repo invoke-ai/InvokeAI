@@ -79,8 +79,8 @@ def merge_diffusion_models_and_commit(
     merged_model_name = name for new model
     alpha  - The interpolation parameter. Ranges from 0 to 1.  It affects the ratio in which the checkpoints are merged. A 0.8 alpha
                would mean that the first model checkpoints would affect the final result far less than an alpha of 0.2
-    interp - The interpolation method to use for the merging. Supports "sigmoid", "inv_sigmoid", "add_difference" and None.
-               Passing None uses the default interpolation which is weighted sum interpolation. For merging three checkpoints, only "add_difference" is supported.
+    interp - The interpolation method to use for the merging. Supports "weighted_average", "sigmoid", "inv_sigmoid", "add_difference" and None.
+               Passing None uses the default interpolation which is weighted sum interpolation. For merging three checkpoints, only "add_difference" is supported. Add_difference is A+(B-C).
     force  - Whether to ignore mismatch in model_config.json for the current models. Defaults to False.
 
     **kwargs - the default DiffusionPipeline.get_config_dict kwargs:
@@ -173,7 +173,6 @@ def _parse_args() -> Namespace:
 
 # ------------------------- GUI HERE -------------------------
 class FloatSlider(npyscreen.Slider):
-    # this is supposed to adjust display precision, but doesn't
     def translate_value(self):
         stri = "%3.2f / %3.2f" % (self.value, self.out_of)
         l = (len(str(self.out_of))) * 2 + 4
@@ -186,7 +185,7 @@ class FloatTitleSlider(npyscreen.TitleText):
 
 
 class mergeModelsForm(npyscreen.FormMultiPageAction):
-    interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid", "add_difference"]
+    interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid"]
 
     def __init__(self, parentApp, name):
         self.parentApp = parentApp
@@ -305,8 +304,8 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         self.alpha = self.add_widget_intelligent(
             FloatTitleSlider,
             name="Weight (alpha) to assign to second and third models:",
-            out_of=1,
-            step=0.05,
+            out_of=1.0,
+            step=0.01,
             lowest=0,
             value=0.5,
             labelColor="CONTROL",
@@ -323,7 +322,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         self.merged_model_name.value = merged_model_name
 
         if selected_model3 > 0:
-            self.merge_method.values = (["add_difference"],)
+            self.merge_method.values = ['add_difference ( A+(B-C) )']
             self.merged_model_name.value += f"+{models[selected_model3]}"
         else:
             self.merge_method.values = self.interpolations
@@ -349,11 +348,14 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         ]
         if self.model3.value[0] > 0:
             models.append(model_names[self.model3.value[0] - 1])
+            interp='add_difference'
+        else:
+            interp=self.interpolations[self.merge_method.value[0]]
 
         args = dict(
             models=models,
             alpha=self.alpha.value,
-            interp=self.interpolations[self.merge_method.value[0]],
+            interp=interp,
             force=self.force.value,
             merged_model_name=self.merged_model_name.value,
         )
@@ -417,7 +419,8 @@ def run_gui(args: Namespace):
     mergeapp.run()
 
     args = mergeapp.merge_arguments
-    merge_diffusion_models_and_commit(**args)
+    print(f'DEBUG: {args}')
+    #merge_diffusion_models_and_commit(**args)
     print(f'>> Models merged into new model: "{args["merged_model_name"]}".')
 
 
