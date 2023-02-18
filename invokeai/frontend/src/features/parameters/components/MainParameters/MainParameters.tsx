@@ -21,7 +21,7 @@ export default function MainSettings() {
 
   const accordionItems = {
     main: {
-      header: `${t('parameters:general')}`,
+      header: `${t('parameters.general')}`,
       feature: undefined,
       content: shouldUseSliders ? (
         <Flex flexDir="column" rowGap={2}>

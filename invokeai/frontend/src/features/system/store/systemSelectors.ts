@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
-import { isEqual, reduce } from 'lodash';
+import { isEqual, reduce, pickBy } from 'lodash';
 
 export const systemSelector = (state: RootState) => state.system;
 
@@ -21,6 +21,26 @@ export const activeModelSelector = createSelector(
       ''
     );
     return { ...model_list[activeModel], name: activeModel };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: isEqual,
+    },
+  }
+);
+
+export const diffusersModelsSelector = createSelector(
+  systemSelector,
+  (system) => {
+    const { model_list } = system;
+
+    const diffusersModels = pickBy(model_list, (model, key) => {
+      if (model.format === 'diffusers') {
+        return { name: key, ...model };
+      }
+    });
+
+    return diffusersModels;
   },
   {
     memoizeOptions: {

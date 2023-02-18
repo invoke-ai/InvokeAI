@@ -16,6 +16,7 @@ import {
   generationRequested,
   modelChangeRequested,
   modelConvertRequested,
+  modelMergingRequested,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -184,6 +185,12 @@ const makeSocketIOEmitters = (
     ) => {
       dispatch(modelConvertRequested());
       socketio.emit('convertToDiffusers', modelToConvert);
+    },
+    emitMergeDiffusersModels: (
+      modelMergeInfo: InvokeAI.InvokeModelMergingProps
+    ) => {
+      dispatch(modelMergingRequested());
+      socketio.emit('mergeDiffusersModels', modelMergeInfo);
     },
     emitRequestModelChange: (modelName: string) => {
       dispatch(modelChangeRequested());

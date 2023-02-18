@@ -14,7 +14,7 @@ export default function SeamStrength() {
   return (
     <IAISlider
       sliderMarkRightOffset={-7}
-      label={t('parameters:seamStrength')}
+      label={t('parameters.seamStrength')}
       min={0.01}
       max={0.99}
       step={0.01}

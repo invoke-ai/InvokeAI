@@ -17,7 +17,7 @@ export default function UnifiedCanvasEnableMask() {
 
   return (
     <IAICheckbox
-      label={`${t('unifiedcanvas:enableMask')} (H)`}
+      label={`${t('unifiedCanvas.enableMask')} (H)`}
       isChecked={isMaskEnabled}
       onChange={handleToggleEnableMask}
     />

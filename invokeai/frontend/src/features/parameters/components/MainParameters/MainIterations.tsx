@@ -22,7 +22,7 @@ export default function MainIterations() {
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters:images')}
+      label={t('parameters.images')}
       step={1}
       min={1}
       max={16}
@@ -37,7 +37,7 @@ export default function MainIterations() {
     />
   ) : (
     <IAINumberInput
-      label={t('parameters:images')}
+      label={t('parameters.images')}
       step={1}
       min={1}
       max={9999}

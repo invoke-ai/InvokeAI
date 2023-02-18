@@ -18,7 +18,7 @@ export default function UnifiedCanvasSnapToGrid() {
 
   return (
     <IAICheckbox
-      label={`${t('unifiedcanvas:snapToGrid')} (N)`}
+      label={`${t('unifiedCanvas.snapToGrid')} (N)`}
       isChecked={shouldSnapToGrid}
       onChange={handleChangeShouldSnapToGrid}
     />

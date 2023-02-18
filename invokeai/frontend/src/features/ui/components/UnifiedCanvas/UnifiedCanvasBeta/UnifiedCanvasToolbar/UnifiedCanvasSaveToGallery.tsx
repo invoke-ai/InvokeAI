@@ -44,8 +44,8 @@ export default function UnifiedCanvasSaveToGallery() {
   };
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:saveToGallery')} (Shift+S)`}
-      tooltip={`${t('unifiedcanvas:saveToGallery')} (Shift+S)`}
+      aria-label={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
+      tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
       icon={<FaSave />}
       onClick={handleSaveToGallery}
       isDisabled={isStaging}

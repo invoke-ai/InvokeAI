@@ -18,7 +18,7 @@ export default function UpscaleDenoisingStrength() {
 
   return (
     <IAISlider
-      label={t('parameters:denoisingStrength')}
+      label={t('parameters.denoisingStrength')}
       value={upscalingDenoising}
       min={0}
       max={1}

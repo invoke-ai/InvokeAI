@@ -18,7 +18,7 @@ export default function MainSteps() {
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters:steps')}
+      label={t('parameters.steps')}
       min={1}
       step={1}
       onChange={handleChangeSteps}
@@ -32,7 +32,7 @@ export default function MainSteps() {
     />
   ) : (
     <IAINumberInput
-      label={t('parameters:steps')}
+      label={t('parameters.steps')}
       min={1}
       max={9999}
       step={1}
