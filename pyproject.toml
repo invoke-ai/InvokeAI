@@ -147,11 +147,26 @@ version = {attr = "ldm.invoke.__version__"}
 "invokeai.frontend.dist" = ["**"]
 
 [tool.black]
+extend-exclude = '''
+/(
+  # skip legacy scripts
+  | scripts/orig_scripts
+)/
+'''
 line-length = 88
-target-version = ['py310']
+target-version = ['py39']
 
 [tool.isort]
+atomic = true
+extend_skip_glob = ["scripts/orig_scripts/*"]
+filter_files = true
+line_length = 88
 profile = "black"
+py_version = 39
+remove_redundant_aliases = true
+skip_gitignore = true
+src_paths = ["installer", "invokeai", "ldm", "tests"]
+virtual_env = ".venv"
 
 [tool.coverage.run]
 branch = true
