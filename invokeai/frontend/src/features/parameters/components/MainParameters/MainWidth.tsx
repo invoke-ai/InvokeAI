@@ -22,7 +22,7 @@ export default function MainWidth() {
       isSliderDisabled={activeTabName === 'unifiedCanvas'}
       isInputDisabled={activeTabName === 'unifiedCanvas'}
       isResetDisabled={activeTabName === 'unifiedCanvas'}
-      label={t('parameters:width')}
+      label={t('parameters.width')}
       value={width}
       min={64}
       step={64}
@@ -40,7 +40,7 @@ export default function MainWidth() {
   ) : (
     <IAISelect
       isDisabled={activeTabName === 'unifiedCanvas'}
-      label={t('parameters:width')}
+      label={t('parameters.width')}
       value={width}
       flexGrow={1}
       onChange={(e) => dispatch(setWidth(Number(e.target.value)))}

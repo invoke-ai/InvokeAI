@@ -17,7 +17,7 @@ export default function UpscaleStrength() {
 
   return (
     <IAISlider
-      label={`${t('parameters:upscale')} ${t('parameters:strength')}`}
+      label={`${t('parameters.upscale')} ${t('parameters.strength')}`}
       value={upscalingStrength}
       min={0}
       max={1}

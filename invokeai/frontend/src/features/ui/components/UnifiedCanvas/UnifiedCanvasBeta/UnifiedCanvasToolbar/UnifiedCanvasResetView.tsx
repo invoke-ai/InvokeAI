@@ -44,8 +44,8 @@ export default function UnifiedCanvasResetView() {
   };
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:resetView')} (R)`}
-      tooltip={`${t('unifiedcanvas:resetView')} (R)`}
+      aria-label={`${t('unifiedCanvas.resetView')} (R)`}
+      tooltip={`${t('unifiedCanvas.resetView')} (R)`}
       icon={<FaCrosshairs />}
       onClick={handleClickResetCanvasView}
     />

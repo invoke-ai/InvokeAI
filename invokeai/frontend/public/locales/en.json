@@ -1,0 +1,581 @@
+{
+    "common": {
+        "hotkeysLabel": "Hotkeys",
+        "themeLabel": "Theme",
+        "languagePickerLabel": "Language Picker",
+        "reportBugLabel": "Report Bug",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "settingsLabel": "Settings",
+        "darkTheme": "Dark",
+        "lightTheme": "Light",
+        "greenTheme": "Green",
+        "langArabic": "العربية",
+        "langEnglish": "English",
+        "langDutch": "Nederlands",
+        "langFrench": "Français",
+        "langGerman": "Deutsch",
+        "langItalian": "Italiano",
+        "langJapanese": "日本語",
+        "langPolish": "Polski",
+        "langBrPortuguese": "Português do Brasil",
+        "langRussian": "Русский",
+        "langSimplifiedChinese": "简体中文",
+        "langUkranian": "Украї́нська",
+        "langSpanish": "Español",
+        "text2img": "Text To Image",
+        "img2img": "Image To Image",
+        "unifiedCanvas": "Unified Canvas",
+        "nodes": "Nodes",
+        "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
+        "postProcessing": "Post Processing",
+        "postProcessDesc1": "Invoke AI offers a wide variety of post processing features. Image Upscaling and Face Restoration are already available in the WebUI. You can access them from the Advanced Options menu of the Text To Image and Image To Image tabs. You can also process images directly, using the image action buttons above the current image display or in the viewer.",
+        "postProcessDesc2": "A dedicated UI will be released soon to facilitate more advanced post processing workflows.",
+        "postProcessDesc3": "The Invoke AI Command Line Interface offers various other features including Embiggen.",
+        "training": "Training",
+        "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
+        "trainingDesc2": "InvokeAI already supports training custom embeddings using Textual Inversion using the main script.",
+        "upload": "Upload",
+        "close": "Close",
+        "load": "Load",
+        "back": "Back",
+        "statusConnected": "Connected",
+        "statusDisconnected": "Disconnected",
+        "statusError": "Error",
+        "statusPreparing": "Preparing",
+        "statusProcessingCanceled": "Processing Canceled",
+        "statusProcessingComplete": "Processing Complete",
+        "statusGenerating": "Generating",
+        "statusGeneratingTextToImage": "Generating Text To Image",
+        "statusGeneratingImageToImage": "Generating Image To Image",
+        "statusGeneratingInpainting": "Generating Inpainting",
+        "statusGeneratingOutpainting": "Generating Outpainting",
+        "statusGenerationComplete": "Generation Complete",
+        "statusIterationComplete": "Iteration Complete",
+        "statusSavingImage": "Saving Image",
+        "statusRestoringFaces": "Restoring Faces",
+        "statusRestoringFacesGFPGAN": "Restoring Faces (GFPGAN)",
+        "statusRestoringFacesCodeFormer": "Restoring Faces (CodeFormer)",
+        "statusUpscaling": "Upscaling",
+        "statusUpscalingESRGAN": "Upscaling (ESRGAN)",
+        "statusLoadingModel": "Loading Model",
+        "statusModelChanged": "Model Changed",
+        "statusConvertingModel": "Converting Model",
+        "statusModelConverted": "Model Converted",
+        "statusMergingModels": "Merging Models",
+        "statusMergedModels": "Models Merged"
+    },
+    "gallery": {
+        "generations": "Generations",
+        "showGenerations": "Show Generations",
+        "uploads": "Uploads",
+        "showUploads": "Show Uploads",
+        "galleryImageSize": "Image Size",
+        "galleryImageResetSize": "Reset Size",
+        "gallerySettings": "Gallery Settings",
+        "maintainAspectRatio": "Maintain Aspect Ratio",
+        "autoSwitchNewImages": "Auto-Switch to New Images",
+        "singleColumnLayout": "Single Column Layout",
+        "pinGallery": "Pin Gallery",
+        "allImagesLoaded": "All Images Loaded",
+        "loadMore": "Load More",
+        "noImagesInGallery": "No Images In Gallery"
+    },
+    "hotkeys": {
+        "keyboardShortcuts": "Keyboard Shorcuts",
+        "appHotkeys": "App Hotkeys",
+        "generalHotkeys": "General Hotkeys",
+        "galleryHotkeys": "Gallery Hotkeys",
+        "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+        "invoke": {
+            "title": "Invoke",
+            "desc": "Generate an image"
+        },
+        "cancel": {
+            "title": "Cancel",
+            "desc": "Cancel image generation"
+        },
+        "focusPrompt": {
+            "title": "Focus Prompt",
+            "desc": "Focus the prompt input area"
+        },
+        "toggleOptions": {
+            "title": "Toggle Options",
+            "desc": "Open and close the options panel"
+        },
+        "pinOptions": {
+            "title": "Pin Options",
+            "desc": "Pin the options panel"
+        },
+        "toggleViewer": {
+            "title": "Toggle Viewer",
+            "desc": "Open and close Image Viewer"
+        },
+        "toggleGallery": {
+            "title": "Toggle Gallery",
+            "desc": "Open and close the gallery drawer"
+        },
+        "maximizeWorkSpace": {
+            "title": "Maximize Workspace",
+            "desc": "Close panels and maximize work area"
+        },
+        "changeTabs": {
+            "title": "Change Tabs",
+            "desc": "Switch to another workspace"
+        },
+        "consoleToggle": {
+            "title": "Console Toggle",
+            "desc": "Open and close console"
+        },
+        "setPrompt": {
+            "title": "Set Prompt",
+            "desc": "Use the prompt of the current image"
+        },
+        "setSeed": {
+            "title": "Set Seed",
+            "desc": "Use the seed of the current image"
+        },
+        "setParameters": {
+            "title": "Set Parameters",
+            "desc": "Use all parameters of the current image"
+        },
+        "restoreFaces": {
+            "title": "Restore Faces",
+            "desc": "Restore the current image"
+        },
+        "upscale": {
+            "title": "Upscale",
+            "desc": "Upscale the current image"
+        },
+        "showInfo": {
+            "title": "Show Info",
+            "desc": "Show metadata info of the current image"
+        },
+        "sendToImageToImage": {
+            "title": "Send To Image To Image",
+            "desc": "Send current image to Image to Image"
+        },
+        "deleteImage": {
+            "title": "Delete Image",
+            "desc": "Delete the current image"
+        },
+        "closePanels": {
+            "title": "Close Panels",
+            "desc": "Closes open panels"
+        },
+        "previousImage": {
+            "title": "Previous Image",
+            "desc": "Display the previous image in gallery"
+        },
+        "nextImage": {
+            "title": "Next Image",
+            "desc": "Display the next image in gallery"
+        },
+        "toggleGalleryPin": {
+            "title": "Toggle Gallery Pin",
+            "desc": "Pins and unpins the gallery to the UI"
+        },
+        "increaseGalleryThumbSize": {
+            "title": "Increase Gallery Image Size",
+            "desc": "Increases gallery thumbnails size"
+        },
+        "decreaseGalleryThumbSize": {
+            "title": "Decrease Gallery Image Size",
+            "desc": "Decreases gallery thumbnails size"
+        },
+        "selectBrush": {
+            "title": "Select Brush",
+            "desc": "Selects the canvas brush"
+        },
+        "selectEraser": {
+            "title": "Select Eraser",
+            "desc": "Selects the canvas eraser"
+        },
+        "decreaseBrushSize": {
+            "title": "Decrease Brush Size",
+            "desc": "Decreases the size of the canvas brush/eraser"
+        },
+        "increaseBrushSize": {
+            "title": "Increase Brush Size",
+            "desc": "Increases the size of the canvas brush/eraser"
+        },
+        "decreaseBrushOpacity": {
+            "title": "Decrease Brush Opacity",
+            "desc": "Decreases the opacity of the canvas brush"
+        },
+        "increaseBrushOpacity": {
+            "title": "Increase Brush Opacity",
+            "desc": "Increases the opacity of the canvas brush"
+        },
+        "moveTool": {
+            "title": "Move Tool",
+            "desc": "Allows canvas navigation"
+        },
+        "fillBoundingBox": {
+            "title": "Fill Bounding Box",
+            "desc": "Fills the bounding box with brush color"
+        },
+        "eraseBoundingBox": {
+            "title": "Erase Bounding Box",
+            "desc": "Erases the bounding box area"
+        },
+        "colorPicker": {
+            "title": "Select Color Picker",
+            "desc": "Selects the canvas color picker"
+        },
+        "toggleSnap": {
+            "title": "Toggle Snap",
+            "desc": "Toggles Snap to Grid"
+        },
+        "quickToggleMove": {
+            "title": "Quick Toggle Move",
+            "desc": "Temporarily toggles Move mode"
+        },
+        "toggleLayer": {
+            "title": "Toggle Layer",
+            "desc": "Toggles mask/base layer selection"
+        },
+        "clearMask": {
+            "title": "Clear Mask",
+            "desc": "Clear the entire mask"
+        },
+        "hideMask": {
+            "title": "Hide Mask",
+            "desc": "Hide and unhide mask"
+        },
+        "showHideBoundingBox": {
+            "title": "Show/Hide Bounding Box",
+            "desc": "Toggle visibility of bounding box"
+        },
+        "mergeVisible": {
+            "title": "Merge Visible",
+            "desc": "Merge all visible layers of canvas"
+        },
+        "saveToGallery": {
+            "title": "Save To Gallery",
+            "desc": "Save current canvas to gallery"
+        },
+        "copyToClipboard": {
+            "title": "Copy to Clipboard",
+            "desc": "Copy current canvas to clipboard"
+        },
+        "downloadImage": {
+            "title": "Download Image",
+            "desc": "Download current canvas"
+        },
+        "undoStroke": {
+            "title": "Undo Stroke",
+            "desc": "Undo a brush stroke"
+        },
+        "redoStroke": {
+            "title": "Redo Stroke",
+            "desc": "Redo a brush stroke"
+        },
+        "resetView": {
+            "title": "Reset View",
+            "desc": "Reset Canvas View"
+        },
+        "previousStagingImage": {
+            "title": "Previous Staging Image",
+            "desc": "Previous Staging Area Image"
+        },
+        "nextStagingImage": {
+            "title": "Next Staging Image",
+            "desc": "Next Staging Area Image"
+        },
+        "acceptStagingImage": {
+            "title": "Accept Staging Image",
+            "desc": "Accept Current Staging Area Image"
+        }
+    },
+    "modelManager": {
+        "modelManager": "Model Manager",
+        "model": "Model",
+        "allModels": "All Models",
+        "checkpointModels": "Checkpoints",
+        "diffusersModels": "Diffusers",
+        "safetensorModels": "SafeTensors",
+        "modelAdded": "Model Added",
+        "modelUpdated": "Model Updated",
+        "modelEntryDeleted": "Model Entry Deleted",
+        "cannotUseSpaces": "Cannot Use Spaces",
+        "addNew": "Add New",
+        "addNewModel": "Add New Model",
+        "addCheckpointModel": "Add Checkpoint / Safetensor Model",
+        "addDiffuserModel": "Add Diffusers",
+        "addManually": "Add Manually",
+        "manual": "Manual",
+        "name": "Name",
+        "nameValidationMsg": "Enter a name for your model",
+        "description": "Description",
+        "descriptionValidationMsg": "Add a description for your model",
+        "config": "Config",
+        "configValidationMsg": "Path to the config file of your model.",
+        "modelLocation": "Model Location",
+        "modelLocationValidationMsg": "Path to where your model is located locally.",
+        "repo_id": "Repo ID",
+        "repoIDValidationMsg": "Online repository of your model",
+        "vaeLocation": "VAE Location",
+        "vaeLocationValidationMsg": "Path to where your VAE is located.",
+        "vaeRepoID": "VAE Repo ID",
+        "vaeRepoIDValidationMsg": "Online repository of your VAE",
+        "width": "Width",
+        "widthValidationMsg": "Default width of your model.",
+        "height": "Height",
+        "heightValidationMsg": "Default height of your model.",
+        "addModel": "Add Model",
+        "updateModel": "Update Model",
+        "availableModels": "Available Models",
+        "search": "Search",
+        "load": "Load",
+        "active": "active",
+        "notLoaded": "not loaded",
+        "cached": "cached",
+        "checkpointFolder": "Checkpoint Folder",
+        "clearCheckpointFolder": "Clear Checkpoint Folder",
+        "findModels": "Find Models",
+        "scanAgain": "Scan Again",
+        "modelsFound": "Models Found",
+        "selectFolder": "Select Folder",
+        "selected": "Selected",
+        "selectAll": "Select All",
+        "deselectAll": "Deselect All",
+        "showExisting": "Show Existing",
+        "addSelected": "Add Selected",
+        "modelExists": "Model Exists",
+        "selectAndAdd": "Select and Add Models Listed Below",
+        "noModelsFound": "No Models Found",
+        "delete": "Delete",
+        "deleteModel": "Delete Model",
+        "deleteConfig": "Delete Config",
+        "deleteMsg1": "Are you sure you want to delete this model entry from InvokeAI?",
+        "deleteMsg2": "This will not delete the model checkpoint file from your disk. You can readd them if you wish to.",
+        "formMessageDiffusersModelLocation": "Diffusers Model Location",
+        "formMessageDiffusersModelLocationDesc": "Please enter at least one.",
+        "formMessageDiffusersVAELocation": "VAE Location",
+        "formMessageDiffusersVAELocationDesc": "If not provided, InvokeAI will look for the VAE file inside the model location given above.",
+        "convert": "Convert",
+        "convertToDiffusers": "Convert To Diffusers",
+        "convertToDiffusersHelpText1": "This model will be converted to the 🧨 Diffusers format.",
+        "convertToDiffusersHelpText2": "This process will replace your Model Manager entry with the Diffusers version of the same model.",
+        "convertToDiffusersHelpText3": "Your checkpoint file on the disk will NOT be deleted or modified in anyway. You can add your checkpoint to the Model Manager again if you want to.",
+        "convertToDiffusersHelpText4": "This is a one time process only. It might take around 30s-60s depending on the specifications of your computer.",
+        "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 4GB-7GB in size.",
+        "convertToDiffusersHelpText6": "Do you wish to convert this model?",
+        "convertToDiffusersSaveLocation": "Save Location",
+        "v1": "v1",
+        "v2": "v2",
+        "inpainting": "v1 Inpainting",
+        "customConfig": "Custom Config",
+        "pathToCustomConfig": "Path To Custom Config",
+        "statusConverting": "Converting",
+        "modelConverted": "Model Converted",
+        "sameFolder": "Same folder",
+        "invokeRoot": "InvokeAI folder",
+        "custom": "Custom",
+        "customSaveLocation": "Custom Save Location",
+        "merge": "Merge",
+        "modelsMerged": "Models Merged",
+        "mergeModels": "Merge Models",
+        "modelOne": "Model 1",
+        "modelTwo": "Model 2",
+        "modelThree": "Model 3",
+        "mergedModelName": "Merged Model Name",
+        "alpha": "Alpha",
+        "interpolationType": "Interpolation Type",
+        "mergedModelSaveLocation": "Save Location",
+        "mergedModelCustomSaveLocation": "Custom Path",
+        "invokeAIFolder": "Invoke AI Folder",
+        "ignoreMismatch": "Ignore Mismatches Between Selected Models",
+        "modelMergeHeaderHelp1": "You can merge upto three different models to create a blend that suits your needs.",
+        "modelMergeHeaderHelp2": "Only Diffusers are available for merging. If you want to merge a checkpoint model, please convert it to Diffusers first.",
+        "modelMergeAlphaHelp": "Alpha controls blend strength for the models. Lower alpha values lead to lower influence of the second model.",
+        "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above."
+    },
+    "parameters": {
+        "general": "General",
+        "images": "Images",
+        "steps": "Steps",
+        "cfgScale": "CFG Scale",
+        "width": "Width",
+        "height": "Height",
+        "sampler": "Sampler",
+        "seed": "Seed",
+        "randomizeSeed": "Randomize Seed",
+        "shuffle": "Shuffle",
+        "noiseThreshold": "Noise Threshold",
+        "perlinNoise": "Perlin Noise",
+        "variations": "Variations",
+        "variationAmount": "Variation Amount",
+        "seedWeights": "Seed Weights",
+        "faceRestoration": "Face Restoration",
+        "restoreFaces": "Restore Faces",
+        "type": "Type",
+        "strength": "Strength",
+        "upscaling": "Upscaling",
+        "upscale": "Upscale",
+        "upscaleImage": "Upscale Image",
+        "denoisingStrength": "Denoising Strength",
+        "scale": "Scale",
+        "otherOptions": "Other Options",
+        "seamlessTiling": "Seamless Tiling",
+        "hiresOptim": "High Res Optimization",
+        "hiresStrength": "High Res Strength",
+        "imageFit": "Fit Initial Image To Output Size",
+        "codeformerFidelity": "Fidelity",
+        "seamSize": "Seam Size",
+        "seamBlur": "Seam Blur",
+        "seamStrength": "Seam Strength",
+        "seamSteps": "Seam Steps",
+        "scaleBeforeProcessing": "Scale Before Processing",
+        "scaledWidth": "Scaled W",
+        "scaledHeight": "Scaled H",
+        "infillMethod": "Infill Method",
+        "tileSize": "Tile Size",
+        "boundingBoxHeader": "Bounding Box",
+        "seamCorrectionHeader": "Seam Correction",
+        "infillScalingHeader": "Infill and Scaling",
+        "img2imgStrength": "Image To Image Strength",
+        "toggleLoopback": "Toggle Loopback",
+        "invoke": "Invoke",
+        "cancel": "Cancel",
+        "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
+        "negativePrompts": "Negative Prompts",
+        "sendTo": "Send to",
+        "sendToImg2Img": "Send to Image to Image",
+        "sendToUnifiedCanvas": "Send To Unified Canvas",
+        "copyImage": "Copy Image",
+        "copyImageToLink": "Copy Image To Link",
+        "downloadImage": "Download Image",
+        "openInViewer": "Open In Viewer",
+        "closeViewer": "Close Viewer",
+        "usePrompt": "Use Prompt",
+        "useSeed": "Use Seed",
+        "useAll": "Use All",
+        "useInitImg": "Use Initial Image",
+        "info": "Info",
+        "deleteImage": "Delete Image",
+        "initialImage": "Initial Image",
+        "showOptionsPanel": "Show Options Panel"
+    },
+    "settings": {
+        "models": "Models",
+        "displayInProgress": "Display In-Progress Images",
+        "saveSteps": "Save images every n steps",
+        "confirmOnDelete": "Confirm On Delete",
+        "displayHelpIcons": "Display Help Icons",
+        "useCanvasBeta": "Use Canvas Beta Layout",
+        "useSlidersForAll": "Use Sliders For All Options",
+        "enableImageDebugging": "Enable Image Debugging",
+        "resetWebUI": "Reset Web UI",
+        "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
+        "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
+        "resetComplete": "Web UI has been reset. Refresh the page to reload."
+    },
+    "toast": {
+        "tempFoldersEmptied": "Temp Folder Emptied",
+        "uploadFailed": "Upload failed",
+        "uploadFailedMultipleImagesDesc": "Multiple images pasted, may only upload one image at a time",
+        "uploadFailedUnableToLoadDesc": "Unable to load file",
+        "downloadImageStarted": "Image Download Started",
+        "imageCopied": "Image Copied",
+        "imageLinkCopied": "Image Link Copied",
+        "imageNotLoaded": "No Image Loaded",
+        "imageNotLoadedDesc": "No image found to send to image to image module",
+        "imageSavedToGallery": "Image Saved to Gallery",
+        "canvasMerged": "Canvas Merged",
+        "sentToImageToImage": "Sent To Image To Image",
+        "sentToUnifiedCanvas": "Sent to Unified Canvas",
+        "parametersSet": "Parameters Set",
+        "parametersNotSet": "Parameters Not Set",
+        "parametersNotSetDesc": "No metadata found for this image.",
+        "parametersFailed": "Problem loading parameters",
+        "parametersFailedDesc": "Unable to load init image.",
+        "seedSet": "Seed Set",
+        "seedNotSet": "Seed Not Set",
+        "seedNotSetDesc": "Could not find seed for this image.",
+        "promptSet": "Prompt Set",
+        "promptNotSet": "Prompt Not Set",
+        "promptNotSetDesc": "Could not find prompt for this image.",
+        "upscalingFailed": "Upscaling Failed",
+        "faceRestoreFailed": "Face Restoration Failed",
+        "metadataLoadFailed": "Failed to load metadata",
+        "initialImageSet": "Initial Image Set",
+        "initialImageNotSet": "Initial Image Not Set",
+        "initialImageNotSetDesc": "Could not load initial image"
+    },
+    "tooltip": {
+        "feature": {
+            "prompt": "This is the prompt field. Prompt includes generation objects and stylistic terms. You can add weight (token importance) in the prompt as well, but CLI commands and parameters will not work.",
+            "gallery": "Gallery displays generations from the outputs folder as they're created. Settings are stored within files and accesed by context menu.",
+            "other": "These options will enable alternative processing modes for Invoke. 'Seamless tiling' will create repeating patterns in the output. 'High resolution' is generation in two steps with img2img: use this setting when you want a larger and more coherent image without artifacts. It will take longer than usual txt2img.",
+            "seed": "Seed value affects the initial noise from which the image is formed. You can use the already existing seeds from previous images. 'Noise Threshold' is used to mitigate artifacts at high CFG values (try the 0-10 range), and Perlin to add Perlin noise during generation: both serve to add variation to your outputs.",
+            "variations": "Try a variation with a value between 0.1 and 1.0 to change the result for a given seed. Interesting variations of the seed are between 0.1 and 0.3.",
+            "upscale": "Use ESRGAN to enlarge the image immediately after generation.",
+            "faceCorrection": "Face correction with GFPGAN or Codeformer: the algorithm detects faces in the image and corrects any defects. High value will change the image more, resulting in more attractive faces. Codeformer with a higher fidelity preserves the original image at the expense of stronger face correction.",
+            "imageToImage": "Image to Image loads any image as initial, which is then used to generate a new one along with the prompt. The higher the value, the more the result image will change. Values from 0.0 to 1.0 are possible, the recommended range is .25-.75",
+            "boundingBox": "The bounding box is the same as the Width and Height settings for Text to Image or Image to Image. Only the area in the box will be processed.",
+            "seamCorrection": "Controls the handling of visible seams that occur between generated images on the canvas.",
+            "infillAndScaling": "Manage infill methods (used on masked or erased areas of the canvas) and scaling (useful for small bounding box sizes)."
+        }
+    },
+    "unifiedCanvas": {
+        "layer": "Layer",
+        "base": "Base",
+        "mask": "Mask",
+        "maskingOptions": "Masking Options",
+        "enableMask": "Enable Mask",
+        "preserveMaskedArea": "Preserve Masked Area",
+        "clearMask": "Clear Mask",
+        "brush": "Brush",
+        "eraser": "Eraser",
+        "fillBoundingBox": "Fill Bounding Box",
+        "eraseBoundingBox": "Erase Bounding Box",
+        "colorPicker": "Color Picker",
+        "brushOptions": "Brush Options",
+        "brushSize": "Size",
+        "move": "Move",
+        "resetView": "Reset View",
+        "mergeVisible": "Merge Visible",
+        "saveToGallery": "Save To Gallery",
+        "copyToClipboard": "Copy to Clipboard",
+        "downloadAsImage": "Download As Image",
+        "undo": "Undo",
+        "redo": "Redo",
+        "clearCanvas": "Clear Canvas",
+        "canvasSettings": "Canvas Settings",
+        "showIntermediates": "Show Intermediates",
+        "showGrid": "Show Grid",
+        "snapToGrid": "Snap to Grid",
+        "darkenOutsideSelection": "Darken Outside Selection",
+        "autoSaveToGallery": "Auto Save to Gallery",
+        "saveBoxRegionOnly": "Save Box Region Only",
+        "limitStrokesToBox": "Limit Strokes to Box",
+        "showCanvasDebugInfo": "Show Canvas Debug Info",
+        "clearCanvasHistory": "Clear Canvas History",
+        "clearHistory": "Clear History",
+        "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
+        "clearCanvasHistoryConfirm": "Are you sure you want to clear the canvas history?",
+        "emptyTempImageFolder": "Empty Temp Image Folder",
+        "emptyFolder": "Empty Folder",
+        "emptyTempImagesFolderMessage": "Emptying the temp image folder also fully resets the Unified Canvas. This includes all undo/redo history, images in the staging area, and the canvas base layer.",
+        "emptyTempImagesFolderConfirm": "Are you sure you want to empty the temp folder?",
+        "activeLayer": "Active Layer",
+        "canvasScale": "Canvas Scale",
+        "boundingBox": "Bounding Box",
+        "scaledBoundingBox": "Scaled Bounding Box",
+        "boundingBoxPosition": "Bounding Box Position",
+        "canvasDimensions": "Canvas Dimensions",
+        "canvasPosition": "Canvas Position",
+        "cursorPosition": "Cursor Position",
+        "previous": "Previous",
+        "next": "Next",
+        "accept": "Accept",
+        "showHide": "Show/Hide",
+        "discardAll": "Discard All",
+        "betaClear": "Clear",
+        "betaDarkenOutside": "Darken Outside",
+        "betaLimitToBox": "Limit To Box",
+        "betaPreserveMasked": "Preserve Masked"
+    }
+}

@@ -54,8 +54,8 @@ export default function IAICanvasUndoButton() {
 
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:undo')} (Ctrl+Z)`}
-      tooltip={`${t('unifiedcanvas:undo')} (Ctrl+Z)`}
+      aria-label={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
+      tooltip={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       icon={<FaUndo />}
       onClick={handleUndo}
       isDisabled={!canUndo}
