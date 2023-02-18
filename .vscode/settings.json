@@ -49,7 +49,7 @@
   "evenBetterToml.formatter.inlineTableExpand": true,
   "evenBetterToml.formatter.reorderArrays": true,
   "evenBetterToml.formatter.reorderKeys": true,
-  "evenBetterToml.formatter.compactEntries": true,
+  "evenBetterToml.formatter.compactEntries": false,
   "evenBetterToml.schema.enabled": true,
   "isort.check": true,
   "isort.args": ["--profile=black", "--filter-files", "--color"],
