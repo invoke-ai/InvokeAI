@@ -37,7 +37,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         ''
       );
       toast({
-        title: t('toast:uploadFailed'),
+        title: t('toast.uploadFailed'),
         description: msg,
         status: 'error',
         isClosable: true,
@@ -105,7 +105,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
       if (imageItems.length > 1) {
         toast({
-          description: t('toast:uploadFailedMultipleImagesDesc'),
+          description: t('toast.uploadFailedMultipleImagesDesc'),
           status: 'error',
           isClosable: true,
         });
@@ -116,7 +116,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
       if (!file) {
         toast({
-          description: t('toast:uploadFailedUnableToLoadDesc'),
+          description: t('toast.uploadFailedUnableToLoadDesc'),
           status: 'error',
           isClosable: true,
         });

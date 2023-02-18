@@ -29,8 +29,8 @@ export default function UnifiedCanvasMoveTool() {
 
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:move')} (V)`}
-      tooltip={`${t('unifiedcanvas:move')} (V)`}
+      aria-label={`${t('unifiedCanvas.move')} (V)`}
+      tooltip={`${t('unifiedCanvas.move')} (V)`}
       icon={<FaArrowsAlt />}
       data-selected={tool === 'move' || isStaging}
       onClick={handleSelectMoveTool}

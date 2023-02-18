@@ -56,7 +56,7 @@ export default function ModelManagerModal({
         <ModalContent className="modal" fontFamily="Inter">
           <ModalCloseButton className="modal-close-btn" />
           <ModalHeader fontWeight="bold">
-            {t('modelmanager:modelManager')}
+            {t('modelManager.modelManager')}
           </ModalHeader>
           <Flex padding="0 1.5rem 1.5rem 1.5rem" width="100%" columnGap="2rem">
             <ModelList />

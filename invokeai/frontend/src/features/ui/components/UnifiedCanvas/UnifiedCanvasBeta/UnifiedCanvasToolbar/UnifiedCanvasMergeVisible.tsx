@@ -39,8 +39,8 @@ export default function UnifiedCanvasMergeVisible() {
   };
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:mergeVisible')} (Shift+M)`}
-      tooltip={`${t('unifiedcanvas:mergeVisible')} (Shift+M)`}
+      aria-label={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
+      tooltip={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
       icon={<FaLayerGroup />}
       onClick={handleMergeVisible}
       isDisabled={isStaging}

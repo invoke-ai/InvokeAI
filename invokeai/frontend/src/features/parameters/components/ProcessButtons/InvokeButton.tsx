@@ -44,19 +44,19 @@ export default function InvokeButton(props: InvokeButton) {
     <div style={{ flexGrow: 4 }}>
       {iconButton ? (
         <IAIIconButton
-          aria-label={t('parameters:invoke')}
+          aria-label={t('parameters.invoke')}
           type="submit"
           icon={<FaPlay />}
           isDisabled={!isReady}
           onClick={handleClickGenerate}
           className="invoke-btn"
-          tooltip={t('parameters:invoke')}
+          tooltip={t('parameters.invoke')}
           tooltipProps={{ placement: 'bottom' }}
           {...rest}
         />
       ) : (
         <IAIButton
-          aria-label={t('parameters:invoke')}
+          aria-label={t('parameters.invoke')}
           type="submit"
           isDisabled={!isReady}
           onClick={handleClickGenerate}

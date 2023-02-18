@@ -10,19 +10,8 @@ i18n
   .init({
     fallbackLng: 'en',
     debug: false,
-    ns: [
-      'common',
-      'gallery',
-      'hotkeys',
-      'parameters',
-      'settings',
-      'modelmanager',
-      'toast',
-      'tooltip',
-      'unifiedcanvas',
-    ],
     backend: {
-      loadPath: '/locales/{{ns}}/{{lng}}.json',
+      loadPath: '/locales/{{lng}}.json',
     },
     interpolation: {
       escapeValue: false,
