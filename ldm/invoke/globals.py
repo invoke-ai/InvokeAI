@@ -54,6 +54,9 @@ Globals.full_precision = False
 # whether we should convert ckpt files into diffusers models on the fly
 Globals.ckpt_convert = False
 
+# logging tokenization everywhere
+Globals.log_tokenization = False
+
 def global_config_file()->Path:
     return Path(Globals.root, Globals.config_dir, Globals.models_file)
 
