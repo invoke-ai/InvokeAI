@@ -1,6 +1,5 @@
 [flake8]
-# line length is intentionally set to 80 here because black uses Bugbear
-max-line-length = 80
+max-line-length = 88
 extend-ignore =
     # See https://github.com/PyCQA/pycodestyle/issues/373
     E203,
@@ -33,13 +32,12 @@ per-file-ignores =
     # F841 assigned to but never used
     # F401 imported but unused
     tests/test_prompt_parser.py: B950, W605, F401
-    tests/test_textual_inversion.py: F841
+    tests/test_textual_inversion.py: F841, B950
     # B023 Function definition does not bind loop variable
     scripts/legacy_api.py: F401, B950, B023, F841
     ldm/invoke/__init__.py: F401
     # B010 Do not call setattr with a constant attribute value
     ldm/invoke/server_legacy.py: B010
-
 # =====================
 # flake-quote settings:
 # =====================
