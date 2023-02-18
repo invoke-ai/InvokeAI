@@ -14,7 +14,7 @@ export default function UnifiedCanvasShowGrid() {
 
   return (
     <IAICheckbox
-      label={t('unifiedcanvas:showGrid')}
+      label={t('unifiedCanvas.showGrid')}
       isChecked={shouldShowGrid}
       onChange={(e) => dispatch(setShouldShowGrid(e.target.checked))}
     />

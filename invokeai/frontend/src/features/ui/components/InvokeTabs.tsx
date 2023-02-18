@@ -63,12 +63,12 @@ export const tabDict: Record<InvokeTabName, InvokeTabInfo> = {
 };
 
 function updateTabTranslations() {
-  tabDict.txt2img.tooltip = i18n.t('common:text2img');
-  tabDict.img2img.tooltip = i18n.t('common:img2img');
-  tabDict.unifiedCanvas.tooltip = i18n.t('common:unifiedCanvas');
-  tabDict.nodes.tooltip = i18n.t('common:nodes');
-  tabDict.postprocess.tooltip = i18n.t('common:postProcessing');
-  tabDict.training.tooltip = i18n.t('common:training');
+  tabDict.txt2img.tooltip = i18n.t('common.text2img');
+  tabDict.img2img.tooltip = i18n.t('common.img2img');
+  tabDict.unifiedCanvas.tooltip = i18n.t('common.unifiedCanvas');
+  tabDict.nodes.tooltip = i18n.t('common.nodes');
+  tabDict.postprocess.tooltip = i18n.t('common.postProcessing');
+  tabDict.training.tooltip = i18n.t('common.training');
 }
 
 export default function InvokeTabs() {

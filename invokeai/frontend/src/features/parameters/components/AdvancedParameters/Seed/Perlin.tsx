@@ -11,7 +11,7 @@ export default function Perlin() {
 
   return (
     <IAISlider
-      label={t('parameters:perlinNoise')}
+      label={t('parameters.perlinNoise')}
       min={0}
       max={1}
       step={0.05}

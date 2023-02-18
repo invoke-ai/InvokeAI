@@ -19,9 +19,9 @@ export default function ThemeChanger() {
   );
 
   const THEMES = {
-    dark: t('common:darkTheme'),
-    light: t('common:lightTheme'),
-    green: t('common:greenTheme'),
+    dark: t('common.darkTheme'),
+    light: t('common.lightTheme'),
+    green: t('common.greenTheme'),
   };
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function ThemeChanger() {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label={t('common:themeLabel')}
+          aria-label={t('common.themeLabel')}
           size="sm"
           variant="link"
           data-variant="link"

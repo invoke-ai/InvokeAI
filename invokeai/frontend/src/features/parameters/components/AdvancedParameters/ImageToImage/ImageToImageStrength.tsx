@@ -11,7 +11,7 @@ interface ImageToImageStrengthProps {
 
 export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
   const { t } = useTranslation();
-  const { label = `${t('parameters:strength')}`, styleClass } = props;
+  const { label = `${t('parameters.strength')}`, styleClass } = props;
   const img2imgStrength = useAppSelector(
     (state: RootState) => state.generation.img2imgStrength
   );

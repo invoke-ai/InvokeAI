@@ -22,30 +22,30 @@ export default function ImageToImagePanel() {
 
   const imageToImageAccordions = {
     seed: {
-      header: `${t('parameters:seed')}`,
+      header: `${t('parameters.seed')}`,
       feature: Feature.SEED,
       content: <SeedSettings />,
     },
     variations: {
-      header: `${t('parameters:variations')}`,
+      header: `${t('parameters.variations')}`,
       feature: Feature.VARIATIONS,
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
     },
     face_restore: {
-      header: `${t('parameters:faceRestoration')}`,
+      header: `${t('parameters.faceRestoration')}`,
       feature: Feature.FACE_CORRECTION,
       content: <FaceRestoreSettings />,
       additionalHeaderComponents: <FaceRestoreToggle />,
     },
     upscale: {
-      header: `${t('parameters:upscaling')}`,
+      header: `${t('parameters.upscaling')}`,
       feature: Feature.UPSCALE,
       content: <UpscaleSettings />,
       additionalHeaderComponents: <UpscaleToggle />,
     },
     other: {
-      header: `${t('parameters:otherOptions')}`,
+      header: `${t('parameters.otherOptions')}`,
       feature: Feature.OTHER,
       content: <ImageToImageOutputSettings />,
     },

@@ -22,7 +22,7 @@ export default function FaceRestoreType() {
 
   return (
     <IAISelect
-      label={t('parameters:type')}
+      label={t('parameters.type')}
       validValues={FACETOOL_TYPES.concat()}
       value={facetoolType}
       onChange={handleChangeFacetoolType}

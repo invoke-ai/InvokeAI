@@ -75,7 +75,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     }
 
     toast({
-      title: t('toast:promptSet'),
+      title: t('toast.promptSet'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -85,7 +85,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleUseSeed = () => {
     image.metadata && dispatch(setSeed(image.metadata.image.seed));
     toast({
-      title: t('toast:seedSet'),
+      title: t('toast.seedSet'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -98,7 +98,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       dispatch(setActiveTab('img2img'));
     }
     toast({
-      title: t('toast:sentToImageToImage'),
+      title: t('toast.sentToImageToImage'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -115,7 +115,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     }
 
     toast({
-      title: t('toast:sentToUnifiedCanvas'),
+      title: t('toast.sentToUnifiedCanvas'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -125,7 +125,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleUseAllParameters = () => {
     metadata && dispatch(setAllParameters(metadata));
     toast({
-      title: t('toast:parametersSet'),
+      title: t('toast.parametersSet'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -139,7 +139,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         dispatch(setActiveTab('img2img'));
         dispatch(setAllImageToImageParameters(metadata));
         toast({
-          title: t('toast:initialImageSet'),
+          title: t('toast.initialImageSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -148,8 +148,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       }
     }
     toast({
-      title: t('toast:initialImageNotSet'),
-      description: t('toast:initialImageNotSetDesc'),
+      title: t('toast.initialImageNotSet'),
+      description: t('toast.initialImageNotSetDesc'),
       status: 'error',
       duration: 2500,
       isClosable: true,
@@ -207,7 +207,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <div className="hoverable-image-delete-button">
               <DeleteImageModal image={image}>
                 <IconButton
-                  aria-label={t('parameters:deleteImage')}
+                  aria-label={t('parameters.deleteImage')}
                   icon={<FaTrashAlt />}
                   size="xs"
                   variant="imageHoverIconButton"
@@ -227,20 +227,20 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         }}
       >
         <ContextMenu.Item onClickCapture={handleLightBox}>
-          {t('parameters:openInViewer')}
+          {t('parameters.openInViewer')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
           disabled={image?.metadata?.image?.prompt === undefined}
         >
-          {t('parameters:usePrompt')}
+          {t('parameters.usePrompt')}
         </ContextMenu.Item>
 
         <ContextMenu.Item
           onClickCapture={handleUseSeed}
           disabled={image?.metadata?.image?.seed === undefined}
         >
-          {t('parameters:useSeed')}
+          {t('parameters.useSeed')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUseAllParameters}
@@ -248,23 +248,23 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
           }
         >
-          {t('parameters:useAll')}
+          {t('parameters.useAll')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUseInitialImage}
           disabled={image?.metadata?.image?.type !== 'img2img'}
         >
-          {t('parameters:useInitImg')}
+          {t('parameters.useInitImg')}
         </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
-          {t('parameters:sendToImg2Img')}
+          {t('parameters.sendToImg2Img')}
         </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToCanvas}>
-          {t('parameters:sendToUnifiedCanvas')}
+          {t('parameters.sendToUnifiedCanvas')}
         </ContextMenu.Item>
         <ContextMenu.Item data-warning>
           <DeleteImageModal image={image}>
-            <p>{t('parameters:deleteImage')}</p>
+            <p>{t('parameters.deleteImage')}</p>
           </DeleteImageModal>
         </ContextMenu.Item>
       </ContextMenu.Content>

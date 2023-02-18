@@ -21,27 +21,27 @@ export default function UnifiedCanvasPanel() {
 
   const unifiedCanvasAccordions = {
     seed: {
-      header: `${t('parameters:seed')}`,
+      header: `${t('parameters.seed')}`,
       feature: Feature.SEED,
       content: <SeedSettings />,
     },
     boundingBox: {
-      header: `${t('parameters:boundingBoxHeader')}`,
+      header: `${t('parameters.boundingBoxHeader')}`,
       feature: Feature.BOUNDING_BOX,
       content: <BoundingBoxSettings />,
     },
     seamCorrection: {
-      header: `${t('parameters:seamCorrectionHeader')}`,
+      header: `${t('parameters.seamCorrectionHeader')}`,
       feature: Feature.SEAM_CORRECTION,
       content: <SeamCorrectionSettings />,
     },
     infillAndScaling: {
-      header: `${t('parameters:infillScalingHeader')}`,
+      header: `${t('parameters.infillScalingHeader')}`,
       feature: Feature.INFILL_AND_SCALING,
       content: <InfillAndScalingSettings />,
     },
     variations: {
-      header: `${t('parameters:variations')}`,
+      header: `${t('parameters.variations')}`,
       feature: Feature.VARIATIONS,
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
@@ -50,11 +50,11 @@ export default function UnifiedCanvasPanel() {
 
   const unifiedCanvasImg2ImgAccordion = {
     unifiedCanvasImg2Img: {
-      header: `${t('parameters:imageToImage')}`,
+      header: `${t('parameters.imageToImage')}`,
       feature: undefined,
       content: (
         <ImageToImageStrength
-          label={t('parameters:img2imgStrength')}
+          label={t('parameters.img2imgStrength')}
           styleClass="main-settings-block image-to-image-strength-main-option"
         />
       ),

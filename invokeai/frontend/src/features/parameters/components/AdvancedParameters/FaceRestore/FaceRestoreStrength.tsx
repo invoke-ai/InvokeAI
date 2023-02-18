@@ -21,7 +21,7 @@ export default function FaceRestoreStrength() {
       isSliderDisabled={!isGFPGANAvailable}
       isInputDisabled={!isGFPGANAvailable}
       isResetDisabled={!isGFPGANAvailable}
-      label={t('parameters:strength')}
+      label={t('parameters.strength')}
       step={0.05}
       min={0}
       max={1}

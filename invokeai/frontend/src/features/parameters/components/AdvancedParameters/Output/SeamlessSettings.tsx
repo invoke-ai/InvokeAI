@@ -24,7 +24,7 @@ const SeamlessSettings = () => {
   return (
     <Flex gap={2} direction="column">
       <IAISwitch
-        label={t('parameters:seamlessTiling')}
+        label={t('parameters.seamlessTiling')}
         fontSize="md"
         isChecked={seamless}
         onChange={handleChangeSeamless}
