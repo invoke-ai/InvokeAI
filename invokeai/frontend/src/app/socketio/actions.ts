@@ -43,6 +43,11 @@ export const convertToDiffusers =
     'socketio/convertToDiffusers'
   );
 
+export const mergeDiffusersModels =
+  createAction<InvokeAI.InvokeModelMergingProps>(
+    'socketio/mergeDiffusersModels'
+  );
+
 export const requestModelChange = createAction<string>(
   'socketio/requestModelChange'
 );

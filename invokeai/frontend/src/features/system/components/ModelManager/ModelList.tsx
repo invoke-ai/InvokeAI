@@ -14,6 +14,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import type { SystemState } from 'features/system/store/systemSlice';
 import { isEqual, map } from 'lodash';
 import type { ChangeEvent, ReactNode } from 'react';
+import MergeModels from './MergeModels';
 
 const modelListSelector = createSelector(
   systemSelector,
@@ -181,7 +182,10 @@ const ModelList = () => {
         <Text fontSize="1.4rem" fontWeight="bold">
           {t('modelmanager:availableModels')}
         </Text>
-        <AddModel />
+        <Flex gap={2}>
+          <AddModel />
+          <MergeModels />
+        </Flex>
       </Flex>
 
       <IAIInput

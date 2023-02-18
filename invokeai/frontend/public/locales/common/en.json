@@ -60,5 +60,7 @@
   "statusLoadingModel": "Loading Model",
   "statusModelChanged": "Model Changed",
   "statusConvertingModel": "Converting Model",
-  "statusModelConverted": "Model Converted"
+  "statusModelConverted": "Model Converted",
+  "statusMergingModels": "Merging Models",
+  "statusMergedModels": "Models Merged"
 }

@@ -432,6 +432,28 @@ const makeSocketIOListeners = (
         })
       );
     },
+    onModelsMerged: (data: InvokeAI.ModelsMergedResponse) => {
+      const { merged_models, merged_model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setCurrentStatus(i18n.t('common:statusMergedModels')));
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(true));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Models merged: ${merged_models}`,
+          level: 'info',
+        })
+      );
+      dispatch(
+        addToast({
+          title: `${i18n.t('modelmanager:modelsMerged')}: ${merged_model_name}`,
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    },
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));
