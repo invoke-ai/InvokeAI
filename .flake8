@@ -10,15 +10,7 @@ extend-ignore =
 extend-select =
     # Bugbear line length
     B950
-exclude =
-    .venv,
-    .git,
-    .tox,
-    dist,
-    doc,
-    *lib/python*,
-    *egg,
-    build
+extend-exclude =
     scripts/orig_scripts/*
     ldm/models/*
     ldm/modules/*
