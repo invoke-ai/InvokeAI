@@ -23,18 +23,18 @@ const EmptyTempFolderButtonModal = () => {
 
   return (
     <IAIAlertDialog
-      title={t('unifiedcanvas:emptyTempImageFolder')}
+      title={t('unifiedCanvas.emptyTempImageFolder')}
       acceptCallback={acceptCallback}
-      acceptButtonText={t('unifiedcanvas:emptyFolder')}
+      acceptButtonText={t('unifiedCanvas.emptyFolder')}
       triggerComponent={
-        <IAIButton leftIcon={<FaTrash />} size={'sm'} isDisabled={isStaging}>
-          {t('unifiedcanvas:emptyTempImageFolder')}
+        <IAIButton leftIcon={<FaTrash />} size="sm" isDisabled={isStaging}>
+          {t('unifiedCanvas.emptyTempImageFolder')}
         </IAIButton>
       }
     >
-      <p>{t('unifiedcanvas:emptyTempImagesFolderMessage')}</p>
+      <p>{t('unifiedCanvas.emptyTempImagesFolderMessage')}</p>
       <br />
-      <p>{t('unifiedcanvas:emptyTempImagesFolderConfirm')}</p>
+      <p>{t('unifiedCanvas.emptyTempImagesFolderConfirm')}</p>
     </IAIAlertDialog>
   );
 };

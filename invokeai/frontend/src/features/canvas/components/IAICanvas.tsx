@@ -140,7 +140,7 @@ const IAICanvas = () => {
         <Stage
           tabIndex={-1}
           ref={canvasStageRefCallback}
-          className={'inpainting-canvas-stage'}
+          className="inpainting-canvas-stage"
           style={{
             ...(stageCursor ? { cursor: stageCursor } : {}),
           }}
@@ -165,19 +165,19 @@ const IAICanvas = () => {
           onWheel={handleWheel}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
-          <Layer id={'grid'} visible={shouldShowGrid}>
+          <Layer id="grid" visible={shouldShowGrid}>
             <IAICanvasGrid />
           </Layer>
 
           <Layer
-            id={'base'}
+            id="base"
             ref={canvasBaseLayerRefCallback}
             listening={false}
             imageSmoothingEnabled={false}
           >
             <IAICanvasObjectRenderer />
           </Layer>
-          <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
+          <Layer id="mask" visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>

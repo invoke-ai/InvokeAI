@@ -20,13 +20,14 @@ export default function MainSampler() {
 
   return (
     <IAISelect
-      label={t('parameters:sampler')}
+      label={t('parameters.sampler')}
       value={sampler}
       onChange={handleChangeSampler}
       validValues={
         activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
       }
       styleClass="main-settings-block"
+      minWidth="9rem"
     />
   );
 }

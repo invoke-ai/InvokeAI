@@ -32,7 +32,7 @@
   .parameters-panel {
     display: flex;
     flex-direction: column;
-    row-gap: 1rem;
+    row-gap: 0.5rem;
     height: 100%;
     @include HideScrollbar;
     background-color: var(--background-color);

@@ -49,7 +49,7 @@ const IAICanvasBoundingBoxOverlay = () => {
         offsetY={stageCoordinates.y / stageScale}
         height={stageDimensions.height / stageScale}
         width={stageDimensions.width / stageScale}
-        fill={'rgba(0,0,0,0.4)'}
+        fill="rgba(0,0,0,0.4)"
         listening={false}
         visible={shouldDarkenOutsideBoundingBox}
       />
@@ -58,10 +58,10 @@ const IAICanvasBoundingBoxOverlay = () => {
         y={boundingBoxCoordinates.y}
         width={boundingBoxDimensions.width}
         height={boundingBoxDimensions.height}
-        fill={'rgb(255,255,255)'}
+        fill="rgb(255,255,255)"
         listening={false}
         visible={shouldDarkenOutsideBoundingBox}
-        globalCompositeOperation={'destination-out'}
+        globalCompositeOperation="destination-out"
       />
     </Group>
   );

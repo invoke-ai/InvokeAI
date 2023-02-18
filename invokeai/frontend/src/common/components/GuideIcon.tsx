@@ -13,7 +13,7 @@ const GuideIcon = forwardRef(
   ({ feature, icon = MdHelp }: GuideIconProps, ref) => (
     <GuidePopover feature={feature}>
       <Box ref={ref}>
-        <Icon marginBottom={'-.15rem'} as={icon} />
+        <Icon marginBottom="-.15rem" as={icon} />
       </Box>
     </GuidePopover>
   )

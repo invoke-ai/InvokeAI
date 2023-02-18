@@ -13,7 +13,7 @@
 [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link]
 
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
-[CI checks on main link]: https://github.com/invoke-ai/InvokeAI/actions/workflows/test-invoke-conda.yml
+[CI checks on main link]:https://github.com/invoke-ai/InvokeAI/actions?query=branch%3Amain
 [discord badge]: https://flat.badgen.net/discord/members/ZmtBAhwWhy?icon=discord
 [discord link]: https://discord.gg/ZmtBAhwWhy
 [github forks badge]: https://flat.badgen.net/github/forks/invoke-ai/InvokeAI?icon=github
@@ -33,7 +33,7 @@
 
 InvokeAI is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. InvokeAI offers an industry leading Web Interface, interactive Command Line Interface, and also serves as the foundation for multiple commercial products.
 
-**Quick links**: [[How to Install](#installation)] [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
+**Quick links**: [[How to Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
 
 _Note: InvokeAI is rapidly evolving. Please use the
 [Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
@@ -272,6 +272,8 @@ Welcome to InvokeAI!
 This fork is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for
 their time, hard work and effort.
+
+Thanks to [Weblate](https://weblate.org/) for generously providing translation services to this project.
 
 ### Support
 

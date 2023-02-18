@@ -22,10 +22,10 @@ const SeamlessSettings = () => {
   const { t } = useTranslation();
 
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <IAISwitch
-        label={t('parameters:seamlessTiling')}
-        fontSize={'md'}
+        label={t('parameters.seamlessTiling')}
+        fontSize="md"
         isChecked={seamless}
         onChange={handleChangeSeamless}
       />

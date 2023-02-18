@@ -33,7 +33,7 @@ Globals.models_file = 'models.yaml'
 Globals.models_dir = 'models'
 Globals.config_dir = 'configs'
 Globals.autoscan_dir = 'weights'
-Globals.converted_ckpts_dir = 'converted-ckpts'
+Globals.converted_ckpts_dir = 'converted_ckpts'
 
 # Try loading patchmatch
 Globals.try_patchmatch = True
@@ -54,6 +54,9 @@ Globals.full_precision = False
 # whether we should convert ckpt files into diffusers models on the fly
 Globals.ckpt_convert = False
 
+# logging tokenization everywhere
+Globals.log_tokenization = False
+
 def global_config_file()->Path:
     return Path(Globals.root, Globals.config_dir, Globals.models_file)
 
@@ -65,6 +68,9 @@ def global_models_dir()->Path:
 
 def global_autoscan_dir()->Path:
     return Path(Globals.root, Globals.autoscan_dir)
+
+def global_converted_ckpts_dir()->Path:
+    return Path(global_models_dir(), Globals.converted_ckpts_dir)
 
 def global_set_root(root_dir:Union[str,Path]):
     Globals.root = root_dir

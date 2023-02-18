@@ -3,7 +3,16 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import React from 'react';
 
-import { Box, Flex, FormControl, HStack, Text, VStack } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  FormControl,
+  HStack,
+  Radio,
+  RadioGroup,
+  Text,
+  VStack,
+} from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
@@ -43,18 +52,18 @@ function ModelExistsTag() {
   const { t } = useTranslation();
   return (
     <Box
-      position={'absolute'}
+      position="absolute"
       zIndex={2}
       right={4}
       top={4}
       fontSize="0.7rem"
-      fontWeight={'bold'}
-      backgroundColor={'var(--accent-color)'}
-      padding={'0.2rem 0.5rem'}
+      fontWeight="bold"
+      backgroundColor="var(--accent-color)"
+      padding="0.2rem 0.5rem"
       borderRadius="0.2rem"
-      alignItems={'center'}
+      alignItems="center"
     >
-      {t('modelmanager:modelExists')}
+      {t('modelManager.modelExists')}
     </Box>
   );
 }
@@ -87,7 +96,7 @@ function SearchModelEntry({
         value={model.name}
         label={
           <>
-            <VStack alignItems={'start'}>
+            <VStack alignItems="start">
               <p style={{ fontWeight: 'bold' }}>{model.name}</p>
               <p style={{ fontStyle: 'italic' }}>{model.location}</p>
             </VStack>
@@ -96,9 +105,9 @@ function SearchModelEntry({
         isChecked={modelsToAdd.includes(model.name)}
         isDisabled={existingModels.includes(model.location)}
         onChange={foundModelsChangeHandler}
-        padding={'1rem'}
-        backgroundColor={'var(--background-color)'}
-        borderRadius={'0.5rem'}
+        padding="1rem"
+        backgroundColor="var(--background-color)"
+        borderRadius="0.5rem"
         _checked={{
           backgroundColor: 'var(--accent-color)',
           color: 'var(--text-color)',
@@ -135,6 +144,8 @@ export default function SearchModels() {
   );
 
   const [modelsToAdd, setModelsToAdd] = React.useState<string[]>([]);
+  const [modelType, setModelType] = React.useState<string>('v1');
+  const [pathToConfig, setPathToConfig] = React.useState<string>('');
 
   const resetSearchModelHandler = () => {
     dispatch(setSearchFolder(null));
@@ -167,11 +178,19 @@ export default function SearchModels() {
     const modelsToBeAdded = foundModels?.filter((foundModel) =>
       modelsToAdd.includes(foundModel.name)
     );
+
+    const configFiles = {
+      v1: 'configs/stable-diffusion/v1-inference.yaml',
+      v2: 'configs/stable-diffusion/v2-inference-v.yaml',
+      inpainting: 'configs/stable-diffusion/v1-inpainting-inference.yaml',
+      custom: pathToConfig,
+    };
+
     modelsToBeAdded?.forEach((model) => {
       const modelFormat = {
         name: model.name,
         description: '',
-        config: 'configs/stable-diffusion/v1-inference.yaml',
+        config: configFiles[modelType as keyof typeof configFiles],
         weights: model.location,
         vae: '',
         width: 512,
@@ -224,12 +243,12 @@ export default function SearchModels() {
     <>
       {searchFolder ? (
         <Flex
-          flexDirection={'column'}
-          padding={'1rem'}
-          backgroundColor={'var(--background-color)'}
+          flexDirection="column"
+          padding="1rem"
+          backgroundColor="var(--background-color)"
           borderRadius="0.5rem"
-          rowGap={'0.5rem'}
-          position={'relative'}
+          rowGap="0.5rem"
+          position="relative"
         >
           <p
             style={{
@@ -241,7 +260,7 @@ export default function SearchModels() {
               borderRadius: '0.2rem',
             }}
           >
-            {t('modelmanager:checkpointFolder')}
+            {t('modelManager.checkpointFolder')}
           </p>
           <p
             style={{ fontWeight: 'bold', fontSize: '0.8rem', maxWidth: '80%' }}
@@ -249,19 +268,19 @@ export default function SearchModels() {
             {searchFolder}
           </p>
           <IAIIconButton
-            aria-label={t('modelmanager:scanAgain')}
-            tooltip={t('modelmanager:scanAgain')}
+            aria-label={t('modelManager.scanAgain')}
+            tooltip={t('modelManager.scanAgain')}
             icon={<BiReset />}
-            position={'absolute'}
+            position="absolute"
             right={16}
             fontSize={18}
             disabled={isProcessing}
             onClick={() => dispatch(searchForModels(searchFolder))}
           />
           <IAIIconButton
-            aria-label={t('modelmanager:clearCheckpointFolder')}
+            aria-label={t('modelManager.clearCheckpointFolder')}
             icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
-            position={'absolute'}
+            position="absolute"
             right={5}
             onClick={resetSearchModelHandler}
           />
@@ -284,13 +303,13 @@ export default function SearchModels() {
                     type="text"
                     width="lg"
                     size="md"
-                    label={t('modelmanager:checkpointFolder')}
+                    label={t('modelManager.checkpointFolder')}
                   />
                 </FormControl>
                 <IAIIconButton
                   icon={<MdFindInPage />}
-                  aria-label={t('modelmanager:findModels')}
-                  tooltip={t('modelmanager:findModels')}
+                  aria-label={t('modelManager.findModels')}
+                  tooltip={t('modelManager.findModels')}
                   type="submit"
                   disabled={isProcessing}
                 />
@@ -300,31 +319,31 @@ export default function SearchModels() {
         </Formik>
       )}
       {foundModels && (
-        <Flex flexDirection={'column'} rowGap={'1rem'}>
-          <Flex justifyContent={'space-between'} alignItems="center">
+        <Flex flexDirection="column" rowGap="1rem">
+          <Flex justifyContent="space-between" alignItems="center">
             <p>
-              {t('modelmanager:modelsFound')}: {foundModels.length}
+              {t('modelManager.modelsFound')}: {foundModels.length}
             </p>
             <p>
-              {t('modelmanager:selected')}: {modelsToAdd.length}
+              {t('modelManager.selected')}: {modelsToAdd.length}
             </p>
           </Flex>
-          <Flex columnGap={'0.5rem'} justifyContent={'space-between'}>
-            <Flex columnGap={'0.5rem'}>
+          <Flex columnGap="0.5rem" justifyContent="space-between">
+            <Flex columnGap="0.5rem">
               <IAIButton
                 isDisabled={modelsToAdd.length === foundModels.length}
                 onClick={addAllToSelected}
               >
-                {t('modelmanager:selectAll')}
+                {t('modelManager.selectAll')}
               </IAIButton>
               <IAIButton
                 isDisabled={modelsToAdd.length === 0}
                 onClick={removeAllFromSelected}
               >
-                {t('modelmanager:deselectAll')}
+                {t('modelManager.deselectAll')}
               </IAIButton>
               <IAICheckbox
-                label={t('modelmanager:showExisting')}
+                label={t('modelManager.showExisting')}
                 isChecked={shouldShowExistingModelsInSearch}
                 onChange={() =>
                   dispatch(
@@ -343,9 +362,58 @@ export default function SearchModels() {
                 modelsToAdd.length > 0 ? 'var(--accent-color) !important' : ''
               }
             >
-              {t('modelmanager:addSelected')}
+              {t('modelManager.addSelected')}
             </IAIButton>
           </Flex>
+
+          <Flex
+            gap={4}
+            backgroundColor="var(--background-color)"
+            padding="1rem 1rem"
+            borderRadius="0.2rem"
+            flexDirection="column"
+          >
+            <Flex gap={4}>
+              <Text fontWeight="bold" color="var(--text-color-secondary)">
+                Pick Model Type:
+              </Text>
+              <RadioGroup
+                value={modelType}
+                onChange={(v) => setModelType(v)}
+                defaultValue="v1"
+                name="model_type"
+              >
+                <Flex gap={4}>
+                  <Radio value="v1">{t('modelManager.v1')}</Radio>
+                  <Radio value="v2">{t('modelManager.v2')}</Radio>
+                  <Radio value="inpainting">
+                    {t('modelManager.inpainting')}
+                  </Radio>
+                  <Radio value="custom">{t('modelManager.customConfig')}</Radio>
+                </Flex>
+              </RadioGroup>
+            </Flex>
+
+            {modelType === 'custom' && (
+              <Flex flexDirection="column" rowGap={2}>
+                <Text
+                  fontWeight="bold"
+                  fontSize="sm"
+                  color="var(--text-color-secondary)"
+                >
+                  {t('modelManager.pathToCustomConfig')}
+                </Text>
+                <IAIInput
+                  value={pathToConfig}
+                  onChange={(e) => {
+                    if (e.target.value !== '') setPathToConfig(e.target.value);
+                  }}
+                  width="42.5rem"
+                />
+              </Flex>
+            )}
+          </Flex>
+
           <Flex
             rowGap="1rem"
             flexDirection="column"
@@ -369,7 +437,7 @@ export default function SearchModels() {
                   marginTop="1rem"
                   width="max-content"
                 >
-                  {t('modelmanager:selectAndAdd')}
+                  {t('modelManager.selectAndAdd')}
                 </Text>
               )
             ) : (
@@ -381,7 +449,7 @@ export default function SearchModels() {
                 textAlign="center"
                 backgroundColor="var(--status-bad-color)"
               >
-                {t('modelmanager:noModelsFound')}
+                {t('modelManager.noModelsFound')}
               </Text>
             )}
 

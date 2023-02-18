@@ -47,11 +47,11 @@ const StatusIndicator = () => {
   let statusMessage = currentStatus;
 
   const intermediateStatuses = [
-    t('common:statusGenerating'),
-    t('common:statusPreparing'),
-    t('common:statusSavingImage'),
-    t('common:statusRestoringFaces'),
-    t('common:statusUpscaling'),
+    t('common.statusGenerating'),
+    t('common.statusPreparing'),
+    t('common.statusSavingImage'),
+    t('common.statusRestoringFaces'),
+    t('common.statusUpscaling'),
   ];
 
   if (intermediateStatuses.includes(statusMessage)) {

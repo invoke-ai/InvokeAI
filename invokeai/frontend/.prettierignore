@@ -2,4 +2,4 @@ dist/
 .husky/
 node_modules/
 patches/
-public/
+stats.html

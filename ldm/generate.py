@@ -191,9 +191,8 @@ class Generate:
         # Note that in previous versions, there was an option to pass the
         # device to Generate(). However the device was then ignored, so
         # it wasn't actually doing anything. This logic could be reinstated.
-        device_type = choose_torch_device()
-        print(f'>> Using device_type {device_type}')
-        self.device = torch.device(device_type)
+        self.device = torch.device(choose_torch_device())
+        print(f'>> Using device_type {self.device.type}')
         if full_precision:
             if self.precision != 'auto':
               raise ValueError('Remove --full_precision / -F if using --precision')
@@ -213,7 +212,9 @@ class Generate:
             print('>> xformers not installed')
 
         # model caching system for fast switching
-        self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
+        self.model_manager = ModelManager(mconfig, self.device, self.precision,
+                                          max_loaded_models=max_loaded_models,
+                                          sequential_offload=self.free_gpu_mem)
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         model = model or fallback
@@ -480,7 +481,6 @@ class Generate:
                 self.model.cond_stage_model.device = self.model.device
                 self.model.cond_stage_model.to(self.model.device)
         except AttributeError:
-            print(">> Warning: '--free_gpu_mem' is not yet supported when generating image using model based on HuggingFace Diffuser.")
             pass
 
         try:

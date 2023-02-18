@@ -147,7 +147,7 @@ echo ***** Installed invoke launcher script ******
 rd /s /q binary_installer installer_files
 
 @rem preload the models
-call .venv\Scripts\python scripts\configure_invokeai.py
+call .venv\Scripts\python ldm\invoke\config\invokeai_configure.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
 deactivate

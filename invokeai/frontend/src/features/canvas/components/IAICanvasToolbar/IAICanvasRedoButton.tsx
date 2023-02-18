@@ -53,8 +53,8 @@ export default function IAICanvasRedoButton() {
 
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:redo')} (Ctrl+Shift+Z)`}
-      tooltip={`${t('unifiedcanvas:redo')} (Ctrl+Shift+Z)`}
+      aria-label={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
+      tooltip={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       icon={<FaRedo />}
       onClick={handleRedo}
       isDisabled={!canRedo}

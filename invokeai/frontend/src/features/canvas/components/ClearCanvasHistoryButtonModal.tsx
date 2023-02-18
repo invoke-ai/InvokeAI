@@ -13,18 +13,18 @@ const ClearCanvasHistoryButtonModal = () => {
 
   return (
     <IAIAlertDialog
-      title={t('unifiedcanvas:clearCanvasHistory')}
+      title={t('unifiedCanvas.clearCanvasHistory')}
       acceptCallback={() => dispatch(clearCanvasHistory())}
-      acceptButtonText={t('unifiedcanvas:clearHistory')}
+      acceptButtonText={t('unifiedCanvas.clearHistory')}
       triggerComponent={
-        <IAIButton size={'sm'} leftIcon={<FaTrash />} isDisabled={isStaging}>
-          {t('unifiedcanvas:clearCanvasHistory')}
+        <IAIButton size="sm" leftIcon={<FaTrash />} isDisabled={isStaging}>
+          {t('unifiedCanvas.clearCanvasHistory')}
         </IAIButton>
       }
     >
-      <p>{t('unifiedcanvas:clearCanvasHistoryMessage')}</p>
+      <p>{t('unifiedCanvas.clearCanvasHistoryMessage')}</p>
       <br />
-      <p>{t('unifiedcanvas:clearCanvasHistoryConfirm')}</p>
+      <p>{t('unifiedCanvas.clearCanvasHistoryConfirm')}</p>
     </IAIAlertDialog>
   );
 };

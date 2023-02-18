@@ -92,8 +92,8 @@ const IAICanvasStatusText = () => {
         style={{
           color: activeLayerColor,
         }}
-      >{`${t('unifiedcanvas:activeLayer')}: ${activeLayerString}`}</div>
-      <div>{`${t('unifiedcanvas:canvasScale')}: ${canvasScaleString}%`}</div>
+      >{`${t('unifiedCanvas.activeLayer')}: ${activeLayerString}`}</div>
+      <div>{`${t('unifiedCanvas.canvasScale')}: ${canvasScaleString}%`}</div>
       {shouldPreserveMaskedArea && (
         <div
           style={{

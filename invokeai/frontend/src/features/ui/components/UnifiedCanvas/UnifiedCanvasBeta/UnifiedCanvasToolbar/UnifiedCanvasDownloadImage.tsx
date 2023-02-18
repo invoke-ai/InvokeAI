@@ -47,8 +47,8 @@ export default function UnifiedCanvasDownloadImage() {
   };
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:downloadAsImage')} (Shift+D)`}
-      tooltip={`${t('unifiedcanvas:downloadAsImage')} (Shift+D)`}
+      aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
+      tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
       icon={<FaDownload />}
       onClick={handleDownloadAsImage}
       isDisabled={isStaging}

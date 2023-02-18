@@ -114,42 +114,42 @@ const IAICanvasStagingAreaToolbar = () => {
 
   return (
     <Flex
-      pos={'absolute'}
-      bottom={'1rem'}
-      w={'100%'}
-      align={'center'}
-      justify={'center'}
+      pos="absolute"
+      bottom="1rem"
+      w="100%"
+      align="center"
+      justify="center"
       filter="drop-shadow(0 0.5rem 1rem rgba(0,0,0))"
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
     >
       <ButtonGroup isAttached>
         <IAIIconButton
-          tooltip={`${t('unifiedcanvas:previous')} (Left)`}
-          aria-label={`${t('unifiedcanvas:previous')} (Left)`}
+          tooltip={`${t('unifiedCanvas.previous')} (Left)`}
+          aria-label={`${t('unifiedCanvas.previous')} (Left)`}
           icon={<FaArrowLeft />}
           onClick={handlePrevImage}
           data-selected={true}
           isDisabled={isOnFirstImage}
         />
         <IAIIconButton
-          tooltip={`${t('unifiedcanvas:next')} (Right)`}
-          aria-label={`${t('unifiedcanvas:next')} (Right)`}
+          tooltip={`${t('unifiedCanvas.next')} (Right)`}
+          aria-label={`${t('unifiedCanvas.next')} (Right)`}
           icon={<FaArrowRight />}
           onClick={handleNextImage}
           data-selected={true}
           isDisabled={isOnLastImage}
         />
         <IAIIconButton
-          tooltip={`${t('unifiedcanvas:accept')} (Enter)`}
-          aria-label={`${t('unifiedcanvas:accept')} (Enter)`}
+          tooltip={`${t('unifiedCanvas.accept')} (Enter)`}
+          aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
           icon={<FaCheck />}
           onClick={handleAccept}
           data-selected={true}
         />
         <IAIIconButton
-          tooltip={t('unifiedcanvas:showHide')}
-          aria-label={t('unifiedcanvas:showHide')}
+          tooltip={t('unifiedCanvas.showHide')}
+          aria-label={t('unifiedCanvas.showHide')}
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
           onClick={() =>
@@ -158,8 +158,8 @@ const IAICanvasStagingAreaToolbar = () => {
           data-selected={true}
         />
         <IAIIconButton
-          tooltip={t('unifiedcanvas:saveToGallery')}
-          aria-label={t('unifiedcanvas:saveToGallery')}
+          tooltip={t('unifiedCanvas.saveToGallery')}
+          aria-label={t('unifiedCanvas.saveToGallery')}
           icon={<FaSave />}
           onClick={() =>
             dispatch(
@@ -169,8 +169,8 @@ const IAICanvasStagingAreaToolbar = () => {
           data-selected={true}
         />
         <IAIIconButton
-          tooltip={t('unifiedcanvas:discardAll')}
-          aria-label={t('unifiedcanvas:discardAll')}
+          tooltip={t('unifiedCanvas.discardAll')}
+          aria-label={t('unifiedCanvas.discardAll')}
           icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
           onClick={() => dispatch(discardStagedImages())}
           data-selected={true}
