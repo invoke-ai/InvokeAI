@@ -1,29 +1,6 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
-    hooks:
-      - id: check-added-large-files
-      - id: check-ast
-      - id: check-executables-have-shebangs
-      - id: check-json
-      - id: check-merge-conflict
-      - id: check-symlinks
-      - id: check-toml
-      - id: check-yaml
-        args: ['--unsafe']
-      - id: end-of-file-fixer
-        # files: \.(py|sh|rst|md|yml|yaml)$
-        exclude: \.(json|jsonc|js|map)$
-      - id: trailing-whitespace
-        exclude: \.(json|jsonc|js|map)$
-
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: 'v3.0.0-alpha.4'
-    hooks:
-      - id: prettier
-
   - repo: https://github.com/psf/black
     rev: 23.1.0
     hooks:
@@ -41,3 +18,22 @@ repos:
         additional_dependencies:
           - flake8-black
           - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-simplify
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: 'v3.0.0-alpha.4'
+    hooks:
+      - id: prettier
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
