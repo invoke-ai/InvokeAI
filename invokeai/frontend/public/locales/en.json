@@ -390,7 +390,10 @@
         "modelMergeHeaderHelp1": "You can merge upto three different models to create a blend that suits your needs.",
         "modelMergeHeaderHelp2": "Only Diffusers are available for merging. If you want to merge a checkpoint model, please convert it to Diffusers first.",
         "modelMergeAlphaHelp": "Alpha controls blend strength for the models. Lower alpha values lead to lower influence of the second model.",
-        "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above."
+        "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above.",
+        "inverseSigmoid": "Inverse Sigmoid",
+        "sigmoid": "Sigmoid",
+        "weightedSum": "Weighted Sum"
     },
     "parameters": {
         "general": "General",
@@ -467,6 +470,7 @@
         "displayHelpIcons": "Display Help Icons",
         "useCanvasBeta": "Use Canvas Beta Layout",
         "enableImageDebugging": "Enable Image Debugging",
+        "useSlidersForAll": "Use Sliders For All Options",
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
