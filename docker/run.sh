@@ -8,9 +8,6 @@ cd "$SCRIPTDIR" || exit 1
 
 source ./env.sh
 
-# Create outputs directory if it does not exist
-[[ -d ./outputs ]] || mkdir ./outputs
-
 echo -e "You are using these values:\n"
 echo -e "Container engine:\t${CONTAINER_ENGINE}"
 echo -e "Volumename:\t${VOLUMENAME}"

@@ -33,17 +33,15 @@ echo -e "Container Tag:\t\t${CONTAINER_TAG}"
 echo -e "Container Flavor:\t${CONTAINER_FLAVOR}"
 echo -e "Container Image:\t${CONTAINER_IMAGE}\n"
 
+# Create outputs directory if it does not exist
+[[ -d ./outputs ]] || mkdir ./outputs
+
 # Create docker volume
 if [[ -n "$(${CONTAINER_ENGINE} volume ls -f name="${VOLUMENAME}" -q)" ]]; then # Note: newer versions of podman: podman volume exists ${VOLUMENAME} 
     echo -e "Volume already exists\n"
 else
     echo -n "creating ${CONTAINER_ENGINE} volume "
     "${CONTAINER_ENGINE}" volume create "${VOLUMENAME}"
-    VOLPATH=`"${CONTAINER_ENGINE}" inspect ${VOLUMENAME} | python3 -c "import json, sys; print(json.load(sys.stdin)[0]['Mountpoint'])" `
-    # podman:  now set file permissions volume for rootless appuser
-    if [[ ${CONTAINER_ENGINE} == "podman" ]] ; then
-       podman unshare chown 1000:1000 -R ${VOLPATH}
-    fi
 fi
 
 # Build Container
@@ -55,3 +53,16 @@ DOCKER_BUILDKIT=1 "${CONTAINER_ENGINE}" build \
     ${PIP_PACKAGE:+--build-arg="PIP_PACKAGE=${PIP_PACKAGE}"} \
     --file="${DOCKERFILE}" \
     ..
+
+# Podman only:  set ownership for user 1000:1000 (appuser) the right way
+if [[ ${CONTAINER_ENGINE} == "podman" ]] ; then
+   echo Setting ownership for container\'s appuser on /data and /data/outputs
+   podman run \
+      --mount type=volume,src="${VOLUMENAME}",target=/data \
+      --user root --entrypoint "/bin/chown" "${CONTAINER_IMAGE:-invokeai}" \
+      -R 1000:1000 /data
+   podman run \
+      --mount type=bind,source="$(pwd)"/outputs,target=/data/outputs \
+      --user root --entrypoint "/bin/chown" "${CONTAINER_IMAGE:-invokeai}" \
+      -R 1000:1000 /data/outputs
+fi
