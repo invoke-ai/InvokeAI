@@ -12,8 +12,7 @@ trim_trailing_whitespace = true
 
 # Python
 [*.py]
-max_line_length = 88
-profile = black
+indent_size = 4
 
 # css
 [*.css]
