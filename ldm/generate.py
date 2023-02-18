@@ -191,9 +191,8 @@ class Generate:
         # Note that in previous versions, there was an option to pass the
         # device to Generate(). However the device was then ignored, so
         # it wasn't actually doing anything. This logic could be reinstated.
-        device_type = choose_torch_device()
-        print(f'>> Using device_type {device_type}')
-        self.device = torch.device(device_type)
+        self.device = torch.device(choose_torch_device())
+        print(f'>> Using device_type {self.device.type}')
         if full_precision:
             if self.precision != 'auto':
               raise ValueError('Remove --full_precision / -F if using --precision')

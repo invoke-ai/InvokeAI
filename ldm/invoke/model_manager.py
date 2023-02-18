@@ -30,6 +30,7 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
+from ldm.invoke.devices import CPU_DEVICE
 from ldm.invoke.generator.diffusers_pipeline import \
     StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import (Globals, global_autoscan_dir, global_cache_dir,
@@ -47,7 +48,7 @@ class ModelManager(object):
     def __init__(
         self,
         config: OmegaConf,
-        device_type: str | torch.device = "cpu",
+        device_type: torch.device = CPU_DEVICE,
         precision: str = "float16",
         max_loaded_models=DEFAULT_MAX_MODELS,
         sequential_offload = False
@@ -675,7 +676,7 @@ class ModelManager(object):
         """
         if str(weights).startswith(("http:", "https:")):
             model_name = model_name or url_attachment_name(weights)
-            
+
         weights_path = self._resolve_path(weights, "models/ldm/stable-diffusion-v1")
         config_path  = self._resolve_path(config, "configs/stable-diffusion")
 
@@ -996,25 +997,25 @@ class ModelManager(object):
         self.models.pop(model_name, None)
 
     def _model_to_cpu(self, model):
-        if self.device == "cpu":
+        if self.device == CPU_DEVICE:
             return model
 
         if isinstance(model, StableDiffusionGeneratorPipeline):
             model.offload_all()
             return model
 
-        model.cond_stage_model.device = "cpu"
-        model.to("cpu")
+        model.cond_stage_model.device = CPU_DEVICE
+        model.to(CPU_DEVICE)
 
         for submodel in ("first_stage_model", "cond_stage_model", "model"):
             try:
-                getattr(model, submodel).to("cpu")
+                getattr(model, submodel).to(CPU_DEVICE)
             except AttributeError:
                 pass
         return model
 
     def _model_from_cpu(self, model):
-        if self.device == "cpu":
+        if self.device == CPU_DEVICE:
             return model
 
         if isinstance(model, StableDiffusionGeneratorPipeline):
