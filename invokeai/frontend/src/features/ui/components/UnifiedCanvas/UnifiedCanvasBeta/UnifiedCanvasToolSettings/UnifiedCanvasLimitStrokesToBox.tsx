@@ -15,7 +15,7 @@ export default function UnifiedCanvasLimitStrokesToBox() {
 
   return (
     <IAICheckbox
-      label={t('unifiedcanvas:betaLimitToBox')}
+      label={t('unifiedCanvas.betaLimitToBox')}
       isChecked={shouldRestrictStrokesToBox}
       onChange={(e) =>
         dispatch(setShouldRestrictStrokesToBox(e.target.checked))

@@ -22,7 +22,7 @@ export default function MainHeight() {
       isSliderDisabled={activeTabName === 'unifiedCanvas'}
       isInputDisabled={activeTabName === 'unifiedCanvas'}
       isResetDisabled={activeTabName === 'unifiedCanvas'}
-      label={t('parameters:height')}
+      label={t('parameters.height')}
       value={height}
       min={64}
       step={64}
@@ -39,7 +39,7 @@ export default function MainHeight() {
   ) : (
     <IAISelect
       isDisabled={activeTabName === 'unifiedCanvas'}
-      label={t('parameters:height')}
+      label={t('parameters.height')}
       value={height}
       flexGrow={1}
       onChange={(e) => dispatch(setHeight(Number(e.target.value)))}

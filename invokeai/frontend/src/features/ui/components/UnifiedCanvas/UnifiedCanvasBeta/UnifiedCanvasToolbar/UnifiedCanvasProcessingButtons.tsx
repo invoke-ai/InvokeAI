@@ -27,9 +27,9 @@ export default function UnifiedCanvasProcessingButtons() {
   return (
     <Flex flexDirection="column" gap="0.5rem">
       <IAIIconButton
-        tooltip={`${t('parameters:showOptionsPanel')} (O)`}
+        tooltip={`${t('parameters.showOptionsPanel')} (O)`}
         tooltipProps={{ placement: 'top' }}
-        aria-label={t('parameters:showOptionsPanel')}
+        aria-label={t('parameters.showOptionsPanel')}
         onClick={handleShowOptionsPanel}
       >
         <FaSlidersH />

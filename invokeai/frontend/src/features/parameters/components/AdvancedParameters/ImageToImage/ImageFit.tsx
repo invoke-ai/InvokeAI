@@ -19,7 +19,7 @@ export default function ImageFit() {
 
   return (
     <IAISwitch
-      label={t('parameters:imageFit')}
+      label={t('parameters.imageFit')}
       isChecked={shouldFitToWidthHeight}
       onChange={handleChangeFit}
     />

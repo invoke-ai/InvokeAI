@@ -19,8 +19,8 @@ export default function UnifiedCanvasResetCanvas() {
   };
   return (
     <IAIIconButton
-      aria-label={t('unifiedcanvas:clearCanvas')}
-      tooltip={t('unifiedcanvas:clearCanvas')}
+      aria-label={t('unifiedCanvas.clearCanvas')}
+      tooltip={t('unifiedCanvas.clearCanvas')}
       icon={<FaTrash />}
       onClick={handleResetCanvas}
       style={{ backgroundColor: 'var(--btn-delete-image)' }}

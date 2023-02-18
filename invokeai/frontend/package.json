@@ -10,7 +10,7 @@
     "madge": "madge --circular src/main.tsx",
     "lint": "eslint --fix .",
     "lint-staged": "lint-staged",
-    "prettier": "prettier *.{json,js,ts,html} src/**/*.{ts,tsx,scss} --write .",
+    "prettier": "prettier *.{json,js,ts,html} public/locales/*.json src/**/*.{ts,tsx,scss} --write --loglevel warn .",
     "fmt": "npm run prettier -- --write",
     "postinstall": "patch-package"
   },

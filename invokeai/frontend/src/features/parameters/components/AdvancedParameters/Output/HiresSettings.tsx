@@ -43,7 +43,7 @@ const HiresStrength = () => {
     <Flex>
       <SubItemHook active={hiresFix} />
       <IAISlider
-        label={t('parameters:hiresStrength')}
+        label={t('parameters.hiresStrength')}
         step={0.01}
         min={0.01}
         max={0.99}
@@ -82,7 +82,7 @@ const HiresSettings = () => {
   return (
     <Flex rowGap="0.8rem" direction={'column'}>
       <IAISwitch
-        label={t('parameters:hiresOptim')}
+        label={t('parameters.hiresOptim')}
         fontSize="md"
         isChecked={hiresFix}
         onChange={handleChangeHiresFix}

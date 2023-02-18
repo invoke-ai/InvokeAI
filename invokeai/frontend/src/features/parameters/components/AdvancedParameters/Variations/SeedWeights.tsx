@@ -24,7 +24,7 @@ export default function SeedWeights() {
 
   return (
     <IAIInput
-      label={t('parameters:seedWeights')}
+      label={t('parameters.seedWeights')}
       value={seedWeights}
       isInvalid={
         shouldGenerateVariations &&

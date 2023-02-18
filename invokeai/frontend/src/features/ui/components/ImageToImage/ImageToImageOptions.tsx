@@ -9,12 +9,12 @@ export default function ImageToImageOptions() {
   const { t } = useTranslation();
   const imageToImageAccordionItems = {
     imageToImage: {
-      header: `${t('parameters:imageToImage')}`,
+      header: `${t('parameters.imageToImage')}`,
       feature: undefined,
       content: (
         <Flex gap={2} flexDir="column">
           <ImageToImageStrength
-            label={t('parameters:img2imgStrength')}
+            label={t('parameters.img2imgStrength')}
             styleClass="main-settings-block image-to-image-strength-main-option"
           />
           <ImageFit />

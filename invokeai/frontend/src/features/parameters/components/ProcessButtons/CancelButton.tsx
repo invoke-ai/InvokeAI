@@ -52,8 +52,8 @@ export default function CancelButton(
   return (
     <IAIIconButton
       icon={<MdCancel />}
-      tooltip={t('parameters:cancel')}
-      aria-label={t('parameters:cancel')}
+      tooltip={t('parameters.cancel')}
+      aria-label={t('parameters.cancel')}
       isDisabled={!isConnected || !isProcessing || !isCancelable}
       onClick={handleClickCancel}
       styleClass="cancel-btn"
