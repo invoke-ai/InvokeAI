@@ -109,7 +109,7 @@ export default function CancelButton(
           tooltip={
             isCancelScheduled
               ? t('parameters.cancel.isScheduled')
-              : t('parameters:cancel.schedule')
+              : t('parameters.cancel.schedule')
           }
           aria-label={
             isCancelScheduled
