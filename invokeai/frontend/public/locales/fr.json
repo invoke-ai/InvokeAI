@@ -15,8 +15,8 @@
         "langFrench": "Français",
         "nodesDesc": "Un système basé sur les nœuds pour la génération d'images est actuellement en développement. Restez à l'écoute pour des mises à jour à ce sujet.",
         "postProcessing": "Post-traitement",
-        "postProcessDesc1": "Invoke AI offre une grande variété de fonctionnalités de post-traitement. Le redimensionnement d'images et la restauration de visages sont déjà disponibles dans la WebUI. Vous pouvez y accéder à partir du menu Options avancées des onglets Texte en image et Image en image. Vous pouvez également traiter les images directement en utilisant les boutons d'action d'image ci-dessus l'affichage d'image actuel ou dans le visualiseur.",
-        "postProcessDesc2": "Une interface utilisateur dédiée sera bientôt disponible pour faciliter les workflows de post-traitement plus avancés.",
+        "postProcessDesc1": "Invoke AI offre une grande variété de fonctionnalités de post-traitement. Le redimensionnement d'images et la restauration de visages sont déjà disponibles dans la WebUI. Vous pouvez y accéder à partir du menu 'Options avancées' des onglets 'Texte vers image' et 'Image vers image'. Vous pouvez également traiter les images directement en utilisant les boutons d'action d'image au-dessus de l'affichage d'image actuel ou dans le visualiseur.",
+        "postProcessDesc2": "Une interface dédiée sera bientôt disponible pour faciliter les workflows de post-traitement plus avancés.",
         "postProcessDesc3": "L'interface en ligne de commande d'Invoke AI offre diverses autres fonctionnalités, notamment Embiggen.",
         "training": "Formation",
         "trainingDesc1": "Un workflow dédié pour former vos propres embeddings et checkpoints en utilisant Textual Inversion et Dreambooth depuis l'interface web.",
@@ -25,27 +25,27 @@
         "close": "Fermer",
         "load": "Charger",
         "back": "Retour",
-        "statusConnected": "Connecté",
-        "statusDisconnected": "Déconnecté",
+        "statusConnected": "En ligne",
+        "statusDisconnected": "Hors ligne",
         "statusError": "Erreur",
         "statusPreparing": "Préparation",
-        "statusProcessingCanceled": "Traitement Annulé",
-        "statusProcessingComplete": "Traitement Terminé",
+        "statusProcessingCanceled": "Traitement annulé",
+        "statusProcessingComplete": "Traitement terminé",
         "statusGenerating": "Génération",
         "statusGeneratingTextToImage": "Génération Texte vers Image",
         "statusGeneratingImageToImage": "Génération Image vers Image",
-        "statusGeneratingInpainting": "Génération de Réparation",
-        "statusGeneratingOutpainting": "Génération de Completion",
-        "statusGenerationComplete": "Génération Terminée",
-        "statusIterationComplete": "Itération Terminée",
-        "statusSavingImage": "Sauvegarde de l'Image",
-        "statusRestoringFaces": "Restauration des Visages",
-        "statusRestoringFacesGFPGAN": "Restauration des Visages (GFPGAN)",
-        "statusRestoringFacesCodeFormer": "Restauration des Visages (CodeFormer)",
-        "statusUpscaling": "Mise à Échelle",
-        "statusUpscalingESRGAN": "Mise à Échelle (ESRGAN)",
-        "statusLoadingModel": "Chargement du Modèle",
-        "statusModelChanged": "Modèle Changé"
+        "statusGeneratingInpainting": "Génération de réparation",
+        "statusGeneratingOutpainting": "Génération de complétion",
+        "statusGenerationComplete": "Génération terminée",
+        "statusIterationComplete": "Itération terminée",
+        "statusSavingImage": "Sauvegarde de l'image",
+        "statusRestoringFaces": "Restauration des visages",
+        "statusRestoringFacesGFPGAN": "Restauration des visages (GFPGAN)",
+        "statusRestoringFacesCodeFormer": "Restauration des visages (CodeFormer)",
+        "statusUpscaling": "Mise à échelle",
+        "statusUpscalingESRGAN": "Mise à échelle (ESRGAN)",
+        "statusLoadingModel": "Chargement du modèle",
+        "statusModelChanged": "Modèle changé"
     },
     "gallery": {
         "generations": "Générations",
@@ -68,7 +68,7 @@
         "appHotkeys": "Raccourcis de l'application",
         "generalHotkeys": "Raccourcis généraux",
         "galleryHotkeys": "Raccourcis de la galerie",
-        "unifiedCanvasHotkeys": "Raccourcis du Canvas unifié",
+        "unifiedCanvasHotkeys": "Raccourcis du canvas unifié",
         "invoke": {
             "title": "Invoquer",
             "desc": "Générer une image"
@@ -78,36 +78,36 @@
             "desc": "Annuler la génération d'image"
         },
         "focusPrompt": {
-            "title": "Prompt de Focus",
+            "title": "Prompt de focus",
             "desc": "Mettre en focus la zone de saisie de la commande"
         },
         "toggleOptions": {
-            "title": "Basculer Options",
-            "desc": "Ouvrir et fermer le panneau d'options"
+            "title": "Affichage des options",
+            "desc": "Afficher et masquer le panneau d'options"
         },
         "pinOptions": {
-            "title": "Epingler Options",
+            "title": "Epinglage des options",
             "desc": "Epingler le panneau d'options"
         },
         "toggleViewer": {
-            "title": "Basculer Visionneuse",
-            "desc": "Ouvrir et fermer la visionneuse d'image"
+            "title": "Affichage de la visionneuse",
+            "desc": "Afficher et masquer la visionneuse d'image"
         },
         "toggleGallery": {
-            "title": "Basculer Galerie",
-            "desc": "Ouvrir et fermer le tiroir de galerie"
+            "title": "Affichage de la galerie",
+            "desc": "Afficher et masquer la galerie"
         },
         "maximizeWorkSpace": {
-            "title": "Maximiser Espace de travail",
+            "title": "Maximiser la zone de travail",
             "desc": "Fermer les panneaux et maximiser la zone de travail"
         },
         "changeTabs": {
-            "title": "Changer d'onglets",
+            "title": "Changer d'onglet",
             "desc": "Passer à un autre espace de travail"
         },
         "consoleToggle": {
-            "title": "Bascule de la console",
-            "desc": "Ouvrir et fermer la console"
+            "title": "Affichage de la console",
+            "desc": "Afficher et masquer la console"
         },
         "setPrompt": {
             "title": "Définir le prompt",
@@ -122,7 +122,7 @@
             "desc": "Utiliser tous les paramètres de l'image actuelle"
         },
         "restoreFaces": {
-            "title": "Restaurer les faces",
+            "title": "Restaurer les visages",
             "desc": "Restaurer l'image actuelle"
         },
         "upscale": {
@@ -155,7 +155,7 @@
         },
         "toggleGalleryPin": {
             "title": "Activer/désactiver l'épinglage de la galerie",
-            "desc": "Épingle ou dépingle la galerie à l'interface utilisateur"
+            "desc": "Épingle ou dépingle la galerie à l'interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Augmenter la taille des miniatures de la galerie",
@@ -330,7 +330,7 @@
         "delete": "Supprimer",
         "deleteModel": "Supprimer le modèle",
         "deleteConfig": "Supprimer la configuration",
-        "deleteMsg1": "Êtes-vous sûr de vouloir supprimer cette entrée de modèle dans InvokeAI?",
+        "deleteMsg1": "Voulez-vous vraiment supprimer cette entrée de modèle dans InvokeAI ?",
         "deleteMsg2": "Cela n'effacera pas le fichier de point de contrôle du modèle de votre disque. Vous pouvez les réajouter si vous le souhaitez.",
         "formMessageDiffusersModelLocation": "Emplacement du modèle de diffuseurs",
         "formMessageDiffusersModelLocationDesc": "Veuillez en entrer au moins un.",
@@ -380,7 +380,6 @@
         "img2imgStrength": "Force de l'Image à l'Image",
         "toggleLoopback": "Activer/Désactiver la Boucle",
         "invoke": "Invoker",
-        "cancel": "Annuler",
         "promptPlaceholder": "Tapez le prompt ici. [tokens négatifs], (poids positif)++, (poids négatif)--, swap et blend sont disponibles (voir les docs)",
         "sendTo": "Envoyer à",
         "sendToImg2Img": "Envoyer à Image à Image",
@@ -448,11 +447,11 @@
         "feature": {
             "prompt": "Ceci est le champ prompt. Le prompt inclut des objets de génération et des termes stylistiques. Vous pouvez également ajouter un poids (importance du jeton) dans le prompt, mais les commandes CLI et les paramètres ne fonctionneront pas.",
             "gallery": "La galerie affiche les générations à partir du dossier de sortie à mesure qu'elles sont créées. Les paramètres sont stockés dans des fichiers et accessibles via le menu contextuel.",
-            "other": "Ces options activent des modes de traitement alternatifs pour Invoke. 'Tuilage seamless' créera des motifs répétitifs dans la sortie. 'Haute résolution' est la génération en deux étapes avec img2img: utilisez ce paramètre lorsque vous souhaitez une image plus grande et plus cohérente sans artefacts. Cela prendra plus de temps que d'habitude txt2img.",
-            "seed": "La valeur de grain affecte le bruit initial à partir duquel l'image est formée. Vous pouvez utiliser les graines déjà existantes provenant d'images précédentes. 'Seuil de bruit' est utilisé pour atténuer les artefacts à des valeurs CFG élevées (essayez la plage de 0 à 10), et Perlin pour ajouter du bruit Perlin pendant la génération: les deux servent à ajouter de la variété à vos sorties.",
+            "other": "Ces options activent des modes de traitement alternatifs pour Invoke. 'Tuilage seamless' créera des motifs répétitifs dans la sortie. 'Haute résolution' est la génération en deux étapes avec img2img : utilisez ce paramètre lorsque vous souhaitez une image plus grande et plus cohérente sans artefacts. Cela prendra plus de temps que d'habitude txt2img.",
+            "seed": "La valeur de grain affecte le bruit initial à partir duquel l'image est formée. Vous pouvez utiliser les graines déjà existantes provenant d'images précédentes. 'Seuil de bruit' est utilisé pour atténuer les artefacts à des valeurs CFG élevées (essayez la plage de 0 à 10), et Perlin pour ajouter du bruit Perlin pendant la génération : les deux servent à ajouter de la variété à vos sorties.",
             "variations": "Essayez une variation avec une valeur comprise entre 0,1 et 1,0 pour changer le résultat pour une graine donnée. Des variations intéressantes de la graine sont entre 0,1 et 0,3.",
             "upscale": "Utilisez ESRGAN pour agrandir l'image immédiatement après la génération.",
-            "faceCorrection": "Correction de visage avec GFPGAN ou Codeformer: l'algorithme détecte les visages dans l'image et corrige tout défaut. La valeur élevée changera plus l'image, ce qui donnera des visages plus attirants. Codeformer avec une fidélité plus élevée préserve l'image originale au prix d'une correction de visage plus forte.",
+            "faceCorrection": "Correction de visage avec GFPGAN ou Codeformer : l'algorithme détecte les visages dans l'image et corrige tout défaut. La valeur élevée changera plus l'image, ce qui donnera des visages plus attirants. Codeformer avec une fidélité plus élevée préserve l'image originale au prix d'une correction de visage plus forte.",
             "imageToImage": "Image to Image charge n'importe quelle image en tant qu'initiale, qui est ensuite utilisée pour générer une nouvelle avec le prompt. Plus la valeur est élevée, plus l'image de résultat changera. Des valeurs de 0,0 à 1,0 sont possibles, la plage recommandée est de 0,25 à 0,75",
             "boundingBox": "La boîte englobante est la même que les paramètres Largeur et Hauteur pour Texte à Image ou Image à Image. Seulement la zone dans la boîte sera traitée.",
             "seamCorrection": "Contrôle la gestion des coutures visibles qui se produisent entre les images générées sur la toile.",
@@ -495,11 +494,11 @@
         "clearCanvasHistory": "Effacer l'historique du canvas",
         "clearHistory": "Effacer l'historique",
         "clearCanvasHistoryMessage": "Effacer l'historique du canvas laisse votre canvas actuel intact, mais efface de manière irréversible l'historique annuler et refaire.",
-        "clearCanvasHistoryConfirm": "Êtes-vous sûr de vouloir effacer l'historique du canvas?",
+        "clearCanvasHistoryConfirm": "Voulez-vous vraiment effacer l'historique du canvas ?",
         "emptyTempImageFolder": "Vider le dossier d'images temporaires",
         "emptyFolder": "Vider le dossier",
         "emptyTempImagesFolderMessage": "Vider le dossier d'images temporaires réinitialise également complètement le canvas unifié. Cela inclut tout l'historique annuler/refaire, les images dans la zone de mise en attente et la couche de base du canvas.",
-        "emptyTempImagesFolderConfirm": "Êtes-vous sûr de vouloir vider le dossier temporaire?",
+        "emptyTempImagesFolderConfirm": "Voulez-vous vraiment vider le dossier temporaire ?",
         "activeLayer": "Calque actif",
         "canvasScale": "Échelle du canevas",
         "boundingBox": "Boîte englobante",

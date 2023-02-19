@@ -357,7 +357,6 @@
         "img2imgStrength": "Bild-zu-Bild-Stärke",
         "toggleLoopback": "Toggle Loopback",
         "invoke": "Invoke",
-        "cancel": "Abbrechen",
         "promptPlaceholder": "Prompt hier eingeben. [negative Token], (mehr Gewicht)++, (geringeres Gewicht)--, Tausch und Überblendung sind verfügbar (siehe Dokumente)",
         "sendTo": "Senden an",
         "sendToImg2Img": "Senden an Bild zu Bild",

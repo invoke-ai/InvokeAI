@@ -365,7 +365,6 @@
         "img2imgStrength": "Peso de Imagen a Imagen",
         "toggleLoopback": "Alternar Retroalimentación",
         "invoke": "Invocar",
-        "cancel": "Cancelar",
         "promptPlaceholder": "Ingrese la entrada aquí. [símbolos negativos], (subir peso)++, (bajar peso)--, también disponible alternado y mezclado (ver documentación)",
         "sendTo": "Enviar a",
         "sendToImg2Img": "Enviar a Imagen a Imagen",
