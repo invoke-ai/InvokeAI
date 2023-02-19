@@ -50,6 +50,7 @@ DOCKER_BUILDKIT=1 "${CONTAINER_ENGINE}" build \
     --tag="${CONTAINER_IMAGE:-invokeai}" \
     ${CONTAINER_FLAVOR:+--build-arg="CONTAINER_FLAVOR=${CONTAINER_FLAVOR}"} \
     ${PIP_EXTRA_INDEX_URL:+--build-arg="PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}"} \
+    ${PYTHON_VERSION:+--build-arg="PYTHON_VERSION=${PYTHON_VERSION}"} \
     ${PIP_PACKAGE:+--build-arg="PIP_PACKAGE=${PIP_PACKAGE}"} \
     --file="${DOCKERFILE}" \
     ..
