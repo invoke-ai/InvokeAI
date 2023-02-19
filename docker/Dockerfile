@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
 ##################
@@ -31,6 +31,9 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 # don't fall back to legacy build system
 ENV PIP_USE_PEP517=1
+# set env for next stages
+ENV APPDIR=${APPDIR}
+ENV APPNAME=${APPNAME}
 
 #######################
 ##  build pyproject  ##
@@ -43,10 +46,9 @@ RUN apt-get update \
     --no-install-recommends \
     build-essential=12.9 \
     gcc=4:10.2.* \
-    python3-dev>=${PYTHON_VERSION}
+    python3-dev=3.9.*
 
 # prepare pip for buildkit cache
-ARG APPNAME=InvokeAI
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
 ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
 RUN mkdir -p ${PIP_CACHE_DIR}
@@ -72,8 +74,6 @@ RUN python3 -c "from patchmatch import patch_match"
 FROM python-base AS runtime
 
 # Create a new user
-ARG APPDIR=/usr/src
-ARG APPNAME=InvokeAI
 ARG UNAME=appuser
 RUN useradd \
   --no-log-init \
