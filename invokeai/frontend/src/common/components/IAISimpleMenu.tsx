@@ -43,9 +43,10 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
 
   const renderMenuItems = () => {
     const menuItemsToRender: ReactNode[] = [];
-    menuItems.forEach((menuItem) => {
+    menuItems.forEach((menuItem, index) => {
       menuItemsToRender.push(
         <MenuItem
+          key={index}
           onClick={menuItem.onClick}
           fontSize="0.9rem"
           color="var(--text-color-secondary)"
