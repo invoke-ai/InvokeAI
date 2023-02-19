@@ -1,20 +1,21 @@
-import { Box, Flex, Text } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Box, Flex, Spinner, Text } from '@chakra-ui/react';
 import IAIInput from 'common/components/IAIInput';
-import { useMemo, useState, useTransition } from 'react';
+import IAIButton from 'common/components/IAIButton';
 
 import AddModel from './AddModel';
 import ModelListItem from './ModelListItem';
+import MergeModels from './MergeModels';
 
 import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 
-import IAIButton from 'common/components/IAIButton';
+import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import type { SystemState } from 'features/system/store/systemSlice';
 import { isEqual, map } from 'lodash';
+
+import React, { useMemo, useState, useTransition } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import MergeModels from './MergeModels';
 
 const modelListSelector = createSelector(
   systemSelector,
@@ -57,6 +58,16 @@ function ModelFilterButton({
 
 const ModelList = () => {
   const models = useAppSelector(modelListSelector);
+
+  const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setRenderModelList(true);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const [searchText, setSearchText] = useState<string>('');
   const [isSelectedFilter, setIsSelectedFilter] = useState<
@@ -217,7 +228,19 @@ const ModelList = () => {
             isActive={isSelectedFilter === 'diffusers'}
           />
         </Flex>
-        {renderModelListItems}
+
+        {renderModelList ? (
+          renderModelListItems
+        ) : (
+          <Flex
+            width="100%"
+            minHeight="30rem"
+            justifyContent="center"
+            alignItems="center"
+          >
+            <Spinner />
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );
