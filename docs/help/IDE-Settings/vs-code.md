@@ -10,34 +10,111 @@ higher priorized than your user settings.
 This helps to have different settings for different projects, while the user
 settings get used as a default value if no workspace settings are provided.
 
-## launch.json
+## tasks.json
 
-It is asumed that you have created a virtual environment as `.venv`:
+First we will create a task configuration which will create a virtual
+environment and update the deps (pip, setuptools and wheel).
 
-```sh
-python -m venv .venv --prompt="InvokeAI" --upgrade-deps
+Into this venv we will then install the pyproject.toml in editable mode with
+dev, docs and test dependencies.
+
+```json
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Create virtual environment",
+            "detail": "Create .venv and upgrade pip, setuptools and wheel",
+            "command": "python3",
+            "args": [
+                "-m",
+                "venv",
+                ".venv",
+                "--prompt",
+                "InvokeAI",
+                "--upgrade-deps"
+            ],
+            "runOptions": {
+                "instanceLimit": 1,
+                "reevaluateOnRerun": true
+            },
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "build InvokeAI",
+            "detail": "Build pyproject.toml with extras dev, docs and test",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": ["-m", "pip", "install", "-e", ".[dev,docs,test]"],
+            "dependsOn": "Create venv",
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        }
+    ]
+}
 ```
 
-This is the most simplified version of launching `invokeai --web` with the
-debugger attached:
+## launch.json
+
+This file is used to define debugger configurations, so that you can one-click
+launch and monitor the application, set halt points to inspect specific states,
+...
 
 ```json title=".vscode/launch.json"
 {
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "invokeai --web",
+            "name": "invokeai web",
             "type": "python",
             "request": "launch",
             "program": ".venv/bin/invokeai",
-            "args": ["--web"],
+            "justMyCode": true
+        },
+        {
+            "name": "invokeai cli",
+            "type": "python",
+            "request": "launch",
+            "program": ".venv/bin/invokeai",
+            "justMyCode": true
+        },
+        {
+            "name": "mkdocs serve",
+            "type": "python",
+            "request": "launch",
+            "program": ".venv/bin/mkdocs",
+            "args": ["serve"],
             "justMyCode": true
         }
     ]
 }
 ```
 
-Then you only need to hit ++F5++ and the fun begins :nerd:
+Then you only need to hit ++f5++ and the fun begins :nerd: (It is asumed that
+you have created a virtual environment via the [tasks](#tasksjson) from the
+previous step.)
 
 ## extensions.json
 
@@ -70,20 +147,28 @@ A list of recommended vscode-extensions to make your life easier:
 
 ## settings.json
 
-With those settings your files already get formated when you save them, which
-will help you to not run into trouble with the pre-commit hooks, which will
-prevent you from commiting if the formaters are failing
+With bellow settings your files already get formated when you save them (only
+your modifications if available), which will help you to not run into trouble
+with the pre-commit hooks. If the hooks fail, they will prevent you from
+commiting, but most hooks directly add a fixed version, so that you just need to
+stage and commit them:
 
 ```json title=".vscode/settings.json"
 {
     "[json]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.quickSuggestions": {
-            "strings": true
+            "comments": false,
+            "strings": true,
+            "other": true
         },
         "editor.suggest.insertMode": "replace",
-        "files.insertFinalNewline": true,
         "gitlens.codeLens.scopes": ["document"]
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "modificationsIfAvailable"
     },
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter",
@@ -96,7 +181,7 @@ prevent you from commiting if the formaters are failing
         "editor.formatOnSaveMode": "modificationsIfAvailable"
     },
     "[yaml]": {
-        "editor.defaultFormatter": "redhat.vscode-yaml",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "modificationsIfAvailable"
     },
@@ -111,10 +196,17 @@ prevent you from commiting if the formaters are failing
             "comments": "off",
             "strings": "off",
             "other": "off"
-        }
+        },
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "modificationsIfAvailable"
+    },
+    "[shellscript]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format"
+    },
+    "[ignore]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format"
     },
     "editor.rulers": [88],
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "evenBetterToml.formatter.alignEntries": false,
     "evenBetterToml.formatter.allowedBlankLines": 1,
     "evenBetterToml.formatter.arrayAutoExpand": true,
@@ -143,7 +235,7 @@ prevent you from commiting if the formaters are failing
         "--cov-report=term:skip-covered"
     ],
     "yaml.schemas": {
-        "https://json.schemastore.org/prettierrc.json": "${workspaceFolder}/.prettierrc"
+        "https://json.schemastore.org/prettierrc.json": "${workspaceFolder}/.prettierrc.yaml"
     }
 }
 ```
