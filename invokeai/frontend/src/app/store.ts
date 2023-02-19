@@ -48,6 +48,7 @@ const systemBlacklist = [
   'totalIterations',
   'totalSteps',
   'openModel',
+  'cancelOptions.cancelAfter',
 ].map((blacklistItem) => `system.${blacklistItem}`);
 
 const galleryBlacklist = [

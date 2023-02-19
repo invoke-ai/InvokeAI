@@ -7,7 +7,7 @@ The UI is in `invokeai/frontend`.
 Install [node](https://nodejs.org/en/download/) (includes npm) and
 [yarn](https://yarnpkg.com/getting-started/install).
 
-From `invokeai/frontend/` run `yarn install` to get everything set up.
+From `invokeai/frontend/` run `yarn install --immutable` to get everything set up.
 
 ## Dev
 
