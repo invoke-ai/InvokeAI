@@ -30,14 +30,14 @@ in the top right.
 
 After you forked the Repository, you should clone it to your dev machine:
 
-=== "Linux:fontawesome-brands-linux: / MacOS:simple-apple:"
+=== ":fontawesome-brands-linux:Linux / :simple-apple:macOS"
 
     ``` sh
     git clone https://github.com/<github username>/InvokeAI \
     && cd InvokeAI
     ```
 
-=== "Windows:fontawesome-brands-windows:"
+=== ":fontawesome-brands-windows:Windows"
 
     ``` powershell
     git clone https://github.com/<github username>/InvokeAI `
@@ -51,7 +51,7 @@ activate a venv first. Afterwards you can install the InvokeAI Package,
 including dev and docs extras in editable mode, follwed by the installation of
 the pre-commit hook:
 
-=== "Linux:fontawesome-brands-linux: / MacOS:simple-apple:"
+=== ":fontawesome-brands-linux:Linux / :simple-apple:macOS"
 
     ``` sh
     python -m venv .venv \
@@ -65,7 +65,7 @@ the pre-commit hook:
     && pre-commit install
     ```
 
-=== "Windows:fontawesome-brands-windows:"
+=== ":fontawesome-brands-windows:Windows"
 
     ``` powershell
     python -m venv .venv `
@@ -83,7 +83,7 @@ the pre-commit hook:
 
 Make sure you are on main branch, from there create your feature branch:
 
-=== "Linux:fontawesome-brands-linux: / MacOS:simple-apple:"
+=== ":fontawesome-brands-linux:Linux / :simple-apple:macOS"
 
     ``` sh
     git checkout main \
@@ -91,7 +91,7 @@ Make sure you are on main branch, from there create your feature branch:
     && git checkout -B <branch name>
     ```
 
-=== "Windows:fontawesome-brands-windows:"
+=== ":fontawesome-brands-windows:Windows"
 
     ``` powershell
     git checkout main `
