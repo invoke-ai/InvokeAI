@@ -293,7 +293,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,
                                                                  text_encoder=self.text_encoder,
                                                                  full_precision=use_full_precision)
-        self.lora_manager = LoraManager(self.unet)
+        self.lora_manager = LoraManager(self)
 
         # InvokeAI's interface for text embeddings and whatnot
         self.prompt_fragments_to_embeddings_converter = WeightedPromptFragmentsToEmbeddingsConverter(
