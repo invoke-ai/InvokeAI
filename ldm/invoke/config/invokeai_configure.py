@@ -8,8 +8,11 @@
 #
 print("Loading Python libraries...\n")
 import argparse
+import curses
+import npyscreen
 import io
 import os
+import re
 import shutil
 import sys
 import traceback
@@ -18,9 +21,10 @@ from pathlib import Path
 from urllib import request
 
 import transformers
-from getpass_asterisk import getpass_asterisk
+from argparse import Namespace
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
+
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
@@ -31,10 +35,12 @@ from transformers import (
 )
 
 import invokeai.configs as configs
-from ldm.invoke.config.model_install_backend import download_from_hf
-from ldm.invoke.config.model_install import select_and_download_models
-from ldm.invoke.globals import Globals, global_config_dir
-from ldm.invoke.readline import generic_completer
+from ..args import Args, PRECISION_CHOICES
+from .model_install_backend import download_from_hf
+from .model_install import select_and_download_models
+from .widgets import IntTitleSlider
+from ..globals import Globals, global_config_dir
+from ..readline import generic_completer
 
 warnings.filterwarnings("ignore")
 
@@ -53,15 +59,18 @@ SD_Configs = Path(global_config_dir()) / "stable-diffusion"
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(["yes", "no"])
 
-Config_preamble = """# This file describes the alternative machine learning models
-# available to InvokeAI script.
-#
-# To add a new model, follow the examples below. Each
-# model requires a model config file, a weights file,
-# and the width and height of the images it
-# was trained on.
+INIT_FILE_PREAMBLE = """# InvokeAI initialization file
+# This is the InvokeAI initialization file, which contains command-line default values.
+# Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
+# or renaming it and then running invokeai-configure again.
+# Place  frequently-used startup commands here, one or more per line.
+# Examples:
+# --outdir=D:\data\images
+# --no-nsfw_checker
+# --web --host=0.0.0.0
+# --steps=20
+# -Ak_euler_a -C10.0
 """
-
 
 # --------------------------------------------
 def postscript(errors: None):
@@ -111,7 +120,6 @@ def yes_or_no(prompt: str, default_yes=True):
     else:
         return response[0] in ("y", "Y")
 
-
 # ---------------------------------------------
 def HfLogin(access_token) -> str:
     """
@@ -128,122 +136,23 @@ def HfLogin(access_token) -> str:
         sys.stdout = sys.__stdout__
         print(exc)
         raise exc
+# -------------------------------------
+class ProgressBar:
+    def __init__(self, model_name="file"):
+        self.pbar = None
+        self.name = model_name
 
-
-# -------------------------------Authenticate against Hugging Face
-def save_hf_token(yes_to_all=False):
-    print("** LICENSE AGREEMENT FOR WEIGHT FILES **")
-    print("=" * shutil.get_terminal_size()[0])
-    print(
-        """
-By downloading the Stable Diffusion weight files from the official Hugging Face
-repository, you agree to have read and accepted the CreativeML Responsible AI License.
-The license terms are located here:
-
-   https://huggingface.co/spaces/CompVis/stable-diffusion-license
-
-"""
-    )
-    print("=" * shutil.get_terminal_size()[0])
-
-    if not yes_to_all:
-        accepted = False
-        while not accepted:
-            accepted = yes_or_no("Accept the above License terms?")
-            if not accepted:
-                print("Please accept the License or Ctrl+C to exit.")
-            else:
-                print("Thank you!")
-    else:
-        print(
-            "The program was started with a '--yes' flag, which indicates user's acceptance of the above License terms."
-        )
-
-    # Authenticate to Huggingface using environment variables.
-    # If successful, authentication will persist for either interactive or non-interactive use.
-    # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
-    print("=" * shutil.get_terminal_size()[0])
-    print("Authenticating to Huggingface")
-    hf_envvars = ["HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN"]
-    token_found = False
-    if not (access_token := HfFolder.get_token()):
-        print("Huggingface token not found in cache.")
-
-        for ev in hf_envvars:
-            if access_token := os.getenv(ev):
-                print(
-                    f"Token was found in the {ev} environment variable.... Logging in."
-                )
-                try:
-                    HfLogin(access_token)
-                    continue
-                except ValueError:
-                    print(f"Login failed due to invalid token found in {ev}")
-            else:
-                print(f"Token was not found in the environment variable {ev}.")
-    else:
-        print("Huggingface token found in cache.")
-        try:
-            HfLogin(access_token)
-            token_found = True
-        except ValueError:
-            print("Login failed due to invalid token found in cache")
-
-    if not (yes_to_all or token_found):
-        print(
-            f""" You may optionally enter your Huggingface token now. InvokeAI
-*will* work without it but you will not be able to automatically
-download some of the Hugging Face style concepts.  See
-https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept
-for more information.
-
-Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
-
-Paste the token below using {"Ctrl+Shift+V" if sys.platform == "linux" else "Command+V" if sys.platform == "darwin" else "Ctrl+V, right-click, or Edit>Paste"}.
-
-Alternatively, press 'Enter' to skip this step and continue.
-
-You may re-run the configuration script again in the future if you do not wish to set the token right now.
-        """
-        )
-        again = True
-        while again:
-            try:
-                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ❯ ")
-                if access_token is None or len(access_token) == 0:
-                    raise EOFError
-                HfLogin(access_token)
-                access_token = HfFolder.get_token()
-                again = False
-            except ValueError:
-                again = yes_or_no(
-                    "Failed to log in to Huggingface. Would you like to try again?"
-                )
-                if not again:
-                    print(
-                        "\nRe-run the configuration script whenever you wish to set the token."
-                    )
-                    print("...Continuing...")
-            except EOFError:
-                # this happens if the user pressed Enter on the prompt without any input; assume this means they don't want to input a token
-                # safety net needed against accidental "Enter"?
-                print("None provided - continuing")
-                again = False
-
-    elif access_token is None:
-        print()
-        print(
-            "HuggingFace login did not succeed. Some functionality may be limited; see https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information"
-        )
-        print()
-        print(
-            f"Re-run the configuration script without '--yes' to set the HuggingFace token interactively, or use one of the environment variables: {', '.join(hf_envvars)}"
-        )
-
-    print("=" * shutil.get_terminal_size()[0])
-
-    return access_token
-
+    def __call__(self, block_num, block_size, total_size):
+        if not self.pbar:
+            self.pbar = tqdm(
+                desc=self.name,
+                initial=0,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+                total=total_size,
+            )
+        self.pbar.update(block_size)
 
 # ---------------------------------------------
 def download_with_progress_bar(model_url: str, model_dest: str, label: str = "the"):
@@ -381,79 +290,270 @@ def get_root(root: str = None) -> str:
         return Globals.root
 
 
-# -------------------------------------
-def select_root(root: str, yes_to_all: bool = False):
-    default = root or os.path.expanduser("~/invokeai")
-    if yes_to_all:
-        return default
-    completer.set_default_dir(default)
-    completer.complete_extensions(())
-    completer.set_line(default)
-    directory = input(
-        f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: "
-    ).strip(" \\")
-    return directory or default
+class editOptsForm(npyscreen.FormMultiPage):
+
+    def create(self):
+        old_opts = self.parentApp.old_opts
+        first_time = not (Globals.root / Globals.initfile).exists()
+        access_token = HfFolder.get_token()
+        
+        window_height, window_width = curses.initscr().getmaxyx()
+        for i in [
+                'Configure startup settings. You can come back and change these later.',
+                'Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.',
+                'Use cursor arrows to make a checkbox selection, and space to toggle.',
+        ]:
+            self.add_widget_intelligent(
+                npyscreen.FixedText,
+                value=i,
+                editable=False,
+                color='CONTROL',
+            )
+            
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="== BASIC OPTIONS ==",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True
+        )
+        self.nextrely -= 1
+        self.add_widget_intelligent(
+            npyscreen.FixedText,
+            value='Select an output directory for images:',
+            editable=False,
+            color='CONTROL',
+        )
+        self.outdir = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name='(<tab> autocompletes, ctrl-N advances):',
+            value=old_opts.outdir or str(default_output_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor='GOOD',
+            begin_entry_at=40,
+            scroll_exit=True,
+        )
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.FixedText,
+            value='Activate the NSFW checker to blur images showing potential sexual imagery:',
+            editable=False,
+            color='CONTROL'
+        )
+        self.safety_checker = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='NSFW checker',
+            value=old_opts.safety_checker,
+            relx = 5,
+            scroll_exit=True,
+        )
+        self.nextrely += 1
+        for i in [
+                'If you have an account at HuggingFace you may paste your access token here',
+                'to allow InvokeAI to download styles & subjects from the "Concept Library".',
+                'See https://huggingface.co/settings/tokens',
+        ]:
+            self.add_widget_intelligent(
+                npyscreen.FixedText,
+                value=i,
+                editable=False,
+                color='CONTROL',
+            )
+
+        self.hf_token = self.add_widget_intelligent(
+            npyscreen.TitlePassword,
+            name='Access Token (use shift-ctrl-V to paste):',
+            value=access_token,
+            begin_entry_at=42,
+            use_two_lines=False,
+            scroll_exit=True
+        )
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="== ADVANCED OPTIONS ==",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True
+        )
+        self.nextrely -= 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="GPU Management",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True
+        )
+        self.nextrely -= 1
+        self.free_gpu_mem = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='Free GPU memory after each generation',
+            value=old_opts.free_gpu_mem,
+            relx=5,
+            scroll_exit=True
+        )
+        self.xformers = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='Enable xformers support if available',
+            value=old_opts.xformers,
+            relx=5,
+            scroll_exit=True
+        )
+        self.always_use_cpu = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='Force CPU to be used on GPU systems',
+            value=old_opts.always_use_cpu,
+            relx=5,
+            scroll_exit=True
+        )
+        self.precision = self.add_widget_intelligent(
+            npyscreen.TitleSelectOne,
+            name='Precision',
+            values=PRECISION_CHOICES,
+            value=PRECISION_CHOICES.index(old_opts.precision),
+            begin_entry_at=3,
+            max_height=len(PRECISION_CHOICES)+1,
+            scroll_exit=True,
+        )
+        self.max_loaded_models = self.add_widget_intelligent(
+            IntTitleSlider,
+            name="Number of models to cache in CPU memory (each will use 2-4 GB!)",
+            value=old_opts.max_loaded_models,
+            out_of=10,
+            lowest=1,
+            begin_entry_at=4,
+            scroll_exit=True
+        )
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.FixedText,
+            value='Directory containing embedding/textual inversion files:',
+            editable=False,
+            color='CONTROL',
+        )
+        self.embedding_path = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name='(<tab> autocompletes, ctrl-N advances):',
+            value=str(default_embedding_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor='GOOD',
+            begin_entry_at=40,
+            scroll_exit=True,
+        )
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="== LICENSE ==",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True
+        )
+        self.nextrely -= 1
+        for i in [
+                'BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ',
+                'AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT',
+                'https://huggingface.co/spaces/CompVis/stable-diffusion-license'
+                ]:
+            self.add_widget_intelligent(
+                npyscreen.FixedText,
+                value=i,
+                editable=False,
+                color='CONTROL',
+            )
+        self.license_acceptance = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name='I accept the CreativeML Responsible AI License',
+            value=not first_time,
+            relx = 2,
+            scroll_exit=True
+        )
+        self.nextrely += 1
+        self.ok_button = self.add_widget_intelligent(
+            npyscreen.ButtonPress,
+            name='DONE',
+            relx= (window_width-len('DONE'))//2,
+            rely= -3,
+            when_pressed_function=self.on_ok
+        )
+        
+    def on_ok(self):
+        options = self.marshall_arguments()
+        if self.validate_field_values(options):
+            self.parentApp.setNextForm(None)
+            self.editing = False
+        else:
+            self.editing = True
+
+    def validate_field_values(self, opt: Namespace) -> bool:
+        bad_fields = []
+        if not opt.license_acceptance:
+            bad_fields.append(
+                'Please accept the license terms before proceeding to model downloads'
+            )
+        if not Path(opt.outdir).parent.exists():
+            bad_fields.append(
+                f'The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory.'
+            )
+        if not Path(opt.embedding_path).parent.exists():
+            bad_fields.append(
+                f'The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_path).parent)} is an existing directory.'
+            )
+        if len(bad_fields) > 0:
+            message = "The following problems were detected and must be corrected:\n"
+            for problem in bad_fields:
+                message += f"* {problem}\n"
+            npyscreen.notify_confirm(message)
+            return False
+        else:
+            return True
+
+    def marshall_arguments(self):
+        new_opts = Namespace()
+
+        for attr in ['outdir','safety_checker','free_gpu_mem','max_loaded_models',
+                     'xformers','always_use_cpu','embedding_path']:
+            setattr(new_opts, attr, getattr(self, attr).value)
+                    
+        new_opts.hf_token = self.hf_token.value
+        new_opts.license_acceptance = self.license_acceptance.value
+        new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
+
+        return new_opts
 
 
-# -------------------------------------
-def select_outputs(root: str, yes_to_all: bool = False):
-    default = os.path.normpath(os.path.join(root, "outputs"))
-    if yes_to_all:
-        return default
-    completer.set_default_dir(os.path.expanduser("~"))
-    completer.complete_extensions(())
-    completer.set_line(default)
-    directory = input(
-        f"Select the default directory for image outputs [{default}]: "
-    ).strip(" \\")
-    return directory or default
+class EditOptApplication(npyscreen.NPSAppManaged):
+    def __init__(self, old_opts=argparse.Namespace):
+        super().__init__()
+        self.old_opts=old_opts
 
+    def onStart(self):
+        npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
+        self.main = self.addForm(
+            "MAIN",
+            editOptsForm,
+            name='InvokeAI Startup Options',
+        )
+
+    def new_opts(self):
+        return self.main.marshall_arguments()
+
+def edit_opts(old_opts: argparse.Namespace)->argparse.Namespace:
+    editApp = EditOptApplication(old_opts)
+    editApp.run()
+    return editApp.new_opts()
 
 # -------------------------------------
 def initialize_rootdir(root: str, yes_to_all: bool = False):
     print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
-    root_selected = False
-    while not root_selected:
-        outputs = select_outputs(root, yes_to_all)
-        outputs = (
-            outputs
-            if os.path.isabs(outputs)
-            else os.path.abspath(os.path.join(Globals.root, outputs))
-        )
-
-        print(f'\nInvokeAI image outputs will be placed into "{outputs}".')
-        if not yes_to_all:
-            root_selected = yes_or_no("Accept this location?")
-        else:
-            root_selected = True
-
-    print(
-        f'\nYou may change the chosen output directory at any time by editing the --outdir options in "{Globals.initfile}",'
-    )
-    print(
-        "You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n"
-    )
-
-    enable_safety_checker = True
-    if not yes_to_all:
-        print(
-            "The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery."
-        )
-        print(
-            "It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker."
-        )
-        print(
-            "The following option will set whether the checker is enabled by default. Like other options, you can"
-        )
-        print(f"change this setting later by editing the file {Globals.initfile}.")
-        print(
-            "This is NOT recommended for systems with less than 6G VRAM because of the checker's memory requirements."
-        )
-        enable_safety_checker = yes_or_no(
-            "Enable the NSFW checker by default?", enable_safety_checker
-        )
-
-    safety_checker = "--nsfw_checker" if enable_safety_checker else "--no-nsfw_checker"
 
     for name in (
         "models",
@@ -469,51 +569,80 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
-    init_file = os.path.join(Globals.root, Globals.initfile)
-
-    print(f'Creating the initialization file at "{init_file}".\n')
-    with open(init_file, "w") as f:
-        f.write(
-            f"""# InvokeAI initialization file
-# This is the InvokeAI initialization file, which contains command-line default values.
-# Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
-# or renaming it and then running invokeai-configure again.
-
-# the --outdir option controls the default location of image files.
---outdir="{outputs}"
-
-# generation arguments
-{safety_checker}
-
-# You may place other  frequently-used startup commands here, one or more per line.
-# Examples:
-# --web --host=0.0.0.0
-# --steps=20
-# -Ak_euler_a -C10.0
-#
-"""
-        )
-
+# -------------------------------------
+def do_edit_opt_form(old_opts: argparse.Namespace)->argparse.Namespace:
+    editApp = EditOptApplication(old_opts)
+    editApp.run()
+    return editApp.new_opts()
 
 # -------------------------------------
-class ProgressBar:
-    def __init__(self, model_name="file"):
-        self.pbar = None
-        self.name = model_name
+def edit_options(init_file: Path):
+    # get current settings from initfile
+    opt = Args().parse_args()
+    new_opt = do_edit_opt_form(opt)
+    write_opts(new_opt, init_file)
 
-    def __call__(self, block_num, block_size, total_size):
-        if not self.pbar:
-            self.pbar = tqdm(
-                desc=self.name,
-                initial=0,
-                unit="iB",
-                unit_scale=True,
-                unit_divisor=1000,
-                total=total_size,
-            )
-        self.pbar.update(block_size)
+# -------------------------------------
+def write_opts(opts: Namespace, init_file: Path):
+    '''
+    Update the invokeai.init file with values from opts Namespace
+    '''
+    # touch file if it doesn't exist
+    if not init_file.exists():
+        with open(init_file,'w') as f:
+            f.write(INIT_FILE_PREAMBLE)
 
+    # We want to write in the changed arguments without clobbering
+    # any other initialization values the user has entered. There is
+    # no good way to do this because of the one-way nature of
+    # argparse: i.e. --outdir could be --outdir, --out, or -o
+    # initfile needs to be replaced with a fully structured format
+    # such as yaml; this is a hack that will work much of the time
+    args_to_skip = re.compile('^--?(o|out|no-xformer|xformer|free|no-nsfw|nsfw|prec|max_load|embed)')
+    new_file = f'{init_file}.new'
+    try:
+        lines = open(init_file,'r').readlines()
+        with open(new_file,'w') as out_file:
+            for line in lines:
+                if not args_to_skip.match(line):
+                    out_file.write(line)
+            out_file.write(f'''
+--outdir={opts.outdir}
+--embedding_path={opts.embedding_path}
+--precision={opts.precision}
+--max_loaded_models={int(opts.max_loaded_models)}
+--{'no-' if not opts.safety_checker else ''}nsfw_checker
+--{'no-' if not opts.xformers else ''}xformers
+{'--free_gpu_mem' if opts.free_gpu_mem else ''}
+{'--always_use_cpu' if opts.always_use_cpu else ''}
+''')
+    except OSError as e:
+        print(f'** An error occurred while writing the init file: {str(e)}')
+        
+    os.replace(new_file, init_file)
 
+    if opts.hf_token:
+        HfLogin(opts.hf_token)
+
+# -------------------------------------
+def default_output_dir()->Path:
+    return Globals.root / 'outputs'
+
+# -------------------------------------
+def default_embedding_dir()->Path:
+    return Globals.root / 'embeddings'
+
+# -------------------------------------
+def write_default_options(initfile: Path):
+    opt = Namespace(
+        outdir=str(default_output_dir()),
+        embedding_path=str(default_embedding_dir()),
+        nsfw_checker=True,
+        max_loaded_models=2,
+        free_gpu_mem=True
+    )
+    write_opts(opt, initfile)
+    
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
@@ -568,11 +697,14 @@ def main():
 
     try:
         # We check for to see if the runtime directory is correctly initialized.
-        if Globals.root == "" or not os.path.exists(
-            os.path.join(Globals.root, "invokeai.init")
-        ):
+        init_file = Path(Globals.root, Globals.initfile)
+        if not init_file.exists():
             initialize_rootdir(Globals.root, opt.yes_to_all)
-            save_hf_token(opt.yes_to_all)
+
+        if opt.yes_to_all:
+            write_default_options(init_file)
+        else:
+            edit_options(init_file)
 
         print("\n** DOWNLOADING SUPPORT MODELS **")
         download_bert()

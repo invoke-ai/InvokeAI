@@ -19,6 +19,7 @@ from typing import List
 
 import npyscreen
 import torch
+from datetime import datetime
 from pathlib import Path
 from npyscreen import widget
 from omegaconf import OmegaConf
@@ -104,6 +105,9 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             color="CONTROL",
         )
         self.nextrely -= 1
+        # if user has already installed some initial models, then don't patronize them
+        # by showing more recommendations
+        show_recommended = self.installed_models is None or len(self.installed_models)==0
         self.models_selected = self.add_widget_intelligent(
             npyscreen.MultiSelect,
             name="Install Starter Models",
@@ -111,7 +115,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             value=[
                 self.starter_model_list.index(x)
                 for x in self.starter_model_list
-                if x in recommended_models
+                if show_recommended and x in recommended_models
             ],
             max_height=len(starter_model_labels) + 1,
             relx = 4,
@@ -202,7 +206,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
 
     def on_cancel(self):
         self.parentApp.setNextForm(None)
-        self.ParentApp.user_cancelled = True
+        self.parentApp.user_cancelled = True
         self.editing = False
 
     def marshall_arguments(self):
@@ -216,9 +220,13 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         .import_model_paths:   list of URLs, repo_ids and file paths to import
         .convert_to_diffusers: if True, convert legacy checkpoints into diffusers
         '''
+        # we're using a global here rather than storing the result in the parentapp
+        # due to some bug in npyscreen that is causing attributes to be lost
+        selections = self.parentApp.user_selections
+
         # starter models to install/remove
         starter_models = dict(map(lambda x: (self.starter_model_list[x], True), self.models_selected.value))
-        self.parentApp.purge_deleted_models=False
+        selections.purge_deleted_models=False
         if hasattr(self,'previously_installed_models'):
             unchecked = [
                 self.previously_installed_models.values[x]
@@ -228,127 +236,52 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             starter_models.update(
                 map(lambda x: (x, False), unchecked)
             )
-            self.parentApp.purge_deleted_models = self.purge_deleted.value
-        self.parentApp.starter_models=starter_models
+            selections.purge_deleted_models = self.purge_deleted.value
+        selections.starter_models=starter_models
 
         # load directory and whether to scan on startup
         if self.show_directory_fields.value:
-            self.parentApp.scan_directory = self.autoload_directory.value
-            self.parentApp.autoscan_on_startup = self.autoscan_on_startup.value
+            selections.scan_directory = self.autoload_directory.value
+            selections.autoscan_on_startup = self.autoscan_on_startup.value
         else:
-            self.parentApp.scan_directory = None
-            self.parentApp.autoscan_on_startup = False
+            selections.scan_directory = None
+            selections.autoscan_on_startup = False
 
         # URLs and the like
-        self.parentApp.import_model_paths = self.import_model_paths.value.split()
-        self.parentApp.convert_to_diffusers = self.convert_models.value[0] == 1
-
-# big chunk of dead code
-# was intended to be a status area in which output of installation steps (including tqdm) was logged in real time.
-# Not used at the current time but retained for possible future implementation.
-# class Log(object):
-#     def __init__(self, writable):
-#         self.writable = writable
-        
-#     def __enter__(self):
-#         self._stdout = sys.stdout
-#         sys.stdout = self.writable
-#         return self
-    
-#     def __exit__(self, *args):
-#         sys.stdout = self._stdout
-
-# class outputForm(npyscreen.ActionForm):
-#     def create(self):
-#         self.done = False
-#         self.buffer = self.add_widget(
-#             npyscreen.BufferPager,
-#             editable=False,
-#         )
-
-#     def write(self,string):
-#         if string != '\n':
-#             self.buffer.buffer([string])
-
-#     def beforeEditing(self):
-#         if self.done:
-#             return
-#         installApp = self.parentApp
-#         with Log(self):
-#             models_to_remove  = [x for x in installApp.starter_models if not installApp.starter_models[x]]
-#             models_to_install = [x for x in installApp.starter_models if installApp.starter_models[x]]
-#             directory_to_scan = installApp.scan_directory
-#             scan_at_startup = installApp.autoscan_on_startup
-#             potential_models_to_install = installApp.import_model_paths
-#             convert_to_diffusers = installApp.convert_to_diffusers
-
-#             print(f'these models will be removed: {models_to_remove}')
-#             print(f'these models will be installed: {models_to_install}')
-#             print(f'this directory will be scanned: {directory_to_scan}')
-#             print(f'these things will be downloaded: {potential_models_to_install}')
-#             print(f'scan at startup time? {scan_at_startup}')
-#             print(f'convert to diffusers? {convert_to_diffusers}')
-#             print(f'\nPress OK to proceed or Cancel.')
-        
-#     def on_cancel(self):
-#         self.buffer.buffer(['goodbye!'])
-#         self.parentApp.setNextForm(None)
-#         self.editing = False
-        
-#     def on_ok(self):
-#         if self.done:
-#             self.on_cancel()
-#             return
-
-#         installApp = self.parentApp
-#         with Log(self):
-#             models_to_remove  = [x for x in installApp.starter_models if not installApp.starter_models[x]]
-#             models_to_install = [x for x in installApp.starter_models if installApp.starter_models[x]]
-#             directory_to_scan = installApp.scan_directory
-#             scan_at_startup = installApp.autoscan_on_startup
-#             potential_models_to_install = installApp.import_model_paths
-#             convert_to_diffusers = installApp.convert_to_diffusers
-
-#             install_requested_models(
-#                 install_initial_models = models_to_install,
-#                 remove_models = models_to_remove,
-#                 scan_directory = Path(directory_to_scan) if directory_to_scan else None,
-#                 external_models = potential_models_to_install,
-#                 scan_at_startup = scan_at_startup,
-#                 convert_to_diffusers = convert_to_diffusers,
-#                 precision = 'float32' if installApp.opt.full_precision else choose_precision(torch.device(choose_torch_device())),
-#                 config_file_path = Path(installApp.opt.config_file) if installApp.opt.config_file else None,
-#             )
-#             self.done = True
-
-
+        selections.import_model_paths = self.import_model_paths.value.split()
+        selections.convert_to_diffusers = self.convert_models.value[0] == 1
+            
 class AddModelApplication(npyscreen.NPSAppManaged):
-    def __init__(self, saved_args=None):
+    def __init__(self):
         super().__init__()
+        self.user_cancelled = False
         self.models_to_install = None
+        self.user_selections = Namespace(
+            starter_models = None,
+            purge_deleted_models = False,
+            scan_directory = None,
+            autoscan_on_startup = None,
+            import_model_paths = None,
+            convert_to_diffusers = None
+        )
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
-        self.main = self.addForm(
+        self.main_form = self.addForm(
             "MAIN",
             addModelsForm,
             name="Add/Remove Models",
         )
-        # self.output = self.addForm(
-        #     'MONITOR_OUTPUT',
-        #     outputForm,
-        #     name='Model Install Output'
-        # )
 
 # --------------------------------------------------------
-def process_and_execute(app: npyscreen.NPSAppManaged):
-    models_to_remove  = [x for x in app.starter_models if not app.starter_models[x]]
-    models_to_install = [x for x in app.starter_models if app.starter_models[x]]
-    directory_to_scan = app.scan_directory
-    scan_at_startup = app.autoscan_on_startup
-    potential_models_to_install = app.import_model_paths
-    convert_to_diffusers = app.convert_to_diffusers
-    
+def process_and_execute(opt: Namespace, selections: Namespace):
+    models_to_remove  = [x for x in selections.starter_models if not selections.starter_models[x]]
+    models_to_install = [x for x in selections.starter_models if selections.starter_models[x]]
+    directory_to_scan = selections.scan_directory
+    scan_at_startup = selections.autoscan_on_startup
+    potential_models_to_install = selections.import_model_paths
+    convert_to_diffusers = selections.convert_to_diffusers
+
     install_requested_models(
         install_initial_models = models_to_install,
         remove_models = models_to_remove,
@@ -356,9 +289,9 @@ def process_and_execute(app: npyscreen.NPSAppManaged):
         external_models = potential_models_to_install,
         scan_at_startup = scan_at_startup,
         convert_to_diffusers = convert_to_diffusers,
-        precision = 'float32' if app.opt.full_precision else choose_precision(torch.device(choose_torch_device())),
-        purge_deleted = app.purge_deleted_models,
-        config_file_path = Path(app.opt.config_file) if app.opt.config_file else None,
+        precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
+        purge_deleted = selections.purge_deleted_models,
+        config_file_path = Path(opt.config_file) if opt.config_file else None,
     )
                         
 # --------------------------------------------------------
@@ -371,9 +304,10 @@ def select_and_download_models(opt: Namespace):
         )
     else:
         installApp = AddModelApplication()
-        installApp.opt = opt
         installApp.run()
-        process_and_execute(installApp)
+
+        if not installApp.user_cancelled:
+            process_and_execute(opt, installApp.user_selections)
 
 # -------------------------------------
 def main():
