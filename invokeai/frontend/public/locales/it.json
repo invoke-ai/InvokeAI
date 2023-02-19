@@ -458,7 +458,14 @@
         "denoisingStrength": "Forza riduzione rumore",
         "copyImage": "Copia immagine",
         "hiresStrength": "Forza Alta Risoluzione",
-        "negativePrompts": "Prompt Negativi"
+        "negativePrompts": "Prompt Negativi",
+        "imageToImage": "Immagine a Immagine",
+        "cancel": {
+            "schedule": "Annulla dopo l'iterazione corrente",
+            "isScheduled": "Annullamento",
+            "setType": "Imposta il tipo di annullamento",
+            "immediate": "Annulla immediatamente"
+        }
     },
     "settings": {
         "models": "Modelli",
