@@ -320,8 +320,8 @@ class Generate:
         variation_amount=0.0,
         threshold=0.0,
         perlin=0.0,
-        h_symmetry_point = None,
-        v_symmetry_point = None,
+        h_symmetry_time_pct = None,
+        v_symmetry_time_pct = None,
         karras_max=None,
         outdir=None,
         # these are specific to img2img and inpaint
@@ -392,8 +392,8 @@ class Generate:
            variation_amount                // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
            threshold                       // optional value >=0 to add thresholding to latent values for k-diffusion samplers (0 disables)
            perlin                          // optional 0-1 value to add a percentage of perlin noise to the initial noise
-           h_symmetry_point                // optional 0-1 value that indicates the point at which horizontal symmetry is applied
-           v_symmetry_point                // optional 0-1 value that indicates the point at which vertical symmetry is applied
+           h_symmetry_time_pct             // optional 0-1 value that indicates the time at which horizontal symmetry is applied
+           v_symmetry_time_pct             // optional 0-1 value that indicates the time at which vertical symmetry is applied
            embiggen                        // scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels
            embiggen_tiles                  // list of tiles by number in order to process and replace onto the image e.g. `0 2 4`
            embiggen_strength               // strength for embiggen. 0.0 preserves image exactly, 1.0 replaces it completely
@@ -565,8 +565,8 @@ class Generate:
                 strength=strength,
                 threshold=threshold,
                 perlin=perlin,
-                h_symmetry_point=h_symmetry_point,
-                v_symmetry_point=v_symmetry_point,
+                h_symmetry_time_pct=h_symmetry_time_pct,
+                v_symmetry_time_pct=v_symmetry_time_pct,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
                 embiggen_strength=embiggen_strength,

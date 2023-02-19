@@ -18,8 +18,8 @@ from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 class PostprocessingSettings:
     threshold: float
     warmup: float
-    h_symmetry_point: Optional[float]
-    v_symmetry_point: Optional[float]
+    h_symmetry_time_pct: Optional[float]
+    v_symmetry_time_pct: Optional[float]
 
 
 class InvokeAIDiffuserComponent:
@@ -365,22 +365,22 @@ class InvokeAIDiffuserComponent:
             return latents
 
         # Check for out of bounds
-        h_symmetry_point = postprocessing_settings.h_symmetry_point
-        if (h_symmetry_point is not None and (h_symmetry_point <= 0.0 or h_symmetry_point > 1.0)):
-            h_symmetry_point = None
+        h_symmetry_time_pct = postprocessing_settings.h_symmetry_time_pct
+        if (h_symmetry_time_pct is not None and (h_symmetry_time_pct <= 0.0 or h_symmetry_time_pct > 1.0)):
+            h_symmetry_time_pct = None
 
-        v_symmetry_point = postprocessing_settings.v_symmetry_point
-        if (v_symmetry_point is not None and (v_symmetry_point <= 0.0 or v_symmetry_point > 1.0)):
-            v_symmetry_point = None
+        v_symmetry_time_pct = postprocessing_settings.v_symmetry_time_pct
+        if (v_symmetry_time_pct is not None and (v_symmetry_time_pct <= 0.0 or v_symmetry_time_pct > 1.0)):
+            v_symmetry_time_pct = None
 
         dev = latents.device.type
 
         latents.to(device='cpu')
 
         if (
-            h_symmetry_point != None and
-            self.last_percent_through < h_symmetry_point and
-            percent_through >= h_symmetry_point
+            h_symmetry_time_pct != None and
+            self.last_percent_through < h_symmetry_time_pct and
+            percent_through >= h_symmetry_time_pct
         ):
             # Horizontal symmetry occurs on the 3rd dimension of the latent
             width = latents.shape[3]
@@ -388,9 +388,9 @@ class InvokeAIDiffuserComponent:
             latents = torch.cat([latents[:, :, :, 0:int(width/2)], x_flipped[:, :, :, int(width/2):int(width)]], dim=3)
 
         if (
-            v_symmetry_point != None and
-            self.last_percent_through < v_symmetry_point and
-            percent_through >= v_symmetry_point
+            v_symmetry_time_pct != None and
+            self.last_percent_through < v_symmetry_time_pct and
+            percent_through >= v_symmetry_time_pct
         ):
             # Vertical symmetry occurs on the 2nd dimension of the latent
             height = latents.shape[2]
