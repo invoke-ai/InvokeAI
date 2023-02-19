@@ -3,10 +3,10 @@ import {
   MenuButton,
   MenuItem,
   MenuList,
-  type MenuProps,
-  type MenuButtonProps,
-  type MenuListProps,
-  type MenuItemProps,
+  MenuProps,
+  MenuButtonProps,
+  MenuListProps,
+  MenuItemProps,
 } from '@chakra-ui/react';
 import { MouseEventHandler, ReactNode } from 'react';
 import { MdArrowDropDown, MdArrowDropUp } from 'react-icons/md';

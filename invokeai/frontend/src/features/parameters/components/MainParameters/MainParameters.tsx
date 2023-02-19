@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import { type RootState } from 'app/store';
+import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 import ParametersAccordion from '../ParametersAccordion';
