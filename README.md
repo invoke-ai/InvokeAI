@@ -10,7 +10,7 @@
 
 [![CI checks on main badge]][CI checks on main link] [![latest commit to main badge]][latest commit to main link]
 
-[![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link]
+[![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
 
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
 [CI checks on main link]:https://github.com/invoke-ai/InvokeAI/actions?query=branch%3Amain
@@ -28,6 +28,8 @@
 [latest commit to main link]: https://github.com/invoke-ai/InvokeAI/commits/main
 [latest release badge]: https://flat.badgen.net/github/release/invoke-ai/InvokeAI/development?icon=github
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases
+[translation status badge]: https://hosted.weblate.org/widgets/invokeai/-/svg-badge.svg
+[translation status link]: https://hosted.weblate.org/engage/invokeai/
 
 </div>
 
@@ -256,6 +258,8 @@ Anyone who wishes to contribute to this project, whether documentation, features
 cleanup, testing, or code reviews, is very much encouraged to do so.
 
 To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board.
+
+If you'd like to help with localization, please register on [Weblate][translation status link]. If you want add a new language, please let us know which language and we will add it to the Weblate project.
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a
