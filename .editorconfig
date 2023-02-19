@@ -21,3 +21,9 @@ indent_size = 4
 # flake8
 [.flake8]
 indent_size = 4
+
+# Markdown MkDocs
+[docs/**/*.md]
+max_line_length = 80
+indent_size = 4
+indent_style = unset
