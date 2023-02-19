@@ -10,19 +10,19 @@ import { FaLanguage } from 'react-icons/fa';
 export default function LanguagePicker() {
   const { t, i18n } = useTranslation();
   const LANGUAGES = {
-    ar: t('common:langArabic'),
-    nl: t('common:langDutch'),
-    en: t('common:langEnglish'),
-    fr: t('common:langFrench'),
-    de: t('common:langGerman'),
-    it: t('common:langItalian'),
-    ja: t('common:langJapanese'),
-    pl: t('common:langPolish'),
-    pt_br: t('common:langBrPortuguese'),
-    ru: t('common:langRussian'),
-    zh_cn: t('common:langSimplifiedChinese'),
-    es: t('common:langSpanish'),
-    ua: t('common:langUkranian'),
+    ar: t('common.langArabic', { lng: 'ar' }),
+    nl: t('common.langDutch', { lng: 'nl' }),
+    en: t('common.langEnglish', { lng: 'en' }),
+    fr: t('common.langFrench', { lng: 'fr' }),
+    de: t('common.langGerman', { lng: 'de' }),
+    it: t('common.langItalian', { lng: 'it' }),
+    ja: t('common.langJapanese', { lng: 'ja' }),
+    pl: t('common.langPolish', { lng: 'pl' }),
+    pt_Br: t('common.langBrPortuguese', { lng: 'pt_Br' }),
+    ru: t('common.langRussian', { lng: 'ru' }),
+    zh_Cn: t('common.langSimplifiedChinese', { lng: 'zh_Cn' }),
+    es: t('common.langSpanish', { lng: 'es' }),
+    uk: t('common.langUkranian', { lng: 'ua' }),
   };
 
   const renderLanguagePicker = () => {
@@ -51,8 +51,8 @@ export default function LanguagePicker() {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label={t('common:languagePickerLabel')}
-          tooltip={t('common:languagePickerLabel')}
+          aria-label={t('common.languagePickerLabel')}
+          tooltip={t('common.languagePickerLabel')}
           icon={<FaLanguage />}
           size="sm"
           variant="link"

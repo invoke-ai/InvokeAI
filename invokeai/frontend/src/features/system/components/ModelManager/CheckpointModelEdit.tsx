@@ -128,7 +128,7 @@ export default function CheckpointModelEdit() {
                   isRequired
                 >
                   <FormLabel htmlFor="description" fontSize="sm">
-                    {t('modelmanager:description')}
+                    {t('modelManager.description')}
                   </FormLabel>
                   <VStack alignItems="start">
                     <Field
@@ -142,7 +142,7 @@ export default function CheckpointModelEdit() {
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:descriptionValidationMsg')}
+                        {t('modelManager.descriptionValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -154,7 +154,7 @@ export default function CheckpointModelEdit() {
                   isRequired
                 >
                   <FormLabel htmlFor="config" fontSize="sm">
-                    {t('modelmanager:config')}
+                    {t('modelManager.config')}
                   </FormLabel>
                   <VStack alignItems="start">
                     <Field
@@ -168,7 +168,7 @@ export default function CheckpointModelEdit() {
                       <FormErrorMessage>{errors.config}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:configValidationMsg')}
+                        {t('modelManager.configValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -180,7 +180,7 @@ export default function CheckpointModelEdit() {
                   isRequired
                 >
                   <FormLabel htmlFor="config" fontSize="sm">
-                    {t('modelmanager:modelLocation')}
+                    {t('modelManager.modelLocation')}
                   </FormLabel>
                   <VStack alignItems="start">
                     <Field
@@ -194,7 +194,7 @@ export default function CheckpointModelEdit() {
                       <FormErrorMessage>{errors.weights}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:modelLocationValidationMsg')}
+                        {t('modelManager.modelLocationValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -203,7 +203,7 @@ export default function CheckpointModelEdit() {
                 {/* VAE */}
                 <FormControl isInvalid={!!errors.vae && touched.vae}>
                   <FormLabel htmlFor="vae" fontSize="sm">
-                    {t('modelmanager:vaeLocation')}
+                    {t('modelManager.vaeLocation')}
                   </FormLabel>
                   <VStack alignItems="start">
                     <Field
@@ -217,7 +217,7 @@ export default function CheckpointModelEdit() {
                       <FormErrorMessage>{errors.vae}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:vaeLocationValidationMsg')}
+                        {t('modelManager.vaeLocationValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -227,7 +227,7 @@ export default function CheckpointModelEdit() {
                   {/* Width */}
                   <FormControl isInvalid={!!errors.width && touched.width}>
                     <FormLabel htmlFor="width" fontSize="sm">
-                      {t('modelmanager:width')}
+                      {t('modelManager.width')}
                     </FormLabel>
                     <VStack alignItems="start">
                       <Field id="width" name="width">
@@ -256,7 +256,7 @@ export default function CheckpointModelEdit() {
                         <FormErrorMessage>{errors.width}</FormErrorMessage>
                       ) : (
                         <FormHelperText margin={0}>
-                          {t('modelmanager:widthValidationMsg')}
+                          {t('modelManager.widthValidationMsg')}
                         </FormHelperText>
                       )}
                     </VStack>
@@ -265,7 +265,7 @@ export default function CheckpointModelEdit() {
                   {/* Height */}
                   <FormControl isInvalid={!!errors.height && touched.height}>
                     <FormLabel htmlFor="height" fontSize="sm">
-                      {t('modelmanager:height')}
+                      {t('modelManager.height')}
                     </FormLabel>
                     <VStack alignItems="start">
                       <Field id="height" name="height">
@@ -294,7 +294,7 @@ export default function CheckpointModelEdit() {
                         <FormErrorMessage>{errors.height}</FormErrorMessage>
                       ) : (
                         <FormHelperText margin={0}>
-                          {t('modelmanager:heightValidationMsg')}
+                          {t('modelManager.heightValidationMsg')}
                         </FormHelperText>
                       )}
                     </VStack>
@@ -306,7 +306,7 @@ export default function CheckpointModelEdit() {
                   className="modal-close-btn"
                   isLoading={isProcessing}
                 >
-                  {t('modelmanager:updateModel')}
+                  {t('modelManager.updateModel')}
                 </IAIButton>
               </VStack>
             </form>

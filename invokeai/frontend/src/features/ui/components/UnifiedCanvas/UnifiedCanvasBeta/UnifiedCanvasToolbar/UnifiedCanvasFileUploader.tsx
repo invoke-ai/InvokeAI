@@ -12,8 +12,8 @@ export default function UnifiedCanvasFileUploader() {
 
   return (
     <IAIIconButton
-      aria-label={t('common:upload')}
-      tooltip={t('common:upload')}
+      aria-label={t('common.upload')}
+      tooltip={t('common.upload')}
       icon={<FaUpload />}
       onClick={openUploader}
       isDisabled={isStaging}

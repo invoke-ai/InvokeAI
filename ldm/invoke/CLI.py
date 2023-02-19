@@ -863,6 +863,7 @@ def optimize_model(model_name_or_path: Union[Path,str], gen, opt, completer):
     model_name_or_path = model_name_or_path.replace('\\','/') # windows
     manager = gen.model_manager
     ckpt_path = None
+    original_config_file=None
 
     if model_name_or_path == gen.model_name:
         print("** Can't convert the active model. !switch to another model first. **")

@@ -70,7 +70,7 @@ const PromptInput = () => {
         <Textarea
           id="prompt"
           name="prompt"
-          placeholder={t('parameters:promptPlaceholder')}
+          placeholder={t('parameters.promptPlaceholder')}
           size="lg"
           value={prompt}
           onChange={handleChangePrompt}

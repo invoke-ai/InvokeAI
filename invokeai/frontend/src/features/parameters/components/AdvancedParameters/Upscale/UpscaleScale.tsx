@@ -27,7 +27,7 @@ export default function UpscaleScale() {
   return (
     <IAISelect
       isDisabled={!isESRGANAvailable}
-      label={t('parameters:scale')}
+      label={t('parameters.scale')}
       value={upscalingLevel}
       onChange={handleChangeLevel}
       validValues={UPSCALING_LEVELS}

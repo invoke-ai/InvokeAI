@@ -13,7 +13,7 @@ export default function Threshold() {
 
   return (
     <IAISlider
-      label={t('parameters:noiseThreshold')}
+      label={t('parameters.noiseThreshold')}
       min={0}
       max={1}
       step={0.005}

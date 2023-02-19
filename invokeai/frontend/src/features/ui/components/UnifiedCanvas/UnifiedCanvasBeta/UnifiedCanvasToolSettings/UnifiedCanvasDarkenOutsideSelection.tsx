@@ -15,7 +15,7 @@ export default function UnifiedCanvasDarkenOutsideSelection() {
 
   return (
     <IAICheckbox
-      label={t('unifiedcanvas:betaDarkenOutside')}
+      label={t('unifiedCanvas.betaDarkenOutside')}
       isChecked={shouldDarkenOutsideBoundingBox}
       onChange={(e) =>
         dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked))

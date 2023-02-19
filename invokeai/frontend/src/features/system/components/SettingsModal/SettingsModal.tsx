@@ -140,7 +140,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         <ModalOverlay />
         <ModalContent className="modal settings-modal">
           <ModalHeader className="settings-modal-header">
-            {t('common:settingsLabel')}
+            {t('common.settingsLabel')}
           </ModalHeader>
           <ModalCloseButton className="modal-close-btn" />
           <ModalBody className="settings-modal-content">
@@ -150,7 +150,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 style={{ gridAutoFlow: 'row', rowGap: '0.5rem' }}
               >
                 <IAISelect
-                  label={t('settings:displayInProgress')}
+                  label={t('settings.displayInProgress')}
                   validValues={IN_PROGRESS_IMAGE_TYPES}
                   value={shouldDisplayInProgressType}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) =>
@@ -163,7 +163,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 />
                 {shouldDisplayInProgressType === 'full-res' && (
                   <IAINumberInput
-                    label={t('settings:saveSteps')}
+                    label={t('settings.saveSteps')}
                     min={1}
                     max={steps}
                     step={1}
@@ -176,7 +176,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               </div>
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={t('settings:confirmOnDelete')}
+                label={t('settings.confirmOnDelete')}
                 isChecked={shouldConfirmOnDelete}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldConfirmOnDelete(e.target.checked))
@@ -184,7 +184,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               />
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={t('settings:displayHelpIcons')}
+                label={t('settings.displayHelpIcons')}
                 isChecked={shouldDisplayGuides}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldDisplayGuides(e.target.checked))
@@ -192,7 +192,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               />
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={t('settings:useCanvasBeta')}
+                label={t('settings.useCanvasBeta')}
                 isChecked={shouldUseCanvasBetaLayout}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
@@ -200,7 +200,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               />
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={t('settings:useSlidersForAll')}
+                label={t('settings.useSlidersForAll')}
                 isChecked={shouldUseSliders}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldUseSliders(e.target.checked))
@@ -212,7 +212,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               <h2 style={{ fontWeight: 'bold' }}>Developer</h2>
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={t('settings:enableImageDebugging')}
+                label={t('settings.enableImageDebugging')}
                 isChecked={enableImageDebugging}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setEnableImageDebugging(e.target.checked))
@@ -221,18 +221,18 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
             </div>
 
             <div className="settings-modal-reset">
-              <Heading size="md">{t('settings:resetWebUI')}</Heading>
+              <Heading size="md">{t('settings.resetWebUI')}</Heading>
               <Button colorScheme="red" onClick={handleClickResetWebUI}>
-                {t('settings:resetWebUI')}
+                {t('settings.resetWebUI')}
               </Button>
-              <Text>{t('settings:resetWebUIDesc1')}</Text>
-              <Text>{t('settings:resetWebUIDesc2')}</Text>
+              <Text>{t('settings.resetWebUIDesc1')}</Text>
+              <Text>{t('settings.resetWebUIDesc2')}</Text>
             </div>
           </ModalBody>
 
           <ModalFooter>
             <Button onClick={onSettingsModalClose} className="modal-close-btn">
-              {t('common:close')}
+              {t('common.close')}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -249,7 +249,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalBody pb={6} pt={6}>
             <Flex justifyContent="center">
               <Text fontSize="lg">
-                <Text>{t('settings:resetComplete')}</Text>
+                <Text>{t('settings.resetComplete')}</Text>
               </Text>
             </Flex>
           </ModalBody>

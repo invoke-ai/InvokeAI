@@ -47,8 +47,8 @@ export default function UnifiedCanvasCopyToClipboard() {
 
   return (
     <IAIIconButton
-      aria-label={`${t('unifiedcanvas:copyToClipboard')} (Cmd/Ctrl+C)`}
-      tooltip={`${t('unifiedcanvas:copyToClipboard')} (Cmd/Ctrl+C)`}
+      aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
+      tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
       icon={<FaCopy />}
       onClick={handleCopyImageToClipboard}
       isDisabled={isStaging}

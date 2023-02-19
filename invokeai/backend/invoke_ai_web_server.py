@@ -31,6 +31,8 @@ from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals, global_converted_ckpts_dir
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
+from ldm.invoke.globals import global_models_dir
+from ldm.invoke.merge_diffusers import merge_diffusion_models
 
 # Loading Arguments
 opt = Args()
@@ -205,11 +207,7 @@ class InvokeAIWebServer:
                 return make_response(response, 200)
 
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
                 return make_response("Error uploading file", 500)
 
         self.load_socketio_listeners(self.socketio)
@@ -317,10 +315,7 @@ class InvokeAIWebServer:
                             'found_models': found_models},
                     )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
+                self.handle_exceptions(e)
                 print("\n")
 
         @socketio.on("addNewModel")
@@ -350,11 +345,7 @@ class InvokeAIWebServer:
                 )
                 print(f">> New Model Added: {model_name}")
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("deleteModel")
         def handle_delete_model(model_name: str):
@@ -370,11 +361,7 @@ class InvokeAIWebServer:
                 )
                 print(f">> Model Deleted: {model_name}")
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("requestModelChange")
         def handle_set_model(model_name: str):
@@ -393,11 +380,7 @@ class InvokeAIWebServer:
                         {"model_name": model_name, "model_list": model_list},
                     )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on('convertToDiffusers')
         def convert_to_diffusers(model_to_convert: dict):
@@ -428,10 +411,12 @@ class InvokeAIWebServer:
                 )
 
                 if model_to_convert['save_location'] == 'root':
-                    diffusers_path = Path(global_converted_ckpts_dir(), f'{model_name}_diffusers')
-                
+                    diffusers_path = Path(
+                        global_converted_ckpts_dir(), f'{model_name}_diffusers')
+
                 if model_to_convert['save_location'] == 'custom' and model_to_convert['custom_location'] is not None:
-                    diffusers_path = Path(model_to_convert['custom_location'], f'{model_name}_diffusers')
+                    diffusers_path = Path(
+                        model_to_convert['custom_location'], f'{model_name}_diffusers')
 
                 if diffusers_path.exists():
                     shutil.rmtree(diffusers_path)
@@ -454,11 +439,51 @@ class InvokeAIWebServer:
                 )
                 print(f">> Model Converted: {model_name}")
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
+                self.handle_exceptions(e)
 
-                traceback.print_exc()
-                print("\n")
+        @socketio.on('mergeDiffusersModels')
+        def merge_diffusers_models(model_merge_info: dict):
+            try:
+                models_to_merge = model_merge_info['models_to_merge']
+                model_ids_or_paths = [
+                    self.generate.model_manager.model_name_or_path(x) for x in models_to_merge]
+                merged_pipe = merge_diffusion_models(
+                    model_ids_or_paths, model_merge_info['alpha'], model_merge_info['interp'], model_merge_info['force'])
+
+                dump_path = global_models_dir() / 'merged_models'
+                if model_merge_info['model_merge_save_path'] is not None:
+                    dump_path = Path(model_merge_info['model_merge_save_path'])
+
+                os.makedirs(dump_path, exist_ok=True)
+                dump_path = dump_path / model_merge_info['merged_model_name']
+                merged_pipe.save_pretrained(dump_path, safe_serialization=1)
+
+                merged_model_config = dict(
+                    model_name=model_merge_info['merged_model_name'],
+                    description=f'Merge of models {", ".join(models_to_merge)}',
+                    commit_to_conf=opt.conf
+                )
+
+                if vae := self.generate.model_manager.config[models_to_merge[0]].get("vae", None):
+                    print(
+                        f">> Using configured VAE assigned to {models_to_merge[0]}")
+                    merged_model_config.update(vae=vae)
+
+                self.generate.model_manager.import_diffuser_model(
+                    dump_path, **merged_model_config)
+                new_model_list = self.generate.model_manager.list_models()
+
+                socketio.emit(
+                    "modelsMerged",
+                    {"merged_models": models_to_merge,
+                     "merged_model_name": model_merge_info['merged_model_name'],
+                     "model_list": new_model_list, 'update': True},
+                )
+                print(f">> Models Merged: {models_to_merge}")
+                print(
+                    f">> New Model Added: {model_merge_info['merged_model_name']}")
+            except Exception as e:
+                self.handle_exceptions(e)
 
         @socketio.on("requestEmptyTempFolder")
         def empty_temp_folder():
@@ -479,11 +504,7 @@ class InvokeAIWebServer:
 
                 socketio.emit("tempFolderEmptied")
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("requestSaveStagingAreaImageToGallery")
         def save_temp_image_to_gallery(url):
@@ -525,11 +546,7 @@ class InvokeAIWebServer:
                 )
 
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("requestLatestImages")
         def handle_request_latest_images(category, latest_mtime):
@@ -595,11 +612,7 @@ class InvokeAIWebServer:
                     {"images": image_array, "category": category},
                 )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("requestImages")
         def handle_request_images(category, earliest_mtime=None):
@@ -674,11 +687,7 @@ class InvokeAIWebServer:
                     },
                 )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("generateImage")
         def handle_generate_image_event(
@@ -711,11 +720,7 @@ class InvokeAIWebServer:
                     facetool_parameters,
                 )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("runPostprocessing")
         def handle_run_postprocessing(original_image, postprocessing_parameters):
@@ -742,13 +747,13 @@ class InvokeAIWebServer:
                     pass
 
                 if postprocessing_parameters["type"] == "esrgan":
-                    progress.set_current_status("common:statusUpscalingESRGAN")
+                    progress.set_current_status("common.statusUpscalingESRGAN")
                 elif postprocessing_parameters["type"] == "gfpgan":
                     progress.set_current_status(
-                        "common:statusRestoringFacesGFPGAN")
+                        "common.statusRestoringFacesGFPGAN")
                 elif postprocessing_parameters["type"] == "codeformer":
                     progress.set_current_status(
-                        "common:statusRestoringFacesCodeFormer")
+                        "common.statusRestoringFacesCodeFormer")
 
                 socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -782,7 +787,7 @@ class InvokeAIWebServer:
                         f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
                     )
 
-                progress.set_current_status("common:statusSavingImage")
+                progress.set_current_status("common.statusSavingImage")
                 socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
@@ -829,11 +834,7 @@ class InvokeAIWebServer:
                     },
                 )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
         @socketio.on("cancel")
         def handle_cancel():
@@ -858,11 +859,7 @@ class InvokeAIWebServer:
                     {"url": url, "uuid": uuid, "category": category},
                 )
             except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
+                self.handle_exceptions(e)
 
     # App Functions
     def get_system_config(self):
@@ -1011,10 +1008,10 @@ class InvokeAIWebServer:
                 nonlocal progress
 
                 generation_messages = {
-                    "txt2img": "common:statusGeneratingTextToImage",
-                    "img2img": "common:statusGeneratingImageToImage",
-                    "inpainting": "common:statusGeneratingInpainting",
-                    "outpainting": "common:statusGeneratingOutpainting",
+                    "txt2img": "common.statusGeneratingTextToImage",
+                    "img2img": "common.statusGeneratingImageToImage",
+                    "inpainting": "common.statusGeneratingInpainting",
+                    "outpainting": "common.statusGeneratingOutpainting",
                 }
 
                 progress.set_current_step(step + 1)
@@ -1106,7 +1103,7 @@ class InvokeAIWebServer:
                         **generation_parameters["bounding_box"],
                     )
 
-                progress.set_current_status("common:statusGenerationComplete")
+                progress.set_current_status("common.statusGenerationComplete")
 
                 self.socketio.emit(
                     "progressUpdate", progress.to_formatted_dict())
@@ -1135,7 +1132,7 @@ class InvokeAIWebServer:
                     raise CanceledException
 
                 if esrgan_parameters:
-                    progress.set_current_status("common:statusUpscaling")
+                    progress.set_current_status("common.statusUpscaling")
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit(
                         "progressUpdate", progress.to_formatted_dict())
@@ -1162,10 +1159,10 @@ class InvokeAIWebServer:
                 if facetool_parameters:
                     if facetool_parameters["type"] == "gfpgan":
                         progress.set_current_status(
-                            "common:statusRestoringFacesGFPGAN")
+                            "common.statusRestoringFacesGFPGAN")
                     elif facetool_parameters["type"] == "codeformer":
                         progress.set_current_status(
-                            "common:statusRestoringFacesCodeFormer")
+                            "common.statusRestoringFacesCodeFormer")
 
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit(
@@ -1198,7 +1195,7 @@ class InvokeAIWebServer:
                     ]
                     all_parameters["facetool_type"] = facetool_parameters["type"]
 
-                progress.set_current_status("common:statusSavingImage")
+                progress.set_current_status("common.statusSavingImage")
                 self.socketio.emit(
                     "progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -1249,7 +1246,7 @@ class InvokeAIWebServer:
                 if progress.total_iterations > progress.current_iteration:
                     progress.set_current_step(1)
                     progress.set_current_status(
-                        "common:statusIterationComplete")
+                        "common.statusIterationComplete")
                     progress.set_current_status_has_steps(False)
                 else:
                     progress.mark_complete()
@@ -1312,11 +1309,7 @@ class InvokeAIWebServer:
             # Clear the CUDA cache on an exception
             self.empty_cuda_cache()
             print(e)
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def empty_cuda_cache(self):
         if self.generate.device.type == "cuda":
@@ -1423,11 +1416,7 @@ class InvokeAIWebServer:
             return metadata
 
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def parameters_to_post_processed_image_metadata(
         self, parameters, original_image_path
@@ -1480,11 +1469,7 @@ class InvokeAIWebServer:
             return current_metadata
 
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def save_result_image(
         self,
@@ -1528,11 +1513,7 @@ class InvokeAIWebServer:
             return os.path.abspath(path)
 
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def make_unique_init_image_filename(self, name):
         try:
@@ -1541,11 +1522,7 @@ class InvokeAIWebServer:
             name = f"{split[0]}.{uuid}{split[1]}"
             return name
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def calculate_real_steps(self, steps, strength, has_init_image):
         import math
@@ -1560,11 +1537,7 @@ class InvokeAIWebServer:
                 file.writelines(message)
 
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def get_image_path_from_url(self, url):
         """Given a url to an image used by the client, returns the absolute file path to that image"""
@@ -1595,11 +1568,7 @@ class InvokeAIWebServer:
                     os.path.join(self.result_path, os.path.basename(url))
                 )
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def get_url_from_image_path(self, path):
         """Given an absolute file path to an image, returns the URL that the client can use to load the image"""
@@ -1617,11 +1586,7 @@ class InvokeAIWebServer:
             else:
                 return os.path.join(self.result_url, os.path.basename(path))
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
-
-            traceback.print_exc()
-            print("\n")
+            self.handle_exceptions(e)
 
     def save_file_unique_uuid_name(self, bytes, name, path):
         try:
@@ -1640,11 +1605,13 @@ class InvokeAIWebServer:
 
             return file_path
         except Exception as e:
-            self.socketio.emit("error", {"message": (str(e))})
-            print("\n")
+            self.handle_exceptions(e)
 
-            traceback.print_exc()
-            print("\n")
+    def handle_exceptions(self, exception, emit_key: str = 'error'):
+        self.socketio.emit(emit_key, {"message": (str(exception))})
+        print("\n")
+        traceback.print_exc()
+        print("\n")
 
 
 class Progress:
@@ -1665,7 +1632,7 @@ class Progress:
         self.total_iterations = (
             generation_parameters["iterations"] if generation_parameters else 1
         )
-        self.current_status = "common:statusPreparing"
+        self.current_status = "common.statusPreparing"
         self.is_processing = True
         self.current_status_has_steps = False
         self.has_error = False
@@ -1695,7 +1662,7 @@ class Progress:
         self.has_error = has_error
 
     def mark_complete(self):
-        self.current_status = "common:statusProcessingComplete"
+        self.current_status = "common.statusProcessingComplete"
         self.current_step = 0
         self.total_steps = 0
         self.current_iteration = 0

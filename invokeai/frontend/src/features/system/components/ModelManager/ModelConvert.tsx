@@ -65,58 +65,58 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   return (
     <IAIAlertDialog
-      title={`${t('modelmanager:convert')} ${model}`}
+      title={`${t('modelManager.convert')} ${model}`}
       acceptCallback={modelConvertHandler}
       cancelCallback={modelConvertCancelHandler}
-      acceptButtonText={`${t('modelmanager:convert')}`}
+      acceptButtonText={`${t('modelManager.convert')}`}
       triggerComponent={
         <IAIButton
           size={'sm'}
-          aria-label={t('modelmanager:convertToDiffusers')}
+          aria-label={t('modelManager.convertToDiffusers')}
           isDisabled={
             retrievedModel.status === 'active' || isProcessing || !isConnected
           }
           className=" modal-close-btn"
           marginRight="2rem"
         >
-          🧨 {t('modelmanager:convertToDiffusers')}
+          🧨 {t('modelManager.convertToDiffusers')}
         </IAIButton>
       }
       motionPreset="slideInBottom"
     >
       <Flex flexDirection="column" rowGap={4}>
-        <Text>{t('modelmanager:convertToDiffusersHelpText1')}</Text>
+        <Text>{t('modelManager.convertToDiffusersHelpText1')}</Text>
         <UnorderedList>
-          <ListItem>{t('modelmanager:convertToDiffusersHelpText2')}</ListItem>
-          <ListItem>{t('modelmanager:convertToDiffusersHelpText3')}</ListItem>
-          <ListItem>{t('modelmanager:convertToDiffusersHelpText4')}</ListItem>
-          <ListItem>{t('modelmanager:convertToDiffusersHelpText5')}</ListItem>
+          <ListItem>{t('modelManager.convertToDiffusersHelpText2')}</ListItem>
+          <ListItem>{t('modelManager.convertToDiffusersHelpText3')}</ListItem>
+          <ListItem>{t('modelManager.convertToDiffusersHelpText4')}</ListItem>
+          <ListItem>{t('modelManager.convertToDiffusersHelpText5')}</ListItem>
         </UnorderedList>
-        <Text>{t('modelmanager:convertToDiffusersHelpText6')}</Text>
+        <Text>{t('modelManager.convertToDiffusersHelpText6')}</Text>
       </Flex>
 
       <Flex flexDir="column" gap={4}>
         <Flex marginTop="1rem" flexDir="column" gap={2}>
           <Text fontWeight="bold">
-            {t('modelmanager:convertToDiffusersSaveLocation')}
+            {t('modelManager.convertToDiffusersSaveLocation')}
           </Text>
           <RadioGroup value={saveLocation} onChange={(v) => setSaveLocation(v)}>
             <Flex gap={4}>
               <Radio value="same">
                 <Tooltip label="Save converted model in the same folder">
-                  {t('modelmanager:sameFolder')}
+                  {t('modelManager.sameFolder')}
                 </Tooltip>
               </Radio>
 
               <Radio value="root">
                 <Tooltip label="Save converted model in the InvokeAI root folder">
-                  {t('modelmanager:invokeRoot')}
+                  {t('modelManager.invokeRoot')}
                 </Tooltip>
               </Radio>
 
               <Radio value="custom">
                 <Tooltip label="Save converted model in a custom folder">
-                  {t('modelmanager:custom')}
+                  {t('modelManager.custom')}
                 </Tooltip>
               </Radio>
             </Flex>
@@ -130,7 +130,7 @@ export default function ModelConvert(props: ModelConvertProps) {
               fontSize="sm"
               color="var(--text-color-secondary)"
             >
-              {t('modelmanager:customSaveLocation')}
+              {t('modelManager.customSaveLocation')}
             </Text>
             <IAIInput
               value={customSaveLocation}

@@ -273,6 +273,8 @@ This fork is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for
 their time, hard work and effort.
 
+Thanks to [Weblate](https://weblate.org/) for generously providing translation services to this project.
+
 ### Support
 
 For support, please use this repository's GitHub Issues tracking service, or join the Discord.

@@ -63,7 +63,7 @@ function ModelExistsTag() {
       borderRadius="0.2rem"
       alignItems="center"
     >
-      {t('modelmanager:modelExists')}
+      {t('modelManager.modelExists')}
     </Box>
   );
 }
@@ -260,7 +260,7 @@ export default function SearchModels() {
               borderRadius: '0.2rem',
             }}
           >
-            {t('modelmanager:checkpointFolder')}
+            {t('modelManager.checkpointFolder')}
           </p>
           <p
             style={{ fontWeight: 'bold', fontSize: '0.8rem', maxWidth: '80%' }}
@@ -268,8 +268,8 @@ export default function SearchModels() {
             {searchFolder}
           </p>
           <IAIIconButton
-            aria-label={t('modelmanager:scanAgain')}
-            tooltip={t('modelmanager:scanAgain')}
+            aria-label={t('modelManager.scanAgain')}
+            tooltip={t('modelManager.scanAgain')}
             icon={<BiReset />}
             position="absolute"
             right={16}
@@ -278,7 +278,7 @@ export default function SearchModels() {
             onClick={() => dispatch(searchForModels(searchFolder))}
           />
           <IAIIconButton
-            aria-label={t('modelmanager:clearCheckpointFolder')}
+            aria-label={t('modelManager.clearCheckpointFolder')}
             icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
             position="absolute"
             right={5}
@@ -303,13 +303,13 @@ export default function SearchModels() {
                     type="text"
                     width="lg"
                     size="md"
-                    label={t('modelmanager:checkpointFolder')}
+                    label={t('modelManager.checkpointFolder')}
                   />
                 </FormControl>
                 <IAIIconButton
                   icon={<MdFindInPage />}
-                  aria-label={t('modelmanager:findModels')}
-                  tooltip={t('modelmanager:findModels')}
+                  aria-label={t('modelManager.findModels')}
+                  tooltip={t('modelManager.findModels')}
                   type="submit"
                   disabled={isProcessing}
                 />
@@ -322,10 +322,10 @@ export default function SearchModels() {
         <Flex flexDirection="column" rowGap="1rem">
           <Flex justifyContent="space-between" alignItems="center">
             <p>
-              {t('modelmanager:modelsFound')}: {foundModels.length}
+              {t('modelManager.modelsFound')}: {foundModels.length}
             </p>
             <p>
-              {t('modelmanager:selected')}: {modelsToAdd.length}
+              {t('modelManager.selected')}: {modelsToAdd.length}
             </p>
           </Flex>
           <Flex columnGap="0.5rem" justifyContent="space-between">
@@ -334,16 +334,16 @@ export default function SearchModels() {
                 isDisabled={modelsToAdd.length === foundModels.length}
                 onClick={addAllToSelected}
               >
-                {t('modelmanager:selectAll')}
+                {t('modelManager.selectAll')}
               </IAIButton>
               <IAIButton
                 isDisabled={modelsToAdd.length === 0}
                 onClick={removeAllFromSelected}
               >
-                {t('modelmanager:deselectAll')}
+                {t('modelManager.deselectAll')}
               </IAIButton>
               <IAICheckbox
-                label={t('modelmanager:showExisting')}
+                label={t('modelManager.showExisting')}
                 isChecked={shouldShowExistingModelsInSearch}
                 onChange={() =>
                   dispatch(
@@ -362,7 +362,7 @@ export default function SearchModels() {
                 modelsToAdd.length > 0 ? 'var(--accent-color) !important' : ''
               }
             >
-              {t('modelmanager:addSelected')}
+              {t('modelManager.addSelected')}
             </IAIButton>
           </Flex>
 
@@ -384,12 +384,12 @@ export default function SearchModels() {
                 name="model_type"
               >
                 <Flex gap={4}>
-                  <Radio value="v1">{t('modelmanager:v1')}</Radio>
-                  <Radio value="v2">{t('modelmanager:v2')}</Radio>
+                  <Radio value="v1">{t('modelManager.v1')}</Radio>
+                  <Radio value="v2">{t('modelManager.v2')}</Radio>
                   <Radio value="inpainting">
-                    {t('modelmanager:inpainting')}
+                    {t('modelManager.inpainting')}
                   </Radio>
-                  <Radio value="custom">{t('modelmanager:customConfig')}</Radio>
+                  <Radio value="custom">{t('modelManager.customConfig')}</Radio>
                 </Flex>
               </RadioGroup>
             </Flex>
@@ -401,7 +401,7 @@ export default function SearchModels() {
                   fontSize="sm"
                   color="var(--text-color-secondary)"
                 >
-                  {t('modelmanager:pathToCustomConfig')}
+                  {t('modelManager.pathToCustomConfig')}
                 </Text>
                 <IAIInput
                   value={pathToConfig}
@@ -437,7 +437,7 @@ export default function SearchModels() {
                   marginTop="1rem"
                   width="max-content"
                 >
-                  {t('modelmanager:selectAndAdd')}
+                  {t('modelManager.selectAndAdd')}
                 </Text>
               )
             ) : (
@@ -449,7 +449,7 @@ export default function SearchModels() {
                 textAlign="center"
                 backgroundColor="var(--status-bad-color)"
               >
-                {t('modelmanager:noModelsFound')}
+                {t('modelManager.noModelsFound')}
               </Text>
             )}
 

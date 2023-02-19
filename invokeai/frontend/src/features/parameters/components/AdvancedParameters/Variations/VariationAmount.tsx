@@ -19,7 +19,7 @@ export default function VariationAmount() {
 
   return (
     <IAISlider
-      label={t('parameters:variationAmount')}
+      label={t('parameters.variationAmount')}
       value={variationAmount}
       step={0.01}
       min={0}

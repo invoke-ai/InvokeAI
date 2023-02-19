@@ -20,7 +20,7 @@ const NegativePromptInput = () => {
         value={negativePrompt}
         onChange={(e) => dispatch(setNegativePrompt(e.target.value))}
         background="var(--prompt-bg-color)"
-        placeholder={t('parameters:negativePrompts')}
+        placeholder={t('parameters.negativePrompts')}
         _placeholder={{ fontSize: '0.8rem' }}
         borderColor="var(--border-color)"
         _hover={{
