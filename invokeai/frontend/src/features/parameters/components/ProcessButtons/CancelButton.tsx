@@ -139,6 +139,15 @@ export default function CancelButton(
       <IAISimpleMenu
         menuItems={cancelMenuItems}
         iconTooltip={t('parameters.cancel.setType')}
+        menuButtonProps={{
+          backgroundColor: 'var(--destructive-color)',
+          color: 'var(--text-color)',
+          minWidth: '1.5rem',
+          minHeight: '1.5rem',
+          _hover: {
+            backgroundColor: 'var(--destructive-color-hover)',
+          },
+        }}
       />
     </ButtonGroup>
   );

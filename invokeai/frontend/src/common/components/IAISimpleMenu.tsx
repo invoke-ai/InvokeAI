@@ -72,13 +72,13 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
             tooltip={iconTooltip}
             icon={isOpen ? <MdArrowDropUp /> : <MdArrowDropDown />}
             padding={menuType === 'regular' ? '0 0.5rem' : 0}
-            backgroundColor="var(--destructive-color)"
-            color="var(--text-color)"
-            minWidth="1.5rem"
-            minHeight="1.5rem"
+            backgroundColor="var(--btn-base-color)"
             _hover={{
-              backgroundColor: 'var(--destructive-color-hover)',
+              backgroundColor: 'var(--btn-base-color-hover)',
             }}
+            minWidth="1rem"
+            minHeight="1rem"
+            fontSize="1.5rem"
             {...menuButtonProps}
           >
             {menuType === 'regular' && buttonText}
