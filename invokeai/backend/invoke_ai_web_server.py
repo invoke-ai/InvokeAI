@@ -30,7 +30,7 @@ from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals, global_converted_ckpts_dir
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
+from compel.prompt_parser import split_weighted_subprompts, Blend
 from ldm.invoke.globals import global_models_dir
 from ldm.invoke.merge_diffusers import merge_diffusion_models
 

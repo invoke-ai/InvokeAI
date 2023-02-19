@@ -93,9 +93,9 @@ import shlex
 import sys
 import ldm.invoke
 import ldm.invoke.pngwriter
+from compel.prompt_parser import split_weighted_subprompts
 
 from ldm.invoke.globals import Globals
-from ldm.invoke.prompt_parser import split_weighted_subprompts
 from argparse import Namespace
 from pathlib import Path
 
