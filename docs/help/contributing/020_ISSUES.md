@@ -2,6 +2,8 @@
 title: Issues
 ---
 
+# :octicons-issue-opened-16: Issues
+
 ## :fontawesome-solid-bug: Report a bug
 
 If you stumbled over a bug while using InvokeAI, we would apreciate it a lot if
