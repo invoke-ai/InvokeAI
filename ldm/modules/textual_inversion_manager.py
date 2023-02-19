@@ -79,7 +79,7 @@ class TextualInversionManager:
 
         embedding_info = self._parse_embedding(str(ckpt_path))
 
-        if embedding_info == None:
+        if embedding_info is None:
             # We've already put out an error message about the bad embedding in _parse_embedding, so just return.
             return
         elif (
