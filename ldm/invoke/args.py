@@ -98,6 +98,7 @@ from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 from argparse import Namespace
 from pathlib import Path
+from typing import List
 
 APP_ID = ldm.invoke.__app_id__
 APP_NAME = ldm.invoke.__app_name__
@@ -172,10 +173,10 @@ class Args(object):
         self._arg_switches = self.parse_cmd('')   # fill in defaults
         self._cmd_switches = self.parse_cmd('')   # fill in defaults
 
-    def parse_args(self):
+    def parse_args(self, args: List[str]=None):
         '''Parse the shell switches and store.'''
+        sysargs = args if args is not None else sys.argv[1:]
         try:
-            sysargs = sys.argv[1:]
             # pre-parse before we do any initialization to get root directory
             # and intercept --version request
             switches = self._arg_parser.parse_args(sysargs)

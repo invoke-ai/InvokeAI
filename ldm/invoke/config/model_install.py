@@ -29,11 +29,11 @@ from ..globals import Globals
 from .widgets import MultiSelectColumns, TextBox
 from .model_install_backend import (Dataset_path, default_config_file,
                                     install_requested_models,
-                                    default_dataset, get_root
+                                    default_dataset, recommended_datasets, get_root
                                     )
 
-class addModelsForm(npyscreen.FormMultiPageAction):
-    def __init__(self, parentApp, name):
+class addModelsForm(npyscreen.FormMultiPage):
+    def __init__(self, parentApp, name, multipage=False):
         self.initial_models = OmegaConf.load(Dataset_path)
         try:
             self.existing_models = OmegaConf.load(default_config_file())
@@ -42,6 +42,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         self.starter_model_list = [
             x for x in list(self.initial_models.keys()) if x not in self.existing_models
         ]
+        self.multipage = multipage
         self.installed_models=dict()
         super().__init__(parentApp, name)
 
@@ -85,7 +86,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
                 columns=columns,
                 values=self.installed_models,
                 value=[x for x in range(0,len(self.installed_models))],
-                max_height=2+len(self.installed_models) // columns,
+                max_height=1+len(self.installed_models) // columns,
                 relx = 4,
                 slow_scroll=True,
                 scroll_exit = True,
@@ -96,6 +97,7 @@ class addModelsForm(npyscreen.FormMultiPageAction):
                 value=False,
                 scroll_exit=True
             )
+        self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="== STARTER MODELS (recommended ones selected) ==",
@@ -169,8 +171,37 @@ class addModelsForm(npyscreen.FormMultiPageAction):
             values=['Keep original format','Convert to diffusers'],
             value=0,
             begin_entry_at=4,
+            max_height=4,
             scroll_exit=True,
         )
+        self.cancel = self.add_widget_intelligent(
+            npyscreen.ButtonPress,
+            name='CANCEL',
+            rely = -3,
+            when_pressed_function=self.on_cancel,
+        )
+        done_label = 'DONE'
+        back_label = 'BACK'
+        button_length = len(done_label)
+        button_offset = 0
+        if self.multipage:
+            button_length += len(back_label)+1
+            button_offset += len(back_label)+1
+            self.back_button = self.add_widget_intelligent(
+                npyscreen.ButtonPress,
+                name=back_label,
+                relx= (window_width-button_length)//2,
+                rely= -3,
+                when_pressed_function=self.on_back
+            )
+        self.ok_button = self.add_widget_intelligent(
+            npyscreen.ButtonPress,
+            name=done_label,
+            relx= button_offset + 1 + (window_width-button_length)//2,
+            rely= -3,
+            when_pressed_function=self.on_ok
+        )
+
         for i in [self.autoload_directory,self.autoscan_on_startup]:
             self.show_directory_fields.addVisibleWhenSelected(i)
 
@@ -204,10 +235,17 @@ class addModelsForm(npyscreen.FormMultiPageAction):
         self.parentApp.user_cancelled = False
         self.marshall_arguments()
 
-    def on_cancel(self):
-        self.parentApp.setNextForm(None)
-        self.parentApp.user_cancelled = True
+    def on_back(self):
+        self.parentApp.switchFormPrevious()
         self.editing = False
+
+    def on_cancel(self):
+        if npyscreen.notify_yes_no(
+                'Are you sure you want to cancel?\nYou may re-run this script later using the invoke.sh or invoke.bat command.\n'
+        ):
+            self.parentApp.setNextForm(None)
+            self.parentApp.user_cancelled = True
+            self.editing = False
 
     def marshall_arguments(self):
         '''
@@ -255,7 +293,6 @@ class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self):
         super().__init__()
         self.user_cancelled = False
-        self.models_to_install = None
         self.user_selections = Namespace(
             starter_models = None,
             purge_deleted_models = False,
@@ -270,7 +307,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         self.main_form = self.addForm(
             "MAIN",
             addModelsForm,
-            name="Add/Remove Models",
+            name="Add/Remove Models"
         )
 
 # --------------------------------------------------------
@@ -296,11 +333,16 @@ def process_and_execute(opt: Namespace, selections: Namespace):
                         
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
+    precision= 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
     if opt.default_only:
-        models_to_install = default_dataset()
         install_requested_models(
-            install_initial_models = models_to_install,
-            precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
+            install_initial_models = default_dataset(),
+            precision = precision,
+        )
+    elif opt.yes_to_all:
+        install_requested_models(
+            install_initial_models = recommended_datasets(),
+            precision = precision,
         )
     else:
         installApp = AddModelApplication()

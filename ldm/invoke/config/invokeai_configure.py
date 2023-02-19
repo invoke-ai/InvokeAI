@@ -36,8 +36,12 @@ from transformers import (
 
 import invokeai.configs as configs
 from ..args import Args, PRECISION_CHOICES
-from .model_install_backend import download_from_hf
-from .model_install import select_and_download_models
+from .model_install_backend import (
+    download_from_hf,
+    recommended_datasets,
+    default_dataset,
+)
+from .model_install import process_and_execute, addModelsForm
 from .widgets import IntTitleSlider
 from ..globals import Globals, global_config_dir
 from ..readline import generic_completer
@@ -72,15 +76,12 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # -Ak_euler_a -C10.0
 """
 
+
 # --------------------------------------------
 def postscript(errors: None):
     if not any(errors):
         message = f"""
-** Model Installation Successful **
-
-You're all set!
-
----
+** INVOKEAI INSTALLATION SUCCESSFUL **
 If you installed manually from source or with 'pip install': activate the virtual environment
 then run one of the following commands to start InvokeAI.
 
@@ -90,15 +91,11 @@ Web UI:
 
 Command-line interface:
    invokeai
----
 
 If you installed using an installation script, run:
-
-{Globals.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+  {Globals.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
 
 Add the '--help' argument to see all of the command-line switches available for use.
-
-Have fun!
 """
 
     else:
@@ -108,6 +105,7 @@ Have fun!
         message += "Please check the logs above and correct any issues."
 
     print(message)
+
 
 # ---------------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
@@ -119,6 +117,7 @@ def yes_or_no(prompt: str, default_yes=True):
         return response[0] not in ("n", "N")
     else:
         return response[0] in ("y", "Y")
+
 
 # ---------------------------------------------
 def HfLogin(access_token) -> str:
@@ -136,6 +135,8 @@ def HfLogin(access_token) -> str:
         sys.stdout = sys.__stdout__
         print(exc)
         raise exc
+
+
 # -------------------------------------
 class ProgressBar:
     def __init__(self, model_name="file"):
@@ -153,6 +154,7 @@ class ProgressBar:
                 total=total_size,
             )
         self.pbar.update(block_size)
+
 
 # ---------------------------------------------
 def download_with_progress_bar(model_url: str, model_dest: str, label: str = "the"):
@@ -172,11 +174,12 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         print(f"Error downloading {label} model")
         print(traceback.format_exc())
 
+
 # ---------------------------------------------
 # this will preload the Bert tokenizer fles
 def download_bert():
     print(
-        "Installing bert tokenizer (ignore deprecation errors)...",
+        "Installing bert tokenizer...",
         end="",
         file=sys.stderr,
     )
@@ -190,7 +193,7 @@ def download_bert():
 
 # ---------------------------------------------
 def download_clip():
-    print("Installing CLIP model (ignore deprecation errors)...", file=sys.stderr)
+    print("Installing CLIP model...", file=sys.stderr)
     version = "openai/clip-vit-large-patch14"
     print("Tokenizer...", file=sys.stderr, end="")
     download_from_hf(CLIPTokenizer, version)
@@ -291,25 +294,25 @@ def get_root(root: str = None) -> str:
 
 
 class editOptsForm(npyscreen.FormMultiPage):
-
     def create(self):
-        old_opts = self.parentApp.old_opts
+        program_opts = self.parentApp.program_opts
+        old_opts = self.parentApp.invokeai_opts
         first_time = not (Globals.root / Globals.initfile).exists()
         access_token = HfFolder.get_token()
-        
+
         window_height, window_width = curses.initscr().getmaxyx()
         for i in [
-                'Configure startup settings. You can come back and change these later.',
-                'Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.',
-                'Use cursor arrows to make a checkbox selection, and space to toggle.',
+            "Configure startup settings. You can come back and change these later.",
+            "Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.",
+            "Use cursor arrows to make a checkbox selection, and space to toggle.",
         ]:
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
                 editable=False,
-                color='CONTROL',
+                color="CONTROL",
             )
-            
+
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -317,60 +320,60 @@ class editOptsForm(npyscreen.FormMultiPage):
             begin_entry_at=0,
             editable=False,
             color="CONTROL",
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value='Select an output directory for images:',
+            value="Select an output directory for images:",
             editable=False,
-            color='CONTROL',
+            color="CONTROL",
         )
         self.outdir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
-            name='(<tab> autocompletes, ctrl-N advances):',
+            name="(<tab> autocompletes, ctrl-N advances):",
             value=old_opts.outdir or str(default_output_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
-            labelColor='GOOD',
+            labelColor="GOOD",
             begin_entry_at=40,
             scroll_exit=True,
         )
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value='Activate the NSFW checker to blur images showing potential sexual imagery:',
+            value="Activate the NSFW checker to blur images showing potential sexual imagery:",
             editable=False,
-            color='CONTROL'
+            color="CONTROL",
         )
         self.safety_checker = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name='NSFW checker',
+            name="NSFW checker",
             value=old_opts.safety_checker,
-            relx = 5,
+            relx=5,
             scroll_exit=True,
         )
         self.nextrely += 1
         for i in [
-                'If you have an account at HuggingFace you may paste your access token here',
-                'to allow InvokeAI to download styles & subjects from the "Concept Library".',
-                'See https://huggingface.co/settings/tokens',
+            "If you have an account at HuggingFace you may paste your access token here",
+            'to allow InvokeAI to download styles & subjects from the "Concept Library".',
+            "See https://huggingface.co/settings/tokens",
         ]:
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
                 editable=False,
-                color='CONTROL',
+                color="CONTROL",
             )
 
         self.hf_token = self.add_widget_intelligent(
             npyscreen.TitlePassword,
-            name='Access Token (use shift-ctrl-V to paste):',
+            name="Access Token (use shift-ctrl-V to paste):",
             value=access_token,
             begin_entry_at=42,
             use_two_lines=False,
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.nextrely += 1
         self.add_widget_intelligent(
@@ -379,7 +382,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             begin_entry_at=0,
             editable=False,
             color="CONTROL",
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.nextrely -= 1
         self.add_widget_intelligent(
@@ -388,37 +391,40 @@ class editOptsForm(npyscreen.FormMultiPage):
             begin_entry_at=0,
             editable=False,
             color="CONTROL",
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.nextrely -= 1
         self.free_gpu_mem = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name='Free GPU memory after each generation',
+            name="Free GPU memory after each generation",
             value=old_opts.free_gpu_mem,
             relx=5,
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.xformers = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name='Enable xformers support if available',
+            name="Enable xformers support if available",
             value=old_opts.xformers,
             relx=5,
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.always_use_cpu = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name='Force CPU to be used on GPU systems',
+            name="Force CPU to be used on GPU systems",
             value=old_opts.always_use_cpu,
             relx=5,
-            scroll_exit=True
+            scroll_exit=True,
+        )
+        precision = old_opts.precision or (
+            "float32" if program_opts.full_precision else "auto"
         )
         self.precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name='Precision',
+            name="Precision",
             values=PRECISION_CHOICES,
-            value=PRECISION_CHOICES.index(old_opts.precision),
+            value=PRECISION_CHOICES.index(precision),
             begin_entry_at=3,
-            max_height=len(PRECISION_CHOICES)+1,
+            max_height=len(PRECISION_CHOICES) + 1,
             scroll_exit=True,
         )
         self.max_loaded_models = self.add_widget_intelligent(
@@ -428,23 +434,23 @@ class editOptsForm(npyscreen.FormMultiPage):
             out_of=10,
             lowest=1,
             begin_entry_at=4,
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value='Directory containing embedding/textual inversion files:',
+            value="Directory containing embedding/textual inversion files:",
             editable=False,
-            color='CONTROL',
+            color="CONTROL",
         )
         self.embedding_path = self.add_widget_intelligent(
             npyscreen.TitleFilename,
-            name='(<tab> autocompletes, ctrl-N advances):',
+            name="(<tab> autocompletes, ctrl-N advances):",
             value=str(default_embedding_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
-            labelColor='GOOD',
+            labelColor="GOOD",
             begin_entry_at=40,
             scroll_exit=True,
         )
@@ -455,40 +461,49 @@ class editOptsForm(npyscreen.FormMultiPage):
             begin_entry_at=0,
             editable=False,
             color="CONTROL",
-            scroll_exit=True
+            scroll_exit=True,
         )
         self.nextrely -= 1
         for i in [
-                'BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ',
-                'AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT',
-                'https://huggingface.co/spaces/CompVis/stable-diffusion-license'
-                ]:
+            "BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ",
+            "AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT",
+            "https://huggingface.co/spaces/CompVis/stable-diffusion-license",
+        ]:
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
                 editable=False,
-                color='CONTROL',
+                color="CONTROL",
             )
         self.license_acceptance = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name='I accept the CreativeML Responsible AI License',
+            name="I accept the CreativeML Responsible AI License",
             value=not first_time,
-            relx = 2,
-            scroll_exit=True
+            relx=2,
+            scroll_exit=True,
         )
         self.nextrely += 1
+        label = (
+            "DONE"
+            if program_opts.skip_sd_weights or program_opts.default_only
+            else "NEXT"
+        )
         self.ok_button = self.add_widget_intelligent(
             npyscreen.ButtonPress,
-            name='DONE',
-            relx= (window_width-len('DONE'))//2,
-            rely= -3,
-            when_pressed_function=self.on_ok
+            name=label,
+            relx=(window_width - len(label)) // 2,
+            rely=-3,
+            when_pressed_function=self.on_ok,
         )
-        
+
     def on_ok(self):
         options = self.marshall_arguments()
         if self.validate_field_values(options):
-            self.parentApp.setNextForm(None)
+            self.parentApp.new_opts = options
+            if hasattr(self.parentApp,'model_select'):
+                self.parentApp.setNextForm("MODELS")
+            else:
+                self.parentApp.setNextForm(None)
             self.editing = False
         else:
             self.editing = True
@@ -497,15 +512,15 @@ class editOptsForm(npyscreen.FormMultiPage):
         bad_fields = []
         if not opt.license_acceptance:
             bad_fields.append(
-                'Please accept the license terms before proceeding to model downloads'
+                "Please accept the license terms before proceeding to model downloads"
             )
         if not Path(opt.outdir).parent.exists():
             bad_fields.append(
-                f'The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory.'
+                f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
             )
         if not Path(opt.embedding_path).parent.exists():
             bad_fields.append(
-                f'The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_path).parent)} is an existing directory.'
+                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_path).parent)} is an existing directory."
             )
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:\n"
@@ -519,10 +534,17 @@ class editOptsForm(npyscreen.FormMultiPage):
     def marshall_arguments(self):
         new_opts = Namespace()
 
-        for attr in ['outdir','safety_checker','free_gpu_mem','max_loaded_models',
-                     'xformers','always_use_cpu','embedding_path']:
+        for attr in [
+            "outdir",
+            "safety_checker",
+            "free_gpu_mem",
+            "max_loaded_models",
+            "xformers",
+            "always_use_cpu",
+            "embedding_path",
+        ]:
             setattr(new_opts, attr, getattr(self, attr).value)
-                    
+
         new_opts.hf_token = self.hf_token.value
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
@@ -531,26 +553,55 @@ class editOptsForm(npyscreen.FormMultiPage):
 
 
 class EditOptApplication(npyscreen.NPSAppManaged):
-    def __init__(self, old_opts=argparse.Namespace):
+    def __init__(self, program_opts: Namespace, invokeai_opts: Namespace):
         super().__init__()
-        self.old_opts=old_opts
+        self.program_opts = program_opts
+        self.invokeai_opts = invokeai_opts
+        self.user_cancelled = False
+        self.user_selections = default_user_selections(program_opts)
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
-        self.main = self.addForm(
+        self.options = self.addForm(
             "MAIN",
             editOptsForm,
-            name='InvokeAI Startup Options',
+            name="InvokeAI Startup Options",
         )
+        if not (self.program_opts.skip_sd_weights or self.program_opts.default_only):
+            self.model_select = self.addForm(
+                "MODELS",
+                addModelsForm,
+                name="Add/Remove Models",
+                multipage=True,
+            )
 
     def new_opts(self):
-        return self.main.marshall_arguments()
+        return self.options.marshall_arguments()
 
-def edit_opts(old_opts: argparse.Namespace)->argparse.Namespace:
-    editApp = EditOptApplication(old_opts)
+def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Namespace:
+    editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     return editApp.new_opts()
 
+def default_startup_options()->Namespace:
+    opts = Args().parse_args([])
+    opts.outdir = str(default_output_dir())
+    opts.safety_checker = True
+    return opts
+
+def default_user_selections(program_opts: Namespace)->Namespace:
+    return Namespace(
+        starter_models=recommended_datasets()
+        if program_opts.yes_to_all
+        else default_dataset()
+        if program_opts.default_only
+        else dict(),
+        purge_deleted_models=False,
+        scan_directory=None,
+        autoscan_on_startup=None,
+        import_model_paths=None,
+        convert_to_diffusers=None,
+    )
 # -------------------------------------
 def initialize_rootdir(root: str, yes_to_all: bool = False):
     print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
@@ -569,27 +620,27 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
-# -------------------------------------
-def do_edit_opt_form(old_opts: argparse.Namespace)->argparse.Namespace:
-    editApp = EditOptApplication(old_opts)
-    editApp.run()
-    return editApp.new_opts()
 
 # -------------------------------------
-def edit_options(init_file: Path):
-    # get current settings from initfile
-    opt = Args().parse_args()
-    new_opt = do_edit_opt_form(opt)
-    write_opts(new_opt, init_file)
+def run_console_ui(program_opts: Namespace) -> (Namespace, Namespace):
+    # parse_args() will read from init file if present
+    invokeai_opts = default_startup_options()
+    editApp = EditOptApplication(program_opts, invokeai_opts)
+    editApp.run()
+    if editApp.user_cancelled:
+        return (None, None)
+    else:
+        return (editApp.new_opts, editApp.user_selections)
+
 
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):
-    '''
+    """
     Update the invokeai.init file with values from opts Namespace
-    '''
+    """
     # touch file if it doesn't exist
     if not init_file.exists():
-        with open(init_file,'w') as f:
+        with open(init_file, "w") as f:
             f.write(INIT_FILE_PREAMBLE)
 
     # We want to write in the changed arguments without clobbering
@@ -598,15 +649,18 @@ def write_opts(opts: Namespace, init_file: Path):
     # argparse: i.e. --outdir could be --outdir, --out, or -o
     # initfile needs to be replaced with a fully structured format
     # such as yaml; this is a hack that will work much of the time
-    args_to_skip = re.compile('^--?(o|out|no-xformer|xformer|free|no-nsfw|nsfw|prec|max_load|embed)')
-    new_file = f'{init_file}.new'
+    args_to_skip = re.compile(
+        "^--?(o|out|no-xformer|xformer|free|no-nsfw|nsfw|prec|max_load|embed|always)"
+    )
+    new_file = f"{init_file}.new"
     try:
-        lines = open(init_file,'r').readlines()
-        with open(new_file,'w') as out_file:
+        lines = [x.strip() for x in open(init_file, "r").readlines()]
+        with open(new_file, "w") as out_file:
             for line in lines:
-                if not args_to_skip.match(line):
-                    out_file.write(line)
-            out_file.write(f'''
+                if len(line) > 0 and not args_to_skip.match(line):
+                    out_file.write(line + "\n")
+            out_file.write(
+                f"""
 --outdir={opts.outdir}
 --embedding_path={opts.embedding_path}
 --precision={opts.precision}
@@ -615,34 +669,34 @@ def write_opts(opts: Namespace, init_file: Path):
 --{'no-' if not opts.xformers else ''}xformers
 {'--free_gpu_mem' if opts.free_gpu_mem else ''}
 {'--always_use_cpu' if opts.always_use_cpu else ''}
-''')
+"""
+            )
     except OSError as e:
-        print(f'** An error occurred while writing the init file: {str(e)}')
-        
+        print(f"** An error occurred while writing the init file: {str(e)}")
+
     os.replace(new_file, init_file)
 
     if opts.hf_token:
         HfLogin(opts.hf_token)
 
-# -------------------------------------
-def default_output_dir()->Path:
-    return Globals.root / 'outputs'
 
 # -------------------------------------
-def default_embedding_dir()->Path:
-    return Globals.root / 'embeddings'
+def default_output_dir() -> Path:
+    return Globals.root / "outputs"
+
 
 # -------------------------------------
-def write_default_options(initfile: Path):
-    opt = Namespace(
-        outdir=str(default_output_dir()),
-        embedding_path=str(default_embedding_dir()),
-        nsfw_checker=True,
-        max_loaded_models=2,
-        free_gpu_mem=True
-    )
+def default_embedding_dir() -> Path:
+    return Globals.root / "embeddings"
+
+
+# -------------------------------------
+def write_default_options(program_opts: Namespace, initfile: Path):
+    opt = default_startup_options()
+    opt.hf_token = HfFolder.get_token()
     write_opts(opt, initfile)
-    
+
+
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
@@ -652,6 +706,13 @@ def main():
         action=argparse.BooleanOptionalAction,
         default=False,
         help="skip downloading the large Stable Diffusion weight files",
+    )
+    parser.add_argument(
+        "--skip-support-models",
+        dest="skip_support_models",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="skip downloading the support models",
     )
     parser.add_argument(
         "--full-precision",
@@ -691,35 +752,45 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
-    Globals.root = os.path.expanduser(get_root(opt.root) or "")
+    Globals.root = Path(os.path.expanduser(get_root(opt.root) or ""))
 
     errors = set()
 
     try:
+        models_to_download = default_user_selections(opt)
+        
         # We check for to see if the runtime directory is correctly initialized.
         init_file = Path(Globals.root, Globals.initfile)
         if not init_file.exists():
             initialize_rootdir(Globals.root, opt.yes_to_all)
 
         if opt.yes_to_all:
-            write_default_options(init_file)
+            write_default_options(opt, init_file)
         else:
-            edit_options(init_file)
+            init_options, models_to_download = run_console_ui(opt)
+            if init_options:
+                write_opts(init_options, init_file)
+            else:
+                print("\n** CANCELLED AT USER'S REQUEST. USE THE \"invoke.sh\" LAUNCHER TO RUN LATER **\n")
+                sys.exit(0)
 
-        print("\n** DOWNLOADING SUPPORT MODELS **")
-        download_bert()
-        download_clip()
-        download_realesrgan()
-        download_gfpgan()
-        download_codeformer()
-        download_clipseg()
-        download_safety_checker()
+        if opt.skip_support_models:
+            print("\n** SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST **")
+        else:
+            print("\n** DOWNLOADING SUPPORT MODELS **")
+            download_bert()
+            download_clip()
+            download_realesrgan()
+            download_gfpgan()
+            download_codeformer()
+            download_clipseg()
+            download_safety_checker()
 
         if opt.skip_sd_weights:
-            print("** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
-        else:
-            print("** DOWNLOADING DIFFUSION WEIGHTS **")
-            errors.add(select_and_download_models(opt))
+            print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
+        elif models_to_download:
+            print("\n** DOWNLOADING DIFFUSION WEIGHTS **")
+            process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)
     except KeyboardInterrupt:
