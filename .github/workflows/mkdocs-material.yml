@@ -9,6 +9,10 @@ jobs:
   mkdocs-material:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      REPO_URL: '${{ github.server_url }}/${{ github.repository }}'
+      REPO_NAME: '${{ github.repository }}'
+      SITE_URL: 'https://${{ github.repository_owner }}.github.io/InvokeAI'
     steps:
       - name: checkout sources
         uses: actions/checkout@v3
