@@ -1,6 +1,8 @@
 ---
-title: Contribute
+title: Contributing
 ---
+
+# :fontawesome-solid-code-commit: Contributing
 
 There are different ways how you can contribute to
 [InvokeAI](https://github.com/invoke-ai/InvokeAI), like Translations, opening
