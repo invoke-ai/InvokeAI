@@ -95,7 +95,7 @@ requires-python = ">=3.9, <3.11"
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "docs" = [
   "mkdocs-git-revision-date-localized-plugin",
-  "mkdocs-material<9.0",
+  "mkdocs-material==9.*",
   "mkdocs-redirects==1.2.0",
 ]
 "test" = ["pytest-cov", "pytest>6.0.0"]
@@ -133,8 +133,8 @@ version = {attr = "ldm.invoke.__version__"}
 
 [tool.setuptools.packages.find]
 "include" = [
-  "invokeai.assets.web*",
-  "invokeai.backend*",
+  "invokeai.assets.web",
+  "invokeai.backend",
   "invokeai.configs*",
   "invokeai.frontend.dist*",
   "ldm*",
