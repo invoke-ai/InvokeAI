@@ -201,6 +201,7 @@ checkpoints
 
 # Scratch folder
 .scratch/
+.vscode/
 gfpgan/
 models/ldm/stable-diffusion-v1/*.sha256
 
