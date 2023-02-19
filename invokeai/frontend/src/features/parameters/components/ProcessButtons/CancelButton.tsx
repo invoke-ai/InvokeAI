@@ -12,23 +12,13 @@ import {
 } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash';
 import { useEffect, useCallback } from 'react';
-import {
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  ButtonSpinner,
-  ButtonGroup,
-} from '@chakra-ui/react';
+import { ButtonSpinner, ButtonGroup } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import {
-  MdCancel,
-  MdCancelScheduleSend,
-  MdArrowDropDown,
-  MdArrowDropUp,
-} from 'react-icons/md';
+import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
+
+import IAISimpleMenu from 'common/components/IAISimpleMenu';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -89,6 +79,17 @@ export default function CancelButton(
     }
   }, [cancelAfter, currentIteration, handleClickCancel]);
 
+  const cancelMenuItems = [
+    {
+      item: t('parameters.cancel.immediate'),
+      onClick: () => dispatch(setCancelType('immediate')),
+    },
+    {
+      item: t('parameters.cancel.schedule'),
+      onClick: () => dispatch(setCancelType('scheduled')),
+    },
+  ];
+
   return (
     <ButtonGroup isAttached variant="link">
       {cancelType === 'immediate' ? (
@@ -104,7 +105,11 @@ export default function CancelButton(
       ) : (
         <IAIIconButton
           icon={
-            isCancelScheduled ? <ButtonSpinner /> : <MdCancelScheduleSend />
+            isCancelScheduled ? (
+              <ButtonSpinner color="var(--text-color)" />
+            ) : (
+              <MdCancelScheduleSend />
+            )
           }
           tooltip={
             isCancelScheduled
@@ -131,27 +136,10 @@ export default function CancelButton(
           {...rest}
         />
       )}
-      <Menu>
-        {({ isOpen }) => (
-          <>
-            <MenuButton
-              as={IAIIconButton}
-              icon={isOpen ? <MdArrowDropUp /> : <MdArrowDropDown />}
-              className="cancel-options-btn"
-              tooltip={t('parameters.cancel.setType')}
-              {...rest}
-            />
-            <MenuList className="cancel-options-btn-context-menu">
-              <MenuItem onClick={() => dispatch(setCancelType('immediate'))}>
-                {t('parameters.cancel.immediate')}
-              </MenuItem>
-              <MenuItem onClick={() => dispatch(setCancelType('scheduled'))}>
-                {t('parameters.cancel.schedule')}
-              </MenuItem>
-            </MenuList>
-          </>
-        )}
-      </Menu>
+      <IAISimpleMenu
+        menuItems={cancelMenuItems}
+        iconTooltip={t('parameters.cancel.setType')}
+      />
     </ButtonGroup>
   );
 }
