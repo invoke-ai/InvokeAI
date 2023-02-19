@@ -364,7 +364,6 @@
         "img2imgStrength": "Sterkte Afbeelding naar afbeelding",
         "toggleLoopback": "Zet recursieve verwerking aan/uit",
         "invoke": "Genereer",
-        "cancel": "Annuleer",
         "promptPlaceholder": "Voer invoertekst hier in. [negatieve trefwoorden], (verhoogdgewicht)++, (verlaagdgewicht)--, swap (wisselen) en blend (mengen) zijn beschikbaar (zie documentatie)",
         "sendTo": "Stuur naar",
         "sendToImg2Img": "Stuur naar Afbeelding naar afbeelding",
