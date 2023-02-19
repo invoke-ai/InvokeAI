@@ -333,7 +333,7 @@ def process_and_execute(opt: Namespace, selections: Namespace):
                         
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
-    precision= 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
+    precision= 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     if opt.default_only:
         install_requested_models(
             install_initial_models = default_dataset(),
