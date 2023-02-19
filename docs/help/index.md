@@ -9,4 +9,4 @@ Here you will find help to topics like
 -   configuration recommendation for IDEs
 
 If you have an Idea about what's missing and aren't scared from contributing,
-just take a look at [DOCS](./contribute/030_DOCS.md) to find out how to do so.
+just take a look at [DOCS](./contributing/030_DOCS.md) to find out how to do so.

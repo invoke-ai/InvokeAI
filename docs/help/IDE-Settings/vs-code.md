@@ -18,7 +18,7 @@ environment and update the deps (pip, setuptools and wheel).
 Into this venv we will then install the pyproject.toml in editable mode with
 dev, docs and test dependencies.
 
-```json
+```json title=".vscode/tasks.json"
 {
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
@@ -55,9 +55,16 @@ dev, docs and test dependencies.
         {
             "label": "build InvokeAI",
             "detail": "Build pyproject.toml with extras dev, docs and test",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["-m", "pip", "install", "-e", ".[dev,docs,test]"],
-            "dependsOn": "Create venv",
+            "command": "${workspaceFolder}/.venv/bin/python3",
+            "args": [
+                "-m",
+                "pip",
+                "install",
+                "--use-pep517",
+                "--editable",
+                ".[dev,docs,test]"
+            ],
+            "dependsOn": "Create virtual environment",
             "dependsOrder": "sequence",
             "group": {
                 "kind": "build",
@@ -75,6 +82,8 @@ dev, docs and test dependencies.
     ]
 }
 ```
+
+The fastest way to build InvokeAI now is ++cmd+shift+b++
 
 ## launch.json
 
