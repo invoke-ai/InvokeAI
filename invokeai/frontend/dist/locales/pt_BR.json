@@ -362,7 +362,6 @@
         "img2imgStrength": "Força de Imagem Para Imagem",
         "toggleLoopback": "Ativar Loopback",
         "invoke": "Invoke",
-        "cancel": "Cancelar",
         "promptPlaceholder": "Digite o prompt aqui. [tokens negativos], (upweight)++, (downweight)--, trocar e misturar estão disponíveis (veja docs)",
         "sendTo": "Mandar para",
         "sendToImg2Img": "Mandar para Imagem Para Imagem",
@@ -425,7 +424,6 @@
         "initialImageNotSet": "Imagem Inicial Não Definida",
         "initialImageNotSetDesc": "Não foi possível carregar imagem incial"
     },
-    "tooltip": {},
     "unifiedCanvas": {
         "layer": "Camada",
         "base": "Base",
