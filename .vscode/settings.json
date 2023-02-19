@@ -24,6 +24,7 @@
     "editor.formatOnSaveMode": "modificationsIfAvailable"
   },
   "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.rulers": [80],
     "editor.unicodeHighlight.ambiguousCharacters": false,
     "editor.unicodeHighlight.invisibleCharacters": false,
@@ -51,8 +52,6 @@
   "evenBetterToml.formatter.reorderKeys": true,
   "evenBetterToml.formatter.compactEntries": false,
   "evenBetterToml.schema.enabled": true,
-  "isort.check": true,
-  "isort.args": ["--profile=black", "--filter-files", "--color"],
   "python.analysis.typeCheckingMode": "basic",
   "python.formatting.provider": "black",
   "python.languageServer": "Pylance",
@@ -65,5 +64,8 @@
     "--cov=ldm",
     "--cov-branch",
     "--cov-report=term:skip-covered"
-  ]
+  ],
+  "yaml.schemas": {
+    "https://json.schemastore.org/prettierrc.json": "${workspaceFolder}/.prettierrc"
+  }
 }
