@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-cd invokeai/frontend/ && npx run lint
+cd invokeai/frontend/ && npm run lint-staged

@@ -95,9 +95,9 @@
     }
   },
   "lint-staged": {
-    "**/*.{js,jsx,ts,tsx,cjs}": [
-      "npx prettier --write",
-      "npx eslint --fix"
+    "**/*.{js,jsx,ts,tsx,cjs,json,html,scss}": [
+      "npm run prettier",
+      "npm run lint"
     ]
   }
 }
