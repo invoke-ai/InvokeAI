@@ -9,7 +9,7 @@ dev_addr: '127.0.0.1:8080'
 # Repository
 repo_name: 'invoke-ai/InvokeAI'
 repo_url: 'https://github.com/invoke-ai/InvokeAI'
-edit_uri: edit/main/docs/
+edit_uri: blob/main/docs/
 
 # Copyright
 copyright: Copyright &copy; 2022 InvokeAI Team
