@@ -79,7 +79,10 @@ class TextualInversionManager:
 
         embedding_info = self._parse_embedding(str(ckpt_path))
 
-        if (
+        if embedding_info is None:
+            # We've already put out an error message about the bad embedding in _parse_embedding, so just return.
+            return
+        elif (
             self.text_encoder.get_input_embeddings().weight.data[0].shape[0]
             != embedding_info["embedding"].shape[0]
         ):
@@ -287,6 +290,7 @@ class TextualInversionManager:
             return self._parse_embedding_bin(embedding_file)
         else:
             print(f">> Not a recognized embedding file: {embedding_file}")
+            return None
 
     def _parse_embedding_pt(self, embedding_file):
         embedding_ckpt = torch.load(embedding_file, map_location="cpu")
