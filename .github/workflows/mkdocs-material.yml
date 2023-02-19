@@ -27,6 +27,8 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: install requirements
+        env:
+          PIP_USE_PEP517: 1
         run: |
           python -m \
             pip install ".[docs]"
