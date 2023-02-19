@@ -33,7 +33,8 @@ from .model_install_backend import (Dataset_path, default_config_file,
                                     )
 
 class addModelsForm(npyscreen.FormMultiPage):
-    def __init__(self, parentApp, name, multipage=False):
+    def __init__(self, parentApp, name, multipage=False, *args, **keywords):
+        self.multipage=multipage
         self.initial_models = OmegaConf.load(Dataset_path)
         try:
             self.existing_models = OmegaConf.load(default_config_file())
@@ -42,9 +43,8 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.starter_model_list = [
             x for x in list(self.initial_models.keys()) if x not in self.existing_models
         ]
-        self.multipage = multipage
         self.installed_models=dict()
-        super().__init__(parentApp, name)
+        super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
     def create(self):
         window_height, window_width = curses.initscr().getmaxyx()
@@ -307,7 +307,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         self.main_form = self.addForm(
             "MAIN",
             addModelsForm,
-            name="Add/Remove Models"
+            name="Install Stable Diffusion Models"
         )
 
 # --------------------------------------------------------

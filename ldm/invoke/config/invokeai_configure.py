@@ -571,7 +571,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             self.model_select = self.addForm(
                 "MODELS",
                 addModelsForm,
-                name="Add/Remove Models",
+                name="Install Stable Diffusion Models",
                 multipage=True,
             )
 
