@@ -442,7 +442,12 @@
         "img2imgStrength": "Image To Image Strength",
         "toggleLoopback": "Toggle Loopback",
         "invoke": "Invoke",
-        "cancel": "Cancel",
+        "cancel": {
+            "immediate": "Cancel immediately",
+            "schedule": "Cancel after current iteration",
+            "isScheduled": "Canceling",
+            "setType": "Set cancel type"
+        },
         "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
         "negativePrompts": "Negative Prompts",
         "sendTo": "Send to",
