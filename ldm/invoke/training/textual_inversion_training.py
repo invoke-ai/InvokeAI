@@ -441,6 +441,7 @@ class TextualInversionDataset(Dataset):
         self.image_paths = [
             os.path.join(self.data_root, file_path)
             for file_path in os.listdir(self.data_root)
+            if os.path.isfile(file_path) and file_path.endswith(('.png','.PNG','.jpg','.JPG','.jpeg','.JPEG','.gif','.GIF'))
         ]
 
         self.num_images = len(self.image_paths)
