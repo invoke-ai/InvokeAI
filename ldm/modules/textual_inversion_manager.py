@@ -69,7 +69,6 @@ class TextualInversionManager:
             return
         
         try:
-            print(f'>> Scanning {str(ckpt_path)} for embedding terms')
             scan_result = scan_file_path(str(ckpt_path))
             if scan_result.infected_files == 1:
                 print(
