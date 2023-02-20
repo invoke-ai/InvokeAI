@@ -436,7 +436,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 callback: Callable[[PipelineIntermediateState], None] = None
                                 ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if timesteps is None:
-            self.scheduler.set_timesteps(num_inference_steps, device=self._model_group.device_for(self.unet))
+            self.scheduler.set_timesteps(num_inference_steps, device=torch.device("cpu"))
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(self.generate_latents_from_embeddings, PipelineIntermediateState)
         result: PipelineIntermediateState = infer_latents_from_embeddings(
@@ -468,7 +468,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
             batch_size = latents.shape[0]
             batched_t = torch.full((batch_size,), timesteps[0],
-                                   dtype=timesteps.dtype, device=self._model_group.device_for(self.unet))
+                                   dtype=timesteps.dtype, device=torch.device("cpu"))
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             attention_map_saver: Optional[AttentionMapSaver] = None
@@ -553,8 +553,18 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             ).add_mask_channels(latents)
 
         # First three args should be positional, not keywords, so torch hooks can see them.
-        return self.unet(latents, t, text_embeddings,
-                         cross_attention_kwargs=cross_attention_kwargs).sample
+        if cross_attention_kwargs is not None:
+            print("---------------------------------- cross_attention_kwargs not None l557")
+        # return self.unet(latents, t, text_embeddings,
+        #                  cross_attention_kwargs=cross_attention_kwargs).sample
+        noise_pred = self.unet(latents, t, text_embeddings)
+        if hasattr(noise_pred, "sample"):
+            noise_pred = noise_pred.sample
+        if isinstance(noise_pred, tuple):
+            noise_pred = noise_pred[0]
+        elif isinstance(noise_pred, dict):
+            noise_pred = noise_pred["sample"]
+        return noise_pred
 
     def img2img_from_embeddings(self,
                                 init_image: Union[torch.FloatTensor, PIL.Image.Image],
@@ -573,7 +583,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # 6. Prepare latent variables
         initial_latents = self.non_noised_latents_from_image(
-            init_image, device=self._model_group.device_for(self.unet),
+            init_image, device=torch.device("cpu"),
             dtype=self.unet.dtype)
         noise = noise_func(initial_latents)
 
@@ -588,7 +598,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                             noise: torch.Tensor, run_id=None, callback=None
                                             ) -> InvokeAIStableDiffusionPipelineOutput:
         timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength,
-                                                  device=self._model_group.device_for(self.unet))
+                                                  device=torch.device("cpu"))
         result_latents, result_attention_maps = self.latents_from_embeddings(
             initial_latents, num_inference_steps, conditioning_data,
             timesteps=timesteps,
@@ -728,7 +738,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             text=c,
             fragment_weights=fragment_weights,
             should_return_tokens=return_tokens,
-            device=self._model_group.device_for(self.unet))
+            device=torch.device("cpu"))
 
     @property
     def cond_stage_model(self):
