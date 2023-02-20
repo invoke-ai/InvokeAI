@@ -1185,9 +1185,9 @@ def report_model_error(opt: Namespace, e: Exception):
             "** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
         )
     else:
-        if click.confirm(
-            "Do you want to run invokeai-configure script to select and/or reinstall models?",
-            default=True,
+        if not click.confirm(
+                'Do you want to run invokeai-configure script to select and/or reinstall models?',
+                default=False
         ):
             return
 
