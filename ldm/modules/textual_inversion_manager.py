@@ -62,8 +62,13 @@ class TextualInversionManager(BaseTextualInversionManager):
 
     def load_textual_inversion(self, ckpt_path: Union[str,Path], defer_injecting_tokens: bool = False):
         ckpt_path = Path(ckpt_path)
+
+        if not ckpt_path.is_file():
+            return
+        
         if str(ckpt_path).endswith(".DS_Store"):
             return
+        
         try:
             scan_result = scan_file_path(str(ckpt_path))
             if scan_result.infected_files == 1:
@@ -80,12 +85,15 @@ class TextualInversionManager(BaseTextualInversionManager):
 
         embedding_info = self._parse_embedding(str(ckpt_path))
 
-        if (
+        if embedding_info is None:
+            # We've already put out an error message about the bad embedding in _parse_embedding, so just return.
+            return
+        elif (
             self.text_encoder.get_input_embeddings().weight.data[0].shape[0]
-            != embedding_info["embedding"].shape[0]
+            != embedding_info['token_dim']
         ):
             print(
-                f"** Notice: {ckpt_path.parents[0].name}/{ckpt_path.name} was trained on a model with a different token dimension. It can't be used with this model."
+                f"** Notice: {ckpt_path.parents[0].name}/{ckpt_path.name} was trained on a model with an incompatible token dimension: {self.text_encoder.get_input_embeddings().weight.data[0].shape[0]} vs {embedding_info['token_dim']}."
             )
             return
 
@@ -288,6 +296,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             return self._parse_embedding_bin(embedding_file)
         else:
             print(f">> Not a recognized embedding file: {embedding_file}")
+            return None
 
     def _parse_embedding_pt(self, embedding_file):
         embedding_ckpt = torch.load(embedding_file, map_location="cpu")
@@ -330,7 +339,6 @@ class TextualInversionManager(BaseTextualInversionManager):
         # .pt files found at https://cyberes.github.io/stable-diffusion-textual-inversion-models/
         # They are actually .bin files
         elif len(embedding_ckpt.keys()) == 1:
-            print(">> Detected .bin file masquerading as .pt file")
             embedding_info = self._parse_embedding_bin(embedding_file)
 
         else:
@@ -369,9 +377,6 @@ class TextualInversionManager(BaseTextualInversionManager):
         if isinstance(
             list(embedding_ckpt["string_to_token"].values())[0], torch.Tensor
         ):
-            print(
-                ">> Detected .pt file variant 1"
-            )  # example at https://github.com/invoke-ai/InvokeAI/issues/1829
             for token in list(embedding_ckpt["string_to_token"].keys()):
                 embedding_info["name"] = (
                     token
@@ -384,7 +389,7 @@ class TextualInversionManager(BaseTextualInversionManager):
                 embedding_info["num_vectors_per_token"] = embedding_info[
                     "embedding"
                 ].shape[0]
-                embedding_info["token_dim"] = embedding_info["embedding"].size()[0]
+                embedding_info["token_dim"] = embedding_info["embedding"].size()[1]
         else:
             print(">> Invalid embedding format")
             embedding_info = None
