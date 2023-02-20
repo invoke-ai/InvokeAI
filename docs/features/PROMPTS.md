@@ -40,7 +40,7 @@ for adj in adjectives:
             print(f'a {adj} day -A{samp} -C{cg}')
 ```
 
-It's output looks like this (abbreviated):
+Its output looks like this (abbreviated):
 
 ```bash
 a sunny day -Aklms -C7.5

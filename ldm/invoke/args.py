@@ -272,6 +272,10 @@ class Args(object):
             switches.append('--seamless')
         if a['hires_fix']:
             switches.append('--hires_fix')
+        if a['h_symmetry_time_pct']:
+            switches.append(f'--h_symmetry_time_pct {a["h_symmetry_time_pct"]}')
+        if a['v_symmetry_time_pct']:
+            switches.append(f'--v_symmetry_time_pct {a["v_symmetry_time_pct"]}')
 
         # img2img generations have parameters relevant only to them and have special handling
         if a['init_img'] and len(a['init_img'])>0:
@@ -853,6 +857,18 @@ class Args(object):
             help='Perlin noise scale (0.0 - 1.0) - add perlin noise to the initialization instead of the usual gaussian noise.',
         )
         render_group.add_argument(
+            '--h_symmetry_time_pct',
+            default=None,
+            type=float,
+            help='Horizontal symmetry point (0.0 - 1.0) - apply horizontal symmetry at this point in image generation.',
+        )
+        render_group.add_argument(
+            '--v_symmetry_time_pct',
+            default=None,
+            type=float,
+            help='Vertical symmetry point (0.0 - 1.0) - apply vertical symmetry at this point in image generation.',
+        )
+        render_group.add_argument(
             '--fnformat',
             default='{prefix}.{seed}.png',
             type=str,
@@ -1158,7 +1174,8 @@ def metadata_dumps(opt,
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
                          'cfg_scale','threshold','perlin','step_number','width','height','extra','strength','seamless'
-                         'init_img','init_mask','facetool','facetool_strength','upscale']
+                         'init_img','init_mask','facetool','facetool_strength','upscale','h_symmetry_time_pct',
+                         'v_symmetry_time_pct']
     rfc_dict ={}
 
     for item in image_dict.items():
