@@ -15,6 +15,7 @@ import NegativePromptInput from 'features/parameters/components/PromptInput/Nega
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
+import UnifiedCanvasOtherSettings from './UnifiedCanvasOtherSettings';
 
 export default function UnifiedCanvasPanel() {
   const { t } = useTranslation();
@@ -45,6 +46,10 @@ export default function UnifiedCanvasPanel() {
       feature: Feature.VARIATIONS,
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
+    },
+    output: {
+      header: `${t('parameters.otherOptions')}`,
+      content: <UnifiedCanvasOtherSettings />,
     },
   };
 
