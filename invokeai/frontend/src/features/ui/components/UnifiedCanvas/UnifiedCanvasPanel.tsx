@@ -5,6 +5,8 @@ import BoundingBoxSettings from 'features/parameters/components/AdvancedParamete
 import InfillAndScalingSettings from 'features/parameters/components/AdvancedParameters/Canvas/InfillAndScalingSettings';
 import SeamCorrectionSettings from 'features/parameters/components/AdvancedParameters/Canvas/SeamCorrection/SeamCorrectionSettings';
 import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
+import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
+import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
@@ -15,7 +17,6 @@ import NegativePromptInput from 'features/parameters/components/PromptInput/Nega
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
-import UnifiedCanvasOtherSettings from './UnifiedCanvasOtherSettings';
 
 export default function UnifiedCanvasPanel() {
   const { t } = useTranslation();
@@ -47,9 +48,10 @@ export default function UnifiedCanvasPanel() {
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
     },
-    output: {
-      header: `${t('parameters.otherOptions')}`,
-      content: <UnifiedCanvasOtherSettings />,
+    symmetry: {
+      header: `${t('parameters.symmetry')}`,
+      content: <SymmetrySettings />,
+      additionalHeaderComponents: <SymmetryToggle />,
     },
   };
 

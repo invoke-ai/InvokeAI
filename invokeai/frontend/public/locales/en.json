@@ -441,6 +441,7 @@
         "infillScalingHeader": "Infill and Scaling",
         "img2imgStrength": "Image To Image Strength",
         "toggleLoopback": "Toggle Loopback",
+        "symmetry": "Symmetry",
         "hSymmetryStep": "H Symmetry Step",
         "vSymmetryStep": "V Symmetry Step",
         "invoke": "Invoke",
