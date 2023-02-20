@@ -853,13 +853,13 @@ class Args(object):
             '--h_symmetry_time_pct',
             default=None,
             type=float,
-            help='Horizontal symmetry point (0.0 - 1.0) - apply horizontal symmetry at this point in image generation (0-100%).',
+            help='Horizontal symmetry point (0.0 - 1.0) - apply horizontal symmetry at this point in image generation.',
         )
         render_group.add_argument(
             '--v_symmetry_time_pct',
             default=None,
             type=float,
-            help='Vertical symmetry point (0.0 - 1.0) - apply vertical symmetry at this point in image generation (0-100%).',
+            help='Vertical symmetry point (0.0 - 1.0) - apply vertical symmetry at this point in image generation.',
         )
         render_group.add_argument(
             '--fnformat',
