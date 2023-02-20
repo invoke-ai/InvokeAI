@@ -16,8 +16,8 @@ class Img2Img(Generator):
         self.init_latent = None    # by get_noise()
 
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
-                       conditioning,init_image,strength,step_callback=None,threshold=0.0,perlin=0.0,
-                       attention_maps_callback=None,
+                       conditioning,init_image,strength,step_callback=None,threshold=0.0,warmup=0.2,perlin=0.0,
+                       h_symmetry_time_pct=None,v_symmetry_time_pct=None,attention_maps_callback=None,
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
@@ -33,8 +33,13 @@ class Img2Img(Generator):
         conditioning_data = (
             ConditioningData(
                 uc, c, cfg_scale, extra_conditioning_info,
-                postprocessing_settings = PostprocessingSettings(threshold, warmup=0.2) if threshold else None)
-            .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
+                postprocessing_settings=PostprocessingSettings(
+                    threshold=threshold,
+                    warmup=warmup,
+                    h_symmetry_time_pct=h_symmetry_time_pct,
+                    v_symmetry_time_pct=v_symmetry_time_pct
+                )
+            ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
 
         def make_image(x_T):
