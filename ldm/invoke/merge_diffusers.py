@@ -323,7 +323,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
 
         if selected_model3 > 0:
             self.merge_method.values = ['add_difference ( A+(B-C) )']
-            self.merged_model_name.value += f"+{models[selected_model3]}"
+            self.merged_model_name.value += f"+{models[selected_model3 -1]}" # In model3 there is one more element in the list (None). So we have to subtract one.
         else:
             self.merge_method.values = self.interpolations
         self.merge_method.value = 0
@@ -419,8 +419,7 @@ def run_gui(args: Namespace):
     mergeapp.run()
 
     args = mergeapp.merge_arguments
-    print(f'DEBUG: {args}')
-    #merge_diffusion_models_and_commit(**args)
+    merge_diffusion_models_and_commit(**args)
     print(f'>> Models merged into new model: "{args["merged_model_name"]}".')
 
 

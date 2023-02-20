@@ -160,7 +160,7 @@
             "title": "Збільшити розмір мініатюр галереї",
             "desc": "Збільшує розмір мініатюр галереї"
         },
-        "reduceGalleryThumbSize": {
+        "decreaseGalleryThumbSize": {
             "title": "Зменшує розмір мініатюр галереї",
             "desc": "Зменшує розмір мініатюр галереї"
         },
@@ -172,7 +172,7 @@
             "title": "Вибрати ластик",
             "desc": "Вибирає ластик для полотна"
         },
-        "reduceBrushSize": {
+        "decreaseBrushSize": {
             "title": "Зменшити розмір пензля",
             "desc": "Зменшує розмір пензля/ластика полотна"
         },
@@ -180,7 +180,7 @@
             "title": "Збільшити розмір пензля",
             "desc": "Збільшує розмір пензля/ластика полотна"
         },
-        "reduceBrushOpacity": {
+        "decreaseBrushOpacity": {
             "title": "Зменшити непрозорість пензля",
             "desc": "Зменшує непрозорість пензля полотна"
         },
@@ -354,7 +354,6 @@
         "seamBlur": "Розмиття шву",
         "seamStrength": "Сила шву",
         "seamSteps": "Кроки шву",
-        "inpaintReplace": "Inpaint-заміна",
         "scaleBeforeProcessing": "Масштабувати",
         "scaledWidth": "Масштаб Ш",
         "scaledHeight": "Масштаб В",
@@ -366,7 +365,6 @@
         "img2imgStrength": "Сила обробки img2img",
         "toggleLoopback": "Зациклити обробку",
         "invoke": "Викликати",
-        "cancel": "Скасувати",
         "promptPlaceholder": "Введіть запит тут (англійською). [видалені токени], (більш вагомі)++, (менш вагомі)--, swap и blend також доступні (дивіться Github)",
         "sendTo": "Надіслати",
         "sendToImg2Img": "Надіслати у img2img",
@@ -495,7 +493,7 @@
         "cursorPosition": "Розташування курсора",
         "previous": "Попереднє",
         "next": "Наступне",
-        "принять": "Приняти",
+        "accept": "Приняти",
         "showHide": "Показати/Сховати",
         "discardAll": "Відмінити все",
         "betaClear": "Очистити",
