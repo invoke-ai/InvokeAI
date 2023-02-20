@@ -594,10 +594,10 @@ def default_startup_options() -> Namespace:
 
 def default_user_selections(program_opts: Namespace) -> Namespace:
     return Namespace(
-        starter_models=recommended_datasets()
-        if program_opts.yes_to_all
-        else default_dataset()
+        starter_models=default_dataset()
         if program_opts.default_only
+        else recommended_datasets()
+        if program_opts.yes_to_all
         else dict(),
         purge_deleted_models=False,
         scan_directory=None,
