@@ -964,6 +964,7 @@ class Generate:
 
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
+            print(f'>> Loading embeddings from {self.embedding_path}')
             for root, _, files in os.walk(self.embedding_path):
                 for name in files:
                     ti_path = os.path.join(root, name)
@@ -971,7 +972,7 @@ class Generate:
                         ti_path, defer_injecting_tokens=True
                     )
             print(
-                f'>> Textual inversions available: {", ".join(self.model.textual_inversion_manager.get_all_trigger_strings())}'
+                f'>> Textual inversion triggers: {", ".join(self.model.textual_inversion_manager.get_all_trigger_strings())}'
             )
 
         self.model_name = model_name
