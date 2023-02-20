@@ -8,6 +8,7 @@ import torch
 from diffusers.models.cross_attention import AttnProcessor
 from typing_extensions import TypeAlias
 
+from ldm.invoke.globals import Globals
 from ldm.models.diffusion.cross_attention_control import Arguments, \
     restore_default_cross_attention, override_cross_attention, Context, get_cross_attention_modules, \
     CrossAttentionType, SwapCrossAttnContext
@@ -35,7 +36,7 @@ class InvokeAIDiffuserComponent:
     * Hybrid conditioning (used for inpainting)
     '''
     debug_thresholding = False
-    sequential_conditioning = False
+    sequential_guidance = False
 
     @dataclass
     class ExtraConditioningInfo:
@@ -60,6 +61,7 @@ class InvokeAIDiffuserComponent:
         self.is_running_diffusers = is_running_diffusers
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
+        self.sequential_guidance = Globals.sequential_guidance
 
     @contextmanager
     def custom_attention_context(self,
@@ -154,7 +156,7 @@ class InvokeAIDiffuserComponent:
                                                                                                            unconditioning,
                                                                                                            conditioning,
                                                                                                            cross_attention_control_types_to_do)
-        elif self.sequential_conditioning:
+        elif self.sequential_guidance:
             unconditioned_next_x, conditioned_next_x = self._apply_standard_conditioning_sequentially(
                 x, sigma, unconditioning, conditioning)
 
