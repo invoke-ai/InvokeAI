@@ -44,19 +44,14 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
     return uc, c, ec
 
 
-def get_prompt_structure(prompt_string, model, skip_normalize_legacy_blend: bool = False) -> (
+def get_prompt_structure(prompt_string, skip_normalize_legacy_blend: bool = False) -> (
     Union[FlattenedPrompt, Blend], FlattenedPrompt):
     """
     parse the passed-in prompt string and return tuple (positive_prompt, negative_prompt)
     """
-    compel = Compel(tokenizer=model.tokenizer,
-                    text_encoder=model.text_encoder,
-                    textual_inversion_manager=model.textual_inversion_manager,
-                    dtype_for_device_getter=torch_dtype)
-
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
-    positive_prompt = compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt = compel.parse_prompt_string(negative_prompt_string)
+    positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
+    negative_prompt = Compel.parse_prompt_string(negative_prompt_string)
 
     return positive_prompt, negative_prompt
 
