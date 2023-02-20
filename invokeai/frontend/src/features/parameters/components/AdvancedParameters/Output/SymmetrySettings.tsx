@@ -32,7 +32,6 @@ export default function SymmetrySettings() {
         max={steps}
         step={1}
         withInput
-        inputWidth="6.5rem"
         withSliderMarks
         withReset
         handleReset={() => dispatch(setHorizontalSymmetryTimePercentage(0))}
@@ -46,7 +45,6 @@ export default function SymmetrySettings() {
         max={steps}
         step={1}
         withInput
-        inputWidth="6.5rem"
         withSliderMarks
         withReset
         handleReset={() => dispatch(setVerticalSymmetryTimePercentage(0))}
