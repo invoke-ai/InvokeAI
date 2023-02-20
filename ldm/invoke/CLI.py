@@ -1387,3 +1387,7 @@ def check_internet() -> bool:
         return True
     except:
         return False
+
+if __name__ == '__main__':
+    main()
+    
