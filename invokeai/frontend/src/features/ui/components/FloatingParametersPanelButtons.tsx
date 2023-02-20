@@ -3,10 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
-import {
-  GalleryState,
-  setShouldShowGallery,
-} from 'features/gallery/store/gallerySlice';
+import { GalleryState } from 'features/gallery/store/gallerySlice';
 import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
 import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
 import {
@@ -16,7 +13,6 @@ import {
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash';
 
-import { useHotkeys } from 'react-hotkeys-hook';
 import { FaSlidersH } from 'react-icons/fa';
 
 export const floatingSelector = createSelector(
@@ -67,12 +63,9 @@ export const floatingSelector = createSelector(
 const FloatingParametersPanelButtons = () => {
   const dispatch = useAppDispatch();
   const {
-    shouldShowParametersPanel,
     shouldShowParametersPanelButton,
     shouldShowProcessButtons,
     shouldPinParametersPanel,
-    shouldShowGallery,
-    shouldPinGallery,
   } = useAppSelector(floatingSelector);
 
   const handleShowOptionsPanel = () => {
@@ -81,22 +74,6 @@ const FloatingParametersPanelButtons = () => {
       setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     }
   };
-
-  useHotkeys(
-    'f',
-    () => {
-      if (shouldShowGallery || shouldShowParametersPanel) {
-        dispatch(setShouldShowParametersPanel(false));
-        dispatch(setShouldShowGallery(false));
-      } else {
-        dispatch(setShouldShowParametersPanel(true));
-        dispatch(setShouldShowGallery(true));
-      }
-      if (shouldPinGallery || shouldPinParametersPanel)
-        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
-    },
-    [shouldShowGallery, shouldShowParametersPanel]
-  );
 
   return shouldShowParametersPanelButton ? (
     <div className="show-hide-button-options">

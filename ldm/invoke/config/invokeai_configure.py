@@ -9,7 +9,6 @@
 print("Loading Python libraries...\n")
 import argparse
 import curses
-import npyscreen
 import io
 import os
 import re
@@ -17,14 +16,14 @@ import shutil
 import sys
 import traceback
 import warnings
+from argparse import Namespace
 from pathlib import Path
 from urllib import request
 
+import npyscreen
 import transformers
-from argparse import Namespace
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
-
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
@@ -35,16 +34,17 @@ from transformers import (
 )
 
 import invokeai.configs as configs
-from ..args import Args, PRECISION_CHOICES
-from .model_install_backend import (
-    download_from_hf,
-    recommended_datasets,
-    default_dataset,
-)
-from .model_install import process_and_execute, addModelsForm
-from .widgets import IntTitleSlider
+
+from ..args import PRECISION_CHOICES, Args
 from ..globals import Globals, global_config_dir
 from ..readline import generic_completer
+from .model_install import addModelsForm, process_and_execute
+from .model_install_backend import (
+    default_dataset,
+    download_from_hf,
+    recommended_datasets,
+)
+from .widgets import IntTitleSlider
 
 warnings.filterwarnings("ignore")
 
@@ -500,7 +500,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         options = self.marshall_arguments()
         if self.validate_field_values(options):
             self.parentApp.new_opts = options
-            if hasattr(self.parentApp,'model_select'):
+            if hasattr(self.parentApp, "model_select"):
                 self.parentApp.setNextForm("MODELS")
             else:
                 self.parentApp.setNextForm(None)
@@ -578,18 +578,21 @@ class EditOptApplication(npyscreen.NPSAppManaged):
     def new_opts(self):
         return self.options.marshall_arguments()
 
+
 def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Namespace:
     editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     return editApp.new_opts()
 
-def default_startup_options()->Namespace:
+
+def default_startup_options() -> Namespace:
     opts = Args().parse_args([])
     opts.outdir = str(default_output_dir())
     opts.safety_checker = True
     return opts
 
-def default_user_selections(program_opts: Namespace)->Namespace:
+
+def default_user_selections(program_opts: Namespace) -> Namespace:
     return Namespace(
         starter_models=recommended_datasets()
         if program_opts.yes_to_all
@@ -602,6 +605,8 @@ def default_user_selections(program_opts: Namespace)->Namespace:
         import_model_paths=None,
         convert_to_diffusers=None,
     )
+
+
 # -------------------------------------
 def initialize_rootdir(root: str, yes_to_all: bool = False):
     print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
@@ -758,7 +763,7 @@ def main():
 
     try:
         models_to_download = default_user_selections(opt)
-        
+
         # We check for to see if the runtime directory is correctly initialized.
         init_file = Path(Globals.root, Globals.initfile)
         if not init_file.exists():
@@ -771,7 +776,9 @@ def main():
             if init_options:
                 write_opts(init_options, init_file)
             else:
-                print("\n** CANCELLED AT USER'S REQUEST. USE THE \"invoke.sh\" LAUNCHER TO RUN LATER **\n")
+                print(
+                    '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'
+                )
                 sys.exit(0)
 
         if opt.skip_support_models:

@@ -93,7 +93,7 @@ def _get_conditioning_for_prompt(parsed_prompt: Union[Blend, FlattenedPrompt], p
     Process prompt structure and tokens, and return (conditioning, unconditioning, extra_conditioning_info)
     """
 
-    if log_tokens or Globals.log_tokenization:
+    if log_tokens or getattr(Globals, "log_tokenization", False):
         print(f"\n>> [TOKENLOG] Parsed Prompt: {parsed_prompt}")
         print(f"\n>> [TOKENLOG] Parsed Negative Prompt: {parsed_negative_prompt}")
 
@@ -236,7 +236,7 @@ def _get_embeddings_and_tokens_for_prompt(model, flattened_prompt: FlattenedProm
     fragments = [x.text for x in flattened_prompt.children]
     weights = [x.weight for x in flattened_prompt.children]
     embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True, fragment_weights=[weights])
-    if log_tokens or Globals.log_tokenization:
+    if log_tokens or getattr(Globals, "log_tokenization", False):
         text = " ".join(fragments)
         log_tokenization(text, model, display_label=log_display_label)
 

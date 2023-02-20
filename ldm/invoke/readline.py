@@ -60,7 +60,7 @@ COMMANDS = (
     '--text_mask','-tm',
     '!fix','!fetch','!replay','!history','!search','!clear',
     '!models','!switch','!import_model','!optimize_model','!convert_model','!edit_model','!del_model',
-    '!mask',
+    '!mask','!triggers',
     )
 MODEL_COMMANDS = (
     '!switch',

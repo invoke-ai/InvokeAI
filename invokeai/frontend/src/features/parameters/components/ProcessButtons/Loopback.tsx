@@ -19,8 +19,8 @@ const LoopbackButton = () => {
 
   return (
     <IAIIconButton
-      aria-label={t('parameters:toggleLoopback')}
-      tooltip={t('parameters:toggleLoopback')}
+      aria-label={t('parameters.toggleLoopback')}
+      tooltip={t('parameters.toggleLoopback')}
       styleClass="loopback-btn"
       asCheckbox={true}
       isChecked={shouldLoopback}

@@ -14,7 +14,7 @@ export default function SeamSteps() {
   return (
     <IAISlider
       sliderMarkRightOffset={-4}
-      label={t('parameters:seamSteps')}
+      label={t('parameters.seamSteps')}
       min={1}
       max={100}
       sliderNumberInputProps={{ max: 999 }}

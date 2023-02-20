@@ -142,7 +142,7 @@ const CurrentImageButtons = () => {
     await navigator.clipboard.write(data);
 
     toast({
-      title: t('toast:imageCopied'),
+      title: t('toast.imageCopied'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -156,7 +156,7 @@ const CurrentImageButtons = () => {
       )
       .then(() => {
         toast({
-          title: t('toast:imageLinkCopied'),
+          title: t('toast.imageLinkCopied'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -170,15 +170,15 @@ const CurrentImageButtons = () => {
       if (currentImage) {
         handleClickUseAsInitialImage();
         toast({
-          title: t('toast:sentToImageToImage'),
+          title: t('toast.sentToImageToImage'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: t('toast:imageNotLoaded'),
-          description: t('toast:imageNotLoadedDesc'),
+          title: t('toast.imageNotLoaded'),
+          description: t('toast.imageNotLoadedDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -206,15 +206,15 @@ const CurrentImageButtons = () => {
       ) {
         handleClickUseAllParameters();
         toast({
-          title: t('toast:parametersSet'),
+          title: t('toast.parametersSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: t('toast:parametersNotSet'),
-          description: t('toast:parametersNotSetDesc'),
+          title: t('toast.parametersNotSet'),
+          description: t('toast.parametersNotSetDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -235,15 +235,15 @@ const CurrentImageButtons = () => {
       if (currentImage?.metadata?.image?.seed) {
         handleClickUseSeed();
         toast({
-          title: t('toast:seedSet'),
+          title: t('toast.seedSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: t('toast:seedNotSet'),
-          description: t('toast:seedNotSetDesc'),
+          title: t('toast.seedNotSet'),
+          description: t('toast.seedNotSetDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -272,15 +272,15 @@ const CurrentImageButtons = () => {
       if (currentImage?.metadata?.image?.prompt) {
         handleClickUsePrompt();
         toast({
-          title: t('toast:promptSet'),
+          title: t('toast.promptSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: t('toast:promptNotSet'),
-          description: t('toast:promptNotSetDesc'),
+          title: t('toast.promptNotSet'),
+          description: t('toast.promptNotSetDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -307,7 +307,7 @@ const CurrentImageButtons = () => {
         handleClickUpscale();
       } else {
         toast({
-          title: t('toast:upscalingFailed'),
+          title: t('toast.upscalingFailed'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -341,7 +341,7 @@ const CurrentImageButtons = () => {
         handleClickFixFaces();
       } else {
         toast({
-          title: t('toast:faceRestoreFailed'),
+          title: t('toast.faceRestoreFailed'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -373,7 +373,7 @@ const CurrentImageButtons = () => {
     }
 
     toast({
-      title: t('toast:sentToUnifiedCanvas'),
+      title: t('toast.sentToUnifiedCanvas'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -387,7 +387,7 @@ const CurrentImageButtons = () => {
         handleClickShowImageDetails();
       } else {
         toast({
-          title: t('toast:metadataLoadFailed'),
+          title: t('toast.metadataLoadFailed'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -408,7 +408,7 @@ const CurrentImageButtons = () => {
           trigger="hover"
           triggerComponent={
             <IAIIconButton
-              aria-label={`${t('parameters:sendTo')}...`}
+              aria-label={`${t('parameters.sendTo')}...`}
               icon={<FaShareAlt />}
             />
           }
@@ -419,14 +419,14 @@ const CurrentImageButtons = () => {
               onClick={handleClickUseAsInitialImage}
               leftIcon={<FaShare />}
             >
-              {t('parameters:sendToImg2Img')}
+              {t('parameters.sendToImg2Img')}
             </IAIButton>
             <IAIButton
               size="sm"
               onClick={handleSendToCanvas}
               leftIcon={<FaShare />}
             >
-              {t('parameters:sendToUnifiedCanvas')}
+              {t('parameters.sendToUnifiedCanvas')}
             </IAIButton>
 
             <IAIButton
@@ -434,19 +434,19 @@ const CurrentImageButtons = () => {
               onClick={handleCopyImage}
               leftIcon={<FaCopy />}
             >
-              {t('parameters:copyImage')}
+              {t('parameters.copyImage')}
             </IAIButton>
             <IAIButton
               size="sm"
               onClick={handleCopyImageLink}
               leftIcon={<FaCopy />}
             >
-              {t('parameters:copyImageToLink')}
+              {t('parameters.copyImageToLink')}
             </IAIButton>
 
             <Link download={true} href={currentImage?.url}>
               <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
-                {t('parameters:downloadImage')}
+                {t('parameters.downloadImage')}
               </IAIButton>
             </Link>
           </div>
@@ -455,13 +455,13 @@ const CurrentImageButtons = () => {
           icon={<FaExpand />}
           tooltip={
             !isLightboxOpen
-              ? `${t('parameters:openInViewer')} (Z)`
-              : `${t('parameters:closeViewer')} (Z)`
+              ? `${t('parameters.openInViewer')} (Z)`
+              : `${t('parameters.closeViewer')} (Z)`
           }
           aria-label={
             !isLightboxOpen
-              ? `${t('parameters:openInViewer')} (Z)`
-              : `${t('parameters:closeViewer')} (Z)`
+              ? `${t('parameters.openInViewer')} (Z)`
+              : `${t('parameters.closeViewer')} (Z)`
           }
           data-selected={isLightboxOpen}
           onClick={handleLightBox}
@@ -471,24 +471,24 @@ const CurrentImageButtons = () => {
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaQuoteRight />}
-          tooltip={`${t('parameters:usePrompt')} (P)`}
-          aria-label={`${t('parameters:usePrompt')} (P)`}
+          tooltip={`${t('parameters.usePrompt')} (P)`}
+          aria-label={`${t('parameters.usePrompt')} (P)`}
           isDisabled={!currentImage?.metadata?.image?.prompt}
           onClick={handleClickUsePrompt}
         />
 
         <IAIIconButton
           icon={<FaSeedling />}
-          tooltip={`${t('parameters:useSeed')} (S)`}
-          aria-label={`${t('parameters:useSeed')} (S)`}
+          tooltip={`${t('parameters.useSeed')} (S)`}
+          aria-label={`${t('parameters.useSeed')} (S)`}
           isDisabled={!currentImage?.metadata?.image?.seed}
           onClick={handleClickUseSeed}
         />
 
         <IAIIconButton
           icon={<FaAsterisk />}
-          tooltip={`${t('parameters:useAll')} (A)`}
-          aria-label={`${t('parameters:useAll')} (A)`}
+          tooltip={`${t('parameters.useAll')} (A)`}
+          aria-label={`${t('parameters.useAll')} (A)`}
           isDisabled={
             !['txt2img', 'img2img'].includes(
               currentImage?.metadata?.image?.type
@@ -504,7 +504,7 @@ const CurrentImageButtons = () => {
           triggerComponent={
             <IAIIconButton
               icon={<FaGrinStars />}
-              aria-label={t('parameters:restoreFaces')}
+              aria-label={t('parameters.restoreFaces')}
             />
           }
         >
@@ -519,7 +519,7 @@ const CurrentImageButtons = () => {
               }
               onClick={handleClickFixFaces}
             >
-              {t('parameters:restoreFaces')}
+              {t('parameters.restoreFaces')}
             </IAIButton>
           </div>
         </IAIPopover>
@@ -529,7 +529,7 @@ const CurrentImageButtons = () => {
           triggerComponent={
             <IAIIconButton
               icon={<FaExpandArrowsAlt />}
-              aria-label={t('parameters:upscale')}
+              aria-label={t('parameters.upscale')}
             />
           }
         >
@@ -544,7 +544,7 @@ const CurrentImageButtons = () => {
               }
               onClick={handleClickUpscale}
             >
-              {t('parameters:upscaleImage')}
+              {t('parameters.upscaleImage')}
             </IAIButton>
           </div>
         </IAIPopover>
@@ -553,8 +553,8 @@ const CurrentImageButtons = () => {
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaCode />}
-          tooltip={`${t('parameters:info')} (I)`}
-          aria-label={`${t('parameters:info')} (I)`}
+          tooltip={`${t('parameters.info')} (I)`}
+          aria-label={`${t('parameters.info')} (I)`}
           data-selected={shouldShowImageDetails}
           onClick={handleClickShowImageDetails}
         />
@@ -563,8 +563,8 @@ const CurrentImageButtons = () => {
       <DeleteImageModal image={currentImage}>
         <IAIIconButton
           icon={<FaTrash />}
-          tooltip={`${t('parameters:deleteImage')} (Del)`}
-          aria-label={`${t('parameters:deleteImage')} (Del)`}
+          tooltip={`${t('parameters.deleteImage')} (Del)`}
+          aria-label={`${t('parameters.deleteImage')} (Del)`}
           isDisabled={!currentImage || !isConnected || isProcessing}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />

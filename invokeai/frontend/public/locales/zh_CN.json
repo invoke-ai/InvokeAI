@@ -1,0 +1,486 @@
+{
+    "common": {
+        "hotkeysLabel": "快捷键",
+        "themeLabel": "主题",
+        "languagePickerLabel": "语言",
+        "reportBugLabel": "提交错误报告",
+        "settingsLabel": "设置",
+        "darkTheme": "暗色",
+        "lightTheme": "亮色",
+        "greenTheme": "绿色",
+        "text2img": "文字到图像",
+        "img2img": "图像到图像",
+        "unifiedCanvas": "统一画布",
+        "nodes": "节点",
+        "langSimplifiedChinese": "简体中文",
+        "nodesDesc": "一个基于节点的图像生成系统目前正在开发中。请持续关注关于这一功能的更新。",
+        "postProcessing": "后期处理",
+        "postProcessDesc1": "Invoke AI 提供各种各样的后期处理功能。图像放大和面部修复在网页界面中已经可用。你可以从文本到图像和图像到图像页面的高级选项菜单中访问它们。你也可以直接使用图像显示上方或查看器中的图像操作按钮处理图像。",
+        "postProcessDesc2": "一个专门的界面将很快发布，新的界面能够处理更复杂的后期处理流程。",
+        "postProcessDesc3": "Invoke AI 命令行界面提供例如Embiggen的各种其他功能。",
+        "training": "训练",
+        "trainingDesc1": "一个专门用于从网络UI使用Textual Inversion和Dreambooth训练自己的嵌入模型和检查点的工作流程。",
+        "trainingDesc2": "InvokeAI已经支持使用主脚本中的Textual Inversion来训练自定义的嵌入模型。",
+        "upload": "上传",
+        "close": "关闭",
+        "load": "加载",
+        "statusConnected": "已连接",
+        "statusDisconnected": "未连接",
+        "statusError": "错误",
+        "statusPreparing": "准备中",
+        "statusProcessingCanceled": "处理取消",
+        "statusProcessingComplete": "处理完成",
+        "statusGenerating": "生成中",
+        "statusGeneratingTextToImage": "文字到图像生成中",
+        "statusGeneratingImageToImage": "图像到图像生成中",
+        "statusGeneratingInpainting": "生成内画中",
+        "statusGeneratingOutpainting": "生成外画中",
+        "statusGenerationComplete": "生成完成",
+        "statusIterationComplete": "迭代完成",
+        "statusSavingImage": "图像保存中",
+        "statusRestoringFaces": "脸部修复中",
+        "statusRestoringFacesGFPGAN": "脸部修复中 (GFPGAN)",
+        "statusRestoringFacesCodeFormer": "脸部修复中 (CodeFormer)",
+        "statusUpscaling": "放大中",
+        "statusUpscalingESRGAN": "放大中 (ESRGAN)",
+        "statusLoadingModel": "模型加载中",
+        "statusModelChanged": "模型已切换"
+    },
+    "gallery": {
+        "generations": "生成的图像",
+        "showGenerations": "显示生成的图像",
+        "uploads": "上传的图像",
+        "showUploads": "显示上传的图像",
+        "galleryImageSize": "预览大小",
+        "galleryImageResetSize": "重置预览大小",
+        "gallerySettings": "预览设置",
+        "maintainAspectRatio": "保持比例",
+        "autoSwitchNewImages": "自动切换到新图像",
+        "singleColumnLayout": "单列布局",
+        "pinGallery": "保持图库常开",
+        "allImagesLoaded": "所有图像加载完成",
+        "loadMore": "加载更多",
+        "noImagesInGallery": "图库中无图像"
+    },
+    "hotkeys": {
+        "keyboardShortcuts": "快捷方式",
+        "appHotkeys": "应用快捷方式",
+        "generalHotkeys": "一般快捷方式",
+        "galleryHotkeys": "图库快捷方式",
+        "unifiedCanvasHotkeys": "统一画布快捷方式",
+        "invoke": {
+            "title": "Invoke",
+            "desc": "生成图像"
+        },
+        "cancel": {
+            "title": "取消",
+            "desc": "取消图像生成"
+        },
+        "focusPrompt": {
+            "title": "打开提示框",
+            "desc": "打开提示文本框"
+        },
+        "toggleOptions": {
+            "title": "切换选项卡",
+            "desc": "打开或关闭选项卡"
+        },
+        "pinOptions": {
+            "title": "常开选项卡",
+            "desc": "保持选项卡常开"
+        },
+        "toggleViewer": {
+            "title": "切换图像视图",
+            "desc": "打开或关闭图像视图"
+        },
+        "toggleGallery": {
+            "title": "切换图库",
+            "desc": "打开或关闭图库"
+        },
+        "maximizeWorkSpace": {
+            "title": "工作台最大化",
+            "desc": "关闭所有浮窗，将工作区域最大化"
+        },
+        "changeTabs": {
+            "title": "切换卡片",
+            "desc": "切换到另一个工作区"
+        },
+        "consoleToggle": {
+            "title": "切换命令行",
+            "desc": "打开或关闭命令行"
+        },
+        "setPrompt": {
+            "title": "使用提示",
+            "desc": "使用当前图像的提示词"
+        },
+        "setSeed": {
+            "title": "使用种子",
+            "desc": "使用当前图像的种子"
+        },
+        "setParameters": {
+            "title": "使用所有参数",
+            "desc": "使用当前图像的所有参数"
+        },
+        "restoreFaces": {
+            "title": "脸部修复",
+            "desc": "对当前图像进行脸部修复"
+        },
+        "upscale": {
+            "title": "放大",
+            "desc": "对当前图像进行放大"
+        },
+        "showInfo": {
+            "title": "显示信息",
+            "desc": "显示当前图像的元数据"
+        },
+        "sendToImageToImage": {
+            "title": "送往图像到图像",
+            "desc": "将当前图像送往图像到图像"
+        },
+        "deleteImage": {
+            "title": "删除图像",
+            "desc": "删除当前图像"
+        },
+        "closePanels": {
+            "title": "关闭浮窗",
+            "desc": "关闭目前打开的浮窗"
+        },
+        "previousImage": {
+            "title": "上一张图像",
+            "desc": "显示相册中的上一张图像"
+        },
+        "nextImage": {
+            "title": "下一张图像",
+            "desc": "显示相册中的下一张图像"
+        },
+        "toggleGalleryPin": {
+            "title": "切换图库常开",
+            "desc": "开关图库在界面中的常开模式"
+        },
+        "increaseGalleryThumbSize": {
+            "title": "增大预览大小",
+            "desc": "增大图库中预览的大小"
+        },
+        "decreaseGalleryThumbSize": {
+            "title": "减小预览大小",
+            "desc": "减小图库中预览的大小"
+        },
+        "selectBrush": {
+            "title": "选择刷子",
+            "desc": "选择统一画布上的刷子"
+        },
+        "selectEraser": {
+            "title": "选择橡皮擦",
+            "desc": "选择统一画布上的橡皮擦"
+        },
+        "decreaseBrushSize": {
+            "title": "减小刷子大小",
+            "desc": "减小统一画布上的刷子或橡皮擦的大小"
+        },
+        "increaseBrushSize": {
+            "title": "增大刷子大小",
+            "desc": "增大统一画布上的刷子或橡皮擦的大小"
+        },
+        "decreaseBrushOpacity": {
+            "title": "减小刷子不透明度",
+            "desc": "减小统一画布上的刷子的不透明度"
+        },
+        "increaseBrushOpacity": {
+            "title": "增大刷子不透明度",
+            "desc": "增大统一画布上的刷子的不透明度"
+        },
+        "moveTool": {
+            "title": "移动工具",
+            "desc": "在画布上移动"
+        },
+        "fillBoundingBox": {
+            "title": "填充选择区域",
+            "desc": "在选择区域中填充刷子颜色"
+        },
+        "eraseBoundingBox": {
+            "title": "取消选择区域",
+            "desc": "将选择区域抹除"
+        },
+        "colorPicker": {
+            "title": "颜色提取工具",
+            "desc": "选择颜色提取工具"
+        },
+        "toggleSnap": {
+            "title": "切换网格对齐",
+            "desc": "打开或关闭网格对齐"
+        },
+        "quickToggleMove": {
+            "title": "快速切换移动模式",
+            "desc": "临时性地切换移动模式"
+        },
+        "toggleLayer": {
+            "title": "切换图层",
+            "desc": "切换遮罩/基础层的选择"
+        },
+        "clearMask": {
+            "title": "清除遮罩",
+            "desc": "清除整个遮罩层"
+        },
+        "hideMask": {
+            "title": "隐藏遮罩",
+            "desc": "隐藏或显示遮罩"
+        },
+        "showHideBoundingBox": {
+            "title": "显示/隐藏框选区",
+            "desc": "切换框选区的的显示状态"
+        },
+        "mergeVisible": {
+            "title": "合并可见层",
+            "desc": "将画板上可见层合并"
+        },
+        "saveToGallery": {
+            "title": "保存至图库",
+            "desc": "将画板当前内容保存至图库"
+        },
+        "copyToClipboard": {
+            "title": "复制到剪贴板",
+            "desc": "将画板当前内容复制到剪贴板"
+        },
+        "downloadImage": {
+            "title": "下载图像",
+            "desc": "下载画板当前内容"
+        },
+        "undoStroke": {
+            "title": "撤销画笔",
+            "desc": "撤销上一笔刷子的动作"
+        },
+        "redoStroke": {
+            "title": "重做画笔",
+            "desc": "重做上一笔刷子的动作"
+        },
+        "resetView": {
+            "title": "重置视图",
+            "desc": "重置画板视图"
+        },
+        "previousStagingImage": {
+            "title": "上一张暂存图像",
+            "desc": "上一张暂存区中的图像"
+        },
+        "nextStagingImage": {
+            "title": "下一张暂存图像",
+            "desc": "下一张暂存区中的图像"
+        },
+        "acceptStagingImage": {
+            "title": "接受暂存图像",
+            "desc": "接受当前暂存区中的图像"
+        }
+    },
+    "modelManager": {
+        "modelManager": "模型管理器",
+        "model": "模型",
+        "modelAdded": "模型已添加",
+        "modelUpdated": "模型已更新",
+        "modelEntryDeleted": "模型已删除",
+        "cannotUseSpaces": "不能使用空格",
+        "addNew": "添加",
+        "addNewModel": "添加新模型",
+        "addManually": "手动添加",
+        "manual": "手动",
+        "name": "名称",
+        "nameValidationMsg": "输入模型的名称",
+        "description": "描述",
+        "descriptionValidationMsg": "添加模型的描述",
+        "config": "配置",
+        "configValidationMsg": "模型配置文件的路径",
+        "modelLocation": "模型位置",
+        "modelLocationValidationMsg": "模型文件的路径",
+        "vaeLocation": "VAE 位置",
+        "vaeLocationValidationMsg": "VAE 文件的路径",
+        "width": "宽度",
+        "widthValidationMsg": "模型的默认宽度",
+        "height": "高度",
+        "heightValidationMsg": "模型的默认高度",
+        "addModel": "添加模型",
+        "updateModel": "更新模型",
+        "availableModels": "可用模型",
+        "search": "搜索",
+        "load": "加载",
+        "active": "活跃",
+        "notLoaded": "未加载",
+        "cached": "缓存",
+        "checkpointFolder": "模型检查点文件夹",
+        "clearCheckpointFolder": "清除模型检查点文件夹",
+        "findModels": "寻找模型",
+        "modelsFound": "找到的模型",
+        "selectFolder": "选择文件夹",
+        "selected": "已选择",
+        "selectAll": "选择所有",
+        "deselectAll": "取消选择所有",
+        "showExisting": "显示已存在",
+        "addSelected": "添加选择",
+        "modelExists": "模型已存在",
+        "delete": "删除",
+        "deleteModel": "删除模型",
+        "deleteConfig": "删除配置",
+        "deleteMsg1": "您确定要将这个模型从 InvokeAI 删除吗？",
+        "deleteMsg2": "这不会从磁盘中删除模型检查点文件。如果您愿意，可以重新添加它们。"
+    },
+    "parameters": {
+        "images": "图像",
+        "steps": "步数",
+        "cfgScale": "CFG 等级",
+        "width": "宽度",
+        "height": "高度",
+        "sampler": "采样算法",
+        "seed": "种子",
+        "randomizeSeed": "随机化种子",
+        "shuffle": "随机化",
+        "noiseThreshold": "噪声阈值",
+        "perlinNoise": "Perlin 噪声",
+        "variations": "变种",
+        "variationAmount": "变种数量",
+        "seedWeights": "种子权重",
+        "faceRestoration": "脸部修复",
+        "restoreFaces": "修复脸部",
+        "type": "种类",
+        "strength": "强度",
+        "upscaling": "放大",
+        "upscale": "放大",
+        "upscaleImage": "放大图像",
+        "scale": "等级",
+        "otherOptions": "其他选项",
+        "seamlessTiling": "无缝拼贴",
+        "hiresOptim": "高清优化",
+        "imageFit": "使生成图像长宽适配原图像",
+        "codeformerFidelity": "保真",
+        "seamSize": "接缝尺寸",
+        "seamBlur": "接缝模糊",
+        "seamStrength": "接缝强度",
+        "seamSteps": "接缝步数",
+        "scaleBeforeProcessing": "处理前缩放",
+        "scaledWidth": "缩放宽度",
+        "scaledHeight": "缩放长度",
+        "infillMethod": "填充法",
+        "tileSize": "方格尺寸",
+        "boundingBoxHeader": "选择区域",
+        "seamCorrectionHeader": "接缝修正",
+        "infillScalingHeader": "内填充和缩放",
+        "img2imgStrength": "图像到图像强度",
+        "toggleLoopback": "切换环回",
+        "invoke": "Invoke",
+        "promptPlaceholder": "在这里输入提示。可以使用[反提示]、(加权)++、(减权)--、交换和混合（见文档）",
+        "sendTo": "发送到",
+        "sendToImg2Img": "发送到图像到图像",
+        "sendToUnifiedCanvas": "发送到统一画布",
+        "copyImageToLink": "复制图像链接",
+        "downloadImage": "下载图像",
+        "openInViewer": "在视图中打开",
+        "closeViewer": "关闭视图",
+        "usePrompt": "使用提示",
+        "useSeed": "使用种子",
+        "useAll": "使用所有参数",
+        "useInitImg": "使用原图像",
+        "info": "信息",
+        "deleteImage": "删除图像",
+        "initialImage": "原图像",
+        "showOptionsPanel": "显示选项浮窗"
+    },
+    "settings": {
+        "models": "模型",
+        "displayInProgress": "显示进行中的图像",
+        "saveSteps": "每n步保存图像",
+        "confirmOnDelete": "删除时确认",
+        "displayHelpIcons": "显示帮助按钮",
+        "useCanvasBeta": "使用测试版画布视图",
+        "enableImageDebugging": "开启图像调试",
+        "resetWebUI": "重置网页界面",
+        "resetWebUIDesc1": "重置网页只会重置浏览器中缓存的图像和设置，不会删除任何图像。",
+        "resetWebUIDesc2": "如果图像没有显示在图库中，或者其他东西不工作，请在GitHub上提交问题之前尝试重置。",
+        "resetComplete": "网页界面已重置。刷新页面以重新加载。"
+    },
+    "toast": {
+        "tempFoldersEmptied": "临时文件夹已清空",
+        "uploadFailed": "上传失败",
+        "uploadFailedMultipleImagesDesc": "多张图像被粘贴，同时只能上传一张图像",
+        "uploadFailedUnableToLoadDesc": "无法加载文件",
+        "downloadImageStarted": "图像下载已开始",
+        "imageCopied": "图像已复制",
+        "imageLinkCopied": "图像链接已复制",
+        "imageNotLoaded": "没有加载图像",
+        "imageNotLoadedDesc": "没有图像可供送往图像到图像界面",
+        "imageSavedToGallery": "图像已保存到图库",
+        "canvasMerged": "画布已合并",
+        "sentToImageToImage": "已送往图像到图像",
+        "sentToUnifiedCanvas": "已送往统一画布",
+        "parametersSet": "参数已设定",
+        "parametersNotSet": "参数未设定",
+        "parametersNotSetDesc": "此图像不存在元数据",
+        "parametersFailed": "加载参数失败",
+        "parametersFailedDesc": "加载初始图像失败",
+        "seedSet": "种子已设定",
+        "seedNotSet": "种子未设定",
+        "seedNotSetDesc": "无法找到该图像的种子",
+        "promptSet": "提示已设定",
+        "promptNotSet": "提示未设定",
+        "promptNotSetDesc": "无法找到该图像的提示",
+        "upscalingFailed": "放大失败",
+        "faceRestoreFailed": "脸部修复失败",
+        "metadataLoadFailed": "加载元数据失败",
+        "initialImageSet": "初始图像已设定",
+        "initialImageNotSet": "初始图像未设定",
+        "initialImageNotSetDesc": "无法加载初始图像"
+    },
+    "unifiedCanvas": {
+        "layer": "图层",
+        "base": "基础层",
+        "mask": "遮罩层层",
+        "maskingOptions": "遮罩层选项",
+        "enableMask": "启用遮罩层",
+        "preserveMaskedArea": "保留遮罩层区域",
+        "clearMask": "清除遮罩层",
+        "brush": "刷子",
+        "eraser": "橡皮擦",
+        "fillBoundingBox": "填充选择区域",
+        "eraseBoundingBox": "取消选择区域",
+        "colorPicker": "颜色提取",
+        "brushOptions": "刷子选项",
+        "brushSize": "大小",
+        "move": "移动",
+        "resetView": "重置视图",
+        "mergeVisible": "合并可见层",
+        "saveToGallery": "保存至图库",
+        "copyToClipboard": "复制到剪贴板",
+        "downloadAsImage": "下载图像",
+        "undo": "撤销",
+        "redo": "重做",
+        "clearCanvas": "清除画布",
+        "canvasSettings": "画布设置",
+        "showIntermediates": "显示中间产物",
+        "showGrid": "显示网格",
+        "snapToGrid": "切换网格对齐",
+        "darkenOutsideSelection": "暗化外部区域",
+        "autoSaveToGallery": "自动保存至图库",
+        "saveBoxRegionOnly": "只保存框内区域",
+        "limitStrokesToBox": "限制画笔在框内",
+        "showCanvasDebugInfo": "显示画布调试信息",
+        "clearCanvasHistory": "清除画布历史",
+        "clearHistory": "清除历史",
+        "clearCanvasHistoryMessage": "清除画布历史不会影响当前画布，但会不可撤销地清除所有撤销/重做历史！",
+        "clearCanvasHistoryConfirm": "确认清除所有画布历史？",
+        "emptyTempImageFolder": "清除临时文件夹",
+        "emptyFolder": "清除文件夹",
+        "emptyTempImagesFolderMessage": "清空临时图像文件夹会完全重置统一画布。这包括所有的撤销/重做历史、暂存区的图像和画布基础层。",
+        "emptyTempImagesFolderConfirm": "确认清除临时文件夹？",
+        "activeLayer": "活跃图层",
+        "canvasScale": "画布缩放",
+        "boundingBox": "选择区域",
+        "scaledBoundingBox": "缩放选择区域",
+        "boundingBoxPosition": "选择区域位置",
+        "canvasDimensions": "画布长宽",
+        "canvasPosition": "画布位置",
+        "cursorPosition": "光标位置",
+        "previous": "上一张",
+        "next": "下一张",
+        "accept": "接受",
+        "showHide": "显示 / 隐藏",
+        "discardAll": "放弃所有",
+        "betaClear": "清除",
+        "betaDarkenOutside": "暗化外部区域",
+        "betaLimitToBox": "限制在框内",
+        "betaPreserveMasked": "保留遮罩层"
+    }
+}

@@ -19,7 +19,7 @@ export default function MainCFGScale() {
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters:cfgScale')}
+      label={t('parameters.cfgScale')}
       step={0.5}
       min={1.01}
       max={30}
@@ -34,7 +34,7 @@ export default function MainCFGScale() {
     />
   ) : (
     <IAINumberInput
-      label={t('parameters:cfgScale')}
+      label={t('parameters.cfgScale')}
       step={0.5}
       min={1.01}
       max={200}

@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import {
   setUpscalingLevel,
-  type UpscalingLevel,
+  UpscalingLevel,
 } from 'features/parameters/store/postprocessingSlice';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +27,7 @@ export default function UpscaleScale() {
   return (
     <IAISelect
       isDisabled={!isESRGANAvailable}
-      label={t('parameters:scale')}
+      label={t('parameters.scale')}
       value={upscalingLevel}
       onChange={handleChangeLevel}
       validValues={UPSCALING_LEVELS}

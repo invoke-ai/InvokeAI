@@ -21,7 +21,7 @@ export default function CodeformerFidelity() {
       isSliderDisabled={!isGFPGANAvailable}
       isInputDisabled={!isGFPGANAvailable}
       isResetDisabled={!isGFPGANAvailable}
-      label={t('parameters:codeformerFidelity')}
+      label={t('parameters.codeformerFidelity')}
       step={0.05}
       min={0}
       max={1}

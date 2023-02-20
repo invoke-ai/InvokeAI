@@ -19,7 +19,7 @@ export default function RandomizeSeed() {
 
   return (
     <IAISwitch
-      label={t('parameters:randomizeSeed')}
+      label={t('parameters.randomizeSeed')}
       isChecked={shouldRandomizeSeed}
       onChange={handleChangeShouldRandomizeSeed}
     />

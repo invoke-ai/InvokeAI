@@ -14,7 +14,7 @@ export default function UnifiedCanvasPreserveMask() {
 
   return (
     <IAICheckbox
-      label={t('unifiedcanvas:betaPreserveMasked')}
+      label={t('unifiedCanvas.betaPreserveMasked')}
       isChecked={shouldPreserveMaskedArea}
       onChange={(e) => dispatch(setShouldPreserveMaskedArea(e.target.checked))}
     />

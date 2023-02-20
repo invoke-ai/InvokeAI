@@ -22,7 +22,7 @@ export default function Seed() {
 
   return (
     <IAINumberInput
-      label={t('parameters:seed')}
+      label={t('parameters.seed')}
       step={1}
       precision={0}
       flexGrow={1}
