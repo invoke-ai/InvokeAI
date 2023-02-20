@@ -304,7 +304,6 @@
         "scaledHeight": "高さのスケール",
         "boundingBoxHeader": "バウンディングボックス",
         "img2imgStrength": "Image To Imageの強度",
-        "cancel": "キャンセル",
         "sendTo": "転送",
         "sendToImg2Img": "Image to Imageに転送",
         "sendToUnifiedCanvas": "Unified Canvasに転送",
