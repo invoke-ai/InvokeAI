@@ -212,6 +212,7 @@ class Generate:
         else:
             print('>> xformers not installed')
 
+
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig, self.device, self.precision,
                                           max_loaded_models=max_loaded_models,
@@ -234,7 +235,7 @@ class Generate:
         # load safety checker if requested
         if safety_checker:
             try:
-                print('>> Initializing safety checker')
+                print('>> Initializing NSFW checker model')
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
@@ -251,6 +252,9 @@ class Generate:
             except Exception:
                 print('** An error was encountered while installing the safety checker:')
                 print(traceback.format_exc())
+        else:
+            print('>> NSFW checker is disabled')
+
 
     def prompt2png(self, prompt, outdir, **kwargs):
         """
