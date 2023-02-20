@@ -3,6 +3,8 @@ import { Feature } from 'app/features';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import FaceRestoreToggle from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreToggle';
 import ImageToImageOutputSettings from 'features/parameters/components/AdvancedParameters/Output/ImageToImageOutputSettings';
+import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
+import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
 import UpscaleToggle from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleToggle';
@@ -43,6 +45,11 @@ export default function ImageToImagePanel() {
       feature: Feature.UPSCALE,
       content: <UpscaleSettings />,
       additionalHeaderComponents: <UpscaleToggle />,
+    },
+    symmetry: {
+      header: `${t('parameters.symmetry')}`,
+      content: <SymmetrySettings />,
+      additionalHeaderComponents: <SymmetryToggle />,
     },
     other: {
       header: `${t('parameters.otherOptions')}`,

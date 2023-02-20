@@ -5,6 +5,8 @@ import BoundingBoxSettings from 'features/parameters/components/AdvancedParamete
 import InfillAndScalingSettings from 'features/parameters/components/AdvancedParameters/Canvas/InfillAndScalingSettings';
 import SeamCorrectionSettings from 'features/parameters/components/AdvancedParameters/Canvas/SeamCorrection/SeamCorrectionSettings';
 import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
+import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
+import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
@@ -45,6 +47,11 @@ export default function UnifiedCanvasPanel() {
       feature: Feature.VARIATIONS,
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
+    },
+    symmetry: {
+      header: `${t('parameters.symmetry')}`,
+      content: <SymmetrySettings />,
+      additionalHeaderComponents: <SymmetryToggle />,
     },
   };
 

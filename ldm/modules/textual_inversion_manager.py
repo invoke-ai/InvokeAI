@@ -84,7 +84,7 @@ class TextualInversionManager:
             return
         elif (
             self.text_encoder.get_input_embeddings().weight.data[0].shape[0]
-            != embedding_info["embedding"].shape[0]
+            != embedding_info['token_dim']
         ):
             print(
                 f"** Notice: {ckpt_path.parents[0].name}/{ckpt_path.name} was trained on a model with a different token dimension. It can't be used with this model."
