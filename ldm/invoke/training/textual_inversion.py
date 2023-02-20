@@ -421,7 +421,6 @@ def do_front_end(args: Namespace):
         save_args(args)
 
         try:
-            print(f"DEBUG: args = {args}")
             do_textual_inversion_training(**args)
             copy_to_embeddings_folder(args)
         except Exception as e:

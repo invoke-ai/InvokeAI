@@ -385,19 +385,25 @@ class ModelManager(object):
             from ldm.invoke.ckpt_to_diffuser import (
                 load_pipeline_from_original_stable_diffusion_ckpt,
             )
-
+            self.offload_model(self.current_model)
             if vae_config := self._choose_diffusers_vae(model_name):
                 vae = self._load_vae(vae_config)
+            if self._has_cuda():
+                torch.cuda.empty_cache()
             pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
                 checkpoint_path=weights,
                 original_config_file=config,
                 vae=vae,
                 return_generator_pipeline=True,
+                precision=torch.float16 if self.precision=='float16' else torch.float32,
             )
+            if self.sequential_offload:
+                pipeline.enable_offload_submodels(self.device)
+            else:
+                pipeline.to(self.device)
+                
             return (
-                pipeline.to(self.device).to(
-                    torch.float16 if self.precision == "float16" else torch.float32
-                ),
+                pipeline,
                 width,
                 height,
                 "NOHASH",
