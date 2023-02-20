@@ -23,6 +23,8 @@ export type ReadinessPayload = {
 
 export type InProgressImageType = 'none' | 'full-res' | 'latents';
 
+export type CancelType = 'immediate' | 'scheduled';
+
 export interface SystemState
   extends InvokeAI.SystemStatus,
     InvokeAI.SystemConfig {
@@ -50,6 +52,10 @@ export interface SystemState
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
   openModel: string | null;
+  cancelOptions: {
+    cancelType: CancelType;
+    cancelAfter: number | null;
+  };
 }
 
 const initialSystemState: SystemState = {
@@ -63,7 +69,7 @@ const initialSystemState: SystemState = {
   isESRGANAvailable: true,
   socketId: '',
   shouldConfirmOnDelete: true,
-  openAccordions: [],
+  openAccordions: [0],
   currentStep: 0,
   totalSteps: 0,
   currentIteration: 0,
@@ -88,6 +94,10 @@ const initialSystemState: SystemState = {
   searchFolder: null,
   foundModels: null,
   openModel: null,
+  cancelOptions: {
+    cancelType: 'immediate',
+    cancelAfter: null,
+  },
 };
 
 export const systemSlice = createSlice({
@@ -255,6 +265,12 @@ export const systemSlice = createSlice({
     setOpenModel: (state, action: PayloadAction<string | null>) => {
       state.openModel = action.payload;
     },
+    setCancelType: (state, action: PayloadAction<CancelType>) => {
+      state.cancelOptions.cancelType = action.payload;
+    },
+    setCancelAfter: (state, action: PayloadAction<number | null>) => {
+      state.cancelOptions.cancelAfter = action.payload;
+    },
   },
 });
 
@@ -288,6 +304,8 @@ export const {
   setSearchFolder,
   setFoundModels,
   setOpenModel,
+  setCancelType,
+  setCancelAfter,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

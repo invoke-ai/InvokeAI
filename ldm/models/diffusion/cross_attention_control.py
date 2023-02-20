@@ -584,7 +584,9 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
         #    print(f"SwapCrossAttnContext for {attention_type} active")
 
         batch_size, sequence_length, _ = hidden_states.shape
-        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
+        attention_mask = attn.prepare_attention_mask(
+            attention_mask=attention_mask, target_length=sequence_length,
+            batch_size=batch_size)
 
         query = attn.to_q(hidden_states)
         dim = query.shape[-1]

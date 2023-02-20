@@ -15,11 +15,11 @@
         "langItalian": "Italiano",
         "nodesDesc": "Attualmente è in fase di sviluppo un sistema basato su nodi per la generazione di immagini. Resta sintonizzato per gli aggiornamenti su questa fantastica funzionalità.",
         "postProcessing": "Post-elaborazione",
-        "postProcessDesc1": "Invoke AI offre un'ampia varietà di funzionalità di post-elaborazione. Ampiamento Immagine e Restaura i  Volti sono già disponibili nell'interfaccia Web. È possibile accedervi dal menu 'Opzioni avanzate' delle schede 'Testo a Immagine' e 'Immagine a Immagine'. È inoltre possibile elaborare le immagini direttamente, utilizzando i pulsanti di azione dell'immagine sopra la visualizzazione dell'immagine corrente o nel visualizzatore.",
+        "postProcessDesc1": "Invoke AI offre un'ampia varietà di funzionalità di post-elaborazione. Ampliamento Immagine e Restaura Volti sono già disponibili nell'interfaccia Web. È possibile accedervi dal menu 'Opzioni avanzate' delle schede 'Testo a Immagine' e 'Immagine a Immagine'. È inoltre possibile elaborare le immagini direttamente, utilizzando i pulsanti di azione dell'immagine sopra la visualizzazione dell'immagine corrente o nel visualizzatore.",
         "postProcessDesc2": "Presto verrà rilasciata un'interfaccia utente dedicata per facilitare flussi di lavoro di post-elaborazione più avanzati.",
         "postProcessDesc3": "L'interfaccia da riga di comando di 'Invoke AI' offre varie altre funzionalità tra cui Embiggen.",
         "training": "Addestramento",
-        "trainingDesc1": "Un flusso di lavoro dedicato per addestrare i tuoi incorporamenti e checkpoint utilizzando Inversione Testuale  e Dreambooth dall'interfaccia web.",
+        "trainingDesc1": "Un flusso di lavoro dedicato per addestrare i tuoi Incorporamenti e Checkpoint utilizzando Inversione Testuale e Dreambooth dall'interfaccia web.",
         "trainingDesc2": "InvokeAI supporta già l'addestramento di incorporamenti personalizzati utilizzando l'inversione testuale utilizzando lo script principale.",
         "upload": "Caricamento",
         "close": "Chiudi",
@@ -45,7 +45,25 @@
         "statusUpscaling": "Ampliamento",
         "statusUpscalingESRGAN": "Ampliamento (ESRGAN)",
         "statusLoadingModel": "Caricamento del modello",
-        "statusModelChanged": "Modello cambiato"
+        "statusModelChanged": "Modello cambiato",
+        "githubLabel": "GitHub",
+        "discordLabel": "Discord",
+        "langArabic": "Arabo",
+        "langEnglish": "Inglese",
+        "langFrench": "Francese",
+        "langGerman": "Tedesco",
+        "langJapanese": "Giapponese",
+        "langPolish": "Polacco",
+        "langBrPortuguese": "Portoghese Basiliano",
+        "langRussian": "Russo",
+        "langUkranian": "Ucraino",
+        "langSpanish": "Spagnolo",
+        "statusMergingModels": "Fusione Modelli",
+        "statusMergedModels": "Modelli fusi",
+        "langSimplifiedChinese": "Cinese semplificato",
+        "langDutch": "Olandese",
+        "statusModelConverted": "Modello Convertito",
+        "statusConvertingModel": "Conversione Modello"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -70,7 +88,7 @@
         "galleryHotkeys": "Tasti di scelta rapida della galleria",
         "unifiedCanvasHotkeys": "Tasti di scelta rapida Tela Unificata",
         "invoke": {
-            "title": "Invoca",
+            "title": "Invoke",
             "desc": "Genera un'immagine"
         },
         "cancel": {
@@ -335,7 +353,47 @@
         "formMessageDiffusersModelLocation": "Ubicazione modelli diffusori",
         "formMessageDiffusersModelLocationDesc": "Inseriscine almeno uno.",
         "formMessageDiffusersVAELocation": "Ubicazione file VAE",
-        "formMessageDiffusersVAELocationDesc": "Se non fornito, InvokeAI cercherà il file VAE all'interno dell'ubicazione del modello sopra indicata."
+        "formMessageDiffusersVAELocationDesc": "Se non fornito, InvokeAI cercherà il file VAE all'interno dell'ubicazione del modello sopra indicata.",
+        "convert": "Converti",
+        "convertToDiffusers": "Converti in Diffusori",
+        "convertToDiffusersHelpText2": "Questo processo sostituirà la voce in Gestione Modelli con la versione Diffusori dello stesso modello.",
+        "convertToDiffusersHelpText4": "Questo è un processo una tantum. Potrebbero essere necessari circa 30-60 secondi a seconda delle specifiche del tuo computer.",
+        "convertToDiffusersHelpText5": "Assicurati di avere spazio su disco sufficiente. I modelli generalmente variano tra 4 GB e 7 GB di dimensioni.",
+        "convertToDiffusersHelpText6": "Vuoi convertire questo modello?",
+        "convertToDiffusersSaveLocation": "Ubicazione salvataggio",
+        "v2": "v2",
+        "inpainting": "v1 Inpainting",
+        "customConfig": "Configurazione personalizzata",
+        "statusConverting": "Conversione in corso",
+        "modelConverted": "Modello convertito",
+        "sameFolder": "Stessa cartella",
+        "invokeRoot": "Cartella InvokeAI",
+        "merge": "Fondere",
+        "modelsMerged": "Modelli fusi",
+        "mergeModels": "Fondi Modelli",
+        "modelOne": "Modello 1",
+        "modelTwo": "Modello 2",
+        "mergedModelName": "Nome del modello fuso",
+        "alpha": "Alpha",
+        "interpolationType": "Tipo di interpolazione",
+        "mergedModelCustomSaveLocation": "Percorso personalizzato",
+        "invokeAIFolder": "Cartella Invoke AI",
+        "ignoreMismatch": "Ignora le discrepanze tra i modelli selezionati",
+        "modelMergeHeaderHelp2": "Solo i diffusori sono disponibili per l'unione. Se desideri unire un modello Checkpoint, convertilo prima in Diffusori.",
+        "modelMergeInterpAddDifferenceHelp": "In questa modalità, il Modello 3 viene prima sottratto dal Modello 2. La versione risultante viene unita al Modello 1 con il tasso Alpha impostato sopra.",
+        "mergedModelSaveLocation": "Ubicazione salvataggio",
+        "convertToDiffusersHelpText1": "Questo modello verrà convertito nel formato 🧨 Diffusore.",
+        "custom": "Personalizzata",
+        "convertToDiffusersHelpText3": "Il tuo file checkpoint sul disco NON verrà comunque cancellato o modificato. Se lo desideri, puoi aggiungerlo di nuovo in Gestione Modelli.",
+        "v1": "v1",
+        "pathToCustomConfig": "Percorso alla configurazione personalizzata",
+        "modelThree": "Modello 3",
+        "modelMergeHeaderHelp1": "Puoi unire fino a tre diversi modelli per creare una miscela adatta alle tue esigenze.",
+        "modelMergeAlphaHelp": "Il valore Alpha controlla la forza di miscelazione dei modelli. Valori Alpha più bassi attenuano l'influenza del secondo modello.",
+        "customSaveLocation": "Ubicazione salvataggio personalizzata",
+        "weightedSum": "Somma pesata",
+        "sigmoid": "Sigmoide",
+        "inverseSigmoid": "Sigmoide inverso"
     },
     "parameters": {
         "images": "Immagini",
@@ -352,7 +410,7 @@
         "variations": "Variazioni",
         "variationAmount": "Quantità di variazione",
         "seedWeights": "Pesi dei semi",
-        "faceRestoration": "Restaura volti",
+        "faceRestoration": "Restauro volti",
         "restoreFaces": "Restaura volti",
         "type": "Tipo",
         "strength": "Forza",
@@ -380,7 +438,6 @@
         "img2imgStrength": "Forza da Immagine a Immagine",
         "toggleLoopback": "Attiva/disattiva elaborazione ricorsiva",
         "invoke": "Invoke",
-        "cancel": "Annulla",
         "promptPlaceholder": "Digita qui il prompt usando termini in lingua inglese. [token negativi], (aumenta il peso)++, (diminuisci il peso)--, scambia e fondi sono disponibili (consulta la documentazione)",
         "sendTo": "Invia a",
         "sendToImg2Img": "Invia a da Immagine a Immagine",
@@ -396,7 +453,19 @@
         "info": "Informazioni",
         "deleteImage": "Elimina immagine",
         "initialImage": "Immagine iniziale",
-        "showOptionsPanel": "Mostra pannello opzioni"
+        "showOptionsPanel": "Mostra pannello opzioni",
+        "general": "Generale",
+        "denoisingStrength": "Forza riduzione rumore",
+        "copyImage": "Copia immagine",
+        "hiresStrength": "Forza Alta Risoluzione",
+        "negativePrompts": "Prompt Negativi",
+        "imageToImage": "Immagine a Immagine",
+        "cancel": {
+            "schedule": "Annulla dopo l'iterazione corrente",
+            "isScheduled": "Annullamento",
+            "setType": "Imposta il tipo di annullamento",
+            "immediate": "Annulla immediatamente"
+        }
     },
     "settings": {
         "models": "Modelli",
@@ -409,7 +478,8 @@
         "resetWebUI": "Reimposta l'interfaccia utente Web",
         "resetWebUIDesc1": "Il ripristino dell'interfaccia utente Web reimposta solo la cache locale del browser delle immagini e le impostazioni memorizzate. Non cancella alcuna immagine dal disco.",
         "resetWebUIDesc2": "Se le immagini non vengono visualizzate nella galleria o qualcos'altro non funziona, prova a reimpostare prima di segnalare un problema su GitHub.",
-        "resetComplete": "L'interfaccia utente Web è stata reimpostata. Aggiorna la pagina per ricaricarla."
+        "resetComplete": "L'interfaccia utente Web è stata reimpostata. Aggiorna la pagina per ricaricarla.",
+        "useSlidersForAll": "Usa i cursori per tutte le opzioni"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -447,7 +517,7 @@
         "feature": {
             "prompt": "Questo è il campo del prompt. Il prompt include oggetti di generazione e termini stilistici. Puoi anche aggiungere il peso (importanza del token) nel prompt, ma i comandi e i parametri dell'interfaccia a linea di comando non funzioneranno.",
             "gallery": "Galleria visualizza le generazioni dalla cartella degli output man mano che vengono create. Le impostazioni sono memorizzate all'interno di file e accessibili dal menu contestuale.",
-            "other": "Queste opzioni abiliteranno modalità di elaborazione alternative per Invoke. 'Piastrella senza cuciture' creerà modelli ripetuti nell'output. 'Ottimizzzazione Alta risoluzione' è la generazione in due passaggi con 'Immagine a Immagine': usa questa impostazione quando vuoi un'immagine più grande e più coerente senza artefatti. Ci vorrà più tempo del solito 'Testo a Immagine'.",
+            "other": "Queste opzioni abiliteranno modalità di elaborazione alternative per Invoke. 'Piastrella senza cuciture' creerà modelli ripetuti nell'output. 'Ottimizzazione Alta risoluzione' è la generazione in due passaggi con 'Immagine a Immagine': usa questa impostazione quando vuoi un'immagine più grande e più coerente senza artefatti. Ci vorrà più tempo del solito 'Testo a Immagine'.",
             "seed": "Il valore del Seme influenza il rumore iniziale da cui è formata l'immagine. Puoi usare i semi già esistenti dalle immagini precedenti. 'Soglia del rumore' viene utilizzato per mitigare gli artefatti a valori CFG elevati (provare l'intervallo 0-10) e Perlin per aggiungere il rumore Perlin durante la generazione: entrambi servono per aggiungere variazioni ai risultati.",
             "variations": "Prova una variazione con un valore compreso tra 0.1 e 1.0 per modificare il risultato per un dato seme. Variazioni interessanti del seme sono comprese tra 0.1 e 0.3.",
             "upscale": "Utilizza ESRGAN per ingrandire l'immagine subito dopo la generazione.",
@@ -515,6 +585,6 @@
         "betaClear": "Svuota",
         "betaDarkenOutside": "Oscura all'esterno",
         "betaLimitToBox": "Limita al rettangolo",
-        "betaPreserveMasked": "Conserva quanto mascheato"
+        "betaPreserveMasked": "Conserva quanto mascherato"
     }
 }

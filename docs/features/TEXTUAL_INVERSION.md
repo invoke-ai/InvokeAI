@@ -250,6 +250,24 @@ invokeai-ti \
        --only_save_embeds
 ```
 
+## Using Embeddings
+
+After training completes, the resultant embeddings will be saved into your `$INVOKEAI_ROOT/embeddings/<trigger word>/learned_embeds.bin`.
+
+These will be automatically loaded when you start InvokeAI.
+
+Add the trigger word, surrounded by angle brackets, to use that embedding. For example, if your trigger word was `terence`, use `<terence>` in prompts. This is the same syntax used by the HuggingFace concepts library.
+
+**Note:** `.pt` embeddings do not require the angle brackets.
+
+## Troubleshooting
+
+### `Cannot load embedding for <trigger>. It was trained on a model with token dimension 1024, but the current model has token dimension 768`
+
+Messages like this indicate you trained the embedding on a different base model than the currently selected one.
+
+For example, in the error above, the training was done on SD2.1 (768x768) but it was used on SD1.5 (512x512).
+
 ## Reading
 
 For more information on textual inversion, please see the following

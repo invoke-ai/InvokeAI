@@ -108,6 +108,7 @@ dependencies = [
 "invokeai-configure" = "ldm.invoke.config.invokeai_configure:main"
 "invokeai-merge" = "ldm.invoke.merge_diffusers:main"   # note name munging
 "invokeai-ti" = "ldm.invoke.training.textual_inversion:main"
+"invokeai-update" = "ldm.invoke.config.invokeai_update:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
