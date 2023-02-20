@@ -6,6 +6,7 @@ from safetensors.torch import load_file
 import torch
 from torch.utils.hooks import RemovableHandle
 
+
 class LoRALayer:
     lora_name: str
     name: str
@@ -47,7 +48,7 @@ def load_lora(
 ):
     print(f">> Loading lora {name} from {path_file}")
     if path_file.suffix == '.safetensors':
-        checkpoint = load_file(path_file, device='cpu')
+        checkpoint = load_file(path_file.absolute().as_posix(), device='cpu')
     else:
         checkpoint = torch.load(path_file, map_location='cpu')
 
@@ -98,6 +99,7 @@ def load_lora(
         else:
             print(
                 f">> Encoundered unknown lora layer module in {name}: {type(value).__name__}")
+            continue
 
         with torch.no_grad():
             module.weight.copy_(value)
@@ -130,6 +132,7 @@ class LoraManager:
         self.loras = {}
         self.applied_loras = {}
         self.hooks = []
+        self.prompt = ""
 
         def find_modules(prefix, root_module: torch.nn.Module, target_replace_modules) -> dict[str, torch.nn.Module]:
             mapping = {}
@@ -176,9 +179,7 @@ class LoraManager:
 
         if path.is_dir() and file.is_file():
             print(f"loading lora: {path}")
-            self.pipe.unet.load_attn_procs(path.absolute().as_posix())
-            if len(args) == 2:
-                self.weights[name] = float(args[1])
+            self.unet.load_attn_procs(path.absolute().as_posix())
         else:
             # converting and saving in diffusers format
             path_file = Path(self.lora_path, f'{name}.ckpt')

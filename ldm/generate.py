@@ -575,13 +575,7 @@ class Generate:
                                              save_original  = save_original,
                                              image_callback = image_callback)
 
-            if self.model.lora_manager:
-                self.model.lora_manager.reset_lora()
-
         except KeyboardInterrupt:
-            if self.model.lora_manager:
-                self.model.lora_manager.reset_lora()
-
             # Clear the CUDA cache on an exception
             self.clear_cuda_cache()
 
@@ -590,9 +584,6 @@ class Generate:
             else:
                 raise KeyboardInterrupt
         except RuntimeError:
-            if self.model.lora_manager:
-                self.model.lora_manager.reset_lora()
-
             # Clear the CUDA cache on an exception
             self.clear_cuda_cache()
 
