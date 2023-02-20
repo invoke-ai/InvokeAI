@@ -725,7 +725,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> 
             vae_repo = dict(repo_id=vae_repo)
         else:
             vae_repo = None
-        model_name = gen.model_manager.convert_and_import(
+        model_name = manager.convert_and_import(
             ckpt_path,
             diffusers_path=Path(
                 Globals.root, "models", Globals.converted_ckpts_dir, model_name_or_path
@@ -741,6 +741,8 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> 
     if not model_name:
         print("** Conversion failed. Aborting.")
         return
+
+    manager.commit(opt.conf)    
     if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
         print(f"{ckpt_path} deleted")
