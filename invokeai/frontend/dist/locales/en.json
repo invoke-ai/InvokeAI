@@ -390,7 +390,10 @@
         "modelMergeHeaderHelp1": "You can merge upto three different models to create a blend that suits your needs.",
         "modelMergeHeaderHelp2": "Only Diffusers are available for merging. If you want to merge a checkpoint model, please convert it to Diffusers first.",
         "modelMergeAlphaHelp": "Alpha controls blend strength for the models. Lower alpha values lead to lower influence of the second model.",
-        "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above."
+        "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above.",
+        "inverseSigmoid": "Inverse Sigmoid",
+        "sigmoid": "Sigmoid",
+        "weightedSum": "Weighted Sum"
     },
     "parameters": {
         "general": "General",
@@ -401,6 +404,7 @@
         "height": "Height",
         "sampler": "Sampler",
         "seed": "Seed",
+        "imageToImage": "Image to Image",
         "randomizeSeed": "Randomize Seed",
         "shuffle": "Shuffle",
         "noiseThreshold": "Noise Threshold",
@@ -438,7 +442,12 @@
         "img2imgStrength": "Image To Image Strength",
         "toggleLoopback": "Toggle Loopback",
         "invoke": "Invoke",
-        "cancel": "Cancel",
+        "cancel": {
+            "immediate": "Cancel immediately",
+            "schedule": "Cancel after current iteration",
+            "isScheduled": "Canceling",
+            "setType": "Set cancel type"
+        },
         "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
         "negativePrompts": "Negative Prompts",
         "sendTo": "Send to",
@@ -465,8 +474,8 @@
         "confirmOnDelete": "Confirm On Delete",
         "displayHelpIcons": "Display Help Icons",
         "useCanvasBeta": "Use Canvas Beta Layout",
-        "useSlidersForAll": "Use Sliders For All Options",
         "enableImageDebugging": "Enable Image Debugging",
+        "useSlidersForAll": "Use Sliders For All Options",
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
@@ -508,7 +517,7 @@
         "feature": {
             "prompt": "This is the prompt field. Prompt includes generation objects and stylistic terms. You can add weight (token importance) in the prompt as well, but CLI commands and parameters will not work.",
             "gallery": "Gallery displays generations from the outputs folder as they're created. Settings are stored within files and accesed by context menu.",
-            "other": "These options will enable alternative processing modes for Invoke. 'Seamless tiling' will create repeating patterns in the output. 'High resolution' is generation in two steps with img2img: use this setting when you want a larger and more coherent image without artifacts. It will take longer that usual txt2img.",
+            "other": "These options will enable alternative processing modes for Invoke. 'Seamless tiling' will create repeating patterns in the output. 'High resolution' is generation in two steps with img2img: use this setting when you want a larger and more coherent image without artifacts. It will take longer than usual txt2img.",
             "seed": "Seed value affects the initial noise from which the image is formed. You can use the already existing seeds from previous images. 'Noise Threshold' is used to mitigate artifacts at high CFG values (try the 0-10 range), and Perlin to add Perlin noise during generation: both serve to add variation to your outputs.",
             "variations": "Try a variation with a value between 0.1 and 1.0 to change the result for a given seed. Interesting variations of the seed are between 0.1 and 0.3.",
             "upscale": "Use ESRGAN to enlarge the image immediately after generation.",

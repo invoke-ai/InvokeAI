@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
-import { type RootState } from 'app/store';
+import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
@@ -27,14 +27,14 @@ import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
-  type SystemState,
+  SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import { type UIState } from 'features/ui/store/uiTypes';
+import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual, map } from 'lodash';
 import { persistor } from 'persistor';
 import { ChangeEvent, cloneElement, ReactElement } from 'react';

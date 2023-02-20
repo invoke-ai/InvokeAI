@@ -362,7 +362,6 @@
         "img2imgStrength": "图像到图像强度",
         "toggleLoopback": "切换环回",
         "invoke": "Invoke",
-        "cancel": "取消",
         "promptPlaceholder": "在这里输入提示。可以使用[反提示]、(加权)++、(减权)--、交换和混合（见文档）",
         "sendTo": "发送到",
         "sendToImg2Img": "发送到图像到图像",
@@ -425,7 +424,6 @@
         "initialImageNotSet": "初始图像未设定",
         "initialImageNotSetDesc": "无法加载初始图像"
     },
-    "tooltip": {},
     "unifiedCanvas": {
         "layer": "图层",
         "base": "基础层",

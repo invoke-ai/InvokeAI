@@ -419,8 +419,7 @@ def run_gui(args: Namespace):
     mergeapp.run()
 
     args = mergeapp.merge_arguments
-    print(f'DEBUG: {args}')
-    #merge_diffusion_models_and_commit(**args)
+    merge_diffusion_models_and_commit(**args)
     print(f'>> Models merged into new model: "{args["merged_model_name"]}".')
 
 

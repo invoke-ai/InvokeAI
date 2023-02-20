@@ -28,6 +28,7 @@ from typing_extensions import ParamSpec
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
+from ..devices import normalize_device, CPU_DEVICE
 from ..offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
@@ -319,7 +320,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 if self.device.type == 'cpu' or self.device.type == 'mps':
                     mem_free = psutil.virtual_memory().free
                 elif self.device.type == 'cuda':
-                    mem_free, _ = torch.cuda.mem_get_info(self.device)
+                    mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
                 else:
                     raise ValueError(f"unrecognized device {self.device}")
                 # input tensor of [1, 4, h/8, w/8]
@@ -380,9 +381,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self._model_group.ready()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None):
+        # overridden method; types match the superclass.
         if torch_device is None:
             return self
-        self._model_group.set_device(torch_device)
+        self._model_group.set_device(torch.device(torch_device))
         self._model_group.ready()
 
     @property
@@ -689,8 +691,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             if device.type == 'mps':
                 # workaround for torch MPS bug that has been fixed in https://github.com/kulinseth/pytorch/pull/222
                 # TODO remove this workaround once kulinseth#222 is merged to pytorch mainline
-                self.vae.to('cpu')
-                init_image = init_image.to('cpu')
+                self.vae.to(CPU_DEVICE)
+                init_image = init_image.to(CPU_DEVICE)
             else:
                 self._model_group.load(self.vae)
             init_latent_dist = self.vae.encode(init_image).latent_dist

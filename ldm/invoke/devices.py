@@ -1,19 +1,25 @@
+from __future__ import annotations
+
+from contextlib import nullcontext
+
 import torch
 from torch import autocast
-from contextlib import nullcontext
+
 from ldm.invoke.globals import Globals
 
-def choose_torch_device() -> str:
+CPU_DEVICE = torch.device("cpu")
+
+def choose_torch_device() -> torch.device:
     '''Convenience routine for guessing which GPU device to run model on'''
     if Globals.always_use_cpu:
-        return "cpu"
+        return CPU_DEVICE
     if torch.cuda.is_available():
-        return 'cuda'
+        return torch.device('cuda')
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return 'mps'
-    return 'cpu'
+        return torch.device('mps')
+    return CPU_DEVICE
 
-def choose_precision(device) -> str:
+def choose_precision(device: torch.device) -> str:
     '''Returns an appropriate precision for the given torch device'''
     if device.type == 'cuda':
         device_name = torch.cuda.get_device_name(device)
@@ -21,7 +27,7 @@ def choose_precision(device) -> str:
             return 'float16'
     return 'float32'
 
-def torch_dtype(device) -> torch.dtype:
+def torch_dtype(device: torch.device) -> torch.dtype:
     if Globals.full_precision:
         return torch.float32
     if choose_precision(device) == 'float16':
@@ -36,3 +42,13 @@ def choose_autocast(precision):
     if precision == 'autocast' or precision == 'float16':
         return autocast
     return nullcontext
+
+def normalize_device(device: str | torch.device) -> torch.device:
+    """Ensure device has a device index defined, if appropriate."""
+    device = torch.device(device)
+    if device.index is None:
+        # cuda might be the only torch backend that currently uses the device index?
+        # I don't see anything like `current_device` for cpu or mps.
+        if device.type == 'cuda':
+            device = torch.device(device.type, torch.cuda.current_device())
+    return device

@@ -12,7 +12,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { mergeDiffusersModels } from 'app/socketio/actions';
-import { type RootState } from 'app/store';
+import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
