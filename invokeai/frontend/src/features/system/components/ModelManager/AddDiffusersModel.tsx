@@ -54,7 +54,7 @@ export default function AddDiffusersModel() {
 
   function baseValidation(value: string) {
     let error;
-    if (hasWhiteSpace(value)) error = t('modelmanager:cannotUseSpaces');
+    if (hasWhiteSpace(value)) error = t('modelManager.cannotUseSpaces');
     return error;
   }
 
@@ -88,8 +88,8 @@ export default function AddDiffusersModel() {
   return (
     <Flex>
       <IAIIconButton
-        aria-label={t('common:back')}
-        tooltip={t('common:back')}
+        aria-label={t('common.back')}
+        tooltip={t('common.back')}
         onClick={() => dispatch(setAddNewModelUIOption(null))}
         width="max-content"
         position="absolute"
@@ -105,7 +105,7 @@ export default function AddDiffusersModel() {
       >
         {({ handleSubmit, errors, touched }) => (
           <form onSubmit={handleSubmit}>
-            <VStack rowGap={'0.5rem'}>
+            <VStack rowGap="0.5rem">
               <FormItemWrapper>
                 {/* Name */}
                 <FormControl
@@ -113,9 +113,9 @@ export default function AddDiffusersModel() {
                   isRequired
                 >
                   <FormLabel htmlFor="name" fontSize="sm">
-                    {t('modelmanager:name')}
+                    {t('modelManager.name')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="name"
@@ -129,7 +129,7 @@ export default function AddDiffusersModel() {
                       <FormErrorMessage>{errors.name}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:nameValidationMsg')}
+                        {t('modelManager.nameValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -143,9 +143,9 @@ export default function AddDiffusersModel() {
                   isRequired
                 >
                   <FormLabel htmlFor="description" fontSize="sm">
-                    {t('modelmanager:description')}
+                    {t('modelManager.description')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="description"
@@ -158,7 +158,7 @@ export default function AddDiffusersModel() {
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:descriptionValidationMsg')}
+                        {t('modelManager.descriptionValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -167,22 +167,22 @@ export default function AddDiffusersModel() {
 
               <FormItemWrapper>
                 <Text fontWeight="bold" fontSize="sm">
-                  {t('modelmanager:formMessageDiffusersModelLocation')}
+                  {t('modelManager.formMessageDiffusersModelLocation')}
                 </Text>
                 <Text
                   fontSize="sm"
                   fontStyle="italic"
                   color="var(--text-color-secondary)"
                 >
-                  {t('modelmanager:formMessageDiffusersModelLocationDesc')}
+                  {t('modelManager.formMessageDiffusersModelLocationDesc')}
                 </Text>
 
                 {/* Path */}
                 <FormControl isInvalid={!!errors.path && touched.path}>
                   <FormLabel htmlFor="path" fontSize="sm">
-                    {t('modelmanager:modelLocation')}
+                    {t('modelManager.modelLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="path"
@@ -194,7 +194,7 @@ export default function AddDiffusersModel() {
                       <FormErrorMessage>{errors.path}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:modelLocationValidationMsg')}
+                        {t('modelManager.modelLocationValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -203,9 +203,9 @@ export default function AddDiffusersModel() {
                 {/* Repo ID */}
                 <FormControl isInvalid={!!errors.repo_id && touched.repo_id}>
                   <FormLabel htmlFor="repo_id" fontSize="sm">
-                    {t('modelmanager:repo_id')}
+                    {t('modelManager.repo_id')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="repo_id"
@@ -217,7 +217,7 @@ export default function AddDiffusersModel() {
                       <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:repoIDValidationMsg')}
+                        {t('modelManager.repoIDValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -227,22 +227,22 @@ export default function AddDiffusersModel() {
               <FormItemWrapper>
                 {/* VAE Path */}
                 <Text fontWeight="bold">
-                  {t('modelmanager:formMessageDiffusersVAELocation')}
+                  {t('modelManager.formMessageDiffusersVAELocation')}
                 </Text>
                 <Text
                   fontSize="sm"
                   fontStyle="italic"
                   color="var(--text-color-secondary)"
                 >
-                  {t('modelmanager:formMessageDiffusersVAELocationDesc')}
+                  {t('modelManager.formMessageDiffusersVAELocationDesc')}
                 </Text>
                 <FormControl
                   isInvalid={!!errors.vae?.path && touched.vae?.path}
                 >
                   <FormLabel htmlFor="vae.path" fontSize="sm">
-                    {t('modelmanager:vaeLocation')}
+                    {t('modelManager.vaeLocation')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="vae.path"
@@ -254,7 +254,7 @@ export default function AddDiffusersModel() {
                       <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:vaeLocationValidationMsg')}
+                        {t('modelManager.vaeLocationValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -265,9 +265,9 @@ export default function AddDiffusersModel() {
                   isInvalid={!!errors.vae?.repo_id && touched.vae?.repo_id}
                 >
                   <FormLabel htmlFor="vae.repo_id" fontSize="sm">
-                    {t('modelmanager:vaeRepoID')}
+                    {t('modelManager.vaeRepoID')}
                   </FormLabel>
-                  <VStack alignItems={'start'}>
+                  <VStack alignItems="start">
                     <Field
                       as={IAIInput}
                       id="vae.repo_id"
@@ -279,7 +279,7 @@ export default function AddDiffusersModel() {
                       <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:vaeRepoIDValidationMsg')}
+                        {t('modelManager.vaeRepoIDValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
@@ -291,7 +291,7 @@ export default function AddDiffusersModel() {
                 className="modal-close-btn"
                 isLoading={isProcessing}
               >
-                {t('modelmanager:addModel')}
+                {t('modelManager.addModel')}
               </IAIButton>
             </VStack>
           </form>

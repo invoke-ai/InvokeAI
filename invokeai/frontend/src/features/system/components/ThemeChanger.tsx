@@ -19,9 +19,9 @@ export default function ThemeChanger() {
   );
 
   const THEMES = {
-    dark: t('common:darkTheme'),
-    light: t('common:lightTheme'),
-    green: t('common:greenTheme'),
+    dark: t('common.darkTheme'),
+    light: t('common.lightTheme'),
+    green: t('common.greenTheme'),
   };
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function ThemeChanger() {
             width: '6rem',
           }}
           leftIcon={currentTheme === theme ? <FaCheck /> : undefined}
-          size={'sm'}
+          size="sm"
           onClick={() => handleChangeTheme(theme)}
           key={theme}
         >
@@ -63,8 +63,8 @@ export default function ThemeChanger() {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label={t('common:themeLabel')}
-          size={'sm'}
+          aria-label={t('common.themeLabel')}
+          size="sm"
           variant="link"
           data-variant="link"
           fontSize={20}
@@ -72,7 +72,7 @@ export default function ThemeChanger() {
         />
       }
     >
-      <VStack align={'stretch'}>{renderThemeOptions()}</VStack>
+      <VStack align="stretch">{renderThemeOptions()}</VStack>
     </IAIPopover>
   );
 }

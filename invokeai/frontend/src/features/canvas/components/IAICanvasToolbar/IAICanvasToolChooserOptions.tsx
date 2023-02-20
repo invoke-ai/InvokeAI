@@ -181,38 +181,38 @@ const IAICanvasToolChooserOptions = () => {
   return (
     <ButtonGroup isAttached>
       <IAIIconButton
-        aria-label={`${t('unifiedcanvas:brush')} (B)`}
-        tooltip={`${t('unifiedcanvas:brush')} (B)`}
+        aria-label={`${t('unifiedCanvas.brush')} (B)`}
+        tooltip={`${t('unifiedCanvas.brush')} (B)`}
         icon={<FaPaintBrush />}
         data-selected={tool === 'brush' && !isStaging}
         onClick={handleSelectBrushTool}
         isDisabled={isStaging}
       />
       <IAIIconButton
-        aria-label={`${t('unifiedcanvas:eraser')} (E)`}
-        tooltip={`${t('unifiedcanvas:eraser')} (E)`}
+        aria-label={`${t('unifiedCanvas.eraser')} (E)`}
+        tooltip={`${t('unifiedCanvas.eraser')} (E)`}
         icon={<FaEraser />}
         data-selected={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
       />
       <IAIIconButton
-        aria-label={`${t('unifiedcanvas:fillBoundingBox')} (Shift+F)`}
-        tooltip={`${t('unifiedcanvas:fillBoundingBox')} (Shift+F)`}
+        aria-label={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
+        tooltip={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
         icon={<FaFillDrip />}
         isDisabled={isStaging}
         onClick={handleFillRect}
       />
       <IAIIconButton
-        aria-label={`${t('unifiedcanvas:eraseBoundingBox')} (Del/Backspace)`}
-        tooltip={`${t('unifiedcanvas:eraseBoundingBox')} (Del/Backspace)`}
+        aria-label={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
+        tooltip={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
         icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
         isDisabled={isStaging}
         onClick={handleEraseBoundingBox}
       />
       <IAIIconButton
-        aria-label={`${t('unifiedcanvas:colorPicker')} (C)`}
-        tooltip={`${t('unifiedcanvas:colorPicker')} (C)`}
+        aria-label={`${t('unifiedCanvas.colorPicker')} (C)`}
+        tooltip={`${t('unifiedCanvas.colorPicker')} (C)`}
         icon={<FaEyeDropper />}
         data-selected={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
@@ -222,21 +222,16 @@ const IAICanvasToolChooserOptions = () => {
         trigger="hover"
         triggerComponent={
           <IAIIconButton
-            aria-label={t('unifiedcanvas:brushOptions')}
-            tooltip={t('unifiedcanvas:brushOptions')}
+            aria-label={t('unifiedCanvas.brushOptions')}
+            tooltip={t('unifiedCanvas.brushOptions')}
             icon={<FaSlidersH />}
           />
         }
       >
-        <Flex
-          minWidth={'15rem'}
-          direction={'column'}
-          gap={'1rem'}
-          width={'100%'}
-        >
-          <Flex gap={'1rem'} justifyContent="space-between">
+        <Flex minWidth="15rem" direction="column" gap="1rem" width="100%">
+          <Flex gap="1rem" justifyContent="space-between">
             <IAISlider
-              label={t('unifiedcanvas:brushSize')}
+              label={t('unifiedCanvas.brushSize')}
               value={brushSize}
               withInput
               onChange={(newSize) => dispatch(setBrushSize(newSize))}

@@ -68,15 +68,15 @@ export default function AddModel() {
   return (
     <>
       <IAIButton
-        aria-label={t('modelmanager:addNewModel')}
-        tooltip={t('modelmanager:addNewModel')}
+        aria-label={t('modelManager.addNewModel')}
+        tooltip={t('modelManager.addNewModel')}
         onClick={onOpen}
         className="modal-close-btn"
-        size={'sm'}
+        size="sm"
       >
-        <Flex columnGap={'0.5rem'} alignItems="center">
+        <Flex columnGap="0.5rem" alignItems="center">
           <FaPlus />
-          {t('modelmanager:addNew')}
+          {t('modelManager.addNew')}
         </Flex>
       </IAIButton>
 
@@ -87,18 +87,22 @@ export default function AddModel() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent className="modal add-model-modal" fontFamily="Inter">
-          <ModalHeader>{t('modelmanager:addNewModel')}</ModalHeader>
+        <ModalContent
+          className="modal add-model-modal"
+          fontFamily="Inter"
+          margin="auto"
+        >
+          <ModalHeader>{t('modelManager.addNewModel')}</ModalHeader>
           <ModalCloseButton marginTop="0.3rem" />
           <ModalBody className="add-model-modal-body">
             {addNewModelUIOption == null && (
               <Flex columnGap="1rem">
                 <AddModelBox
-                  text={t('modelmanager:addCheckpointModel')}
+                  text={t('modelManager.addCheckpointModel')}
                   onClick={() => dispatch(setAddNewModelUIOption('ckpt'))}
                 />
                 <AddModelBox
-                  text={t('modelmanager:addDiffuserModel')}
+                  text={t('modelManager.addDiffuserModel')}
                   onClick={() => dispatch(setAddNewModelUIOption('diffusers'))}
                 />
               </Flex>

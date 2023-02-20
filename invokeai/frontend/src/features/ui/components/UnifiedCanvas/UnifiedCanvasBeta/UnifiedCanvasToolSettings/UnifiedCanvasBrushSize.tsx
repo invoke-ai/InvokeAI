@@ -43,13 +43,13 @@ export default function UnifiedCanvasBrushSize() {
 
   return (
     <IAISlider
-      label={t('unifiedcanvas:brushSize')}
+      label={t('unifiedCanvas.brushSize')}
       value={brushSize}
       withInput
       onChange={(newSize) => dispatch(setBrushSize(newSize))}
       sliderNumberInputProps={{ max: 500 }}
       inputReadOnly={false}
-      width={'100px'}
+      width="100px"
       isCompact
     />
   );

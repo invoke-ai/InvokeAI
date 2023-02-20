@@ -25,19 +25,18 @@ import torch
 import transformers
 from diffusers import AutoencoderKL
 from diffusers import logging as dlogging
-from diffusers.utils.logging import (get_verbosity, set_verbosity,
-                                     set_verbosity_error)
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
+from ldm.invoke.devices import CPU_DEVICE
 from ldm.invoke.generator.diffusers_pipeline import \
     StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import (Globals, global_autoscan_dir, global_cache_dir,
                                 global_models_dir)
-from ldm.util import (ask_user, download_with_progress_bar,
-                      instantiate_from_config)
+from ldm.util import (ask_user, download_with_resume,
+                      url_attachment_name, instantiate_from_config)
 
 DEFAULT_MAX_MODELS = 2
 VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
@@ -49,9 +48,10 @@ class ModelManager(object):
     def __init__(
         self,
         config: OmegaConf,
-        device_type: str = "cpu",
+        device_type: torch.device = CPU_DEVICE,
         precision: str = "float16",
         max_loaded_models=DEFAULT_MAX_MODELS,
+        sequential_offload = False
     ):
         """
         Initialize with the path to the models.yaml config file,
@@ -69,6 +69,7 @@ class ModelManager(object):
         self.models = {}
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
+        self.sequential_offload = sequential_offload
 
     def valid_model(self, model_name: str) -> bool:
         """
@@ -529,7 +530,10 @@ class ModelManager(object):
         dlogging.set_verbosity(verbosity)
         assert pipeline is not None, OSError(f'"{name_or_path}" could not be loaded')
 
-        pipeline.to(self.device)
+        if self.sequential_offload:
+            pipeline.enable_offload_submodels(self.device)
+        else:
+            pipeline.to(self.device)
 
         model_hash = self._diffuser_sha256(name_or_path)
 
@@ -670,15 +674,18 @@ class ModelManager(object):
         path to the configuration file, then the new entry will be committed to the
         models.yaml file.
         """
+        if str(weights).startswith(("http:", "https:")):
+            model_name = model_name or url_attachment_name(weights)
+
         weights_path = self._resolve_path(weights, "models/ldm/stable-diffusion-v1")
-        config_path = self._resolve_path(config, "configs/stable-diffusion")
+        config_path  = self._resolve_path(config, "configs/stable-diffusion")
 
         if weights_path is None or not weights_path.exists():
             return False
         if config_path is None or not config_path.exists():
             return False
 
-        model_name = model_name or Path(weights).stem
+        model_name = model_name or Path(weights).stem  # note this gives ugly pathnames if used on a URL without a Content-Disposition header
         model_description = (
             model_description or f"imported stable diffusion weights file {model_name}"
         )
@@ -748,7 +755,6 @@ class ModelManager(object):
         into models.yaml.
         """
         new_config = None
-        import transformers
 
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
 
@@ -759,7 +765,7 @@ class ModelManager(object):
             return
 
         model_name = model_name or diffusers_path.name
-        model_description = model_description or "Optimized version of {model_name}"
+        model_description = model_description or f"Optimized version of {model_name}"
         print(f">> Optimizing {model_name} (30-60s)")
         try:
             # By passing the specified VAE too the conversion function, the autoencoder
@@ -799,15 +805,17 @@ class ModelManager(object):
         models_folder_safetensors = Path(search_folder).glob("**/*.safetensors")
 
         ckpt_files = [x for x in models_folder_ckpt if x.is_file()]
-        safetensor_files = [x for x in models_folder_safetensors if x.is_file]
+        safetensor_files = [x for x in models_folder_safetensors if x.is_file()]
 
         files = ckpt_files + safetensor_files
 
         found_models = []
         for file in files:
-            found_models.append(
-                {"name": file.stem, "location": str(file.resolve()).replace("\\", "/")}
-            )
+            location = str(file.resolve()).replace("\\", "/")
+            if 'model.safetensors' not in location and 'diffusion_pytorch_model.safetensors' not in location:
+                found_models.append(
+                    {"name": file.stem, "location": location}
+                )
 
         return search_folder, found_models
 
@@ -967,16 +975,15 @@ class ModelManager(object):
         print("** Migration is done. Continuing...")
 
     def _resolve_path(
-        self, source: Union[str, Path], dest_directory: str
+            self, source: Union[str, Path], dest_directory: str
     ) -> Optional[Path]:
         resolved_path = None
         if str(source).startswith(("http:", "https:", "ftp:")):
-            basename = os.path.basename(source)
-            if not os.path.isabs(dest_directory):
-                dest_directory = os.path.join(Globals.root, dest_directory)
-            dest = os.path.join(dest_directory, basename)
-            if download_with_progress_bar(str(source), Path(dest)):
-                resolved_path = Path(dest)
+            dest_directory = Path(dest_directory)
+            if not dest_directory.is_absolute():
+                dest_directory = Globals.root / dest_directory
+            dest_directory.mkdir(parents=True, exist_ok=True)
+            resolved_path = download_with_resume(str(source), dest_directory)
         else:
             if not os.path.isabs(source):
                 source = os.path.join(Globals.root, source)
@@ -990,25 +997,29 @@ class ModelManager(object):
         self.models.pop(model_name, None)
 
     def _model_to_cpu(self, model):
-        if self.device == "cpu":
+        if self.device == CPU_DEVICE:
             return model
 
-        # diffusers really really doesn't like us moving a float16 model onto CPU
-        verbosity = get_verbosity()
-        set_verbosity_error()
-        model.cond_stage_model.device = "cpu"
-        model.to("cpu")
-        set_verbosity(verbosity)
+        if isinstance(model, StableDiffusionGeneratorPipeline):
+            model.offload_all()
+            return model
+
+        model.cond_stage_model.device = CPU_DEVICE
+        model.to(CPU_DEVICE)
 
         for submodel in ("first_stage_model", "cond_stage_model", "model"):
             try:
-                getattr(model, submodel).to("cpu")
+                getattr(model, submodel).to(CPU_DEVICE)
             except AttributeError:
                 pass
         return model
 
     def _model_from_cpu(self, model):
-        if self.device == "cpu":
+        if self.device == CPU_DEVICE:
+            return model
+
+        if isinstance(model, StableDiffusionGeneratorPipeline):
+            model.ready()
             return model
 
         model.to(self.device)
@@ -1161,7 +1172,7 @@ class ModelManager(object):
         strategy.execute()
 
     @staticmethod
-    def _abs_path(path: Union(str, Path)) -> Path:
+    def _abs_path(path: str | Path) -> Path:
         if path is None or Path(path).is_absolute():
             return path
         return Path(Globals.root, path).resolve()

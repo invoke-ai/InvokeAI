@@ -1,18 +1,20 @@
-import { Box, Flex, Text } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Box, Flex, Spinner, Text } from '@chakra-ui/react';
 import IAIInput from 'common/components/IAIInput';
-import { useMemo, useState, useTransition } from 'react';
+import IAIButton from 'common/components/IAIButton';
 
 import AddModel from './AddModel';
 import ModelListItem from './ModelListItem';
+import MergeModels from './MergeModels';
 
 import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 
-import IAIButton from 'common/components/IAIButton';
+import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import type { SystemState } from 'features/system/store/systemSlice';
 import { isEqual, map } from 'lodash';
+
+import React, { useMemo, useState, useTransition } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 
 const modelListSelector = createSelector(
@@ -56,6 +58,16 @@ function ModelFilterButton({
 
 const ModelList = () => {
   const models = useAppSelector(modelListSelector);
+
+  const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setRenderModelList(true);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const [searchText, setSearchText] = useState<string>('');
   const [isSelectedFilter, setIsSelectedFilter] = useState<
@@ -139,7 +151,7 @@ const ModelList = () => {
                 width="max-content"
                 fontSize="14"
               >
-                {t('modelmanager:checkpointModels')}
+                {t('modelManager.checkpointModels')}
               </Text>
               {ckptModelListItemsToRender}
             </Box>
@@ -153,7 +165,7 @@ const ModelList = () => {
                 width="max-content"
                 fontSize="14"
               >
-                {t('modelmanager:diffusersModels')}
+                {t('modelManager.diffusersModels')}
               </Text>
               {diffusersModelListItemsToRender}
             </Box>
@@ -176,44 +188,59 @@ const ModelList = () => {
   }, [models, searchText, t, isSelectedFilter]);
 
   return (
-    <Flex flexDirection={'column'} rowGap="2rem" width="50%" minWidth="50%">
-      <Flex justifyContent={'space-between'}>
-        <Text fontSize={'1.4rem'} fontWeight="bold">
-          {t('modelmanager:availableModels')}
+    <Flex flexDirection="column" rowGap="2rem" width="50%" minWidth="50%">
+      <Flex justifyContent="space-between">
+        <Text fontSize="1.4rem" fontWeight="bold">
+          {t('modelManager.availableModels')}
         </Text>
-        <AddModel />
+        <Flex gap={2}>
+          <AddModel />
+          <MergeModels />
+        </Flex>
       </Flex>
 
       <IAIInput
         onChange={handleSearchFilter}
-        label={t('modelmanager:search')}
+        label={t('modelManager.search')}
       />
 
       <Flex
-        flexDirection={'column'}
+        flexDirection="column"
         gap={1}
         maxHeight={window.innerHeight - 360}
-        overflow={'scroll'}
+        overflow="scroll"
         paddingRight="1rem"
       >
         <Flex columnGap="0.5rem">
           <ModelFilterButton
-            label={t('modelmanager:allModels')}
+            label={t('modelManager.allModels')}
             onClick={() => setIsSelectedFilter('all')}
             isActive={isSelectedFilter === 'all'}
           />
           <ModelFilterButton
-            label={t('modelmanager:checkpointModels')}
+            label={t('modelManager.checkpointModels')}
             onClick={() => setIsSelectedFilter('ckpt')}
             isActive={isSelectedFilter === 'ckpt'}
           />
           <ModelFilterButton
-            label={t('modelmanager:diffusersModels')}
+            label={t('modelManager.diffusersModels')}
             onClick={() => setIsSelectedFilter('diffusers')}
             isActive={isSelectedFilter === 'diffusers'}
           />
         </Flex>
-        {renderModelListItems}
+
+        {renderModelList ? (
+          renderModelListItems
+        ) : (
+          <Flex
+            width="100%"
+            minHeight="30rem"
+            justifyContent="center"
+            alignItems="center"
+          >
+            <Spinner />
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );

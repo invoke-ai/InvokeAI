@@ -58,9 +58,11 @@ COMMANDS = (
     '--inpaint_replace','-r',
     '--png_compression','-z',
     '--text_mask','-tm',
+    '--h_symmetry_time_pct',
+    '--v_symmetry_time_pct',
     '!fix','!fetch','!replay','!history','!search','!clear',
     '!models','!switch','!import_model','!optimize_model','!convert_model','!edit_model','!del_model',
-    '!mask',
+    '!mask','!triggers',
     )
 MODEL_COMMANDS = (
     '!switch',
@@ -138,7 +140,7 @@ class Completer(object):
             elif re.match('^'+'|'.join(MODEL_COMMANDS),buffer):
                 self.matches= self._model_completions(text, state)
 
-            # looking for a ckpt model 
+            # looking for a ckpt model
             elif re.match('^'+'|'.join(CKPT_MODEL_COMMANDS),buffer):
                 self.matches= self._model_completions(text, state, ckpt_only=True)
 
@@ -255,7 +257,7 @@ class Completer(object):
         update our list of models
         '''
         self.models = models
-        
+
     def _seed_completions(self, text, state):
         m = re.search('(-S\s?|--seed[=\s]?)(\d*)',text)
         if m:

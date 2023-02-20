@@ -68,9 +68,9 @@ const BoundingBoxSettings = () => {
   };
 
   return (
-    <Flex direction="column" gap="1rem">
+    <Flex direction="column" gap={2}>
       <IAISlider
-        label={t('parameters:width')}
+        label={t('parameters.width')}
         min={64}
         max={1024}
         step={64}
@@ -82,9 +82,10 @@ const BoundingBoxSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetWidth}
+        sliderMarkRightOffset={-7}
       />
       <IAISlider
-        label={t('parameters:height')}
+        label={t('parameters.height')}
         min={64}
         max={1024}
         step={64}
@@ -96,6 +97,7 @@ const BoundingBoxSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetHeight}
+        sliderMarkRightOffset={-7}
       />
     </Flex>
   );
@@ -107,7 +109,7 @@ export const BoundingBoxSettingsHeader = () => {
   const { t } = useTranslation();
   return (
     <Box flex="1" textAlign="left">
-      {t('parameters:boundingBoxHeader')}
+      {t('parameters.boundingBoxHeader')}
     </Box>
   );
 };

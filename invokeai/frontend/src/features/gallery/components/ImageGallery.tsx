@@ -281,7 +281,7 @@ export default function ImageGallery() {
         <Resizable
           minWidth={galleryMinWidth}
           maxWidth={shouldPinGallery ? galleryMaxWidth : window.innerWidth}
-          className={'image-gallery-popup'}
+          className="image-gallery-popup"
           handleStyles={{
             left: {
               width: '15px',
@@ -395,32 +395,32 @@ export default function ImageGallery() {
               {shouldShowButtons ? (
                 <>
                   <IAIButton
-                    size={'sm'}
+                    size="sm"
                     data-selected={currentCategory === 'result'}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   >
-                    {t('gallery:generations')}
+                    {t('gallery.generations')}
                   </IAIButton>
                   <IAIButton
-                    size={'sm'}
+                    size="sm"
                     data-selected={currentCategory === 'user'}
                     onClick={() => dispatch(setCurrentCategory('user'))}
                   >
-                    {t('gallery:uploads')}
+                    {t('gallery.uploads')}
                   </IAIButton>
                 </>
               ) : (
                 <>
                   <IAIIconButton
-                    aria-label={t('gallery:showGenerations')}
-                    tooltip={t('gallery:showGenerations')}
+                    aria-label={t('gallery.showGenerations')}
+                    tooltip={t('gallery.showGenerations')}
                     data-selected={currentCategory === 'result'}
                     icon={<FaImage />}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   />
                   <IAIIconButton
-                    aria-label={t('gallery:showUploads')}
-                    tooltip={t('gallery:showUploads')}
+                    aria-label={t('gallery.showUploads')}
+                    tooltip={t('gallery.showUploads')}
                     data-selected={currentCategory === 'user'}
                     icon={<FaUser />}
                     onClick={() => dispatch(setCurrentCategory('user'))}
@@ -433,14 +433,14 @@ export default function ImageGallery() {
               <IAIPopover
                 isLazy
                 trigger="hover"
-                placement={'left'}
+                placement="left"
                 triggerComponent={
                   <IAIIconButton
-                    size={'sm'}
-                    aria-label={t('gallery:gallerySettings')}
+                    size="sm"
+                    aria-label={t('gallery.gallerySettings')}
                     icon={<FaWrench />}
                     className="image-gallery-icon-btn"
-                    cursor={'pointer'}
+                    cursor="pointer"
                   />
                 }
               >
@@ -452,12 +452,12 @@ export default function ImageGallery() {
                       min={32}
                       max={256}
                       hideTooltip={true}
-                      label={t('gallery:galleryImageSize')}
+                      label={t('gallery.galleryImageSize')}
                     />
                     <IAIIconButton
-                      size={'sm'}
-                      aria-label={t('gallery:galleryImageResetSize')}
-                      tooltip={t('gallery:galleryImageResetSize')}
+                      size="sm"
+                      aria-label={t('gallery.galleryImageResetSize')}
+                      tooltip={t('gallery.galleryImageResetSize')}
                       onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
                       icon={<BiReset />}
                       data-selected={shouldPinGallery}
@@ -466,7 +466,7 @@ export default function ImageGallery() {
                   </div>
                   <div>
                     <IAICheckbox
-                      label={t('gallery:maintainAspectRatio')}
+                      label={t('gallery.maintainAspectRatio')}
                       isChecked={galleryImageObjectFit === 'contain'}
                       onChange={() =>
                         dispatch(
@@ -481,7 +481,7 @@ export default function ImageGallery() {
                   </div>
                   <div>
                     <IAICheckbox
-                      label={t('gallery:autoSwitchNewImages')}
+                      label={t('gallery.autoSwitchNewImages')}
                       isChecked={shouldAutoSwitchToNewImages}
                       onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         dispatch(
@@ -492,7 +492,7 @@ export default function ImageGallery() {
                   </div>
                   <div>
                     <IAICheckbox
-                      label={t('gallery:singleColumnLayout')}
+                      label={t('gallery.singleColumnLayout')}
                       isChecked={shouldUseSingleGalleryColumn}
                       onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         dispatch(
@@ -505,10 +505,10 @@ export default function ImageGallery() {
               </IAIPopover>
 
               <IAIIconButton
-                size={'sm'}
-                className={'image-gallery-icon-btn'}
-                aria-label={t('gallery:pinGallery')}
-                tooltip={`${t('gallery:pinGallery')} (Shift+G)`}
+                size="sm"
+                className="image-gallery-icon-btn"
+                aria-label={t('gallery.pinGallery')}
+                tooltip={`${t('gallery.pinGallery')} (Shift+G)`}
                 onClick={handleSetShouldPinGallery}
                 icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />
@@ -539,14 +539,14 @@ export default function ImageGallery() {
                   className="image-gallery-load-more-btn"
                 >
                   {areMoreImagesAvailable
-                    ? t('gallery:loadMore')
-                    : t('gallery:allImagesLoaded')}
+                    ? t('gallery.loadMore')
+                    : t('gallery.allImagesLoaded')}
                 </Button>
               </>
             ) : (
               <div className="image-gallery-container-placeholder">
                 <MdPhotoLibrary />
-                <p>{t('gallery:noImagesInGallery')}</p>
+                <p>{t('gallery.noImagesInGallery')}</p>
               </div>
             )}
           </div>

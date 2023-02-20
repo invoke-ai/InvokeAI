@@ -18,12 +18,12 @@ export default function ShuffleSeed() {
 
   return (
     <Button
-      size={'sm'}
+      size="sm"
       isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
       padding="0 1.5rem"
     >
-      <p>{t('parameters:shuffle')}</p>
+      <p>{t('parameters.shuffle')}</p>
     </Button>
   );
 }

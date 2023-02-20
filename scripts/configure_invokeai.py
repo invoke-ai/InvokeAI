@@ -5,5 +5,5 @@ import warnings
 from ldm.invoke.config import invokeai_configure
 
 if __name__ == '__main__':
-    warnings.warn("configure_invokeai.py is deprecated, please run 'invokai-configure'", DeprecationWarning)
-    configure_invokeai.main()
+    warnings.warn("configure_invokeai.py is deprecated, running 'invokeai-configure'...", DeprecationWarning)
+    invokeai_configure.main()

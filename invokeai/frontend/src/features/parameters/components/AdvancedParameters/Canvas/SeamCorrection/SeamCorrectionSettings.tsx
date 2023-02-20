@@ -6,7 +6,7 @@ import SeamStrength from './SeamStrength';
 
 const SeamCorrectionSettings = () => {
   return (
-    <Flex direction="column" gap="1rem">
+    <Flex direction="column" gap={2}>
       <SeamSize />
       <SeamBlur />
       <SeamStrength />

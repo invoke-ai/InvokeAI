@@ -18,8 +18,8 @@ export default function InitImagePreview() {
 
   const alertMissingInitImage = () => {
     toast({
-      title: t('toast:parametersFailed'),
-      description: t('toast:parametersFailedDesc'),
+      title: t('toast.parametersFailed'),
+      description: t('toast.parametersFailedDesc'),
       status: 'error',
       isClosable: true,
     });
@@ -29,15 +29,15 @@ export default function InitImagePreview() {
   return (
     <>
       <div className="init-image-preview-header">
-        <h2>{t('parameters:initialImage')}</h2>
+        <h2>{t('parameters.initialImage')}</h2>
         <ImageUploaderIconButton />
       </div>
       {initialImage && (
         <div className="init-image-preview">
           <Image
-            fit={'contain'}
-            maxWidth={'100%'}
-            maxHeight={'100%'}
+            fit="contain"
+            maxWidth="100%"
+            maxHeight="100%"
             src={
               typeof initialImage === 'string' ? initialImage : initialImage.url
             }

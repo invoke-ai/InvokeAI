@@ -38,6 +38,16 @@ export const addNewModel = createAction<
 
 export const deleteModel = createAction<string>('socketio/deleteModel');
 
+export const convertToDiffusers =
+  createAction<InvokeAI.InvokeModelConversionProps>(
+    'socketio/convertToDiffusers'
+  );
+
+export const mergeDiffusersModels =
+  createAction<InvokeAI.InvokeModelMergingProps>(
+    'socketio/mergeDiffusersModels'
+  );
+
 export const requestModelChange = createAction<string>(
   'socketio/requestModelChange'
 );

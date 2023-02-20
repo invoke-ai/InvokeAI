@@ -107,9 +107,9 @@ const InfillAndScalingSettings = () => {
   };
 
   return (
-    <Flex direction="column" gap="1rem">
+    <Flex direction="column" gap={4}>
       <IAISelect
-        label={t('parameters:scaleBeforeProcessing')}
+        label={t('parameters.scaleBeforeProcessing')}
         validValues={BOUNDING_BOX_SCALES_DICT}
         value={boundingBoxScale}
         onChange={handleChangeBoundingBoxScaleMethod}
@@ -118,7 +118,7 @@ const InfillAndScalingSettings = () => {
         isInputDisabled={!isManual}
         isResetDisabled={!isManual}
         isSliderDisabled={!isManual}
-        label={t('parameters:scaledWidth')}
+        label={t('parameters.scaledWidth')}
         min={64}
         max={1024}
         step={64}
@@ -130,12 +130,13 @@ const InfillAndScalingSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetScaledWidth}
+        sliderMarkRightOffset={-7}
       />
       <IAISlider
         isInputDisabled={!isManual}
         isResetDisabled={!isManual}
         isSliderDisabled={!isManual}
-        label={t('parameters:scaledHeight')}
+        label={t('parameters.scaledHeight')}
         min={64}
         max={1024}
         step={64}
@@ -147,9 +148,10 @@ const InfillAndScalingSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetScaledHeight}
+        sliderMarkRightOffset={-7}
       />
       <IAISelect
-        label={t('parameters:infillMethod')}
+        label={t('parameters.infillMethod')}
         value={infillMethod}
         validValues={availableInfillMethods}
         onChange={(e) => dispatch(setInfillMethod(e.target.value))}
@@ -159,7 +161,7 @@ const InfillAndScalingSettings = () => {
         isResetDisabled={infillMethod !== 'tile'}
         isSliderDisabled={infillMethod !== 'tile'}
         sliderMarkRightOffset={-4}
-        label={t('parameters:tileSize')}
+        label={t('parameters.tileSize')}
         min={16}
         max={64}
         sliderNumberInputProps={{ max: 256 }}

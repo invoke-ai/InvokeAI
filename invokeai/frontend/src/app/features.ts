@@ -29,57 +29,57 @@ const useFeatures = (): Record<Feature, FeatureHelpInfo> => {
   return useMemo(
     () => ({
       [Feature.PROMPT]: {
-        text: t('tooltip:feature.prompt'),
+        text: t('tooltip.feature.prompt'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.GALLERY]: {
-        text: t('tooltip:feature.gallery'),
+        text: t('tooltip.feature.gallery'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.OTHER]: {
-        text: t('tooltip:feature.other'),
+        text: t('tooltip.feature.other'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.SEED]: {
-        text: t('tooltip:feature.seed'),
+        text: t('tooltip.feature.seed'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.VARIATIONS]: {
-        text: t('tooltip:feature.variations'),
+        text: t('tooltip.feature.variations'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.UPSCALE]: {
-        text: t('tooltip:feature.upscale'),
+        text: t('tooltip.feature.upscale'),
         href: 'link/to/docs/feature1.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.FACE_CORRECTION]: {
-        text: t('tooltip:feature.faceCorrection'),
+        text: t('tooltip.feature.faceCorrection'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.IMAGE_TO_IMAGE]: {
-        text: t('tooltip:feature.imageToImage'),
+        text: t('tooltip.feature.imageToImage'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.BOUNDING_BOX]: {
-        text: t('tooltip:feature.boundingBox'),
+        text: t('tooltip.feature.boundingBox'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.SEAM_CORRECTION]: {
-        text: t('tooltip:feature.seamCorrection'),
+        text: t('tooltip.feature.seamCorrection'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },
       [Feature.INFILL_AND_SCALING]: {
-        text: t('tooltip:feature.infillAndScaling'),
+        text: t('tooltip.feature.infillAndScaling'),
         href: 'link/to/docs/feature3.html',
         guideImage: 'asset/path.gif',
       },

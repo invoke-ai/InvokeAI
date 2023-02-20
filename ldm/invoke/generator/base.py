@@ -64,6 +64,7 @@ class Generator:
 
     def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
+                 h_symmetry_time_pct=None, v_symmetry_time_pct=None,
                  safety_checker:dict=None,
                  free_gpu_mem: bool=False,
                  **kwargs):
@@ -81,6 +82,8 @@ class Generator:
             step_callback = step_callback,
             threshold     = threshold,
             perlin        = perlin,
+            h_symmetry_time_pct     = h_symmetry_time_pct,
+            v_symmetry_time_pct     = v_symmetry_time_pct,
             attention_maps_callback = attention_maps_callback,
             **kwargs
         )
@@ -247,11 +250,14 @@ class Generator:
         fixdevice = 'cpu' if (self.model.device.type == 'mps') else self.model.device
         # limit noise to only the diffusion image channels, not the mask channels
         input_channels = min(self.latent_channels, 4)
+        # round up to the nearest block of 8
+        temp_width = int((width + 7) / 8) * 8
+        temp_height = int((height + 7) / 8) * 8
         noise = torch.stack([
-            rand_perlin_2d((height, width),
+            rand_perlin_2d((temp_height, temp_width),
                            (8, 8),
                            device = self.model.device).to(fixdevice) for _ in range(input_channels)], dim=0).to(self.model.device)
-        return noise
+        return noise[0:4, 0:height, 0:width]
 
     def new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)

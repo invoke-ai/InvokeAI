@@ -78,7 +78,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     tooltipSuffix = '',
     withSliderMarks = false,
     sliderMarkLeftOffset = 0,
-    sliderMarkRightOffset = -7,
+    sliderMarkRightOffset = -1,
     withInput = false,
     isInteger = false,
     inputWidth = '5.5rem',
@@ -164,12 +164,13 @@ export default function IAISlider(props: IAIFullSliderProps) {
     >
       <FormLabel
         className="invokeai__slider-component-label"
+        fontSize="sm"
         {...sliderFormLabelProps}
       >
         {label}
       </FormLabel>
 
-      <HStack w={'100%'} gap={2} alignItems="center">
+      <HStack w="100%" gap={2} alignItems="center">
         <Slider
           aria-label={label}
           value={value}
@@ -259,9 +260,9 @@ export default function IAISlider(props: IAIFullSliderProps) {
 
         {withReset && (
           <IAIIconButton
-            size={'sm'}
-            aria-label={'Reset'}
-            tooltip={'Reset'}
+            size="sm"
+            aria-label="Reset"
+            tooltip="Reset"
             icon={<BiReset />}
             onClick={handleResetDisable}
             isDisabled={isResetDisabled}
