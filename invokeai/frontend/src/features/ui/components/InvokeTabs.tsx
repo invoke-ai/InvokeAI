@@ -11,14 +11,20 @@ import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
 import TrainingIcon from 'common/icons/TrainingIcon';
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import {
+  setActiveTab,
+  setShouldShowParametersPanel,
+} from 'features/ui/store/uiSlice';
 import i18n from 'i18n';
 import { ReactElement } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabIndexSelector } from '../store/uiSelectors';
+import { floatingSelector } from './FloatingParametersPanelButtons';
 import ImageToImageWorkarea from './ImageToImage';
 import TextToImageWorkarea from './TextToImage';
 import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
@@ -73,9 +79,17 @@ function updateTabTranslations() {
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
+
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
+
+  const {
+    shouldShowGallery,
+    shouldShowParametersPanel,
+    shouldPinGallery,
+    shouldPinParametersPanel,
+  } = useAppSelector(floatingSelector);
 
   useUpdateTranslations(updateTabTranslations);
 
@@ -112,6 +126,22 @@ export default function InvokeTabs() {
       dispatch(setIsLightboxOpen(!isLightBoxOpen));
     },
     [isLightBoxOpen]
+  );
+
+  useHotkeys(
+    'f',
+    () => {
+      if (shouldShowGallery || shouldShowParametersPanel) {
+        dispatch(setShouldShowParametersPanel(false));
+        dispatch(setShouldShowGallery(false));
+      } else {
+        dispatch(setShouldShowParametersPanel(true));
+        dispatch(setShouldShowGallery(true));
+      }
+      if (shouldPinGallery || shouldPinParametersPanel)
+        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    },
+    [shouldShowGallery, shouldShowParametersPanel]
   );
 
   const renderTabs = () => {

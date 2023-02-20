@@ -40,11 +40,15 @@ const cancelButtonSelector = createSelector(
   }
 );
 
+interface CancelButtonProps {
+  btnGroupWidth?: string | number;
+}
+
 export default function CancelButton(
-  props: Omit<IAIIconButtonProps, 'aria-label'>
+  props: CancelButtonProps & Omit<IAIIconButtonProps, 'aria-label'>
 ) {
   const dispatch = useAppDispatch();
-  const { ...rest } = props;
+  const { btnGroupWidth = 'auto', ...rest } = props;
   const {
     isProcessing,
     isConnected,
@@ -91,7 +95,12 @@ export default function CancelButton(
   ];
 
   return (
-    <ButtonGroup isAttached variant="link">
+    <ButtonGroup
+      isAttached
+      variant="link"
+      minHeight="2.5rem"
+      width={btnGroupWidth}
+    >
       {cancelType === 'immediate' ? (
         <IAIIconButton
           icon={<MdCancel />}
