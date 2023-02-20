@@ -1,240 +1,216 @@
 import re
 from pathlib import Path
 from ldm.invoke.globals import global_models_dir
-import torch
+from ldm.invoke.devices import choose_torch_device
 from safetensors.torch import load_file
-from typing import List, Optional, Set, Type
+import torch
+from torch.utils.hooks import RemovableHandle
+
+class LoRALayer:
+    lora_name: str
+    name: str
+    scale: float
+    up: torch.nn.Module
+    down: torch.nn.Module
+
+    def __init__(self, lora_name: str, name: str, rank=4, alpha=1.0):
+        self.lora_name = lora_name
+        self.name = name
+        self.scale = alpha / rank
 
 
-class LoraLinear(torch.nn.Module):
-    def __init__(
-        self, in_features, out_features, rank=4
-    ):
-        super().__init__()
+class LoRA:
+    name: str
+    layers: dict[str, LoRALayer]
+    multiplier: float
 
-        if rank > min(in_features, out_features):
-            raise ValueError(
-                f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}"
-            )
-        self.rank = rank
-        self.linear = torch.nn.Linear(in_features, out_features, bias=False)
-        self.lora = torch.nn.Linear(in_features, out_features, bias=False)
+    def __init__(self, name: str, multiplier=1.0):
+        self.name = name
+        self.layers = {}
+        self.multiplier = multiplier
 
-    def forward(self, hidden_states):
-        orig_dtype = hidden_states.dtype
-        dtype = self.lora.weight.dtype
-        return self.lora(hidden_states.to(dtype)).to(orig_dtype)
+
+UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
+TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
+LORA_PREFIX_UNET = 'lora_unet'
+LORA_PREFIX_TEXT_ENCODER = 'lora_te'
+
+
+def load_lora(
+    name: str,
+    path_file: Path,
+    device: torch.device,
+    dtype: torch.dtype,
+    text_modules: dict[str, torch.nn.Module],
+    unet_modules: dict[str, torch.nn.Module],
+    multiplier=1.0
+):
+    print(f">> Loading lora {name} from {path_file}")
+    if path_file.suffix == '.safetensors':
+        checkpoint = load_file(path_file, device='cpu')
+    else:
+        checkpoint = torch.load(path_file, map_location='cpu')
+
+    lora = LoRA(name, multiplier)
+
+    alpha = None
+    rank = None
+    for key, value in checkpoint.items():
+        stem, leaf = key.split(".", 1)
+
+        if leaf.endswith("alpha"):
+            if alpha is None:
+                alpha = value.item()
+            continue
+
+        if stem.startswith(LORA_PREFIX_TEXT_ENCODER):
+            # text encoder layer
+            wrapped = text_modules.get(stem, None)
+            if wrapped is None:
+                print(f">> Missing layer: {stem}")
+                continue
+        elif stem.startswith(LORA_PREFIX_UNET):
+            # unet layer
+            wrapped = unet_modules.get(stem, None)
+            if wrapped is None:
+                print(f">> Missing layer: {stem}")
+                continue
+        else:
+            continue
+
+        if rank is None and leaf == 'lora_down.weight' and len(value.size()) == 2:
+            rank = value.shape[0]
+
+        if wrapped is None:
+            continue
+
+        layer = lora.layers.get(stem, None)
+        if layer is None:
+            layer = LoRALayer(name, stem, rank, alpha)
+            lora.layers[stem] = layer
+
+        if type(wrapped) == torch.nn.Linear:
+            module = torch.nn.Linear(
+                value.shape[1], value.shape[0], bias=False)
+        elif type(wrapped) == torch.nn.Conv2d:
+            module = torch.nn.Conv2d(
+                value.shape[1], value.shape[0], (1, 1), bias=False)
+        else:
+            print(
+                f">> Encoundered unknown lora layer module in {name}: {type(value).__name__}")
+
+        with torch.no_grad():
+            module.weight.copy_(value)
+
+        module.to(device=device, dtype=dtype)
+
+        if leaf == "lora_up.weight":
+            layer.up = module
+        elif leaf == "lora_down.weight":
+            layer.down = module
+        else:
+            print(f">> Encountered unknown layer in lora {name}: {key}")
+            continue
+
+    return lora
 
 
 class LoraManager:
+    loras: dict[str, LoRA]
+    applied_loras: dict[str, LoRA]
+    hooks: list[RemovableHandle]
 
     def __init__(self, pipe):
-        self.pipe = pipe
         self.lora_path = Path(global_models_dir(), 'lora')
         self.lora_match = re.compile(r"<lora:([^>]+)>")
-        self.prompt = None
+        self.unet = pipe.unet
+        self.text_encoder = pipe.text_encoder
+        self.device = torch.device(choose_torch_device())
+        self.dtype = pipe.unet.dtype
+        self.loras = {}
+        self.applied_loras = {}
+        self.hooks = []
 
-    def _process_lora(self, lora):
-        processed_lora = {
-            "unet": [],
-            "text_encoder": []
-        }
-        visited = []
-        for key in lora:
-            if ".alpha" in key or key in visited:
-                continue
-            if "text" in key:
-                lora_type, pair_keys = self._find_layer(
-                    "text_encoder",
-                    key.split(".")[0].split("lora_te" + "_")[-1].split("_"),
-                    key
-                )
-            else:
-                lora_type, pair_keys = self._find_layer(
-                    "unet",
-                    key.split(".")[0].split("lora_unet" + "_")[-1].split("_"),
-                    key
-                )
+        def find_modules(prefix, root_module: torch.nn.Module, target_replace_modules) -> dict[str, torch.nn.Module]:
+            mapping = {}
+            for name, module in root_module.named_modules():
+                if module.__class__.__name__ in target_replace_modules:
+                    for child_name, child_module in module.named_modules():
+                        if child_module.__class__.__name__ == "Linear" or (child_module.__class__.__name__ == "Conv2d" and child_module.kernel_size == (1, 1)):
+                            # It's easier to just convert into "lora" naming instead of trying to inverse map from "lora" -> diffuser
+                            lora_name = prefix + '.' + name + '.' + child_name
+                            lora_name = lora_name.replace('.', '_')
+                            mapping[lora_name] = child_module
+                            self.hooks.append(child_module.register_forward_hook(self._make_hook(lora_name)))
+            return mapping
 
-            if len(lora[pair_keys[0]].shape) == 4:
-                weight_up = lora[pair_keys[0]].squeeze(3).squeeze(2).to(torch.float32)
-                weight_down = lora[pair_keys[1]].squeeze(3).squeeze(2).to(torch.float32)
-                weight = torch.mm(weight_up, weight_down)
-            else:
-                weight_up = lora[pair_keys[0]].to(torch.float32)
-                weight_down = lora[pair_keys[1]].to(torch.float32)
-                weight = torch.mm(weight_up, weight_down)
+        self.text_modules = find_modules(
+            LORA_PREFIX_TEXT_ENCODER, self.text_encoder, TEXT_ENCODER_TARGET_REPLACE_MODULE)
+        self.unet_modules = find_modules(
+            LORA_PREFIX_UNET, self.unet, UNET_TARGET_REPLACE_MODULE)
 
-            processed_lora[lora_type].append({
-                "weight": weight,
-                "rank": lora[pair_keys[1]].shape[0]
-            })
+    def _make_hook(self, layer: str):
+        def hook(module, input, output):
+            for lora in self.applied_loras.values():
+                lora_layer = lora.layers.get(layer, None)
+                if lora_layer is None:
+                    continue
+                output = output + \
+                    lora_layer.up(lora_layer.down(*input)) * \
+                    lora.multiplier * lora_layer.scale
+            return output
+        return hook
 
-            for item in pair_keys:
-                visited.append(item)
-
-        return processed_lora
-
-    def _find_layer(self, lora_type, layer_key, key):
-        temp_name = layer_key.pop(0)
-        if lora_type == "unet":
-            curr_layer = self.pipe.unet
-        elif lora_type == "text_encoder":
-            curr_layer = self.pipe.text_encoder
-        else:
-            raise ValueError("Invalid Lora Type")
-
-        while len(layer_key) > -1:
-            try:
-                curr_layer = curr_layer.__getattr__(temp_name)
-                if len(layer_key) > 0:
-                    temp_name = layer_key.pop(0)
-                elif len(layer_key) == 0:
-                    break
-            except Exception:
-                if len(temp_name) > 0:
-                    temp_name += "_" + layer_key.pop(0)
-                else:
-                    temp_name = layer_key.pop(0)
-
-        pair_keys = []
-        if "lora_down" in key:
-            pair_keys.append(key.replace("lora_down", "lora_up"))
-            pair_keys.append(key)
-        else:
-            pair_keys.append(key)
-            pair_keys.append(key.replace("lora_up", "lora_down"))
-
-        return lora_type, pair_keys
-
-    @staticmethod
-    def _find_modules(
-        model,
-        ancestor_class: Optional[Set[str]] = None,
-        search_class: List[Type[torch.nn.Module]] = [torch.nn.Linear],
-        exclude_children_of: Optional[List[Type[torch.nn.Module]]] = [LoraLinear],
-    ):
-        """
-        Find all modules of a certain class (or union of classes) that are direct or
-        indirect descendants of other modules of a certain class (or union of classes).
-        Returns all matching modules, along with the parent of those modules and the
-        names they are referenced by.
-        """
-
-        # Get the targets we should replace all linears under
-        if ancestor_class is not None:
-            ancestors = (
-                module
-                for module in model.modules()
-                if module.__class__.__name__ in ancestor_class
-            )
-        else:
-            # this, incase you want to naively iterate over all modules.
-            ancestors = [module for module in model.modules()]
-
-        # For each target find every linear_class module that isn't a child of a LoraInjectedLinear
-        for ancestor in ancestors:
-            for fullname, module in ancestor.named_modules():
-                if any([isinstance(module, _class) for _class in search_class]):
-                    # Find the direct parent if this is a descendant, not a child, of target
-                    *path, name = fullname.split(".")
-                    parent = ancestor
-                    while path:
-                        parent = parent.get_submodule(path.pop(0))
-                    # Skip this linear if it's a child of a LoraInjectedLinear
-                    if exclude_children_of and any(
-                        [isinstance(parent, _class) for _class in exclude_children_of]
-                    ):
-                        continue
-                    # Otherwise, yield it
-                    yield parent, name, module
-
-    @staticmethod
-    def patch_module(lora_type, processed_lora, module, name, child_module, scale: float = 1.0):
-        _source = (
-            child_module.linear
-            if isinstance(child_module, LoraLinear)
-            else child_module
-        )
-
-        lora = processed_lora[lora_type].pop(0)
-
-        weight = _source.weight
-        _tmp = LoraLinear(
-            in_features=_source.in_features,
-            out_features=_source.out_features,
-            rank=lora["rank"]
-        )
-        _tmp.linear.weight = weight
-
-        # switch the module
-        module._modules[name] = _tmp
-        module._modules[name].lora.weight.data = lora["weight"]
-        module._modules[name].to(weight.device)
-
-    def patch_lora(self, lora_path, scale: float = 1.0):
-        lora = load_file(lora_path)
-        processed_lora = self._process_lora(lora)
-        for module, name, child_module in self._find_modules(
-            self.pipe.unet,
-            {"CrossAttention", "Attention", "GEGLU"},
-            search_class=[torch.nn.Linear, LoraLinear]
-        ):
-            self.patch_module("unet", processed_lora, module, name, child_module, scale)
-
-        for module, name, child_module in self._find_modules(
-            self.pipe.text_encoder,
-            {"CLIPAttention"},
-            search_class=[torch.nn.Linear, LoraLinear]
-        ):
-            self.patch_module("text_encoder", processed_lora, module, name, child_module, scale)
+    def _load_lora(self, name, path_file, multiplier=1.0):
+        lora = load_lora(name, path_file, self.device, self.dtype,
+                         self.text_modules, self.unet_modules, multiplier)
+        self.loras[name] = lora
+        self.applied_loras[name] = lora
+        return lora
 
     def apply_lora_model(self, args):
         args = args.split(':')
         name = args[0]
-
         path = Path(self.lora_path, name)
         file = Path(path, "pytorch_lora_weights.bin")
 
         if path.is_dir() and file.is_file():
-            print(f"loading diffusers lora: {path}")
+            print(f"loading lora: {path}")
             self.pipe.unet.load_attn_procs(path.absolute().as_posix())
-        else:
-            file = Path(self.lora_path, f"{name}.safetensors")
-            print(f"loading lora: {file}")
-            scale = 1.0
             if len(args) == 2:
-                scale = float(args[1])
+                self.weights[name] = float(args[1])
+        else:
+            # converting and saving in diffusers format
+            path_file = Path(self.lora_path, f'{name}.ckpt')
+            if Path(self.lora_path, f'{name}.safetensors').exists():
+                path_file = Path(self.lora_path, f'{name}.safetensors')
 
-            self.patch_lora(file.absolute().as_posix(), scale)
+            if not path_file.exists():
+                print(f">> Unable to find lora: {name}")
+                return
 
-    @staticmethod
-    def remove_lora(child_module):
-        _source = child_module.linear
-        weight = _source.weight
+            mult = 1.0
+            if len(args) == 2:
+                mult = float(args[1])
 
-        _tmp = torch.nn.Linear(_source.in_features, _source.out_features)
-        _tmp.weight = weight
+            lora = self.loras.get(name, None)
+            if lora is None:
+                lora = self._load_lora(name, path_file, mult)
 
-    def reset_lora(self):
-        for module, name, child_module in self._find_modules(
-            self.pipe.unet,
-            search_class=[LoraLinear]
-        ):
-            self.remove_lora(child_module)
-
-        for module, name, child_module in self._find_modules(
-            self.pipe.text_encoder,
-            search_class=[LoraLinear]
-        ):
-            self.remove_lora(child_module)
+            lora.multiplier = mult
+            self.applied_loras[name] = lora
 
     def load_lora_from_prompt(self, prompt: str):
+        self.applied_loras = {}
         for m in re.findall(self.lora_match, prompt):
             self.apply_lora_model(m)
 
     def load_lora(self):
         self.load_lora_from_prompt(self.prompt)
+
+    def unload_lora(self, lora_name: str):
+        if lora_name in self.loras:
+            del self.loras[lora_name]
 
     def configure_prompt(self, prompt: str) -> str:
         self.prompt = prompt
@@ -243,3 +219,12 @@ class LoraManager:
             return ""
 
         return re.sub(self.lora_match, found, prompt)
+
+    def __del__(self):
+        del self.loras
+        del self.applied_loras
+        del self.text_modules
+        del self.unet_modules
+        for cb in self.hooks:
+            cb.remove()
+        del self.hooks
