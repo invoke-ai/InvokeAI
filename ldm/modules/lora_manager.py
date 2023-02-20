@@ -168,7 +168,6 @@ class LoraManager:
         lora = load_lora(name, path_file, self.device, self.dtype,
                          self.text_modules, self.unet_modules, multiplier)
         self.loras[name] = lora
-        self.applied_loras[name] = lora
         return lora
 
     def apply_lora_model(self, args):
@@ -202,7 +201,6 @@ class LoraManager:
             self.applied_loras[name] = lora
 
     def load_lora_from_prompt(self, prompt: str):
-        self.applied_loras = {}
         for m in re.findall(self.lora_match, prompt):
             self.apply_lora_model(m)
 
@@ -214,6 +212,7 @@ class LoraManager:
             del self.loras[lora_name]
 
     def configure_prompt(self, prompt: str) -> str:
+        self.applied_loras = {}
         self.prompt = prompt
 
         def found(m):
