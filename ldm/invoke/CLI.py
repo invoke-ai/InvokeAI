@@ -532,32 +532,25 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
                 "** please provide (1) a URL to a .ckpt file to import; (2) a local path to a .ckpt file; or (3) a diffusers repository id in the form stabilityai/stable-diffusion-2-1"
             )
         else:
-            import_model(path[1], gen, opt, completer)
-        completer.add_history(command)
+            try:
+                import_model(path[1], gen, opt, completer)
+                completer.add_history(command)
+            except KeyboardInterrupt:
+                print('\n')
         operation = None
 
-    elif command.startswith("!convert"):
+    elif command.startswith(("!convert","!optimize")):
         path = shlex.split(command)
         if len(path) < 2:
             print("** please provide the path to a .ckpt or .safetensors model")
-        elif not os.path.exists(path[1]):
-            print(f"** {path[1]}: model not found")
         else:
-            convert_model(path[1], gen, opt, completer)
-        completer.add_history(command)
+            try:
+                convert_model(path[1], gen, opt, completer)
+                completer.add_history(command)
+            except KeyboardInterrupt:
+                print('\n')
         operation = None
-
-    elif command.startswith("!optimize"):
-        path = shlex.split(command)
-        if len(path) < 2:
-            print("** please provide an installed model name")
-        elif not path[1] in gen.model_manager.list_models():
-            print(f"** {path[1]}: model not found")
-        else:
-            convert_model(path[1], gen, opt, completer)
-        completer.add_history(command)
-        operation = None
-
+ 
     elif command.startswith("!edit"):
         path = shlex.split(command)
         if len(path) < 2:
@@ -646,11 +639,17 @@ def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
     ):
         pass
     else:
-        model_name, model_desc = _get_model_name_and_desc(
-            gen.model_manager,
-            completer,
-            model_name=default_name,
-        )
+        if model_path.startswith(('http:','https:')):
+            try:
+                default_name = url_attachment_name(model_path)
+                default_name = Path(default_name).stem
+            except Exception as e:
+                print(f'** URL: {str(e)}')
+            model_name, model_desc = _get_model_name_and_desc(
+                gen.model_manager,
+                completer,
+                model_name=default_name,
+            )
     imported_name = gen.model_manager.heuristic_import(
         model_path,
         model_name=model_name,
@@ -740,7 +739,10 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> 
             vae=vae_repo,
         )
     else:
-        model_name = import_model(model_name_or_path, gen, opt, completer, convert=True)
+        try:
+            model_name = import_model(model_name_or_path, gen, opt, completer, convert=True)
+        except KeyboardInterrupt:
+            return
 
     if not model_name:
         print("** Conversion failed. Aborting.")
