@@ -482,6 +482,8 @@ class Generate:
 
         if self.model.lora_manager:
             prompt = self.model.lora_manager.configure_prompt(prompt)
+            # lora MUST process prompt before conditioning
+            self.model.lora_manager.load_lora()
 
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
@@ -512,10 +514,6 @@ class Generate:
                 self.model.cond_stage_model.to(self.model.device)
         except AttributeError:
             pass
-
-        # lora MUST process prompt before conditioning
-        if self.model.lora_manager:
-            self.model.lora_manager.load_lora()
 
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
