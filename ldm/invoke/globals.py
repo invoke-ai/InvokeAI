@@ -13,8 +13,8 @@ the attributes:
 
 import os
 import os.path as osp
-from pathlib import Path
 from argparse import Namespace
+from pathlib import Path
 from typing import Union
 
 Globals = Namespace()
@@ -47,6 +47,9 @@ Globals.internet_available = True
 
 # Whether to disable xformers
 Globals.disable_xformers = False
+
+# Low-memory tradeoff for guidance calculations.
+Globals.sequential_guidance = False
 
 # whether we are forcing full precision
 Globals.full_precision = False

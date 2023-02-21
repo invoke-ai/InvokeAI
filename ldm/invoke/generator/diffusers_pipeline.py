@@ -330,7 +330,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     16 * \
                     latents.size(dim=2) * latents.size(dim=3) * latents.size(dim=2) * latents.size(dim=3) * \
                     bytes_per_element_needed_for_baddbmm_duplication
-                if max_size_required_for_baddbmm > (mem_free * 3.3 / 4.0): # 3.3 / 4.0 is from old Invoke code
+                if max_size_required_for_baddbmm > (mem_free * 3.0 / 4.0): # 3.3 / 4.0 is from old Invoke code
                     self.enable_attention_slicing(slice_size='max')
                 else:
                     self.disable_attention_slicing()

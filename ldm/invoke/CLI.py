@@ -62,6 +62,7 @@ def main():
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = args.ckpt_convert
 
     print(f">> Internet connectivity is {Globals.internet_available}")
