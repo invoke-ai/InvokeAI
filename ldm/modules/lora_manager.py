@@ -15,6 +15,7 @@ class LoRALayer:
     down: torch.nn.Module
 
     def __init__(self, lora_name: str, name: str, rank=4, alpha=1.0):
+        super().__init__()
         self.lora_name = lora_name
         self.name = name
         self.scale = alpha / rank
@@ -35,6 +36,27 @@ UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
 TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
 LORA_PREFIX_UNET = 'lora_unet'
 LORA_PREFIX_TEXT_ENCODER = 'lora_te'
+
+
+def lora_forward(module, input_h, output):
+    if len(loaded_loras) == 0:
+        return output
+
+    lora_name = getattr(module, 'lora_name', None)
+    for lora in applied_loras.values():
+        layer = lora.layers.get(lora_name, None)
+        if layer is None:
+            continue
+        output = output + layer.up(layer.down(*input_h)) * lora.multiplier * layer.scale
+    return output
+
+
+def lora_linear_forward(self, input_h):
+    return lora_forward(self, input_h, torch.nn.Linear.forward_before_lora(self, input_h))
+
+
+def lora_conv2d_forward(self, input_h):
+    return lora_forward(self, input_h, torch.nn.Conv2d.forward_before_lora(self, input_h))
 
 
 def load_lora(
@@ -118,10 +140,7 @@ def load_lora(
 
 
 class LoraManager:
-    loras: dict[str, LoRA]
-    applied_loras: dict[str, LoRA]
-    loras_to_load: dict[str, dict]
-    hooks: list[RemovableHandle]
+    loras_to_load: dict[str, float]
 
     def __init__(self, pipe):
         self.lora_path = Path(global_models_dir(), 'lora')
@@ -129,10 +148,16 @@ class LoraManager:
         self.text_encoder = pipe.text_encoder
         self.device = torch.device(choose_torch_device())
         self.dtype = pipe.unet.dtype
-        self.loras = {}
-        self.applied_loras = {}
-        self.hooks = []
         self.loras_to_load = {}
+
+        if not hasattr(torch.nn.Linear, 'forward_before_lora'):
+            torch.nn.Linear.forward_before_lora = torch.nn.Linear.forward
+
+        if not hasattr(torch.nn.Conv2d, 'forward_before_lora'):
+            torch.nn.Conv2d.forward_before_lora = torch.nn.Conv2d.forward
+
+        torch.nn.Linear.forward = lora_linear_forward
+        torch.nn.Conv2d.forward = lora_conv2d_forward
 
         def find_modules(prefix, root_module: torch.nn.Module, target_replace_modules) -> dict[str, torch.nn.Module]:
             mapping = {}
@@ -140,11 +165,10 @@ class LoraManager:
                 if module.__class__.__name__ in target_replace_modules:
                     for child_name, child_module in module.named_modules():
                         if child_module.__class__.__name__ == "Linear" or (child_module.__class__.__name__ == "Conv2d" and child_module.kernel_size == (1, 1)):
-                            # It's easier to just convert into "lora" naming instead of trying to inverse map from "lora" -> diffuser
                             lora_name = prefix + '.' + name + '.' + child_name
                             lora_name = lora_name.replace('.', '_')
                             mapping[lora_name] = child_module
-                            self.hooks.append(child_module.register_forward_hook(self._make_hook(lora_name)))
+                            module.lora_name = lora_name
             return mapping
 
         self.text_modules = find_modules(
@@ -152,22 +176,10 @@ class LoraManager:
         self.unet_modules = find_modules(
             LORA_PREFIX_UNET, self.unet, UNET_TARGET_REPLACE_MODULE)
 
-    def _make_hook(self, layer: str):
-        def hook(module, input_h, output):
-            for lora in self.applied_loras.values():
-                lora_layer = lora.layers.get(layer, None)
-                if lora_layer is None:
-                    continue
-                output = output + \
-                    lora_layer.up(lora_layer.down(*input_h)) * \
-                    lora.multiplier * lora_layer.scale
-            return output
-        return hook
-
-    def _load_lora(self, name, path_file, multiplier=1.0):
+    def _load_lora(self, name, path_file, multiplier: float = 1.0):
         lora = load_lora(name, path_file, self.device, self.dtype,
                          self.text_modules, self.unet_modules, multiplier)
-        self.loras[name] = lora
+        loaded_loras[name] = lora
         return lora
 
     def apply_lora_model(self, name, mult: float = 1.0):
@@ -175,10 +187,10 @@ class LoraManager:
         file = Path(path, "pytorch_lora_weights.bin")
 
         if path.is_dir() and file.is_file():
-            print(f"loading lora: {path}")
-            self.unet.load_attn_procs(path.absolute().as_posix())
+            print(f"Diffusers lora is currently disabled: {path}")
+            # print(f"loading lora: {path}")
+            # self.unet.load_attn_procs(path.absolute().as_posix())
         else:
-            # converting and saving in diffusers format
             path_file = Path(self.lora_path, f'{name}.ckpt')
             if Path(self.lora_path, f'{name}.safetensors').exists():
                 path_file = Path(self.lora_path, f'{name}.safetensors')
@@ -187,34 +199,40 @@ class LoraManager:
                 print(f">> Unable to find lora: {name}")
                 return
 
-            lora = self.loras.get(name, None)
+            lora = loaded_loras.get(name, None)
             if lora is None:
                 lora = self._load_lora(name, path_file, mult)
 
             lora.multiplier = mult
-            self.applied_loras[name] = lora
+            applied_loras[name] = lora
 
     def load_lora(self):
-        for name, data in self.loras_to_load.items():
-            self.apply_lora_model(name, data["mult"])
+        for name, multiplier in self.loras_to_load.items():
+            self.apply_lora_model(name, multiplier)
 
         # unload any lora's not defined by loras_to_load
-        for name in list(self.loras.keys()):
+        for name in list(applied_loras.keys()):
             if name not in self.loras_to_load:
                 self.unload_applied_lora(name)
 
-    def unload_applied_lora(self, lora_name: str):
-        if lora_name in self.applied_loras:
-            del self.applied_loras[lora_name]
+    @staticmethod
+    def unload_applied_lora(lora_name: str):
+        if lora_name in applied_loras:
+            del applied_loras[lora_name]
 
-    def unload_lora(self, lora_name: str):
-        if lora_name in self.loras:
-            del self.loras[lora_name]
+    @staticmethod
+    def unload_lora(lora_name: str):
+        if lora_name in loaded_loras:
+            del loaded_loras[lora_name]
 
     # Define a lora to be loaded
     # Can be used to define a lora to be loaded outside of prompts
-    def set_lora(self, name, mult: float = 1.0):
-        self.loras_to_load[name] = {"mult": mult}
+    def set_lora(self, name, multiplier: float = 1.0):
+        self.loras_to_load[name] = multiplier
+
+        # update the multiplier if the lora was already loaded
+        if name in loaded_loras:
+            loaded_loras[name].multiplier = multiplier
 
     # Load the lora from a prompt, syntax is <lora:lora_name:multiplier>
     # Multiplier should be a value between 0.0 and 1.0
@@ -237,15 +255,33 @@ class LoraManager:
         return re.sub(lora_match, "", prompt)
 
     def clear_loras(self):
-        self.applied_loras = {}
+        clear_applied_loras()
         self.loras_to_load = {}
 
     def __del__(self):
-        del self.loras
-        del self.applied_loras
+        # cleanup overrides
+        if hasattr(torch.nn.Linear, 'forward_before_lora'):
+            torch.nn.Linear.forward = torch.nn.Linear.forward_before_lora
+            del torch.nn.Linear.forward_before_lora
+
+        if hasattr(torch.nn.Conv2d, 'forward_before_lora'):
+            torch.nn.Conv2d.forward = torch.nn.Conv2d.forward_before_lora
+            del torch.nn.Conv2d.forward_before_lora
+
+        clear_applied_loras()
+        clear_loaded_loras()
         del self.text_modules
         del self.unet_modules
-        for cb in self.hooks:
-            cb.remove()
-        del self.hooks
         del self.loras_to_load
+
+
+applied_loras = {}
+loaded_loras = {}
+
+
+def clear_applied_loras():
+    applied_loras.clear()
+
+
+def clear_loaded_loras():
+    loaded_loras.clear()
