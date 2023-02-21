@@ -513,6 +513,10 @@ class Generate:
         except AttributeError:
             pass
 
+        # lora MUST process prompt before conditioning
+        if self.model.lora_manager:
+            self.model.lora_manager.load_lora()
+
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
                 prompt,
@@ -548,9 +552,6 @@ class Generate:
                 if self.safety_checker
                 else None
             )
-
-            if self.model.lora_manager:
-                self.model.lora_manager.load_lora()
 
             results = generator.generate(
                 prompt,
