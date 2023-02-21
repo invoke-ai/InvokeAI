@@ -19,13 +19,12 @@ from typing import List
 
 import npyscreen
 import torch
-from datetime import datetime
 from pathlib import Path
 from npyscreen import widget
 from omegaconf import OmegaConf
 
 from ..devices import choose_precision, choose_torch_device
-from ..globals import Globals
+from ..globals import Globals, global_config_dir
 from .widgets import MultiSelectColumns, TextBox
 from .model_install_backend import (Dataset_path, default_config_file,
                                     install_requested_models,
@@ -109,7 +108,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely -= 1
         # if user has already installed some initial models, then don't patronize them
         # by showing more recommendations
-        show_recommended = self.installed_models is None or len(self.installed_models)==0
+        show_recommended = not self.existing_models
         self.models_selected = self.add_widget_intelligent(
             npyscreen.MultiSelect,
             name="Install Starter Models",
@@ -137,7 +136,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             self.nextrely -= 1
         self.import_model_paths = self.add_widget_intelligent(
             TextBox,
-            max_height=8,
+            max_height=5,
             scroll_exit=True,
             editable=True,
             relx=4
@@ -165,6 +164,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             relx = 4,
             scroll_exit=True,
         )
+        self.nextrely += 1
         self.convert_models = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
             name='== CONVERT IMPORTED MODELS INTO DIFFUSERS==',
@@ -172,6 +172,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             value=0,
             begin_entry_at=4,
             max_height=4,
+            hidden=True,  # will appear when imported models box is edited
             scroll_exit=True,
         )
         self.cancel = self.add_widget_intelligent(
@@ -205,9 +206,22 @@ class addModelsForm(npyscreen.FormMultiPage):
         for i in [self.autoload_directory,self.autoscan_on_startup]:
             self.show_directory_fields.addVisibleWhenSelected(i)
 
+        self.show_directory_fields.when_value_edited = self._clear_scan_directory
+        self.import_model_paths.when_value_edited = self._show_hide_convert
+        self.autoload_directory.when_value_edited = self._show_hide_convert
+
     def resize(self):
         super().resize()
         self.models_selected.values = self._get_starter_model_labels()
+
+    def _clear_scan_directory(self):
+        if not self.show_directory_fields.value:
+            self.autoload_directory.value = ''
+        
+    def _show_hide_convert(self):
+        model_paths = self.import_model_paths.value or ''
+        autoload_directory = self.autoload_directory.value or ''
+        self.convert_models.hidden = len(model_paths)==0 and len(autoload_directory)==0
         
     def _get_starter_model_labels(self)->List[str]:
         window_height, window_width = curses.initscr().getmaxyx()
@@ -393,6 +407,12 @@ def main():
 
     # setting a global here
     Globals.root = os.path.expanduser(get_root(opt.root) or "")
+
+    if not global_config_dir().exists():
+        print('>> Your InvokeAI root directory is not set up. Calling invokeai-configure.')
+        import ldm.invoke.config.invokeai_configure
+        ldm.invoke.config.invokeai_configure.main()
+        sys.exit(0)
 
     try:
         select_and_download_models(opt)

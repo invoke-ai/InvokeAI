@@ -658,7 +658,7 @@ def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
     )
 
     if not imported_name:
-        print("** model failed to load. Aborting")
+        print("** Import failed or was skipped")
         return
 
     if not _verify_load(imported_name, gen):

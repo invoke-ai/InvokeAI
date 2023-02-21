@@ -560,8 +560,8 @@ class Args(object):
             '--outdir',
             '-o',
             type=str,
-            help='Directory to save generated images and a log of prompts and seeds. Default: outputs/img-samples',
-            default='outputs/img-samples',
+            help='Directory to save generated images and a log of prompts and seeds. Default: ROOTDIR/outputs',
+            default='outputs',
         )
         file_group.add_argument(
             '--prompt_as_dir',

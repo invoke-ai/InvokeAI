@@ -136,6 +136,7 @@ class ModelManager(object):
         for model_name in self.config:
             if self.config[model_name].get("default"):
                 return model_name
+        return list(self.config.keys())[0]  # first one
 
     def set_default_model(self, model_name: str) -> None:
         """
@@ -633,18 +634,21 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
-        description = description or f"imported diffusers model {model_name}"
+        description = model_description or f"imported diffusers model {model_name}"
         new_config = dict(
-            description=description,
+            description=model_description,
             vae=vae,
             format="diffusers",
         )
+        print(f'DEBUG: here i am 1')
         if isinstance(repo_or_path, Path) and repo_or_path.exists():
             new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
+        print(f'DEBUG: here i am 2')
 
         self.add_model(model_name, new_config, True)
+        print(f'DEBUG: config = {self.config}')
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name
@@ -778,8 +782,12 @@ class ModelManager(object):
             model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')  # _resolve_path does a download if needed
 
         elif Path(thing).is_file() and thing.endswith(('.ckpt','.safetensors')):
-            print(f'   | {thing} appears to be a checkpoint file on disk')
-            model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')
+            if Path(thing).stem in ['model','diffusion_pytorch_model']:
+                print(f'   | {Path(thing).name} appears to be part of a diffusers model. Skipping import')
+                return
+            else:
+                print(f'   | {thing} appears to be a checkpoint file on disk')
+                model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')
             
         elif Path(thing).is_dir() and Path(thing, 'model_index.json').exists():
             print(f'   | {thing} appears to be a diffusers file on disk')
@@ -792,11 +800,16 @@ class ModelManager(object):
             )
 
         elif Path(thing).is_dir():
-            print(f'>> {thing} appears to be a directory. Will scan for models to import')
-            for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
-                if model_name := self.heuristic_import(str(m), convert, commit_to_conf=commit_to_conf):
-                    print(f' >> {model_name} successfully imported')
-            return model_name
+            
+            if (Path(thing) / 'model_index.json').exists():
+                print(f'>> {thing} appears to be a diffusers model.')
+                model_name = self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
+            else:
+                print(f'>> {thing} appears to be a directory. Will scan for models to import')
+                for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
+                    if model_name := self.heuristic_import(str(m), convert, commit_to_conf=commit_to_conf):
+                        print(f' >> {model_name} successfully imported')
+                return model_name
 
         elif re.match(r'^[\w.+-]+/[\w.+-]+$', thing):
             print(f'   | {thing} appears to be a HuggingFace diffusers repo_id')
@@ -831,9 +844,9 @@ class ModelManager(object):
             model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
             convert = True
         else:
-            print(f'** {thing} is a legacy checkpoint file of unkown format. Will treat as a regular v1.X model')
-            model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
-            
+            print(f'** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import')
+            return
+        
         if convert:
             diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir, model_path.stem)
             model_name = self.convert_and_import(
@@ -854,6 +867,8 @@ class ModelManager(object):
                 vae=str(Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt')),
                 commit_to_conf=commit_to_conf,
             )
+        if commit_to_conf:
+            self.commit(commit_to_conf)
         return model_name
 
     def convert_and_import(

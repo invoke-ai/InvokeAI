@@ -839,7 +839,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
 
-        checkpoint = load_file(checkpoint_path,device='cpu') if Path(checkpoint_path).suffix == '.safetensors' else torch.load(checkpoint_path,device='cpu')
+        checkpoint = load_file(checkpoint_path) if Path(checkpoint_path).suffix == '.safetensors' else torch.load(checkpoint_path)
         cache_dir = global_cache_dir('hub')
         pipeline_class = StableDiffusionGeneratorPipeline if return_generator_pipeline else StableDiffusionPipeline
 

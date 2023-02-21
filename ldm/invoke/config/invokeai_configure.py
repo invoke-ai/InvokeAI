@@ -21,7 +21,9 @@ from pathlib import Path
 from urllib import request
 
 import npyscreen
+import torch
 import transformers
+from diffusers import AutoencoderKL
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
@@ -36,13 +38,14 @@ from transformers import (
 import invokeai.configs as configs
 
 from ..args import PRECISION_CHOICES, Args
-from ..globals import Globals, global_config_dir
+from ..globals import Globals, global_config_dir, global_config_file, global_cache_dir
 from ..readline import generic_completer
 from .model_install import addModelsForm, process_and_execute
 from .model_install_backend import (
     default_dataset,
     download_from_hf,
     recommended_datasets,
+    hf_download_with_resume,
 )
 from .widgets import IntTitleSlider
 
@@ -170,10 +173,9 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         else:
             print("...exists", file=sys.stderr)
     except Exception:
-        print("...download failed")
-        print(f"Error downloading {label} model")
-        print(traceback.format_exc())
-
+        print("...download failed", file=sys.stderr)
+        print(f"Error downloading {label} model", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
 
 # ---------------------------------------------
 # this will preload the Bert tokenizer fles
@@ -282,6 +284,36 @@ def download_safety_checker():
     download_from_hf(StableDiffusionSafetyChecker, safety_model_id)
     print("...success", file=sys.stderr)
 
+# -------------------------------------
+def download_vaes(precision: str):
+    print("Installing stabilityai VAE...", file=sys.stderr)
+    try:
+        # first the diffusers version
+        repo_id = 'stabilityai/sd-vae-ft-mse'
+        args = dict(
+            cache_dir=global_cache_dir('diffusers'),
+        )
+        if precision=='float16':
+            args.update(
+                torch_dtype=torch.float16,
+                revision='fp16'
+            )
+        if not AutoencoderKL.from_pretrained(repo_id, **args):
+            raise Exception(f'download of {repo_id} failed')
+
+        repo_id = 'stabilityai/sd-vae-ft-mse-original'
+        model_name = 'vae-ft-mse-840000-ema-pruned.ckpt'
+        # next the legacy checkpoint version
+        if not hf_download_with_resume(
+                repo_id = repo_id,
+                model_name = model_name,
+                model_dir = str(Globals.root / Model_dir / Weights_dir)
+        ):
+            raise Exception(f'download of {model_name} failed')
+        print("...downloaded successfully", file=sys.stderr)
+    except Exception as e:
+        print(f"Error downloading StabilityAI standard VAE: {str(e)}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
 
 # -------------------------------------
 def get_root(root: str = None) -> str:
@@ -297,6 +329,8 @@ class editOptsForm(npyscreen.FormMultiPage):
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
+        with open('log.txt','w') as f:
+            f.write(str(old_opts))
         first_time = not (Globals.root / Globals.initfile).exists()
         access_token = HfFolder.get_token()
 
@@ -585,10 +619,13 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     return editApp.new_opts()
 
 
-def default_startup_options() -> Namespace:
+def default_startup_options(init_file: Path) -> Namespace:
     opts = Args().parse_args([])
-    opts.outdir = str(default_output_dir())
-    opts.safety_checker = True
+    outdir = Path(opts.outdir)
+    if not outdir.is_absolute():
+        opts.outdir = str(Globals.root / opts.outdir)
+    if not init_file.exists():
+        opts.safety_checker = True
     return opts
 
 
@@ -627,9 +664,9 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
 
 
 # -------------------------------------
-def run_console_ui(program_opts: Namespace) -> (Namespace, Namespace):
+def run_console_ui(program_opts: Namespace, initfile: Path=None) -> (Namespace, Namespace):
     # parse_args() will read from init file if present
-    invokeai_opts = default_startup_options()
+    invokeai_opts = default_startup_options(initfile)
     editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     if editApp.user_cancelled:
@@ -766,13 +803,13 @@ def main():
 
         # We check for to see if the runtime directory is correctly initialized.
         init_file = Path(Globals.root, Globals.initfile)
-        if not init_file.exists():
+        if not init_file.exists() or not global_config_file().exists():
             initialize_rootdir(Globals.root, opt.yes_to_all)
 
         if opt.yes_to_all:
             write_default_options(opt, init_file)
         else:
-            init_options, models_to_download = run_console_ui(opt)
+            init_options, models_to_download = run_console_ui(opt, init_file)
             if init_options:
                 write_opts(init_options, init_file)
             else:
@@ -792,6 +829,7 @@ def main():
             download_codeformer()
             download_clipseg()
             download_safety_checker()
+            download_vaes(init_options.precision)
 
         if opt.skip_sd_weights:
             print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
