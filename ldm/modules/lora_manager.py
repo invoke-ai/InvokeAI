@@ -201,7 +201,11 @@ class LoraManager:
         # unload any lora's not defined by loras_to_load
         for name in list(self.loras.keys()):
             if name not in self.loras_to_load:
-                self.unload_lora(name)
+                self.unload_applied_lora(name)
+
+    def unload_applied_lora(self, lora_name: str):
+        if lora_name in self.applied_loras:
+            del self.applied_loras[lora_name]
 
     def unload_lora(self, lora_name: str):
         if lora_name in self.loras:
@@ -215,8 +219,7 @@ class LoraManager:
     # Load the lora from a prompt, syntax is <lora:lora_name:multiplier>
     # Multiplier should be a value between 0.0 and 1.0
     def configure_prompt(self, prompt: str) -> str:
-        self.applied_loras = {}
-        self.loras_to_load = {}
+        self.clear_loras()
 
         lora_match = re.compile(r"<lora:([^>]+)>")
 
@@ -232,6 +235,10 @@ class LoraManager:
 
         # remove lora and return prompt to avoid the lora prompt causing issues in inference
         return re.sub(lora_match, "", prompt)
+
+    def clear_loras(self):
+        self.applied_loras = {}
+        self.loras_to_load = {}
 
     def __del__(self):
         del self.loras
