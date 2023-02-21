@@ -743,10 +743,9 @@ def default_embedding_dir() -> Path:
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
-    opt = default_startup_options()
+    opt = default_startup_options(initfile)
     opt.hf_token = HfFolder.get_token()
     write_opts(opt, initfile)
-
 
 # -------------------------------------
 def main():

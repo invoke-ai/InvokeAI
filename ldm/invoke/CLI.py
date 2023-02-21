@@ -62,6 +62,7 @@ def main():
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = args.ckpt_convert
 
     print(f">> Internet connectivity is {Globals.internet_available}")
@@ -672,7 +673,6 @@ def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
     completer.update_models(gen.model_manager.list_models())
     print(f">> {model_name} successfully installed")
 
-
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")
     current_model = gen.model_name
@@ -704,7 +704,6 @@ def _get_model_name_and_desc(
         or model_description
     )
     return model_name, model_description
-
 
 def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> str:
     model_name_or_path = model_name_or_path.replace("\\", "/")  # windows

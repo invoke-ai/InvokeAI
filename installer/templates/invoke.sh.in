@@ -34,9 +34,10 @@ if [ "$0" != "bash" ]; then
     echo "6. change InvokeAI startup options"
     echo "7. re-run the configure script to fix a broken install"
     echo "8. open the developer console"
-    echo "9. command-line help "
+    echo "9. update InvokeAI"
+    echo "10. command-line help "
     echo ""
-    read -p "Please enter 1-9: [2] " yn
+    read -p "Please enter 1-10: [2] " yn
     choice=${yn:='2'}
     case $choice in
         1)
@@ -65,11 +66,15 @@ if [ "$0" != "bash" ]; then
             exec invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only
 	    ;;
 	8)
-            echo "Developer Console:"
+	    echo "Developer Console:"
             file_name=$(basename "${BASH_SOURCE[0]}")
             bash --init-file "$file_name"
             ;;
         9)
+	    echo "Update:"
+            exec invokeai-update
+            ;;
+        10)
             exec invokeai --help
             ;;
         *)
