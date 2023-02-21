@@ -346,6 +346,7 @@ class Embiggen(Generator):
                 newinitimage = torch.from_numpy(newinitimage)
                 newinitimage = 2.0 * newinitimage - 1.0
                 newinitimage = newinitimage.to(self.model.device)
+                clear_cuda_cache = kwargs['clear_cuda_cache'] if 'clear_cuda_cache' in kwargs else None
 
                 tile_results = gen_img2img.generate(
                     prompt,
@@ -363,6 +364,7 @@ class Embiggen(Generator):
                     init_image     = newinitimage,    # notice that init_image is different from init_img
                     mask_image     = None,
                     strength       = strength,
+                    clear_cuda_cache     = clear_cuda_cache
                 )
 
                 emb_tile_store.append(tile_results[0][0])
