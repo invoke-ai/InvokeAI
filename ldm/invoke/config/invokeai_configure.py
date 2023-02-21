@@ -816,6 +816,7 @@ def main():
 
         if opt.yes_to_all:
             write_default_options(opt, init_file)
+            init_options = Namespace(precision='float32' if opt.full_precision else 'float16')
         else:
             init_options, models_to_download = run_console_ui(opt, init_file)
             if init_options:
