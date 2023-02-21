@@ -171,9 +171,7 @@ class LoraManager:
         return lora
 
     def apply_module_forward(self, module, lora_name):
-        handle = RemovableHandle(module._forward_hooks)
-        handle.id = 9000
-        module._forward_hooks[handle.id] = lora_forward_hook(lora_name)
+        handle = module.register_module_forward_hook(lora_forward_hook(lora_name))
         self.hooks.append(handle)
 
     def apply_lora_model(self, name, mult: float = 1.0):
