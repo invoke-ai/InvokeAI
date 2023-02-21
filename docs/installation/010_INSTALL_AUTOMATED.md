@@ -40,9 +40,10 @@ experimental versions later.
     this, open up a command-line window ("Terminal" on Linux and
     Macintosh, "Command" or "Powershell" on Windows) and type `python
     --version`. If Python is installed, it will print out the version
-    number. If it is version `3.9.1` or `3.10.x`, you meet
-    requirements.
-
+    number. If it is version `3.9.*` or `3.10.*`, you meet
+    requirements. We do not recommend using Python 3.11 or higher,
+    as not all the libraries that InvokeAI depends on work properly
+    with this version.
 
     !!! warning "What to do if you have an unsupported version"
 
@@ -50,8 +51,7 @@ experimental versions later.
         and download the appropriate installer package for your
         platform. We recommend [Version
         3.10.9](https://www.python.org/downloads/release/python-3109/),
-        which has been extensively tested with InvokeAI. At this time
-        we do not recommend Python 3.11.
+        which has been extensively tested with InvokeAI.
 
     _Please select your platform in the section below for platform-specific
     setup requirements._
@@ -150,7 +150,7 @@ experimental versions later.
 
     ```cmd
     C:\Documents\Linco> cd InvokeAI-Installer
-    C:\Documents\Linco\invokeAI> install.bat
+    C:\Documents\Linco\invokeAI> .\install.bat
     ```
 
 7.  **Select the location to install InvokeAI**: The script will ask you to choose where to install InvokeAI. Select a
@@ -167,6 +167,11 @@ experimental versions later.
       `/home/YourName/invokeai` on Linux systems, and `/Users/YourName/invokeai`
       on Macintoshes, where "YourName" is your login name.
 
+    -If you have previously installed InvokeAI, you will be asked to
+     confirm whether you want to reinstall into this directory.  You
+     may choose to reinstall, in which case your version will be upgraded,
+     or choose a different directory.
+
     - The script uses tab autocompletion to suggest directory path completions.
       Type part of the path (e.g. "C:\Users") and press ++tab++ repeatedly
       to suggest completions.
@@ -181,11 +186,6 @@ experimental versions later.
     are unsure what GPU you are using, you can ask the installer to
     guess.
 
-    <figure markdown>
-    ![choose-gpu-screenshot](../assets/installer-walkthrough/choose-gpu.png)
-    </figure>
-
-
 9.  **Watch it go!**: Sit back and let the install script work. It will install the third-party
     libraries needed by InvokeAI and the application itself.
 
@@ -197,25 +197,138 @@ experimental versions later.
     minutes and nothing is happening, you can interrupt the script with ^C. You
     may restart it and it will pick up where it left off.
 
-10. **Post-install Configuration**: After installation completes, the installer will launch the
-    configuration script, which will guide you through the first-time
-    process of selecting one or more Stable Diffusion model weights
-    files, downloading and configuring them. We provide a list of
-    popular models that InvokeAI performs well with. However, you can
-    add more weight files later on using the command-line client or
-    the Web UI. See [Installing Models](050_INSTALLING_MODELS.md) for
-    details.
-
     <figure markdown>
-    ![downloading-models-screenshot](../assets/installer-walkthrough/downloading-models.png)
+    ![initial-settings-screenshot](../assets/installer-walkthrough/settings-form.png)
     </figure>
 
-    If you have already downloaded the weights file(s) for another Stable
-    Diffusion distribution, you may skip this step (by selecting "skip" when
-    prompted) and configure InvokeAI to use the previously-downloaded files. The
-    process for this is described in [Installing Models](050_INSTALLING_MODELS.md).
+10. **Post-install Configuration**: After installation completes, the
+    installer will launch the configuration form, which will guide you
+    through the first-time process of adjusting some of InvokeAI's
+    startup settings. To move around this form use ctrl-N for
+    &lt;N&gt;ext and ctrl-P for &lt;P&gt;revious, or use &lt;tab&gt;
+    and shift-&lt;tab&gt; to move forward and back. Once you are in a
+    multi-checkbox field use the up and down cursor keys to select the
+    item you want, and &lt;space&gt; to toggle it on and off.  Within
+    a directory field, pressing &lt;tab&gt; will provide autocomplete
+    options.
 
-11. **Running InvokeAI for the first time**: The script will now exit and you'll be ready to generate some images. Look
+    Generally the defaults are fine, and you can come back to this screen at
+    any time to tweak your system. Here are the options you can adjust:
+
+    - ***Output directory for images***
+      This is the path to a directory in which InvokeAI will store all its
+      generated images.
+
+    - ***NSFW checker***
+      If checked, InvokeAI will test images for potential sexual content
+      and blur them out if found.
+
+    - ***HuggingFace Access Token***
+      InvokeAI has the ability to download embedded styles and subjects
+      from the HuggingFace Concept Library on-demand. However, some of
+      the concept library files are password protected. To make download
+      smoother, you can set up an account at huggingface.co, obtain an
+      access token, and paste it into this field. Note that you paste
+      to this screen using ctrl-shift-V
+
+    - ***Free GPU memory after each generation***
+        This is useful for low-memory machines and helps minimize the
+	amount of GPU VRAM used by InvokeAI.
+
+    - ***Enable xformers support if available***
+        If the xformers library was successfully installed, this will activate
+	it to reduce memory consumption and increase rendering speed noticeably.
+	Note that xformers has the side effect of generating slightly different
+	images even when presented with the same seed and other settings.
+
+    - ***Force CPU to be used on GPU systems***
+        This will use the (slow) CPU rather than the accelerated GPU. This
+	can be used to generate images on systems that don't have a compatible
+	GPU.
+
+    - ***Precision***
+        This controls whether to use float32 or float16 arithmetic.
+	float16 uses less memory but is also slightly less accurate.
+	Ordinarily the right arithmetic is picked automatically ("auto"),
+	but you may have to use float32 to get images on certain systems
+	and graphics cards. The "autocast" option is deprecated and
+	shouldn't be used unless you are asked to by a member of the team.
+
+    - ***Number of models to cache in CPU memory***
+        This allows you to keep models in memory and switch rapidly among
+	them rather than having them load from disk each time. This slider
+	controls how many models to keep loaded at once. Each
+	model will use 2-4 GB of RAM, so use this cautiously
+
+    - ***Directory containing embedding/textual inversion files***
+        This is the directory in which you can place custom embedding
+	files (.pt or .bin). During startup, this directory will be
+	scanned and InvokeAI will print out the text terms that
+	are available to trigger the embeddings.
+
+    At the bottom of the screen you will see a checkbox for accepting
+    the CreativeML Responsible AI License. You need to accept the license
+    in order to download Stable Diffusion models from the next screen.
+
+    _You can come back to the startup options form_ as many times as you like.
+    From the `invoke.sh` or `invoke.bat` launcher, select option (6) to relaunch
+    this script. On the command line, it is named `invokeai-configure`.
+
+11. **Downloading Models**: After you press `[NEXT]` on the screen, you will be taken
+    to another screen that prompts you to download a series of starter models. The ones
+    we recommend are preselected for you, but you are encouraged to use the checkboxes to
+    pick and choose.
+    You will probably wish to download `autoencoder-840000` for use with models that
+    were trained with an older version of the Stability VAE.
+
+    <figure markdown>
+    ![select-models-screenshot](../assets/installer-walkthrough/installing-models.png)
+    </figure>
+    
+    Below the preselected list of starter models is a large text field which you can use
+    to specify a series of models to import. You can specify models in a variety of formats,
+    each separated by a space or newline. The formats accepted are:
+
+    - The path to a .ckpt or .safetensors file. On most systems, you can drag a file from
+      the file browser to the textfield to automatically paste the path. Be sure to remove
+      extraneous quotation marks and other things that come along for the ride.
+
+    - The path to a directory containing a combination of `.ckpt` and `.safetensors` files.
+      The directory will be scanned from top to bottom (including subfolders) and any
+      file that can be imported will be.
+
+    - A URL pointing to a `.ckpt` or `.safetensors` file. You can cut
+      and paste directly from a web page, or simply drag the link from the web page
+      or navigation bar. (You can also use ctrl-shift-V to paste into this field)
+      The file will be downloaded and installed.
+      
+    - The HuggingFace repository ID (repo_id) for a `diffusers` model. These IDs have
+       the format _author_name/model_name_, as in `andite/anything-v4.0`
+      
+    - The path to a local directory containing a `diffusers`
+      model. These directories always have the file `model_index.json`
+      at their top level.
+
+    _Select a directory for models to import_ You may select a local
+    directory for autoimporting at startup time. If you select this
+    option, the directory you choose will be scanned for new
+    .ckpt/.safetensors files each time InvokeAI starts up, and any new
+    files will be automatically imported and made available for your
+    use.
+
+    _Convert imported models into diffusers_ When legacy checkpoint
+    files are imported, you may select to use them unmodified (the
+    default) or to convert them into `diffusers` models. The latter
+    load much faster and have slightly better rendering performance,
+    but not all checkpoint files can be converted. Note that Stable Diffusion
+    Version 2.X files are **only** supported in `diffusers` format and will
+    be converted regardless.
+     
+     _You can come back to the model install form_ as many times as you like.
+     From the `invoke.sh` or `invoke.bat` launcher, select option (5) to relaunch
+     this script. On the command line, it is named `invokeai-model-install`.
+
+12. **Running InvokeAI for the first time**: The script will now exit and you'll be ready to generate some images. Look
     for the directory `invokeai` installed in the location you chose at the
     beginning of the install session. Look for a shell script named `invoke.sh`
     (Linux/Mac) or `invoke.bat` (Windows). Launch the script by double-clicking
@@ -348,25 +461,11 @@ version (recommended), follow these steps:
 1. Start the `invoke.sh`/`invoke.bat` launch script from within the
    `invokeai` root directory.
 
-2. Choose menu item (6) "Developer's Console". This will launch a new
-   command line.
+2. Choose menu item (10) "Update InvokeAI".
 
-3. Type the following command:
+3. This will launch a menu that gives you the option of:
 
-   ```bash
-   pip install InvokeAI --upgrade
-   ```
-4.  Watch the installation run. Once it is complete, you may exit the
-    command line by typing `exit`, and then start InvokeAI from the
-    launch script as per usual.
-
-
-Alternatively, if you wish to get the most recent unreleased
-development version, perform the same steps to enter the developer's
-console, and then type:
-
-   ```bash
-   pip install https://github.com/invoke-ai/InvokeAI/archive/refs/heads/main.zip
-   ```
-
-
+   1. Updating to the latest official release;
+   2. Updating to the bleeding-edge development version; or
+   3. Manually entering the tag or branch name of a version of
+      InvokeAI you wish to try out.

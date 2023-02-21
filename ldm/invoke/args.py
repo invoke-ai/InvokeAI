@@ -91,13 +91,13 @@ import pydoc
 import re
 import shlex
 import sys
-import ldm.invoke
-import ldm.invoke.pngwriter
-
-from ldm.invoke.globals import Globals
-from ldm.invoke.prompt_parser import split_weighted_subprompts
 from argparse import Namespace
 from pathlib import Path
+
+import ldm.invoke
+import ldm.invoke.pngwriter
+from ldm.invoke.globals import Globals
+from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 APP_ID = ldm.invoke.__app_id__
 APP_NAME = ldm.invoke.__app_name__
@@ -487,6 +487,13 @@ class Args(object):
             dest='free_gpu_mem',
             action='store_true',
             help='Force free gpu memory before final decoding',
+        )
+        model_group.add_argument(
+            '--sequential_guidance',
+            dest='sequential_guidance',
+            action='store_true',
+            help="Calculate guidance in serial instead of in parallel, lowering memory requirement "
+                 "at the expense of speed",
         )
         model_group.add_argument(
             '--xformers',
