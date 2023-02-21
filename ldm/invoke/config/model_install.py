@@ -4,10 +4,10 @@
 # run this script from one with internet connectivity. The
 # two machines must share a common .cache directory.
 
-'''
+"""
 This is the npyscreen frontend to the model installation application.
 The work is actually done in backend code in model_install_backend.py.
-'''
+"""
 
 import argparse
 import curses
@@ -15,25 +15,26 @@ import os
 import sys
 import traceback
 from argparse import Namespace
+from pathlib import Path
 from typing import List
 
 import npyscreen
 import torch
-from pathlib import Path
 from npyscreen import widget
 from omegaconf import OmegaConf
 
 from ..devices import choose_precision, choose_torch_device
 from ..globals import Globals, global_config_dir
-from .widgets import MultiSelectColumns, TextBox
 from .model_install_backend import (Dataset_path, default_config_file,
+                                    default_dataset, get_root,
                                     install_requested_models,
-                                    default_dataset, recommended_datasets, get_root
-                                    )
+                                    recommended_datasets)
+from .widgets import MultiSelectColumns, TextBox
+
 
 class addModelsForm(npyscreen.FormMultiPage):
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
-        self.multipage=multipage
+        self.multipage = multipage
         self.initial_models = OmegaConf.load(Dataset_path)
         try:
             self.existing_models = OmegaConf.load(default_config_file())
@@ -42,7 +43,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.starter_model_list = [
             x for x in list(self.initial_models.keys()) if x not in self.existing_models
         ]
-        self.installed_models=dict()
+        self.installed_models = dict()
         super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
     def create(self):
@@ -54,19 +55,17 @@ class addModelsForm(npyscreen.FormMultiPage):
             if self.initial_models[x].get("recommended", False)
         ]
         self.installed_models = sorted(
-            [
-                x for x in list(self.initial_models.keys()) if x in self.existing_models
-            ]
+            [x for x in list(self.initial_models.keys()) if x in self.existing_models]
         )
         self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value='Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields,',
+            value="Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields,",
             editable=False,
         )
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value='cursor arrows to make a selection, and space to toggle checkboxes.',
+            value="cursor arrows to make a selection, and space to toggle checkboxes.",
             editable=False,
         )
         self.nextrely += 1
@@ -84,17 +83,17 @@ class addModelsForm(npyscreen.FormMultiPage):
                 MultiSelectColumns,
                 columns=columns,
                 values=self.installed_models,
-                value=[x for x in range(0,len(self.installed_models))],
-                max_height=1+len(self.installed_models) // columns,
-                relx = 4,
+                value=[x for x in range(0, len(self.installed_models))],
+                max_height=1 + len(self.installed_models) // columns,
+                relx=4,
                 slow_scroll=True,
-                scroll_exit = True,
+                scroll_exit=True,
             )
             self.purge_deleted = self.add_widget_intelligent(
                 npyscreen.Checkbox,
-                name='Purge deleted models from disk',
+                name="Purge deleted models from disk",
                 value=False,
-                scroll_exit=True
+                scroll_exit=True,
             )
         self.nextrely += 1
         self.add_widget_intelligent(
@@ -119,13 +118,13 @@ class addModelsForm(npyscreen.FormMultiPage):
                 if show_recommended and x in recommended_models
             ],
             max_height=len(starter_model_labels) + 1,
-            relx = 4,
+            relx=4,
             scroll_exit=True,
         )
         for line in [
-                '== IMPORT LOCAL AND REMOTE MODELS ==',
-                'Enter URLs, file paths, or HuggingFace diffusers repository IDs separated by spaces.',
-                'Use control-V or shift-control-V to paste:'
+            "== IMPORT LOCAL AND REMOTE MODELS ==",
+            "Enter URLs, file paths, or HuggingFace diffusers repository IDs separated by spaces.",
+            "Use control-V or shift-control-V to paste:",
         ]:
             self.add_widget_intelligent(
                 npyscreen.TitleText,
@@ -135,40 +134,36 @@ class addModelsForm(npyscreen.FormMultiPage):
             )
             self.nextrely -= 1
         self.import_model_paths = self.add_widget_intelligent(
-            TextBox,
-            max_height=5,
-            scroll_exit=True,
-            editable=True,
-            relx=4
+            TextBox, max_height=5, scroll_exit=True, editable=True, relx=4
         )
         self.nextrely += 1
-        self.show_directory_fields= self.add_widget_intelligent(
+        self.show_directory_fields = self.add_widget_intelligent(
             npyscreen.FormControlCheckbox,
-            name='Select a directory for models to import',
+            name="Select a directory for models to import",
             value=False,
         )
         self.autoload_directory = self.add_widget_intelligent(
             npyscreen.TitleFilename,
-            name='Directory (<tab> autocompletes):',
+            name="Directory (<tab> autocompletes):",
             select_dir=True,
             must_exist=True,
             use_two_lines=False,
-            labelColor='DANGER',
+            labelColor="DANGER",
             begin_entry_at=34,
             scroll_exit=True,
         )
         self.autoscan_on_startup = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name='Scan this directory each time InvokeAI starts for new models to import',
+            name="Scan this directory each time InvokeAI starts for new models to import",
             value=False,
-            relx = 4,
+            relx=4,
             scroll_exit=True,
         )
         self.nextrely += 1
         self.convert_models = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name='== CONVERT IMPORTED MODELS INTO DIFFUSERS==',
-            values=['Keep original format','Convert to diffusers'],
+            name="== CONVERT IMPORTED MODELS INTO DIFFUSERS==",
+            values=["Keep original format", "Convert to diffusers"],
             value=0,
             begin_entry_at=4,
             max_height=4,
@@ -177,33 +172,33 @@ class addModelsForm(npyscreen.FormMultiPage):
         )
         self.cancel = self.add_widget_intelligent(
             npyscreen.ButtonPress,
-            name='CANCEL',
-            rely = -3,
+            name="CANCEL",
+            rely=-3,
             when_pressed_function=self.on_cancel,
         )
-        done_label = 'DONE'
-        back_label = 'BACK'
+        done_label = "DONE"
+        back_label = "BACK"
         button_length = len(done_label)
         button_offset = 0
         if self.multipage:
-            button_length += len(back_label)+1
-            button_offset += len(back_label)+1
+            button_length += len(back_label) + 1
+            button_offset += len(back_label) + 1
             self.back_button = self.add_widget_intelligent(
                 npyscreen.ButtonPress,
                 name=back_label,
-                relx= (window_width-button_length)//2,
-                rely= -3,
-                when_pressed_function=self.on_back
+                relx=(window_width - button_length) // 2,
+                rely=-3,
+                when_pressed_function=self.on_back,
             )
         self.ok_button = self.add_widget_intelligent(
             npyscreen.ButtonPress,
             name=done_label,
-            relx= button_offset + 1 + (window_width-button_length)//2,
-            rely= -3,
-            when_pressed_function=self.on_ok
+            relx=button_offset + 1 + (window_width - button_length) // 2,
+            rely=-3,
+            when_pressed_function=self.on_ok,
         )
 
-        for i in [self.autoload_directory,self.autoscan_on_startup]:
+        for i in [self.autoload_directory, self.autoscan_on_startup]:
             self.show_directory_fields.addVisibleWhenSelected(i)
 
         self.show_directory_fields.when_value_edited = self._clear_scan_directory
@@ -216,14 +211,16 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def _clear_scan_directory(self):
         if not self.show_directory_fields.value:
-            self.autoload_directory.value = ''
-        
+            self.autoload_directory.value = ""
+
     def _show_hide_convert(self):
-        model_paths = self.import_model_paths.value or ''
-        autoload_directory = self.autoload_directory.value or ''
-        self.convert_models.hidden = len(model_paths)==0 and len(autoload_directory)==0
-        
-    def _get_starter_model_labels(self)->List[str]:
+        model_paths = self.import_model_paths.value or ""
+        autoload_directory = self.autoload_directory.value or ""
+        self.convert_models.hidden = (
+            len(model_paths) == 0 and len(autoload_directory) == 0
+        )
+
+    def _get_starter_model_labels(self) -> List[str]:
         window_height, window_width = curses.initscr().getmaxyx()
         label_width = 25
         checkbox_width = 4
@@ -231,18 +228,29 @@ class addModelsForm(npyscreen.FormMultiPage):
         description_width = window_width - label_width - checkbox_width - spacing_width
         im = self.initial_models
         names = self.starter_model_list
-        descriptions = [im[x].description [0:description_width-3]+'...'
-                        if len(im[x].description) > description_width
-                        else im[x].description
-                        for x in names]
+        descriptions = [
+            im[x].description[0 : description_width - 3] + "..."
+            if len(im[x].description) > description_width
+            else im[x].description
+            for x in names
+        ]
         return [
-            f"%-{label_width}s %s" % (names[x], descriptions[x]) for x in range(0,len(names))
+            f"%-{label_width}s %s" % (names[x], descriptions[x])
+            for x in range(0, len(names))
         ]
 
-    def _get_columns(self)->int:
+    def _get_columns(self) -> int:
         window_height, window_width = curses.initscr().getmaxyx()
-        cols = 4 if window_width > 240 else 3 if window_width>160 else 2 if window_width>80 else 1
-        return min(cols,len(self.installed_models))
+        cols = (
+            4
+            if window_width > 240
+            else 3
+            if window_width > 160
+            else 2
+            if window_width > 80
+            else 1
+        )
+        return min(cols, len(self.installed_models))
 
     def on_ok(self):
         self.parentApp.setNextForm(None)
@@ -256,14 +264,14 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def on_cancel(self):
         if npyscreen.notify_yes_no(
-                'Are you sure you want to cancel?\nYou may re-run this script later using the invoke.sh or invoke.bat command.\n'
+            "Are you sure you want to cancel?\nYou may re-run this script later using the invoke.sh or invoke.bat command.\n"
         ):
             self.parentApp.setNextForm(None)
             self.parentApp.user_cancelled = True
             self.editing = False
 
     def marshall_arguments(self):
-        '''
+        """
         Assemble arguments and store as attributes of the application:
         .starter_models: dict of model names to install from INITIAL_CONFIGURE.yaml
                          True  => Install
@@ -272,25 +280,27 @@ class addModelsForm(npyscreen.FormMultiPage):
         .autoscan_on_startup:  True if invokeai should scan and import at startup time
         .import_model_paths:   list of URLs, repo_ids and file paths to import
         .convert_to_diffusers: if True, convert legacy checkpoints into diffusers
-        '''
+        """
         # we're using a global here rather than storing the result in the parentapp
         # due to some bug in npyscreen that is causing attributes to be lost
         selections = self.parentApp.user_selections
 
         # starter models to install/remove
-        starter_models = dict(map(lambda x: (self.starter_model_list[x], True), self.models_selected.value))
-        selections.purge_deleted_models=False
-        if hasattr(self,'previously_installed_models'):
+        starter_models = dict(
+            map(
+                lambda x: (self.starter_model_list[x], True), self.models_selected.value
+            )
+        )
+        selections.purge_deleted_models = False
+        if hasattr(self, "previously_installed_models"):
             unchecked = [
                 self.previously_installed_models.values[x]
-                for x in range(0,len(self.previously_installed_models.values))
+                for x in range(0, len(self.previously_installed_models.values))
                 if x not in self.previously_installed_models.value
             ]
-            starter_models.update(
-                map(lambda x: (x, False), unchecked)
-            )
+            starter_models.update(map(lambda x: (x, False), unchecked))
             selections.purge_deleted_models = self.purge_deleted.value
-        selections.starter_models=starter_models
+        selections.starter_models = starter_models
 
         # load directory and whether to scan on startup
         if self.show_directory_fields.value:
@@ -303,61 +313,72 @@ class addModelsForm(npyscreen.FormMultiPage):
         # URLs and the like
         selections.import_model_paths = self.import_model_paths.value.split()
         selections.convert_to_diffusers = self.convert_models.value[0] == 1
-            
+
+
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self):
         super().__init__()
         self.user_cancelled = False
         self.user_selections = Namespace(
-            starter_models = None,
-            purge_deleted_models = False,
-            scan_directory = None,
-            autoscan_on_startup = None,
-            import_model_paths = None,
-            convert_to_diffusers = None
+            starter_models=None,
+            purge_deleted_models=False,
+            scan_directory=None,
+            autoscan_on_startup=None,
+            import_model_paths=None,
+            convert_to_diffusers=None,
         )
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main_form = self.addForm(
-            "MAIN",
-            addModelsForm,
-            name="Install Stable Diffusion Models"
+            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
         )
+
 
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace, selections: Namespace):
-    models_to_remove  = [x for x in selections.starter_models if not selections.starter_models[x]]
-    models_to_install = [x for x in selections.starter_models if selections.starter_models[x]]
+    models_to_remove = [
+        x for x in selections.starter_models if not selections.starter_models[x]
+    ]
+    models_to_install = [
+        x for x in selections.starter_models if selections.starter_models[x]
+    ]
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
     convert_to_diffusers = selections.convert_to_diffusers
 
     install_requested_models(
-        install_initial_models = models_to_install,
-        remove_models = models_to_remove,
-        scan_directory = Path(directory_to_scan) if directory_to_scan else None,
-        external_models = potential_models_to_install,
-        scan_at_startup = scan_at_startup,
-        convert_to_diffusers = convert_to_diffusers,
-        precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
-        purge_deleted = selections.purge_deleted_models,
-        config_file_path = Path(opt.config_file) if opt.config_file else None,
+        install_initial_models=models_to_install,
+        remove_models=models_to_remove,
+        scan_directory=Path(directory_to_scan) if directory_to_scan else None,
+        external_models=potential_models_to_install,
+        scan_at_startup=scan_at_startup,
+        convert_to_diffusers=convert_to_diffusers,
+        precision="float32"
+        if opt.full_precision
+        else choose_precision(torch.device(choose_torch_device())),
+        purge_deleted=selections.purge_deleted_models,
+        config_file_path=Path(opt.config_file) if opt.config_file else None,
     )
-                        
+
+
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
-    precision= 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
+    precision = (
+        "float32"
+        if opt.full_precision
+        else choose_precision(torch.device(choose_torch_device()))
+    )
     if opt.default_only:
         install_requested_models(
-            install_initial_models = default_dataset(),
-            precision = precision,
+            install_initial_models=default_dataset(),
+            precision=precision,
         )
     elif opt.yes_to_all:
         install_requested_models(
-            install_initial_models = recommended_datasets(),
-            precision = precision,
+            install_initial_models=recommended_datasets(),
+            precision=precision,
         )
     else:
         installApp = AddModelApplication()
@@ -365,6 +386,7 @@ def select_and_download_models(opt: Namespace):
 
         if not installApp.user_cancelled:
             process_and_execute(opt, installApp.user_selections)
+
 
 # -------------------------------------
 def main():
@@ -410,8 +432,11 @@ def main():
     Globals.root = os.path.expanduser(get_root(opt.root) or "")
 
     if not global_config_dir().exists():
-        print('>> Your InvokeAI root directory is not set up. Calling invokeai-configure.')
+        print(
+            ">> Your InvokeAI root directory is not set up. Calling invokeai-configure."
+        )
         import ldm.invoke.config.invokeai_configure
+
         ldm.invoke.config.invokeai_configure.main()
         sys.exit(0)
 
@@ -427,14 +452,15 @@ def main():
             print(
                 "** Insufficient vertical space for the interface. Please make your window taller and try again"
             )
-        elif str(e).startswith('addwstr'):
+        elif str(e).startswith("addwstr"):
             print(
-                '** Insufficient horizontal space for the interface. Please make your window wider and try again.'
+                "** Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
         else:
             print(f"** An error has occurred: {str(e)}")
             traceback.print_exc()
         sys.exit(-1)
+
 
 # -------------------------------------
 if __name__ == "__main__":

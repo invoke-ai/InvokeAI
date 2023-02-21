@@ -33,17 +33,22 @@ from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.devices import CPU_DEVICE
-from ldm.invoke.generator.diffusers_pipeline import \
-    StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import (Globals, global_cache_dir)
-from ldm.util import (ask_user, download_with_resume,
-                      url_attachment_name, instantiate_from_config)
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ldm.invoke.globals import Globals, global_cache_dir
+from ldm.util import (
+    ask_user,
+    download_with_resume,
+    instantiate_from_config,
+    url_attachment_name,
+)
+
 
 class SDLegacyType(Enum):
-    V1         = 1
+    V1 = 1
     V1_INPAINT = 2
-    V2         = 3
-    UNKNOWN    = 99
+    V2 = 3
+    UNKNOWN = 99
+
 
 DEFAULT_MAX_MODELS = 2
 VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
@@ -58,7 +63,7 @@ class ModelManager(object):
         device_type: torch.device = CPU_DEVICE,
         precision: str = "float16",
         max_loaded_models=DEFAULT_MAX_MODELS,
-        sequential_offload = False
+        sequential_offload=False,
     ):
         """
         Initialize with the path to the models.yaml config file,
@@ -386,6 +391,7 @@ class ModelManager(object):
             from ldm.invoke.ckpt_to_diffuser import (
                 load_pipeline_from_original_stable_diffusion_ckpt,
             )
+
             self.offload_model(self.current_model)
             if vae_config := self._choose_diffusers_vae(model_name):
                 vae = self._load_vae(vae_config)
@@ -396,13 +402,15 @@ class ModelManager(object):
                 original_config_file=config,
                 vae=vae,
                 return_generator_pipeline=True,
-                precision=torch.float16 if self.precision=='float16' else torch.float32,
+                precision=torch.float16
+                if self.precision == "float16"
+                else torch.float32,
             )
             if self.sequential_offload:
                 pipeline.enable_offload_submodels(self.device)
             else:
                 pipeline.to(self.device)
-                
+
             return (
                 pipeline,
                 width,
@@ -615,12 +623,12 @@ class ModelManager(object):
             print(">> Model scanned ok")
 
     def import_diffuser_model(
-            self,
-            repo_or_path: Union[str, Path],
-            model_name: str = None,
-            model_description: str = None,
-            vae: dict = None,
-            commit_to_conf: Path = None,
+        self,
+        repo_or_path: Union[str, Path],
+        model_name: str = None,
+        model_description: str = None,
+        vae: dict = None,
+        commit_to_conf: Path = None,
     ) -> bool:
         """
         Attempts to install the indicated diffuser model and returns True if successful.
@@ -640,15 +648,15 @@ class ModelManager(object):
             vae=vae,
             format="diffusers",
         )
-        print(f'DEBUG: here i am 1')
+        print(f"DEBUG: here i am 1")
         if isinstance(repo_or_path, Path) and repo_or_path.exists():
             new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
-        print(f'DEBUG: here i am 2')
+        print(f"DEBUG: here i am 2")
 
         self.add_model(model_name, new_config, True)
-        print(f'DEBUG: config = {self.config}')
+        print(f"DEBUG: config = {self.config}")
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name
@@ -685,14 +693,16 @@ class ModelManager(object):
             model_name = model_name or url_attachment_name(weights)
 
         weights_path = self._resolve_path(weights, "models/ldm/stable-diffusion-v1")
-        config_path  = self._resolve_path(config, "configs/stable-diffusion")
+        config_path = self._resolve_path(config, "configs/stable-diffusion")
 
         if weights_path is None or not weights_path.exists():
             return
         if config_path is None or not config_path.exists():
             return
 
-        model_name = model_name or Path(weights).stem  # note this gives ugly pathnames if used on a URL without a Content-Disposition header
+        model_name = (
+            model_name or Path(weights).stem
+        )  # note this gives ugly pathnames if used on a URL without a Content-Disposition header
         model_description = (
             model_description or f"imported stable diffusion weights file {model_name}"
         )
@@ -712,8 +722,8 @@ class ModelManager(object):
         return model_name
 
     @classmethod
-    def probe_model_type(self, checkpoint: dict)->SDLegacyType:
-        '''
+    def probe_model_type(self, checkpoint: dict) -> SDLegacyType:
+        """
         Given a pickle or safetensors model object, probes contents
         of the object and returns an SDLegacyType indicating its
         format. Valid return values include:
@@ -721,14 +731,16 @@ class ModelManager(object):
         SDLegacyType.V1_INPAINT
         SDLegacyType.V2
         UNKNOWN
-        '''
+        """
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
             return SDLegacyType.V2
-            
+
         try:
-            state_dict = checkpoint.get('state_dict') or checkpoint
-            in_channels = state_dict['model.diffusion_model.input_blocks.0.0.weight'].shape[1]
+            state_dict = checkpoint.get("state_dict") or checkpoint
+            in_channels = state_dict[
+                "model.diffusion_model.input_blocks.0.0.weight"
+            ].shape[1]
             if in_channels == 9:
                 return SDLegacyType.V1_INPAINT
             elif in_channels == 4:
@@ -739,15 +751,15 @@ class ModelManager(object):
             return SDLegacyType.UNKNOWN
 
     def heuristic_import(
-            self,
-            path_url_or_repo: str,
-            convert: bool= False,
-            model_name: str = None,
-            description: str = None,
-            commit_to_conf: Path=None,
-    )->str:
-        '''
-        Accept a string which could be: 
+        self,
+        path_url_or_repo: str,
+        convert: bool = False,
+        model_name: str = None,
+        description: str = None,
+        commit_to_conf: Path = None,
+    ) -> str:
+        """
+        Accept a string which could be:
            - a HF diffusers repo_id
            - a URL pointing to a legacy .ckpt or .safetensors file
            - a local path pointing to a legacy .ckpt or .safetensors file
@@ -771,88 +783,119 @@ class ModelManager(object):
         The (potentially derived) name of the model is returned on success, or None
         on failure. When multiple models are added from a directory, only the last
         imported one is returned.
-        '''
+        """
         model_path: Path = None
         thing = path_url_or_repo  # to save typing
 
-        print(f'>> Probing {thing} for import')
+        print(f">> Probing {thing} for import")
 
-        if thing.startswith(('http:','https:','ftp:')):
-            print(f'   | {thing} appears to be a URL')
-            model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')  # _resolve_path does a download if needed
+        if thing.startswith(("http:", "https:", "ftp:")):
+            print(f"   | {thing} appears to be a URL")
+            model_path = self._resolve_path(
+                thing, "models/ldm/stable-diffusion-v1"
+            )  # _resolve_path does a download if needed
 
-        elif Path(thing).is_file() and thing.endswith(('.ckpt','.safetensors')):
-            if Path(thing).stem in ['model','diffusion_pytorch_model']:
-                print(f'   | {Path(thing).name} appears to be part of a diffusers model. Skipping import')
+        elif Path(thing).is_file() and thing.endswith((".ckpt", ".safetensors")):
+            if Path(thing).stem in ["model", "diffusion_pytorch_model"]:
+                print(
+                    f"   | {Path(thing).name} appears to be part of a diffusers model. Skipping import"
+                )
                 return
             else:
-                print(f'   | {thing} appears to be a checkpoint file on disk')
-                model_path = self._resolve_path(thing, 'models/ldm/stable-diffusion-v1')
-            
-        elif Path(thing).is_dir() and Path(thing, 'model_index.json').exists():
-            print(f'   | {thing} appears to be a diffusers file on disk')
+                print(f"   | {thing} appears to be a checkpoint file on disk")
+                model_path = self._resolve_path(thing, "models/ldm/stable-diffusion-v1")
+
+        elif Path(thing).is_dir() and Path(thing, "model_index.json").exists():
+            print(f"   | {thing} appears to be a diffusers file on disk")
             model_name = self.import_diffuser_model(
                 thing,
-                vae=dict(repo_id='stabilityai/sd-vae-ft-mse'),
+                vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
                 model_name=model_name,
                 description=description,
-                commit_to_conf=commit_to_conf
+                commit_to_conf=commit_to_conf,
             )
 
         elif Path(thing).is_dir():
-            
-            if (Path(thing) / 'model_index.json').exists():
-                print(f'>> {thing} appears to be a diffusers model.')
-                model_name = self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
+            if (Path(thing) / "model_index.json").exists():
+                print(f">> {thing} appears to be a diffusers model.")
+                model_name = self.import_diffuser_model(
+                    thing, commit_to_conf=commit_to_conf
+                )
             else:
-                print(f'>> {thing} appears to be a directory. Will scan for models to import')
-                for m in list(Path(thing).rglob('*.ckpt')) + list(Path(thing).rglob('*.safetensors')):
-                    if model_name := self.heuristic_import(str(m), convert, commit_to_conf=commit_to_conf):
-                        print(f' >> {model_name} successfully imported')
+                print(
+                    f">> {thing} appears to be a directory. Will scan for models to import"
+                )
+                for m in list(Path(thing).rglob("*.ckpt")) + list(
+                    Path(thing).rglob("*.safetensors")
+                ):
+                    if model_name := self.heuristic_import(
+                        str(m), convert, commit_to_conf=commit_to_conf
+                    ):
+                        print(f" >> {model_name} successfully imported")
                 return model_name
 
-        elif re.match(r'^[\w.+-]+/[\w.+-]+$', thing):
-            print(f'   | {thing} appears to be a HuggingFace diffusers repo_id')
-            model_name = self.import_diffuser_model(thing, commit_to_conf=commit_to_conf)
-            pipeline,_,_,_ = self._load_diffusers_model(self.config[model_name])
+        elif re.match(r"^[\w.+-]+/[\w.+-]+$", thing):
+            print(f"   | {thing} appears to be a HuggingFace diffusers repo_id")
+            model_name = self.import_diffuser_model(
+                thing, commit_to_conf=commit_to_conf
+            )
+            pipeline, _, _, _ = self._load_diffusers_model(self.config[model_name])
 
         else:
-            print(f"** {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id")
+            print(
+                f"** {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id"
+            )
 
         # Model_path is set in the event of a legacy checkpoint file.
         # If not set, we're all done
         if not model_path:
             return
 
-        if model_path.stem in self.config:  #already imported
-            print('   | Already imported. Skipping')
+        if model_path.stem in self.config:  # already imported
+            print("   | Already imported. Skipping")
             return
 
         # another round of heuristics to guess the correct config file.
-        checkpoint = safetensors.torch.load_file(model_path) if model_path.suffix == '.safetensors' else torch.load(model_path)
+        checkpoint = (
+            safetensors.torch.load_file(model_path)
+            if model_path.suffix == ".safetensors"
+            else torch.load(model_path)
+        )
         model_type = self.probe_model_type(checkpoint)
 
         model_config_file = None
         if model_type == SDLegacyType.V1:
-            print('   | SD-v1 model detected')
-            model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
+            print("   | SD-v1 model detected")
+            model_config_file = Path(
+                Globals.root, "configs/stable-diffusion/v1-inference.yaml"
+            )
         elif model_type == SDLegacyType.V1_INPAINT:
-            print('   | SD-v1 inpainting model detected')
-            model_config_file = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml')
+            print("   | SD-v1 inpainting model detected")
+            model_config_file = Path(
+                Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
+            )
         elif model_type == SDLegacyType.V2:
-            print('   | SD-v2 model detected; model will be converted to diffusers format')
-            model_config_file = Path(Globals.root,'configs/stable-diffusion/v2-inference-v.yaml')
+            print(
+                "   | SD-v2 model detected; model will be converted to diffusers format"
+            )
+            model_config_file = Path(
+                Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
+            )
             convert = True
         else:
-            print(f'** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import')
+            print(
+                f"** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import"
+            )
             return
-        
+
         if convert:
-            diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir, model_path.stem)
+            diffuser_path = Path(
+                Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
+            )
             model_name = self.convert_and_import(
                 model_path,
                 diffusers_path=diffuser_path,
-                vae=dict(repo_id='stabilityai/sd-vae-ft-mse'),
+                vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
                 model_name=model_name,
                 model_description=description,
                 original_config_file=model_config_file,
@@ -864,7 +907,12 @@ class ModelManager(object):
                 config=model_config_file,
                 model_name=model_name,
                 model_description=description,
-                vae=str(Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt')),
+                vae=str(
+                    Path(
+                        Globals.root,
+                        "models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt",
+                    )
+                ),
                 commit_to_conf=commit_to_conf,
             )
         if commit_to_conf:
@@ -872,23 +920,25 @@ class ModelManager(object):
         return model_name
 
     def convert_and_import(
-            self,
-            ckpt_path: Path,
-            diffusers_path: Path,
-            model_name=None,
-            model_description=None,
-            vae=None,
-            original_config_file: Path = None,
-            commit_to_conf: Path = None,
+        self,
+        ckpt_path: Path,
+        diffusers_path: Path,
+        model_name=None,
+        model_description=None,
+        vae=None,
+        original_config_file: Path = None,
+        commit_to_conf: Path = None,
     ) -> dict:
         """
         Convert a legacy ckpt weights file to diffuser model and import
         into models.yaml.
         """
-        ckpt_path = self._resolve_path(ckpt_path, 'models/ldm/stable-diffusion-v1')
+        ckpt_path = self._resolve_path(ckpt_path, "models/ldm/stable-diffusion-v1")
         if original_config_file:
-            original_config_file = self._resolve_path(original_config_file, 'configs/stable-diffusion')
-            
+            original_config_file = self._resolve_path(
+                original_config_file, "configs/stable-diffusion"
+            )
+
         new_config = None
 
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
@@ -949,10 +999,11 @@ class ModelManager(object):
         found_models = []
         for file in files:
             location = str(file.resolve()).replace("\\", "/")
-            if 'model.safetensors' not in location and 'diffusion_pytorch_model.safetensors' not in location:
-                found_models.append(
-                    {"name": file.stem, "location": location}
-                )
+            if (
+                "model.safetensors" not in location
+                and "diffusion_pytorch_model.safetensors" not in location
+            ):
+                found_models.append({"name": file.stem, "location": location})
 
         return search_folder, found_models
 
@@ -1112,7 +1163,7 @@ class ModelManager(object):
         print("** Migration is done. Continuing...")
 
     def _resolve_path(
-            self, source: Union[str, Path], dest_directory: str
+        self, source: Union[str, Path], dest_directory: str
     ) -> Optional[Path]:
         resolved_path = None
         if str(source).startswith(("http:", "https:", "ftp:")):
