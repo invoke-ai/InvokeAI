@@ -61,6 +61,7 @@ def main():
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = args.ckpt_convert
 
     print(f">> Internet connectivity is {Globals.internet_available}")
@@ -750,7 +751,7 @@ def import_ckpt_model(
     base_name = Path(url_attachment_name(path_or_url)).name if is_a_url else Path(path_or_url).name
     default_name = Path(base_name).stem
     default_description = f"Imported model {default_name}"
-    
+
     model_name, model_description = _get_model_name_and_desc(
         manager,
         completer,
@@ -835,7 +836,7 @@ def _ask_for_config_file(model_path: Union[str,Path], completer, plural: bool=Fa
         '2': 'v2-inference-v.yaml',
         '3': 'v1-inpainting-inference.yaml',
     }
-    
+
     prompt = '''What type of models are these?:
 [1] Models based on Stable Diffusion 1.X
 [2] Models based on Stable Diffusion 2.X
@@ -844,7 +845,7 @@ def _ask_for_config_file(model_path: Union[str,Path], completer, plural: bool=Fa
 [1] A model based on Stable Diffusion 1.X
 [2] A model based on Stable Diffusion 2.X
 [3] An inpainting models based on Stable Diffusion 1.X
-[4] Something else''' 
+[4] Something else'''
     print(prompt)
     choice = input(f'Your choice: [{default}] ')
     choice = choice.strip() or default
