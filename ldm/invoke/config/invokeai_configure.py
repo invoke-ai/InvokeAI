@@ -442,6 +442,13 @@ class editOptsForm(npyscreen.FormMultiPage):
             relx=5,
             scroll_exit=True,
         )
+        self.ckpt_convert = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name="Load legacy checkpoint models into memory as diffusers models",
+            value=old_opts.ckpt_convert,
+            relx=5,
+            scroll_exit=True,
+        )
         self.always_use_cpu = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Force CPU to be used on GPU systems",
@@ -569,13 +576,14 @@ class editOptsForm(npyscreen.FormMultiPage):
         new_opts = Namespace()
 
         for attr in [
-            "outdir",
-            "safety_checker",
-            "free_gpu_mem",
-            "max_loaded_models",
-            "xformers",
-            "always_use_cpu",
-            "embedding_path",
+                "outdir",
+                "safety_checker",
+                "free_gpu_mem",
+                "max_loaded_models",
+                "xformers",
+                "always_use_cpu",
+                "embedding_path",
+                "ckpt_convert",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
@@ -709,6 +717,7 @@ def write_opts(opts: Namespace, init_file: Path):
 --max_loaded_models={int(opts.max_loaded_models)}
 --{'no-' if not opts.safety_checker else ''}nsfw_checker
 --{'no-' if not opts.xformers else ''}xformers
+--{'no-' if not opts.ckpt_convert else ''}ckpt_convert
 {'--free_gpu_mem' if opts.free_gpu_mem else ''}
 {'--always_use_cpu' if opts.always_use_cpu else ''}
 """

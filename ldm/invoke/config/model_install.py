@@ -241,7 +241,8 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def _get_columns(self)->int:
         window_height, window_width = curses.initscr().getmaxyx()
-        return 4 if window_width > 240 else 3 if window_width>160 else 2 if window_width>80 else 1
+        cols = 4 if window_width > 240 else 3 if window_width>160 else 2 if window_width>80 else 1
+        return min(cols,len(self.installed_models))
 
     def on_ok(self):
         self.parentApp.setNextForm(None)
