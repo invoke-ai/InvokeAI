@@ -329,8 +329,6 @@ class editOptsForm(npyscreen.FormMultiPage):
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
-        with open("log.txt", "w") as f:
-            f.write(str(old_opts))
         first_time = not (Globals.root / Globals.initfile).exists()
         access_token = HfFolder.get_token()
 
