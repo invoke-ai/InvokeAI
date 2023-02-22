@@ -178,7 +178,9 @@ class Generate:
         self.model_hash = None
         self.sampler = None
         self.device = None
-        self.session_peakmem = None
+        self.max_memory_allocated = 0
+        self.memory_allocated = 0
+        self.session_peakmem = 0
         self.base_generator = None
         self.seed = None
         self.outdir = outdir
@@ -786,6 +788,7 @@ class Generate:
                 embiggen_tiles=opt.embiggen_tiles,
                 embiggen_strength=opt.embiggen_strength,
                 image_callback=callback,
+                clear_cuda_cache=self.clear_cuda_cache,
             )
         elif tool == "outpaint":
             from ldm.invoke.restoration.outpaint import Outpaint

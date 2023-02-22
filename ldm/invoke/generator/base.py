@@ -126,7 +126,7 @@ class Generator:
                 seed = self.new_seed()
 
                 # Free up memory from the last generation.
-                clear_cuda_cache = kwargs['clear_cuda_cache'] or None
+                clear_cuda_cache = kwargs['clear_cuda_cache'] if 'clear_cuda_cache' in kwargs else None
                 if clear_cuda_cache is not None:
                     clear_cuda_cache()
 
