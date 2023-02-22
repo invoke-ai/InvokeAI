@@ -659,7 +659,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
         "models",
         "configs",
         "embeddings",
-        "text-inversion-data",
+        "text-inversion-output",
         "text-inversion-training-data",
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
