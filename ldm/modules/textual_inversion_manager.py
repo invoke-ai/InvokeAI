@@ -125,12 +125,12 @@ class TextualInversionManager:
                 embedding_info["embedding"],
                 defer_injecting_tokens=defer_injecting_tokens,
             )
+            # remember which source file claims this trigger
+            self.trigger_to_sourcefile[trigger_str] = sourcefile
+
         except ValueError as e:
             print(f'   | Ignoring incompatible embedding {embedding_info["name"]}')
             print(f"   | The error was {str(e)}")
-
-        # remember which source file claims this trigger
-        self.trigger_to_sourcefile[trigger_str] = sourcefile
 
     def _add_textual_inversion(
         self, trigger_str, embedding, defer_injecting_tokens=False
