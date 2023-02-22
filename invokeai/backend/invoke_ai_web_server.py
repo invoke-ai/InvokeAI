@@ -1383,13 +1383,6 @@ class InvokeAIWebServer:
             # semantic drift
             rfc_dict["sampler"] = parameters["sampler_name"]
 
-            # display weighted subprompts (liable to change)
-            subprompts = split_weighted_subprompts(
-                parameters["prompt"], skip_normalize=True
-            )
-            subprompts = [{"prompt": x[0], "weight": x[1]} for x in subprompts]
-            rfc_dict["prompt"] = subprompts
-
             # 'variations' should always exist and be an array, empty or consisting of {'seed': seed, 'weight': weight} pairs
             variations = []
 

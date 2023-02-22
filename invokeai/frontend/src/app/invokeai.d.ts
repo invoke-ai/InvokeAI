@@ -29,7 +29,8 @@ export declare type PromptItem = {
   weight: number;
 };
 
-export declare type Prompt = Array<PromptItem>;
+// TECHDEBT: We need to retain compatibility with plain prompt strings and the structure Prompt type
+export declare type Prompt = Array<PromptItem> | string;
 
 export declare type SeedWeightPair = {
   seed: number;

@@ -1,9 +1,11 @@
 import * as InvokeAI from 'app/invokeai';
 import promptToString from './promptToString';
 
-export function getPromptAndNegative(input_prompt: InvokeAI.Prompt) {
-  let prompt: string = promptToString(input_prompt);
-  let negativePrompt: string | null = null;
+export function getPromptAndNegative(inputPrompt: InvokeAI.Prompt) {
+  let prompt: string =
+    typeof inputPrompt === 'string' ? inputPrompt : promptToString(inputPrompt);
+
+  let negativePrompt = '';
 
   // Matches all negative prompts, 1st capturing group is the prompt itself
   const negativePromptRegExp = new RegExp(/\[([^\][]*)]/, 'gi');
