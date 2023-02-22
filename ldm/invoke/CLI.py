@@ -9,6 +9,8 @@ from typing import Union
 
 import click
 
+from compel import PromptParser
+
 if sys.platform == "darwin":
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
@@ -25,7 +27,6 @@ from .image_util import make_grid
 from .log import write_log
 from .model_manager import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
-from .prompt_parser import PromptParser
 from .readline import Completer, get_completer
 from ..util import url_attachment_name
 

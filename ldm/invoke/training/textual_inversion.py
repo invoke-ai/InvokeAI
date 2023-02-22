@@ -453,7 +453,7 @@ def main():
                 '** Not enough window space for the interface. Please make your window larger and try again.'
             )
         else:
-            print(f"** A layout error has occurred: {str(e)}")
+            print(f"** An error has occurred: {str(e)}")
         sys.exit(-1)
 
 
