@@ -1,6 +1,10 @@
 import * as InvokeAI from 'app/invokeai';
 
 const promptToString = (prompt: InvokeAI.Prompt): string => {
+  if (typeof prompt === 'string') {
+    return prompt;
+  }
+
   if (prompt.length === 1) {
     return prompt[0].prompt;
   }

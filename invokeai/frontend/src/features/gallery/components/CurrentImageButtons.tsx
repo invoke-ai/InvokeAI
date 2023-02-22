@@ -7,7 +7,6 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import {
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
@@ -20,8 +19,6 @@ import UpscaleSettings from 'features/parameters/components/AdvancedParameters/U
 import {
   setAllParameters,
   setInitialImage,
-  setNegativePrompt,
-  setPrompt,
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
@@ -53,6 +50,8 @@ import {
 } from 'react-icons/fa';
 import { gallerySelector } from '../store/gallerySelectors';
 import DeleteImageModal from './DeleteImageModal';
+import { useCallback } from 'react';
+import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -125,6 +124,7 @@ const CurrentImageButtons = () => {
 
   const toast = useToast();
   const { t } = useTranslation();
+  const setBothPrompts = useSetBothPrompts();
 
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
@@ -253,18 +253,11 @@ const CurrentImageButtons = () => {
     [currentImage]
   );
 
-  const handleClickUsePrompt = () => {
+  const handleClickUsePrompt = useCallback(() => {
     if (currentImage?.metadata?.image?.prompt) {
-      const [prompt, negativePrompt] = getPromptAndNegative(
-        currentImage?.metadata?.image?.prompt
-      );
-
-      prompt && dispatch(setPrompt(prompt));
-      negativePrompt
-        ? dispatch(setNegativePrompt(negativePrompt))
-        : dispatch(setNegativePrompt(''));
+      setBothPrompts(currentImage?.metadata?.image?.prompt);
     }
-  };
+  }, [currentImage?.metadata?.image?.prompt, setBothPrompts]);
 
   useHotkeys(
     'p',
