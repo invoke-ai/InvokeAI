@@ -12,6 +12,7 @@ import * as InvokeAI from 'app/invokeai';
 import { useAppDispatch } from 'app/storeHooks';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
+import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import {
   setCfgScale,
   setHeight,
@@ -19,7 +20,6 @@ import {
   setInitialImage,
   setMaskPath,
   setPerlin,
-  setPrompt,
   setSampler,
   setSeamless,
   setSeed,
@@ -129,6 +129,8 @@ const ImageMetadataViewer = memo(
   ({ image, styleClass }: ImageMetadataViewerProps) => {
     const dispatch = useAppDispatch();
 
+    const setBothPrompts = useSetBothPrompts();
+
     useHotkeys('esc', () => {
       dispatch(setShouldShowImageDetails(false));
     });
@@ -152,7 +154,6 @@ const ImageMetadataViewer = memo(
       seed,
       steps,
       strength,
-      denoise_str,
       threshold,
       type,
       variations,
@@ -189,8 +190,10 @@ const ImageMetadataViewer = memo(
                 <MetadataItem
                   label="Prompt"
                   labelPosition="top"
-                  value={promptToString(prompt)}
-                  onClick={() => dispatch(setPrompt(prompt))}
+                  value={
+                    typeof prompt === 'string' ? prompt : promptToString(prompt)
+                  }
+                  onClick={() => setBothPrompts(prompt)}
                 />
               )}
               {seed !== undefined && (
