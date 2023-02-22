@@ -56,33 +56,3 @@ trinart-2.0:
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
    recommended: False
-trinart-characters-2_0:
-   description: An SD model finetuned with 19.2M anime/manga style images (ckpt version) (4.27 GB)
-   repo_id: naclbit/trinart_derrida_characters_v2_stable_diffusion
-   config: v1-inference.yaml
-   file: derrida_final.ckpt
-   format: ckpt
-   vae:
-      repo_id: naclbit/trinart_derrida_characters_v2_stable_diffusion
-      file: autoencoder_fix_kl-f8-trinart_characters.ckpt
-   width: 512
-   height: 512
-   recommended: False
-ft-mse-improved-autoencoder-840000:
-   description: StabilityAI improved autoencoder fine-tuned for human faces. Improves legacy .ckpt models (335 MB)
-   repo_id: stabilityai/sd-vae-ft-mse-original
-   format: ckpt
-   config: VAE/default
-   file: vae-ft-mse-840000-ema-pruned.ckpt
-   width: 512
-   height: 512
-   recommended: True
-trinart_vae:
-   description: Custom autoencoder for trinart_characters for legacy .ckpt models only (335 MB)
-   repo_id: naclbit/trinart_characters_19.2m_stable_diffusion_v1
-   config: VAE/trinart
-   format: ckpt
-   file: autoencoder_fix_kl-f8-trinart_characters.ckpt
-   width: 512
-   height: 512
-   recommended: False

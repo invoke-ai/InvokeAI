@@ -306,8 +306,12 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
                  dest/filename
     :param access_token: Access token to access this resource
     '''
-    resp = requests.get(url, stream=True)
-    total = int(resp.headers.get("content-length", 0))
+    header = {"Authorization": f"Bearer {access_token}"} if access_token else {}
+    open_mode = "wb"
+    exist_size = 0
+
+    resp = requests.get(url, header, stream=True)
+    content_length = int(resp.headers.get("content-length", 0))
 
     if dest.is_dir():
         try:
@@ -318,41 +322,41 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f'DEBUG: after many manipulations, dest={dest}')
-
-    header = {"Authorization": f"Bearer {access_token}"} if access_token else {}
-    open_mode = "wb"
-    exist_size = 0
-
     if dest.exists():
         exist_size = dest.stat().st_size
         header["Range"] = f"bytes={exist_size}-"
         open_mode = "ab"
+        resp = requests.get(url, headers=header, stream=True) # new request with range
+
+    if exist_size > content_length:
+        print('* corrupt existing file found. re-downloading')
+        os.remove(dest)
+        exist_size = 0
 
     if (
-        resp.status_code == 416
-    ):  # "range not satisfiable", which means nothing to return
+        resp.status_code == 416 or exist_size == content_length
+    ):
         print(f"* {dest}: complete file found. Skipping.")
         return dest
+    elif resp.status_code == 206 or exist_size > 0:
+        print(f"* {dest}: partial file found. Resuming...")
     elif resp.status_code != 200:
         print(f"** An error occurred during downloading {dest}: {resp.reason}")
-    elif exist_size > 0:
-        print(f"* {dest}: partial file found. Resuming...")
     else:
         print(f"* {dest}: Downloading...")
 
     try:
-        if total < 2000:
+        if content_length < 2000:
             print(f"*** ERROR DOWNLOADING {url}: {resp.text}")
             return None
 
         with open(dest, open_mode) as file, tqdm(
-            desc=str(dest),
-            initial=exist_size,
-            total=total + exist_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1000,
+                desc=str(dest),
+                initial=exist_size,
+                total=content_length,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
         ) as bar:
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)

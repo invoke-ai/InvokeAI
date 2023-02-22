@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import psutil
 import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -308,7 +309,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
-        if is_xformers_available() and not Globals.disable_xformers:
+        if torch.cuda.is_available() and is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
         else:
             if torch.backends.mps.is_available():

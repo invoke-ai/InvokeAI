@@ -339,7 +339,6 @@ class Generator:
         if self.caution_img:
             return self.caution_img
         path = Path(web_assets.__path__[0]) / CAUTION_IMG
-        print(f'DEBUG: path to caution = {path}')
         caution = Image.open(path)
         self.caution_img = caution.resize((caution.width // 2, caution.height //2))
         return self.caution_img

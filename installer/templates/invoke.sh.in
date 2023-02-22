@@ -30,12 +30,14 @@ if [ "$0" != "bash" ]; then
     echo "2. browser-based UI"
     echo "3. run textual inversion training"
     echo "4. merge models (diffusers type only)"
-    echo "5. re-run the configure script to download new models"
-    echo "6. update InvokeAI"
-    echo "7. open the developer console"
-    echo "8. command-line help"
+    echo "5. download and install models"
+    echo "6. change InvokeAI startup options"
+    echo "7. re-run the configure script to fix a broken install"
+    echo "8. open the developer console"
+    echo "9. update InvokeAI"
+    echo "10. command-line help "
     echo ""
-    read -p "Please enter 1, 2, 3, 4, 5, 6, 7 or 8: [2] " yn
+    read -p "Please enter 1-10: [2] " yn
     choice=${yn:='2'}
     case $choice in
         1)
@@ -55,19 +57,24 @@ if [ "$0" != "bash" ]; then
             exec invokeai-merge --gui $@
             ;;
         5)
-	    echo "Configuration:"
-            exec invokeai-configure --root ${INVOKEAI_ROOT}
+            exec invokeai-model-install --root ${INVOKEAI_ROOT}
             ;;
         6)
-	    echo "Update:"
-            exec invokeai-update
+            exec invokeai-configure --root ${INVOKEAI_ROOT} --skip-sd-weights --skip-support-models
             ;;
         7)
-            echo "Developer Console:"
+            exec invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only
+	    ;;
+	8)
+	    echo "Developer Console:"
             file_name=$(basename "${BASH_SOURCE[0]}")
             bash --init-file "$file_name"
             ;;
-        8)
+        9)
+	    echo "Update:"
+            exec invokeai-update
+            ;;
+        10)
             exec invokeai --help
             ;;
         *)
