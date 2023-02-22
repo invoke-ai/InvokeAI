@@ -5,6 +5,8 @@ from ldm.invoke.devices import choose_torch_device
 from safetensors.torch import load_file
 import torch
 from torch.utils.hooks import RemovableHandle
+from diffusers.models import UNet2DConditionModel
+from transformers import CLIPTextModel
 
 
 class LoRALayer:
@@ -15,7 +17,6 @@ class LoRALayer:
     down: torch.nn.Module
 
     def __init__(self, lora_name: str, name: str, rank=4, alpha=1.0):
-        super().__init__()
         self.lora_name = lora_name
         self.name = name
         self.scale = alpha / rank
@@ -24,18 +25,201 @@ class LoRALayer:
 class LoRA:
     name: str
     layers: dict[str, LoRALayer]
+    device: torch.device
+    dtype: torch.dtype
     multiplier: float
 
-    def __init__(self, name: str, multiplier=1.0):
+    def __init__(self, name: str, device, dtype, multiplier=1.0):
         self.name = name
         self.layers = {}
         self.multiplier = multiplier
+        self.device = device
+        self.dtype = dtype
+        self.rank = None
+        self.alpha = None
+
+    def load_from_dict(self,
+                       state_dict,
+                       text_modules: dict[str, torch.nn.Module],
+                       unet_modules: dict[str, torch.nn.Module]):
+        for key, value in state_dict.items():
+            stem, leaf = key.split(".", 1)
+
+            if leaf.endswith("alpha"):
+                if self.alpha is None:
+                    self.alpha = value.item()
+                continue
+
+            if stem.startswith(LORA_PREFIX_TEXT_ENCODER):
+                wrapped = text_modules.get(stem, None)
+                if wrapped is None:
+                    print(f">> Missing layer: {stem}")
+                    continue
+
+                if self.rank is None and leaf == 'lora_down.weight' and len(value.size()) == 2:
+                    self.rank = value.shape[0]
+                self.load_lora_layer(stem, leaf, value, wrapped)
+                continue
+            elif stem.startswith(LORA_PREFIX_UNET):
+                wrapped = unet_modules.get(stem, None)
+                if wrapped is None:
+                    print(f">> Missing layer: {stem}")
+                    continue
+
+                if self.rank is None and leaf == 'lora_down.weight' and len(value.size()) == 2:
+                    self.rank = value.shape[0]
+                self.load_lora_layer(stem, leaf, value, wrapped)
+                continue
+            else:
+                continue
+
+    def load_lora_layer(self, stem: str, leaf: str, value, wrapped: torch.nn.Module):
+        layer = self.layers.get(stem, None)
+        if layer is None:
+            layer = LoRALayer(self.name, stem, self.rank, self.alpha)
+            self.layers[stem] = layer
+
+        if type(wrapped) == torch.nn.Linear:
+            module = torch.nn.Linear(value.shape[1], value.shape[0], bias=False)
+        elif type(wrapped) == torch.nn.Conv2d:
+            module = torch.nn.Conv2d(value.shape[1], value.shape[0], (1, 1), bias=False)
+        else:
+            print(f">> Encountered unknown lora layer module in {self.name}: {type(value).__name__}")
+            return
+
+        with torch.no_grad():
+            module.weight.copy_(value)
+
+        module.to(device=self.device, dtype=self.dtype)
+
+        if leaf == "lora_up.weight":
+            layer.up = module
+        elif leaf == "lora_down.weight":
+            layer.down = module
+        else:
+            print(f">> Encountered unknown layer in lora {self.name}: {leaf}")
+            return
 
 
 UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
 TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
 LORA_PREFIX_UNET = 'lora_unet'
 LORA_PREFIX_TEXT_ENCODER = 'lora_te'
+
+re_digits = re.compile(r"\d+")
+re_unet_transformer_attn_blocks = re.compile(
+    r"lora_unet_(.+)_blocks_(\d+)_attentions_(\d+)_transformer_blocks_(\d+)_attn(\d+)_(.+).(weight|alpha)"
+)
+re_unet_mid_blocks = re.compile(
+    r"lora_unet_mid_block_attentions_(\d+)_(.+).(weight|alpha)"
+)
+re_unet_transformer_blocks = re.compile(
+    r"lora_unet_(.+)_blocks_(\d+)_attentions_(\d+)_transformer_blocks_(\d+)_(.+).(weight|alpha)"
+)
+re_unet_mid_transformer_blocks = re.compile(
+    r"lora_unet_mid_block_attentions_(\d+)_transformer_blocks_(\d+)_(.+).(weight|alpha)"
+)
+re_unet_norm_blocks = re.compile(
+    r"lora_unet_(.+)_blocks_(\d+)_attentions_(\d+)_(.+).(weight|alpha)"
+)
+re_out = re.compile(r"to_out_(\d+)")
+re_processor_weight = re.compile(r"(.+)_(\d+)_(.+)")
+re_processor_alpha = re.compile(r"(.+)_(\d+)")
+
+
+def convert_key_to_diffusers(key):
+    def match(match_list, regex, subject):
+        r = re.match(regex, subject)
+        if not r:
+            return False
+
+        match_list.clear()
+        match_list.extend([int(x) if re.match(re_digits, x) else x for x in r.groups()])
+        return True
+
+    m = []
+
+    def get_front_block(first, second, third, fourth=None):
+        if first == "mid":
+            b_type = f"mid_block"
+        else:
+            b_type = f"{first}_blocks.{second}"
+
+        if fourth is None:
+            return f"{b_type}.attentions.{third}"
+
+        return f"{b_type}.attentions.{third}.transformer_blocks.{fourth}"
+
+    def get_back_block(first, second, third):
+        second = second.replace(".lora_", "_lora.")
+        if third == "weight":
+            bm = []
+            if match(bm, re_processor_weight, second):
+                s_bm = bm[2].split('.')
+                s_front = f"{bm[0]}_{s_bm[0]}"
+                s_back = f"{s_bm[1]}"
+                if int(bm[1]) == 0:
+                    second = f"{s_front}.{s_back}"
+                else:
+                    second = f"{s_front}.{bm[1]}.{s_back}"
+        elif third == "alpha":
+            bma = []
+            if match(bma, re_processor_alpha, second):
+                if int(bma[1]) == 0:
+                    second = f"{bma[0]}"
+                else:
+                    second = f"{bma[0]}.{bma[1]}"
+
+        if first is None:
+            return f"processor.{second}.{third}"
+
+        return f"attn{first}.processor.{second}.{third}"
+
+    if match(m, re_unet_transformer_attn_blocks, key):
+        return f"{get_front_block(m[0], m[1], m[2], m[3])}.{get_back_block(m[4], m[5], m[6])}"
+
+    if match(m, re_unet_transformer_blocks, key):
+        return f"{get_front_block(m[0], m[1], m[2], m[3])}.{get_back_block(None, m[4], m[5])}"
+
+    if match(m, re_unet_mid_transformer_blocks, key):
+        return f"{get_front_block('mid', None, m[0], m[1])}.{get_back_block(None, m[2], m[3])}"
+
+    if match(m, re_unet_norm_blocks, key):
+        return f"{get_front_block(m[0], m[1], m[2])}.{get_back_block(None, m[3], m[4])}"
+
+    if match(m, re_unet_mid_blocks, key):
+        return f"{get_front_block('mid', None, m[0])}.{get_back_block(None, m[1], m[2])}"
+
+    return key
+
+
+def load_lora_attn(
+    name: str,
+    path_file: Path,
+    unet: UNet2DConditionModel,
+    text_encoder: CLIPTextModel,
+    multiplier=1.0
+):
+    print(f">> Loading lora {name} from {path_file}")
+    if path_file.suffix == '.safetensors':
+        checkpoint = load_file(path_file.absolute().as_posix(), device='cpu')
+    else:
+        checkpoint = torch.load(path_file, map_location='cpu')
+
+    for key in list(checkpoint.keys()):
+        if key.startswith(LORA_PREFIX_UNET):
+            # convert unet keys
+            checkpoint[convert_key_to_diffusers(key)] = checkpoint.pop(key)
+        elif key.startswith(LORA_PREFIX_UNET):
+            # convert text encoder keys (not yet supported)
+            # state_dict[convert_key_to_diffusers(key)] = state_dict.pop(key)
+            checkpoint.pop(key)
+        else:
+            # remove invalid key
+            checkpoint.pop(key)
+
+    unet.load_attn_procs(checkpoint)
+    # text_encoder.load_attn_procs(checkpoint)
 
 
 def lora_forward_hook(name):
@@ -68,67 +252,8 @@ def load_lora(
     else:
         checkpoint = torch.load(path_file, map_location='cpu')
 
-    lora = LoRA(name, multiplier)
-
-    alpha = None
-    rank = None
-    for key, value in checkpoint.items():
-        stem, leaf = key.split(".", 1)
-
-        if leaf.endswith("alpha"):
-            if alpha is None:
-                alpha = value.item()
-            continue
-
-        if stem.startswith(LORA_PREFIX_TEXT_ENCODER):
-            # text encoder layer
-            wrapped = text_modules.get(stem, None)
-            if wrapped is None:
-                print(f">> Missing layer: {stem}")
-                continue
-        elif stem.startswith(LORA_PREFIX_UNET):
-            # unet layer
-            wrapped = unet_modules.get(stem, None)
-            if wrapped is None:
-                print(f">> Missing layer: {stem}")
-                continue
-        else:
-            continue
-
-        if rank is None and leaf == 'lora_down.weight' and len(value.size()) == 2:
-            rank = value.shape[0]
-
-        if wrapped is None:
-            continue
-
-        layer = lora.layers.get(stem, None)
-        if layer is None:
-            layer = LoRALayer(name, stem, rank, alpha)
-            lora.layers[stem] = layer
-
-        if type(wrapped) == torch.nn.Linear:
-            module = torch.nn.Linear(
-                value.shape[1], value.shape[0], bias=False)
-        elif type(wrapped) == torch.nn.Conv2d:
-            module = torch.nn.Conv2d(
-                value.shape[1], value.shape[0], (1, 1), bias=False)
-        else:
-            print(
-                f">> Encountered unknown lora layer module in {name}: {type(value).__name__}")
-            continue
-
-        with torch.no_grad():
-            module.weight.copy_(value)
-
-        module.to(device=device, dtype=dtype)
-
-        if leaf == "lora_up.weight":
-            layer.up = module
-        elif leaf == "lora_down.weight":
-            layer.down = module
-        else:
-            print(f">> Encountered unknown layer in lora {name}: {key}")
-            continue
+    lora = LoRA(name, device, dtype, multiplier)
+    lora.load_from_dict(checkpoint, text_modules, unet_modules)
 
     return lora
 
@@ -161,12 +286,14 @@ class LoraManager:
 
         self.text_modules = find_modules(
             LORA_PREFIX_TEXT_ENCODER, self.text_encoder, TEXT_ENCODER_TARGET_REPLACE_MODULE)
+
         self.unet_modules = find_modules(
             LORA_PREFIX_UNET, self.unet, UNET_TARGET_REPLACE_MODULE)
 
     def _load_lora(self, name, path_file, multiplier: float = 1.0):
-        lora = load_lora(name, path_file, self.device, self.dtype,
-                         self.text_modules, self.unet_modules, multiplier)
+        # can be used instead to load through diffusers, once enough support is added
+        # lora = load_lora_attn(name, path_file, self.unet, self.text_encoder, multiplier)
+        lora = load_lora(name, path_file, self.device, self.dtype, self.text_modules, self.unet_modules, multiplier)
         loaded_loras[name] = lora
         return lora
 
