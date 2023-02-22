@@ -430,7 +430,7 @@ class TextualInversionDataset(Dataset):
         placeholder_token="*",
         center_crop=False,
     ):
-        self.data_root = data_root
+        self.data_root = Path(data_root)
         self.tokenizer = tokenizer
         self.learnable_property = learnable_property
         self.size = size
@@ -439,9 +439,9 @@ class TextualInversionDataset(Dataset):
         self.flip_p = flip_p
 
         self.image_paths = [
-            os.path.join(self.data_root, file_path)
-            for file_path in os.listdir(self.data_root)
-            if os.path.isfile(file_path) and file_path.endswith(('.png','.PNG','.jpg','.JPG','.jpeg','.JPEG','.gif','.GIF'))
+            self.data_root / file_path
+            for file_path in self.data_root.iterdir()
+            if file_path.is_file() and file_path.name.endswith(('.png','.PNG','.jpg','.JPG','.jpeg','.JPEG','.gif','.GIF'))
         ]
 
         self.num_images = len(self.image_paths)
