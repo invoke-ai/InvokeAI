@@ -33,7 +33,8 @@ from .widgets import (MultiSelectColumns, TextBox,
                       OffsetButtonPress, CenteredTitleText)
 
 class addModelsForm(npyscreen.FormMultiPage):
-    FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    # for responsive resizing - disabled
+    #FIX_MINIMUM_SIZE_WHEN_CREATED = False
     
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage

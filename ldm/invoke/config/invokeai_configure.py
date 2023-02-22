@@ -324,7 +324,8 @@ def get_root(root: str = None) -> str:
 
 # -------------------------------------
 class editOptsForm(npyscreen.FormMultiPage):
-    FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    # for responsive resizing - disabled
+    # FIX_MINIMUM_SIZE_WHEN_CREATED = False
     
     def create(self):
         program_opts = self.parentApp.program_opts
@@ -570,10 +571,6 @@ class editOptsForm(npyscreen.FormMultiPage):
         else:
             return True
 
-    def resize(self):
-        super().resize()
-        self.ok_button.relx=5
-
     def marshall_arguments(self):
         new_opts = Namespace()
 
@@ -704,7 +701,7 @@ def write_opts(opts: Namespace, init_file: Path):
     # initfile needs to be replaced with a fully structured format
     # such as yaml; this is a hack that will work much of the time
     args_to_skip = re.compile(
-        "^--?(o|out|no-xformer|xformer|free|no-nsfw|nsfw|prec|max_load|embed|always)"
+        "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
     )
     new_file = f"{init_file}.new"
     try:
