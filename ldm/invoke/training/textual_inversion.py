@@ -421,7 +421,6 @@ def do_front_end(args: Namespace):
         save_args(args)
 
         try:
-            print(f"DEBUG: args = {args}")
             do_textual_inversion_training(**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
@@ -454,7 +453,7 @@ def main():
                 '** Not enough window space for the interface. Please make your window larger and try again.'
             )
         else:
-            print(f"** A layout error has occurred: {str(e)}")
+            print(f"** An error has occurred: {str(e)}")
         sys.exit(-1)
 
 
