@@ -39,7 +39,6 @@ import invokeai.configs as configs
 
 from ..args import PRECISION_CHOICES, Args
 from ..globals import Globals, global_config_dir, global_config_file, global_cache_dir
-from ..readline import generic_completer
 from .model_install import addModelsForm, process_and_execute
 from .model_install_backend import (
     default_dataset,
@@ -47,7 +46,7 @@ from .model_install_backend import (
     recommended_datasets,
     hf_download_with_resume,
 )
-from .widgets import IntTitleSlider
+from .widgets import IntTitleSlider, CenteredButtonPress
 
 warnings.filterwarnings("ignore")
 
@@ -64,7 +63,6 @@ Default_config_file = Path(global_config_dir()) / "models.yaml"
 SD_Configs = Path(global_config_dir()) / "stable-diffusion"
 
 Datasets = OmegaConf.load(Dataset_path)
-completer = generic_completer(["yes", "no"])
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -78,7 +76,6 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # --steps=20
 # -Ak_euler_a -C10.0
 """
-
 
 # --------------------------------------------
 def postscript(errors: None):
@@ -325,7 +322,10 @@ def get_root(root: str = None) -> str:
         return Globals.root
 
 
+# -------------------------------------
 class editOptsForm(npyscreen.FormMultiPage):
+    FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
@@ -401,7 +401,7 @@ class editOptsForm(npyscreen.FormMultiPage):
 
         self.hf_token = self.add_widget_intelligent(
             npyscreen.TitlePassword,
-            name="Access Token (use shift-ctrl-V to paste):",
+            name="Access Token (ctrl-shift-V pastes):",
             value=access_token,
             begin_entry_at=42,
             use_two_lines=False,
@@ -528,7 +528,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             else "NEXT"
         )
         self.ok_button = self.add_widget_intelligent(
-            npyscreen.ButtonPress,
+            CenteredButtonPress,
             name=label,
             relx=(window_width - len(label)) // 2,
             rely=-3,
@@ -569,6 +569,10 @@ class editOptsForm(npyscreen.FormMultiPage):
             return False
         else:
             return True
+
+    def resize(self):
+        super().resize()
+        self.ok_button.relx=5
 
     def marshall_arguments(self):
         new_opts = Namespace()

@@ -29,10 +29,12 @@ from .model_install_backend import (Dataset_path, default_config_file,
                                     default_dataset, get_root,
                                     install_requested_models,
                                     recommended_datasets)
-from .widgets import MultiSelectColumns, TextBox
-
+from .widgets import (MultiSelectColumns, TextBox,
+                      OffsetButtonPress, CenteredTitleText)
 
 class addModelsForm(npyscreen.FormMultiPage):
+    FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
         self.initial_models = OmegaConf.load(Dataset_path)
@@ -62,22 +64,30 @@ class addModelsForm(npyscreen.FormMultiPage):
             npyscreen.FixedText,
             value="Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields,",
             editable=False,
+            color='CAUTION',
         )
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="cursor arrows to make a selection, and space to toggle checkboxes.",
+            value="Use cursor arrows to make a selection, and space to toggle checkboxes.",
             editable=False,
+            color='CAUTION'
         )
         self.nextrely += 1
         if len(self.installed_models) > 0:
             self.add_widget_intelligent(
-                npyscreen.TitleFixedText,
+                CenteredTitleText,
                 name="== INSTALLED STARTER MODELS ==",
-                value="Currently installed starter models. Uncheck to delete:",
-                begin_entry_at=2,
                 editable=False,
                 color="CONTROL",
             )
+            self.nextrely -= 1
+            self.add_widget_intelligent(
+                CenteredTitleText,
+                name="Currently installed starter models. Uncheck to delete:",
+                editable=False,
+                labelColor="CAUTION",
+            )
+            self.nextrely -= 1
             columns = self._get_columns()
             self.previously_installed_models = self.add_widget_intelligent(
                 MultiSelectColumns,
@@ -94,16 +104,23 @@ class addModelsForm(npyscreen.FormMultiPage):
                 name="Purge deleted models from disk",
                 value=False,
                 scroll_exit=True,
+                relx=4,
             )
         self.nextrely += 1
         self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
+            CenteredTitleText,
             name="== STARTER MODELS (recommended ones selected) ==",
-            value="Select from a starter set of Stable Diffusion models from HuggingFace:",
-            begin_entry_at=2,
             editable=False,
             color="CONTROL",
         )
+        self.nextrely -= 1
+        self.add_widget_intelligent(
+            CenteredTitleText,
+            name="Select from a starter set of Stable Diffusion models from HuggingFace:",
+            editable=False,
+            labelColor="CAUTION",
+        )
+
         self.nextrely -= 1
         # if user has already installed some initial models, then don't patronize them
         # by showing more recommendations
@@ -121,16 +138,24 @@ class addModelsForm(npyscreen.FormMultiPage):
             relx=4,
             scroll_exit=True,
         )
+        self.add_widget_intelligent(
+            CenteredTitleText,
+            name='== IMPORT LOCAL AND REMOTE MODELS ==',
+            editable=False,
+            color="CONTROL",
+        )
+        self.nextrely -= 1
+
         for line in [
-            "== IMPORT LOCAL AND REMOTE MODELS ==",
-            "Enter URLs, file paths, or HuggingFace diffusers repository IDs separated by spaces.",
-            "Use control-V or shift-control-V to paste:",
+                "In the box below, enter URLs, file paths, or HuggingFace repository IDs.",
+                "Separate model names by lines or whitespace (Use shift-control-V to paste):",
         ]:
             self.add_widget_intelligent(
-                npyscreen.TitleText,
+                CenteredTitleText,
                 name=line,
                 editable=False,
-                color="CONTROL",
+                labelColor="CONTROL",
+                relx = 4,
             )
             self.nextrely -= 1
         self.import_model_paths = self.add_widget_intelligent(
@@ -184,15 +209,17 @@ class addModelsForm(npyscreen.FormMultiPage):
             button_length += len(back_label) + 1
             button_offset += len(back_label) + 1
             self.back_button = self.add_widget_intelligent(
-                npyscreen.ButtonPress,
+                OffsetButtonPress,
                 name=back_label,
                 relx=(window_width - button_length) // 2,
+                offset=-3,
                 rely=-3,
                 when_pressed_function=self.on_back,
             )
         self.ok_button = self.add_widget_intelligent(
-            npyscreen.ButtonPress,
+            OffsetButtonPress,
             name=done_label,
+            offset=+3,
             relx=button_offset + 1 + (window_width - button_length) // 2,
             rely=-3,
             when_pressed_function=self.on_ok,

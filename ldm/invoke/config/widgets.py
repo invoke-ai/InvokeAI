@@ -12,6 +12,38 @@ class IntSlider(npyscreen.Slider):
         stri = stri.rjust(l)
         return stri
 
+# -------------------------------------
+class CenteredTitleText(npyscreen.TitleText):
+    def __init__(self,*args,**keywords):
+        super().__init__(*args,**keywords)
+        self.resize()
+        
+    def resize(self):
+        super().resize()
+        maxy, maxx = self.parent.curses_pad.getmaxyx()
+        label = self.name
+        self.relx = (maxx - len(label)) // 2
+        begin_entry_at = -self.relx + 2
+    
+# -------------------------------------
+class CenteredButtonPress(npyscreen.ButtonPress):
+    def resize(self):
+        super().resize()
+        maxy, maxx = self.parent.curses_pad.getmaxyx()
+        label = self.name
+        self.relx = (maxx - len(label)) // 2
+    
+# -------------------------------------
+class OffsetButtonPress(npyscreen.ButtonPress):
+    def __init__(self, screen, offset=0, *args,  **keywords):
+        super().__init__(screen, *args, **keywords)
+        self.offset = offset
+        
+    def resize(self):
+        maxy, maxx = self.parent.curses_pad.getmaxyx()
+        width = len(self.name)
+        self.relx = self.offset + (maxx - width) // 2
+
 class IntTitleSlider(npyscreen.TitleText):
     _entry_type = IntSlider
 
