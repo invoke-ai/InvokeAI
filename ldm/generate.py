@@ -211,7 +211,7 @@ class Generate:
         Globals.full_precision = self.precision == "float32"
 
         if is_xformers_available():
-            if not Globals.disable_xformers:
+            if torch.cuda.is_available() and not Globals.disable_xformers:
                 print(">> xformers memory-efficient attention is available and enabled")
             else:
                 print(
@@ -221,9 +221,13 @@ class Generate:
             print(">> xformers not installed")
 
         # model caching system for fast switching
-        self.model_manager = ModelManager(mconfig, self.device, self.precision,
-                                          max_loaded_models=max_loaded_models,
-                                          sequential_offload=self.free_gpu_mem)
+        self.model_manager = ModelManager(
+            mconfig,
+            self.device,
+            self.precision,
+            max_loaded_models=max_loaded_models,
+            sequential_offload=self.free_gpu_mem,
+        )
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         model = model or fallback
@@ -246,7 +250,7 @@ class Generate:
         # load safety checker if requested
         if safety_checker:
             try:
-                print(">> Initializing safety checker")
+                print(">> Initializing NSFW checker")
                 from diffusers.pipelines.stable_diffusion.safety_checker import (
                     StableDiffusionSafetyChecker,
                 )
@@ -270,6 +274,8 @@ class Generate:
                     "** An error was encountered while installing the safety checker:"
                 )
                 print(traceback.format_exc())
+        else:
+            print(">> NSFW checker is disabled")
 
     def prompt2png(self, prompt, outdir, **kwargs):
         """

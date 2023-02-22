@@ -11,11 +11,13 @@ echo 1. command-line
 echo 2. browser-based UI
 echo 3. run textual inversion training
 echo 4. merge models (diffusers type only)
-echo 5. re-run the configure script to download new models
-echo 6. update InvokeAI
-echo 7. open the developer console
-echo 8. command-line help
-set /P restore="Please enter 1, 2, 3, 4, 5, 6, 7 or 8: [2] "
+echo 5. download and install models
+echo 6. change InvokeAI startup options
+echo 7. re-run the configure script to fix a broken install
+echo 8. open the developer console
+echo 9. update InvokeAI
+echo 10. command-line help
+set /P restore="Please enter 1-10: [2] "
 if not defined restore set restore=2
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
@@ -25,17 +27,20 @@ IF /I "%restore%" == "1" (
     python .venv\Scripts\invokeai.exe --web %*
 ) ELSE IF /I "%restore%" == "3" (
     echo Starting textual inversion training..
-    python .venv\Scripts\invokeai-ti.exe --gui %*
+    python .venv\Scripts\invokeai-ti.exe --gui
 ) ELSE IF /I "%restore%" == "4" (
     echo Starting model merging script..
-    python .venv\Scripts\invokeai-merge.exe --gui %*
+    python .venv\Scripts\invokeai-merge.exe --gui
 ) ELSE IF /I "%restore%" == "5" (
-    echo Running invokeai-configure...
-    python .venv\Scripts\invokeai-configure.exe %*
+    echo Running invokeai-model-install...
+    python .venv\Scripts\invokeai-model-install.exe
 ) ELSE IF /I "%restore%" == "6" (
-    echo Running invokeai-update...
-    python .venv\Scripts\invokeai-update.exe %*
+    echo Running invokeai-configure...
+    python .venv\Scripts\invokeai-configure.exe --skip-sd-weight --skip-support-models
 ) ELSE IF /I "%restore%" == "7" (
+    echo Running invokeai-configure...
+    python .venv\Scripts\invokeai-configure.exe --yes --default_only
+) ELSE IF /I "%restore%" == "8" (
     echo Developer Console
     echo Python command is:
     where python
@@ -47,7 +52,10 @@ IF /I "%restore%" == "1" (
     echo *************************
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
-) ELSE IF /I "%restore%" == "8" (
+) ELSE IF /I "%restore%" == "9" (
+   echo Running invokeai-update...
+   python .venv\Scripts\invokeai-update.exe %*
+) ELSE IF /I "%restore%" == "10" (
     echo Displaying command line help...
     python .venv\Scripts\invokeai.exe --help %*
     pause

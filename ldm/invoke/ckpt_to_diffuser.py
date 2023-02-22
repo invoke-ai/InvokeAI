@@ -803,6 +803,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         extract_ema:bool=True,
         upcast_attn:bool=False,
         vae:AutoencoderKL=None,
+        precision:torch.dtype=torch.float32,
         return_generator_pipeline:bool=False,
 )->Union[StableDiffusionPipeline,StableDiffusionGeneratorPipeline]:
     '''
@@ -828,6 +829,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
      checkpoints that have both EMA and non-EMA weights. Whether to extract the EMA weights
      or not. Defaults to `False`. Pass `True` to extract the EMA weights. EMA weights usually yield higher
      quality images for inference. Non-EMA weights are usually better to continue fine-tuning.
+    :param precision: precision to use - torch.float16, torch.float32 or torch.autocast
     :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
     running stable diffusion 2.1.
     '''
@@ -988,12 +990,12 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             safety_checker = StableDiffusionSafetyChecker.from_pretrained('CompVis/stable-diffusion-safety-checker',cache_dir=global_cache_dir("hub"))
             feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
             pipe = pipeline_class(
-                vae=vae,
-                text_encoder=text_model,
+                vae=vae.to(precision),
+                text_encoder=text_model.to(precision),
                 tokenizer=tokenizer,
-                unet=unet,
+                unet=unet.to(precision),
                 scheduler=scheduler,
-                safety_checker=safety_checker,
+                safety_checker=safety_checker.to(precision),
                 feature_extractor=feature_extractor,
             )
         else:

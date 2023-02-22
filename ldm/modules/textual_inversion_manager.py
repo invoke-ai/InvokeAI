@@ -8,6 +8,7 @@ import torch
 from picklescan.scanner import scan_file_path
 from transformers import CLIPTextModel, CLIPTokenizer
 
+from compel.embeddings_provider import BaseTextualInversionManager
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 
 
@@ -23,7 +24,7 @@ class TextualInversion:
         return self.embedding.shape[0]
 
 
-class TextualInversionManager:
+class TextualInversionManager(BaseTextualInversionManager):
     def __init__(
         self,
         tokenizer: CLIPTokenizer,
@@ -134,7 +135,7 @@ class TextualInversionManager:
 
     def _add_textual_inversion(
         self, trigger_str, embedding, defer_injecting_tokens=False
-    ) -> TextualInversion:
+    ) -> Optional[TextualInversion]:
         """
         Add a textual inversion to be recognised.
         :param trigger_str: The trigger text in the prompt that activates this textual inversion. If unknown to the embedder's tokenizer, will be added.
