@@ -7,10 +7,10 @@ get_uc_and_c_and_ec()           get the conditioned and unconditioned latent, an
 
 '''
 import re
-from typing import Union
+from typing import Union, Optional
 
 from compel import Compel
-from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute
+from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser
 from .devices import torch_dtype
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
@@ -27,8 +27,13 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
                     dtype_for_device_getter=torch_dtype)
 
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
-    positive_prompt = compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt = compel.parse_prompt_string(negative_prompt_string)
+    legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
+    positive_prompt: FlattenedPrompt|Blend
+    if legacy_blend is not None:
+        positive_prompt = legacy_blend
+    else:
+        positive_prompt = compel.parse_prompt_string(positive_prompt_string)
+    negative_prompt: FlattenedPrompt|Blend = compel.parse_prompt_string(negative_prompt_string)
 
     if log_tokens or getattr(Globals, "log_tokenization", False):
         log_tokenization(positive_prompt, negative_prompt, tokenizer=model.tokenizer)
@@ -155,3 +160,54 @@ def log_tokenization_for_text(text, tokenizer, display_label=None):
     if discarded != "":
         print(f'\n>> [TOKENLOG] Tokens Discarded ({totalTokens - usedTokens}):')
         print(f'{discarded}\x1b[0m')
+
+
+def try_parse_legacy_blend(text: str, skip_normalize: bool=False) -> Optional[Blend]:
+    weighted_subprompts = split_weighted_subprompts(text, skip_normalize=skip_normalize)
+    if len(weighted_subprompts) <= 1:
+        return None
+    strings = [x[0] for x in weighted_subprompts]
+    weights = [x[1] for x in weighted_subprompts]
+
+    pp = PromptParser()
+    parsed_conjunctions = [pp.parse_conjunction(x) for x in strings]
+    flattened_prompts = [x.prompts[0] for x in parsed_conjunctions]
+
+    return Blend(prompts=flattened_prompts, weights=weights, normalize_weights=not skip_normalize)
+
+
+def split_weighted_subprompts(text, skip_normalize=False)->list:
+    """
+    Legacy blend parsing.
+
+    grabs all text up to the first occurrence of ':'
+    uses the grabbed text as a sub-prompt, and takes the value following ':' as weight
+    if ':' has no value defined, defaults to 1.0
+    repeats until no text remaining
+    """
+    prompt_parser = re.compile("""
+            (?P<prompt>     # capture group for 'prompt'
+            (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
+            )               # end 'prompt'
+            (?:             # non-capture group
+            :+              # match one or more ':' characters
+            (?P<weight>     # capture group for 'weight'
+            -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
+            )?              # end weight capture group, make optional
+            \s*             # strip spaces after weight
+            |               # OR
+            $               # else, if no ':' then match end of line
+            )               # end non-capture group
+            """, re.VERBOSE)
+    parsed_prompts = [(match.group("prompt").replace("\\:", ":"), float(
+        match.group("weight") or 1)) for match in re.finditer(prompt_parser, text)]
+    if skip_normalize:
+        return parsed_prompts
+    weight_sum = sum(map(lambda x: x[1], parsed_prompts))
+    if weight_sum == 0:
+        print(
+            "* Warning: Subprompt weights add up to zero. Discarding and using even weights instead.")
+        equal_weight = 1 / max(len(parsed_prompts), 1)
+        return [(x[0], equal_weight) for x in parsed_prompts]
+    return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
+
