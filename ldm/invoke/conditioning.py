@@ -77,9 +77,6 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
 
 def get_prompt_structure(prompt_string, skip_normalize_legacy_blend: bool = False) -> (
     Union[FlattenedPrompt, Blend], FlattenedPrompt):
-    """
-    parse the passed-in prompt string and return tuple (positive_prompt, negative_prompt)
-    """
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
     legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
     positive_prompt: FlattenedPrompt|Blend
