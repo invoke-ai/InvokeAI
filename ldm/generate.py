@@ -980,7 +980,7 @@ class Generate:
                         ti_path, defer_injecting_tokens=True
                     )
             print(
-                f'>> Textual inversion triggers: {", ".join(self.model.textual_inversion_manager.get_all_trigger_strings())}'
+                f'>> Textual inversion triggers: {", ".join(sorted(self.model.textual_inversion_manager.get_all_trigger_strings()))}'
             )
 
         self.model_name = model_name
