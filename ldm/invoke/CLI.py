@@ -5,9 +5,11 @@ import sys
 import traceback
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Union
 
 import click
+
+from compel import PromptParser
 
 if sys.platform == "darwin":
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
@@ -15,6 +17,7 @@ if sys.platform == "darwin":
 import pyparsing  # type: ignore
 
 import ldm.invoke
+
 from ..generate import Generate
 from .args import (Args, dream_cmd_from_png, metadata_dumps,
                              metadata_from_png)
@@ -24,7 +27,6 @@ from .image_util import make_grid
 from .log import write_log
 from .model_manager import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
-from .prompt_parser import PromptParser
 from .readline import Completer, get_completer
 from ..util import url_attachment_name
 
@@ -82,6 +84,7 @@ def main():
     import transformers  # type: ignore
 
     from ldm.generate import Generate
+
     transformers.logging.set_verbosity_error()
     import diffusers
 
@@ -154,11 +157,14 @@ def main():
         report_model_error(opt, e)
 
     # try to autoconvert new models
-    # autoimport new .ckpt files
+    if path := opt.autoimport:
+        gen.model_manager.heuristic_import(
+            str(path), convert=False, commit_to_conf=opt.conf
+        )
+
     if path := opt.autoconvert:
-        gen.model_manager.autoconvert_weights(
-            conf_path=opt.conf,
-            weights_directory=path,
+        gen.model_manager.heuristic_import(
+            str(path), convert=True, commit_to_conf=opt.conf
         )
 
     # web server loops forever
@@ -528,32 +534,25 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
                 "** please provide (1) a URL to a .ckpt file to import; (2) a local path to a .ckpt file; or (3) a diffusers repository id in the form stabilityai/stable-diffusion-2-1"
             )
         else:
-            import_model(path[1], gen, opt, completer)
-        completer.add_history(command)
+            try:
+                import_model(path[1], gen, opt, completer)
+                completer.add_history(command)
+            except KeyboardInterrupt:
+                print('\n')
         operation = None
 
-    elif command.startswith("!convert"):
+    elif command.startswith(("!convert","!optimize")):
         path = shlex.split(command)
         if len(path) < 2:
             print("** please provide the path to a .ckpt or .safetensors model")
-        elif not os.path.exists(path[1]):
-            print(f"** {path[1]}: model not found")
         else:
-            optimize_model(path[1], gen, opt, completer)
-        completer.add_history(command)
+            try:
+                convert_model(path[1], gen, opt, completer)
+                completer.add_history(command)
+            except KeyboardInterrupt:
+                print('\n')
         operation = None
-
-    elif command.startswith("!optimize"):
-        path = shlex.split(command)
-        if len(path) < 2:
-            print("** please provide an installed model name")
-        elif not path[1] in gen.model_manager.list_models():
-            print(f"** {path[1]}: model not found")
-        else:
-            optimize_model(path[1], gen, opt, completer)
-        completer.add_history(command)
-        operation = None
-
+ 
     elif command.startswith("!edit"):
         path = shlex.split(command)
         if len(path) < 2:
@@ -625,190 +624,69 @@ def set_default_output_dir(opt: Args, completer: Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def import_model(model_path: str, gen, opt, completer):
+def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
     """
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path;
     (3) a huggingface repository id; or (4) a local directory containing a
     diffusers model.
     """
-    model_path = model_path.replace('\\','/') # windows
+    model_path = model_path.replace("\\", "/")  # windows
+    default_name = Path(model_path).stem
     model_name = None
+    model_desc = None
 
-    if model_path.startswith(("http:", "https:", "ftp:")):
-        model_name = import_ckpt_model(model_path, gen, opt, completer)
-
-    elif (
-        os.path.exists(model_path)
-        and model_path.endswith((".ckpt", ".safetensors"))
-        and os.path.isfile(model_path)
+    if (
+        Path(model_path).is_dir()
+        and not (Path(model_path) / "model_index.json").exists()
     ):
-        model_name = import_ckpt_model(model_path, gen, opt, completer)
-
-    elif os.path.isdir(model_path):
-        # Allow for a directory containing multiple models.
-        models = list(Path(model_path).rglob("*.ckpt")) + list(
-            Path(model_path).rglob("*.safetensors")
-        )
-
-        if models:
-            # Only the last model name will be used below.
-            for model in sorted(models):
-                if click.confirm(f"Import {model.stem} ?", default=True):
-                    model_name = import_ckpt_model(model, gen, opt, completer)
-                    print()
-        else:
-            model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
-
-    elif re.match(r"^[\w.+-]+/[\w.+-]+$", model_path):
-        model_name = import_diffuser_model(model_path, gen, opt, completer)
-
+        pass
     else:
-        print(
-            f"** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can't import."
-        )
+        if model_path.startswith(('http:','https:')):
+            try:
+                default_name = url_attachment_name(model_path)
+                default_name = Path(default_name).stem
+            except Exception as e:
+                print(f'** URL: {str(e)}')
+            model_name, model_desc = _get_model_name_and_desc(
+                gen.model_manager,
+                completer,
+                model_name=default_name,
+            )
+    imported_name = gen.model_manager.heuristic_import(
+        model_path,
+        model_name=model_name,
+        description=model_desc,
+        convert=convert,
+    )
 
-    if not model_name:
+    if not imported_name:
+        print("** Import failed or was skipped")
         return
 
-    if not _verify_load(model_name, gen):
+    if not _verify_load(imported_name, gen):
         print("** model failed to load. Discarding configuration entry")
-        gen.model_manager.del_model(model_name)
+        gen.model_manager.del_model(imported_name)
         return
-    if click.confirm('Make this the default model?', default=False):
-        gen.model_manager.set_default_model(model_name)
+    if click.confirm("Make this the default model?", default=False):
+        gen.model_manager.set_default_model(imported_name)
 
     gen.model_manager.commit(opt.conf)
     completer.update_models(gen.model_manager.list_models())
     print(f">> {model_name} successfully installed")
 
-
-def import_checkpoint_list(models: List[Path], gen, opt, completer)->List[str]:
-    '''
-    Does a mass import of all the checkpoint/safetensors on a path list
-    '''
-    model_names = list()
-    choice = input('** Directory of checkpoint/safetensors models detected. Install <a>ll or <s>elected models? [a] ') or 'a'
-    do_all = choice.startswith('a')
-    if do_all:
-        config_file = _ask_for_config_file(models[0], completer, plural=True)
-        manager = gen.model_manager
-        for model in sorted(models):
-            model_name = f'{model.stem}'
-            model_description = f'Imported model {model_name}'
-            if model_name in manager.model_names():
-                print(f'** {model_name} is already imported. Skipping.')
-            elif manager.import_ckpt_model(
-                    model,
-                    config = config_file,
-                    model_name = model_name,
-                    model_description = model_description,
-                    commit_to_conf = opt.conf):
-                model_names.append(model_name)
-                print(f'>> Model {model_name} imported successfully')
-            else:
-                print(f'** Model {model} failed to import')
-    else:
-        for model in sorted(models):
-            if click.confirm(f'Import {model.stem} ?', default=True):
-                if model_name := import_ckpt_model(model, gen, opt, completer):
-                    print(f'>> Model {model.stem} imported successfully')
-                    model_names.append(model_name)
-                else:
-                    print(f'** Model {model} failed to import')
-                print()
-    return model_names
-
-def import_diffuser_model(
-    path_or_repo: Union[Path, str], gen, _, completer
-) -> Optional[str]:
-    path_or_repo = path_or_repo.replace('\\','/') # windows
-    manager = gen.model_manager
-    default_name = Path(path_or_repo).stem
-    default_description = f"Imported model {default_name}"
-    model_name, model_description = _get_model_name_and_desc(
-        manager,
-        completer,
-        model_name=default_name,
-        model_description=default_description,
-    )
-    vae = None
-    if click.confirm('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"?', default=False):
-        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
-
-    if not manager.import_diffuser_model(
-        path_or_repo, model_name=model_name, vae=vae, description=model_description
-    ):
-        print("** model failed to import")
-        return None
-    return model_name
-
-def import_ckpt_model(
-    path_or_url: Union[Path, str], gen, opt, completer
-) -> Optional[str]:
-    path_or_url = path_or_url.replace('\\','/')
-    manager = gen.model_manager
-    is_a_url = str(path_or_url).startswith(('http:','https:'))
-    base_name = Path(url_attachment_name(path_or_url)).name if is_a_url else Path(path_or_url).name
-    default_name = Path(base_name).stem
-    default_description = f"Imported model {default_name}"
-
-    model_name, model_description = _get_model_name_and_desc(
-        manager,
-        completer,
-        model_name=default_name,
-        model_description=default_description,
-    )
-    config_file = None
-    default = (
-        Path(Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml")
-        if re.search("inpaint", default_name, flags=re.IGNORECASE)
-        else Path(Globals.root, "configs/stable-diffusion/v1-inference.yaml")
-    )
-
-    completer.complete_extensions((".yaml", ".yml"))
-    completer.set_line(str(default))
-    done = False
-    while not done:
-        config_file = input("Configuration file for this model: ").strip()
-        done = os.path.exists(config_file)
-
-    completer.complete_extensions((".ckpt", ".safetensors"))
-    vae = None
-    default = Path(
-        Globals.root, "models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt"
-    )
-    completer.set_line(str(default))
-    done = False
-    while not done:
-        vae = input("VAE file for this model (leave blank for none): ").strip() or None
-        done = (not vae) or os.path.exists(vae)
-    completer.complete_extensions(None)
-
-    if not manager.import_ckpt_model(
-        path_or_url,
-        config=config_file,
-        vae=vae,
-        model_name=model_name,
-        model_description=model_description,
-        commit_to_conf=opt.conf,
-    ):
-        print("** model failed to import")
-        return None
-
-    return model_name
-
-
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")
     current_model = gen.model_name
     try:
-        if not gen.model_manager.get_model(model_name):
+        if not gen.set_model(model_name):
             return False
     except Exception as e:
-        print(f'** model failed to load: {str(e)}')
-        print('** note that importing 2.X checkpoints is not supported. Please use !convert_model instead.')
+        print(f"** model failed to load: {str(e)}")
+        print(
+            "** note that importing 2.X checkpoints is not supported. Please use !convert_model instead."
+        )
         return False
-    if click.confirm('Keep model loaded?', default=True):
+    if click.confirm("Keep model loaded?", default=True):
         gen.set_model(model_name)
     else:
         print(">> Restoring previous model")
@@ -820,6 +698,7 @@ def _get_model_name_and_desc(
     model_manager, completer, model_name: str = "", model_description: str = ""
 ):
     model_name = _get_model_name(model_manager.list_models(), completer, model_name)
+    model_description = model_description or f"Imported model {model_name}"
     completer.set_line(model_description)
     model_description = (
         input(f"Description for this model [{model_description}]: ").strip()
@@ -827,46 +706,11 @@ def _get_model_name_and_desc(
     )
     return model_name, model_description
 
-def _ask_for_config_file(model_path: Union[str,Path], completer, plural: bool=False)->Path:
-    default = '1'
-    if re.search('inpaint',str(model_path),flags=re.IGNORECASE):
-        default = '3'
-    choices={
-        '1': 'v1-inference.yaml',
-        '2': 'v2-inference-v.yaml',
-        '3': 'v1-inpainting-inference.yaml',
-    }
-
-    prompt = '''What type of models are these?:
-[1] Models based on Stable Diffusion 1.X
-[2] Models based on Stable Diffusion 2.X
-[3] Inpainting models based on Stable Diffusion 1.X
-[4] Something else''' if plural else '''What type of model is this?:
-[1] A model based on Stable Diffusion 1.X
-[2] A model based on Stable Diffusion 2.X
-[3] An inpainting models based on Stable Diffusion 1.X
-[4] Something else'''
-    print(prompt)
-    choice = input(f'Your choice: [{default}] ')
-    choice = choice.strip() or default
-    if config_file := choices.get(choice,None):
-        return Path('configs','stable-diffusion',config_file)
-
-    # otherwise ask user to select
-    done = False
-    completer.complete_extensions(('.yaml','.yml'))
-    completer.set_line(str(Path(Globals.root,'configs/stable-diffusion/')))
-    while not done:
-        config_path = input('Configuration file for this model (leave blank to abort): ').strip()
-        done = not config_path or os.path.exists(config_path)
-    return config_path
-
-def optimize_model(model_name_or_path: Union[Path,str], gen, opt, completer):
-    model_name_or_path = model_name_or_path.replace('\\','/') # windows
+def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> str:
+    model_name_or_path = model_name_or_path.replace("\\", "/")  # windows
     manager = gen.model_manager
     ckpt_path = None
-    original_config_file=None
-
+    original_config_file = None
     if model_name_or_path == gen.model_name:
         print("** Can't convert the active model. !switch to another model first. **")
         return
@@ -876,61 +720,39 @@ def optimize_model(model_name_or_path: Union[Path,str], gen, opt, completer):
             original_config_file = Path(model_info["config"])
             model_name = model_name_or_path
             model_description = model_info["description"]
+            vae = model_info["vae"]
         else:
             print(f"** {model_name_or_path} is not a legacy .ckpt weights file")
             return
-    elif os.path.exists(model_name_or_path):
-        original_config_file = original_config_file or _ask_for_config_file(model_name_or_path, completer)
-        if not original_config_file:
-            return
-        ckpt_path = Path(model_name_or_path)
-        model_name, model_description = _get_model_name_and_desc(
-            manager, completer, ckpt_path.stem, f"Converted model {ckpt_path.stem}"
+        if vae_repo := ldm.invoke.model_manager.VAE_TO_REPO_ID.get(Path(vae).stem):
+            vae_repo = dict(repo_id=vae_repo)
+        else:
+            vae_repo = None
+        model_name = manager.convert_and_import(
+            ckpt_path,
+            diffusers_path=Path(
+                Globals.root, "models", Globals.converted_ckpts_dir, model_name_or_path
+            ),
+            model_name=model_name,
+            model_description=model_description,
+            original_config_file=original_config_file,
+            vae=vae_repo,
         )
     else:
-        print(
-            f"** {model_name_or_path} is neither an existing model nor the path to a .ckpt file"
-        )
+        try:
+            model_name = import_model(model_name_or_path, gen, opt, completer, convert=True)
+        except KeyboardInterrupt:
+            return
+
+    if not model_name:
+        print("** Conversion failed. Aborting.")
         return
 
-    if not ckpt_path.is_absolute():
-        ckpt_path = Path(Globals.root, ckpt_path)
-
-    if original_config_file and not original_config_file.is_absolute():
-        original_config_file = Path(Globals.root, original_config_file)
-
-    diffuser_path = Path(
-        Globals.root, "models", Globals.converted_ckpts_dir, model_name
-    )
-    if diffuser_path.exists():
-        print(
-            f"** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again."
-        )
-        return
-
-    vae = None
-    if click.confirm('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"?', default=False):
-        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
-
-    new_config = gen.model_manager.convert_and_import(
-        ckpt_path,
-        diffuser_path,
-        model_name=model_name,
-        model_description=model_description,
-        vae=vae,
-        original_config_file=original_config_file,
-        commit_to_conf=opt.conf,
-    )
-    if not new_config:
-        return
-
-    completer.update_models(gen.model_manager.list_models())
-    if click.confirm(f'Load optimized model {model_name}?', default=True):
-        gen.set_model(model_name)
-
-    if click.confirm(f'Delete the original .ckpt file at {ckpt_path}?',default=False):
+    manager.commit(opt.conf)    
+    if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
         print(f"{ckpt_path} deleted")
+    return model_name
 
 
 def del_config(model_name: str, gen, opt, completer):
@@ -942,11 +764,15 @@ def del_config(model_name: str, gen, opt, completer):
         print(f"** Unknown model {model_name}")
         return
 
-    if not click.confirm(f'Remove {model_name} from the list of models known to InvokeAI?',default=True):
+    if not click.confirm(
+        f"Remove {model_name} from the list of models known to InvokeAI?", default=True
+    ):
         return
 
-    delete_completely = click.confirm('Completely remove the model file or directory from disk?',default=False)
-    gen.model_manager.del_model(model_name,delete_files=delete_completely)
+    delete_completely = click.confirm(
+        "Completely remove the model file or directory from disk?", default=False
+    )
+    gen.model_manager.del_model(model_name, delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
     print(f"** {model_name} deleted")
     completer.update_models(gen.model_manager.list_models())
@@ -969,13 +795,30 @@ def edit_model(model_name: str, gen, opt, completer):
         completer.set_line(info[attribute])
         info[attribute] = input(f"{attribute}: ") or info[attribute]
 
+    if info["format"] == "diffusers":
+        vae = info.get("vae", dict(repo_id=None, path=None, subfolder=None))
+        completer.set_line(vae.get("repo_id") or "stabilityai/sd-vae-ft-mse")
+        vae["repo_id"] = input("External VAE repo_id: ").strip() or None
+        if not vae["repo_id"]:
+            completer.set_line(vae.get("path") or "")
+            vae["path"] = (
+                input("Path to a local diffusers VAE model (usually none): ").strip()
+                or None
+            )
+        completer.set_line(vae.get("subfolder") or "")
+        vae["subfolder"] = (
+            input("Name of subfolder containing the VAE model (usually none): ").strip()
+            or None
+        )
+        info["vae"] = vae
+
     if new_name != model_name:
         manager.del_model(model_name)
 
     # this does the update
     manager.add_model(new_name, info, True)
 
-    if click.confirm('Make this the default model?',default=False):
+    if click.confirm("Make this the default model?", default=False):
         manager.set_default_model(new_name)
     manager.commit(opt.conf)
     completer.update_models(manager.list_models())
@@ -1353,7 +1196,10 @@ def report_model_error(opt: Namespace, e: Exception):
             "** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
         )
     else:
-        if click.confirm('Do you want to run invokeai-configure script to select and/or reinstall models?', default=True):
+        if not click.confirm(
+                'Do you want to run invokeai-configure script to select and/or reinstall models?',
+                default=False
+        ):
             return
 
     print("invokeai-configure is launching....\n")

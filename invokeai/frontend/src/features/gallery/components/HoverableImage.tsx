@@ -8,8 +8,6 @@ import {
   setAllImageToImageParameters,
   setAllParameters,
   setInitialImage,
-  setNegativePrompt,
-  setPrompt,
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { DragEvent, memo, useState } from 'react';
@@ -18,7 +16,6 @@ import DeleteImageModal from './DeleteImageModal';
 
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as InvokeAI from 'app/invokeai';
-import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
@@ -26,6 +23,7 @@ import {
 import { hoverableImageSelector } from 'features/gallery/store/gallerySelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
+import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -55,23 +53,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
-
   const { t } = useTranslation();
+  const setBothPrompts = useSetBothPrompts();
 
   const handleMouseOver = () => setIsHovered(true);
 
   const handleMouseOut = () => setIsHovered(false);
 
   const handleUsePrompt = () => {
-    if (image.metadata) {
-      const [prompt, negativePrompt] = getPromptAndNegative(
-        image.metadata?.image?.prompt
-      );
-
-      prompt && dispatch(setPrompt(prompt));
-      negativePrompt
-        ? dispatch(setNegativePrompt(negativePrompt))
-        : dispatch(setNegativePrompt(''));
+    if (image.metadata?.image?.prompt) {
+      setBothPrompts(image.metadata?.image?.prompt);
     }
 
     toast({

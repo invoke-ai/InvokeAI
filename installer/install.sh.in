@@ -9,13 +9,16 @@ cd $scriptdir
 function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 
 MINIMUM_PYTHON_VERSION=3.9.0
+MAXIMUM_PYTHON_VERSION=3.11.0
 PYTHON=""
-for candidate in python3.10 python3.9 python3 python python3.11 ; do
+for candidate in python3.10 python3.9 python3 python ; do
     if ppath=`which $candidate`; then
         python_version=$($ppath -V | awk '{ print $2 }')
         if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
-            PYTHON=$ppath
-            break
+	    if [ $(version $python_version) -lt $(version "$MAXIMUM_PYTHON_VERSION") ]; then
+		PYTHON=$ppath
+		break
+	    fi
         fi
     fi
 done
@@ -28,3 +31,4 @@ if [ -z "$PYTHON" ]; then
 fi
 
 exec $PYTHON ./lib/main.py ${@}
+read -p "Press any key to exit"

@@ -93,11 +93,13 @@ import shlex
 import sys
 from argparse import Namespace
 from pathlib import Path
+from typing import List
 
 import ldm.invoke
 import ldm.invoke.pngwriter
+from ldm.invoke.conditioning import split_weighted_subprompts
+
 from ldm.invoke.globals import Globals
-from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 APP_ID = ldm.invoke.__app_id__
 APP_NAME = ldm.invoke.__app_name__
@@ -172,10 +174,10 @@ class Args(object):
         self._arg_switches = self.parse_cmd('')   # fill in defaults
         self._cmd_switches = self.parse_cmd('')   # fill in defaults
 
-    def parse_args(self):
+    def parse_args(self, args: List[str]=None):
         '''Parse the shell switches and store.'''
+        sysargs = args if args is not None else sys.argv[1:]
         try:
-            sysargs = sys.argv[1:]
             # pre-parse before we do any initialization to get root directory
             # and intercept --version request
             switches = self._arg_parser.parse_args(sysargs)
@@ -539,10 +541,16 @@ class Args(object):
             help='Check for and blur potentially NSFW images. Use --no-nsfw_checker to disable.',
         )
         model_group.add_argument(
+            '--autoimport',
+            default=None,
+            type=str,
+            help='Check the indicated directory for .ckpt/.safetensors weights files at startup and import directly',
+        )
+        model_group.add_argument(
             '--autoconvert',
             default=None,
             type=str,
-            help='Check the indicated directory for .ckpt weights files at startup and import as optimized diffuser models',
+            help='Check the indicated directory for .ckpt/.safetensors weights files at startup and import as optimized diffuser models',
         )
         model_group.add_argument(
             '--patchmatch',
@@ -560,8 +568,8 @@ class Args(object):
             '--outdir',
             '-o',
             type=str,
-            help='Directory to save generated images and a log of prompts and seeds. Default: outputs/img-samples',
-            default='outputs/img-samples',
+            help='Directory to save generated images and a log of prompts and seeds. Default: ROOTDIR/outputs',
+            default='outputs',
         )
         file_group.add_argument(
             '--prompt_as_dir',
