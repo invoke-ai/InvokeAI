@@ -67,6 +67,9 @@ def install_requested_models(
         purge_deleted: bool = False,
         config_file_path: Path = None,
 ):
+    '''
+    Entry point for installing/deleting starter models, or installing external models.
+    '''
     config_file_path=config_file_path or default_config_file()
     if not config_file_path.exists():
         open(config_file_path,'w')
@@ -124,7 +127,7 @@ def install_requested_models(
                         output.writelines([line])
                 output.writelines([f'{argument} {str(scan_directory)}'])
         os.replace(replacement,initfile)
-            
+
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
     default = "y" if default_yes else "n"

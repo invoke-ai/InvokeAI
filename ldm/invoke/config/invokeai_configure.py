@@ -8,7 +8,6 @@
 #
 print("Loading Python libraries...\n")
 import argparse
-import curses
 import io
 import os
 import re
@@ -19,6 +18,7 @@ import warnings
 from argparse import Namespace
 from pathlib import Path
 from urllib import request
+from shutil import get_terminal_size
 
 import npyscreen
 import torch
@@ -46,7 +46,8 @@ from .model_install_backend import (
     recommended_datasets,
     hf_download_with_resume,
 )
-from .widgets import IntTitleSlider, CenteredButtonPress
+from .widgets import IntTitleSlider, CenteredButtonPress, set_min_terminal_size
+
 
 warnings.filterwarnings("ignore")
 
@@ -63,6 +64,10 @@ Default_config_file = Path(global_config_dir()) / "models.yaml"
 SD_Configs = Path(global_config_dir()) / "stable-diffusion"
 
 Datasets = OmegaConf.load(Dataset_path)
+
+# minimum size for the UI
+MIN_COLS = 120
+MIN_LINES = 45
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -109,8 +114,6 @@ Add the '--help' argument to see all of the command-line switches available for 
 
 # ---------------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
-    completer.set_options(["yes", "no"])
-    completer.complete_extensions(None)  # turn off path-completion mode
     default = "y" if default_yes else "n"
     response = input(f"{prompt} [{default}] ") or default
     if default_yes:
@@ -332,8 +335,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         old_opts = self.parentApp.invokeai_opts
         first_time = not (Globals.root / Globals.initfile).exists()
         access_token = HfFolder.get_token()
-
-        window_height, window_width = curses.initscr().getmaxyx()
+        window_width,window_height = get_terminal_size()
         for i in [
             "Configure startup settings. You can come back and change these later.",
             "Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.",
@@ -676,13 +678,14 @@ def run_console_ui(
 ) -> (Namespace, Namespace):
     # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
+
+    set_min_terminal_size(MIN_COLS, MIN_LINES)
     editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     if editApp.user_cancelled:
         return (None, None)
     else:
         return (editApp.new_opts, editApp.user_selections)
-
 
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):

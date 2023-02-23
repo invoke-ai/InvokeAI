@@ -346,7 +346,21 @@ class InvokeAiInstance:
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
         # this may change in the future with config refactoring!
-        invokeai_configure.main()
+        succeeded = False
+        try:
+            invokeai_configure.main()
+            succeeded = True
+        except ConnectionError as e:
+            print(f'A network error was encountered during configuration and download: {str(e)}')
+        except OSError as e:
+            print(f'An OS error was encountered during configuration and download: {str(e)}')
+        except Exception as e:
+            print(f'A problem was encountered during the configuration and download steps: {str(e)}')
+        finally:
+            if not succeeded:
+                print('You may be able to finish the process by launching "invoke.sh" or "invoke.bat"')
+                print('from within the "invokeai" directory, and choosing options 5 and/or 6.')
+                print('Alternatively you can relaunch the installer.')
 
     def install_user_scripts(self):
         """
