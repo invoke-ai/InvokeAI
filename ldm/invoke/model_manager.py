@@ -640,7 +640,7 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
-        model_description = model_description or f"imported diffusers model {model_name}"
+        model_description = model_description or f"Imported diffusers model {model_name}"
         new_config = dict(
             description=model_description,
             vae=vae,
@@ -699,7 +699,7 @@ class ModelManager(object):
             model_name or Path(weights).stem
         )  # note this gives ugly pathnames if used on a URL without a Content-Disposition header
         model_description = (
-            model_description or f"imported stable diffusion weights file {model_name}"
+            model_description or f"Imported stable diffusion weights file {model_name}"
         )
         new_config = dict(
             weights=str(weights_path),
@@ -835,7 +835,7 @@ class ModelManager(object):
                 thing, commit_to_conf=commit_to_conf
             )
             pipeline, _, _, _ = self._load_diffusers_model(self.config[model_name])
-
+            return model_name
         else:
             print(
                 f"** {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id"

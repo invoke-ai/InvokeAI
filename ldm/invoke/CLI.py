@@ -672,7 +672,7 @@ def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
 
     gen.model_manager.commit(opt.conf)
     completer.update_models(gen.model_manager.list_models())
-    print(f">> {model_name} successfully installed")
+    print(f">> {imported_name} successfully installed")
 
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")
