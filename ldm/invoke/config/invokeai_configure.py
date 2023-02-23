@@ -8,7 +8,6 @@
 #
 print("Loading Python libraries...\n")
 import argparse
-import curses
 import io
 import os
 import re
@@ -19,6 +18,7 @@ import warnings
 from argparse import Namespace
 from pathlib import Path
 from urllib import request
+from shutil import get_terminal_size
 
 import npyscreen
 import torch
@@ -46,7 +46,8 @@ from .model_install_backend import (
     recommended_datasets,
     hf_download_with_resume,
 )
-from .widgets import IntTitleSlider, CenteredButtonPress
+from .widgets import IntTitleSlider, CenteredButtonPress, set_min_terminal_size
+
 
 warnings.filterwarnings("ignore")
 
@@ -63,6 +64,10 @@ Default_config_file = Path(global_config_dir()) / "models.yaml"
 SD_Configs = Path(global_config_dir()) / "stable-diffusion"
 
 Datasets = OmegaConf.load(Dataset_path)
+
+# minimum size for the UI
+MIN_COLS = 135
+MIN_LINES = 45
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -109,8 +114,6 @@ Add the '--help' argument to see all of the command-line switches available for 
 
 # ---------------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
-    completer.set_options(["yes", "no"])
-    completer.complete_extensions(None)  # turn off path-completion mode
     default = "y" if default_yes else "n"
     response = input(f"{prompt} [{default}] ") or default
     if default_yes:
@@ -162,7 +165,6 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         print(f"Installing {label} model file {model_url}...", end="", file=sys.stderr)
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-            print("", file=sys.stderr)
             request.urlretrieve(
                 model_url, model_dest, ProgressBar(os.path.basename(model_dest))
             )
@@ -180,26 +182,22 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
 def download_bert():
     print(
         "Installing bert tokenizer...",
-        end="",
-        file=sys.stderr,
+        file=sys.stderr
     )
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         from transformers import BertTokenizerFast
-
         download_from_hf(BertTokenizerFast, "bert-base-uncased")
-        print("...success", file=sys.stderr)
 
 
 # ---------------------------------------------
 def download_clip():
     print("Installing CLIP model...", file=sys.stderr)
     version = "openai/clip-vit-large-patch14"
-    print("Tokenizer...", file=sys.stderr, end="")
+    print("Tokenizer...", file=sys.stderr)
     download_from_hf(CLIPTokenizer, version)
-    print("Text model...", file=sys.stderr, end="")
+    print("Text model...", file=sys.stderr)
     download_from_hf(CLIPTextModel, version)
-    print("...success", file=sys.stderr)
 
 
 # ---------------------------------------------
@@ -252,7 +250,7 @@ def download_codeformer():
 
 # ---------------------------------------------
 def download_clipseg():
-    print("Installing clipseg model for text-based masking...", end="", file=sys.stderr)
+    print("Installing clipseg model for text-based masking...", file=sys.stderr)
     CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
     try:
         download_from_hf(AutoProcessor, CLIPSEG_MODEL)
@@ -260,7 +258,6 @@ def download_clipseg():
     except Exception:
         print("Error installing clipseg model:")
         print(traceback.format_exc())
-    print("...success", file=sys.stderr)
 
 
 # -------------------------------------
@@ -276,15 +273,14 @@ def download_safety_checker():
         print(traceback.format_exc())
         return
     safety_model_id = "CompVis/stable-diffusion-safety-checker"
-    print("AutoFeatureExtractor...", end="", file=sys.stderr)
+    print("AutoFeatureExtractor...", file=sys.stderr)
     download_from_hf(AutoFeatureExtractor, safety_model_id)
-    print("StableDiffusionSafetyChecker...", end="", file=sys.stderr)
+    print("StableDiffusionSafetyChecker...", file=sys.stderr)
     download_from_hf(StableDiffusionSafetyChecker, safety_model_id)
-    print("...success", file=sys.stderr)
 
 
 # -------------------------------------
-def download_vaes(precision: str):
+def download_vaes():
     print("Installing stabilityai VAE...", file=sys.stderr)
     try:
         # first the diffusers version
@@ -292,8 +288,6 @@ def download_vaes(precision: str):
         args = dict(
             cache_dir=global_cache_dir("diffusers"),
         )
-        if precision == "float16":
-            args.update(torch_dtype=torch.float16, revision="fp16")
         if not AutoencoderKL.from_pretrained(repo_id, **args):
             raise Exception(f"download of {repo_id} failed")
 
@@ -306,7 +300,6 @@ def download_vaes(precision: str):
             model_dir=str(Globals.root / Model_dir / Weights_dir),
         ):
             raise Exception(f"download of {model_name} failed")
-        print("...downloaded successfully", file=sys.stderr)
     except Exception as e:
         print(f"Error downloading StabilityAI standard VAE: {str(e)}", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
@@ -332,8 +325,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         old_opts = self.parentApp.invokeai_opts
         first_time = not (Globals.root / Globals.initfile).exists()
         access_token = HfFolder.get_token()
-
-        window_height, window_width = curses.initscr().getmaxyx()
+        window_width,window_height = get_terminal_size()
         for i in [
             "Configure startup settings. You can come back and change these later.",
             "Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.",
@@ -676,13 +668,14 @@ def run_console_ui(
 ) -> (Namespace, Namespace):
     # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
+
+    set_min_terminal_size(MIN_COLS, MIN_LINES)
     editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     if editApp.user_cancelled:
         return (None, None)
     else:
         return (editApp.new_opts, editApp.user_selections)
-
 
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):
@@ -703,6 +696,9 @@ def write_opts(opts: Namespace, init_file: Path):
     args_to_skip = re.compile(
         "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
     )
+    # fix windows paths
+    opts.outdir = opts.outdir.replace('\\','/')
+    opts.embedding_path = opts.embedding_path.replace('\\','/')
     new_file = f"{init_file}.new"
     try:
         lines = [x.strip() for x in open(init_file, "r").readlines()]
@@ -842,7 +838,7 @@ def main():
             download_codeformer()
             download_clipseg()
             download_safety_checker()
-            download_vaes(init_options.precision)
+            download_vaes()
 
         if opt.skip_sd_weights:
             print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
@@ -853,10 +849,6 @@ def main():
         postscript(errors=errors)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
-    except Exception as e:
-        print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
-        print(traceback.format_exc())
-
 
 # -------------------------------------
 if __name__ == "__main__":

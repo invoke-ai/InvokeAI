@@ -67,6 +67,9 @@ def install_requested_models(
         purge_deleted: bool = False,
         config_file_path: Path = None,
 ):
+    '''
+    Entry point for installing/deleting starter models, or installing external models.
+    '''
     config_file_path=config_file_path or default_config_file()
     if not config_file_path.exists():
         open(config_file_path,'w')
@@ -117,14 +120,15 @@ def install_requested_models(
         argument = '--autoconvert' if convert_to_diffusers else '--autoimport'
         initfile = Path(Globals.root, Globals.initfile)
         replacement = Path(Globals.root, f'{Globals.initfile}.new')
+        directory = str(scan_directory).replace('\\','/')
         with open(initfile,'r') as input:
             with open(replacement,'w') as output:
                 while line := input.readline():
                     if not line.startswith(argument):
                         output.writelines([line])
-                output.writelines([f'{argument} {str(scan_directory)}'])
+                output.writelines([f'{argument} {directory}'])
         os.replace(replacement,initfile)
-            
+
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
     default = "y" if default_yes else "n"
@@ -231,7 +235,6 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
 def download_from_hf(
     model_class: object, model_name: str, cache_subdir: Path = Path("hub"), **kwargs
 ):
-    print("", file=sys.stderr)  # to prevent tqdm from overwriting
     path = global_cache_dir(cache_subdir)
     model = model_class.from_pretrained(
         model_name,

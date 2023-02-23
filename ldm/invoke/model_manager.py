@@ -428,8 +428,6 @@ class ModelManager(object):
             torch.cuda.reset_peak_memory_stats()
             torch.cuda.empty_cache()
 
-        tic = time.time()
-
         # this does the work
         if not os.path.isabs(config):
             config = os.path.join(Globals.root, config)
@@ -642,21 +640,18 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
-        description = model_description or f"imported diffusers model {model_name}"
+        model_description = model_description or f"Imported diffusers model {model_name}"
         new_config = dict(
             description=model_description,
             vae=vae,
             format="diffusers",
         )
-        print(f"DEBUG: here i am 1")
         if isinstance(repo_or_path, Path) and repo_or_path.exists():
             new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
-        print(f"DEBUG: here i am 2")
 
         self.add_model(model_name, new_config, True)
-        print(f"DEBUG: config = {self.config}")
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name
@@ -704,7 +699,7 @@ class ModelManager(object):
             model_name or Path(weights).stem
         )  # note this gives ugly pathnames if used on a URL without a Content-Disposition header
         model_description = (
-            model_description or f"imported stable diffusion weights file {model_name}"
+            model_description or f"Imported stable diffusion weights file {model_name}"
         )
         new_config = dict(
             weights=str(weights_path),
@@ -840,7 +835,7 @@ class ModelManager(object):
                 thing, commit_to_conf=commit_to_conf
             )
             pipeline, _, _, _ = self._load_diffusers_model(self.config[model_name])
-
+            return model_name
         else:
             print(
                 f"** {thing}: Unknown thing. Please provide a URL, file path, directory or HuggingFace repo_id"

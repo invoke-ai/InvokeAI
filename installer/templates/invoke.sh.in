@@ -24,9 +24,11 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
+while true
+do
 if [ "$0" != "bash" ]; then
     echo "Do you want to generate images using the"
-    echo "1. command-line"
+    echo "1. command-line interface"
     echo "2. browser-based UI"
     echo "3. run textual inversion training"
     echo "4. merge models (diffusers type only)"
@@ -35,35 +37,36 @@ if [ "$0" != "bash" ]; then
     echo "7. re-run the configure script to fix a broken install"
     echo "8. open the developer console"
     echo "9. update InvokeAI"
-    echo "10. command-line help "
+    echo "10. command-line help"
+    echo "Q - Quit"
     echo ""
-    read -p "Please enter 1-10: [2] " yn
+    read -p "Please enter 1-10, Q: [2] " yn
     choice=${yn:='2'}
     case $choice in
         1)
             echo "Starting the InvokeAI command-line..."
-            exec invokeai $@
+            invokeai $@
             ;;
         2)
             echo "Starting the InvokeAI browser-based UI..."
-            exec invokeai --web $@
+            invokeai --web $@
             ;;
         3)
             echo "Starting Textual Inversion:"
-            exec invokeai-ti --gui $@
+            invokeai-ti --gui $@
             ;;
         4)
             echo "Merging Models:"
-            exec invokeai-merge --gui $@
+            invokeai-merge --gui $@
             ;;
         5)
-            exec invokeai-model-install --root ${INVOKEAI_ROOT}
+            invokeai-model-install --root ${INVOKEAI_ROOT}
             ;;
         6)
-            exec invokeai-configure --root ${INVOKEAI_ROOT} --skip-sd-weights --skip-support-models
+            invokeai-configure --root ${INVOKEAI_ROOT} --skip-sd-weights --skip-support-models
             ;;
         7)
-            exec invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only
+            invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only
 	    ;;
 	8)
 	    echo "Developer Console:"
@@ -72,10 +75,13 @@ if [ "$0" != "bash" ]; then
             ;;
         9)
 	    echo "Update:"
-            exec invokeai-update
+            invokeai-update
             ;;
         10)
-            exec invokeai --help
+            invokeai --help
+            ;;
+	[qQ])
+            exit 0
             ;;
         *)
             echo "Invalid selection"
@@ -86,3 +92,4 @@ else # in developer console
     echo "Press ^D to exit"
     export PS1="(InvokeAI) \u@\h \w> "
 fi
+done
