@@ -10,10 +10,8 @@ The work is actually done in backend code in model_install_backend.py.
 """
 
 import argparse
-import curses
 import os
 import sys
-import traceback
 from argparse import Namespace
 from pathlib import Path
 from typing import List
@@ -22,15 +20,23 @@ import npyscreen
 import torch
 from npyscreen import widget
 from omegaconf import OmegaConf
+from shutil import get_terminal_size
 
 from ..devices import choose_precision, choose_torch_device
 from ..globals import Globals, global_config_dir
 from .model_install_backend import (Dataset_path, default_config_file,
                                     default_dataset, get_root,
                                     install_requested_models,
-                                    recommended_datasets)
+                                    recommended_datasets,
+                                    )
 from .widgets import (MultiSelectColumns, TextBox,
-                      OffsetButtonPress, CenteredTitleText)
+                      OffsetButtonPress, CenteredTitleText,
+                      set_min_terminal_size,
+                      )
+
+# minimum size for the UI
+MIN_COLS = 120
+MIN_LINES = 45
 
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
@@ -50,7 +56,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
     def create(self):
-        window_height, window_width = curses.initscr().getmaxyx()
+        window_width, window_height = get_terminal_size()
         starter_model_labels = self._get_starter_model_labels()
         recommended_models = [
             x
@@ -249,7 +255,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         )
 
     def _get_starter_model_labels(self) -> List[str]:
-        window_height, window_width = curses.initscr().getmaxyx()
+        window_width, window_height = get_terminal_size()
         label_width = 25
         checkbox_width = 4
         spacing_width = 2
@@ -268,7 +274,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         ]
 
     def _get_columns(self) -> int:
-        window_height, window_width = curses.initscr().getmaxyx()
+        window_width, window_height = get_terminal_size()
         cols = (
             4
             if window_width > 240
@@ -362,7 +368,6 @@ class AddModelApplication(npyscreen.NPSAppManaged):
             "MAIN", addModelsForm, name="Install Stable Diffusion Models"
         )
 
-
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace, selections: Namespace):
     models_to_remove = [
@@ -409,6 +414,7 @@ def select_and_download_models(opt: Namespace):
             precision=precision,
         )
     else:
+        set_min_terminal_size(MIN_COLS, MIN_LINES)
         installApp = AddModelApplication()
         installApp.run()
 
@@ -475,7 +481,7 @@ def main():
         sys.exit(-1)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
-    except (widget.NotEnoughSpaceForWidget, Exception) as e:
+    except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
             print(
                 "** Insufficient vertical space for the interface. Please make your window taller and try again"
@@ -484,11 +490,6 @@ def main():
             print(
                 "** Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
-        else:
-            print(f"** An error has occurred: {str(e)}")
-            traceback.print_exc()
-        sys.exit(-1)
-
 
 # -------------------------------------
 if __name__ == "__main__":
