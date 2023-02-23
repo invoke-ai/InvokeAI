@@ -259,7 +259,7 @@ cleanup, testing, or code reviews, is very much encouraged to do so.
 
 To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board.
 
-If you'd like to help with localization, please register on [Weblate][translation status link]. If you want add a new language, please let us know which language and we will add it to the Weblate project.
+If you'd like to help with translation, please see our [translation guide](docs/other/TRANSLATION.md).
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a
