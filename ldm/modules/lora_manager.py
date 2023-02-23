@@ -273,45 +273,14 @@ class LoRA:
             return
 
 
-def load_lora_attn(
-    name: str,
-    path_file: Path,
-    wrapper: LoRAModuleWrapper,
-    multiplier=1.0
-):
-    print(f">> Loading lora {name} from {path_file}")
-    if path_file.suffix == '.safetensors':
-        checkpoint = load_file(path_file.absolute().as_posix(), device='cpu')
-    else:
-        checkpoint = torch.load(path_file, map_location='cpu')
-
-    for key in list(checkpoint.keys()):
-        if key.startswith(wrapper.LORA_PREFIX_UNET):
-            # convert unet keys
-            checkpoint[wrapper.convert_key_to_diffusers(key)] = checkpoint.pop(key)
-        elif key.startswith(wrapper.LORA_PREFIX_UNET):
-            # convert text encoder keys (not yet supported)
-            # state_dict[wrapper.convert_key_to_diffusers(key)] = state_dict.pop(key)
-            checkpoint.pop(key)
-        else:
-            # remove invalid key
-            checkpoint.pop(key)
-
-    wrapper.unet.load_attn_procs(checkpoint)
-    # wrapper.text_encoder.load_attn_procs(checkpoint)
-
-
-class LoraManager:
-    loras_to_load: dict[str, float]
-
-    def __init__(self, pipe):
-        self.lora_path = Path(global_models_dir(), 'lora')
+class LegacyLora:
+    def __init__(self, pipe, lora_path):
         self.unet = pipe.unet
+        self.lora_path = lora_path
+        self.wrapper = LoRAModuleWrapper(pipe.unet, pipe.text_encoder)
         self.text_encoder = pipe.text_encoder
         self.device = torch.device(choose_torch_device())
         self.dtype = pipe.unet.dtype
-        self.loras_to_load = {}
-        self.wrapper = LoRAModuleWrapper(pipe.unet, pipe.text_encoder)
 
     def load_lora_module(self, name, path_file, multiplier: float = 1.0):
         # can be used instead to load through diffusers, once enough support is added
@@ -330,35 +299,25 @@ class LoraManager:
         return lora
 
     def apply_lora_model(self, name, mult: float = 1.0):
-        path = Path(self.lora_path, name)
-        file = Path(path, "pytorch_lora_weights.bin")
+        path_file = Path(self.lora_path, f'{name}.ckpt')
+        if Path(self.lora_path, f'{name}.safetensors').exists():
+            path_file = Path(self.lora_path, f'{name}.safetensors')
 
-        if path.is_dir() and file.is_file():
-            print(f"loading lora: {path}")
-            self.unet.load_attn_procs(path.absolute().as_posix())
-        else:
-            path_file = Path(self.lora_path, f'{name}.ckpt')
-            if Path(self.lora_path, f'{name}.safetensors').exists():
-                path_file = Path(self.lora_path, f'{name}.safetensors')
+        if not path_file.exists():
+            print(f">> Unable to find lora: {name}")
+            return
 
-            if not path_file.exists():
-                print(f">> Unable to find lora: {name}")
-                return
+        lora = self.wrapper.loaded_loras.get(name, None)
+        if lora is None:
+            lora = self.load_lora_module(name, path_file, mult)
 
-            lora = self.wrapper.loaded_loras.get(name, None)
-            if lora is None:
-                lora = self.load_lora_module(name, path_file, mult)
+        lora.multiplier = mult
+        self.wrapper.applied_loras[name] = lora
 
-            lora.multiplier = mult
-            self.wrapper.applied_loras[name] = lora
-
-    def load_lora(self):
-        for name, multiplier in self.loras_to_load.items():
-            self.apply_lora_model(name, multiplier)
-
+    def unload_applied_loras(self, loras_to_load):
         # unload any lora's not defined by loras_to_load
         for name in list(self.wrapper.applied_loras.keys()):
-            if name not in self.loras_to_load:
+            if name not in loras_to_load:
                 self.unload_applied_lora(name)
 
     def unload_applied_lora(self, lora_name: str):
@@ -369,29 +328,63 @@ class LoraManager:
         if lora_name in self.wrapper.loaded_loras:
             del self.wrapper.loaded_loras[lora_name]
 
+    def set_lora(self, name, multiplier: float = 1.0):
+        # update the multiplier if the lora was already loaded
+        if name in self.wrapper.loaded_loras:
+            self.wrapper.loaded_loras[name].multiplier = multiplier
+
+    def clear_loras(self):
+        self.wrapper.clear_applied_loras()
+
+
+class LoraManager:
+    loras_to_load: dict[str, float]
+
+    def __init__(self, pipe):
+        self.lora_path = Path(global_models_dir(), 'lora')
+        self.unet = pipe.unet
+        self.loras_to_load = {}
+        # Legacy class handles lora not generated through diffusers
+        self.legacy = LegacyLora(pipe, self.lora_path)
+
+    def apply_lora_model(self, name, mult: float = 1.0):
+        path = Path(self.lora_path, name)
+        file = Path(path, "pytorch_lora_weights.bin")
+
+        if path.is_dir() and file.is_file():
+            print(f"loading lora: {path}")
+            self.unet.load_attn_procs(path.absolute().as_posix())
+        else:
+            self.legacy.apply_lora_model(name, mult)
+
+    def load_lora(self):
+        for name, multiplier in self.loras_to_load.items():
+            self.apply_lora_model(name, multiplier)
+
+        self.legacy.unload_applied_loras(self.loras_to_load)
+
     # Define a lora to be loaded
     # Can be used to define a lora to be loaded outside of prompts
     def set_lora(self, name, multiplier: float = 1.0):
         self.loras_to_load[name] = multiplier
-
-        # update the multiplier if the lora was already loaded
-        if name in self.wrapper.loaded_loras:
-            self.wrapper.loaded_loras[name].multiplier = multiplier
+        self.legacy.set_lora(name, multiplier)
 
     # Load the lora from a prompt, syntax is <lora:lora_name:multiplier>
     # Multiplier should be a value between 0.0 and 1.0
     def configure_prompt(self, prompt: str) -> str:
         self.clear_loras()
 
-        lora_match = re.compile(r"<lora:([^>]+)>")
+        # lora_match = re.compile(r"<lora:([^>]+)>")
+        lora_match = re.compile(r"withLora\(([a-zA-Z\,\d]+)\)")
 
         for match in re.findall(lora_match, prompt):
-            match = match.split(':')
-            name = match[0]
+            # match = match.split(':')
+            match = match.split(',')
+            name = match[0].strip()
 
             mult = 1.0
             if len(match) == 2:
-                mult = float(match[1])
+                mult = float(match[1].strip())
 
             self.set_lora(name, mult)
 
@@ -399,8 +392,8 @@ class LoraManager:
         return re.sub(lora_match, "", prompt)
 
     def clear_loras(self):
-        self.wrapper.clear_applied_loras()
         self.loras_to_load = {}
+        self.legacy.clear_loras()
 
     def __del__(self):
         del self.loras_to_load
