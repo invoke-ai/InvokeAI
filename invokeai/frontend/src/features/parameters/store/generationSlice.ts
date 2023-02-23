@@ -32,6 +32,9 @@ export interface GenerationState {
   tileSize: number;
   variationAmount: number;
   width: number;
+  shouldUseSymmetry: boolean;
+  horizontalSymmetryTimePercentage: number;
+  verticalSymmetryTimePercentage: number;
 }
 
 const initialGenerationState: GenerationState = {
@@ -60,6 +63,9 @@ const initialGenerationState: GenerationState = {
   tileSize: 32,
   variationAmount: 0.1,
   width: 512,
+  shouldUseSymmetry: false,
+  horizontalSymmetryTimePercentage: 0,
+  verticalSymmetryTimePercentage: 0,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -325,6 +331,21 @@ export const generationSlice = createSlice({
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
     },
+    setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseSymmetry = action.payload;
+    },
+    setHorizontalSymmetryTimePercentage: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.horizontalSymmetryTimePercentage = action.payload;
+    },
+    setVerticalSymmetryTimePercentage: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.verticalSymmetryTimePercentage = action.payload;
+    },
   },
 });
 
@@ -362,6 +383,9 @@ export const {
   setTileSize,
   setVariationAmount,
   setWidth,
+  setShouldUseSymmetry,
+  setHorizontalSymmetryTimePercentage,
+  setVerticalSymmetryTimePercentage,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

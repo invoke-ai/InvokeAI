@@ -126,7 +126,7 @@ class Generator:
                 seed = self.new_seed()
 
                 # Free up memory from the last generation.
-                clear_cuda_cache = kwargs['clear_cuda_cache'] or None
+                clear_cuda_cache = kwargs['clear_cuda_cache'] if 'clear_cuda_cache' in kwargs else None
                 if clear_cuda_cache is not None:
                     clear_cuda_cache()
 
@@ -339,7 +339,6 @@ class Generator:
         if self.caution_img:
             return self.caution_img
         path = Path(web_assets.__path__[0]) / CAUTION_IMG
-        print(f'DEBUG: path to caution = {path}')
         caution = Image.open(path)
         self.caution_img = caution.resize((caution.width // 2, caution.height //2))
         return self.caution_img

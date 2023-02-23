@@ -178,7 +178,9 @@ class Generate:
         self.model_hash = None
         self.sampler = None
         self.device = None
-        self.session_peakmem = None
+        self.max_memory_allocated = 0
+        self.memory_allocated = 0
+        self.session_peakmem = 0
         self.base_generator = None
         self.seed = None
         self.outdir = outdir
@@ -209,7 +211,7 @@ class Generate:
         Globals.full_precision = self.precision == "float32"
 
         if is_xformers_available():
-            if not Globals.disable_xformers:
+            if torch.cuda.is_available() and not Globals.disable_xformers:
                 print(">> xformers memory-efficient attention is available and enabled")
             else:
                 print(
@@ -219,9 +221,13 @@ class Generate:
             print(">> xformers not installed")
 
         # model caching system for fast switching
-        self.model_manager = ModelManager(mconfig, self.device, self.precision,
-                                          max_loaded_models=max_loaded_models,
-                                          sequential_offload=self.free_gpu_mem)
+        self.model_manager = ModelManager(
+            mconfig,
+            self.device,
+            self.precision,
+            max_loaded_models=max_loaded_models,
+            sequential_offload=self.free_gpu_mem,
+        )
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         model = model or fallback
@@ -244,7 +250,7 @@ class Generate:
         # load safety checker if requested
         if safety_checker:
             try:
-                print(">> Initializing safety checker")
+                print(">> Initializing NSFW checker")
                 from diffusers.pipelines.stable_diffusion.safety_checker import (
                     StableDiffusionSafetyChecker,
                 )
@@ -268,6 +274,8 @@ class Generate:
                     "** An error was encountered while installing the safety checker:"
                 )
                 print(traceback.format_exc())
+        else:
+            print(">> NSFW checker is disabled")
 
     def prompt2png(self, prompt, outdir, **kwargs):
         """
@@ -781,6 +789,7 @@ class Generate:
                 embiggen_tiles=opt.embiggen_tiles,
                 embiggen_strength=opt.embiggen_strength,
                 image_callback=callback,
+                clear_cuda_cache=self.clear_cuda_cache,
             )
         elif tool == "outpaint":
             from ldm.invoke.restoration.outpaint import Outpaint
@@ -964,6 +973,7 @@ class Generate:
 
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
+            print(f'>> Loading embeddings from {self.embedding_path}')
             for root, _, files in os.walk(self.embedding_path):
                 for name in files:
                     ti_path = os.path.join(root, name)
@@ -971,7 +981,7 @@ class Generate:
                         ti_path, defer_injecting_tokens=True
                     )
             print(
-                f'>> Textual inversions available: {", ".join(self.model.textual_inversion_manager.get_all_trigger_strings())}'
+                f'>> Textual inversion triggers: {", ".join(sorted(self.model.textual_inversion_manager.get_all_trigger_strings()))}'
             )
 
         self.model_name = model_name

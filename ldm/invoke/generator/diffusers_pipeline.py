@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import psutil
 import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -31,7 +32,7 @@ from ldm.modules.textual_inversion_manager import TextualInversionManager
 from ..devices import normalize_device, CPU_DEVICE
 from ..offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
-from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
+from compel import EmbeddingsProvider
 
 
 @dataclass
@@ -294,7 +295,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                                                  text_encoder=self.text_encoder,
                                                                  full_precision=use_full_precision)
         # InvokeAI's interface for text embeddings and whatnot
-        self.prompt_fragments_to_embeddings_converter = WeightedPromptFragmentsToEmbeddingsConverter(
+        self.embeddings_provider = EmbeddingsProvider(
             tokenizer=self.tokenizer,
             text_encoder=self.text_encoder,
             textual_inversion_manager=self.textual_inversion_manager
@@ -308,7 +309,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
-        if is_xformers_available() and not Globals.disable_xformers:
+        if torch.cuda.is_available() and is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
         else:
             if torch.backends.mps.is_available():
@@ -330,7 +331,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     16 * \
                     latents.size(dim=2) * latents.size(dim=3) * latents.size(dim=2) * latents.size(dim=3) * \
                     bytes_per_element_needed_for_baddbmm_duplication
-                if max_size_required_for_baddbmm > (mem_free * 3.3 / 4.0): # 3.3 / 4.0 is from old Invoke code
+                if max_size_required_for_baddbmm > (mem_free * 3.0 / 4.0): # 3.3 / 4.0 is from old Invoke code
                     self.enable_attention_slicing(slice_size='max')
                 else:
                     self.disable_attention_slicing()
@@ -726,15 +727,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
-        return self.prompt_fragments_to_embeddings_converter.get_embeddings_for_weighted_prompt_fragments(
-            text=c,
-            fragment_weights=fragment_weights,
+        return self.embeddings_provider.get_embeddings_for_weighted_prompt_fragments(
+            text_batch=c,
+            fragment_weights_batch=fragment_weights,
             should_return_tokens=return_tokens,
             device=self._model_group.device_for(self.unet))
 
     @property
     def cond_stage_model(self):
-        return self.prompt_fragments_to_embeddings_converter
+        return self.embeddings_provider
 
     @torch.inference_mode()
     def _tokenize(self, prompt: Union[str, List[str]]):

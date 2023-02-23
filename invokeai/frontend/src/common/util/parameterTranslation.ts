@@ -65,6 +65,8 @@ export type BackendGenerationParameters = {
   with_variations?: Array<Array<number>>;
   variation_amount?: number;
   enable_image_debugging?: boolean;
+  h_symmetry_time_pct?: number;
+  v_symmetry_time_pct?: number;
 };
 
 export type BackendEsrGanParameters = {
@@ -141,6 +143,9 @@ export const frontendToBackendParameters = (
     tileSize,
     variationAmount,
     width,
+    shouldUseSymmetry,
+    horizontalSymmetryTimePercentage,
+    verticalSymmetryTimePercentage,
   } = generationState;
 
   const {
@@ -170,9 +175,6 @@ export const frontendToBackendParameters = (
   let esrganParameters: false | BackendEsrGanParameters = false;
   let facetoolParameters: false | BackendFacetoolParameters = false;
 
-  // Multiplying it by 10000 so the Slider can have values between 0 and 1 which makes more sense
-  generationParameters.threshold = threshold * 1000;
-
   if (negativePrompt !== '') {
     generationParameters.prompt = `${prompt} [${negativePrompt}]`;
   }
@@ -180,6 +182,23 @@ export const frontendToBackendParameters = (
   generationParameters.seed = shouldRandomizeSeed
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
     : seed;
+
+  // Symmetry Settings
+  if (shouldUseSymmetry) {
+    if (horizontalSymmetryTimePercentage > 0) {
+      generationParameters.h_symmetry_time_pct = Math.max(
+        0,
+        Math.min(1, horizontalSymmetryTimePercentage / steps)
+      );
+    }
+
+    if (horizontalSymmetryTimePercentage > 0) {
+      generationParameters.v_symmetry_time_pct = Math.max(
+        0,
+        Math.min(1, verticalSymmetryTimePercentage / steps)
+      );
+    }
+  }
 
   // txt2img exclusive parameters
   if (generationMode === 'txt2img') {

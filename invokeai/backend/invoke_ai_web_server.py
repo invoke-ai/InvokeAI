@@ -25,12 +25,13 @@ from invokeai.backend.modules.parameters import parameters_to_command
 import invokeai.frontend.dist as frontend
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
+from ldm.invoke.conditioning import get_tokens_for_prompt_object, get_prompt_structure, split_weighted_subprompts, \
+    get_tokenizer
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals, global_converted_ckpts_dir
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
+from compel.prompt_parser import Blend
 from ldm.invoke.globals import global_models_dir
 from ldm.invoke.merge_diffusers import merge_diffusion_models
 
@@ -1258,7 +1259,7 @@ class InvokeAIWebServer:
                 parsed_prompt, _ = get_prompt_structure(
                     generation_parameters["prompt"])
                 tokens = None if type(parsed_prompt) is Blend else \
-                    get_tokens_for_prompt(self.generate.model, parsed_prompt)
+                    get_tokens_for_prompt_object(get_tokenizer(self.generate.model), parsed_prompt)
                 attention_maps_image_base64_url = None if attention_maps_image is None \
                     else image_to_dataURL(attention_maps_image)
 
@@ -1382,13 +1383,6 @@ class InvokeAIWebServer:
 
             # semantic drift
             rfc_dict["sampler"] = parameters["sampler_name"]
-
-            # display weighted subprompts (liable to change)
-            subprompts = split_weighted_subprompts(
-                parameters["prompt"], skip_normalize=True
-            )
-            subprompts = [{"prompt": x[0], "weight": x[1]} for x in subprompts]
-            rfc_dict["prompt"] = subprompts
 
             # 'variations' should always exist and be an array, empty or consisting of {'seed': seed, 'weight': weight} pairs
             variations = []

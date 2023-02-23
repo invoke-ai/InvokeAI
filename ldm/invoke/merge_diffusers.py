@@ -20,6 +20,7 @@ from diffusers import logging as dlogging
 from npyscreen import widget
 from omegaconf import OmegaConf
 
+from ldm.invoke.config.widgets import FloatTitleSlider
 from ldm.invoke.globals import (Globals, global_cache_dir, global_config_file,
                                 global_models_dir, global_set_root)
 from ldm.invoke.model_manager import ModelManager
@@ -172,18 +173,6 @@ def _parse_args() -> Namespace:
 
 
 # ------------------------- GUI HERE -------------------------
-class FloatSlider(npyscreen.Slider):
-    def translate_value(self):
-        stri = "%3.2f / %3.2f" % (self.value, self.out_of)
-        l = (len(str(self.out_of))) * 2 + 4
-        stri = stri.rjust(l)
-        return stri
-
-
-class FloatTitleSlider(npyscreen.TitleText):
-    _entry_type = FloatSlider
-
-
 class mergeModelsForm(npyscreen.FormMultiPageAction):
     interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid"]
 
