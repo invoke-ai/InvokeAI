@@ -336,7 +336,8 @@ class InvokeAiInstance:
             elif el in ['-y','--yes','--yes-to-all']:
                 new_argv.append(el)
         sys.argv = new_argv
-
+        
+        import requests  # to catch download exceptions
         from messages import introduction
 
         introduction()
@@ -350,16 +351,16 @@ class InvokeAiInstance:
         try:
             invokeai_configure.main()
             succeeded = True
-        except ConnectionError as e:
-            print(f'A network error was encountered during configuration and download: {str(e)}')
+        except requests.exceptions.ConnectionError as e:
+            print(f'\nA network error was encountered during configuration and download: {str(e)}')
         except OSError as e:
-            print(f'An OS error was encountered during configuration and download: {str(e)}')
+            print(f'\nAn OS error was encountered during configuration and download: {str(e)}')
         except Exception as e:
-            print(f'A problem was encountered during the configuration and download steps: {str(e)}')
+            print(f'\nA problem was encountered during the configuration and download steps: {str(e)}')
         finally:
             if not succeeded:
-                print('You may be able to finish the process by launching "invoke.sh" or "invoke.bat"')
-                print('from within the "invokeai" directory, and choosing options 5 and/or 6.')
+                print('To try again, find the "invokeai" directory, run the script "invoke.sh" or "invoke.bat"')
+                print('and choose option 7 to fix a broken install, optionally followed by option 5 to install models.')
                 print('Alternatively you can relaunch the installer.')
 
     def install_user_scripts(self):

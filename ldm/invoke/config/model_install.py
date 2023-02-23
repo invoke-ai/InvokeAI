@@ -12,7 +12,6 @@ The work is actually done in backend code in model_install_backend.py.
 import argparse
 import os
 import sys
-import traceback
 from argparse import Namespace
 from pathlib import Path
 from typing import List
@@ -482,7 +481,7 @@ def main():
         sys.exit(-1)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
-    except (widget.NotEnoughSpaceForWidget, Exception) as e:
+    except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
             print(
                 "** Insufficient vertical space for the interface. Please make your window taller and try again"
@@ -491,11 +490,6 @@ def main():
             print(
                 "** Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
-        else:
-            print(f"** An error has occurred: {str(e)}")
-            traceback.print_exc()
-        sys.exit(-1)
-
 
 # -------------------------------------
 if __name__ == "__main__":

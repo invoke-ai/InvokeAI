@@ -66,7 +66,7 @@ SD_Configs = Path(global_config_dir()) / "stable-diffusion"
 Datasets = OmegaConf.load(Dataset_path)
 
 # minimum size for the UI
-MIN_COLS = 120
+MIN_COLS = 135
 MIN_LINES = 45
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
@@ -165,7 +165,6 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         print(f"Installing {label} model file {model_url}...", end="", file=sys.stderr)
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-            print("", file=sys.stderr)
             request.urlretrieve(
                 model_url, model_dest, ProgressBar(os.path.basename(model_dest))
             )
@@ -183,26 +182,22 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
 def download_bert():
     print(
         "Installing bert tokenizer...",
-        end="",
-        file=sys.stderr,
+        file=sys.stderr
     )
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         from transformers import BertTokenizerFast
-
         download_from_hf(BertTokenizerFast, "bert-base-uncased")
-        print("...success", file=sys.stderr)
 
 
 # ---------------------------------------------
 def download_clip():
     print("Installing CLIP model...", file=sys.stderr)
     version = "openai/clip-vit-large-patch14"
-    print("Tokenizer...", file=sys.stderr, end="")
+    print("Tokenizer...", file=sys.stderr)
     download_from_hf(CLIPTokenizer, version)
-    print("Text model...", file=sys.stderr, end="")
+    print("Text model...", file=sys.stderr)
     download_from_hf(CLIPTextModel, version)
-    print("...success", file=sys.stderr)
 
 
 # ---------------------------------------------
@@ -255,7 +250,7 @@ def download_codeformer():
 
 # ---------------------------------------------
 def download_clipseg():
-    print("Installing clipseg model for text-based masking...", end="", file=sys.stderr)
+    print("Installing clipseg model for text-based masking...", file=sys.stderr)
     CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
     try:
         download_from_hf(AutoProcessor, CLIPSEG_MODEL)
@@ -263,7 +258,6 @@ def download_clipseg():
     except Exception:
         print("Error installing clipseg model:")
         print(traceback.format_exc())
-    print("...success", file=sys.stderr)
 
 
 # -------------------------------------
@@ -279,15 +273,14 @@ def download_safety_checker():
         print(traceback.format_exc())
         return
     safety_model_id = "CompVis/stable-diffusion-safety-checker"
-    print("AutoFeatureExtractor...", end="", file=sys.stderr)
+    print("AutoFeatureExtractor...", file=sys.stderr)
     download_from_hf(AutoFeatureExtractor, safety_model_id)
-    print("StableDiffusionSafetyChecker...", end="", file=sys.stderr)
+    print("StableDiffusionSafetyChecker...", file=sys.stderr)
     download_from_hf(StableDiffusionSafetyChecker, safety_model_id)
-    print("...success", file=sys.stderr)
 
 
 # -------------------------------------
-def download_vaes(precision: str):
+def download_vaes():
     print("Installing stabilityai VAE...", file=sys.stderr)
     try:
         # first the diffusers version
@@ -295,8 +288,6 @@ def download_vaes(precision: str):
         args = dict(
             cache_dir=global_cache_dir("diffusers"),
         )
-        if precision == "float16":
-            args.update(torch_dtype=torch.float16, revision="fp16")
         if not AutoencoderKL.from_pretrained(repo_id, **args):
             raise Exception(f"download of {repo_id} failed")
 
@@ -309,7 +300,6 @@ def download_vaes(precision: str):
             model_dir=str(Globals.root / Model_dir / Weights_dir),
         ):
             raise Exception(f"download of {model_name} failed")
-        print("...downloaded successfully", file=sys.stderr)
     except Exception as e:
         print(f"Error downloading StabilityAI standard VAE: {str(e)}", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
@@ -706,6 +696,9 @@ def write_opts(opts: Namespace, init_file: Path):
     args_to_skip = re.compile(
         "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
     )
+    # fix windows paths
+    opts.outdir = opts.outdir.replace('\\','/')
+    opts.embedding_path = opts.embedding_path.replace('\\','/')
     new_file = f"{init_file}.new"
     try:
         lines = [x.strip() for x in open(init_file, "r").readlines()]
@@ -845,7 +838,7 @@ def main():
             download_codeformer()
             download_clipseg()
             download_safety_checker()
-            download_vaes(init_options.precision)
+            download_vaes()
 
         if opt.skip_sd_weights:
             print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
@@ -856,10 +849,6 @@ def main():
         postscript(errors=errors)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
-    except Exception as e:
-        print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
-        print(traceback.format_exc())
-
 
 # -------------------------------------
 if __name__ == "__main__":

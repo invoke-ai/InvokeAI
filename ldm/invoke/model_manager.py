@@ -428,8 +428,6 @@ class ModelManager(object):
             torch.cuda.reset_peak_memory_stats()
             torch.cuda.empty_cache()
 
-        tic = time.time()
-
         # this does the work
         if not os.path.isabs(config):
             config = os.path.join(Globals.root, config)
@@ -642,21 +640,18 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
-        description = model_description or f"imported diffusers model {model_name}"
+        model_description = model_description or f"imported diffusers model {model_name}"
         new_config = dict(
             description=model_description,
             vae=vae,
             format="diffusers",
         )
-        print(f"DEBUG: here i am 1")
         if isinstance(repo_or_path, Path) and repo_or_path.exists():
             new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
-        print(f"DEBUG: here i am 2")
 
         self.add_model(model_name, new_config, True)
-        print(f"DEBUG: config = {self.config}")
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name
