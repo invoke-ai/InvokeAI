@@ -488,10 +488,11 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
+        # To try and load lora not trained through diffusers
         if self.model.lora_manager:
-            prompt = self.model.lora_manager.configure_prompt(prompt)
+            prompt = self.model.lora_manager.configure_prompt_legacy(prompt)
             # lora MUST process prompt before conditioning
-            self.model.lora_manager.load_lora()
+            self.model.lora_manager.load_lora_legacy()
 
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
