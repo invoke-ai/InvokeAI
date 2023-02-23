@@ -19,21 +19,27 @@ from typing import Union
 
 Globals = Namespace()
 
-# This is usually overwritten by the command line and/or environment variables
-if os.environ.get('INVOKEAI_ROOT'):
-    Globals.root = osp.abspath(os.environ.get('INVOKEAI_ROOT'))
-elif os.environ.get('VIRTUAL_ENV'):
-    Globals.root = osp.abspath(osp.join(os.environ.get('VIRTUAL_ENV'), '..'))
-else:
-    Globals.root = osp.abspath(osp.expanduser('~/invokeai'))
-
-# Where to look for the initialization file
+# Where to look for the initialization file and other key components
 Globals.initfile = 'invokeai.init'
 Globals.models_file = 'models.yaml'
 Globals.models_dir = 'models'
 Globals.config_dir = 'configs'
 Globals.autoscan_dir = 'weights'
 Globals.converted_ckpts_dir = 'converted_ckpts'
+
+# Set the default root directory. This can be overwritten by explicitly
+# passing the `--root <directory>` argument on the command line.
+# logic is:
+# 1) use INVOKEAI_ROOT environment variable (no check for this being a valid directory)
+# 2) use VIRTUAL_ENV environment variable, with a check for initfile being there
+# 3) use ~/invokeai
+
+if os.environ.get('INVOKEAI_ROOT'):
+    Globals.root = osp.abspath(os.environ.get('INVOKEAI_ROOT'))
+elif os.environ.get('VIRTUAL_ENV') and Path(os.environ.get('VIRTUAL_ENV'),'..',Globals.initfile).exists():
+    Globals.root = osp.abspath(osp.join(os.environ.get('VIRTUAL_ENV'), '..'))
+else:
+    Globals.root = osp.abspath(osp.expanduser('~/invokeai'))
 
 # Try loading patchmatch
 Globals.try_patchmatch = True
