@@ -334,9 +334,8 @@ class LoraManager:
         file = Path(path, "pytorch_lora_weights.bin")
 
         if path.is_dir() and file.is_file():
-            print(f"Diffusers lora is currently disabled: {path}")
-            # print(f"loading lora: {path}")
-            # self.unet.load_attn_procs(path.absolute().as_posix())
+            print(f"loading lora: {path}")
+            self.unet.load_attn_procs(path.absolute().as_posix())
         else:
             path_file = Path(self.lora_path, f'{name}.ckpt')
             if Path(self.lora_path, f'{name}.safetensors').exists():
