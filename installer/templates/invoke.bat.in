@@ -6,8 +6,9 @@ setlocal
 call .venv\Scripts\activate.bat
 set INVOKEAI_ROOT=.
 
+:start
 echo Do you want to generate images using the
-echo 1. command-line
+echo 1. command-line interface
 echo 2. browser-based UI
 echo 3. run textual inversion training
 echo 4. merge models (diffusers type only)
@@ -17,7 +18,8 @@ echo 7. re-run the configure script to fix a broken install
 echo 8. open the developer console
 echo 9. update InvokeAI
 echo 10. command-line help
-set /P restore="Please enter 1-10: [2] "
+echo Q - quit
+set /P restore="Please enter 1-10, Q: [2] "
 if not defined restore set restore=2
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
@@ -60,9 +62,19 @@ IF /I "%restore%" == "1" (
     python .venv\Scripts\invokeai.exe --help %*
     pause
     exit /b
+) ELSE IF /I "%restore%" == "q" (
+    echo Goodbye!
+    goto ending
 ) ELSE (
     echo Invalid selection
     pause
     exit /b
 )
+goto start
+
 endlocal
+pause
+
+:ending
+exit /b
+
