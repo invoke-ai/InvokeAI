@@ -1,6 +1,6 @@
 # Translation
 
-We are now using [Weblate](https://weblate.org) to translate InvokeAI. Weblate is a FOSS project providing a scalable translation service. Using Weblate automates the tedious parts of managing translation of a growing project and provides their service for free for FOSS projects like InvokeAI.
+InvokeAI uses [Weblate](https://weblate.org) for translation. Weblate is a FOSS project providing a scalable translation service. Weblate automates the tedious parts of managing translation of a growing project, and the service is generously provided at no cost to FOSS projects like InvokeAI.
 
 ## Contributing
 
