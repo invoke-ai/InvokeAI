@@ -32,6 +32,7 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",
+  "compel>=0.1.6",
   "datasets",
   "diffusers[torch]~=0.13",
   "dnspython==2.2.1",
@@ -134,7 +135,7 @@ version = {attr = "ldm.invoke.__version__"}
 [tool.setuptools.packages.find]
 "include" = [
   "invokeai.assets.web",
-  "invokeai.backend",
+  "invokeai.backend*",
   "invokeai.configs*",
   "invokeai.frontend.dist*",
   "ldm*",
