@@ -488,7 +488,8 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
-        # To try and load lora not trained through diffusers
+        # To try and load LoRA not trained through diffusers
+        # To be removed once support for diffusers LoRA weights is high enough
         if self.model.lora_manager:
             prompt = self.model.lora_manager.configure_prompt_legacy(prompt)
             # lora MUST process prompt before conditioning
