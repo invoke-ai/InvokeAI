@@ -369,11 +369,15 @@ class LegacyLoraManager:
 
 
 class LoraManager:
+    models: list[str]
+
     def __init__(self, pipe):
         self.lora_path = Path(global_models_dir(), 'lora')
         self.unet = pipe.unet
+        self.text_encoder = pipe.text_encoder
         # Legacy class handles lora not generated through diffusers
         self.legacy = LegacyLoraManager(pipe, self.lora_path)
+        self.models = []
 
     def apply_lora_model(self, name):
         path = Path(self.lora_path, name)
@@ -385,10 +389,17 @@ class LoraManager:
         else:
             print(f">> Unable to find valid LoRA at: {path}")
 
-    def load_lora_compel(self, lora_weights: list):
+    def set_lora_model(self, name):
+        self.models.append(name)
+
+    def set_loras_compel(self, lora_weights: list):
         if len(lora_weights) > 0:
             for lora in lora_weights:
-                self.apply_lora_model(lora.model)
+                self.set_lora_model(lora.model)
+
+    def load_loras(self):
+        for name in self.models:
+            self.apply_lora_model(name)
 
     # Legacy functions, to pipe to LoraLegacyManager
     def configure_prompt_legacy(self, prompt: str) -> str:

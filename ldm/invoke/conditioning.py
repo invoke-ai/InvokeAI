@@ -60,7 +60,7 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
     else:
         positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
         if model.lora_manager:
-            model.lora_manager.load_lora_compel(positive_prompt.lora_weights)
+            model.lora_manager.set_loras_compel(positive_prompt.lora_weights)
     negative_prompt: FlattenedPrompt|Blend = Compel.parse_prompt_string(negative_prompt_string)
 
     if log_tokens or getattr(Globals, "log_tokenization", False):

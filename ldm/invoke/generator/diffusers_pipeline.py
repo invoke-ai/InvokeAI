@@ -290,12 +290,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward, is_running_diffusers=True)
+        self.lora_manager = LoraManager(self)
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet,
+                                                           self._unet_forward,
+                                                           self.lora_manager,
+                                                           is_running_diffusers=True)
         use_full_precision = (precision == 'float32' or precision == 'autocast')
         self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,
                                                                  text_encoder=self.text_encoder,
                                                                  full_precision=use_full_precision)
-        self.lora_manager = LoraManager(self)
 
         # InvokeAI's interface for text embeddings and whatnot
         self.embeddings_provider = EmbeddingsProvider(

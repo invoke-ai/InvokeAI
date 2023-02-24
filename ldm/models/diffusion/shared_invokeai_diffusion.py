@@ -13,6 +13,7 @@ from ldm.models.diffusion.cross_attention_control import Arguments, \
     restore_default_cross_attention, override_cross_attention, Context, get_cross_attention_modules, \
     CrossAttentionType, SwapCrossAttnContext
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
+from ldm.modules.lora_manager import LoraManager
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -51,7 +52,7 @@ class InvokeAIDiffuserComponent:
             return self.cross_attention_control_args is not None
 
 
-    def __init__(self, model, model_forward_callback: ModelForwardCallback,
+    def __init__(self, model, model_forward_callback: ModelForwardCallback, lora_manager: LoraManager,
                  is_running_diffusers: bool=False,
                  ):
         """
@@ -64,6 +65,7 @@ class InvokeAIDiffuserComponent:
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
         self.sequential_guidance = Globals.sequential_guidance
+        self.lora_manager = lora_manager
 
     @contextmanager
     def custom_attention_context(self,
@@ -71,6 +73,8 @@ class InvokeAIDiffuserComponent:
                                  step_count: int):
         do_swap = extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
         old_attn_processor = None
+        if self.lora_manager:
+            self.lora_manager.load_loras()
         if do_swap:
             old_attn_processor = self.override_cross_attention(extra_conditioning_info,
                                                                step_count=step_count)
@@ -81,6 +85,7 @@ class InvokeAIDiffuserComponent:
                 self.restore_default_cross_attention(old_attn_processor)
             # TODO resuscitate attention map saving
             #self.remove_attention_map_saving()
+
 
     def override_cross_attention(self, conditioning: ExtraConditioningInfo, step_count: int) -> Dict[str, AttnProcessor]:
         """
