@@ -13,7 +13,7 @@ from ldm.models.diffusion.cross_attention_control import Arguments, \
     restore_default_cross_attention, override_cross_attention, Context, get_cross_attention_modules, \
     CrossAttentionType, SwapCrossAttnContext
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
-from ldm.modules.lora_manager import LoraManager
+from ldm.modules.lora_manager import LoraCondition
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -46,13 +46,21 @@ class InvokeAIDiffuserComponent:
 
         tokens_count_including_eos_bos: int
         cross_attention_control_args: Optional[Arguments] = None
+        lora_conditions: Optional[list[LoraCondition]] = None
 
         @property
         def wants_cross_attention_control(self):
             return self.cross_attention_control_args is not None
 
+        @property
+        def has_lora_conditions(self):
+            return self.lora_conditions is not None
 
-    def __init__(self, model, model_forward_callback: ModelForwardCallback, lora_manager: LoraManager,
+        @property
+        def should_do_swap(self):
+            return self.wants_cross_attention_control or self.has_lora_conditions
+
+    def __init__(self, model, model_forward_callback: ModelForwardCallback,
                  is_running_diffusers: bool=False,
                  ):
         """
@@ -65,16 +73,13 @@ class InvokeAIDiffuserComponent:
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
         self.sequential_guidance = Globals.sequential_guidance
-        self.lora_manager = lora_manager
 
     @contextmanager
     def custom_attention_context(self,
                                  extra_conditioning_info: Optional[ExtraConditioningInfo],
                                  step_count: int):
-        do_swap = extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
+        do_swap = extra_conditioning_info is not None and extra_conditioning_info.should_do_swap
         old_attn_processor = None
-        if self.lora_manager:
-            self.lora_manager.load_loras()
         if do_swap:
             old_attn_processor = self.override_cross_attention(extra_conditioning_info,
                                                                step_count=step_count)
@@ -93,6 +98,21 @@ class InvokeAIDiffuserComponent:
         the previous attention processor is returned so that the caller can restore it later.
         """
         self.conditioning = conditioning
+
+        # If other modules do not want cross_attention_control then we should bypass setting up Context
+        old_attn_processors = None
+        if not self.conditioning.wants_cross_attention_control:
+            old_attn_processors = self.model.attn_processors
+
+        # Load lora conditions into the model
+        if self.conditioning.has_lora_conditions:
+            for condition in self.conditioning.lora_conditions:
+                condition(self.model)
+
+        # return old_attn_processors if there is nothing further to do here
+        if not self.conditioning.wants_cross_attention_control:
+            return old_attn_processors
+
         self.cross_attention_control_context = Context(
             arguments=self.conditioning.cross_attention_control_args,
             step_count=step_count
