@@ -88,7 +88,7 @@ def get_prompt_structure(prompt_string, skip_normalize_legacy_blend: bool = Fals
 
     return positive_prompt, negative_prompt
 
-def get_max_token_count(tokenizer, prompt: FlattenedPrompt|Blend, truncate_if_too_long=True) -> int:
+def get_max_token_count(tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=True) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
         return max([get_max_token_count(tokenizer, c, truncate_if_too_long) for c in blend.prompts])
@@ -129,8 +129,8 @@ def split_prompt_to_positive_and_negative(prompt_string_uncleaned):
     return prompt_string_cleaned, unconditioned_words
 
 
-def log_tokenization(positive_prompt: Blend | FlattenedPrompt,
-                     negative_prompt: Blend | FlattenedPrompt,
+def log_tokenization(positive_prompt: Union[Blend, FlattenedPrompt],
+                     negative_prompt: Union[Blend, FlattenedPrompt],
                      tokenizer):
     print(f"\n>> [TOKENLOG] Parsed Prompt: {positive_prompt}")
     print(f"\n>> [TOKENLOG] Parsed Negative Prompt: {negative_prompt}")
@@ -139,7 +139,7 @@ def log_tokenization(positive_prompt: Blend | FlattenedPrompt,
     log_tokenization_for_prompt_object(negative_prompt, tokenizer, display_label_prefix="(negative prompt)")
 
 
-def log_tokenization_for_prompt_object(p: Blend | FlattenedPrompt, tokenizer, display_label_prefix=None):
+def log_tokenization_for_prompt_object(p: Union[Blend, FlattenedPrompt], tokenizer, display_label_prefix=None):
     display_label_prefix = display_label_prefix or ""
     if type(p) is Blend:
         blend: Blend = p
