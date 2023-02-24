@@ -43,25 +43,31 @@ InvokeAI comes with support for a good set of starter models. You'll
 find them listed in the master models file
 `configs/INITIAL_MODELS.yaml` in the InvokeAI root directory. The
 subset that are currently installed are found in
-`configs/models.yaml`. The current list is:
+`configs/models.yaml`. As of v2.3.1, the list of starter models is:
 
-| Model                | HuggingFace Repo ID               | Description                                                | URL
-| -------------------- | --------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| stable-diffusion-1.5 | runwayml/stable-diffusion-v1-5    | Most recent version of base Stable Diffusion model         | https://huggingface.co/runwayml/stable-diffusion-v1-5          |
-| stable-diffusion-1.4 | runwayml/stable-diffusion-v1-4    | Previous version of base Stable Diffusion model         | https://huggingface.co/runwayml/stable-diffusion-v1-4          |
-| inpainting-1.5       | runwayml/stable-diffusion-inpainting  | Stable diffusion 1.5 optimized for inpainting          | https://huggingface.co/runwayml/stable-diffusion-inpainting    |
-| stable-diffusion-2.1-base |stabilityai/stable-diffusion-2-1-base | Stable Diffusion version 2.1 trained on 512 pixel images | https://huggingface.co/stabilityai/stable-diffusion-2-1-base |
-| stable-diffusion-2.1-768 |stabilityai/stable-diffusion-2-1 | Stable Diffusion version 2.1 trained on 768 pixel images | https://huggingface.co/stabilityai/stable-diffusion-2-1        |
-| dreamlike-diffusion-1.0  | dreamlike-art/dreamlike-diffusion-1.0  | An SD 1.5 model finetuned on high quality art    | https://huggingface.co/dreamlike-art/dreamlike-diffusion-1.0   |
-| dreamlike-photoreal-2.0  | dreamlike-art/dreamlike-photoreal-2.0  | A photorealistic model trained on 768 pixel images| https://huggingface.co/dreamlike-art/dreamlike-photoreal-2.0   |
-| openjourney-4.0      | prompthero/openjourney              | An SD 1.5 model finetuned on Midjourney images prompt with "mdjrny-v4 style"   | https://huggingface.co/prompthero/openjourney  |
-| nitro-diffusion-1.0  | nitrosocke/Nitro-Diffusion          | An SD 1.5 model finetuned on three styles, prompt with "archer style", "arcane style" or "modern disney style" | https://huggingface.co/nitrosocke/Nitro-Diffusion|
-| trinart-2.0          | naclbit/trinart_stable_diffusion_v2 | An SD 1.5 model finetuned with ~40,000 assorted high resolution manga/anime-style pictures | https://huggingface.co/naclbit/trinart_stable_diffusion_v2|
-| trinart-characters-2_0 | naclbit/trinart_derrida_characters_v2_stable_diffusion | An SD 1.5 model finetuned with 19.2M manga/anime-style pictures | https://huggingface.co/naclbit/trinart_derrida_characters_v2_stable_diffusion|
+|Model Name | HuggingFace Repo ID | Description | URL |
+|---------- | ---------- | ----------- | --- |
+|stable-diffusion-1.5|runwayml/stable-diffusion-v1-5|Stable Diffusion version 1.5 diffusers model (4.27 GB)|https://huggingface.co/runwayml/stable-diffusion-v1-5 |
+|sd-inpainting-1.5|runwayml/stable-diffusion-inpainting|RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)|https://huggingface.co/runwayml/stable-diffusion-inpainting |
+|stable-diffusion-2.1|stabilityai/stable-diffusion-2-1|Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)|https://huggingface.co/stabilityai/stable-diffusion-2-1 |
+|sd-inpainting-2.0|stabilityai/stable-diffusion-2-1|Stable Diffusion version 2.0 inpainting model (5.21 GB)|https://huggingface.co/stabilityai/stable-diffusion-2-1 |
+|analog-diffusion-1.0|wavymulder/Analog-Diffusion|An SD-1.5 model trained on diverse analog photographs (2.13 GB)|https://huggingface.co/wavymulder/Analog-Diffusion |
+|deliberate-1.0|XpucT/Deliberate|Versatile model that produces detailed images up to 768px (4.27 GB)|https://huggingface.co/XpucT/Deliberate |
+|d&d-diffusion-1.0|0xJustin/Dungeons-and-Diffusion|Dungeons & Dragons characters (2.13 GB)|https://huggingface.co/0xJustin/Dungeons-and-Diffusion |
+|dreamlike-photoreal-2.0|dreamlike-art/dreamlike-photoreal-2.0|A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)|https://huggingface.co/dreamlike-art/dreamlike-photoreal-2.0 |
+|inkpunk-1.0|Envvi/Inkpunk-Diffusion|Stylized illustrations inspired by Gorillaz, FLCL and Shinkawa; prompt with "nvinkpunk" (4.27 GB)|https://huggingface.co/Envvi/Inkpunk-Diffusion |
+|openjourney-4.0|prompthero/openjourney|An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)|https://huggingface.co/prompthero/openjourney |
+|portrait-plus-1.0|wavymulder/portraitplus|An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)|https://huggingface.co/wavymulder/portraitplus |
+|seek-art-mega-1.0|coreco/seek.art_MEGA|A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)|https://huggingface.co/coreco/seek.art_MEGA |
+|trinart-2.0|naclbit/trinart_stable_diffusion_v2|An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)|https://huggingface.co/naclbit/trinart_stable_diffusion_v2 |
+|waifu-diffusion-1.4|hakurei/waifu-diffusion|An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)|https://huggingface.co/hakurei/waifu-diffusion |
 
-Note that these files are covered by an "Ethical AI" license which forbids
-certain uses. When you initially download them, you are asked to
-accept the license terms.
+Note that these files are covered by an "Ethical AI" license which
+forbids certain uses. When you initially download them, you are asked
+to accept the license terms. In addition, some of these models carry
+additional license terms that limit their use in commercial
+applications or on public servers. Be sure to familiarize yourself
+with the model terms by visiting the URLs in the table above.
 
 ## Community-Contributed Models
 
