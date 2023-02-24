@@ -625,7 +625,7 @@ def set_default_output_dir(opt: Args, completer: Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
+def import_model(model_path: str, gen, opt, completer, convert=False):
     """
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path;
     (3) a huggingface repository id; or (4) a local directory containing a
@@ -679,7 +679,7 @@ def _verify_load(model_name: str, gen) -> bool:
     current_model = gen.model_name
     try:
         if not gen.set_model(model_name):
-            return False
+            return
     except Exception as e:
         print(f"** model failed to load: {str(e)}")
         print(
@@ -706,7 +706,7 @@ def _get_model_name_and_desc(
     )
     return model_name, model_description
 
-def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> str:
+def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
     model_name_or_path = model_name_or_path.replace("\\", "/")  # windows
     manager = gen.model_manager
     ckpt_path = None
@@ -740,19 +740,14 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer) -> 
         )
     else:
         try:
-            model_name = import_model(model_name_or_path, gen, opt, completer, convert=True)
+            import_model(model_name_or_path, gen, opt, completer, convert=True)
         except KeyboardInterrupt:
             return
-
-    if not model_name:
-        print("** Conversion failed. Aborting.")
-        return
 
     manager.commit(opt.conf)    
     if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
         print(f"{ckpt_path} deleted")
-    return model_name
 
 
 def del_config(model_name: str, gen, opt, completer):
