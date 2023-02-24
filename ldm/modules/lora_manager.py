@@ -13,12 +13,16 @@ class LoraCondition:
 
     def __call__(self, model):
         path = Path(global_lora_models_dir(), self.name)
-        file = Path(path, "pytorch_lora_weights.bin")
 
-        if path.is_dir() and file.is_file():
+        # TODO: make model able to load from huggingface, rather then just local files
+        if path.is_dir():
             if model.load_attn_procs:
-                print(f">> Loading LoRA: {path}")
-                model.load_attn_procs(path.absolute().as_posix())
+                file = Path(path, "pytorch_lora_weights.bin")
+                if file.is_file():
+                    print(f">> Loading LoRA: {path}")
+                    model.load_attn_procs(path.absolute().as_posix())
+                else:
+                    print(f">> Unable to find valid LoRA at: {path}")
             else:
                 print(f">> Invalid Model to load LoRA")
         else:
@@ -26,25 +30,19 @@ class LoraCondition:
 
 
 class LoraManager:
-    conditions: list[LoraCondition]
-
     def __init__(self, pipe):
-        self.unet = pipe.unet
-        self.text_encoder = pipe.text_encoder
         # Legacy class handles lora not generated through diffusers
         self.legacy = LegacyLoraManager(pipe, global_lora_models_dir())
-        self.conditions = []
 
-    def set_lora_model(self, name, weight: float = 1.0):
-        self.conditions.append(LoraCondition(name, weight))
-
-    def set_loras_conditions(self, lora_weights: list):
+    @staticmethod
+    def set_loras_conditions(lora_weights: list):
+        conditions = []
         if len(lora_weights) > 0:
             for lora in lora_weights:
-                self.set_lora_model(lora.model, lora.weight)
+                conditions.append(LoraCondition(lora.model, lora.weight))
 
-        if len(self.conditions) > 0:
-            return self.conditions
+        if len(conditions) > 0:
+            return conditions
 
         return None
 
