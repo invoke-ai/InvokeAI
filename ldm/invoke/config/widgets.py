@@ -2,8 +2,34 @@
 Widget class definitions used by model_select.py, merge_diffusers.py and textual_inversion.py
 '''
 import math
+import platform
 import npyscreen
+import os
+import sys
 import curses
+import struct
+
+from shutil import get_terminal_size
+
+# -------------------------------------
+def set_terminal_size(columns: int, lines: int):
+    OS = platform.uname().system
+    if OS=="Windows":
+        os.system(f'mode con: cols={columns} lines={lines}')
+    elif OS in ['Darwin', 'Linux']:
+        import termios
+        import fcntl
+        winsize = struct.pack("HHHH", lines, columns, 0, 0)
+        fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
+        sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=lines, cols=columns))
+        sys.stdout.flush()
+
+def set_min_terminal_size(min_cols: int, min_lines: int):
+    # make sure there's enough room for the ui
+    term_cols, term_lines = get_terminal_size()
+    cols  = max(term_cols, min_cols)
+    lines = max(term_lines, min_lines)
+    set_terminal_size(cols,lines)
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
@@ -23,7 +49,6 @@ class CenteredTitleText(npyscreen.TitleText):
         maxy, maxx = self.parent.curses_pad.getmaxyx()
         label = self.name
         self.relx = (maxx - len(label)) // 2
-        begin_entry_at = -self.relx + 2
     
 # -------------------------------------
 class CenteredButtonPress(npyscreen.ButtonPress):

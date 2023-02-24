@@ -496,6 +496,7 @@ def main_loop(gen, opt):
 def do_command(command: str, gen, opt: Args, completer) -> tuple:
     global infile
     operation = "generate"  # default operation, alternative is 'postprocess'
+    command = command.replace('\\','/') # windows
 
     if command.startswith(
         "!dream"
@@ -630,7 +631,6 @@ def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
     (3) a huggingface repository id; or (4) a local directory containing a
     diffusers model.
     """
-    model_path = model_path.replace("\\", "/")  # windows
     default_name = Path(model_path).stem
     model_name = None
     model_desc = None
@@ -672,7 +672,7 @@ def import_model(model_path: str, gen, opt, completer, convert=False) -> str:
 
     gen.model_manager.commit(opt.conf)
     completer.update_models(gen.model_manager.list_models())
-    print(f">> {model_name} successfully installed")
+    print(f">> {imported_name} successfully installed")
 
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")

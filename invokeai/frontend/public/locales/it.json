@@ -465,7 +465,10 @@
             "isScheduled": "Annullamento",
             "setType": "Imposta il tipo di annullamento",
             "immediate": "Annulla immediatamente"
-        }
+        },
+        "hSymmetryStep": "Passi Simmetria Orizzontale",
+        "vSymmetryStep": "Passi Simmetria Verticale",
+        "symmetry": "Simmetria"
     },
     "settings": {
         "models": "Modelli",
