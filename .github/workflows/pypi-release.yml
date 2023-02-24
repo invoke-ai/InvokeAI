@@ -28,7 +28,7 @@ jobs:
         run: twine check dist/*
 
       - name: check PyPI versions
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/v2.3'
         run: |
           pip install --upgrade requests
           python -c "\
