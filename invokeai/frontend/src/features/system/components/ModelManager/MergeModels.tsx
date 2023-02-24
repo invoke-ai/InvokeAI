@@ -217,7 +217,7 @@ export default function MergeModels() {
                     <Radio value="add_difference">
                       <Tooltip
                         label={t(
-                          'modelmanager:modelMergeInterpAddDifferenceHelp'
+                          'modelManager.modelMergeInterpAddDifferenceHelp'
                         )}
                       >
                         add_difference

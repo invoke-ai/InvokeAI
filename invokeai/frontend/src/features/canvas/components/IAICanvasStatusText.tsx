@@ -109,7 +109,7 @@ const IAICanvasStatusText = () => {
             color: boundingBoxColor,
           }}
         >{`${t(
-          'unifiedcanvas:boundingBox'
+          'unifiedCanvas.boundingBox'
         )}: ${boundingBoxDimensionsString}`}</div>
       )}
       {shouldShowScaledBoundingBox && (
@@ -118,19 +118,19 @@ const IAICanvasStatusText = () => {
             color: boundingBoxColor,
           }}
         >{`${t(
-          'unifiedcanvas:scaledBoundingBox'
+          'unifiedCanvas.scaledBoundingBox'
         )}: ${scaledBoundingBoxDimensionsString}`}</div>
       )}
       {shouldShowCanvasDebugInfo && (
         <>
           <div>{`${t(
-            'unifiedcanvas:boundingBoxPosition'
+            'unifiedCanvas.boundingBoxPosition'
           )}: ${boundingBoxCoordinatesString}`}</div>
           <div>{`${t(
-            'unifiedcanvas:canvasDimensions'
+            'unifiedCanvas.canvasDimensions'
           )}: ${canvasDimensionsString}`}</div>
           <div>{`${t(
-            'unifiedcanvas:canvasPosition'
+            'unifiedCanvas.canvasPosition'
           )}: ${canvasCoordinatesString}`}</div>
           <IAICanvasStatusTextCursorPos />
         </>
