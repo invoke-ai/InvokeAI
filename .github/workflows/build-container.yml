@@ -26,11 +26,11 @@ jobs:
       fail-fast: false
       matrix:
         flavor:
-          - amd
+          - rocm
           - cuda
           - cpu
         include:
-          - flavor: amd
+          - flavor: rocm
             pip-extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
           - flavor: cuda
             pip-extra-index-url: ''
