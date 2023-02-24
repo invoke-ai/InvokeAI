@@ -5,6 +5,8 @@ on:
       - 'main'
       - 'update/ci/docker/*'
       - 'update/docker/*'
+      - 'dev/ci/docker/*'
+      - 'dev/docker/*'
     paths:
       - 'pyproject.toml'
       - 'ldm/**'
