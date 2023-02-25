@@ -57,19 +57,19 @@ export default function MergeModels() {
 
   const [modelMergeForce, setModelMergeForce] = useState<boolean>(false);
 
-  const modelOneList = Object.keys(diffusersModels).filter((model) => {
-    if (model !== modelTwo && model !== modelThree) return model;
-  });
+  const modelOneList = Object.keys(diffusersModels).filter(
+    (model) => model !== modelTwo && model !== modelThree
+  );
 
-  const modelTwoList = Object.keys(diffusersModels).filter((model) => {
-    if (model !== modelOne && model !== modelThree) return model;
-  });
+  const modelTwoList = Object.keys(diffusersModels).filter(
+    (model) => model !== modelOne && model !== modelThree
+  );
 
   const modelThreeList = [
-    'none',
-    ...Object.keys(diffusersModels).filter((model) => {
-      if (model !== modelOne && model !== modelTwo) return model;
-    }),
+    { key: t('modelManager.none'), value: 'none' },
+    ...Object.keys(diffusersModels)
+      .filter((model) => model !== modelOne && model !== modelTwo)
+      .map((model) => ({ key: model, value: model })),
   ];
 
   const isProcessing = useAppSelector(
@@ -209,18 +209,22 @@ export default function MergeModels() {
                 <Flex columnGap={4}>
                   {modelThree === 'none' ? (
                     <>
-                      <Radio value="weighted_sum">weighted_sum</Radio>
-                      <Radio value="sigmoid">sigmoid</Radio>
-                      <Radio value="inv_sigmoid">inv_sigmoid</Radio>
+                      <Radio value="weighted_sum">
+                        {t('modelManager.weightedSum')}
+                      </Radio>
+                      <Radio value="sigmoid">{t('modelManager.sigmoid')}</Radio>
+                      <Radio value="inv_sigmoid">
+                        {t('modelManager.inverseSigmoid')}
+                      </Radio>
                     </>
                   ) : (
                     <Radio value="add_difference">
                       <Tooltip
                         label={t(
-                          'modelmanager:modelMergeInterpAddDifferenceHelp'
+                          'modelManager.modelMergeInterpAddDifferenceHelp'
                         )}
                       >
-                        add_difference
+                        {t('modelManager.addDifference')}
                       </Tooltip>
                     </Radio>
                   )}

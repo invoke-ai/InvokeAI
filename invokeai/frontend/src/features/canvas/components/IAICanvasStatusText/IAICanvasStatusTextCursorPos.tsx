@@ -34,7 +34,7 @@ export default function IAICanvasStatusTextCursorPos() {
 
   return (
     <div>{`${t(
-      'unifiedcanvas:cursorPosition'
+      'unifiedCanvas.cursorPosition'
     )}: ${cursorCoordinatesString}`}</div>
   );
 }
