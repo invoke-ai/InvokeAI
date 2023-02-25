@@ -6,52 +6,77 @@ stable-diffusion-1.5:
      repo_id: stabilityai/sd-vae-ft-mse
    recommended: True
    default: True
-inpainting-1.5:
+sd-inpainting-1.5:
   description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
   repo_id: runwayml/stable-diffusion-inpainting
   format: diffusers
   vae:
     repo_id: stabilityai/sd-vae-ft-mse
   recommended: True
-dreamlike-diffusion-1.0:
-  description: An SD 1.5 model fine tuned on high quality art by dreamlike.art, diffusers version (2.13 BG)
-  format: diffusers
-  repo_id: dreamlike-art/dreamlike-diffusion-1.0
-  vae:
-     repo_id: stabilityai/sd-vae-ft-mse
-  recommended: True
-dreamlike-photoreal-2.0:
-  description: A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)
-  format: diffusers
-  repo_id: dreamlike-art/dreamlike-photoreal-2.0
-  recommended: False
-stable-diffusion-2.1-768:
+stable-diffusion-2.1:
    description: Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-1
    format: diffusers
    recommended: True
-stable-diffusion-2.1-base:
-   description: Stable Diffusion version 2.1 diffusers base model, trained on 512 pixel images (5.21 GB)
-   repo_id: stabilityai/stable-diffusion-2-1-base
+sd-inpainting-2.0:
+   description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
+   repo_id: stabilityai/stable-diffusion-2-1
    format: diffusers
    recommended: False
+analog-diffusion-1.0:
+   description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
+   repo_id: wavymulder/Analog-Diffusion
+   format: diffusers
+   recommended: false
+deliberate-1.0:
+   description: Versatile model that produces detailed images up to 768px (4.27 GB)
+   format: diffusers
+   repo_id: XpucT/Deliberate
+   recommended: False
+d&d-diffusion-1.0:
+   description: Dungeons & Dragons characters (2.13 GB)
+   format: diffusers
+   repo_id: 0xJustin/Dungeons-and-Diffusion
+   recommended: False
+dreamlike-photoreal-2.0:
+   description: A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)
+   format: diffusers
+   repo_id: dreamlike-art/dreamlike-photoreal-2.0
+   recommended: False
+inkpunk-1.0:
+   description: Stylized illustrations inspired by Gorillaz, FLCL and Shinkawa; prompt with "nvinkpunk" (4.27 GB)
+   format: diffusers
+   repo_id: Envvi/Inkpunk-Diffusion
+   recommended: False
 openjourney-4.0:
-  description: An SD 1.5 model fine tuned on Midjourney images by PromptHero - include "mdjrny-v4 style" in your prompts (2.13 GB)
-  format: diffusers
-  repo_id: prompthero/openjourney
-  vae:
+   description: An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)
+   format: diffusers
+   repo_id: prompthero/openjourney
+   vae:
      repo_id: stabilityai/sd-vae-ft-mse
-  recommended: False
-nitro-diffusion-1.0:
-   description: A SD 1.5 model trained on three artstyles - prompt with "archer style", "arcane style" and/or "modern disney style" (2.13 GB)
-   repo_id: nitrosocke/Nitro-Diffusion
+   recommended: False
+portrait-plus-1.0:
+   description: An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)
+   format: diffusers
+   repo_id: wavymulder/portraitplus
+   recommended: False
+seek-art-mega-1.0:
+   description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
+   repo_id: coreco/seek.art_MEGA
    format: diffusers
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
    recommended: False
 trinart-2.0:
-   description: An SD model finetuned with ~40,000 assorted high resolution manga/anime-style pictures, diffusers version (2.13 GB)
+   description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
    repo_id: naclbit/trinart_stable_diffusion_v2
+   format: diffusers
+   vae:
+     repo_id: stabilityai/sd-vae-ft-mse
+   recommended: False
+waifu-diffusion-1.4:
+   description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
+   repo_id: hakurei/waifu-diffusion
    format: diffusers
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
