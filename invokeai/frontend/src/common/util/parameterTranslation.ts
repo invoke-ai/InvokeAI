@@ -192,7 +192,7 @@ export const frontendToBackendParameters = (
       );
     }
 
-    if (horizontalSymmetryTimePercentage > 0) {
+    if (verticalSymmetryTimePercentage > 0) {
       generationParameters.v_symmetry_time_pct = Math.max(
         0,
         Math.min(1, verticalSymmetryTimePercentage / steps)
