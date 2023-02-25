@@ -28,11 +28,11 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     def __process(self, stop_event: Event):
         try:
             while not stop_event.is_set():
-                queue_item: InvocationQueueItem = self.__invoker.invoker_services.queue.get()
+                queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
                 if not queue_item: # Probably stopping
                     continue
 
-                graph_execution_state = self.__invoker.invoker_services.graph_execution_manager.get(queue_item.graph_execution_state_id)
+                graph_execution_state = self.__invoker.services.graph_execution_manager.get(queue_item.graph_execution_state_id)
                 invocation = graph_execution_state.execution_graph.get_node(queue_item.invocation_id)
 
                 # Send starting event
@@ -52,7 +52,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     graph_execution_state.complete(invocation.id, outputs)
 
                     # Save the state changes
-                    self.__invoker.invoker_services.graph_execution_manager.set(graph_execution_state)
+                    self.__invoker.services.graph_execution_manager.set(graph_execution_state)
 
                     # Send complete event
                     self.__invoker.services.events.emit_invocation_complete(

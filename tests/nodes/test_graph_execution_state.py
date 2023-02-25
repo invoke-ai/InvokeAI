@@ -1,10 +1,11 @@
 from .test_invoker import create_edge
 from .test_nodes import ImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation
 from ldm.invoke.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from ldm.invoke.app.services.processor import DefaultInvocationProcessor
+from ldm.invoke.app.services.sqlite import SqliteItemStorage, sqlite_memory
+from ldm.invoke.app.services.invocation_queue import MemoryInvocationQueue
 from ldm.invoke.app.services.invocation_services import InvocationServices
 from ldm.invoke.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
-from ldm.invoke.app.invocations.generate import ImageToImageInvocation, TextToImageInvocation
-from ldm.invoke.app.invocations.upscale import UpscaleInvocation
 import pytest
 
 
@@ -19,7 +20,14 @@ def simple_graph():
 @pytest.fixture
 def mock_services():
     # NOTE: none of these are actually called by the test invocations
-    return InvocationServices(generate = None, events = None, images = None)
+    return InvocationServices(
+        generate = None,
+        events = None,
+        images = None,
+        queue = MemoryInvocationQueue(),
+        graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
+        processor = DefaultInvocationProcessor()
+    )
 
 def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[BaseInvocation, BaseInvocationOutput]:
     n = g.next()
