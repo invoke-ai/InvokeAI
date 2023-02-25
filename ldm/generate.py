@@ -1030,6 +1030,8 @@ class Generate:
         image_callback=None,
         prefix=None,
     ):
+
+        results = []
         for r in image_list:
             image, seed = r
             try:
@@ -1082,6 +1084,10 @@ class Generate:
                 image_callback(image, seed, upscaled=True, use_prefix=prefix)
             else:
                 r[0] = image
+
+            results.append([image, seed])
+
+        return results
 
     def apply_textmask(
         self, image_path: str, prompt: str, callback, threshold: float = 0.5
