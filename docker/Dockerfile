@@ -4,7 +4,7 @@ ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
 ##################
-FROM python:${PYTHON_VERSION}-slim AS python-base
+FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
 
 LABEL org.opencontainers.image.authors="mauwii@outlook.de"
 
@@ -51,11 +51,6 @@ RUN \
     gcc=4:10.2.* \
     python3-dev=3.9.*
 
-# Install pip-tools
-RUN pip install \
-  --no-cache-dir \
-  pip-tools==6.12.2
-
 # Prepare pip for buildkit cache
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
 ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
@@ -72,11 +67,7 @@ COPY --link ldm/invoke/_version.py ldm/invoke/__init__.py ldm/invoke/
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  pip-compile \
-  --resolver=backtracking \
-  --output-file=requirements.txt \
-  pyproject.toml && "${APPNAME}"/bin/pip install \
-  -r requirements.txt
+  "${APPNAME}"/bin/pip install .
 
 # Install pyproject.toml
 COPY --link . .
@@ -102,11 +93,11 @@ RUN useradd \
 # Create volume directory
 ARG VOLUME_DIR=/data
 RUN mkdir -p "${VOLUME_DIR}" \
-  && chown -R "${UNAME}" "${VOLUME_DIR}"
+  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
 
 # Setup runtime environment
-USER ${UNAME}
-COPY --chown=${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+USER ${UNAME}:${UNAME}
+COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
