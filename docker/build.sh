@@ -41,7 +41,7 @@ else
 fi
 
 # Build Container
-DOCKER_BUILDKIT=1 docker build \
+docker build \
     --platform="${PLATFORM:-linux/amd64}" \
     --tag="${CONTAINER_IMAGE:-invokeai}" \
     ${CONTAINER_FLAVOR:+--build-arg="CONTAINER_FLAVOR=${CONTAINER_FLAVOR}"} \
