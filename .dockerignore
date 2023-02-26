@@ -4,10 +4,6 @@
 !ldm
 !pyproject.toml
 
-# Guard against pulling in any models that might exist in the directory tree
-**/*.pt*
-**/*.ckpt
-
 # ignore frontend but whitelist dist
 invokeai/frontend/
 !invokeai/frontend/dist/
@@ -16,10 +12,14 @@ invokeai/frontend/
 invokeai/assets/
 !invokeai/assets/web/
 
+# Guard against pulling in any models that might exist in the directory tree
+**/*.pt*
+**/*.ckpt
+
 # Byte-compiled / optimized / DLL files
 **/__pycache__/
 **/*.py[cod]
 
 # Distribution / packaging
-*.egg-info/
-*.egg
+**/*.egg-info/
+**/*.egg

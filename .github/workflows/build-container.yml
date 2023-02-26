@@ -5,6 +5,8 @@ on:
       - 'main'
       - 'update/ci/docker/*'
       - 'update/docker/*'
+      - 'dev/ci/docker/*'
+      - 'dev/docker/*'
     paths:
       - 'pyproject.toml'
       - 'ldm/**'
@@ -24,11 +26,11 @@ jobs:
       fail-fast: false
       matrix:
         flavor:
-          - amd
+          - rocm
           - cuda
           - cpu
         include:
-          - flavor: amd
+          - flavor: rocm
             pip-extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
           - flavor: cuda
             pip-extra-index-url: ''
