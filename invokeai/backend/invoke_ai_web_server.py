@@ -7,13 +7,15 @@ import mimetypes
 import os
 import shutil
 import traceback
+from pathlib import Path
 from threading import Event
 from uuid import uuid4
 
 import eventlet
-from pathlib import Path
+import invokeai.frontend.dist as frontend
 from PIL import Image
 from PIL.Image import Image as ImageType
+from compel.prompt_parser import Blend
 from flask import Flask, redirect, send_from_directory, request, make_response
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
@@ -22,18 +24,15 @@ from invokeai.backend.modules.get_canvas_generation_mode import (
     get_canvas_generation_mode,
 )
 from invokeai.backend.modules.parameters import parameters_to_command
-import invokeai.frontend.dist as frontend
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.conditioning import get_tokens_for_prompt_object, get_prompt_structure, split_weighted_subprompts, \
-    get_tokenizer
+from ldm.invoke.conditioning import get_tokens_for_prompt_object, get_prompt_structure, get_tokenizer
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals, global_converted_ckpts_dir
-from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from compel.prompt_parser import Blend
 from ldm.invoke.globals import global_models_dir
 from ldm.invoke.merge_diffusers import merge_diffusion_models
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 
 # Loading Arguments
 opt = Args()
@@ -1685,27 +1684,23 @@ class CanceledException(Exception):
     pass
 
 
-"""
-Returns a copy an image, cropped to a bounding box.
-"""
-
-
 def copy_image_from_bounding_box(
     image: ImageType, x: int, y: int, width: int, height: int
 ) -> ImageType:
+    """
+    Returns a copy an image, cropped to a bounding box.
+    """
     with image as im:
         bounds = (x, y, x + width, y + height)
         im_cropped = im.crop(bounds)
         return im_cropped
 
 
-"""
-Converts a base64 image dataURL into an image.
-The dataURL is split on the first commma.
-"""
-
-
 def dataURL_to_image(dataURL: str) -> ImageType:
+    """
+    Converts a base64 image dataURL into an image.
+    The dataURL is split on the first comma.
+    """
     image = Image.open(
         io.BytesIO(
             base64.decodebytes(
@@ -1719,12 +1714,10 @@ def dataURL_to_image(dataURL: str) -> ImageType:
     return image
 
 
-"""
-Converts an image into a base64 image dataURL.
-"""
-
-
 def image_to_dataURL(image: ImageType) -> str:
+    """
+    Converts an image into a base64 image dataURL.
+    """
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     image_base64 = "data:image/png;base64," + base64.b64encode(
@@ -1733,24 +1726,17 @@ def image_to_dataURL(image: ImageType) -> str:
     return image_base64
 
 
-"""
-Converts a base64 image dataURL into bytes.
-The dataURL is split on the first commma.
-"""
-
-
 def dataURL_to_bytes(dataURL: str) -> bytes:
+    """
+    Converts a base64 image dataURL into bytes.
+    The dataURL is split on the first comma.
+    """
     return base64.decodebytes(
         bytes(
             dataURL.split(",", 1)[1],
             "utf-8",
         )
     )
-
-
-"""
-Pastes an image onto another with a bounding box.
-"""
 
 
 def paste_image_into_bounding_box(
@@ -1761,15 +1747,13 @@ def paste_image_into_bounding_box(
     width: int,
     height: int,
 ) -> ImageType:
+    """
+    Pastes an image onto another with a bounding box.
+    """
     with recipient_image as im:
         bounds = (x, y, x + width, y + height)
         im.paste(donor_image, bounds)
         return recipient_image
-
-
-"""
-Saves a thumbnail of an image, returning its path.
-"""
 
 
 def save_thumbnail(
@@ -1778,6 +1762,9 @@ def save_thumbnail(
     path: str,
     size: int = 256,
 ) -> str:
+    """
+    Saves a thumbnail of an image, returning its path.
+    """
     base_filename = os.path.splitext(filename)[0]
     thumbnail_path = os.path.join(path, base_filename + ".webp")
 
