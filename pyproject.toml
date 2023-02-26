@@ -32,7 +32,7 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",
-  "compel>=0.1.6",
+  "compel==0.1.7",
   "datasets",
   "diffusers[torch]~=0.13",
   "dnspython==2.2.1",
