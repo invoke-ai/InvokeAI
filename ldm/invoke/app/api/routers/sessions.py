@@ -44,9 +44,9 @@ async def list_sessions(
 ) -> PaginatedResults[GraphExecutionState]:
     """Gets a list of sessions, optionally searching"""
     if filter == '':
-        result = ApiDependencies.invoker.services.graph_execution_manager.list(page, per_page)
+        result = ApiDependencies.invoker.invoker_services.graph_execution_manager.list(page, per_page)
     else:
-        result = ApiDependencies.invoker.services.graph_execution_manager.search(query, page, per_page)
+        result = ApiDependencies.invoker.invoker_services.graph_execution_manager.search(query, page, per_page)
     return result
 
 
@@ -60,7 +60,7 @@ async def get_session(
     session_id: str = Path(description = "The id of the session to get")
 ) -> GraphExecutionState:
     """Gets a session"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
     else:
@@ -80,13 +80,13 @@ async def add_node(
     node: Annotated[Union[BaseInvocation.get_invocations()], Field(discriminator="type")] = Body(description = "The node to add")
 ) -> str:
     """Adds a node to the graph"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
 
     try:
         session.add_node(node)
-        ApiDependencies.invoker.services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
+        ApiDependencies.invoker.invoker_services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
         return session.id
     except NodeAlreadyExecutedError:
         return Response(status_code = 400)
@@ -108,13 +108,13 @@ async def update_node(
     node: Annotated[Union[BaseInvocation.get_invocations()], Field(discriminator="type")] = Body(description = "The new node")
 ) -> GraphExecutionState:
     """Updates a node in the graph and removes all linked edges"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
 
     try:
         session.update_node(node_path, node)
-        ApiDependencies.invoker.services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
+        ApiDependencies.invoker.invoker_services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
         return session
     except NodeAlreadyExecutedError:
         return Response(status_code = 400)
@@ -135,13 +135,13 @@ async def delete_node(
     node_path: str = Path(description = "The path to the node to delete")
 ) -> GraphExecutionState:
     """Deletes a node in the graph and removes all linked edges"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
 
     try:
         session.delete_node(node_path)
-        ApiDependencies.invoker.services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
+        ApiDependencies.invoker.invoker_services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
         return session
     except NodeAlreadyExecutedError:
         return Response(status_code = 400)
@@ -162,13 +162,13 @@ async def add_edge(
     edge: tuple[EdgeConnection, EdgeConnection] = Body(description = "The edge to add")
 ) -> GraphExecutionState:
     """Adds an edge to the graph"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
 
     try:
         session.add_edge(edge)
-        ApiDependencies.invoker.services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
+        ApiDependencies.invoker.invoker_services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
         return session
     except NodeAlreadyExecutedError:
         return Response(status_code = 400)
@@ -193,14 +193,14 @@ async def delete_edge(
     to_field: str = Path(description = "The field of the node the edge is going to")
 ) -> GraphExecutionState:
     """Deletes an edge from the graph"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
 
     try:
         edge = (EdgeConnection(node_id = from_node_id, field = from_field), EdgeConnection(node_id = to_node_id, field = to_field))
         session.delete_edge(edge)
-        ApiDependencies.invoker.services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
+        ApiDependencies.invoker.invoker_services.graph_execution_manager.set(session) # TODO: can this be done automatically, or add node through an API?
         return session
     except NodeAlreadyExecutedError:
         return Response(status_code = 400)
@@ -221,7 +221,7 @@ async def invoke_session(
     all: bool       = Query(default = False, description = "Whether or not to invoke all remaining invocations")
 ) -> None:
     """Invokes a session"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
+    session = ApiDependencies.invoker.invoker_services.graph_execution_manager.get(session_id)
     if session is None:
         return Response(status_code = 404)
     

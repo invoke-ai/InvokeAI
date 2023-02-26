@@ -2,10 +2,12 @@ from .test_nodes import ImageTestInvocation, ListPassThroughInvocation, PromptTe
 from ldm.invoke.app.services.processor import DefaultInvocationProcessor
 from ldm.invoke.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from ldm.invoke.app.services.invocation_queue import MemoryInvocationQueue
-from ldm.invoke.app.services.invoker import Invoker
+from ldm.invoke.app.services.invoker import Invoker, InvokerServices
 from ldm.invoke.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from ldm.invoke.app.services.invocation_services import InvocationServices
 from ldm.invoke.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
+from ldm.invoke.app.invocations.generate import ImageToImageInvocation, TextToImageInvocation
+from ldm.invoke.app.invocations.upscale import UpscaleInvocation
 import pytest
 
 
@@ -20,19 +22,21 @@ def simple_graph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
-    return InvocationServices(
-        generate = None,
-        events = TestEventService(),
-        images = None,
+    return InvocationServices(generate = None, events = TestEventService(), images = None)
+
+@pytest.fixture()
+def mock_invoker_services() -> InvokerServices:
+    return InvokerServices(
         queue = MemoryInvocationQueue(),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
         processor = DefaultInvocationProcessor()
     )
 
 @pytest.fixture()
-def mock_invoker(mock_services: InvocationServices) -> Invoker:
+def mock_invoker(mock_services: InvocationServices, mock_invoker_services: InvokerServices) -> Invoker:
     return Invoker(
-        services = mock_services
+        services = mock_services,
+        invoker_services = mock_invoker_services
     )
 
 def test_can_create_graph_state(mock_invoker: Invoker):
@@ -56,13 +60,13 @@ def test_can_invoke(mock_invoker: Invoker, simple_graph):
     assert invocation_id is not None
 
     def has_executed_any(g: GraphExecutionState):
-        g = mock_invoker.services.graph_execution_manager.get(g.id)
+        g = mock_invoker.invoker_services.graph_execution_manager.get(g.id)
         return len(g.executed) > 0
 
     wait_until(lambda: has_executed_any(g), timeout = 5, interval = 1)
     mock_invoker.stop()
 
-    g = mock_invoker.services.graph_execution_manager.get(g.id)
+    g = mock_invoker.invoker_services.graph_execution_manager.get(g.id)
     assert len(g.executed) > 0
 
 def test_can_invoke_all(mock_invoker: Invoker, simple_graph):
@@ -71,11 +75,11 @@ def test_can_invoke_all(mock_invoker: Invoker, simple_graph):
     assert invocation_id is not None
 
     def has_executed_all(g: GraphExecutionState):
-        g = mock_invoker.services.graph_execution_manager.get(g.id)
+        g = mock_invoker.invoker_services.graph_execution_manager.get(g.id)
         return g.is_complete()
 
     wait_until(lambda: has_executed_all(g), timeout = 5, interval = 1)
     mock_invoker.stop()
 
-    g = mock_invoker.services.graph_execution_manager.get(g.id)
+    g = mock_invoker.invoker_services.graph_execution_manager.get(g.id)
     assert g.is_complete()

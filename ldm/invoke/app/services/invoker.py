@@ -9,15 +9,34 @@ from .invocation_services import InvocationServices
 from .invocation_queue import InvocationQueueABC, InvocationQueueItem
 
 
+class InvokerServices:
+    """Services used by the Invoker for execution"""
+
+    queue: InvocationQueueABC
+    graph_execution_manager: ItemStorageABC[GraphExecutionState]
+    processor: 'InvocationProcessorABC'
+
+    def __init__(self,
+        queue: InvocationQueueABC,
+        graph_execution_manager: ItemStorageABC[GraphExecutionState],
+        processor: 'InvocationProcessorABC'):
+        self.queue           = queue
+        self.graph_execution_manager = graph_execution_manager
+        self.processor       = processor
+
+
 class Invoker:
     """The invoker, used to execute invocations"""
 
     services: InvocationServices
+    invoker_services: InvokerServices
 
     def __init__(self,
-        services: InvocationServices
+        services: InvocationServices,      # Services used by nodes to perform invocations
+        invoker_services: InvokerServices # Services used by the invoker for orchestration
     ):
         self.services = services
+        self.invoker_services = invoker_services
         self._start()
 
 
@@ -30,11 +49,11 @@ class Invoker:
             return None
 
         # Save the execution state
-        self.services.graph_execution_manager.set(graph_execution_state)
+        self.invoker_services.graph_execution_manager.set(graph_execution_state)
 
         # Queue the invocation
         print(f'queueing item {invocation.id}')
-        self.services.queue.put(InvocationQueueItem(
+        self.invoker_services.queue.put(InvocationQueueItem(
             #session_id    = session.id,
             graph_execution_state_id = graph_execution_state.id,
             invocation_id = invocation.id,
@@ -47,7 +66,7 @@ class Invoker:
     def create_execution_state(self, graph: Graph|None = None) -> GraphExecutionState:
         """Creates a new execution state for the given graph"""
         new_state = GraphExecutionState(graph = Graph() if graph is None else graph)
-        self.services.graph_execution_manager.set(new_state)
+        self.invoker_services.graph_execution_manager.set(new_state)
         return new_state
 
 
@@ -67,8 +86,8 @@ class Invoker:
     
     def _start(self) -> None:
         """Starts the invoker. This is called automatically when the invoker is created."""
-        for service in vars(self.services):
-            self.__start_service(getattr(self.services, service))
+        for service in vars(self.invoker_services):
+            self.__start_service(getattr(self.invoker_services, service))
 
         for service in vars(self.services):
             self.__start_service(getattr(self.services, service))
@@ -80,10 +99,10 @@ class Invoker:
         for service in vars(self.services):
             self.__stop_service(getattr(self.services, service))
 
-        for service in vars(self.services):
-            self.__stop_service(getattr(self.services, service))
+        for service in vars(self.invoker_services):
+            self.__stop_service(getattr(self.invoker_services, service))
 
-        self.services.queue.put(None)
+        self.invoker_services.queue.put(None)
 
 
 class InvocationProcessorABC(ABC):

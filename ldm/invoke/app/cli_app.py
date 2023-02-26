@@ -20,7 +20,7 @@ from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
 from .invocations.baseinvocation import BaseInvocation
 from .services.invocation_services import InvocationServices
-from .services.invoker import Invoker 
+from .services.invoker import Invoker, InvokerServices
 from .invocations import *
 from ..args import Args
 from .services.events import EventServiceBase
@@ -171,25 +171,28 @@ def invoke_cli():
 
     output_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../outputs'))
 
+    services = InvocationServices(
+        generate = generate,
+        events = events,
+        images = DiskImageStorage(output_folder)
+    )
+
     # TODO: build a file/path manager?
     db_location = os.path.join(output_folder, 'invokeai.db')
 
-    services = InvocationServices(
-        generate                = generate,
-        events                  = events,
-        images                  = DiskImageStorage(output_folder),
-        queue                   = MemoryInvocationQueue(),
+    invoker_services = InvokerServices(
+        queue           = MemoryInvocationQueue(),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = db_location, table_name = 'graph_executions'),
-        processor               = DefaultInvocationProcessor()
+        processor = DefaultInvocationProcessor()
     )
 
-    invoker = Invoker(services)
+    invoker = Invoker(services, invoker_services)
     session = invoker.create_execution_state()
     
     parser = get_invocation_parser()
 
     # Uncomment to print out previous sessions at startup
-    # print(services.session_manager.list())
+    # print(invoker_services.session_manager.list())
 
     # Defaults storage
     defaults: Dict[str, Any] = dict()
@@ -210,7 +213,7 @@ def invoke_cli():
 
         try:
             # Refresh the state of the session
-            session = invoker.services.graph_execution_manager.get(session.id)
+            session = invoker.invoker_services.graph_execution_manager.get(session.id)
             history = list(get_graph_execution_history(session))
 
             # Split the command for piping
@@ -286,7 +289,7 @@ def invoke_cli():
             invoker.invoke(session, invoke_all = True)
             while not session.is_complete():
                 # Wait some time
-                session = invoker.services.graph_execution_manager.get(session.id)
+                session = invoker.invoker_services.graph_execution_manager.get(session.id)
                 time.sleep(0.1)
 
         except InvalidArgs:

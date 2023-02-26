@@ -13,7 +13,7 @@ from ...globals import Globals
 from ..services.image_storage import DiskImageStorage
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
-from ..services.invoker import Invoker
+from ..services.invoker import Invoker, InvokerServices
 from ..services.generate_initializer import get_generate
 from .events import FastAPIEventService
 
@@ -60,19 +60,22 @@ class ApiDependencies:
 
         images = DiskImageStorage(output_folder)
 
-        # TODO: build a file/path manager?
-        db_location = os.path.join(output_folder, 'invokeai.db')
-
         services = InvocationServices(
             generate = generate,
             events   = events,
-            images   = images,
-            queue                   = MemoryInvocationQueue(),
+            images   = images
+        )
+            
+        # TODO: build a file/path manager?
+        db_location = os.path.join(output_folder, 'invokeai.db')
+
+        invoker_services = InvokerServices(
+            queue = MemoryInvocationQueue(),
             graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = db_location, table_name = 'graph_executions'),
-            processor               = DefaultInvocationProcessor()
+            processor = DefaultInvocationProcessor()
         )
 
-        ApiDependencies.invoker = Invoker(services)
+        ApiDependencies.invoker = Invoker(services, invoker_services)
     
     @staticmethod
     def shutdown():
