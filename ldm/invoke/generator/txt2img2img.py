@@ -80,9 +80,7 @@ class Txt2Img2Img(Generator):
             # the message below is accurate.
             init_width = first_pass_latent_output.size()[3] * self.downsampling_factor
             init_height = first_pass_latent_output.size()[2] * self.downsampling_factor
-            print(
-                f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
-            )
+            print(f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling")
 
             # resizing
             resized_latents = torch.nn.functional.interpolate(
@@ -99,22 +97,14 @@ class Txt2Img2Img(Generator):
             if clear_cuda_cache is not None:
                 clear_cuda_cache()
 
-            second_pass_noise = self.get_noise_like(
-                resized_latents, override_perlin=True
-            )
+            second_pass_noise = self.get_noise_like(resized_latents, override_perlin=True)
 
             # Clear symmetry for the second pass
             from dataclasses import replace
 
-            new_postprocessing_settings = replace(
-                conditioning_data.postprocessing_settings, h_symmetry_time_pct=None
-            )
-            new_postprocessing_settings = replace(
-                new_postprocessing_settings, v_symmetry_time_pct=None
-            )
-            new_conditioning_data = replace(
-                conditioning_data, postprocessing_settings=new_postprocessing_settings
-            )
+            new_postprocessing_settings = replace(conditioning_data.postprocessing_settings, h_symmetry_time_pct=None)
+            new_postprocessing_settings = replace(new_postprocessing_settings, v_symmetry_time_pct=None)
+            new_conditioning_data = replace(conditioning_data, postprocessing_settings=new_postprocessing_settings)
 
             verbosity = get_verbosity()
             set_verbosity_error()
@@ -128,10 +118,7 @@ class Txt2Img2Img(Generator):
             )
             set_verbosity(verbosity)
 
-            if (
-                pipeline_output.attention_map_saver is not None
-                and attention_maps_callback is not None
-            ):
+            if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
                 attention_maps_callback(pipeline_output.attention_map_saver)
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
@@ -149,16 +136,12 @@ class Txt2Img2Img(Generator):
     def get_noise_like(self, like: torch.Tensor, override_perlin: bool = False):
         device = like.device
         if device.type == "mps":
-            x = torch.randn_like(like, device="cpu", dtype=self.torch_dtype()).to(
-                device
-            )
+            x = torch.randn_like(like, device="cpu", dtype=self.torch_dtype()).to(device)
         else:
             x = torch.randn_like(like, device=device, dtype=self.torch_dtype())
         if self.perlin > 0.0 and override_perlin == False:
             shape = like.shape
-            x = (1 - self.perlin) * x + self.perlin * self.get_perlin_noise(
-                shape[3], shape[2]
-            )
+            x = (1 - self.perlin) * x + self.perlin * self.get_perlin_noise(shape[3], shape[2])
         return x
 
     # returns a tensor filled with random numbers from a normal distribution
@@ -172,9 +155,7 @@ class Txt2Img2Img(Generator):
             aspect = width / height
             dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
             min_dimension = math.floor(dimension * 0.5)
-            model_area = (
-                dimension * dimension
-            )  # hardcoded for now since all models are trained on square images
+            model_area = dimension * dimension  # hardcoded for now since all models are trained on square images
 
             if aspect > 1.0:
                 init_height = max(min_dimension, math.sqrt(model_area / aspect))
@@ -183,9 +164,7 @@ class Txt2Img2Img(Generator):
                 init_width = max(min_dimension, math.sqrt(model_area * aspect))
                 init_height = init_width / aspect
 
-            scaled_width, scaled_height = trim_to_multiple_of(
-                math.floor(init_width), math.floor(init_height)
-            )
+            scaled_width, scaled_height = trim_to_multiple_of(math.floor(init_width), math.floor(init_height))
 
         else:
             scaled_width = width

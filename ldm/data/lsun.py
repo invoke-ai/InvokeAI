@@ -109,9 +109,7 @@ class LSUNBedroomsValidation(LSUNBase):
 
 class LSUNCatsTrain(LSUNBase):
     def __init__(self, **kwargs):
-        super().__init__(
-            txt_file="data/lsun/cat_train.txt", data_root="data/lsun/cats", **kwargs
-        )
+        super().__init__(txt_file="data/lsun/cat_train.txt", data_root="data/lsun/cats", **kwargs)
 
 
 class LSUNCatsValidation(LSUNBase):

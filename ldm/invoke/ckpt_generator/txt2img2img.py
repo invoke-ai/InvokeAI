@@ -55,9 +55,7 @@ class CkptTxt2Img2Img(CkptGenerator):
                 init_width // self.downsampling_factor,
             ]
 
-            sampler.make_schedule(
-                ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
-            )
+            sampler.make_schedule(ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False)
 
             # x = self.get_noise(init_width, init_height)
             x = x_T
@@ -79,9 +77,7 @@ class CkptTxt2Img2Img(CkptGenerator):
                 extra_conditioning_info=extra_conditioning_info,
             )
 
-            print(
-                f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
-            )
+            print(f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling")
 
             # resizing
             samples = torch.nn.functional.interpolate(
@@ -95,9 +91,7 @@ class CkptTxt2Img2Img(CkptGenerator):
 
             t_enc = int(strength * steps)
             ddim_sampler = DDIMSampler(self.model, device=self.model.device)
-            ddim_sampler.make_schedule(
-                ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
-            )
+            ddim_sampler.make_schedule(ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False)
 
             z_enc = ddim_sampler.stochastic_encode(
                 samples,
@@ -147,9 +141,7 @@ class CkptTxt2Img2Img(CkptGenerator):
             )
             assert result is not None and len(result) > 0, "** txt2img failed **"
             image = result[0][0]
-            interpolated_image = image.resize(
-                (width, height), resample=Image.Resampling.LANCZOS
-            )
+            interpolated_image = image.resize((width, height), resample=Image.Resampling.LANCZOS)
             print(kwargs.pop("init_image", None))
             result = omnibus.generate(
                 prompt,

@@ -54,9 +54,7 @@ class EmbeddingManager(nn.Module):
 
         if hasattr(embedder, "tokenizer"):  # using Stable Diffusion's CLIP encoder
             self.is_clip = True
-            get_token_id_for_string = partial(
-                get_clip_token_id_for_string, embedder.tokenizer
-            )
+            get_token_id_for_string = partial(get_clip_token_id_for_string, embedder.tokenizer)
             get_embedding_for_tkn_id = partial(
                 get_embedding_for_clip_token_id,
                 embedder.transformer.text_model.embeddings,
@@ -66,9 +64,7 @@ class EmbeddingManager(nn.Module):
             token_dim = 768
         else:  # using LDM's BERT encoder
             self.is_clip = False
-            get_token_id_for_string = partial(
-                get_bert_token_id_for_string, embedder.tknz_fn
-            )
+            get_token_id_for_string = partial(get_bert_token_id_for_string, embedder.tknz_fn)
             get_embedding_for_tkn_id = embedder.transformer.token_emb
             token_dim = 1280
 
@@ -116,9 +112,7 @@ class EmbeddingManager(nn.Module):
             placeholder_string,
             placeholder_token,
         ) in self.string_to_token_dict.items():
-            placeholder_embedding = self.string_to_param_dict[placeholder_string].to(
-                device
-            )
+            placeholder_embedding = self.string_to_param_dict[placeholder_string].to(device)
 
             if self.progressive_words:
                 self.progressive_counter += 1
@@ -128,9 +122,7 @@ class EmbeddingManager(nn.Module):
 
             num_vectors_for_token = min(placeholder_embedding.shape[0], max_step_tokens)
 
-            placeholder_rows, placeholder_cols = torch.where(
-                tokenized_text == placeholder_token
-            )
+            placeholder_rows, placeholder_cols = torch.where(tokenized_text == placeholder_token)
 
             if placeholder_rows.nelement() == 0:
                 continue
@@ -145,9 +137,7 @@ class EmbeddingManager(nn.Module):
                 new_token_row = torch.cat(
                     [
                         tokenized_text[row][:col],
-                        torch.tensor(
-                            [placeholder_token] * num_vectors_for_token, device=device
-                        ),
+                        torch.tensor([placeholder_token] * num_vectors_for_token, device=device),
                         tokenized_text[row][col + 1 :],
                     ],
                     axis=0,
@@ -189,9 +179,7 @@ class EmbeddingManager(nn.Module):
         for term in self.string_to_param_dict.keys():
             term = term.strip("<").strip(">")
             self.concepts_loaded[term] = True
-        print(
-            f'>> Current embedding manager terms: {", ".join(self.string_to_param_dict.keys())}'
-        )
+        print(f'>> Current embedding manager terms: {", ".join(self.string_to_param_dict.keys())}')
 
     def _expand_directories(self, paths: list[str]):
         expanded_paths = list()
@@ -208,42 +196,30 @@ class EmbeddingManager(nn.Module):
         try:
             scan_result = scan_file_path(ckpt_path)
             if scan_result.infected_files == 1:
-                print(
-                    f"\n### Security Issues Found in Model: {scan_result.issues_count}"
-                )
+                print(f"\n### Security Issues Found in Model: {scan_result.issues_count}")
                 print("### For your safety, InvokeAI will not load this embed.")
                 return
         except Exception:
-            print(
-                f"### WARNING::: Invalid or corrupt embeddings found. Ignoring: {ckpt_path}"
-            )
+            print(f"### WARNING::: Invalid or corrupt embeddings found. Ignoring: {ckpt_path}")
             return
 
         embedding_info = self.parse_embedding(ckpt_path)
         if embedding_info:
             self.max_vectors_per_token = embedding_info["num_vectors_per_token"]
-            self.add_embedding(
-                embedding_info["name"], embedding_info["embedding"], full
-            )
+            self.add_embedding(embedding_info["name"], embedding_info["embedding"], full)
         else:
-            print(
-                f">> Failed to load embedding located at {ckpt_path}. Unsupported file."
-            )
+            print(f">> Failed to load embedding located at {ckpt_path}. Unsupported file.")
 
     def add_embedding(self, token_str, embedding, full):
         if token_str in self.string_to_param_dict:
-            print(
-                f">> Embedding manager refusing to overwrite already-loaded term '{token_str}'"
-            )
+            print(f">> Embedding manager refusing to overwrite already-loaded term '{token_str}'")
             return
         if not full:
             embedding = embedding.half()
         if len(embedding.shape) == 1:
             embedding = embedding.unsqueeze(0)
 
-        existing_token_id = get_clip_token_id_for_string(
-            self.embedder.tokenizer, token_str
-        )
+        existing_token_id = get_clip_token_id_for_string(self.embedder.tokenizer, token_str)
         if existing_token_id == self.embedder.tokenizer.unk_token_id:
             num_tokens_added = self.embedder.tokenizer.add_tokens(token_str)
             current_embeddings = self.embedder.transformer.resize_token_embeddings(None)
@@ -272,14 +248,10 @@ class EmbeddingManager(nn.Module):
         if "string_to_token" and "string_to_param" in embedding_ckpt:
             # Catch variants that do not have the expected keys or values.
             try:
-                embedding_info["name"] = embedding_ckpt["name"] or os.path.basename(
-                    os.path.splitext(embedding_file)[0]
-                )
+                embedding_info["name"] = embedding_ckpt["name"] or os.path.basename(os.path.splitext(embedding_file)[0])
 
                 # Check num of embeddings and warn user only the first will be used
-                embedding_info["num_of_embeddings"] = len(
-                    embedding_ckpt["string_to_token"]
-                )
+                embedding_info["num_of_embeddings"] = len(embedding_ckpt["string_to_token"])
                 if embedding_info["num_of_embeddings"] > 1:
                     print(">> More than 1 embedding found. Will use the first one")
 
@@ -293,12 +265,8 @@ class EmbeddingManager(nn.Module):
 
             try:
                 embedding_info["trained_steps"] = embedding_ckpt["step"]
-                embedding_info["trained_model_name"] = embedding_ckpt[
-                    "sd_checkpoint_name"
-                ]
-                embedding_info["trained_model_checksum"] = embedding_ckpt[
-                    "sd_checkpoint"
-                ]
+                embedding_info["trained_model_name"] = embedding_ckpt["sd_checkpoint_name"]
+                embedding_info["trained_model_checksum"] = embedding_ckpt["sd_checkpoint"]
             except AttributeError:
                 print(">> No Training Details Found. Passing ...")
 
@@ -323,40 +291,26 @@ class EmbeddingManager(nn.Module):
             embedding_info = None
         else:
             for token in list(embedding_ckpt.keys()):
-                embedding_info["name"] = token or os.path.basename(
-                    os.path.splitext(embedding_file)[0]
-                )
+                embedding_info["name"] = token or os.path.basename(os.path.splitext(embedding_file)[0])
                 embedding_info["embedding"] = embedding_ckpt[token]
-                embedding_info[
-                    "num_vectors_per_token"
-                ] = 1  # All Concepts seem to default to 1
+                embedding_info["num_vectors_per_token"] = 1  # All Concepts seem to default to 1
                 embedding_info["token_dim"] = embedding_info["embedding"].size()[0]
 
         return embedding_info
 
-    def handle_broken_pt_variants(
-        self, embedding_ckpt: dict, embedding_file: str
-    ) -> dict:
+    def handle_broken_pt_variants(self, embedding_ckpt: dict, embedding_file: str) -> dict:
         """
         This handles the broken .pt file variants. We only know of one at present.
         """
         embedding_info = {}
-        if isinstance(
-            list(embedding_ckpt["string_to_token"].values())[0], torch.Tensor
-        ):
+        if isinstance(list(embedding_ckpt["string_to_token"].values())[0], torch.Tensor):
             print(
                 f">> Variant Embedding Detected. Parsing: {embedding_file}"
             )  # example at https://github.com/invoke-ai/InvokeAI/issues/1829
             token = list(embedding_ckpt["string_to_token"].keys())[0]
-            embedding_info["name"] = os.path.basename(
-                os.path.splitext(embedding_file)[0]
-            )
-            embedding_info["embedding"] = embedding_ckpt[
-                "string_to_param"
-            ].state_dict()[token]
-            embedding_info["num_vectors_per_token"] = embedding_info["embedding"].shape[
-                0
-            ]
+            embedding_info["name"] = os.path.basename(os.path.splitext(embedding_file)[0])
+            embedding_info["embedding"] = embedding_ckpt["string_to_param"].state_dict()[token]
+            embedding_info["num_vectors_per_token"] = embedding_info["embedding"].shape[0]
             embedding_info["token_dim"] = embedding_info["embedding"].size()[0]
         else:
             print(">> Invalid embedding format")
@@ -368,9 +322,7 @@ class EmbeddingManager(nn.Module):
         return token_str in self.string_to_token_dict
 
     def get_embedding_norms_squared(self):
-        all_params = torch.cat(
-            list(self.string_to_param_dict.values()), axis=0
-        )  # num_placeholders x embedding_dim
+        all_params = torch.cat(list(self.string_to_param_dict.values()), axis=0)  # num_placeholders x embedding_dim
         param_norm_squared = (all_params * all_params).sum(axis=-1)  # num_placeholders
 
         return param_norm_squared

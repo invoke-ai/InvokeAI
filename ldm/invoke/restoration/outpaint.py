@@ -63,9 +63,7 @@ class Outpaint:
             image = image.transpose(Image.Transpose.ROTATE_90)
 
         pixels = image.height // 2 if pixels is None else int(pixels)
-        assert (
-            0 < pixels < image.height
-        ), "Direction (-D) pixels length must be in the range 0 - image.size"
+        assert 0 < pixels < image.height, "Direction (-D) pixels length must be in the range 0 - image.size"
 
         # the top part of the image is taken from the source image mirrored
         # coordinates (0,0) are the upper left corner of an image

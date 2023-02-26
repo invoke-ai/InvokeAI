@@ -165,9 +165,7 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         print(f"Installing {label} model file {model_url}...", end="", file=sys.stderr)
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-            request.urlretrieve(
-                model_url, model_dest, ProgressBar(os.path.basename(model_dest))
-            )
+            request.urlretrieve(model_url, model_dest, ProgressBar(os.path.basename(model_dest)))
             print("...downloaded successfully", file=sys.stderr)
         else:
             print("...exists", file=sys.stderr)
@@ -210,13 +208,9 @@ def download_realesrgan():
     model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
-    model_dest = os.path.join(
-        Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
-    )
+    model_dest = os.path.join(Globals.root, "models/realesrgan/realesr-general-x4v3.pth")
 
-    wdn_model_dest = os.path.join(
-        Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
-    )
+    wdn_model_dest = os.path.join(Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth")
 
     download_with_progress_bar(model_url, model_dest, "RealESRGAN")
     download_with_progress_bar(wdn_model_url, wdn_model_dest, "RealESRGANwdn")
@@ -245,9 +239,7 @@ def download_gfpgan():
 # ---------------------------------------------
 def download_codeformer():
     print("Installing CodeFormer model file...", file=sys.stderr)
-    model_url = (
-        "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
-    )
+    model_url = "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     model_dest = os.path.join(Globals.root, "models/codeformer/codeformer.pth")
     download_with_progress_bar(model_url, model_dest, "CodeFormer")
 
@@ -451,9 +443,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             relx=5,
             scroll_exit=True,
         )
-        precision = old_opts.precision or (
-            "float32" if program_opts.full_precision else "auto"
-        )
+        precision = old_opts.precision or ("float32" if program_opts.full_precision else "auto")
         self.precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
             name="Precision",
@@ -519,11 +509,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             scroll_exit=True,
         )
         self.nextrely += 1
-        label = (
-            "DONE"
-            if program_opts.skip_sd_weights or program_opts.default_only
-            else "NEXT"
-        )
+        label = "DONE" if program_opts.skip_sd_weights or program_opts.default_only else "NEXT"
         self.ok_button = self.add_widget_intelligent(
             CenteredButtonPress,
             name=label,
@@ -547,9 +533,7 @@ class editOptsForm(npyscreen.FormMultiPage):
     def validate_field_values(self, opt: Namespace) -> bool:
         bad_fields = []
         if not opt.license_acceptance:
-            bad_fields.append(
-                "Please accept the license terms before proceeding to model downloads"
-            )
+            bad_fields.append("Please accept the license terms before proceeding to model downloads")
         if not Path(opt.outdir).parent.exists():
             bad_fields.append(
                 f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
@@ -667,9 +651,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
 
 
 # -------------------------------------
-def run_console_ui(
-    program_opts: Namespace, initfile: Path = None
-) -> (Namespace, Namespace):
+def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace, Namespace):
     # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
 
@@ -819,17 +801,13 @@ def main():
 
         if opt.yes_to_all:
             write_default_options(opt, init_file)
-            init_options = Namespace(
-                precision="float32" if opt.full_precision else "float16"
-            )
+            init_options = Namespace(precision="float32" if opt.full_precision else "float16")
         else:
             init_options, models_to_download = run_console_ui(opt, init_file)
             if init_options:
                 write_opts(init_options, init_file)
             else:
-                print(
-                    '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'
-                )
+                print('\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n')
                 sys.exit(0)
 
         if opt.skip_support_models:

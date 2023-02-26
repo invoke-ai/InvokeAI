@@ -109,9 +109,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             npyscreen.TitleSelectOne,
             name="Learnable property:",
             values=self.learnable_properties,
-            value=self.learnable_properties.index(
-                saved_args.get("learnable_property", "object")
-            ),
+            value=self.learnable_properties.index(saved_args.get("learnable_property", "object")),
             max_height=4,
             scroll_exit=True,
         )
@@ -241,9 +239,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
     def initializer_changed(self):
         placeholder = self.placeholder_token.value
         self.prompt_token.value = f"(Trigger by using <{placeholder}> in your prompts)"
-        self.train_data_dir.value = str(
-            Path(Globals.root) / TRAINING_DATA / placeholder
-        )
+        self.train_data_dir.value = str(Path(Globals.root) / TRAINING_DATA / placeholder)
         self.output_dir.value = str(Path(Globals.root) / TRAINING_DIR / placeholder)
         self.resume_from_checkpoint.value = Path(self.output_dir.value).exists()
 
@@ -252,9 +248,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             self.parentApp.setNextForm(None)
             self.editing = False
             self.parentApp.ti_arguments = self.marshall_arguments()
-            npyscreen.notify(
-                "Launching textual inversion training. This will take a while..."
-            )
+            npyscreen.notify("Launching textual inversion training. This will take a while...")
         else:
             self.editing = True
 
@@ -264,13 +258,9 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
     def validate_field_values(self) -> bool:
         bad_fields = []
         if self.model.value is None:
-            bad_fields.append(
-                "Model Name must correspond to a known model in models.yaml"
-            )
+            bad_fields.append("Model Name must correspond to a known model in models.yaml")
         if not re.match("^[a-zA-Z0-9.-]+$", self.placeholder_token.value):
-            bad_fields.append(
-                "Trigger term must only contain alphanumeric characters, the dot and hyphen"
-            )
+            bad_fields.append("Trigger term must only contain alphanumeric characters, the dot and hyphen")
         if self.train_data_dir.value is None:
             bad_fields.append("Data Training Directory cannot be empty")
         if self.output_dir.value is None:
@@ -286,16 +276,8 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
     def get_model_names(self) -> tuple[list[str], int]:
         conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
-        model_names = [
-            idx
-            for idx in sorted(list(conf.keys()))
-            if conf[idx].get("format", None) == "diffusers"
-        ]
-        defaults = [
-            idx
-            for idx in range(len(model_names))
-            if "default" in conf[model_names[idx]]
-        ]
+        model_names = [idx for idx in sorted(list(conf.keys())) if conf[idx].get("format", None) == "diffusers"]
+        defaults = [idx for idx in range(len(model_names)) if "default" in conf[model_names[idx]]]
         default = defaults[0] if len(defaults) > 0 else 0
         return (model_names, default)
 
@@ -308,9 +290,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             resolution=self.resolutions[self.resolution.value[0]],
             lr_scheduler=self.lr_schedulers[self.lr_scheduler.value[0]],
             mixed_precision=self.precisions[self.mixed_precision.value[0]],
-            learnable_property=self.learnable_properties[
-                self.learnable_property.value[0]
-            ],
+            learnable_property=self.learnable_properties[self.learnable_property.value[0]],
         )
 
         # all the strings and booleans
@@ -372,9 +352,7 @@ def copy_to_embeddings_folder(args: dict):
     os.makedirs(destination, exist_ok=True)
     print(f">> Training completed. Copying learned_embeds.bin into {str(destination)}")
     shutil.copy(source, destination)
-    if (
-        input("Delete training logs and intermediate checkpoints? [y] ") or "y"
-    ).startswith(("y", "Y")):
+    if (input("Delete training logs and intermediate checkpoints? [y] ") or "y").startswith(("y", "Y")):
         shutil.rmtree(Path(args["output_dir"]))
     else:
         print(f'>> Keeping {args["output_dir"]}')
@@ -445,13 +423,9 @@ def main():
         pass
     except (widget.NotEnoughSpaceForWidget, Exception) as e:
         if str(e).startswith("Height of 1 allocated"):
-            print(
-                "** You need to have at least one diffusers models defined in models.yaml in order to train"
-            )
+            print("** You need to have at least one diffusers models defined in models.yaml in order to train")
         elif str(e).startswith("addwstr"):
-            print(
-                "** Not enough window space for the interface. Please make your window larger and try again."
-            )
+            print("** Not enough window space for the interface. Please make your window larger and try again.")
         else:
             print(f"** An error has occurred: {str(e)}")
         sys.exit(-1)

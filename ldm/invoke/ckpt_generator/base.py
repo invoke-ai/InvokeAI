@@ -50,9 +50,7 @@ class CkptGenerator:
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
         """
-        raise NotImplementedError(
-            "image_iterator() must be implemented in a descendent class"
-        )
+        raise NotImplementedError("image_iterator() must be implemented in a descendent class")
 
     def set_variation(self, seed, variation_amount, with_variations):
         self.seed = seed
@@ -81,9 +79,7 @@ class CkptGenerator:
         self.safety_checker = safety_checker
         self.free_gpu_mem = free_gpu_mem
         attention_maps_images = []
-        attention_maps_callback = lambda saver: attention_maps_images.append(
-            saver.get_stacked_maps_image()
-        )
+        attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
         make_image = self.get_make_image(
             prompt,
             sampler=sampler,
@@ -129,11 +125,7 @@ class CkptGenerator:
                 results.append([image, seed])
 
                 if image_callback is not None:
-                    attention_maps_image = (
-                        None
-                        if len(attention_maps_images) == 0
-                        else attention_maps_images[-1]
-                    )
+                    attention_maps_image = None if len(attention_maps_images) == 0 else attention_maps_images[-1]
                     image_callback(
                         image,
                         seed,
@@ -153,9 +145,7 @@ class CkptGenerator:
         x_samples = self.model.decode_first_stage(samples)
         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
         if len(x_samples) != 1:
-            raise Exception(
-                f">> expected to get a single image, but got {len(x_samples)}"
-            )
+            raise Exception(f">> expected to get a single image, but got {len(x_samples)}")
         x_sample = 255.0 * rearrange(x_samples[0].cpu().numpy(), "c h w -> h w c")
         return Image.fromarray(x_sample.astype(np.uint8))
 
@@ -173,14 +163,8 @@ class CkptGenerator:
 
         # Get the original alpha channel of the mask if there is one.
         # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
-        pil_init_mask = (
-            init_mask.getchannel("A")
-            if init_mask.mode == "RGBA"
-            else init_mask.convert("L")
-        )
-        pil_init_image = init_image.convert(
-            "RGBA"
-        )  # Add an alpha channel if one doesn't exist
+        pil_init_mask = init_mask.getchannel("A") if init_mask.mode == "RGBA" else init_mask.convert("L")
+        pil_init_image = init_image.convert("RGBA")  # Add an alpha channel if one doesn't exist
 
         # Build an image with only visible pixels from source to use as reference for color-matching.
         init_rgb_pixels = np.asarray(init_image.convert("RGB"), dtype=np.uint8)
@@ -205,13 +189,7 @@ class CkptGenerator:
             np_matched_result = np_image.copy()
             np_matched_result[:, :, :] = (
                 (
-                    (
-                        (
-                            np_matched_result[:, :, :].astype(np.float32)
-                            - gen_means[None, None, :]
-                        )
-                        / gen_std[None, None, :]
-                    )
+                    ((np_matched_result[:, :, :].astype(np.float32) - gen_means[None, None, :]) / gen_std[None, None, :])
                     * init_std[None, None, :]
                     + init_means[None, None, :]
                 )
@@ -235,9 +213,7 @@ class CkptGenerator:
         else:
             blurred_init_mask = pil_init_mask
 
-        multiplied_blurred_init_mask = ImageChops.multiply(
-            blurred_init_mask, self.pil_image.split()[-1]
-        )
+        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, self.pil_image.split()[-1])
 
         # Paste original on color-corrected generation (using blurred mask)
         matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
@@ -262,10 +238,7 @@ class CkptGenerator:
 
         latent_image = samples[0].permute(1, 2, 0) @ v1_5_latent_rgb_factors
         latents_ubyte = (
-            ((latent_image + 1) / 2)
-            .clamp(0, 1)  # change scale from -1..1 to 0..1
-            .mul(0xFF)  # to 0..255
-            .byte()
+            ((latent_image + 1) / 2).clamp(0, 1).mul(0xFF).byte()  # change scale from -1..1 to 0..1  # to 0..255
         ).cpu()
 
         return Image.fromarray(latents_ubyte.numpy())
@@ -294,17 +267,13 @@ class CkptGenerator:
         Returns a tensor filled with random numbers, either form a normal distribution
         (txt2img) or from the latent image (img2img, inpaint)
         """
-        raise NotImplementedError(
-            "get_noise() must be implemented in a descendent class"
-        )
+        raise NotImplementedError("get_noise() must be implemented in a descendent class")
 
     def get_perlin_noise(self, width, height):
         fixdevice = "cpu" if (self.model.device.type == "mps") else self.model.device
         return torch.stack(
             [
-                rand_perlin_2d((height, width), (8, 8), device=self.model.device).to(
-                    fixdevice
-                )
+                rand_perlin_2d((height, width), (8, 8), device=self.model.device).to(fixdevice)
                 for _ in range(self.latent_channels)
             ],
             dim=0,
@@ -368,13 +337,9 @@ class CkptGenerator:
         x_image = x_image[None].transpose(0, 3, 1, 2)
 
         diffusers.logging.set_verbosity_error()
-        checked_image, has_nsfw_concept = checker(
-            images=x_image, clip_input=features.pixel_values
-        )
+        checked_image, has_nsfw_concept = checker(images=x_image, clip_input=features.pixel_values)
         if has_nsfw_concept[0]:
-            print(
-                "** An image with potential non-safe content has been detected. A blurred image will be returned. **"
-            )
+            print("** An image with potential non-safe content has been detected. A blurred image will be returned. **")
             return self.blur(image)
         else:
             return image

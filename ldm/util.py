@@ -28,9 +28,7 @@ def log_txt_as_img(wh, xc, size=10):
         draw = ImageDraw.Draw(txt)
         font = ImageFont.load_default()
         nc = int(40 * (wh[0] / 256))
-        lines = "\n".join(
-            xc[bi][start : start + nc] for start in range(0, len(xc[bi]), nc)
-        )
+        lines = "\n".join(xc[bi][start : start + nc] for start in range(0, len(xc[bi]), nc))
 
         try:
             draw.text((0, 0), lines, fill="black", font=font)
@@ -77,9 +75,7 @@ def mean_flat(tensor):
 def count_params(model, verbose=False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
-        print(
-            f"   | {model.__class__.__name__} has {total_params * 1.e-6:.2f} M params."
-        )
+        print(f"   | {model.__class__.__name__} has {total_params * 1.e-6:.2f} M params.")
     return total_params
 
 
@@ -150,21 +146,11 @@ def parallel_data_prefetch(
         proc = Thread
     # spawn processes
     if target_data_type == "ndarray":
-        arguments = [
-            [func, Q, part, i, use_worker_id]
-            for i, part in enumerate(np.array_split(data, n_proc))
-        ]
+        arguments = [[func, Q, part, i, use_worker_id] for i, part in enumerate(np.array_split(data, n_proc))]
     else:
-        step = (
-            int(len(data) / n_proc + 1)
-            if len(data) % n_proc != 0
-            else int(len(data) / n_proc)
-        )
+        step = int(len(data) / n_proc + 1) if len(data) % n_proc != 0 else int(len(data) / n_proc)
         arguments = [
-            [func, Q, part, i, use_worker_id]
-            for i, part in enumerate(
-                [data[i : i + step] for i in range(0, len(data), step)]
-            )
+            [func, Q, part, i, use_worker_id] for i, part in enumerate([data[i : i + step] for i in range(0, len(data), step)])
         ]
     processes = []
     for i in range(n_proc):
@@ -216,9 +202,7 @@ def parallel_data_prefetch(
         return gather_res
 
 
-def rand_perlin_2d(
-    shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 * t**3
-):
+def rand_perlin_2d(shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 * t**3):
     delta = (res[0] / shape[0], res[1] / shape[1])
     d = (shape[0] // res[0], shape[1] // res[1])
 
@@ -261,9 +245,7 @@ def rand_perlin_2d(
     n01 = dot(tile_grads([0, -1], [1, None]), [0, -1]).to(device)
     n11 = dot(tile_grads([1, None], [1, None]), [-1, -1]).to(device)
     t = fade(grid[: shape[0], : shape[1]])
-    noise = math.sqrt(2) * torch.lerp(
-        torch.lerp(n00, n10, t[..., 0]), torch.lerp(n01, n11, t[..., 0]), t[..., 1]
-    ).to(device)
+    noise = math.sqrt(2) * torch.lerp(torch.lerp(n00, n10, t[..., 0]), torch.lerp(n01, n11, t[..., 0]), t[..., 1]).to(device)
     return noise.to(dtype=torch_dtype(device))
 
 
@@ -272,17 +254,13 @@ def ask_user(question: str, answers: list):
 
     user_prompt = f"\n>> {question} {answers}: "
     invalid_answer_msg = "Invalid answer. Please try again."
-    pose_question = chain(
-        [user_prompt], repeat("\n".join([invalid_answer_msg, user_prompt]))
-    )
+    pose_question = chain([user_prompt], repeat("\n".join([invalid_answer_msg, user_prompt])))
     user_answers = map(input, pose_question)
     valid_response = next(filter(answers.__contains__, user_answers))
     return valid_response
 
 
-def debug_image(
-    debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False
-):
+def debug_image(debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False):
     if not debug_status:
         return
 
@@ -315,9 +293,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
 
     if dest.is_dir():
         try:
-            file_name = re.search(
-                'filename="(.+)"', resp.headers.get("Content-Disposition")
-            ).group(1)
+            file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition")).group(1)
         except:
             file_name = os.path.basename(url)
         dest = dest / file_name

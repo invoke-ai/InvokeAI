@@ -14,9 +14,7 @@ from basicsr.utils.registry import ARCH_REGISTRY
 
 
 def normalize(in_channels):
-    return torch.nn.GroupNorm(
-        num_groups=32, num_channels=in_channels, eps=1e-6, affine=True
-    )
+    return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True)
 
 
 @torch.jit.script
@@ -32,9 +30,7 @@ class VectorQuantizer(nn.Module):
         self.emb_dim = emb_dim  # dimension of embedding
         self.beta = beta  # commitment cost used in loss term, beta * ||z_e(x)-sg[e]||^2
         self.embedding = nn.Embedding(self.codebook_size, self.emb_dim)
-        self.embedding.weight.data.uniform_(
-            -1.0 / self.codebook_size, 1.0 / self.codebook_size
-        )
+        self.embedding.weight.data.uniform_(-1.0 / self.codebook_size, 1.0 / self.codebook_size)
 
     def forward(self, z):
         # reshape z -> (batch, height, width, channel) and flatten
@@ -51,23 +47,17 @@ class VectorQuantizer(nn.Module):
         mean_distance = torch.mean(d)
         # find closest encodings
         # min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
-        min_encoding_scores, min_encoding_indices = torch.topk(
-            d, 1, dim=1, largest=False
-        )
+        min_encoding_scores, min_encoding_indices = torch.topk(d, 1, dim=1, largest=False)
         # [0-1], higher score, higher confidence
         min_encoding_scores = torch.exp(-min_encoding_scores / 10)
 
-        min_encodings = torch.zeros(
-            min_encoding_indices.shape[0], self.codebook_size
-        ).to(z)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], self.codebook_size).to(z)
         min_encodings.scatter_(1, min_encoding_indices, 1)
 
         # get quantized latent vectors
         z_q = torch.matmul(min_encodings, self.embedding.weight).view(z.shape)
         # compute loss for embedding
-        loss = torch.mean((z_q.detach() - z) ** 2) + self.beta * torch.mean(
-            (z_q - z.detach()) ** 2
-        )
+        loss = torch.mean((z_q.detach() - z) ** 2) + self.beta * torch.mean((z_q - z.detach()) ** 2)
         # preserve gradients
         z_q = z + (z_q - z).detach()
 
@@ -120,9 +110,7 @@ class GumbelQuantizer(nn.Module):
         self.straight_through = straight_through
         self.temperature = temp_init
         self.kl_weight = kl_weight
-        self.proj = nn.Conv2d(
-            num_hiddens, codebook_size, 1
-        )  # projects last encoder layer to quantized logits
+        self.proj = nn.Conv2d(num_hiddens, codebook_size, 1)  # projects last encoder layer to quantized logits
         self.embed = nn.Embedding(codebook_size, emb_dim)
 
     def forward(self, z):
@@ -136,10 +124,7 @@ class GumbelQuantizer(nn.Module):
 
         # + kl divergence to the prior loss
         qy = F.softmax(logits, dim=1)
-        diff = (
-            self.kl_weight
-            * torch.sum(qy * torch.log(qy * self.codebook_size + 1e-10), dim=1).mean()
-        )
+        diff = self.kl_weight * torch.sum(qy * torch.log(qy * self.codebook_size + 1e-10), dim=1).mean()
         min_encoding_indices = soft_one_hot.argmax(dim=1)
 
         return z_q, diff, {"min_encoding_indices": min_encoding_indices}
@@ -148,9 +133,7 @@ class GumbelQuantizer(nn.Module):
 class Downsample(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
-        self.conv = torch.nn.Conv2d(
-            in_channels, in_channels, kernel_size=3, stride=2, padding=0
-        )
+        self.conv = torch.nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=2, padding=0)
 
     def forward(self, x):
         pad = (0, 1, 0, 1)
@@ -162,9 +145,7 @@ class Downsample(nn.Module):
 class Upsample(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
-        self.conv = nn.Conv2d(
-            in_channels, in_channels, kernel_size=3, stride=1, padding=1
-        )
+        self.conv = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
         x = F.interpolate(x, scale_factor=2.0, mode="nearest")
@@ -179,17 +160,11 @@ class ResBlock(nn.Module):
         self.in_channels = in_channels
         self.out_channels = in_channels if out_channels is None else out_channels
         self.norm1 = normalize(in_channels)
-        self.conv1 = nn.Conv2d(
-            in_channels, out_channels, kernel_size=3, stride=1, padding=1
-        )
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.norm2 = normalize(out_channels)
-        self.conv2 = nn.Conv2d(
-            out_channels, out_channels, kernel_size=3, stride=1, padding=1
-        )
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
         if self.in_channels != self.out_channels:
-            self.conv_out = nn.Conv2d(
-                in_channels, out_channels, kernel_size=1, stride=1, padding=0
-            )
+            self.conv_out = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x_in):
         x = x_in
@@ -211,18 +186,10 @@ class AttnBlock(nn.Module):
         self.in_channels = in_channels
 
         self.norm = normalize(in_channels)
-        self.q = torch.nn.Conv2d(
-            in_channels, in_channels, kernel_size=1, stride=1, padding=0
-        )
-        self.k = torch.nn.Conv2d(
-            in_channels, in_channels, kernel_size=1, stride=1, padding=0
-        )
-        self.v = torch.nn.Conv2d(
-            in_channels, in_channels, kernel_size=1, stride=1, padding=0
-        )
-        self.proj_out = torch.nn.Conv2d(
-            in_channels, in_channels, kernel_size=1, stride=1, padding=0
-        )
+        self.q = torch.nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
+        self.k = torch.nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
+        self.v = torch.nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
+        self.proj_out = torch.nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x):
         h_ = x
@@ -297,9 +264,7 @@ class Encoder(nn.Module):
 
         # normalise and convert to latent size
         blocks.append(normalize(block_in_ch))
-        blocks.append(
-            nn.Conv2d(block_in_ch, emb_dim, kernel_size=3, stride=1, padding=1)
-        )
+        blocks.append(nn.Conv2d(block_in_ch, emb_dim, kernel_size=3, stride=1, padding=1))
         self.blocks = nn.ModuleList(blocks)
 
     def forward(self, x):
@@ -325,9 +290,7 @@ class Generator(nn.Module):
 
         blocks = []
         # initial conv
-        blocks.append(
-            nn.Conv2d(self.in_channels, block_in_ch, kernel_size=3, stride=1, padding=1)
-        )
+        blocks.append(nn.Conv2d(self.in_channels, block_in_ch, kernel_size=3, stride=1, padding=1))
 
         # non-local attention block
         blocks.append(ResBlock(block_in_ch, block_in_ch))
@@ -349,11 +312,7 @@ class Generator(nn.Module):
                 curr_res = curr_res * 2
 
         blocks.append(normalize(block_in_ch))
-        blocks.append(
-            nn.Conv2d(
-                block_in_ch, self.out_channels, kernel_size=3, stride=1, padding=1
-            )
-        )
+        blocks.append(nn.Conv2d(block_in_ch, self.out_channels, kernel_size=3, stride=1, padding=1))
 
         self.blocks = nn.ModuleList(blocks)
 
@@ -403,9 +362,7 @@ class VQAutoEncoder(nn.Module):
         )
         if self.quantizer_type == "nearest":
             self.beta = beta  # 0.25
-            self.quantize = VectorQuantizer(
-                self.codebook_size, self.embed_dim, self.beta
-            )
+            self.quantize = VectorQuantizer(self.codebook_size, self.embed_dim, self.beta)
         elif self.quantizer_type == "gumbel":
             self.gumbel_num_hiddens = emb_dim
             self.straight_through = gumbel_straight_through
@@ -429,14 +386,10 @@ class VQAutoEncoder(nn.Module):
         if model_path is not None:
             chkpt = torch.load(model_path, map_location="cpu")
             if "params_ema" in chkpt:
-                self.load_state_dict(
-                    torch.load(model_path, map_location="cpu")["params_ema"]
-                )
+                self.load_state_dict(torch.load(model_path, map_location="cpu")["params_ema"])
                 logger.info(f"vqgan is loaded from: {model_path} [params_ema]")
             elif "params" in chkpt:
-                self.load_state_dict(
-                    torch.load(model_path, map_location="cpu")["params"]
-                )
+                self.load_state_dict(torch.load(model_path, map_location="cpu")["params"])
                 logger.info(f"vqgan is loaded from: {model_path} [params]")
             else:
                 raise ValueError(f"Wrong params!")
@@ -492,21 +445,15 @@ class VQGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, True),
         ]
 
-        layers += [
-            nn.Conv2d(ndf * ndf_mult, 1, kernel_size=4, stride=1, padding=1)
-        ]  # output 1 channel prediction map
+        layers += [nn.Conv2d(ndf * ndf_mult, 1, kernel_size=4, stride=1, padding=1)]  # output 1 channel prediction map
         self.main = nn.Sequential(*layers)
 
         if model_path is not None:
             chkpt = torch.load(model_path, map_location="cpu")
             if "params_d" in chkpt:
-                self.load_state_dict(
-                    torch.load(model_path, map_location="cpu")["params_d"]
-                )
+                self.load_state_dict(torch.load(model_path, map_location="cpu")["params_d"])
             elif "params" in chkpt:
-                self.load_state_dict(
-                    torch.load(model_path, map_location="cpu")["params"]
-                )
+                self.load_state_dict(torch.load(model_path, map_location="cpu")["params"])
             else:
                 raise ValueError(f"Wrong params!")
 

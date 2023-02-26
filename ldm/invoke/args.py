@@ -206,9 +206,7 @@ class Args:
                     f">> WARNING: Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init."
                 )
                 sysargs.insert(0, f"@{legacyinit}")
-            Globals.log_tokenization = self._arg_parser.parse_args(
-                sysargs
-            ).log_tokenization
+            Globals.log_tokenization = self._arg_parser.parse_args(sysargs).log_tokenization
 
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
@@ -241,9 +239,7 @@ class Args:
                     prompt = cmd_string
                     switches = ""
         try:
-            self._cmd_switches = self._cmd_parser.parse_args(
-                shlex.split(switches, comments=True)
-            )
+            self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches, comments=True))
             if not getattr(self._cmd_switches, "prompt"):
                 setattr(self._cmd_switches, "prompt", prompt)
             return self._cmd_switches
@@ -328,9 +324,7 @@ class Args:
         if a["embiggen"]:
             switches.append(f'--embiggen {" ".join([str(u) for u in a["embiggen"]])}')
         if a["embiggen_tiles"]:
-            switches.append(
-                f'--embiggen_tiles {" ".join([str(u) for u in a["embiggen_tiles"]])}'
-            )
+            switches.append(f'--embiggen_tiles {" ".join([str(u) for u in a["embiggen_tiles"]])}')
         if a["embiggen_strength"]:
             switches.append(f'--embiggen_strength {a["embiggen_strength"]}')
 
@@ -343,9 +337,7 @@ class Args:
         # 2. However, they come out of the CLI (and probably web) with the keyword "with_variations" and
         #    in broken-out form. Variation (1) should be changed to comply with (2)
         if a["with_variations"] and len(a["with_variations"]) > 0:
-            formatted_variations = ",".join(
-                f"{seed}:{weight}" for seed, weight in (a["with_variations"])
-            )
+            formatted_variations = ",".join(f"{seed}:{weight}" for seed, weight in (a["with_variations"]))
             switches.append(f"-V {formatted_variations}")
         if "variations" in a and len(a["variations"]) > 0:
             switches.append(f'-V {a["variations"]}')
@@ -450,9 +442,7 @@ class Args:
 
         deprecated_group.add_argument("--laion400m")
         deprecated_group.add_argument("--weights")  # deprecated
-        general_group.add_argument(
-            "--version", "-V", action="store_true", help="Print InvokeAI version number"
-        )
+        general_group.add_argument("--version", "-V", action="store_true", help="Print InvokeAI version number")
         model_group.add_argument(
             "--root_dir",
             default=None,
@@ -509,8 +499,7 @@ class Args:
             "--sequential_guidance",
             dest="sequential_guidance",
             action="store_true",
-            help="Calculate guidance in serial instead of in parallel, lowering memory requirement "
-            "at the expense of speed",
+            help="Calculate guidance in serial instead of in parallel, lowering memory requirement " "at the expense of speed",
         )
         model_group.add_argument(
             "--xformers",
@@ -598,9 +587,7 @@ class Args:
             type=str,
             help="Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png",
         )
-        render_group.add_argument(
-            "-s", "--steps", type=int, default=50, help="Number of steps"
-        )
+        render_group.add_argument("-s", "--steps", type=int, default=50, help="Number of steps")
         render_group.add_argument(
             "-W",
             "--width",
@@ -742,9 +729,7 @@ class Args:
             default="127.0.0.1",
             help="Web server: Host or IP to listen on. Set to 0.0.0.0 to accept traffic from other devices on your network.",
         )
-        web_server_group.add_argument(
-            "--port", type=int, default="9090", help="Web server: Port to listen on"
-        )
+        web_server_group.add_argument("--port", type=int, default="9090", help="Web server: Port to listen on")
         web_server_group.add_argument(
             "--certfile",
             type=str,
@@ -1221,11 +1206,7 @@ def metadata_dumps(opt, seeds=[], model_hash=None, postprocessing=None):
         rfc_dict["prompt"] = subprompts
 
     # 'variations' should always exist and be an array, empty or consisting of {'seed': seed, 'weight': weight} pairs
-    rfc_dict["variations"] = (
-        [{"seed": x[0], "weight": x[1]} for x in opt.with_variations]
-        if opt.with_variations
-        else []
-    )
+    rfc_dict["variations"] = [{"seed": x[0], "weight": x[1]} for x in opt.with_variations] if opt.with_variations else []
 
     # if variations are present then we need to replace 'seed' with 'orig_seed'
     if hasattr(opt, "first_seed"):
@@ -1310,12 +1291,7 @@ def metadata_loads(metadata) -> list:
             if "prompt" in image:
                 image["prompt"] = repack_prompt(image["prompt"])
             if "variations" in image:
-                image["variations"] = ",".join(
-                    [
-                        ":".join([str(x["seed"]), str(x["weight"])])
-                        for x in image["variations"]
-                    ]
-                )
+                image["variations"] = ",".join([":".join([str(x["seed"]), str(x["weight"])]) for x in image["variations"]])
             # fix a bit of semantic drift here
             image["sampler_name"] = image.pop("sampler")
             opt = Args()
@@ -1333,9 +1309,7 @@ def metadata_loads(metadata) -> list:
 def repack_prompt(prompt_list: list) -> str:
     # in the common case of no weighting syntax, just return the prompt as is
     if len(prompt_list) > 1:
-        return ",".join(
-            [":".join([x["prompt"], str(x["weight"])]) for x in prompt_list]
-        )
+        return ",".join([":".join([x["prompt"], str(x["weight"])]) for x in prompt_list])
     else:
         return prompt_list[0]["prompt"]
 

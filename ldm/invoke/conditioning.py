@@ -27,17 +27,12 @@ from .devices import torch_dtype
 
 def get_tokenizer(model) -> CLIPTokenizer:
     # TODO remove legacy ckpt fallback handling
-    return (
-        getattr(model, "tokenizer", None)  # diffusers
-        or model.cond_stage_model.tokenizer
-    )  # ldm
+    return getattr(model, "tokenizer", None) or model.cond_stage_model.tokenizer  # diffusers  # ldm
 
 
 def get_text_encoder(model) -> Any:
     # TODO remove legacy ckpt fallback handling
-    return getattr(
-        model, "text_encoder", None
-    ) or UnsqueezingLDMTransformer(  # diffusers
+    return getattr(model, "text_encoder", None) or UnsqueezingLDMTransformer(  # diffusers
         model.cond_stage_model.transformer
     )  # ldm
 
@@ -55,14 +50,10 @@ class UnsqueezingLDMTransformer:
         return insufficiently_unsqueezed_tensor.unsqueeze(0)
 
 
-def get_uc_and_c_and_ec(
-    prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False
-):
+def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
     # lazy-load any deferred textual inversions.
     # this might take a couple of seconds the first time a textual inversion is used.
-    model.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(
-        prompt_string
-    )
+    model.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(prompt_string)
 
     tokenizer = get_tokenizer(model)
     text_encoder = get_text_encoder(model)
@@ -77,17 +68,13 @@ def get_uc_and_c_and_ec(
         positive_prompt_string,
         negative_prompt_string,
     ) = split_prompt_to_positive_and_negative(prompt_string)
-    legacy_blend = try_parse_legacy_blend(
-        positive_prompt_string, skip_normalize_legacy_blend
-    )
+    legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
     positive_prompt: FlattenedPrompt | Blend
     if legacy_blend is not None:
         positive_prompt = legacy_blend
     else:
         positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt: FlattenedPrompt | Blend = Compel.parse_prompt_string(
-        negative_prompt_string
-    )
+    negative_prompt: FlattenedPrompt | Blend = Compel.parse_prompt_string(negative_prompt_string)
 
     if log_tokens or getattr(Globals, "log_tokenization", False):
         log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
@@ -111,54 +98,33 @@ def get_prompt_structure(
         positive_prompt_string,
         negative_prompt_string,
     ) = split_prompt_to_positive_and_negative(prompt_string)
-    legacy_blend = try_parse_legacy_blend(
-        positive_prompt_string, skip_normalize_legacy_blend
-    )
+    legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
     positive_prompt: FlattenedPrompt | Blend
     if legacy_blend is not None:
         positive_prompt = legacy_blend
     else:
         positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt: FlattenedPrompt | Blend = Compel.parse_prompt_string(
-        negative_prompt_string
-    )
+    negative_prompt: FlattenedPrompt | Blend = Compel.parse_prompt_string(negative_prompt_string)
 
     return positive_prompt, negative_prompt
 
 
-def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=True
-) -> int:
+def get_max_token_count(tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=True) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
-        return max(
-            [
-                get_max_token_count(tokenizer, c, truncate_if_too_long)
-                for c in blend.prompts
-            ]
-        )
+        return max([get_max_token_count(tokenizer, c, truncate_if_too_long) for c in blend.prompts])
     else:
-        return len(
-            get_tokens_for_prompt_object(tokenizer, prompt, truncate_if_too_long)
-        )
+        return len(get_tokens_for_prompt_object(tokenizer, prompt, truncate_if_too_long))
 
 
-def get_tokens_for_prompt_object(
-    tokenizer, parsed_prompt: FlattenedPrompt, truncate_if_too_long=True
-) -> [str]:
+def get_tokens_for_prompt_object(tokenizer, parsed_prompt: FlattenedPrompt, truncate_if_too_long=True) -> [str]:
     if type(parsed_prompt) is Blend:
-        raise ValueError(
-            "Blend is not supported here - you need to get tokens for each of its .children"
-        )
+        raise ValueError("Blend is not supported here - you need to get tokens for each of its .children")
 
     text_fragments = [
         x.text
         if type(x) is Fragment
-        else (
-            " ".join([f.text for f in x.original])
-            if type(x) is CrossAttentionControlSubstitute
-            else str(x)
-        )
+        else (" ".join([f.text for f in x.original]) if type(x) is CrossAttentionControlSubstitute else str(x))
         for x in parsed_prompt.children
     ]
     text = " ".join(text_fragments)
@@ -194,14 +160,10 @@ def log_tokenization(
     print(f"\n>> [TOKENLOG] Parsed Negative Prompt: {negative_prompt}")
 
     log_tokenization_for_prompt_object(positive_prompt, tokenizer)
-    log_tokenization_for_prompt_object(
-        negative_prompt, tokenizer, display_label_prefix="(negative prompt)"
-    )
+    log_tokenization_for_prompt_object(negative_prompt, tokenizer, display_label_prefix="(negative prompt)")
 
 
-def log_tokenization_for_prompt_object(
-    p: Union[Blend, FlattenedPrompt], tokenizer, display_label_prefix=None
-):
+def log_tokenization_for_prompt_object(p: Union[Blend, FlattenedPrompt], tokenizer, display_label_prefix=None):
     display_label_prefix = display_label_prefix or ""
     if type(p) is Blend:
         blend: Blend = p
@@ -238,9 +200,7 @@ def log_tokenization_for_prompt_object(
             )
         else:
             text = " ".join([x.text for x in flattened_prompt.children])
-            log_tokenization_for_text(
-                text, tokenizer, display_label=display_label_prefix
-            )
+            log_tokenization_for_text(text, tokenizer, display_label=display_label_prefix)
 
 
 def log_tokenization_for_text(text, tokenizer, display_label=None):
@@ -284,9 +244,7 @@ def try_parse_legacy_blend(text: str, skip_normalize: bool = False) -> Optional[
     parsed_conjunctions = [pp.parse_conjunction(x) for x in strings]
     flattened_prompts = [x.prompts[0] for x in parsed_conjunctions]
 
-    return Blend(
-        prompts=flattened_prompts, weights=weights, normalize_weights=not skip_normalize
-    )
+    return Blend(prompts=flattened_prompts, weights=weights, normalize_weights=not skip_normalize)
 
 
 def split_weighted_subprompts(text, skip_normalize=False) -> list:
@@ -323,9 +281,7 @@ def split_weighted_subprompts(text, skip_normalize=False) -> list:
         return parsed_prompts
     weight_sum = sum(map(lambda x: x[1], parsed_prompts))
     if weight_sum == 0:
-        print(
-            "* Warning: Subprompt weights add up to zero. Discarding and using even weights instead."
-        )
+        print("* Warning: Subprompt weights add up to zero. Discarding and using even weights instead.")
         equal_weight = 1 / max(len(parsed_prompts), 1)
         return [(x[0], equal_weight) for x in parsed_prompts]
     return [(x[0], x[1] / weight_sum) for x in parsed_prompts]

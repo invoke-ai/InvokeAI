@@ -69,15 +69,11 @@ class Inpaint(Img2Img):
             return im
 
         # Patchmatch (note, we may want to expose patch_size? Increasing it significantly impacts performance though)
-        im_patched_np = PatchMatch.inpaint(
-            im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3
-        )
+        im_patched_np = PatchMatch.inpaint(im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3)
         im_patched = Image.fromarray(im_patched_np, mode="RGB")
         return im_patched
 
-    def tile_fill_missing(
-        self, im: Image.Image, tile_size: int = 16, seed: int = None
-    ) -> Image:
+    def tile_fill_missing(self, im: Image.Image, tile_size: int = 16, seed: int = None) -> Image:
         # Only fill if there's an alpha layer
         if im.mode != "RGBA":
             return im
@@ -110,9 +106,7 @@ class Inpaint(Img2Img):
         # Find all invalid tiles and replace with a random valid tile
         replace_count = (tiles_mask == False).sum()
         rng = np.random.default_rng(seed=seed)
-        tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[
-            rng.choice(filtered_tiles.shape[0], replace_count), :, :, :
-        ]
+        tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[rng.choice(filtered_tiles.shape[0], replace_count), :, :, :]
 
         # Convert back to an image
         tiles_all = tiles_all.reshape(tshape)
@@ -132,9 +126,7 @@ class Inpaint(Img2Img):
         npimg = np.asarray(mask, dtype=np.uint8)
 
         # Detect any partially transparent regions
-        npgradient = np.uint8(
-            255 * (1.0 - np.floor(np.abs(0.5 - np.float32(npimg) / 255.0) * 2.0))
-        )
+        npgradient = np.uint8(255 * (1.0 - np.floor(np.abs(0.5 - np.float32(npimg) / 255.0) * 2.0)))
 
         # Detect hard edges
         npedge = cv2.Canny(npimg, threshold1=100, threshold2=200)
@@ -143,9 +135,7 @@ class Inpaint(Img2Img):
         npmask = npgradient + npedge
 
         # Expand
-        npmask = cv2.dilate(
-            npmask, np.ones((3, 3), np.uint8), iterations=int(edge_size / 2)
-        )
+        npmask = cv2.dilate(npmask, np.ones((3, 3), np.uint8), iterations=int(edge_size / 2))
 
         new_mask = Image.fromarray(npmask)
 
@@ -246,25 +236,19 @@ class Inpaint(Img2Img):
             if infill_method == "patchmatch" and PatchMatch.patchmatch_available():
                 init_filled = self.infill_patchmatch(self.pil_image.copy())
             elif infill_method == "tile":
-                init_filled = self.tile_fill_missing(
-                    self.pil_image.copy(), seed=self.seed, tile_size=tile_size
-                )
+                init_filled = self.tile_fill_missing(self.pil_image.copy(), seed=self.seed, tile_size=tile_size)
             elif infill_method == "solid":
                 solid_bg = PIL.Image.new("RGBA", init_image.size, inpaint_fill)
                 init_filled = PIL.Image.alpha_composite(solid_bg, init_image)
             else:
-                raise ValueError(
-                    f"Non-supported infill type {infill_method}", infill_method
-                )
+                raise ValueError(f"Non-supported infill type {infill_method}", infill_method)
             init_filled.paste(init_image, (0, 0), init_image.split()[-1])
 
             # Resize if requested for inpainting
             if inpaint_width and inpaint_height:
                 init_filled = init_filled.resize((inpaint_width, inpaint_height))
 
-            debug_image(
-                init_filled, "init_filled", debug_status=self.enable_image_debugging
-            )
+            debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
 
             # Create init tensor
             init_image = image_resized_to_grid_as_tensor(init_filled.convert("RGB"))
@@ -293,9 +277,7 @@ class Inpaint(Img2Img):
                 "mask_image AFTER multiply with pil_image",
                 debug_status=self.enable_image_debugging,
             )
-            mask: torch.FloatTensor = image_resized_to_grid_as_tensor(
-                mask_image, normalize=False
-            )
+            mask: torch.FloatTensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
         else:
             mask: torch.FloatTensor = mask_image
 
@@ -307,9 +289,9 @@ class Inpaint(Img2Img):
 
         # todo: support cross-attention control
         uc, c, _ = conditioning
-        conditioning_data = ConditioningData(
-            uc, c, cfg_scale
-        ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
+        conditioning_data = ConditioningData(uc, c, cfg_scale).add_scheduler_args_if_applicable(
+            pipeline.scheduler, eta=ddim_eta
+        )
 
         def make_image(x_T):
             pipeline_output = pipeline.inpaint_from_embeddings(
@@ -322,15 +304,10 @@ class Inpaint(Img2Img):
                 callback=step_callback,
             )
 
-            if (
-                pipeline_output.attention_map_saver is not None
-                and attention_maps_callback is not None
-            ):
+            if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
                 attention_maps_callback(pipeline_output.attention_map_saver)
 
-            result = self.postprocess_size_and_mask(
-                pipeline.numpy_to_pil(pipeline_output.images)[0]
-            )
+            result = self.postprocess_size_and_mask(pipeline.numpy_to_pil(pipeline_output.images)[0])
 
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)
             if seam_size > 0:
@@ -397,9 +374,7 @@ class Inpaint(Img2Img):
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
 
-        corrected_result = self.repaste_and_color_correct(
-            gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius
-        )
+        corrected_result = self.repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
         debug_image(
             corrected_result,
             "corrected_result",

@@ -36,10 +36,7 @@ Globals.converted_ckpts_dir = "converted_ckpts"
 
 if os.environ.get("INVOKEAI_ROOT"):
     Globals.root = osp.abspath(os.environ.get("INVOKEAI_ROOT"))
-elif (
-    os.environ.get("VIRTUAL_ENV")
-    and Path(os.environ.get("VIRTUAL_ENV"), "..", Globals.initfile).exists()
-):
+elif os.environ.get("VIRTUAL_ENV") and Path(os.environ.get("VIRTUAL_ENV"), "..", Globals.initfile).exists():
     Globals.root = osp.abspath(osp.join(os.environ.get("VIRTUAL_ENV"), ".."))
 else:
     Globals.root = osp.abspath(osp.expanduser("~/invokeai"))

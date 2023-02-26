@@ -160,15 +160,9 @@ class TextBox(npyscreen.MultiLineEdit):
         WIDTH = self.width
         # draw box.
         self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-        self.parent.curses_pad.hline(
-            self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-        )
-        self.parent.curses_pad.vline(
-            self.rely, self.relx, curses.ACS_VLINE, self.height
-        )
-        self.parent.curses_pad.vline(
-            self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-        )
+        self.parent.curses_pad.hline(self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH)
+        self.parent.curses_pad.vline(self.rely, self.relx, curses.ACS_VLINE, self.height)
+        self.parent.curses_pad.vline(self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT)
 
         # draw corners
         self.parent.curses_pad.addch(

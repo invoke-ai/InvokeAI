@@ -42,9 +42,7 @@ def main():
         sys.exit(-1)
 
     if args.laion400m:
-        print(
-            "--laion400m flag has been deprecated. Please use --model laion400m instead."
-        )
+        print("--laion400m flag has been deprecated. Please use --model laion400m instead.")
         sys.exit(-1)
     if args.weights:
         print(
@@ -69,9 +67,7 @@ def main():
     if not args.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
         if not os.path.exists(config_file):
-            report_model_error(
-                opt, FileNotFoundError(f"The file {config_file} could not be found.")
-            )
+            report_model_error(opt, FileNotFoundError(f"The file {config_file} could not be found."))
 
     print(f">> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}")
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
@@ -97,9 +93,7 @@ def main():
 
     if opt.embeddings:
         if not os.path.isabs(opt.embedding_path):
-            embedding_path = os.path.normpath(
-                os.path.join(Globals.root, opt.embedding_path)
-            )
+            embedding_path = os.path.normpath(os.path.join(Globals.root, opt.embedding_path))
         else:
             embedding_path = opt.embedding_path
     else:
@@ -156,14 +150,10 @@ def main():
 
     # try to autoconvert new models
     if path := opt.autoimport:
-        gen.model_manager.heuristic_import(
-            str(path), convert=False, commit_to_conf=opt.conf
-        )
+        gen.model_manager.heuristic_import(str(path), convert=False, commit_to_conf=opt.conf)
 
     if path := opt.autoconvert:
-        gen.model_manager.heuristic_import(
-            str(path), convert=True, commit_to_conf=opt.conf
-        )
+        gen.model_manager.heuristic_import(str(path), convert=True, commit_to_conf=opt.conf)
 
     # web server loops forever
     if opt.web or opt.gui:
@@ -171,9 +161,7 @@ def main():
         sys.exit(0)
 
     if not infile:
-        print(
-            "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)"
-        )
+        print("\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)")
 
     try:
         main_loop(gen, opt)
@@ -329,11 +317,7 @@ def main_loop(gen, opt):
             grid_images = dict()  # seed -> Image, only used if `opt.grid`
             prior_variations = opt.with_variations or []
             prefix = file_writer.unique_prefix()
-            step_callback = (
-                make_step_callback(gen, opt, prefix)
-                if opt.save_intermediates > 0
-                else None
-            )
+            step_callback = make_step_callback(gen, opt, prefix) if opt.save_intermediates > 0 else None
 
             def image_writer(
                 image,
@@ -358,9 +342,7 @@ def main_loop(gen, opt):
                     filename = f"{prefix}.{use_prefix}.{seed}.png"
                     tm = opt.text_mask[0]
                     th = opt.text_mask[1] if len(opt.text_mask) > 1 else 0.5
-                    formatted_dream_prompt = (
-                        f"!mask {opt.input_file_path} -tm {tm} {th}"
-                    )
+                    formatted_dream_prompt = f"!mask {opt.input_file_path} -tm {tm} {th}"
                     path = file_writer.save_image_and_prompt_to_png(
                         image=image,
                         dream_prompt=formatted_dream_prompt,
@@ -374,10 +356,8 @@ def main_loop(gen, opt):
                     if use_prefix is not None:
                         prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation == "postprocess"
-                    opt.prompt = (
-                        gen.huggingface_concepts_library.replace_triggers_with_concepts(
-                            opt.prompt or prompt_in
-                        )
+                    opt.prompt = gen.huggingface_concepts_library.replace_triggers_with_concepts(
+                        opt.prompt or prompt_in
                     )  # to avoid the problem of non-unique concept triggers
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
@@ -393,12 +373,7 @@ def main_loop(gen, opt):
                         dream_prompt=formatted_dream_prompt,
                         metadata=metadata_dumps(
                             opt,
-                            seeds=[
-                                seed
-                                if opt.variation_amount == 0
-                                and len(prior_variations) == 0
-                                else first_seed
-                            ],
+                            seeds=[seed if opt.variation_amount == 0 and len(prior_variations) == 0 else first_seed],
                             model_hash=gen.model_hash,
                         ),
                         name=filename,
@@ -407,9 +382,7 @@ def main_loop(gen, opt):
 
                     # update rfc metadata
                     if operation == "postprocess":
-                        tool = re.match(
-                            r"postprocess:(\w+)", opt.last_operation
-                        ).groups()[0]
+                        tool = re.match(r"postprocess:(\w+)", opt.last_operation).groups()[0]
                         add_postprocessing_to_metadata(
                             opt,
                             opt.input_file_path,
@@ -429,9 +402,7 @@ def main_loop(gen, opt):
                 last_results.append([path, seed])
 
             if operation == "generate":
-                catch_ctrl_c = (
-                    infile is None
-                )  # if running interactively, we catch keyboard interrupts
+                catch_ctrl_c = infile is None  # if running interactively, we catch keyboard interrupts
                 opt.last_operation = "generate"
                 try:
                     gen.prompt2image(
@@ -456,13 +427,9 @@ def main_loop(gen, opt):
                 grid_seeds = list(grid_images.keys())
                 first_seed = last_results[0][1]
                 filename = f"{prefix}.{first_seed}.png"
-                formatted_dream_prompt = opt.dream_prompt_str(
-                    seed=first_seed, grid=True, iterations=len(grid_images)
-                )
+                formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed, grid=True, iterations=len(grid_images))
                 formatted_dream_prompt += f" # {grid_seeds}"
-                metadata = metadata_dumps(
-                    opt, seeds=grid_seeds, model_hash=gen.model_hash
-                )
+                metadata = metadata_dumps(opt, seeds=grid_seeds, model_hash=gen.model_hash)
                 path = file_writer.save_image_and_prompt_to_png(
                     image=grid_img,
                     dream_prompt=formatted_dream_prompt,
@@ -484,9 +451,7 @@ def main_loop(gen, opt):
         output_cntr = write_log(results, log_path, ("txt", "md"), output_cntr)
         print()
 
-    print(
-        f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
-    )
+    print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
 
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
@@ -496,9 +461,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
     operation = "generate"  # default operation, alternative is 'postprocess'
     command = command.replace("\\", "/")  # windows
 
-    if command.startswith(
-        "!dream"
-    ):  # in case a stored prompt still contains the !dream command
+    if command.startswith("!dream"):  # in case a stored prompt still contains the !dream command
         command = command.replace("!dream ", "", 1)
 
     elif command.startswith("!fix"):
@@ -633,10 +596,7 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     model_name = None
     model_desc = None
 
-    if (
-        Path(model_path).is_dir()
-        and not (Path(model_path) / "model_index.json").exists()
-    ):
+    if Path(model_path).is_dir() and not (Path(model_path) / "model_index.json").exists():
         pass
     else:
         if model_path.startswith(("http:", "https:")):
@@ -681,9 +641,7 @@ def _verify_load(model_name: str, gen) -> bool:
             return
     except Exception as e:
         print(f"** model failed to load: {str(e)}")
-        print(
-            "** note that importing 2.X checkpoints is not supported. Please use !convert_model instead."
-        )
+        print("** note that importing 2.X checkpoints is not supported. Please use !convert_model instead.")
         return False
     if click.confirm("Keep model loaded?", default=True):
         gen.set_model(model_name)
@@ -693,16 +651,11 @@ def _verify_load(model_name: str, gen) -> bool:
     return True
 
 
-def _get_model_name_and_desc(
-    model_manager, completer, model_name: str = "", model_description: str = ""
-):
+def _get_model_name_and_desc(model_manager, completer, model_name: str = "", model_description: str = ""):
     model_name = _get_model_name(model_manager.list_models(), completer, model_name)
     model_description = model_description or f"Imported model {model_name}"
     completer.set_line(model_description)
-    model_description = (
-        input(f"Description for this model [{model_description}]: ").strip()
-        or model_description
-    )
+    model_description = input(f"Description for this model [{model_description}]: ").strip() or model_description
     return model_name, model_description
 
 
@@ -730,9 +683,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             vae_repo = None
         model_name = manager.convert_and_import(
             ckpt_path,
-            diffusers_path=Path(
-                Globals.root, "models", Globals.converted_ckpts_dir, model_name_or_path
-            ),
+            diffusers_path=Path(Globals.root, "models", Globals.converted_ckpts_dir, model_name_or_path),
             model_name=model_name,
             model_description=model_description,
             original_config_file=original_config_file,
@@ -759,14 +710,10 @@ def del_config(model_name: str, gen, opt, completer):
         print(f"** Unknown model {model_name}")
         return
 
-    if not click.confirm(
-        f"Remove {model_name} from the list of models known to InvokeAI?", default=True
-    ):
+    if not click.confirm(f"Remove {model_name} from the list of models known to InvokeAI?", default=True):
         return
 
-    delete_completely = click.confirm(
-        "Completely remove the model file or directory from disk?", default=False
-    )
+    delete_completely = click.confirm("Completely remove the model file or directory from disk?", default=False)
     gen.model_manager.del_model(model_name, delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
     print(f"** {model_name} deleted")
@@ -796,15 +743,9 @@ def edit_model(model_name: str, gen, opt, completer):
         vae["repo_id"] = input("External VAE repo_id: ").strip() or None
         if not vae["repo_id"]:
             completer.set_line(vae.get("path") or "")
-            vae["path"] = (
-                input("Path to a local diffusers VAE model (usually none): ").strip()
-                or None
-            )
+            vae["path"] = input("Path to a local diffusers VAE model (usually none): ").strip() or None
         completer.set_line(vae.get("subfolder") or "")
-        vae["subfolder"] = (
-            input("Name of subfolder containing the VAE model (usually none): ").strip()
-            or None
-        )
+        vae["subfolder"] = input("Name of subfolder containing the VAE model (usually none): ").strip() or None
         info["vae"] = vae
 
     if new_name != model_name:
@@ -828,9 +769,7 @@ def _get_model_name(existing_names, completer, default_name: str = "") -> str:
         if len(model_name) == 0:
             model_name = default_name
         if not re.match(r"^[\w._+:/-]+$", model_name):
-            print(
-                '** model name must contain only words, digits and the characters "._+:/-" **'
-            )
+            print('** model name must contain only words, digits and the characters "._+:/-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f"** the name {model_name} is already in use. Pick another.")
         else:
@@ -842,12 +781,8 @@ def do_textmask(gen, opt, callback):
     image_path = opt.prompt
     if not os.path.exists(image_path):
         image_path = os.path.join(opt.outdir, image_path)
-    assert os.path.exists(
-        image_path
-    ), '** "{opt.prompt}" not found. Please enter the name of an existing image file to mask **'
-    assert (
-        opt.text_mask is not None and len(opt.text_mask) >= 1
-    ), "** Please provide a text mask with -tm **"
+    assert os.path.exists(image_path), '** "{opt.prompt}" not found. Please enter the name of an existing image file to mask **'
+    assert opt.text_mask is not None and len(opt.text_mask) >= 1, "** Please provide a text mask with -tm **"
     opt.input_file_path = image_path
     tm = opt.text_mask[0]
     threshold = float(opt.text_mask[1]) if len(opt.text_mask) > 1 else 0.5
@@ -909,14 +844,8 @@ def do_postprocess(gen, opt, callback):
 
 
 def add_postprocessing_to_metadata(opt, original_file, new_file, tool, command):
-    original_file = (
-        original_file
-        if os.path.exists(original_file)
-        else os.path.join(opt.outdir, original_file)
-    )
-    new_file = (
-        new_file if os.path.exists(new_file) else os.path.join(opt.outdir, new_file)
-    )
+    original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir, original_file)
+    new_file = new_file if os.path.exists(new_file) else os.path.join(opt.outdir, new_file)
     try:
         meta = retrieve_metadata(original_file)["sd-metadata"]
     except AttributeError:
@@ -958,14 +887,10 @@ def prepare_image_metadata(
         try:
             filename = opt.fnformat.format(**wildcards)
         except KeyError as e:
-            print(
-                f"** The filename format contains an unknown key '{e.args[0]}'. Will use {{prefix}}.{{seed}}.png' instead"
-            )
+            print(f"** The filename format contains an unknown key '{e.args[0]}'. Will use {{prefix}}.{{seed}}.png' instead")
             filename = f"{prefix}.{seed}.png"
         except IndexError:
-            print(
-                "** The filename format is broken or complete. Will use '{prefix}.{seed}.png' instead"
-            )
+            print("** The filename format is broken or complete. Will use '{prefix}.{seed}.png' instead")
             filename = f"{prefix}.{seed}.png"
 
     if opt.variation_amount > 0:
@@ -976,9 +901,7 @@ def prepare_image_metadata(
     elif len(prior_variations) > 0:
         formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed)
     elif operation == "postprocess":
-        formatted_dream_prompt = "!fix " + opt.dream_prompt_str(
-            seed=seed, prompt=opt.input_file_path
-        )
+        formatted_dream_prompt = "!fix " + opt.dream_prompt_str(seed=seed, prompt=opt.input_file_path)
     else:
         formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
     return filename, formatted_dream_prompt
@@ -987,9 +910,7 @@ def prepare_image_metadata(
 def choose_postprocess_name(opt, prefix, seed) -> str:
     match = re.search(r"postprocess:(\w+)", opt.last_operation)
     if match:
-        modifier = match.group(
-            1
-        )  # will look like "gfpgan", "upscale", "outpaint" or "embiggen"
+        modifier = match.group(1)  # will look like "gfpgan", "upscale", "outpaint" or "embiggen"
     else:
         modifier = "postprocessed"
 
@@ -1027,9 +948,7 @@ def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     # Change working directory to the stable-diffusion directory
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-    invoke_ai_web_server = InvokeAIWebServer(
-        generate=gen, gfpgan=gfpgan, codeformer=codeformer, esrgan=esrgan
-    )
+    invoke_ai_web_server = InvokeAIWebServer(generate=gen, gfpgan=gfpgan, codeformer=codeformer, esrgan=esrgan)
 
     try:
         invoke_ai_web_server.run()
@@ -1080,9 +999,7 @@ def load_face_restoration(opt):
 
             restoration = Restoration()
             if opt.restore:
-                gfpgan, codeformer = restoration.load_face_restore_models(
-                    opt.gfpgan_model_path
-                )
+                gfpgan, codeformer = restoration.load_face_restore_models(opt.gfpgan_model_path)
             else:
                 print(">> Face restoration disabled")
             if opt.esrgan:
@@ -1187,9 +1104,7 @@ def report_model_error(opt: Namespace, e: Exception):
     )
     yes_to_all = os.environ.get("INVOKE_MODEL_RECONFIGURE")
     if yes_to_all:
-        print(
-            "** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
-        )
+        print("** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE")
     else:
         if not click.confirm(
             "Do you want to run invokeai-configure script to select and/or reinstall models?",

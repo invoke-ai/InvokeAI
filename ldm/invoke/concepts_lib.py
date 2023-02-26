@@ -34,24 +34,16 @@ class HuggingFaceConceptsLibrary:
         self.concepts_loaded = dict()
         self.triggers = dict()  # concept name to trigger phrase
         self.concept_names = dict()  # trigger phrase to concept name
-        self.match_trigger = re.compile(
-            r"(<[\w\- >]+>)"
-        )  # trigger is slightly less restrictive than HF concept name
-        self.match_concept = re.compile(
-            r"<([\w\-]+)>"
-        )  # HF concept name can only contain A-Za-z0-9_-
+        self.match_trigger = re.compile(r"(<[\w\- >]+>)")  # trigger is slightly less restrictive than HF concept name
+        self.match_concept = re.compile(r"<([\w\-]+)>")  # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self) -> list:
         """
         Return a list of all the concepts by name, without the 'sd-concepts-library' part.
         Also adds local concepts in invokeai/embeddings folder.
         """
-        local_concepts_now = self.get_local_concepts(
-            os.path.join(self.root, "embeddings")
-        )
-        local_concepts_to_add = set(local_concepts_now).difference(
-            set(self.local_concepts)
-        )
+        local_concepts_now = self.get_local_concepts(os.path.join(self.root, "embeddings"))
+        local_concepts_to_add = set(local_concepts_now).difference(set(self.local_concepts))
         self.local_concepts.update(local_concepts_now)
 
         if self.concept_list is not None:
@@ -61,9 +53,7 @@ class HuggingFaceConceptsLibrary:
             return self.concept_list
         else:
             try:
-                models = self.hf_api.list_models(
-                    filter=ModelFilter(model_name="sd-concepts-library/")
-                )
+                models = self.hf_api.list_models(filter=ModelFilter(model_name="sd-concepts-library/"))
                 self.concept_list = [a.id.split("/")[1] for a in models]
                 # when init, add all in dir. when not init, add only concepts added between init and now
                 self.concept_list.extend(list(local_concepts_to_add))
@@ -71,9 +61,7 @@ class HuggingFaceConceptsLibrary:
                 print(
                     f" ** WARNING: Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}."
                 )
-                print(
-                    " ** You may load .bin and .pt file(s) manually using the --embedding_directory argument."
-                )
+                print(" ** You may load .bin and .pt file(s) manually using the --embedding_directory argument.")
             return self.concept_list
 
     def get_concept_model_path(self, concept_name: str) -> str:
@@ -102,9 +90,7 @@ class HuggingFaceConceptsLibrary:
             self.concept_names[trigger] = concept_name
             return trigger
 
-        file = self.get_concept_file(
-            concept_name, "token_identifier.txt", local_only=True
-        )
+        file = self.get_concept_file(concept_name, "token_identifier.txt", local_only=True)
         if not file:
             return None
         with open(file) as f:
@@ -178,11 +164,7 @@ class HuggingFaceConceptsLibrary:
         file_name: str = "learned_embeds.bin",
         local_only: bool = False,
     ) -> str:
-        if not (
-            self.concept_is_downloaded(concept_name)
-            or self.concept_is_local(concept_name)
-            or local_only
-        ):
+        if not (self.concept_is_downloaded(concept_name) or self.concept_is_local(concept_name) or local_only):
             self.download_concept(concept_name)
 
         # get local path in invokeai/embeddings if local concept
@@ -230,24 +212,16 @@ class HuggingFaceConceptsLibrary:
                 "type_of_concept.txt",
             ):
                 url = hf_hub_url(repo_id, file)
-                request.urlretrieve(
-                    url, os.path.join(dest, file), reporthook=tally_download_size
-                )
+                request.urlretrieve(url, os.path.join(dest, file), reporthook=tally_download_size)
         except ul_error.HTTPError as e:
             if e.code == 404:
-                print(
-                    f"This concept is not known to the Hugging Face library. Generation will continue without the concept."
-                )
+                print(f"This concept is not known to the Hugging Face library. Generation will continue without the concept.")
             else:
-                print(
-                    f"Failed to download {concept_name}/{file} ({str(e)}. Generation will continue without the concept.)"
-                )
+                print(f"Failed to download {concept_name}/{file} ({str(e)}. Generation will continue without the concept.)")
             os.rmdir(dest)
             return False
         except ul_error.URLError as e:
-            print(
-                f"ERROR: {str(e)}. This may reflect a network issue. Generation will continue without the concept."
-            )
+            print(f"ERROR: {str(e)}. This may reflect a network issue. Generation will continue without the concept.")
             os.rmdir(dest)
             return False
         print(f"...{bytes / 1024:.2f}Kb")

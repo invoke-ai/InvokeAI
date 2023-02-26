@@ -32,14 +32,10 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     setattr(
         opt,
         "upscale",
-        [int(post_data["upscale_level"]), float(post_data["upscale_strength"])]
-        if post_data["upscale_level"] != ""
-        else None,
+        [int(post_data["upscale_level"]), float(post_data["upscale_strength"])] if post_data["upscale_level"] != "" else None,
     )
     setattr(opt, "progress_images", "progress_images" in post_data)
-    setattr(
-        opt, "seed", None if int(post_data["seed"]) == -1 else int(post_data["seed"])
-    )
+    setattr(opt, "seed", None if int(post_data["seed"]) == -1 else int(post_data["seed"]))
     setattr(
         opt,
         "variation_amount",
@@ -97,9 +93,7 @@ class DreamServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/javascript")
             self.end_headers()
             config = {"gfpgan_model_exists": gfpgan_model_exists}
-            self.wfile.write(
-                bytes("let config = " + json.dumps(config) + ";\n", "utf-8")
-            )
+            self.wfile.write(bytes("let config = " + json.dumps(config) + ";\n", "utf-8"))
         elif self.path == "/run_log.json":
             self.send_response(200)
             self.send_header("Content-type", "application/json")
@@ -186,9 +180,7 @@ class DreamServer(BaseHTTPRequestHandler):
             elif opt.with_variations is None:
                 iter_opt.seed = seed
             normalized_prompt = PromptFormatter(self.model, iter_opt).normalize_prompt()
-            path = pngwriter.save_image_and_prompt_to_png(
-                image, f"{normalized_prompt} -S{iter_opt.seed}", name
-            )
+            path = pngwriter.save_image_and_prompt_to_png(image, f"{normalized_prompt} -S{iter_opt.seed}", name)
 
             if int(config["seed"]) == -1:
                 config["seed"] = seed
@@ -247,9 +239,7 @@ class DreamServer(BaseHTTPRequestHandler):
 
         def image_progress(sample, step):
             if self.canceled.is_set():
-                self.wfile.write(
-                    bytes(json.dumps({"event": "canceled"}) + "\n", "utf-8")
-                )
+                self.wfile.write(bytes(json.dumps({"event": "canceled"}) + "\n", "utf-8"))
                 raise CanceledException
             path = None
             # since rendering images is moderately expensive, only render every 5th image
@@ -271,9 +261,7 @@ class DreamServer(BaseHTTPRequestHandler):
         try:
             if opt.init_img is None:
                 # Run txt2img
-                self.model.prompt2image(
-                    **vars(opt), step_callback=image_progress, image_callback=image_done
-                )
+                self.model.prompt2image(**vars(opt), step_callback=image_progress, image_callback=image_done)
             else:
                 # Decode initimg as base64 to temp file
                 with open("./img2img-tmp.png", "wb") as f:

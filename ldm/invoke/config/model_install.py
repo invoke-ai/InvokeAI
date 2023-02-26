@@ -56,23 +56,15 @@ class addModelsForm(npyscreen.FormMultiPage):
             self.existing_models = OmegaConf.load(default_config_file())
         except:
             self.existing_models = dict()
-        self.starter_model_list = [
-            x for x in list(self.initial_models.keys()) if x not in self.existing_models
-        ]
+        self.starter_model_list = [x for x in list(self.initial_models.keys()) if x not in self.existing_models]
         self.installed_models = dict()
         super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
     def create(self):
         window_width, window_height = get_terminal_size()
         starter_model_labels = self._get_starter_model_labels()
-        recommended_models = [
-            x
-            for x in self.starter_model_list
-            if self.initial_models[x].get("recommended", False)
-        ]
-        self.installed_models = sorted(
-            [x for x in list(self.initial_models.keys()) if x in self.existing_models]
-        )
+        recommended_models = [x for x in self.starter_model_list if self.initial_models[x].get("recommended", False)]
+        self.installed_models = sorted([x for x in list(self.initial_models.keys()) if x in self.existing_models])
         self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
@@ -172,9 +164,7 @@ class addModelsForm(npyscreen.FormMultiPage):
                 relx=4,
             )
             self.nextrely -= 1
-        self.import_model_paths = self.add_widget_intelligent(
-            TextBox, max_height=7, scroll_exit=True, editable=True, relx=4
-        )
+        self.import_model_paths = self.add_widget_intelligent(TextBox, max_height=7, scroll_exit=True, editable=True, relx=4)
         self.nextrely += 1
         self.show_directory_fields = self.add_widget_intelligent(
             npyscreen.FormControlCheckbox,
@@ -258,9 +248,7 @@ class addModelsForm(npyscreen.FormMultiPage):
     def _show_hide_convert(self):
         model_paths = self.import_model_paths.value or ""
         autoload_directory = self.autoload_directory.value or ""
-        self.convert_models.hidden = (
-            len(model_paths) == 0 and len(autoload_directory) == 0
-        )
+        self.convert_models.hidden = len(model_paths) == 0 and len(autoload_directory) == 0
 
     def _get_starter_model_labels(self) -> list[str]:
         window_width, window_height = get_terminal_size()
@@ -276,22 +264,11 @@ class addModelsForm(npyscreen.FormMultiPage):
             else im[x].description
             for x in names
         ]
-        return [
-            f"%-{label_width}s %s" % (names[x], descriptions[x])
-            for x in range(0, len(names))
-        ]
+        return [f"%-{label_width}s %s" % (names[x], descriptions[x]) for x in range(0, len(names))]
 
     def _get_columns(self) -> int:
         window_width, window_height = get_terminal_size()
-        cols = (
-            4
-            if window_width > 240
-            else 3
-            if window_width > 160
-            else 2
-            if window_width > 80
-            else 1
-        )
+        cols = 4 if window_width > 240 else 3 if window_width > 160 else 2 if window_width > 80 else 1
         return min(cols, len(self.installed_models))
 
     def on_ok(self):
@@ -376,19 +353,13 @@ class AddModelApplication(npyscreen.NPSAppManaged):
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
-        self.main_form = self.addForm(
-            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
-        )
+        self.main_form = self.addForm("MAIN", addModelsForm, name="Install Stable Diffusion Models")
 
 
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace, selections: Namespace):
-    models_to_remove = [
-        x for x in selections.starter_models if not selections.starter_models[x]
-    ]
-    models_to_install = [
-        x for x in selections.starter_models if selections.starter_models[x]
-    ]
+    models_to_remove = [x for x in selections.starter_models if not selections.starter_models[x]]
+    models_to_install = [x for x in selections.starter_models if selections.starter_models[x]]
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
@@ -401,9 +372,7 @@ def process_and_execute(opt: Namespace, selections: Namespace):
         external_models=potential_models_to_install,
         scan_at_startup=scan_at_startup,
         convert_to_diffusers=convert_to_diffusers,
-        precision="float32"
-        if opt.full_precision
-        else choose_precision(torch.device(choose_torch_device())),
+        precision="float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device())),
         purge_deleted=selections.purge_deleted_models,
         config_file_path=Path(opt.config_file) if opt.config_file else None,
     )
@@ -411,11 +380,7 @@ def process_and_execute(opt: Namespace, selections: Namespace):
 
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
-    precision = (
-        "float32"
-        if opt.full_precision
-        else choose_precision(torch.device(choose_torch_device()))
-    )
+    precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     if opt.default_only:
         install_requested_models(
             install_initial_models=default_dataset(),
@@ -479,9 +444,7 @@ def main():
     Globals.root = os.path.expanduser(get_root(opt.root) or "")
 
     if not global_config_dir().exists():
-        print(
-            ">> Your InvokeAI root directory is not set up. Calling invokeai-configure."
-        )
+        print(">> Your InvokeAI root directory is not set up. Calling invokeai-configure.")
         import ldm.invoke.config.invokeai_configure
 
         ldm.invoke.config.invokeai_configure.main()
@@ -496,13 +459,9 @@ def main():
         print("\nGoodbye! Come back soon.")
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
-            print(
-                "** Insufficient vertical space for the interface. Please make your window taller and try again"
-            )
+            print("** Insufficient vertical space for the interface. Please make your window taller and try again")
         elif str(e).startswith("addwstr"):
-            print(
-                "** Insufficient horizontal space for the interface. Please make your window wider and try again."
-            )
+            print("** Insufficient horizontal space for the interface. Please make your window wider and try again.")
 
 
 # -------------------------------------

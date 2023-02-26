@@ -134,3 +134,7 @@ version = { attr = "ldm.invoke.__version__" }
 
 [tool.pytest.ini_options]
 addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
+
+[tool.black]
+line-length = 128
+target-version = ['py39']

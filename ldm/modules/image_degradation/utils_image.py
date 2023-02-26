@@ -296,22 +296,14 @@ def single2uint16(img):
 def uint2tensor4(img):
     if img.ndim == 2:
         img = np.expand_dims(img, axis=2)
-    return (
-        torch.from_numpy(np.ascontiguousarray(img))
-        .permute(2, 0, 1)
-        .float()
-        .div(255.0)
-        .unsqueeze(0)
-    )
+    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.0).unsqueeze(0)
 
 
 # convert uint to 3-dimensional torch tensor
 def uint2tensor3(img):
     if img.ndim == 2:
         img = np.expand_dims(img, axis=2)
-    return (
-        torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.0)
-    )
+    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.0)
 
 
 # convert 2/3/4-dimensional torch tensor to uint
@@ -334,12 +326,7 @@ def single2tensor3(img):
 
 # convert single (HxWxC) to 4-dimensional torch tensor
 def single2tensor4(img):
-    return (
-        torch.from_numpy(np.ascontiguousarray(img))
-        .permute(2, 0, 1)
-        .float()
-        .unsqueeze(0)
-    )
+    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().unsqueeze(0)
 
 
 # convert torch tensor to single
@@ -362,12 +349,7 @@ def tensor2single3(img):
 
 
 def single2tensor5(img):
-    return (
-        torch.from_numpy(np.ascontiguousarray(img))
-        .permute(2, 0, 1, 3)
-        .float()
-        .unsqueeze(0)
-    )
+    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1, 3).float().unsqueeze(0)
 
 
 def single32tensor5(img):
@@ -385,9 +367,7 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     Input: 4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
     Output: 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
     """
-    tensor = (
-        tensor.squeeze().float().cpu().clamp_(*min_max)
-    )  # squeeze first, then clamp
+    tensor = tensor.squeeze().float().cpu().clamp_(*min_max)  # squeeze first, then clamp
     tensor = (tensor - min_max[0]) / (min_max[1] - min_max[0])  # to range [0,1]
     n_dim = tensor.dim()
     if n_dim == 4:
@@ -400,11 +380,7 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     elif n_dim == 2:
         img_np = tensor.numpy()
     else:
-        raise TypeError(
-            "Only support 4D, 3D and 2D tensor. But received with dimension: {:d}".format(
-                n_dim
-            )
-        )
+        raise TypeError("Only support 4D, 3D and 2D tensor. But received with dimension: {:d}".format(n_dim))
     if out_type == np.uint8:
         img_np = (img_np * 255.0).round()
         # Important. Unlike matlab, numpy.unit8() WILL NOT round by default.
@@ -744,9 +720,7 @@ def ssim(img1, img2):
     sigma2_sq = cv2.filter2D(img2**2, -1, window)[5:-5, 5:-5] - mu2_sq
     sigma12 = cv2.filter2D(img1 * img2, -1, window)[5:-5, 5:-5] - mu1_mu2
 
-    ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / (
-        (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
-    )
+    ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
     return ssim_map.mean()
 
 
@@ -762,14 +736,12 @@ def cubic(x):
     absx = torch.abs(x)
     absx2 = absx**2
     absx3 = absx**3
-    return (1.5 * absx3 - 2.5 * absx2 + 1) * ((absx <= 1).type_as(absx)) + (
-        -0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2
-    ) * (((absx > 1) * (absx <= 2)).type_as(absx))
+    return (1.5 * absx3 - 2.5 * absx2 + 1) * ((absx <= 1).type_as(absx)) + (-0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2) * (
+        ((absx > 1) * (absx <= 2)).type_as(absx)
+    )
 
 
-def calculate_weights_indices(
-    in_length, out_length, scale, kernel, kernel_width, antialiasing
-):
+def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width, antialiasing):
     if (scale < 1) and (antialiasing):
         # Use a modified kernel to simultaneously interpolate and antialias- larger kernel width
         kernel_width = kernel_width / scale
@@ -793,9 +765,7 @@ def calculate_weights_indices(
 
     # The indices of the input pixels involved in computing the k-th output
     # pixel are in row k of the indices matrix.
-    indices = left.view(out_length, 1).expand(out_length, P) + torch.linspace(
-        0, P - 1, P
-    ).view(1, P).expand(out_length, P)
+    indices = left.view(out_length, 1).expand(out_length, P) + torch.linspace(0, P - 1, P).view(1, P).expand(out_length, P)
 
     # The weights used to compute the k-th output pixel are in row k of the
     # weights matrix.
@@ -876,9 +846,7 @@ def imresize(img, scale, antialiasing=True):
     for i in range(out_H):
         idx = int(indices_H[i][0])
         for j in range(out_C):
-            out_1[j, i, :] = (
-                img_aug[j, idx : idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
-            )
+            out_1[j, i, :] = img_aug[j, idx : idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
 
     # process W dimension
     # symmetric copying
@@ -959,9 +927,7 @@ def imresize_np(img, scale, antialiasing=True):
     for i in range(out_H):
         idx = int(indices_H[i][0])
         for j in range(out_C):
-            out_1[i, :, j] = (
-                img_aug[idx : idx + kernel_width, :, j].transpose(0, 1).mv(weights_H[i])
-            )
+            out_1[i, :, j] = img_aug[idx : idx + kernel_width, :, j].transpose(0, 1).mv(weights_H[i])
 
     # process W dimension
     # symmetric copying

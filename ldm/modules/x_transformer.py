@@ -38,10 +38,7 @@ class FixedPositionalEmbedding(nn.Module):
         self.register_buffer("inv_freq", inv_freq)
 
     def forward(self, x, seq_dim=1, offset=0):
-        t = (
-            torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq)
-            + offset
-        )
+        t = torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq) + offset
         sinusoid_inp = torch.einsum("i , j -> i j", t, self.inv_freq)
         emb = torch.cat((sinusoid_inp.sin(), sinusoid_inp.cos()), dim=-1)
         return emb[None, :, :]
@@ -111,9 +108,7 @@ def group_by_key_prefix(prefix, d):
 
 
 def groupby_prefix_and_trim(prefix, d):
-    kwargs_with_prefix, kwargs = group_dict_by_key(
-        partial(string_begins_with, prefix), d
-    )
+    kwargs_with_prefix, kwargs = group_dict_by_key(partial(string_begins_with, prefix), d)
     kwargs_without_prefix = dict(
         map(
             lambda x: (x[0][len(prefix) :], x[1]),
@@ -207,15 +202,9 @@ class FeedForward(nn.Module):
         super().__init__()
         inner_dim = int(dim * mult)
         dim_out = default(dim_out, dim)
-        project_in = (
-            nn.Sequential(nn.Linear(dim, inner_dim), nn.GELU())
-            if not glu
-            else GEGLU(dim, inner_dim)
-        )
+        project_in = nn.Sequential(nn.Linear(dim, inner_dim), nn.GELU()) if not glu else GEGLU(dim, inner_dim)
 
-        self.net = nn.Sequential(
-            project_in, nn.Dropout(dropout), nn.Linear(inner_dim, dim_out)
-        )
+        self.net = nn.Sequential(project_in, nn.Dropout(dropout), nn.Linear(inner_dim, dim_out))
 
     def forward(self, x):
         return self.net(x)
@@ -239,9 +228,7 @@ class Attention(nn.Module):
     ):
         super().__init__()
         if use_entmax15:
-            raise NotImplementedError(
-                "Check out entmax activation instead of softmax activation!"
-            )
+            raise NotImplementedError("Check out entmax activation instead of softmax activation!")
         self.scale = dim_head**-0.5
         self.heads = heads
         self.causal = causal
@@ -275,11 +262,7 @@ class Attention(nn.Module):
 
         # attention on attention
         self.attn_on_attn = on_attn
-        self.to_out = (
-            nn.Sequential(nn.Linear(inner_dim, dim * 2), nn.GLU())
-            if on_attn
-            else nn.Linear(inner_dim, dim)
-        )
+        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim * 2), nn.GLU()) if on_attn else nn.Linear(inner_dim, dim)
 
     def forward(
         self,
@@ -351,9 +334,7 @@ class Attention(nn.Module):
         pre_softmax_attn = dots
 
         if talking_heads:
-            dots = einsum(
-                "b h i j, h k -> b k i j", dots, self.pre_softmax_proj
-            ).contiguous()
+            dots = einsum("b h i j, h k -> b k i j", dots, self.pre_softmax_proj).contiguous()
 
         if exists(rel_pos):
             dots = rel_pos(dots)
@@ -383,9 +364,7 @@ class Attention(nn.Module):
         attn = self.dropout(attn)
 
         if talking_heads:
-            attn = einsum(
-                "b h i j, h k -> b k i j", attn, self.post_softmax_proj
-            ).contiguous()
+            attn = einsum("b h i j, h k -> b k i j", attn, self.post_softmax_proj).contiguous()
 
         out = einsum("b h i j, b h j d -> b h i d", attn, v)
         out = rearrange(out, "b h n d -> b n (h d)")
@@ -434,9 +413,7 @@ class AttentionLayers(nn.Module):
         self.layers = nn.ModuleList([])
 
         self.has_pos_emb = position_infused_attn
-        self.pia_pos_emb = (
-            FixedPositionalEmbedding(dim) if position_infused_attn else None
-        )
+        self.pia_pos_emb = FixedPositionalEmbedding(dim) if position_infused_attn else None
         self.rotary_pos_emb = always(None)
 
         assert (
@@ -473,25 +450,15 @@ class AttentionLayers(nn.Module):
             assert 1 < par_ratio <= par_depth, "par ratio out of range"
             default_block = tuple(filter(not_equals("f"), default_block))
             par_attn = par_depth // par_ratio
-            depth_cut = (
-                par_depth * 2 // 3
-            )  # 2 / 3 attention layer cutoff suggested by PAR paper
+            depth_cut = par_depth * 2 // 3  # 2 / 3 attention layer cutoff suggested by PAR paper
             par_width = (depth_cut + depth_cut // par_attn) // par_attn
-            assert (
-                len(default_block) <= par_width
-            ), "default block is too large for par_ratio"
+            assert len(default_block) <= par_width, "default block is too large for par_ratio"
             par_block = default_block + ("f",) * (par_width - len(default_block))
             par_head = par_block * par_attn
             layer_types = par_head + ("f",) * (par_depth - len(par_head))
         elif exists(sandwich_coef):
-            assert (
-                sandwich_coef > 0 and sandwich_coef <= depth
-            ), "sandwich coefficient should be less than the depth"
-            layer_types = (
-                ("a",) * sandwich_coef
-                + default_block * (depth - sandwich_coef)
-                + ("f",) * sandwich_coef
-            )
+            assert sandwich_coef > 0 and sandwich_coef <= depth, "sandwich coefficient should be less than the depth"
+            layer_types = ("a",) * sandwich_coef + default_block * (depth - sandwich_coef) + ("f",) * sandwich_coef
         else:
             layer_types = default_block * depth
 
@@ -536,9 +503,7 @@ class AttentionLayers(nn.Module):
 
         mems = mems.copy() if exists(mems) else [None] * self.num_attn_layers
 
-        for ind, (layer_type, (norm, block, residual_fn)) in enumerate(
-            zip(self.layer_types, self.layers)
-        ):
+        for ind, (layer_type, (norm, block, residual_fn)) in enumerate(zip(self.layer_types, self.layers)):
             is_last = ind == (len(self.layers) - 1)
 
             if layer_type == "a":
@@ -584,9 +549,7 @@ class AttentionLayers(nn.Module):
                 x = norm(x)
 
         if return_hiddens:
-            intermediates = LayerIntermediates(
-                hiddens=hiddens, attn_intermediates=intermediates
-            )
+            intermediates = LayerIntermediates(hiddens=hiddens, attn_intermediates=intermediates)
 
             return x, intermediates
 
@@ -614,9 +577,7 @@ class TransformerWrapper(nn.Module):
         use_pos_emb=True,
     ):
         super().__init__()
-        assert isinstance(
-            attn_layers, AttentionLayers
-        ), "attention layers must be one of Encoder or Decoder"
+        assert isinstance(attn_layers, AttentionLayers), "attention layers must be one of Encoder or Decoder"
 
         dim = attn_layers.dim
         emb_dim = default(emb_dim, dim)
@@ -627,9 +588,7 @@ class TransformerWrapper(nn.Module):
 
         self.token_emb = nn.Embedding(num_tokens, emb_dim)
         self.pos_emb = (
-            AbsolutePositionalEmbedding(emb_dim, max_seq_len)
-            if (use_pos_emb and not attn_layers.has_pos_emb)
-            else always(0)
+            AbsolutePositionalEmbedding(emb_dim, max_seq_len) if (use_pos_emb and not attn_layers.has_pos_emb) else always(0)
         )
         self.emb_dropout = nn.Dropout(emb_dropout)
 
@@ -639,11 +598,7 @@ class TransformerWrapper(nn.Module):
 
         self.init_()
 
-        self.to_logits = (
-            nn.Linear(dim, num_tokens)
-            if not tie_embedding
-            else lambda t: t @ self.token_emb.weight.t()
-        )
+        self.to_logits = nn.Linear(dim, num_tokens) if not tie_embedding else lambda t: t @ self.token_emb.weight.t()
 
         # memory tokens (like [cls]) from Memory Transformers paper
         num_memory_tokens = default(num_memory_tokens, 0)
@@ -691,9 +646,7 @@ class TransformerWrapper(nn.Module):
             if exists(mask):
                 mask = F.pad(mask, (num_mem, 0), value=True)
 
-        x, intermediates = self.attn_layers(
-            x, mask=mask, mems=mems, return_hiddens=True, **kwargs
-        )
+        x, intermediates = self.attn_layers(x, mask=mask, mems=mems, return_hiddens=True, **kwargs)
         x = self.norm(x)
 
         mem, x = x[:, :num_mem], x[:, num_mem:]
@@ -712,9 +665,7 @@ class TransformerWrapper(nn.Module):
                 if exists(mems)
                 else hiddens
             )
-            new_mems = list(
-                map(lambda t: t[..., -self.max_mem_len :, :].detach(), new_mems)
-            )
+            new_mems = list(map(lambda t: t[..., -self.max_mem_len :, :].detach(), new_mems))
             return out, new_mems
 
         if return_attn:

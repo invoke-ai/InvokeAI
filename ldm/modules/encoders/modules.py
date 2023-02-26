@@ -28,9 +28,7 @@ def _expand_mask(mask, dtype, tgt_len=None):
 
     inverted_mask = 1.0 - expanded_mask
 
-    return inverted_mask.masked_fill(
-        inverted_mask.to(torch.bool), torch.finfo(dtype).min
-    )
+    return inverted_mask.masked_fill(inverted_mask.to(torch.bool), torch.finfo(dtype).min)
 
 
 def _build_causal_attention_mask(bsz, seq_len, dtype):
@@ -103,9 +101,7 @@ class BERTTokenizer(AbstractEncoder):
 
         cache = global_cache_dir("hub")
         try:
-            self.tokenizer = BertTokenizerFast.from_pretrained(
-                "bert-base-uncased", cache_dir=cache, local_files_only=True
-            )
+            self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased", cache_dir=cache, local_files_only=True)
         except OSError:
             raise SystemExit(
                 "* Couldn't load Bert tokenizer files. Try running scripts/preload_models.py from an internet-conected machine."
@@ -168,9 +164,7 @@ class BERTEmbedder(AbstractEncoder):
             tokens = self.tknz_fn(text)  # .to(self.device)
         else:
             tokens = text
-        z = self.transformer(
-            tokens, return_embeddings=True, embedding_manager=embedding_manager
-        )
+        z = self.transformer(tokens, return_embeddings=True, embedding_manager=embedding_manager)
         return z
 
     def encode(self, text, **kwargs):
@@ -203,9 +197,7 @@ class SpatialRescaler(nn.Module):
         self.interpolator = partial(torch.nn.functional.interpolate, mode=method)
         self.remap_output = out_channels is not None
         if self.remap_output:
-            print(
-                f"Spatial Rescaler mapping from {in_channels} to {out_channels} channels after resizing."
-            )
+            print(f"Spatial Rescaler mapping from {in_channels} to {out_channels} channels after resizing.")
             self.channel_mapper = nn.Conv2d(in_channels, out_channels, 1, bias=bias)
 
     def forward(self, x):
@@ -235,12 +227,8 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     ):
         super().__init__()
         cache = global_cache_dir("hub")
-        self.tokenizer = tokenizer or CLIPTokenizer.from_pretrained(
-            version, cache_dir=cache, local_files_only=True
-        )
-        self.transformer = transformer or CLIPTextModel.from_pretrained(
-            version, cache_dir=cache, local_files_only=True
-        )
+        self.tokenizer = tokenizer or CLIPTokenizer.from_pretrained(version, cache_dir=cache, local_files_only=True)
+        self.transformer = transformer or CLIPTextModel.from_pretrained(version, cache_dir=cache, local_files_only=True)
         self.max_length = max_length
         self.freeze()
 
@@ -251,11 +239,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             inputs_embeds=None,
             embedding_manager=None,
         ) -> torch.Tensor:
-            seq_length = (
-                input_ids.shape[-1]
-                if input_ids is not None
-                else inputs_embeds.shape[-2]
-            )
+            seq_length = input_ids.shape[-1] if input_ids is not None else inputs_embeds.shape[-2]
 
             if position_ids is None:
                 position_ids = self.position_ids[:, :seq_length]
@@ -271,9 +255,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
 
             return embeddings
 
-        self.transformer.text_model.embeddings.forward = embedding_forward.__get__(
-            self.transformer.text_model.embeddings
-        )
+        self.transformer.text_model.embeddings.forward = embedding_forward.__get__(self.transformer.text_model.embeddings)
 
         def encoder_forward(
             self,
@@ -284,19 +266,11 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             output_hidden_states=None,
             return_dict=None,
         ):
-            output_attentions = (
-                output_attentions
-                if output_attentions is not None
-                else self.config.output_attentions
-            )
+            output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
             output_hidden_states = (
-                output_hidden_states
-                if output_hidden_states is not None
-                else self.config.output_hidden_states
+                output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
             )
-            return_dict = (
-                return_dict if return_dict is not None else self.config.use_return_dict
-            )
+            return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
             encoder_states = () if output_hidden_states else None
             all_attentions = () if output_attentions else None
@@ -323,9 +297,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
 
             return hidden_states
 
-        self.transformer.text_model.encoder.forward = encoder_forward.__get__(
-            self.transformer.text_model.encoder
-        )
+        self.transformer.text_model.encoder.forward = encoder_forward.__get__(self.transformer.text_model.encoder)
 
         def text_encoder_forward(
             self,
@@ -337,19 +309,11 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             return_dict=None,
             embedding_manager=None,
         ):
-            output_attentions = (
-                output_attentions
-                if output_attentions is not None
-                else self.config.output_attentions
-            )
+            output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
             output_hidden_states = (
-                output_hidden_states
-                if output_hidden_states is not None
-                else self.config.output_hidden_states
+                output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
             )
-            return_dict = (
-                return_dict if return_dict is not None else self.config.use_return_dict
-            )
+            return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
             if input_ids is None:
                 raise ValueError("You have to specify either input_ids")
@@ -366,9 +330,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             bsz, seq_len = input_shape
             # CLIP's text model uses causal mask, prepare it here.
             # https://github.com/openai/CLIP/blob/cfcffb90e69f37bf2ff1e988237a0fbe41f33c04/clip/model.py#L324
-            causal_attention_mask = _build_causal_attention_mask(
-                bsz, seq_len, hidden_states.dtype
-            ).to(hidden_states.device)
+            causal_attention_mask = _build_causal_attention_mask(bsz, seq_len, hidden_states.dtype).to(hidden_states.device)
 
             # expand attention_mask
             if attention_mask is not None:
@@ -388,9 +350,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
 
             return last_hidden_state
 
-        self.transformer.text_model.forward = text_encoder_forward.__get__(
-            self.transformer.text_model
-        )
+        self.transformer.text_model.forward = text_encoder_forward.__get__(self.transformer.text_model)
 
         def transformer_forward(
             self,
@@ -493,9 +453,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
             # handle weights >=1
             tokens, per_token_weights = self.get_tokens_and_weights(fragments, weights)
-            base_embedding = self.build_weighted_embedding_tensor(
-                tokens, per_token_weights, **kwargs
-            )
+            base_embedding = self.build_weighted_embedding_tensor(tokens, per_token_weights, **kwargs)
 
             # this is our starting point
             embeddings = base_embedding.unsqueeze(0)
@@ -513,16 +471,10 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
                 if fragment_weight < 1:
                     fragments_without_this = fragments[:index] + fragments[index + 1 :]
                     weights_without_this = weights[:index] + weights[index + 1 :]
-                    tokens, per_token_weights = self.get_tokens_and_weights(
-                        fragments_without_this, weights_without_this
-                    )
-                    embedding_without_this = self.build_weighted_embedding_tensor(
-                        tokens, per_token_weights, **kwargs
-                    )
+                    tokens, per_token_weights = self.get_tokens_and_weights(fragments_without_this, weights_without_this)
+                    embedding_without_this = self.build_weighted_embedding_tensor(tokens, per_token_weights, **kwargs)
 
-                    embeddings = torch.cat(
-                        (embeddings, embedding_without_this.unsqueeze(0)), dim=1
-                    )
+                    embeddings = torch.cat((embeddings, embedding_without_this.unsqueeze(0)), dim=1)
                     # weight of the embedding *without* this fragment gets *stronger* as its weight approaches 0
                     # if fragment_weight = 0, basically we want embedding_without_this to completely overwhelm base_embedding
                     # therefore:
@@ -536,16 +488,12 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
                     # -> tan((1-weight)*PI/2) should give us ideal lerp weights
                     epsilon = 1e-9
                     fragment_weight = max(epsilon, fragment_weight)  # inf is bad
-                    embedding_lerp_weight = math.tan(
-                        (1.0 - fragment_weight) * math.pi / 2
-                    )
+                    embedding_lerp_weight = math.tan((1.0 - fragment_weight) * math.pi / 2)
                     # todo handle negative weight?
 
                     per_embedding_weights.append(embedding_lerp_weight)
 
-            lerped_embeddings = self.apply_embedding_weights(
-                embeddings, per_embedding_weights, normalize=True
-            ).squeeze(0)
+            lerped_embeddings = self.apply_embedding_weights(embeddings, per_embedding_weights, normalize=True).squeeze(0)
 
             # print(f"assembled tokens for '{fragments}' into tensor of shape {lerped_embeddings.shape}")
 
@@ -556,9 +504,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
                 else torch.cat([batch_z, lerped_embeddings.unsqueeze(0)], dim=1)
             )
             batch_tokens = (
-                tokens.unsqueeze(0)
-                if batch_tokens is None
-                else torch.cat([batch_tokens, tokens.unsqueeze(0)], dim=1)
+                tokens.unsqueeze(0) if batch_tokens is None else torch.cat([batch_tokens, tokens.unsqueeze(0)], dim=1)
             )
 
         # should have shape (B, 77, 768)
@@ -569,9 +515,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         else:
             return batch_z
 
-    def get_token_ids(
-        self, fragments: list[str], include_start_and_end_markers: bool = True
-    ) -> list[list[int]]:
+    def get_token_ids(self, fragments: list[str], include_start_and_end_markers: bool = True) -> list[list[int]]:
         """
         Convert a list of strings like `["a cat", "sitting", "on a mat"]` into a list of lists of token ids like
         `[[bos, 0, 1, eos], [bos, 2, eos], [bos, 3, 0, 4, eos]]`. bos/eos markers are skipped if
@@ -598,18 +542,12 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
             # trim eos/bos
             token_ids = token_ids[1:-1]
             # pad for textual inversions with vector length >1
-            token_ids = self.textual_inversion_manager.expand_textual_inversion_token_ids_if_necessary(
-                token_ids
-            )
+            token_ids = self.textual_inversion_manager.expand_textual_inversion_token_ids_if_necessary(token_ids)
             # restrict length to max_length-2 (leaving room for bos/eos)
             token_ids = token_ids[0 : self.max_length - 2]
             # add back eos/bos if requested
             if include_start_and_end_markers:
-                token_ids = (
-                    [self.tokenizer.bos_token_id]
-                    + token_ids
-                    + [self.tokenizer.eos_token_id]
-                )
+                token_ids = [self.tokenizer.bos_token_id] + token_ids + [self.tokenizer.eos_token_id]
 
             result.append(token_ids)
 
@@ -622,13 +560,9 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         per_embedding_weights: list[float],
         normalize: bool,
     ) -> torch.Tensor:
-        per_embedding_weights = torch.tensor(
-            per_embedding_weights, dtype=embeddings.dtype, device=embeddings.device
-        )
+        per_embedding_weights = torch.tensor(per_embedding_weights, dtype=embeddings.dtype, device=embeddings.device)
         if normalize:
-            per_embedding_weights = per_embedding_weights / torch.sum(
-                per_embedding_weights
-            )
+            per_embedding_weights = per_embedding_weights / torch.sum(per_embedding_weights)
         reshaped_weights = per_embedding_weights.reshape(
             per_embedding_weights.shape
             + (
@@ -640,9 +574,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         return torch.sum(embeddings * reshaped_weights, dim=1)
         # lerped embeddings has shape (77, 768)
 
-    def get_tokens_and_weights(
-        self, fragments: list[str], weights: list[float]
-    ) -> (torch.Tensor, torch.Tensor):
+    def get_tokens_and_weights(self, fragments: list[str], weights: list[float]) -> (torch.Tensor, torch.Tensor):
         """
 
         :param fragments:
@@ -653,9 +585,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         if len(fragments) == 0 and len(weights) == 0:
             fragments = [""]
             weights = [1]
-        per_fragment_token_ids = self.get_token_ids(
-            fragments, include_start_and_end_markers=False
-        )
+        per_fragment_token_ids = self.get_token_ids(fragments, include_start_and_end_markers=False)
         all_token_ids = []
         per_token_weights = []
         # print("all fragments:", fragments, weights)
@@ -672,38 +602,24 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         # leave room for bos/eos
         max_token_count_without_bos_eos_markers = self.max_length - 2
         if len(all_token_ids) > max_token_count_without_bos_eos_markers:
-            excess_token_count = (
-                len(all_token_ids) - max_token_count_without_bos_eos_markers
-            )
+            excess_token_count = len(all_token_ids) - max_token_count_without_bos_eos_markers
             # TODO build nice description string of how the truncation was applied
             # this should be done by calling self.tokenizer.convert_ids_to_tokens() then passing the result to
             # self.tokenizer.convert_tokens_to_string() for the token_ids on each side of the truncation limit.
-            print(
-                f">> Prompt is {excess_token_count} token(s) too long and has been truncated"
-            )
+            print(f">> Prompt is {excess_token_count} token(s) too long and has been truncated")
             all_token_ids = all_token_ids[0:max_token_count_without_bos_eos_markers]
-            per_token_weights = per_token_weights[
-                0:max_token_count_without_bos_eos_markers
-            ]
+            per_token_weights = per_token_weights[0:max_token_count_without_bos_eos_markers]
 
         # pad out to a 77-entry array: [bos_token, <prompt tokens>, eos_token, pad_token…]
         # (77 = self.max_length)
-        all_token_ids = (
-            [self.tokenizer.bos_token_id]
-            + all_token_ids
-            + [self.tokenizer.eos_token_id]
-        )
+        all_token_ids = [self.tokenizer.bos_token_id] + all_token_ids + [self.tokenizer.eos_token_id]
         per_token_weights = [1.0] + per_token_weights + [1.0]
         pad_length = self.max_length - len(all_token_ids)
         all_token_ids += [self.tokenizer.pad_token_id] * pad_length
         per_token_weights += [1.0] * pad_length
 
-        all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long).to(
-            self.device
-        )
-        per_token_weights_tensor = torch.tensor(
-            per_token_weights, dtype=torch.float32
-        ).to(self.device)
+        all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long).to(self.device)
+        per_token_weights_tensor = torch.tensor(per_token_weights, dtype=torch.float32).to(self.device)
         # print(f"assembled all_token_ids_tensor with shape {all_token_ids_tensor.shape}")
         return all_token_ids_tensor, per_token_weights_tensor
 
@@ -724,15 +640,11 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         """
         # print(f"building weighted embedding tensor for {tokens} with weights {per_token_weights}")
         if token_ids.shape != torch.Size([self.max_length]):
-            raise ValueError(
-                f"token_ids has shape {token_ids.shape} - expected [{self.max_length}]"
-            )
+            raise ValueError(f"token_ids has shape {token_ids.shape} - expected [{self.max_length}]")
 
         z = self.transformer(input_ids=token_ids.unsqueeze(0), **kwargs)
 
-        batch_weights_expanded = per_token_weights.reshape(
-            per_token_weights.shape + (1,)
-        ).expand(z.shape)
+        batch_weights_expanded = per_token_weights.reshape(per_token_weights.shape + (1,)).expand(z.shape)
 
         if weight_delta_from_empty:
             empty_tokens = self.tokenizer(

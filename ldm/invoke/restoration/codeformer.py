@@ -7,15 +7,11 @@ import torch
 
 from ldm.invoke.globals import Globals
 
-pretrained_model_url = (
-    "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
-)
+pretrained_model_url = "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
 
 
 class CodeFormerRestoration:
-    def __init__(
-        self, codeformer_dir="models/codeformer", codeformer_model_path="codeformer.pth"
-    ) -> None:
+    def __init__(self, codeformer_dir="models/codeformer", codeformer_model_path="codeformer.pth") -> None:
         if not os.path.isabs(codeformer_dir):
             codeformer_dir = os.path.join(Globals.root, codeformer_dir)
 
@@ -70,9 +66,7 @@ class CodeFormerRestoration:
                 upscale_factor=1,
                 use_parse=True,
                 device=device,
-                model_rootpath=os.path.join(
-                    Globals.root, "models", "gfpgan", "weights"
-                ),
+                model_rootpath=os.path.join(Globals.root, "models", "gfpgan", "weights"),
             )
             face_helper.clean_all()
             face_helper.read_image(bgr_image_array)
@@ -80,20 +74,14 @@ class CodeFormerRestoration:
             face_helper.align_warp_face()
 
             for idx, cropped_face in enumerate(face_helper.cropped_faces):
-                cropped_face_t = img2tensor(
-                    cropped_face / 255.0, bgr2rgb=True, float32=True
-                )
-                normalize(
-                    cropped_face_t, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True
-                )
+                cropped_face_t = img2tensor(cropped_face / 255.0, bgr2rgb=True, float32=True)
+                normalize(cropped_face_t, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True)
                 cropped_face_t = cropped_face_t.unsqueeze(0).to(device)
 
                 try:
                     with torch.no_grad():
                         output = cf(cropped_face_t, w=fidelity, adain=True)[0]
-                        restored_face = tensor2img(
-                            output.squeeze(0), rgb2bgr=True, min_max=(-1, 1)
-                        )
+                        restored_face = tensor2img(output.squeeze(0), rgb2bgr=True, min_max=(-1, 1))
                     del output
                     torch.cuda.empty_cache()
                 except RuntimeError as error:

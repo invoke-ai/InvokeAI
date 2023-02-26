@@ -54,21 +54,15 @@ class CkptOmnibus(CkptImg2Img, CkptTxt2Img):
         if isinstance(mask_image, Image.Image):
             self.pil_mask = mask_image
 
-            mask_image = ImageChops.multiply(
-                mask_image.convert("L"), self.pil_image.split()[-1]
-            )
-            mask_image = self._image_to_tensor(
-                ImageOps.invert(mask_image), normalize=False
-            )
+            mask_image = ImageChops.multiply(mask_image.convert("L"), self.pil_image.split()[-1])
+            mask_image = self._image_to_tensor(ImageOps.invert(mask_image), normalize=False)
 
         self.mask_blur_radius = mask_blur_radius
 
         t_enc = steps
 
         if init_image is not None and mask_image is not None:  # inpainting
-            masked_image = init_image * (
-                1 - mask_image
-            )  # masked image is the image masked by mask - masked regions zero
+            masked_image = init_image * (1 - mask_image)  # masked image is the image masked by mask - masked regions zero
 
         elif init_image is not None:  # img2img
             scope = choose_autocast(self.precision)
@@ -79,9 +73,7 @@ class CkptOmnibus(CkptImg2Img, CkptTxt2Img):
                 )  # move to latent space
 
             # create a completely black mask  (1s)
-            mask_image = torch.ones(
-                1, 1, init_image.shape[2], init_image.shape[3], device=self.model.device
-            )
+            mask_image = torch.ones(1, 1, init_image.shape[2], init_image.shape[3], device=self.model.device)
             # and the masked image is just a copy of the original
             masked_image = init_image
 
@@ -116,9 +108,7 @@ class CkptOmnibus(CkptImg2Img, CkptTxt2Img):
                             bchw = [num_samples, 4, height // 8, width // 8]
                             cc = torch.nn.functional.interpolate(cc, size=bchw[-2:])
                         else:
-                            cc = model.get_first_stage_encoding(
-                                model.encode_first_stage(cc)
-                            )
+                            cc = model.get_first_stage_encoding(model.encode_first_stage(cc))
                         c_cat.append(cc)
                     c_cat = torch.cat(c_cat, dim=1)
 
@@ -154,9 +144,7 @@ class CkptOmnibus(CkptImg2Img, CkptTxt2Img):
             "image": repeat(image.to(device=device), "1 ... -> n ...", n=num_samples),
             "txt": num_samples * [prompt],
             "mask": repeat(mask.to(device=device), "1 ... -> n ...", n=num_samples),
-            "masked_image": repeat(
-                masked_image.to(device=device), "1 ... -> n ...", n=num_samples
-            ),
+            "masked_image": repeat(masked_image.to(device=device), "1 ... -> n ...", n=num_samples),
         }
         return batch
 

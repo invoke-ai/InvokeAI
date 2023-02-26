@@ -95,9 +95,7 @@ class CkptImg2Img(CkptGenerator):
             x = torch.randn_like(init_latent, device=device)
         if self.perlin > 0.0:
             shape = init_latent.shape
-            x = (1 - self.perlin) * x + self.perlin * self.get_perlin_noise(
-                shape[3], shape[2]
-            )
+            x = (1 - self.perlin) * x + self.perlin * self.get_perlin_noise(shape[3], shape[2])
         return x
 
     def _image_to_tensor(self, image: Image, normalize: bool = True) -> Tensor:

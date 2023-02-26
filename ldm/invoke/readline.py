@@ -162,9 +162,7 @@ class Completer:
             # looking for an image file
             elif re.search(path_regexp, buffer):
                 do_shortcut = re.search("^" + "|".join(IMG_FILE_COMMANDS), buffer)
-                self.matches = self._path_completions(
-                    text, state, IMG_EXTENSIONS, shortcut_ok=do_shortcut
-                )
+                self.matches = self._path_completions(text, state, IMG_EXTENSIONS, shortcut_ok=do_shortcut)
 
             # looking for a seed
             elif re.search(r"(-S\s*|--seed[=\s])\d*$", buffer):
@@ -361,9 +359,7 @@ class Completer:
             readline.redisplay()
             self.linebuffer = None
 
-    def _path_completions(
-        self, text, state, extensions, shortcut_ok=True, default_dir: str = ""
-    ):
+    def _path_completions(self, text, state, extensions, shortcut_ok=True, default_dir: str = ""):
         # separate the switch from the partial path
         match = re.search(r"^(-\w|--\w+=?)(.*)", text)
         if match is None:
@@ -402,13 +398,9 @@ class Completer:
 
             if switch is None:
                 match_path = os.path.join(dir, node)
-                matches.append(
-                    match_path + "/" if os.path.isdir(full_path) else match_path
-                )
+                matches.append(match_path + "/" if os.path.isdir(full_path) else match_path)
             elif os.path.isdir(full_path):
-                matches.append(
-                    switch + os.path.join(os.path.dirname(full_path), node) + "/"
-                )
+                matches.append(switch + os.path.join(os.path.dirname(full_path), node) + "/")
             elif node.endswith(extensions):
                 matches.append(switch + os.path.join(os.path.dirname(full_path), node))
 
@@ -486,9 +478,7 @@ def get_completer(opt: Args, models=[]) -> Completer:
             pass
         except OSError:  # file likely corrupted
             newname = f"{histfile}.old"
-            print(
-                f"## Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}"
-            )
+            print(f"## Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}")
             os.replace(histfile, newname)
         atexit.register(readline.write_history_file, histfile)
 

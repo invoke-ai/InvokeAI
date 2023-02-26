@@ -193,37 +193,27 @@ def migrate_models_ckpt():
         'The Stable Diffusion v4.1 "model.ckpt" is already installed. The name will be changed to {new_name} to avoid confusion.'
     )
     print(f"model.ckpt => {new_name}")
-    os.replace(
-        os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name)
-    )
+    os.replace(os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name))
 
 
 # ---------------------------------------------
-def download_weight_datasets(
-    models: list[str], access_token: str, precision: str = "float32"
-):
+def download_weight_datasets(models: list[str], access_token: str, precision: str = "float32"):
     migrate_models_ckpt()
     successful = dict()
     for mod in models:
         print(f"Downloading {mod}:")
-        successful[mod] = _download_repo_or_file(
-            initial_models()[mod], access_token, precision=precision
-        )
+        successful[mod] = _download_repo_or_file(initial_models()[mod], access_token, precision=precision)
     return successful
 
 
-def _download_repo_or_file(
-    mconfig: DictConfig, access_token: str, precision: str = "float32"
-) -> Path:
+def _download_repo_or_file(mconfig: DictConfig, access_token: str, precision: str = "float32") -> Path:
     path = None
     if mconfig["format"] == "ckpt":
         path = _download_ckpt_weights(mconfig, access_token)
     else:
         path = _download_diffusion_weights(mconfig, access_token, precision=precision)
         if "vae" in mconfig and "repo_id" in mconfig["vae"]:
-            _download_diffusion_weights(
-                mconfig["vae"], access_token, precision=precision
-            )
+            _download_diffusion_weights(mconfig["vae"], access_token, precision=precision)
     return path
 
 
@@ -240,9 +230,7 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
 
 
 # ---------------------------------------------
-def download_from_hf(
-    model_class: object, model_name: str, cache_subdir: Path = Path("hub"), **kwargs
-):
+def download_from_hf(model_class: object, model_name: str, cache_subdir: Path = Path("hub"), **kwargs):
     path = global_cache_dir(cache_subdir)
     model = model_class.from_pretrained(
         model_name,
@@ -254,15 +242,9 @@ def download_from_hf(
     return path / model_name if model else None
 
 
-def _download_diffusion_weights(
-    mconfig: DictConfig, access_token: str, precision: str = "float32"
-):
+def _download_diffusion_weights(mconfig: DictConfig, access_token: str, precision: str = "float32"):
     repo_id = mconfig["repo_id"]
-    model_class = (
-        StableDiffusionGeneratorPipeline
-        if mconfig.get("format", None) == "diffusers"
-        else AutoencoderKL
-    )
+    model_class = StableDiffusionGeneratorPipeline if mconfig.get("format", None) == "diffusers" else AutoencoderKL
     extra_arg_list = [{"revision": "fp16"}, {}] if precision == "float16" else [{}]
     path = None
     for extra_args in extra_arg_list:
@@ -285,9 +267,7 @@ def _download_diffusion_weights(
 
 
 # ---------------------------------------------
-def hf_download_with_resume(
-    repo_id: str, model_dir: str, model_name: str, access_token: str = None
-) -> Path:
+def hf_download_with_resume(repo_id: str, model_dir: str, model_name: str, access_token: str = None) -> Path:
     model_dest = Path(os.path.join(model_dir, model_name))
     os.makedirs(model_dir, exist_ok=True)
 
@@ -305,9 +285,7 @@ def hf_download_with_resume(
     resp = requests.get(url, headers=header, stream=True)
     total = int(resp.headers.get("content-length", 0))
 
-    if (
-        resp.status_code == 416
-    ):  # "range not satisfiable", which means nothing to return
+    if resp.status_code == 416:  # "range not satisfiable", which means nothing to return
         print(f"* {model_name}: complete file found. Skipping.")
         return model_dest
     elif resp.status_code != 200:
@@ -341,9 +319,7 @@ def hf_download_with_resume(
 
 # ---------------------------------------------
 def update_config_file(successfully_downloaded: dict, config_file: Path):
-    config_file = (
-        Path(config_file) if config_file is not None else default_config_file()
-    )
+    config_file = Path(config_file) if config_file is not None else default_config_file()
 
     # In some cases (incomplete setup, etc), the default configs directory might be missing.
     # Create it if it doesn't exist.
@@ -359,9 +335,7 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     try:
         backup = None
         if os.path.exists(config_file):
-            print(
-                f"** {config_file.name} exists. Renaming to {config_file.stem}.yaml.orig"
-            )
+            print(f"** {config_file.name} exists. Renaming to {config_file.stem}.yaml.orig")
             backup = config_file.with_suffix(".yaml.orig")
             ## Ugh. Windows is unable to overwrite an existing backup file, raises a WinError 183
             if sys.platform == "win32" and backup.is_file():
@@ -419,17 +393,11 @@ def new_config_file_contents(
         if "height" in mod:
             stanza["height"] = mod["height"]
         if "file" in mod:
-            stanza["weights"] = os.path.relpath(
-                successfully_downloaded[model], start=Globals.root
-            )
-            stanza["config"] = os.path.normpath(
-                os.path.join(sd_configs(), mod["config"])
-            )
+            stanza["weights"] = os.path.relpath(successfully_downloaded[model], start=Globals.root)
+            stanza["config"] = os.path.normpath(os.path.join(sd_configs(), mod["config"]))
         if "vae" in mod:
             if "file" in mod["vae"]:
-                stanza["vae"] = os.path.normpath(
-                    os.path.join(Model_dir, Weights_dir, mod["vae"]["file"])
-                )
+                stanza["vae"] = os.path.normpath(os.path.join(Model_dir, Weights_dir, mod["vae"]["file"]))
             else:
                 stanza["vae"] = mod["vae"]
         if mod.get("default", False):

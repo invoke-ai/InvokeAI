@@ -35,12 +35,8 @@ class ESRGAN:
             upscale=4,
             act_type="prelu",
         )
-        model_path = os.path.join(
-            Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
-        )
-        wdn_model_path = os.path.join(
-            Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
-        )
+        model_path = os.path.join(Globals.root, "models/realesrgan/realesr-general-x4v3.pth")
+        wdn_model_path = os.path.join(Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth")
         scale = 4
 
         bg_upsampler = RealESRGANer(

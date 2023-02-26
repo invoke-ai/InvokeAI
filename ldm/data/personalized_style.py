@@ -91,9 +91,7 @@ class PersonalizedBase(Dataset):
         self.data_root = data_root
 
         self.image_paths = [
-            os.path.join(self.data_root, file_path)
-            for file_path in os.listdir(self.data_root)
-            if file_path != ".DS_Store"
+            os.path.join(self.data_root, file_path) for file_path in os.listdir(self.data_root) if file_path != ".DS_Store"
         ]
 
         # self._length = len(self.image_paths)
@@ -137,9 +135,7 @@ class PersonalizedBase(Dataset):
                 self.placeholder_token, per_img_token_list[i % self.num_images]
             )
         else:
-            text = random.choice(imagenet_templates_small).format(
-                self.placeholder_token
-            )
+            text = random.choice(imagenet_templates_small).format(self.placeholder_token)
 
         example["caption"] = text
 

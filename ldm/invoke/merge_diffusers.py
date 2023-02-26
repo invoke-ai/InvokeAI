@@ -101,17 +101,13 @@ def merge_diffusion_models_and_commit(
         ), f"** {mod} is not a diffusers model. It must be optimized before merging."
     model_ids_or_paths = [model_manager.model_name_or_path(x) for x in models]
 
-    merged_pipe = merge_diffusion_models(
-        model_ids_or_paths, alpha, interp, force, **kwargs
-    )
+    merged_pipe = merge_diffusion_models(model_ids_or_paths, alpha, interp, force, **kwargs)
     dump_path = global_models_dir() / DEST_MERGED_MODEL_DIR
 
     os.makedirs(dump_path, exist_ok=True)
     dump_path = dump_path / merged_model_name
     merged_pipe.save_pretrained(dump_path, safe_serialization=1)
-    import_args = dict(
-        model_name=merged_model_name, description=f'Merge of models {", ".join(models)}'
-    )
+    import_args = dict(model_name=merged_model_name, description=f'Merge of models {", ".join(models)}')
     if vae := model_manager.config[models[0]].get("vae", None):
         print(f">> Using configured VAE assigned to {models[0]}")
         import_args.update(vae=vae)
@@ -360,9 +356,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         if model_out not in self.model_names:
             return True
         else:
-            return npyscreen.notify_yes_no(
-                f"The chosen merged model destination, {model_out}, is already in use. Overwrite?"
-            )
+            return npyscreen.notify_yes_no(f"The chosen merged model destination, {model_out}, is already in use. Overwrite?")
 
     def validate_field_values(self) -> bool:
         bad_fields = []
@@ -374,9 +368,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         if self.model3.value[0] > 0:
             selected_models.add(model_names[self.model3.value[0] - 1])
         if len(selected_models) < 2:
-            bad_fields.append(
-                f"Please select two or three DIFFERENT models to compare. You selected {selected_models}"
-            )
+            bad_fields.append(f"Please select two or three DIFFERENT models to compare. You selected {selected_models}")
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:"
             for problem in bad_fields:
@@ -400,9 +392,7 @@ class Mergeapp(npyscreen.NPSAppManaged):
     def __init__(self):
         super().__init__()
         conf = OmegaConf.load(global_config_file())
-        self.model_manager = ModelManager(
-            conf, "cpu", "float16"
-        )  # precision doesn't really matter here
+        self.model_manager = ModelManager(conf, "cpu", "float16")  # precision doesn't really matter here
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.ElegantTheme)
@@ -426,9 +416,7 @@ def run_cli(args: Namespace):
 
     if not args.merged_model_name:
         args.merged_model_name = "+".join(args.models)
-        print(
-            f'>> No --merged_model_name provided. Defaulting to "{args.merged_model_name}"'
-        )
+        print(f'>> No --merged_model_name provided. Defaulting to "{args.merged_model_name}"')
 
         model_manager = ModelManager(OmegaConf.load(global_config_file()))
         assert (
@@ -444,9 +432,7 @@ def main():
     global_set_root(args.root_dir)
 
     cache_dir = str(global_cache_dir("diffusers"))
-    os.environ[
-        "HF_HOME"
-    ] = cache_dir  # because not clear the merge pipeline is honoring cache_dir
+    os.environ["HF_HOME"] = cache_dir  # because not clear the merge pipeline is honoring cache_dir
     args.cache_dir = cache_dir
 
     try:
@@ -456,13 +442,9 @@ def main():
             run_cli(args)
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
-            print(
-                "** You need to have at least two diffusers models defined in models.yaml in order to merge"
-            )
+            print("** You need to have at least two diffusers models defined in models.yaml in order to merge")
         else:
-            print(
-                f"** Not enough room for the user interface. Try making this window larger."
-            )
+            print(f"** Not enough room for the user interface. Try making this window larger.")
         sys.exit(-1)
     except Exception as e:
         print(">> An error occurred:")

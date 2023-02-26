@@ -78,21 +78,15 @@ class AddsMaskLatents:
     mask: torch.Tensor
     initial_image_latents: torch.Tensor
 
-    def __call__(
-        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor
-    ) -> torch.Tensor:
+    def __call__(self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor) -> torch.Tensor:
         model_input = self.add_mask_channels(latents)
         return self.forward(model_input, t, text_embeddings)
 
     def add_mask_channels(self, latents):
         batch_size = latents.size(0)
         # duplicate mask and latents for each batch
-        mask = einops.repeat(
-            self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size
-        )
-        image_latents = einops.repeat(
-            self.initial_image_latents, "b c h w -> (repeat b) c h w", repeat=batch_size
-        )
+        mask = einops.repeat(self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
+        image_latents = einops.repeat(self.initial_image_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
         # add mask and image as additional channels
         model_input, _ = einops.pack([latents, mask, image_latents], "b * h w")
         return model_input
@@ -110,9 +104,7 @@ class AddsMaskGuidance:
     noise: torch.Tensor
     _debug: Callable | None = None
 
-    def __call__(
-        self, step_output: BaseOutput | SchedulerOutput, t: torch.Tensor, conditioning
-    ) -> BaseOutput:
+    def __call__(self, step_output: BaseOutput | SchedulerOutput, t: torch.Tensor, conditioning) -> BaseOutput:
         output_class = step_output.__class__  # We'll create a new one with masked data.
 
         # The problem with taking SchedulerOutput instead of the model output is that we're less certain what's in it.
@@ -123,11 +115,7 @@ class AddsMaskGuidance:
         # Mask anything that has the same shape as prev_sample, return others as-is.
         return output_class(
             {
-                k: (
-                    self.apply_mask(v, self._t_for_field(k, t))
-                    if are_like_tensors(prev_sample, v)
-                    else v
-                )
+                k: (self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v)
                 for k, v in step_output.items()
             }
         )
@@ -139,9 +127,7 @@ class AddsMaskGuidance:
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
         batch_size = latents.size(0)
-        mask = einops.repeat(
-            self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size
-        )
+        mask = einops.repeat(self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
         if t.dim() == 0:
             # some schedulers expect t to be one-dimensional.
             # TODO: file diffusers bug about inconsistency?
@@ -151,12 +137,8 @@ class AddsMaskGuidance:
         mask_latents = self.scheduler.add_noise(self.mask_latents, self.noise, t)
         # TODO: Do we need to also apply scheduler.scale_model_input? Or is add_noise appropriately scaled already?
         # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
-        mask_latents = einops.repeat(
-            mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size
-        )
-        masked_input = torch.lerp(
-            mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype)
-        )
+        mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
+        masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
         if self._debug:
             self._debug(masked_input, f"t={t} lerped")
         return masked_input
@@ -166,9 +148,7 @@ def trim_to_multiple_of(*args, multiple_of=8):
     return tuple((x - x % multiple_of) for x in args)
 
 
-def image_resized_to_grid_as_tensor(
-    image: PIL.Image.Image, normalize: bool = True, multiple_of=8
-) -> torch.FloatTensor:
+def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = True, multiple_of=8) -> torch.FloatTensor:
     """
 
     :param image: input image
@@ -334,9 +314,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.invokeai_diffuser = InvokeAIDiffuserComponent(
-            self.unet, self._unet_forward, is_running_diffusers=True
-        )
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward, is_running_diffusers=True)
         use_full_precision = precision == "float32" or precision == "autocast"
         self.textual_inversion_manager = TextualInversionManager(
             tokenizer=self.tokenizer,
@@ -357,11 +335,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
-        if (
-            torch.cuda.is_available()
-            and is_xformers_available()
-            and not Globals.disable_xformers
-        ):
+        if torch.cuda.is_available() and is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
         else:
             if torch.backends.mps.is_available():
@@ -378,9 +352,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     raise ValueError(f"unrecognized device {self.device}")
                 # input tensor of [1, 4, h/8, w/8]
                 # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
-                bytes_per_element_needed_for_baddbmm_duplication = (
-                    latents.element_size() + 4
-                )
+                bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
                 max_size_required_for_baddbmm = (
                     16
                     * latents.size(dim=2)
@@ -389,9 +361,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     * latents.size(dim=3)
                     * bytes_per_element_needed_for_baddbmm_duplication
                 )
-                if max_size_required_for_baddbmm > (
-                    mem_free * 3.0 / 4.0
-                ):  # 3.3 / 4.0 is from old Invoke code
+                if max_size_required_for_baddbmm > (mem_free * 3.0 / 4.0):  # 3.3 / 4.0 is from old Invoke code
                     self.enable_attention_slicing(slice_size="max")
                 else:
                     self.disable_attention_slicing()
@@ -512,9 +482,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
     ) -> tuple[torch.Tensor, AttentionMapSaver | None]:
         if timesteps is None:
-            self.scheduler.set_timesteps(
-                num_inference_steps, device=self._model_group.device_for(self.unet)
-            )
+            self.scheduler.set_timesteps(num_inference_steps, device=self._model_group.device_for(self.unet))
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(
             self.generate_latents_from_embeddings, PipelineIntermediateState
@@ -640,9 +608,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = self.scheduler.step(
-            noise_pred, timestep, latents, **conditioning_data.scheduler_args
-        )
+        step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
 
         # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
         #    But the way things are now, scheduler runs _after_ that, so there was
@@ -667,18 +633,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             #     use of AddsMaskLatents.
             latents = AddsMaskLatents(
                 self._unet_forward,
-                mask=torch.ones_like(
-                    latents[:1, :1], device=latents.device, dtype=latents.dtype
-                ),
-                initial_image_latents=torch.zeros_like(
-                    latents[:1], device=latents.device, dtype=latents.dtype
-                ),
+                mask=torch.ones_like(latents[:1, :1], device=latents.device, dtype=latents.dtype),
+                initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype),
             ).add_mask_channels(latents)
 
         # First three args should be positional, not keywords, so torch hooks can see them.
-        return self.unet(
-            latents, t, text_embeddings, cross_attention_kwargs=cross_attention_kwargs
-        ).sample
+        return self.unet(latents, t, text_embeddings, cross_attention_kwargs=cross_attention_kwargs).sample
 
     def img2img_from_embeddings(
         self,
@@ -752,15 +712,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             )
             return self.check_for_safety(output, dtype=conditioning_data.dtype)
 
-    def get_img2img_timesteps(
-        self, num_inference_steps: int, strength: float, device
-    ) -> (torch.Tensor, int):
+    def get_img2img_timesteps(self, num_inference_steps: int, strength: float, device) -> (torch.Tensor, int):
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         assert img2img_pipeline.scheduler is self.scheduler
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps, adjusted_steps = img2img_pipeline.get_timesteps(
-            num_inference_steps, strength, device=device
-        )
+        timesteps, adjusted_steps = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
         # Workaround for low strength resulting in zero timesteps.
         # TODO: submit upstream fix for zero-step img2img
         if timesteps.numel() == 0:
@@ -792,23 +748,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if init_image.dim() == 3:
             init_image = init_image.unsqueeze(0)
 
-        timesteps, _ = self.get_img2img_timesteps(
-            num_inference_steps, strength, device=device
-        )
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength, device=device)
 
         # 6. Prepare latent variables
         # can't quite use upstream StableDiffusionImg2ImgPipeline.prepare_latents
         # because we have our own noise function
-        init_image_latents = self.non_noised_latents_from_image(
-            init_image, device=device, dtype=latents_dtype
-        )
+        init_image_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
         noise = noise_func(init_image_latents)
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)
-        latent_mask = tv_resize(
-            mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR
-        ).to(device=device, dtype=latents_dtype)
+        latent_mask = tv_resize(mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR).to(
+            device=device, dtype=latents_dtype
+        )
 
         guidance: list[Callable] = []
 
@@ -816,18 +768,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
             # (that's why there's a mask!) but it seems to really want that blanked out.
             masked_init_image = init_image * torch.where(mask < 0.5, 1, 0)
-            masked_latents = self.non_noised_latents_from_image(
-                masked_init_image, device=device, dtype=latents_dtype
-            )
+            masked_latents = self.non_noised_latents_from_image(masked_init_image, device=device, dtype=latents_dtype)
 
             # TODO: we should probably pass this in so we don't have to try/finally around setting it.
-            self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
-                self._unet_forward, latent_mask, masked_latents
-            )
+            self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(self._unet_forward, latent_mask, masked_latents)
         else:
-            guidance.append(
-                AddsMaskGuidance(latent_mask, init_image_latents, self.scheduler, noise)
-            )
+            guidance.append(AddsMaskGuidance(latent_mask, init_image_latents, self.scheduler, noise))
 
         try:
             result_latents, result_attention_maps = self.latents_from_embeddings(
@@ -866,9 +812,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             else:
                 self._model_group.load(self.vae)
             init_latent_dist = self.vae.encode(init_image).latent_dist
-            init_latents = init_latent_dist.sample().to(
-                dtype=dtype
-            )  # FIXME: uses torch.randn. make reproducible!
+            init_latents = init_latent_dist.sample().to(dtype=dtype)  # FIXME: uses torch.randn. make reproducible!
             if device.type == "mps":
                 self.vae.to(device)
                 init_latents = init_latents.to(device)
@@ -878,9 +822,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     def check_for_safety(self, output, dtype):
         with torch.inference_mode():
-            screened_images, has_nsfw_concept = self.run_safety_checker(
-                output.images, dtype=dtype
-            )
+            screened_images, has_nsfw_concept = self.run_safety_checker(output.images, dtype=dtype)
         screened_attention_map_saver = None
         if has_nsfw_concept is None or not has_nsfw_concept:
             screened_attention_map_saver = output.attention_map_saver
@@ -898,9 +840,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         return super().run_safety_checker(image, device, dtype)
 
     @torch.inference_mode()
-    def get_learned_conditioning(
-        self, c: list[list[str]], *, return_tokens=True, fragment_weights=None
-    ):
+    def get_learned_conditioning(self, c: list[list[str]], *, return_tokens=True, fragment_weights=None):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
@@ -941,6 +881,4 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
             decoded = self.numpy_to_pil(self.decode_latents(latents))
             for i, img in enumerate(decoded):
-                debug_image(
-                    img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True
-                )
+                debug_image(img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True)

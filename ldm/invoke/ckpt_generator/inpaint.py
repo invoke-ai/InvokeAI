@@ -66,15 +66,11 @@ class CkptInpaint(CkptImg2Img):
             return im
 
         # Patchmatch (note, we may want to expose patch_size? Increasing it significantly impacts performance though)
-        im_patched_np = PatchMatch.inpaint(
-            im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3
-        )
+        im_patched_np = PatchMatch.inpaint(im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3)
         im_patched = Image.fromarray(im_patched_np, mode="RGB")
         return im_patched
 
-    def tile_fill_missing(
-        self, im: Image.Image, tile_size: int = 16, seed: int = None
-    ) -> Image:
+    def tile_fill_missing(self, im: Image.Image, tile_size: int = 16, seed: int = None) -> Image:
         # Only fill if there's an alpha layer
         if im.mode != "RGBA":
             return im
@@ -107,9 +103,7 @@ class CkptInpaint(CkptImg2Img):
         # Find all invalid tiles and replace with a random valid tile
         replace_count = (tiles_mask == False).sum()
         rng = np.random.default_rng(seed=seed)
-        tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[
-            rng.choice(filtered_tiles.shape[0], replace_count), :, :, :
-        ]
+        tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[rng.choice(filtered_tiles.shape[0], replace_count), :, :, :]
 
         # Convert back to an image
         tiles_all = tiles_all.reshape(tshape)
@@ -129,9 +123,7 @@ class CkptInpaint(CkptImg2Img):
         npimg = np.asarray(mask, dtype=np.uint8)
 
         # Detect any partially transparent regions
-        npgradient = np.uint8(
-            255 * (1.0 - np.floor(np.abs(0.5 - np.float32(npimg) / 255.0) * 2.0))
-        )
+        npgradient = np.uint8(255 * (1.0 - np.floor(np.abs(0.5 - np.float32(npimg) / 255.0) * 2.0)))
 
         # Detect hard edges
         npedge = cv.Canny(npimg, threshold1=100, threshold2=200)
@@ -140,9 +132,7 @@ class CkptInpaint(CkptImg2Img):
         npmask = npgradient + npedge
 
         # Expand
-        npmask = cv.dilate(
-            npmask, np.ones((3, 3), np.uint8), iterations=int(edge_size / 2)
-        )
+        npmask = cv.dilate(npmask, np.ones((3, 3), np.uint8), iterations=int(edge_size / 2))
 
         new_mask = Image.fromarray(npmask)
 
@@ -226,9 +216,7 @@ class CkptInpaint(CkptImg2Img):
         """
 
         self.enable_image_debugging = enable_image_debugging
-        self.infill_method = (
-            infill_method or infill_methods()[0],
-        )  # The infill method to use
+        self.infill_method = (infill_method or infill_methods()[0],)  # The infill method to use
 
         self.inpaint_width = inpaint_width
         self.inpaint_height = inpaint_height
@@ -240,18 +228,14 @@ class CkptInpaint(CkptImg2Img):
             if infill_method == "patchmatch" and PatchMatch.patchmatch_available():
                 init_filled = self.infill_patchmatch(self.pil_image.copy())
             else:  # if infill_method == 'tile': # Only two methods right now, so always use 'tile' if not patchmatch
-                init_filled = self.tile_fill_missing(
-                    self.pil_image.copy(), seed=self.seed, tile_size=tile_size
-                )
+                init_filled = self.tile_fill_missing(self.pil_image.copy(), seed=self.seed, tile_size=tile_size)
             init_filled.paste(init_image, (0, 0), init_image.split()[-1])
 
             # Resize if requested for inpainting
             if inpaint_width and inpaint_height:
                 init_filled = init_filled.resize((inpaint_width, inpaint_height))
 
-            debug_image(
-                init_filled, "init_filled", debug_status=self.enable_image_debugging
-            )
+            debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
 
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert("RGB"))
@@ -264,9 +248,7 @@ class CkptInpaint(CkptImg2Img):
                 debug_status=self.enable_image_debugging,
             )
 
-            mask_image = ImageChops.multiply(
-                mask_image, self.pil_image.split()[-1].convert("RGB")
-            )
+            mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert("RGB"))
             self.pil_mask = mask_image
 
             # Resize if requested for inpainting
@@ -319,15 +301,10 @@ class CkptInpaint(CkptImg2Img):
 
             # to replace masked area with latent noise, weighted by inpaint_replace strength
             if inpaint_replace > 0.0:
-                print(
-                    f">> inpaint will replace what was under the mask with a strength of {inpaint_replace}"
-                )
+                print(f">> inpaint will replace what was under the mask with a strength of {inpaint_replace}")
                 l_noise = self.get_noise(kwargs["width"], kwargs["height"])
                 inverted_mask = 1.0 - mask_image  # there will be 1s where the mask is
-                masked_region = (
-                    (1.0 - inpaint_replace) * inverted_mask * z_enc
-                    + inpaint_replace * inverted_mask * l_noise
-                )
+                masked_region = (1.0 - inpaint_replace) * inverted_mask * z_enc + inpaint_replace * inverted_mask * l_noise
                 z_enc = z_enc * mask_image + masked_region
 
             if self.free_gpu_mem and self.model.model.device != self.model.device:
@@ -408,9 +385,7 @@ class CkptInpaint(CkptImg2Img):
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
 
-        corrected_result = super().repaste_and_color_correct(
-            gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius
-        )
+        corrected_result = super().repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
         debug_image(
             corrected_result,
             "corrected_result",
