@@ -221,7 +221,10 @@ experimental versions later.
 
     - ***NSFW checker***
       If checked, InvokeAI will test images for potential sexual content
-      and blur them out if found.
+      and blur them out if found. Note that the NSFW checker consumes
+      an additional 0.6 GB of VRAM on top of the 2-3 GB of VRAM used
+      by most image models. If you have a low VRAM GPU (4-6 GB), you
+      can reduce out of memory errors by disabling the checker.
 
     - ***HuggingFace Access Token***
       InvokeAI has the ability to download embedded styles and subjects
@@ -439,6 +442,52 @@ _If none of these maneuvers fixes the problem_ then please report the problem to
 the [InvokeAI Issues](https://github.com/invoke-ai/InvokeAI/issues) section, or
 visit our [Discord Server](https://discord.gg/ZmtBAhwWhy) for interactive
 assistance.
+
+### Out of Memory Issues
+
+The models are large, VRAM is expensive, and you may find yourself
+faced with Out of Memory errors when generating images. Here are some
+tips to reduce the problem:
+
+* **4 GB of VRAM**
+
+This should be adequate for 512x512 pixel images using Stable Diffusion 1.5
+and derived models, provided that you **disable** the NSFW checker. To
+disable the filter, do one of the following:
+
+   * Select option (6) "_change InvokeAI startup options_" from the
+     launcher. This will bring up the console-based startup settings
+     dialogue and allow you to unselect the "NSFW Checker" option.
+   * Start the startup settings dialogue directly by running
+     `invokeai-configure --skip-sd-weights --skip-support-models`
+     from the command line.
+   * Find the `invokeai.init` initialization file in the InvokeAI root
+     directory, open it in a text editor, and change `--nsfw_checker`
+     to `--no-nsfw_checker`
+
+If you are on a CUDA system, you can realize significant memory
+savings by activating the `xformers` library as described above. The
+downside is `xformers` introduces non-deterministic behavior, such
+that images generated with exactly the same prompt and settings will
+be slightly different from each other. See above for more information.
+
+* **6 GB of VRAM**
+
+This is a border case. Using the SD 1.5 series you should be able to
+generate images up to 640x640 with the NSFW checker enabled, and up to
+1024x1024 with it disabled and `xformers` activated. 
+
+If you run into persistent memory issues there are a series of
+environment variables that you can set before launching InvokeAI that
+alter how the PyTorch machine learning library manages memory.  See
+https://pytorch.org/docs/stable/notes/cuda.html#memory-management for
+a list of these tweaks.
+
+* **12 GB of VRAM**
+
+This should be sufficient to generate larger images up to about
+1280x1280. If you wish to push further, consider activating
+`xformers`.
 
 ### Other Problems
 

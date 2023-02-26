@@ -17,16 +17,15 @@
 # Original file at: https://github.com/huggingface/diffusers/blob/main/scripts/convert_ldm_original_checkpoint_to_diffusers.py
 """ Conversion script for the LDM checkpoints. """
 
-import os
 import re
 import torch
 import warnings
 from pathlib import Path
 from ldm.invoke.globals import (
-    Globals,
     global_cache_dir,
     global_config_dir,
     )
+from ldm.invoke.model_manager import ModelManager, SDLegacyType
 from safetensors.torch import load_file
 from typing import Union
 
@@ -760,7 +759,12 @@ def convert_open_clip_checkpoint(checkpoint):
 
     text_model_dict = {}
 
-    d_model = int(checkpoint["cond_stage_model.model.text_projection"].shape[0])
+    if 'cond_stage_model.model.text_projection' in keys:
+        d_model = int(checkpoint["cond_stage_model.model.text_projection"].shape[0])
+    elif 'cond_stage_model.model.ln_final.bias' in keys:
+        d_model = int(checkpoint['cond_stage_model.model.ln_final.bias'].shape[0])
+    else:
+        raise KeyError('Expected key "cond_stage_model.model.text_projection" not found in model')
 
     text_model_dict["text_model.embeddings.position_ids"] = text_model.text_model.embeddings.get_buffer("position_ids")
 
@@ -856,19 +860,22 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         upcast_attention = False
         if original_config_file is None:
-            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-
-            if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
+            model_type = ModelManager.probe_model_type(checkpoint)
+            
+            if model_type == SDLegacyType.V2:
                 original_config_file = global_config_dir() / 'stable-diffusion' / 'v2-inference-v.yaml'
-
                 if global_step == 110000:
                     # v2.1 needs to upcast attention
                     upcast_attention = True
-            elif str(checkpoint_path).lower().find('inpaint') >= 0: # brittle - please pass original_config_file parameter!
-                print(f'  | checkpoint has "inpaint" in name, assuming an inpainting model')
+                    
+            elif model_type == SDLegacyType.V1_INPAINT:
                 original_config_file = global_config_dir() / 'stable-diffusion' / 'v1-inpainting-inference.yaml'
-            else:
+                
+            elif model_type == SDLegacyType.V1:
                 original_config_file = global_config_dir() / 'stable-diffusion' / 'v1-inference.yaml'
+
+            else:
+                raise Exception('Unknown checkpoint type')
 
         original_config = OmegaConf.load(original_config_file)
 
@@ -960,7 +967,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             text_model = convert_open_clip_checkpoint(checkpoint)
             tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2",
                                                       subfolder="tokenizer",
-                                                      cache_dir=global_cache_dir('diffusers')
+                                                      cache_dir=cache_dir,
                                                       )
             pipe = pipeline_class(
                 vae=vae,

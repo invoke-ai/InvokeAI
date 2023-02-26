@@ -725,7 +725,7 @@ class ModelManager(object):
         SDLegacyType.V1
         SDLegacyType.V1_INPAINT
         SDLegacyType.V2
-        UNKNOWN
+        SDLegacyType.UNKNOWN
         """
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
@@ -785,7 +785,7 @@ class ModelManager(object):
         print(f">> Probing {thing} for import")
 
         if thing.startswith(("http:", "https:", "ftp:")):
-            print(f"   | {thing} appears to be a URL")
+            print(f"  | {thing} appears to be a URL")
             model_path = self._resolve_path(
                 thing, "models/ldm/stable-diffusion-v1"
             )  # _resolve_path does a download if needed
@@ -793,15 +793,15 @@ class ModelManager(object):
         elif Path(thing).is_file() and thing.endswith((".ckpt", ".safetensors")):
             if Path(thing).stem in ["model", "diffusion_pytorch_model"]:
                 print(
-                    f"   | {Path(thing).name} appears to be part of a diffusers model. Skipping import"
+                    f"  | {Path(thing).name} appears to be part of a diffusers model. Skipping import"
                 )
                 return
             else:
-                print(f"   | {thing} appears to be a checkpoint file on disk")
+                print(f"  | {thing} appears to be a checkpoint file on disk")
                 model_path = self._resolve_path(thing, "models/ldm/stable-diffusion-v1")
 
         elif Path(thing).is_dir() and Path(thing, "model_index.json").exists():
-            print(f"   | {thing} appears to be a diffusers file on disk")
+            print(f"  | {thing} appears to be a diffusers file on disk")
             model_name = self.import_diffuser_model(
                 thing,
                 vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
@@ -812,13 +812,13 @@ class ModelManager(object):
 
         elif Path(thing).is_dir():
             if (Path(thing) / "model_index.json").exists():
-                print(f">> {thing} appears to be a diffusers model.")
+                print(f"  | {thing} appears to be a diffusers model.")
                 model_name = self.import_diffuser_model(
                     thing, commit_to_conf=commit_to_conf
                 )
             else:
                 print(
-                    f">> {thing} appears to be a directory. Will scan for models to import"
+                    f"  |{thing} appears to be a directory. Will scan for models to import"
                 )
                 for m in list(Path(thing).rglob("*.ckpt")) + list(
                     Path(thing).rglob("*.safetensors")
@@ -830,7 +830,7 @@ class ModelManager(object):
                 return model_name
 
         elif re.match(r"^[\w.+-]+/[\w.+-]+$", thing):
-            print(f"   | {thing} appears to be a HuggingFace diffusers repo_id")
+            print(f"  | {thing} appears to be a HuggingFace diffusers repo_id")
             model_name = self.import_diffuser_model(
                 thing, commit_to_conf=commit_to_conf
             )
@@ -847,7 +847,7 @@ class ModelManager(object):
             return
 
         if model_path.stem in self.config:  # already imported
-            print("   | Already imported. Skipping")
+            print("  | Already imported. Skipping")
             return
 
         # another round of heuristics to guess the correct config file.
@@ -860,18 +860,18 @@ class ModelManager(object):
 
         model_config_file = None
         if model_type == SDLegacyType.V1:
-            print("   | SD-v1 model detected")
+            print("  | SD-v1 model detected")
             model_config_file = Path(
                 Globals.root, "configs/stable-diffusion/v1-inference.yaml"
             )
         elif model_type == SDLegacyType.V1_INPAINT:
-            print("   | SD-v1 inpainting model detected")
+            print("  | SD-v1 inpainting model detected")
             model_config_file = Path(
                 Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
             )
         elif model_type == SDLegacyType.V2:
             print(
-                "   | SD-v2 model detected; model will be converted to diffusers format"
+                "  | SD-v2 model detected; model will be converted to diffusers format"
             )
             model_config_file = Path(
                 Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
@@ -923,7 +923,7 @@ class ModelManager(object):
         vae=None,
         original_config_file: Path = None,
         commit_to_conf: Path = None,
-    ) -> dict:
+    ) -> str:
         """
         Convert a legacy ckpt weights file to diffuser model and import
         into models.yaml.
