@@ -30,6 +30,7 @@ from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
 from ldm.modules.lora_manager import LoraManager
+from ldm.modules.peft_manager import PeftManager
 from ..devices import normalize_device, CPU_DEVICE
 from ..offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
@@ -291,6 +292,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             feature_extractor=feature_extractor,
         )
         self.lora_manager = LoraManager(self)
+        self.peft_manager = PeftManager()
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward, is_running_diffusers=True)
         use_full_precision = (precision == 'float32' or precision == 'autocast')
         self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,

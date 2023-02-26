@@ -533,6 +533,9 @@ class Generate:
                 log_tokens=self.log_tokenization,
             )
 
+            if self.model.peft_manager:
+                self.model = self.model.peft_manager.load(self.model, self.model.unet.dtype)
+
             init_image, mask_image = self._make_images(
                 init_img,
                 init_mask,
