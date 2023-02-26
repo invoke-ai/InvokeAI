@@ -62,7 +62,7 @@ class Generator:
         self.variation_amount = variation_amount
         self.with_variations  = with_variations
 
-    def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
+    def generate(self,prompt,width,height,sampler, init_image=None, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  h_symmetry_time_pct=None, v_symmetry_time_pct=None,
                  safety_checker:dict=None,

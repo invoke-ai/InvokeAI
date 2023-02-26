@@ -55,6 +55,20 @@ VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
     "vae-ft-mse-840000-ema-pruned": "stabilityai/sd-vae-ft-mse",
 }
 
+class SharedModel(object):
+    def __init__(self, manager: ModelManager, model_name: str, model_info: dict):
+        self.manager = manager
+        self.manager.in_use[model_name] = 0
+        self.model_name = model_name
+        self.model_info = model_info
+
+    def __enter__(self):
+        self.manager.claim(self.model_name)
+        return self.model_info
+
+    def __exit__(self, type, value, traceback):
+        self.manager.release(self.model_name)
+
 class ModelManager(object):
     def __init__(
         self,
@@ -127,12 +141,24 @@ class ModelManager(object):
 
         self.current_model = model_name
         self._push_newest_model(model_name)
-        return {
-            "model": requested_model,
-            "width": width,
-            "height": height,
-            "hash": hash,
-        }
+        return SharedModel(
+            self,
+            model_name,
+            {
+                "model": requested_model,
+                "width": width,
+                "height": height,
+                "hash": hash,
+            })
+
+    def claim(self, model_name):
+        self.in_use[model_name] += 1
+
+    def release(self, model_name):
+        self.in_use[model_name] -= 1
+
+    def refcount(self,model_name)->int:
+        return self.in_use.get(model_name,0)
 
     def default_model(self) -> str | None:
         """
