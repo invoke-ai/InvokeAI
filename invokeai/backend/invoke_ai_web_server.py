@@ -1062,7 +1062,7 @@ class InvokeAIWebServer:
                     (width, height) = image.size
                     width *= 8
                     height *= 8
-                    img_base64 = image_to_dataURL(image)
+                    img_base64 = image_to_dataURL(image, image_format="JPEG")
                     self.socketio.emit(
                         "intermediateResult",
                         {
@@ -1714,13 +1714,14 @@ def dataURL_to_image(dataURL: str) -> ImageType:
     return image
 
 
-def image_to_dataURL(image: ImageType) -> str:
+def image_to_dataURL(image: ImageType, image_format:str="PNG") -> str:
     """
     Converts an image into a base64 image dataURL.
     """
     buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
-    image_base64 = "data:image/png;base64," + base64.b64encode(
+    image.save(buffered, format=image_format)
+    mime_type = Image.MIME.get(image_format.upper(), "image/" + image_format.lower())
+    image_base64 = f"data:{mime_type};base64," + base64.b64encode(
         buffered.getvalue()
     ).decode("UTF-8")
     return image_base64
