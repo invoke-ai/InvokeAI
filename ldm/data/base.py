@@ -1,10 +1,6 @@
 from abc import abstractmethod
-from torch.utils.data import (
-    Dataset,
-    ConcatDataset,
-    ChainDataset,
-    IterableDataset,
-)
+
+from torch.utils.data import ChainDataset, ConcatDataset, Dataset, IterableDataset
 
 
 class Txt2ImgIterableBaseDataset(IterableDataset):
@@ -19,9 +15,7 @@ class Txt2ImgIterableBaseDataset(IterableDataset):
         self.sample_ids = valid_ids
         self.size = size
 
-        print(
-            f'{self.__class__.__name__} dataset contains {self.__len__()} examples.'
-        )
+        print(f"{self.__class__.__name__} dataset contains {self.__len__()} examples.")
 
     def __len__(self):
         return self.num_records

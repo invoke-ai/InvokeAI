@@ -6,50 +6,33 @@ https://github.com/CompVis/taming-transformers
 -- merci
 """
 
-import torch
-
-import torch.nn as nn
 import os
-import numpy as np
-import pytorch_lightning as pl
-from torch.optim.lr_scheduler import LambdaLR
-from einops import rearrange, repeat
+import urllib
 from contextlib import contextmanager
 from functools import partial
-from tqdm import tqdm
-from torchvision.utils import make_grid
-from pytorch_lightning.utilities.distributed import rank_zero_only
+
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+from einops import rearrange, repeat
 from omegaconf import ListConfig
-import urllib
+from pytorch_lightning.utilities.distributed import rank_zero_only
+from torch.optim.lr_scheduler import LambdaLR
+from torchvision.utils import make_grid
+from tqdm import tqdm
 
-from ldm.modules.textual_inversion_manager import TextualInversionManager
-from ldm.util import (
-    log_txt_as_img,
-    exists,
-    default,
-    ismap,
-    isimage,
-    mean_flat,
-    count_params,
-    instantiate_from_config,
-)
-from ldm.modules.ema import LitEma
-from ldm.modules.distributions.distributions import (
-    normal_kl,
-    DiagonalGaussianDistribution,
-)
-from ldm.models.autoencoder import (
-    VQModelInterface,
-    IdentityFirstStage,
-    AutoencoderKL,
-)
-from ldm.modules.diffusionmodules.util import (
-    make_beta_schedule,
-    extract_into_tensor,
-    noise_like,
-)
+from ldm.models.autoencoder import (AutoencoderKL, IdentityFirstStage,
+                                    VQModelInterface)
 from ldm.models.diffusion.ddim import DDIMSampler
-
+from ldm.modules.diffusionmodules.util import (extract_into_tensor,
+                                               make_beta_schedule, noise_like)
+from ldm.modules.distributions.distributions import (
+    DiagonalGaussianDistribution, normal_kl)
+from ldm.modules.ema import LitEma
+from ldm.modules.textual_inversion_manager import TextualInversionManager
+from ldm.util import (count_params, default, exists, instantiate_from_config,
+                      isimage, ismap, log_txt_as_img, mean_flat)
 
 __conditioning_keys__ = {
     'concat': 'c_concat',
@@ -289,7 +272,7 @@ class DDPM(pl.LightningModule):
         for k in keys:
             for ik in ignore_keys:
                 if k.startswith(ik):
-                    print('Deleting key {} from state_dict.'.format(k))
+                    print(f'Deleting key {k} from state_dict.')
                     del sd[k]
         missing, unexpected = (
             self.load_state_dict(sd, strict=False)

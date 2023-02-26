@@ -1,34 +1,36 @@
-import os, yaml, pickle, shutil, tarfile, glob
-import cv2
-import albumentations
-import PIL
-import numpy as np
-import torchvision.transforms.functional as TF
-from omegaconf import OmegaConf
+import glob
+import os
+import pickle
+import shutil
+import tarfile
 from functools import partial
-from PIL import Image
-from tqdm import tqdm
-from torch.utils.data import Dataset, Subset
 
+import albumentations
+import cv2
+import numpy as np
+import PIL
 import taming.data.utils as tdu
+import torchvision.transforms.functional as TF
+import yaml
+from omegaconf import OmegaConf
+from PIL import Image
 from taming.data.imagenet import (
-    str_to_indices,
-    give_synsets_from_indices,
+    ImagePaths,
     download,
+    give_synsets_from_indices,
     retrieve,
+    str_to_indices,
 )
-from taming.data.imagenet import ImagePaths
+from torch.utils.data import Dataset, Subset
+from tqdm import tqdm
 
-from ldm.modules.image_degradation import (
-    degradation_fn_bsr,
-    degradation_fn_bsr_light,
-)
+from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
 
 
-def synset2idx(path_to_yaml='data/index_synset.yaml'):
+def synset2idx(path_to_yaml="data/index_synset.yaml"):
     with open(path_to_yaml) as f:
         di2s = yaml.load(f)
-    return dict((v, k) for k, v in di2s.items())
+    return {v: k for k, v in di2s.items()}
 
 
 class ImageNetBase(Dataset):
@@ -36,9 +38,7 @@ class ImageNetBase(Dataset):
         self.config = config or OmegaConf.create()
         if not type(self.config) == dict:
             self.config = OmegaConf.to_container(self.config)
-        self.keep_orig_class_label = self.config.get(
-            'keep_orig_class_label', False
-        )
+        self.keep_orig_class_label = self.config.get("keep_orig_class_label", False)
         self.process_images = True  # if False we skip loading & processing images and self.data contains filepaths
         self._prepare()
         self._prepare_synset_to_human()
@@ -56,23 +56,19 @@ class ImageNetBase(Dataset):
         raise NotImplementedError()
 
     def _filter_relpaths(self, relpaths):
-        ignore = set(
-            [
-                'n06596364_9591.JPEG',
-            ]
-        )
-        relpaths = [
-            rpath for rpath in relpaths if not rpath.split('/')[-1] in ignore
-        ]
-        if 'sub_indices' in self.config:
-            indices = str_to_indices(self.config['sub_indices'])
+        ignore = {
+            "n06596364_9591.JPEG",
+        }
+        relpaths = [rpath for rpath in relpaths if not rpath.split("/")[-1] in ignore]
+        if "sub_indices" in self.config:
+            indices = str_to_indices(self.config["sub_indices"])
             synsets = give_synsets_from_indices(
                 indices, path_to_yaml=self.idx2syn
             )  # returns a list of strings
             self.synset2idx = synset2idx(path_to_yaml=self.idx2syn)
             files = []
             for rpath in relpaths:
-                syn = rpath.split('/')[0]
+                syn = rpath.split("/")[0]
                 if syn in synsets:
                     files.append(rpath)
             return files
@@ -81,8 +77,8 @@ class ImageNetBase(Dataset):
 
     def _prepare_synset_to_human(self):
         SIZE = 2655750
-        URL = 'https://heibox.uni-heidelberg.de/f/9f28e956cd304264bb82/?dl=1'
-        self.human_dict = os.path.join(self.root, 'synset_human.txt')
+        URL = "https://heibox.uni-heidelberg.de/f/9f28e956cd304264bb82/?dl=1"
+        self.human_dict = os.path.join(self.root, "synset_human.txt")
         if (
             not os.path.exists(self.human_dict)
             or not os.path.getsize(self.human_dict) == SIZE
@@ -90,64 +86,62 @@ class ImageNetBase(Dataset):
             download(URL, self.human_dict)
 
     def _prepare_idx_to_synset(self):
-        URL = 'https://heibox.uni-heidelberg.de/f/d835d5b6ceda4d3aa910/?dl=1'
-        self.idx2syn = os.path.join(self.root, 'index_synset.yaml')
+        URL = "https://heibox.uni-heidelberg.de/f/d835d5b6ceda4d3aa910/?dl=1"
+        self.idx2syn = os.path.join(self.root, "index_synset.yaml")
         if not os.path.exists(self.idx2syn):
             download(URL, self.idx2syn)
 
     def _prepare_human_to_integer_label(self):
-        URL = 'https://heibox.uni-heidelberg.de/f/2362b797d5be43b883f6/?dl=1'
+        URL = "https://heibox.uni-heidelberg.de/f/2362b797d5be43b883f6/?dl=1"
         self.human2integer = os.path.join(
-            self.root, 'imagenet1000_clsidx_to_labels.txt'
+            self.root, "imagenet1000_clsidx_to_labels.txt"
         )
         if not os.path.exists(self.human2integer):
             download(URL, self.human2integer)
-        with open(self.human2integer, 'r') as f:
+        with open(self.human2integer) as f:
             lines = f.read().splitlines()
             assert len(lines) == 1000
             self.human2integer_dict = dict()
             for line in lines:
-                value, key = line.split(':')
+                value, key = line.split(":")
                 self.human2integer_dict[key] = int(value)
 
     def _load(self):
-        with open(self.txt_filelist, 'r') as f:
+        with open(self.txt_filelist) as f:
             self.relpaths = f.read().splitlines()
             l1 = len(self.relpaths)
             self.relpaths = self._filter_relpaths(self.relpaths)
             print(
-                'Removed {} files from filelist during filtering.'.format(
+                "Removed {} files from filelist during filtering.".format(
                     l1 - len(self.relpaths)
                 )
             )
 
-        self.synsets = [p.split('/')[0] for p in self.relpaths]
+        self.synsets = [p.split("/")[0] for p in self.relpaths]
         self.abspaths = [os.path.join(self.datadir, p) for p in self.relpaths]
 
         unique_synsets = np.unique(self.synsets)
-        class_dict = dict(
-            (synset, i) for i, synset in enumerate(unique_synsets)
-        )
+        class_dict = {synset: i for i, synset in enumerate(unique_synsets)}
         if not self.keep_orig_class_label:
             self.class_labels = [class_dict[s] for s in self.synsets]
         else:
             self.class_labels = [self.synset2idx[s] for s in self.synsets]
 
-        with open(self.human_dict, 'r') as f:
+        with open(self.human_dict) as f:
             human_dict = f.read().splitlines()
             human_dict = dict(line.split(maxsplit=1) for line in human_dict)
 
         self.human_labels = [human_dict[s] for s in self.synsets]
 
         labels = {
-            'relpath': np.array(self.relpaths),
-            'synsets': np.array(self.synsets),
-            'class_label': np.array(self.class_labels),
-            'human_label': np.array(self.human_labels),
+            "relpath": np.array(self.relpaths),
+            "synsets": np.array(self.synsets),
+            "class_label": np.array(self.class_labels),
+            "human_label": np.array(self.human_labels),
         }
 
         if self.process_images:
-            self.size = retrieve(self.config, 'size', default=256)
+            self.size = retrieve(self.config, "size", default=256)
             self.data = ImagePaths(
                 self.abspaths,
                 labels=labels,
@@ -159,11 +153,11 @@ class ImageNetBase(Dataset):
 
 
 class ImageNetTrain(ImageNetBase):
-    NAME = 'ILSVRC2012_train'
-    URL = 'http://www.image-net.org/challenges/LSVRC/2012/'
-    AT_HASH = 'a306397ccf9c2ead27155983c254227c0fd938e2'
+    NAME = "ILSVRC2012_train"
+    URL = "http://www.image-net.org/challenges/LSVRC/2012/"
+    AT_HASH = "a306397ccf9c2ead27155983c254227c0fd938e2"
     FILES = [
-        'ILSVRC2012_img_train.tar',
+        "ILSVRC2012_img_train.tar",
     ]
     SIZES = [
         147897477120,
@@ -178,20 +172,18 @@ class ImageNetTrain(ImageNetBase):
         if self.data_root:
             self.root = os.path.join(self.data_root, self.NAME)
         else:
-            cachedir = os.environ.get(
-                'XDG_CACHE_HOME', os.path.expanduser('~/.cache')
-            )
-            self.root = os.path.join(cachedir, 'autoencoders/data', self.NAME)
+            cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+            self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
 
-        self.datadir = os.path.join(self.root, 'data')
-        self.txt_filelist = os.path.join(self.root, 'filelist.txt')
+        self.datadir = os.path.join(self.root, "data")
+        self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 1281167
         self.random_crop = retrieve(
-            self.config, 'ImageNetTrain/random_crop', default=True
+            self.config, "ImageNetTrain/random_crop", default=True
         )
         if not tdu.is_prepared(self.root):
             # prep
-            print('Preparing dataset {} in {}'.format(self.NAME, self.root))
+            print(f"Preparing dataset {self.NAME} in {self.root}")
 
             datadir = self.datadir
             if not os.path.exists(datadir):
@@ -205,37 +197,37 @@ class ImageNetTrain(ImageNetBase):
                     atpath = at.get(self.AT_HASH, datastore=self.root)
                     assert atpath == path
 
-                print('Extracting {} to {}'.format(path, datadir))
+                print(f"Extracting {path} to {datadir}")
                 os.makedirs(datadir, exist_ok=True)
-                with tarfile.open(path, 'r:') as tar:
+                with tarfile.open(path, "r:") as tar:
                     tar.extractall(path=datadir)
 
-                print('Extracting sub-tars.')
-                subpaths = sorted(glob.glob(os.path.join(datadir, '*.tar')))
+                print("Extracting sub-tars.")
+                subpaths = sorted(glob.glob(os.path.join(datadir, "*.tar")))
                 for subpath in tqdm(subpaths):
-                    subdir = subpath[: -len('.tar')]
+                    subdir = subpath[: -len(".tar")]
                     os.makedirs(subdir, exist_ok=True)
-                    with tarfile.open(subpath, 'r:') as tar:
+                    with tarfile.open(subpath, "r:") as tar:
                         tar.extractall(path=subdir)
 
-            filelist = glob.glob(os.path.join(datadir, '**', '*.JPEG'))
+            filelist = glob.glob(os.path.join(datadir, "**", "*.JPEG"))
             filelist = [os.path.relpath(p, start=datadir) for p in filelist]
             filelist = sorted(filelist)
-            filelist = '\n'.join(filelist) + '\n'
-            with open(self.txt_filelist, 'w') as f:
+            filelist = "\n".join(filelist) + "\n"
+            with open(self.txt_filelist, "w") as f:
                 f.write(filelist)
 
             tdu.mark_prepared(self.root)
 
 
 class ImageNetValidation(ImageNetBase):
-    NAME = 'ILSVRC2012_validation'
-    URL = 'http://www.image-net.org/challenges/LSVRC/2012/'
-    AT_HASH = '5d6d0df7ed81efd49ca99ea4737e0ae5e3a5f2e5'
-    VS_URL = 'https://heibox.uni-heidelberg.de/f/3e0f6e9c624e45f2bd73/?dl=1'
+    NAME = "ILSVRC2012_validation"
+    URL = "http://www.image-net.org/challenges/LSVRC/2012/"
+    AT_HASH = "5d6d0df7ed81efd49ca99ea4737e0ae5e3a5f2e5"
+    VS_URL = "https://heibox.uni-heidelberg.de/f/3e0f6e9c624e45f2bd73/?dl=1"
     FILES = [
-        'ILSVRC2012_img_val.tar',
-        'validation_synset.txt',
+        "ILSVRC2012_img_val.tar",
+        "validation_synset.txt",
     ]
     SIZES = [
         6744924160,
@@ -251,19 +243,17 @@ class ImageNetValidation(ImageNetBase):
         if self.data_root:
             self.root = os.path.join(self.data_root, self.NAME)
         else:
-            cachedir = os.environ.get(
-                'XDG_CACHE_HOME', os.path.expanduser('~/.cache')
-            )
-            self.root = os.path.join(cachedir, 'autoencoders/data', self.NAME)
-        self.datadir = os.path.join(self.root, 'data')
-        self.txt_filelist = os.path.join(self.root, 'filelist.txt')
+            cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+            self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
+        self.datadir = os.path.join(self.root, "data")
+        self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 50000
         self.random_crop = retrieve(
-            self.config, 'ImageNetValidation/random_crop', default=False
+            self.config, "ImageNetValidation/random_crop", default=False
         )
         if not tdu.is_prepared(self.root):
             # prep
-            print('Preparing dataset {} in {}'.format(self.NAME, self.root))
+            print(f"Preparing dataset {self.NAME} in {self.root}")
 
             datadir = self.datadir
             if not os.path.exists(datadir):
@@ -277,9 +267,9 @@ class ImageNetValidation(ImageNetBase):
                     atpath = at.get(self.AT_HASH, datastore=self.root)
                     assert atpath == path
 
-                print('Extracting {} to {}'.format(path, datadir))
+                print(f"Extracting {path} to {datadir}")
                 os.makedirs(datadir, exist_ok=True)
-                with tarfile.open(path, 'r:') as tar:
+                with tarfile.open(path, "r:") as tar:
                     tar.extractall(path=datadir)
 
                 vspath = os.path.join(self.root, self.FILES[1])
@@ -289,11 +279,11 @@ class ImageNetValidation(ImageNetBase):
                 ):
                     download(self.VS_URL, vspath)
 
-                with open(vspath, 'r') as f:
+                with open(vspath) as f:
                     synset_dict = f.read().splitlines()
                     synset_dict = dict(line.split() for line in synset_dict)
 
-                print('Reorganizing into synset folders')
+                print("Reorganizing into synset folders")
                 synsets = np.unique(list(synset_dict.values()))
                 for s in synsets:
                     os.makedirs(os.path.join(datadir, s), exist_ok=True)
@@ -302,11 +292,11 @@ class ImageNetValidation(ImageNetBase):
                     dst = os.path.join(datadir, v)
                     shutil.move(src, dst)
 
-            filelist = glob.glob(os.path.join(datadir, '**', '*.JPEG'))
+            filelist = glob.glob(os.path.join(datadir, "**", "*.JPEG"))
             filelist = [os.path.relpath(p, start=datadir) for p in filelist]
             filelist = sorted(filelist)
-            filelist = '\n'.join(filelist) + '\n'
-            with open(self.txt_filelist, 'w') as f:
+            filelist = "\n".join(filelist) + "\n"
+            with open(self.txt_filelist, "w") as f:
                 f.write(filelist)
 
             tdu.mark_prepared(self.root)
@@ -356,32 +346,28 @@ class ImageNetSR(Dataset):
             False  # gets reset later if incase interp_op is from pillow
         )
 
-        if degradation == 'bsrgan':
-            self.degradation_process = partial(
-                degradation_fn_bsr, sf=downscale_f
-            )
+        if degradation == "bsrgan":
+            self.degradation_process = partial(degradation_fn_bsr, sf=downscale_f)
 
-        elif degradation == 'bsrgan_light':
-            self.degradation_process = partial(
-                degradation_fn_bsr_light, sf=downscale_f
-            )
+        elif degradation == "bsrgan_light":
+            self.degradation_process = partial(degradation_fn_bsr_light, sf=downscale_f)
 
         else:
             interpolation_fn = {
-                'cv_nearest': cv2.INTER_NEAREST,
-                'cv_bilinear': cv2.INTER_LINEAR,
-                'cv_bicubic': cv2.INTER_CUBIC,
-                'cv_area': cv2.INTER_AREA,
-                'cv_lanczos': cv2.INTER_LANCZOS4,
-                'pil_nearest': PIL.Image.NEAREST,
-                'pil_bilinear': PIL.Image.BILINEAR,
-                'pil_bicubic': PIL.Image.BICUBIC,
-                'pil_box': PIL.Image.BOX,
-                'pil_hamming': PIL.Image.HAMMING,
-                'pil_lanczos': PIL.Image.LANCZOS,
+                "cv_nearest": cv2.INTER_NEAREST,
+                "cv_bilinear": cv2.INTER_LINEAR,
+                "cv_bicubic": cv2.INTER_CUBIC,
+                "cv_area": cv2.INTER_AREA,
+                "cv_lanczos": cv2.INTER_LANCZOS4,
+                "pil_nearest": PIL.Image.NEAREST,
+                "pil_bilinear": PIL.Image.BILINEAR,
+                "pil_bicubic": PIL.Image.BICUBIC,
+                "pil_box": PIL.Image.BOX,
+                "pil_hamming": PIL.Image.HAMMING,
+                "pil_lanczos": PIL.Image.LANCZOS,
             }[degradation]
 
-            self.pil_interpolation = degradation.startswith('pil_')
+            self.pil_interpolation = degradation.startswith("pil_")
 
             if self.pil_interpolation:
                 self.degradation_process = partial(
@@ -400,10 +386,10 @@ class ImageNetSR(Dataset):
 
     def __getitem__(self, i):
         example = self.base[i]
-        image = Image.open(example['file_path_'])
+        image = Image.open(example["file_path_"])
 
-        if not image.mode == 'RGB':
-            image = image.convert('RGB')
+        if not image.mode == "RGB":
+            image = image.convert("RGB")
 
         image = np.array(image).astype(np.uint8)
 
@@ -423,8 +409,8 @@ class ImageNetSR(Dataset):
                 height=crop_side_len, width=crop_side_len
             )
 
-        image = self.cropper(image=image)['image']
-        image = self.image_rescaler(image=image)['image']
+        image = self.cropper(image=image)["image"]
+        image = self.image_rescaler(image=image)["image"]
 
         if self.pil_interpolation:
             image_pil = PIL.Image.fromarray(image)
@@ -432,10 +418,10 @@ class ImageNetSR(Dataset):
             LR_image = np.array(LR_image).astype(np.uint8)
 
         else:
-            LR_image = self.degradation_process(image=image)['image']
+            LR_image = self.degradation_process(image=image)["image"]
 
-        example['image'] = (image / 127.5 - 1.0).astype(np.float32)
-        example['LR_image'] = (LR_image / 127.5 - 1.0).astype(np.float32)
+        example["image"] = (image / 127.5 - 1.0).astype(np.float32)
+        example["LR_image"] = (LR_image / 127.5 - 1.0).astype(np.float32)
 
         return example
 
@@ -445,7 +431,7 @@ class ImageNetSRTrain(ImageNetSR):
         super().__init__(**kwargs)
 
     def get_base(self):
-        with open('data/imagenet_train_hr_indices.p', 'rb') as f:
+        with open("data/imagenet_train_hr_indices.p", "rb") as f:
             indices = pickle.load(f)
         dset = ImageNetTrain(
             process_images=False,
@@ -458,7 +444,7 @@ class ImageNetSRValidation(ImageNetSR):
         super().__init__(**kwargs)
 
     def get_base(self):
-        with open('data/imagenet_val_hr_indices.p', 'rb') as f:
+        with open("data/imagenet_val_hr_indices.p", "rb") as f:
             indices = pickle.load(f)
         dset = ImageNetValidation(
             process_images=False,

@@ -25,14 +25,15 @@ def write_log_message(results, output_cntr):
     if len(results) == 0:
         return output_cntr
     log_lines = [f"{path}: {prompt}\n" for path, prompt in results]
-    if len(log_lines)>1:
+    if len(log_lines) > 1:
         subcntr = 1
         for l in log_lines:
-           print(f"[{output_cntr}.{subcntr}] {l}", end="")
-           subcntr += 1
+            print(f"[{output_cntr}.{subcntr}] {l}", end="")
+            subcntr += 1
     else:
-           print(f"[{output_cntr}] {log_lines[0]}", end="")
-    return output_cntr+1
+        print(f"[{output_cntr}] {log_lines[0]}", end="")
+    return output_cntr + 1
+
 
 def write_log_files(results, log_path, file_types):
     for file_type in file_types:

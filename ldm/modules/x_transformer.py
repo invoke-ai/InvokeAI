@@ -1,23 +1,20 @@
 """shout-out to https://github.com/lucidrains/x-transformers/tree/main/x_transformers"""
-import torch
-from torch import nn, einsum
-import torch.nn.functional as F
+from collections import namedtuple
 from functools import partial
 from inspect import isfunction
-from collections import namedtuple
-from einops import rearrange, repeat, reduce
+
+import torch
+import torch.nn.functional as F
+from einops import rearrange, reduce, repeat
+from torch import einsum, nn
 
 # constants
 
 DEFAULT_DIM_HEAD = 64
 
-Intermediates = namedtuple(
-    'Intermediates', ['pre_softmax_attn', 'post_softmax_attn']
-)
+Intermediates = namedtuple("Intermediates", ["pre_softmax_attn", "post_softmax_attn"])
 
-LayerIntermediates = namedtuple(
-    'Intermediates', ['hiddens', 'attn_intermediates']
-)
+LayerIntermediates = namedtuple("Intermediates", ["hiddens", "attn_intermediates"])
 
 
 class AbsolutePositionalEmbedding(nn.Module):
@@ -38,16 +35,14 @@ class FixedPositionalEmbedding(nn.Module):
     def __init__(self, dim):
         super().__init__()
         inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
-        self.register_buffer('inv_freq', inv_freq)
+        self.register_buffer("inv_freq", inv_freq)
 
     def forward(self, x, seq_dim=1, offset=0):
         t = (
-            torch.arange(x.shape[seq_dim], device=x.device).type_as(
-                self.inv_freq
-            )
+            torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq)
             + offset
         )
-        sinusoid_inp = torch.einsum('i , j -> i j', t, self.inv_freq)
+        sinusoid_inp = torch.einsum("i , j -> i j", t, self.inv_freq)
         emb = torch.cat((sinusoid_inp.sin(), sinusoid_inp.cos()), dim=-1)
         return emb[None, :, :]
 
@@ -187,8 +182,8 @@ class GRUGating(nn.Module):
 
     def forward(self, x, residual):
         gated_output = self.gru(
-            rearrange(x, 'b n d -> (b n) d'),
-            rearrange(residual, 'b n d -> (b n) d'),
+            rearrange(x, "b n d -> (b n) d"),
+            rearrange(residual, "b n d -> (b n) d"),
         )
 
         return gated_output.reshape_as(x)
@@ -245,7 +240,7 @@ class Attention(nn.Module):
         super().__init__()
         if use_entmax15:
             raise NotImplementedError(
-                'Check out entmax activation instead of softmax activation!'
+                "Check out entmax activation instead of softmax activation!"
             )
         self.scale = dim_head**-0.5
         self.heads = heads
@@ -323,37 +318,31 @@ class Attention(nn.Module):
         k = self.to_k(k_input)
         v = self.to_v(v_input)
 
-        q, k, v = map(
-            lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), (q, k, v)
-        )
+        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
 
         input_mask = None
         if any(map(exists, (mask, context_mask))):
-            q_mask = default(
-                mask, lambda: torch.ones((b, n), device=device).bool()
-            )
+            q_mask = default(mask, lambda: torch.ones((b, n), device=device).bool())
             k_mask = q_mask if not exists(context) else context_mask
             k_mask = default(
                 k_mask,
                 lambda: torch.ones((b, k.shape[-2]), device=device).bool(),
             )
-            q_mask = rearrange(q_mask, 'b i -> b () i ()')
-            k_mask = rearrange(k_mask, 'b j -> b () () j')
+            q_mask = rearrange(q_mask, "b i -> b () i ()")
+            k_mask = rearrange(k_mask, "b j -> b () () j")
             input_mask = q_mask * k_mask
 
         if self.num_mem_kv > 0:
             mem_k, mem_v = map(
-                lambda t: repeat(t, 'h n d -> b h n d', b=b),
+                lambda t: repeat(t, "h n d -> b h n d", b=b),
                 (self.mem_k, self.mem_v),
             )
             k = torch.cat((mem_k, k), dim=-2)
             v = torch.cat((mem_v, v), dim=-2)
             if exists(input_mask):
-                input_mask = F.pad(
-                    input_mask, (self.num_mem_kv, 0), value=True
-                )
+                input_mask = F.pad(input_mask, (self.num_mem_kv, 0), value=True)
 
-        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+        dots = einsum("b h i d, b h j d -> b h i j", q, k) * self.scale
         mask_value = max_neg_value(dots)
 
         if exists(prev_attn):
@@ -363,7 +352,7 @@ class Attention(nn.Module):
 
         if talking_heads:
             dots = einsum(
-                'b h i j, h k -> b k i j', dots, self.pre_softmax_proj
+                "b h i j, h k -> b k i j", dots, self.pre_softmax_proj
             ).contiguous()
 
         if exists(rel_pos):
@@ -376,9 +365,7 @@ class Attention(nn.Module):
         if self.causal:
             i, j = dots.shape[-2:]
             r = torch.arange(i, device=device)
-            mask = rearrange(r, 'i -> () () i ()') < rearrange(
-                r, 'j -> () () () j'
-            )
+            mask = rearrange(r, "i -> () () i ()") < rearrange(r, "j -> () () () j")
             mask = F.pad(mask, (j - i, 0), value=False)
             dots.masked_fill_(mask, mask_value)
             del mask
@@ -397,11 +384,11 @@ class Attention(nn.Module):
 
         if talking_heads:
             attn = einsum(
-                'b h i j, h k -> b k i j', attn, self.post_softmax_proj
+                "b h i j, h k -> b k i j", attn, self.post_softmax_proj
             ).contiguous()
 
-        out = einsum('b h i j, b h j d -> b h i d', attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = einsum("b h i j, b h j d -> b h i d", attn, v)
+        out = rearrange(out, "b h n d -> b n (h d)")
 
         intermediates = Intermediates(
             pre_softmax_attn=pre_softmax_attn,
@@ -437,10 +424,10 @@ class AttentionLayers(nn.Module):
         **kwargs,
     ):
         super().__init__()
-        ff_kwargs, kwargs = groupby_prefix_and_trim('ff_', kwargs)
-        attn_kwargs, _ = groupby_prefix_and_trim('attn_', kwargs)
+        ff_kwargs, kwargs = groupby_prefix_and_trim("ff_", kwargs)
+        attn_kwargs, _ = groupby_prefix_and_trim("attn_", kwargs)
 
-        dim_head = attn_kwargs.get('dim_head', DEFAULT_DIM_HEAD)
+        dim_head = attn_kwargs.get("dim_head", DEFAULT_DIM_HEAD)
 
         self.dim = dim
         self.depth = depth
@@ -454,7 +441,7 @@ class AttentionLayers(nn.Module):
 
         assert (
             rel_pos_num_buckets <= rel_pos_max_distance
-        ), 'number of relative position buckets must be less than the relative position max distance'
+        ), "number of relative position buckets must be less than the relative position max distance"
         self.rel_pos = None
 
         self.pre_norm = pre_norm
@@ -470,21 +457,21 @@ class AttentionLayers(nn.Module):
         branch_fn = Rezero if use_rezero else None
 
         if cross_attend and not only_cross:
-            default_block = ('a', 'c', 'f')
+            default_block = ("a", "c", "f")
         elif cross_attend and only_cross:
-            default_block = ('c', 'f')
+            default_block = ("c", "f")
         else:
-            default_block = ('a', 'f')
+            default_block = ("a", "f")
 
         if macaron:
-            default_block = ('f',) + default_block
+            default_block = ("f",) + default_block
 
         if exists(custom_layers):
             layer_types = custom_layers
         elif exists(par_ratio):
             par_depth = depth * len(default_block)
-            assert 1 < par_ratio <= par_depth, 'par ratio out of range'
-            default_block = tuple(filter(not_equals('f'), default_block))
+            assert 1 < par_ratio <= par_depth, "par ratio out of range"
+            default_block = tuple(filter(not_equals("f"), default_block))
             par_attn = par_depth // par_ratio
             depth_cut = (
                 par_depth * 2 // 3
@@ -492,39 +479,35 @@ class AttentionLayers(nn.Module):
             par_width = (depth_cut + depth_cut // par_attn) // par_attn
             assert (
                 len(default_block) <= par_width
-            ), 'default block is too large for par_ratio'
-            par_block = default_block + ('f',) * (
-                par_width - len(default_block)
-            )
+            ), "default block is too large for par_ratio"
+            par_block = default_block + ("f",) * (par_width - len(default_block))
             par_head = par_block * par_attn
-            layer_types = par_head + ('f',) * (par_depth - len(par_head))
+            layer_types = par_head + ("f",) * (par_depth - len(par_head))
         elif exists(sandwich_coef):
             assert (
                 sandwich_coef > 0 and sandwich_coef <= depth
-            ), 'sandwich coefficient should be less than the depth'
+            ), "sandwich coefficient should be less than the depth"
             layer_types = (
-                ('a',) * sandwich_coef
+                ("a",) * sandwich_coef
                 + default_block * (depth - sandwich_coef)
-                + ('f',) * sandwich_coef
+                + ("f",) * sandwich_coef
             )
         else:
             layer_types = default_block * depth
 
         self.layer_types = layer_types
-        self.num_attn_layers = len(list(filter(equals('a'), layer_types)))
+        self.num_attn_layers = len(list(filter(equals("a"), layer_types)))
 
         for layer_type in self.layer_types:
-            if layer_type == 'a':
-                layer = Attention(
-                    dim, heads=heads, causal=causal, **attn_kwargs
-                )
-            elif layer_type == 'c':
+            if layer_type == "a":
+                layer = Attention(dim, heads=heads, causal=causal, **attn_kwargs)
+            elif layer_type == "c":
                 layer = Attention(dim, heads=heads, **attn_kwargs)
-            elif layer_type == 'f':
+            elif layer_type == "f":
                 layer = FeedForward(dim, **ff_kwargs)
                 layer = layer if not macaron else Scale(0.5, layer)
             else:
-                raise Exception(f'invalid layer type {layer_type}')
+                raise Exception(f"invalid layer type {layer_type}")
 
             if isinstance(layer, Attention) and exists(branch_fn):
                 layer = branch_fn(layer)
@@ -558,7 +541,7 @@ class AttentionLayers(nn.Module):
         ):
             is_last = ind == (len(self.layers) - 1)
 
-            if layer_type == 'a':
+            if layer_type == "a":
                 hiddens.append(x)
                 layer_mem = mems.pop(0)
 
@@ -567,7 +550,7 @@ class AttentionLayers(nn.Module):
             if self.pre_norm:
                 x = norm(x)
 
-            if layer_type == 'a':
+            if layer_type == "a":
                 out, inter = block(
                     x,
                     mask=mask,
@@ -576,7 +559,7 @@ class AttentionLayers(nn.Module):
                     prev_attn=prev_attn,
                     mem=layer_mem,
                 )
-            elif layer_type == 'c':
+            elif layer_type == "c":
                 out, inter = block(
                     x,
                     context=context,
@@ -584,17 +567,17 @@ class AttentionLayers(nn.Module):
                     context_mask=context_mask,
                     prev_attn=prev_cross_attn,
                 )
-            elif layer_type == 'f':
+            elif layer_type == "f":
                 out = block(x)
 
             x = residual_fn(out, residual)
 
-            if layer_type in ('a', 'c'):
+            if layer_type in ("a", "c"):
                 intermediates.append(inter)
 
-            if layer_type == 'a' and self.residual_attn:
+            if layer_type == "a" and self.residual_attn:
                 prev_attn = inter.pre_softmax_attn
-            elif layer_type == 'c' and self.cross_residual_attn:
+            elif layer_type == "c" and self.cross_residual_attn:
                 prev_cross_attn = inter.pre_softmax_attn
 
             if not self.pre_norm and not is_last:
@@ -612,7 +595,7 @@ class AttentionLayers(nn.Module):
 
 class Encoder(AttentionLayers):
     def __init__(self, **kwargs):
-        assert 'causal' not in kwargs, 'cannot set causality on encoder'
+        assert "causal" not in kwargs, "cannot set causality on encoder"
         super().__init__(causal=False, **kwargs)
 
 
@@ -633,7 +616,7 @@ class TransformerWrapper(nn.Module):
         super().__init__()
         assert isinstance(
             attn_layers, AttentionLayers
-        ), 'attention layers must be one of Encoder or Decoder'
+        ), "attention layers must be one of Encoder or Decoder"
 
         dim = attn_layers.dim
         emb_dim = default(emb_dim, dim)
@@ -650,9 +633,7 @@ class TransformerWrapper(nn.Module):
         )
         self.emb_dropout = nn.Dropout(emb_dropout)
 
-        self.project_emb = (
-            nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
-        )
+        self.project_emb = nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
         self.attn_layers = attn_layers
         self.norm = nn.LayerNorm(dim)
 
@@ -668,12 +649,10 @@ class TransformerWrapper(nn.Module):
         num_memory_tokens = default(num_memory_tokens, 0)
         self.num_memory_tokens = num_memory_tokens
         if num_memory_tokens > 0:
-            self.memory_tokens = nn.Parameter(
-                torch.randn(num_memory_tokens, dim)
-            )
+            self.memory_tokens = nn.Parameter(torch.randn(num_memory_tokens, dim))
 
             # let funnel encoder know number of memory tokens, if specified
-            if hasattr(attn_layers, 'num_memory_tokens'):
+            if hasattr(attn_layers, "num_memory_tokens"):
                 attn_layers.num_memory_tokens = num_memory_tokens
 
     def init_(self):
@@ -705,7 +684,7 @@ class TransformerWrapper(nn.Module):
         x = self.project_emb(x)
 
         if num_mem > 0:
-            mem = repeat(self.memory_tokens, 'n d -> b n d', b=b)
+            mem = repeat(self.memory_tokens, "n d -> b n d", b=b)
             x = torch.cat((mem, x), dim=1)
 
             # auto-handle masking after appending memory tokens
@@ -734,9 +713,7 @@ class TransformerWrapper(nn.Module):
                 else hiddens
             )
             new_mems = list(
-                map(
-                    lambda t: t[..., -self.max_mem_len :, :].detach(), new_mems
-                )
+                map(lambda t: t[..., -self.max_mem_len :, :].detach(), new_mems)
             )
             return out, new_mems
 

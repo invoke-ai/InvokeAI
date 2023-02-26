@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Union
 
 import click
-
 from compel import PromptParser
 
 if sys.platform == "darwin":
@@ -19,8 +18,8 @@ import pyparsing  # type: ignore
 import ldm.invoke
 
 from ..generate import Generate
-from .args import (Args, dream_cmd_from_png, metadata_dumps,
-                             metadata_from_png)
+from ..util import url_attachment_name
+from .args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
 from .generator.diffusers_pipeline import PipelineIntermediateState
 from .globals import Globals
 from .image_util import make_grid
@@ -28,7 +27,6 @@ from .log import write_log
 from .model_manager import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
-from ..util import url_attachment_name
 
 # global used in multiple functions (fix)
 infile = None
@@ -114,12 +112,12 @@ def main():
     if opt.infile:
         try:
             if os.path.isfile(opt.infile):
-                infile = open(opt.infile, "r", encoding="utf-8")
+                infile = open(opt.infile, encoding="utf-8")
             elif opt.infile == "-":  # stdin
                 infile = sys.stdin
             else:
                 raise FileNotFoundError(f"{opt.infile} not found.")
-        except (FileNotFoundError, IOError) as e:
+        except (FileNotFoundError, OSError) as e:
             print(f"{e}. Aborting.")
             sys.exit(-1)
 
@@ -141,7 +139,7 @@ def main():
         )
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(opt, e)
-    except (IOError, KeyError) as e:
+    except (OSError, KeyError) as e:
         print(f"{e}. Aborting.")
         sys.exit(-1)
 
@@ -410,7 +408,7 @@ def main_loop(gen, opt):
                     # update rfc metadata
                     if operation == "postprocess":
                         tool = re.match(
-                            "postprocess:(\w+)", opt.last_operation
+                            r"postprocess:(\w+)", opt.last_operation
                         ).groups()[0]
                         add_postprocessing_to_metadata(
                             opt,
@@ -496,7 +494,7 @@ def main_loop(gen, opt):
 def do_command(command: str, gen, opt: Args, completer) -> tuple:
     global infile
     operation = "generate"  # default operation, alternative is 'postprocess'
-    command = command.replace('\\','/') # windows
+    command = command.replace("\\", "/")  # windows
 
     if command.startswith(
         "!dream"
@@ -539,10 +537,10 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
                 import_model(path[1], gen, opt, completer)
                 completer.add_history(command)
             except KeyboardInterrupt:
-                print('\n')
+                print("\n")
         operation = None
 
-    elif command.startswith(("!convert","!optimize")):
+    elif command.startswith(("!convert", "!optimize")):
         path = shlex.split(command)
         if len(path) < 2:
             print("** please provide the path to a .ckpt or .safetensors model")
@@ -551,9 +549,9 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
                 convert_model(path[1], gen, opt, completer)
                 completer.add_history(command)
             except KeyboardInterrupt:
-                print('\n')
+                print("\n")
         operation = None
- 
+
     elif command.startswith("!edit"):
         path = shlex.split(command)
         if len(path) < 2:
@@ -581,7 +579,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
     elif command.startswith("!replay"):
         file_path = command.replace("!replay", "", 1).strip()
         if infile is None and os.path.isfile(file_path):
-            infile = open(file_path, "r", encoding="utf-8")
+            infile = open(file_path, encoding="utf-8")
         completer.add_history(command)
         operation = None
 
@@ -602,8 +600,8 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
         completer.clear_history()
         operation = None
 
-    elif re.match("^!(\d+)", command):
-        command_no = re.match("^!(\d+)", command).groups()[0]
+    elif re.match(r"^!(\d+)", command):
+        command_no = re.match(r"^!(\d+)", command).groups()[0]
         command = completer.get_line(int(command_no))
         completer.set_line(command)
         operation = None
@@ -641,12 +639,12 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     ):
         pass
     else:
-        if model_path.startswith(('http:','https:')):
+        if model_path.startswith(("http:", "https:")):
             try:
                 default_name = url_attachment_name(model_path)
                 default_name = Path(default_name).stem
             except Exception as e:
-                print(f'** URL: {str(e)}')
+                print(f"** URL: {str(e)}")
             model_name, model_desc = _get_model_name_and_desc(
                 gen.model_manager,
                 completer,
@@ -673,6 +671,7 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     gen.model_manager.commit(opt.conf)
     completer.update_models(gen.model_manager.list_models())
     print(f">> {imported_name} successfully installed")
+
 
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")
@@ -705,6 +704,7 @@ def _get_model_name_and_desc(
         or model_description
     )
     return model_name, model_description
+
 
 def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
     model_name_or_path = model_name_or_path.replace("\\", "/")  # windows
@@ -744,7 +744,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
         except KeyboardInterrupt:
             return
 
-    manager.commit(opt.conf)    
+    manager.commit(opt.conf)
     if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
         print(f"{ckpt_path} deleted")
@@ -827,7 +827,7 @@ def _get_model_name(existing_names, completer, default_name: str = "") -> str:
         model_name = input(f"Short name for this model [{default_name}]: ").strip()
         if len(model_name) == 0:
             model_name = default_name
-        if not re.match("^[\w._+:/-]+$", model_name):
+        if not re.match(r"^[\w._+:/-]+$", model_name):
             print(
                 '** model name must contain only words, digits and the characters "._+:/-" **'
             )
@@ -985,7 +985,7 @@ def prepare_image_metadata(
 
 
 def choose_postprocess_name(opt, prefix, seed) -> str:
-    match = re.search("postprocess:(\w+)", opt.last_operation)
+    match = re.search(r"postprocess:(\w+)", opt.last_operation)
     if match:
         modifier = match.group(
             1
@@ -1108,7 +1108,7 @@ def make_step_callback(gen, opt, prefix):
         if step % opt.save_intermediates == 0 or step == opt.steps - 1:
             filename = os.path.join(destination, f"{step:04}.png")
             image = gen.sample_to_lowres_estimated_image(latents)
-            image = image.resize((image.size[0]*8,image.size[1]*8))
+            image = image.resize((image.size[0] * 8, image.size[1] * 8))
             image.save(filename, "PNG")
 
     return callback
@@ -1192,8 +1192,8 @@ def report_model_error(opt: Namespace, e: Exception):
         )
     else:
         if not click.confirm(
-                'Do you want to run invokeai-configure script to select and/or reinstall models?',
-                default=False
+            "Do you want to run invokeai-configure script to select and/or reinstall models?",
+            default=False,
         ):
             return
 
@@ -1234,6 +1234,6 @@ def check_internet() -> bool:
     except:
         return False
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
-    

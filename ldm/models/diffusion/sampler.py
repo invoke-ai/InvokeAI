@@ -3,21 +3,21 @@ ldm.models.diffusion.sampler
 
 Base class for ldm.models.diffusion.ddim, ldm.models.diffusion.ksampler, etc
 '''
-import torch
-import numpy as np
-from tqdm import tqdm
 from functools import partial
+
+import numpy as np
+import torch
+from tqdm import tqdm
+
 from ldm.invoke.devices import choose_torch_device
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+from ldm.models.diffusion.shared_invokeai_diffusion import \
+    InvokeAIDiffuserComponent
+from ldm.modules.diffusionmodules.util import (extract_into_tensor,
+                                               make_ddim_sampling_parameters,
+                                               make_ddim_timesteps, noise_like)
 
-from ldm.modules.diffusionmodules.util import (
-    make_ddim_sampling_parameters,
-    make_ddim_timesteps,
-    noise_like,
-    extract_into_tensor,
-)
 
-class Sampler(object):
+class Sampler:
     def __init__(self, model, schedule='linear', steps=None, device=None, **kwargs):
         self.model = model
         self.ddim_timesteps = None

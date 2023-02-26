@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 from math import ceil
-from typing import Callable, Optional, Union, Any, Dict
+from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -9,9 +9,10 @@ from diffusers.models.cross_attention import AttnProcessor
 from typing_extensions import TypeAlias
 
 from ldm.invoke.globals import Globals
-from ldm.models.diffusion.cross_attention_control import Arguments, \
-    restore_default_cross_attention, override_cross_attention, Context, get_cross_attention_modules, \
-    CrossAttentionType, SwapCrossAttnContext
+from ldm.models.diffusion.cross_attention_control import (
+    Arguments, Context, CrossAttentionType, SwapCrossAttnContext,
+    get_cross_attention_modules, override_cross_attention,
+    restore_default_cross_attention)
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 
 ModelForwardCallback: TypeAlias = Union[
@@ -82,7 +83,7 @@ class InvokeAIDiffuserComponent:
             # TODO resuscitate attention map saving
             #self.remove_attention_map_saving()
 
-    def override_cross_attention(self, conditioning: ExtraConditioningInfo, step_count: int) -> Dict[str, AttnProcessor]:
+    def override_cross_attention(self, conditioning: ExtraConditioningInfo, step_count: int) -> dict[str, AttnProcessor]:
         """
         setup cross attention .swap control. for diffusers this replaces the attention processor, so
         the previous attention processor is returned so that the caller can restore it later.
@@ -346,7 +347,7 @@ class InvokeAIDiffuserComponent:
         scale = 0.7  # default value from #395
 
         if self.debug_thresholding:
-            std, mean = [i.item() for i in torch.std_mean(latents)]
+            std, mean = (i.item() for i in torch.std_mean(latents))
             outside = torch.count_nonzero((latents < -current_threshold) | (latents > current_threshold))
             print(f"\nThreshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
                   f"  | min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}\n"

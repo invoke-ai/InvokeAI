@@ -8,7 +8,6 @@ from .cross_attention_map_saving import AttentionMapSaver
 from .sampler import Sampler
 from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
-
 # at this threshold, the scheduler will stop using the Karras
 # noise schedule and start using the model's schedule
 STEP_THRESHOLD = 30

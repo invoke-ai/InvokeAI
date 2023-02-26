@@ -328,8 +328,8 @@ class Generate:
         variation_amount=0.0,
         threshold=0.0,
         perlin=0.0,
-        h_symmetry_time_pct = None,
-        v_symmetry_time_pct = None,
+        h_symmetry_time_pct=None,
+        v_symmetry_time_pct=None,
         karras_max=None,
         outdir=None,
         # these are specific to img2img and inpaint
@@ -975,7 +975,7 @@ class Generate:
 
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
-            print(f'>> Loading embeddings from {self.embedding_path}')
+            print(f">> Loading embeddings from {self.embedding_path}")
             for root, _, files in os.walk(self.embedding_path):
                 for name in files:
                     ti_path = os.path.join(root, name)
@@ -998,7 +998,7 @@ class Generate:
         return self.model.textual_inversion_manager.hf_concepts_library
 
     @property
-    def embedding_trigger_strings(self) -> List[str]:
+    def embedding_trigger_strings(self) -> list[str]:
         return self.model.textual_inversion_manager.get_all_trigger_strings()
 
     def correct_colors(self, image_list, reference_image_path, image_callback=None):

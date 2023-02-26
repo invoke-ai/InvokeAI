@@ -1,9 +1,12 @@
 """SAMPLING ONLY."""
 
 import torch
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+
 from ldm.models.diffusion.sampler import Sampler
-from ldm.modules.diffusionmodules.util import  noise_like
+from ldm.models.diffusion.shared_invokeai_diffusion import \
+    InvokeAIDiffuserComponent
+from ldm.modules.diffusionmodules.util import noise_like
+
 
 class DDIMSampler(Sampler):
     def __init__(self, model, schedule='linear', device=None, **kwargs):

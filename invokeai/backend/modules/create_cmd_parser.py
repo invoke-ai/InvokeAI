@@ -1,5 +1,6 @@
 import argparse
 import os
+
 from ldm.invoke.args import PRECISION_CHOICES
 
 
@@ -46,10 +47,10 @@ def create_cmd_parser():
         default="auto",
     )
     parser.add_argument(
-        '--free_gpu_mem',
-        dest='free_gpu_mem',
-        action='store_true',
-        help='Force free gpu memory before final decoding',
+        "--free_gpu_mem",
+        dest="free_gpu_mem",
+        action="store_true",
+        help="Force free gpu memory before final decoding",
     )
 
     return parser

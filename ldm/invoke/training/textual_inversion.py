@@ -284,7 +284,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self) -> Tuple[List[str], int]:
+    def get_model_names(self) -> tuple[list[str], int]:
         conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
         model_names = [
             idx
@@ -448,9 +448,9 @@ def main():
             print(
                 "** You need to have at least one diffusers models defined in models.yaml in order to train"
             )
-        elif str(e).startswith('addwstr'):
+        elif str(e).startswith("addwstr"):
             print(
-                '** Not enough window space for the interface. Please make your window larger and try again.'
+                "** Not enough window space for the interface. Please make your window larger and try again."
             )
         else:
             print(f"** An error has occurred: {str(e)}")

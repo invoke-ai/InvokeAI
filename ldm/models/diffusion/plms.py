@@ -1,13 +1,16 @@
 """SAMPLING ONLY."""
 
-import torch
-import numpy as np
-from tqdm import tqdm
 from functools import partial
+
+import numpy as np
+import torch
+from tqdm import tqdm
+
 from ldm.invoke.devices import choose_torch_device
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.models.diffusion.sampler import Sampler
-from ldm.modules.diffusionmodules.util import  noise_like
+from ldm.models.diffusion.shared_invokeai_diffusion import \
+    InvokeAIDiffuserComponent
+from ldm.modules.diffusionmodules.util import noise_like
 
 
 class PLMSSampler(Sampler):

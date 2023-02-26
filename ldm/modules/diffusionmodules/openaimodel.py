@@ -1,23 +1,23 @@
+import math
 from abc import abstractmethod
 from functools import partial
-import math
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ldm.modules.attention import SpatialTransformer
 from ldm.modules.diffusionmodules.util import (
+    avg_pool_nd,
     checkpoint,
     conv_nd,
     linear,
-    avg_pool_nd,
-    zero_module,
     normalization,
     timestep_embedding,
+    zero_module,
 )
-from ldm.modules.attention import SpatialTransformer
 
 
 # dummy replace
@@ -100,9 +100,7 @@ class Upsample(nn.Module):
                  upsampling occurs in the inner-two dimensions.
     """
 
-    def __init__(
-        self, channels, use_conv, dims=2, out_channels=None, padding=1
-    ):
+    def __init__(self, channels, use_conv, dims=2, out_channels=None, padding=1):
         super().__init__()
         self.channels = channels
         self.out_channels = out_channels or channels
@@ -117,10 +115,10 @@ class Upsample(nn.Module):
         assert x.shape[1] == self.channels
         if self.dims == 3:
             x = F.interpolate(
-                x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode='nearest'
+                x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
             )
         else:
-            x = F.interpolate(x, scale_factor=2, mode='nearest')
+            x = F.interpolate(x, scale_factor=2, mode="nearest")
         if self.use_conv:
             x = self.conv(x)
         return x
@@ -151,9 +149,7 @@ class Downsample(nn.Module):
                  downsampling occurs in the inner-two dimensions.
     """
 
-    def __init__(
-        self, channels, use_conv, dims=2, out_channels=None, padding=1
-    ):
+    def __init__(self, channels, use_conv, dims=2, out_channels=None, padding=1):
         super().__init__()
         self.channels = channels
         self.out_channels = out_channels or channels
@@ -237,9 +233,7 @@ class ResBlock(TimestepBlock):
             nn.SiLU(),
             linear(
                 emb_channels,
-                2 * self.out_channels
-                if use_scale_shift_norm
-                else self.out_channels,
+                2 * self.out_channels if use_scale_shift_norm else self.out_channels,
             ),
         )
         self.out_layers = nn.Sequential(
@@ -247,9 +241,7 @@ class ResBlock(TimestepBlock):
             nn.SiLU(),
             nn.Dropout(p=dropout),
             zero_module(
-                conv_nd(
-                    dims, self.out_channels, self.out_channels, 3, padding=1
-                )
+                conv_nd(dims, self.out_channels, self.out_channels, 3, padding=1)
             ),
         )
 
@@ -260,9 +252,7 @@ class ResBlock(TimestepBlock):
                 dims, channels, self.out_channels, 3, padding=1
             )
         else:
-            self.skip_connection = conv_nd(
-                dims, channels, self.out_channels, 1
-            )
+            self.skip_connection = conv_nd(dims, channels, self.out_channels, 1)
 
     def forward(self, x, emb):
         """
@@ -320,7 +310,7 @@ class AttentionBlock(nn.Module):
         else:
             assert (
                 channels % num_head_channels == 0
-            ), f'q,k,v channels {channels} is not divisible by num_head_channels {num_head_channels}'
+            ), f"q,k,v channels {channels} is not divisible by num_head_channels {num_head_channels}"
             self.num_heads = channels // num_head_channels
         self.use_checkpoint = use_checkpoint
         self.norm = normalization(channels)
@@ -337,7 +327,7 @@ class AttentionBlock(nn.Module):
     def forward(self, x):
         return checkpoint(
             self._forward, (x,), self.parameters(), True
-        )   # TODO: check checkpoint usage, is True # TODO: fix the .half call!!!
+        )  # TODO: check checkpoint usage, is True # TODO: fix the .half call!!!
         # return pt_checkpoint(self._forward, x)  # pytorch
 
     def _forward(self, x):
@@ -387,15 +377,13 @@ class QKVAttentionLegacy(nn.Module):
         bs, width, length = qkv.shape
         assert width % (3 * self.n_heads) == 0
         ch = width // (3 * self.n_heads)
-        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(
-            ch, dim=1
-        )
+        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch, dim=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
         weight = th.einsum(
-            'bct,bcs->bts', q * scale, k * scale
+            "bct,bcs->bts", q * scale, k * scale
         )  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum('bts,bcs->bct', weight, v)
+        a = th.einsum("bts,bcs->bct", weight, v)
         return a.reshape(bs, -1, length)
 
     @staticmethod
@@ -424,14 +412,12 @@ class QKVAttention(nn.Module):
         q, k, v = qkv.chunk(3, dim=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
         weight = th.einsum(
-            'bct,bcs->bts',
+            "bct,bcs->bts",
             (q * scale).view(bs * self.n_heads, ch, length),
             (k * scale).view(bs * self.n_heads, ch, length),
         )  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum(
-            'bts,bcs->bct', weight, v.reshape(bs * self.n_heads, ch, length)
-        )
+        a = th.einsum("bts,bcs->bct", weight, v.reshape(bs * self.n_heads, ch, length))
         return a.reshape(bs, -1, length)
 
     @staticmethod
@@ -500,12 +486,12 @@ class UNetModel(nn.Module):
         if use_spatial_transformer:
             assert (
                 context_dim is not None
-            ), 'Fool!! You forgot to include the dimension of your cross-attention conditioning...'
+            ), "Fool!! You forgot to include the dimension of your cross-attention conditioning..."
 
         if context_dim is not None:
             assert (
                 use_spatial_transformer
-            ), 'Fool!! You forgot to use the spatial transformer for your cross-attention conditioning...'
+            ), "Fool!! You forgot to use the spatial transformer for your cross-attention conditioning..."
             from omegaconf.listconfig import ListConfig
 
             if type(context_dim) == ListConfig:
@@ -517,12 +503,12 @@ class UNetModel(nn.Module):
         if num_heads == -1:
             assert (
                 num_head_channels != -1
-            ), 'Either num_heads or num_head_channels has to be set'
+            ), "Either num_heads or num_head_channels has to be set"
 
         if num_head_channels == -1:
             assert (
                 num_heads != -1
-            ), 'Either num_heads or num_head_channels has to be set'
+            ), "Either num_heads or num_head_channels has to be set"
 
         self.image_size = image_size
         self.in_channels = in_channels
@@ -641,11 +627,7 @@ class UNetModel(nn.Module):
             dim_head = num_head_channels
         if legacy:
             # num_heads = 1
-            dim_head = (
-                ch // num_heads
-                if use_spatial_transformer
-                else num_head_channels
-            )
+            dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
         self.middle_block = TimestepEmbedSequential(
             ResBlock(
                 ch,
@@ -741,9 +723,7 @@ class UNetModel(nn.Module):
                             up=True,
                         )
                         if resblock_updown
-                        else Upsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch
-                        )
+                        else Upsample(ch, conv_resample, dims=dims, out_channels=out_ch)
                     )
                     ds //= 2
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
@@ -752,9 +732,7 @@ class UNetModel(nn.Module):
         self.out = nn.Sequential(
             normalization(ch),
             nn.SiLU(),
-            zero_module(
-                conv_nd(dims, model_channels, out_channels, 3, padding=1)
-            ),
+            zero_module(conv_nd(dims, model_channels, out_channels, 3, padding=1)),
         )
         if self.predict_codebook_ids:
             self.id_predictor = nn.Sequential(
@@ -790,11 +768,9 @@ class UNetModel(nn.Module):
         """
         assert (y is not None) == (
             self.num_classes is not None
-        ), 'must specify y if and only if the model is class-conditional'
+        ), "must specify y if and only if the model is class-conditional"
         hs = []
-        t_emb = timestep_embedding(
-            timesteps, self.model_channels, repeat_only=False
-        )
+        t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
         emb = self.time_embed(t_emb)
 
         if self.num_classes is not None:
@@ -842,7 +818,7 @@ class EncoderUNetModel(nn.Module):
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
-        pool='adaptive',
+        pool="adaptive",
         *args,
         **kwargs,
     ):
@@ -962,7 +938,7 @@ class EncoderUNetModel(nn.Module):
         )
         self._feature_size += ch
         self.pool = pool
-        if pool == 'adaptive':
+        if pool == "adaptive":
             self.out = nn.Sequential(
                 normalization(ch),
                 nn.SiLU(),
@@ -970,7 +946,7 @@ class EncoderUNetModel(nn.Module):
                 zero_module(conv_nd(dims, ch, out_channels, 1)),
                 nn.Flatten(),
             )
-        elif pool == 'attention':
+        elif pool == "attention":
             assert num_head_channels != -1
             self.out = nn.Sequential(
                 normalization(ch),
@@ -979,13 +955,13 @@ class EncoderUNetModel(nn.Module):
                     (image_size // ds), ch, num_head_channels, out_channels
                 ),
             )
-        elif pool == 'spatial':
+        elif pool == "spatial":
             self.out = nn.Sequential(
                 nn.Linear(self._feature_size, 2048),
                 nn.ReLU(),
                 nn.Linear(2048, self.out_channels),
             )
-        elif pool == 'spatial_v2':
+        elif pool == "spatial_v2":
             self.out = nn.Sequential(
                 nn.Linear(self._feature_size, 2048),
                 normalization(2048),
@@ -993,7 +969,7 @@ class EncoderUNetModel(nn.Module):
                 nn.Linear(2048, self.out_channels),
             )
         else:
-            raise NotImplementedError(f'Unexpected {pool} pooling')
+            raise NotImplementedError(f"Unexpected {pool} pooling")
 
     def convert_to_fp16(self):
         """
@@ -1016,18 +992,16 @@ class EncoderUNetModel(nn.Module):
         :param timesteps: a 1-D batch of timesteps.
         :return: an [N x K] Tensor of outputs.
         """
-        emb = self.time_embed(
-            timestep_embedding(timesteps, self.model_channels)
-        )
+        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
 
         results = []
         h = x.type(self.dtype)
         for module in self.input_blocks:
             h = module(h, emb)
-            if self.pool.startswith('spatial'):
+            if self.pool.startswith("spatial"):
                 results.append(h.type(x.dtype).mean(dim=(2, 3)))
         h = self.middle_block(h, emb)
-        if self.pool.startswith('spatial'):
+        if self.pool.startswith("spatial"):
             results.append(h.type(x.dtype).mean(dim=(2, 3)))
             h = th.cat(results, axis=-1)
             return self.out(h)

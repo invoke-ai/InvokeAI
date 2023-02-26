@@ -8,6 +8,7 @@ import sys
 import warnings
 from pathlib import Path
 from tempfile import TemporaryFile
+from typing import List
 
 import requests
 from diffusers import AutoencoderKL
@@ -15,9 +16,9 @@ from huggingface_hub import hf_hub_url
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
-from typing import List
 
 import invokeai.configs as configs
+
 from ..generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..globals import Globals, global_cache_dir, global_config_dir
 from ..model_manager import ModelManager
@@ -44,11 +45,14 @@ Config_preamble = """
 # was trained on.
 """
 
+
 def default_config_file():
     return Path(global_config_dir()) / "models.yaml"
 
+
 def sd_configs():
     return Path(global_config_dir()) / "stable-diffusion"
+
 
 def initial_models():
     global Datasets
@@ -56,33 +60,34 @@ def initial_models():
         return Datasets
     return (Datasets := OmegaConf.load(Dataset_path))
 
+
 def install_requested_models(
-        install_initial_models: List[str] = None,
-        remove_models: List[str] = None,
-        scan_directory: Path = None,
-        external_models: List[str] = None,
-        scan_at_startup: bool = False,
-        convert_to_diffusers: bool = False,
-        precision: str = "float16",
-        purge_deleted: bool = False,
-        config_file_path: Path = None,
+    install_initial_models: list[str] = None,
+    remove_models: list[str] = None,
+    scan_directory: Path = None,
+    external_models: list[str] = None,
+    scan_at_startup: bool = False,
+    convert_to_diffusers: bool = False,
+    precision: str = "float16",
+    purge_deleted: bool = False,
+    config_file_path: Path = None,
 ):
-    '''
+    """
     Entry point for installing/deleting starter models, or installing external models.
-    '''
-    config_file_path=config_file_path or default_config_file()
+    """
+    config_file_path = config_file_path or default_config_file()
     if not config_file_path.exists():
-        open(config_file_path,'w')
-            
-    model_manager= ModelManager(OmegaConf.load(config_file_path),precision=precision)
-    
+        open(config_file_path, "w")
+
+    model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
+
     if remove_models and len(remove_models) > 0:
         print("== DELETING UNCHECKED STARTER MODELS ==")
         for model in remove_models:
-            print(f'{model}...')
+            print(f"{model}...")
             model_manager.del_model(model, delete_files=purge_deleted)
         model_manager.commit(config_file_path)
-    
+
     if install_initial_models and len(install_initial_models) > 0:
         print("== INSTALLING SELECTED STARTER MODELS ==")
         successfully_downloaded = download_weight_datasets(
@@ -96,20 +101,20 @@ def install_requested_models(
 
     # due to above, we have to reload the model manager because conf file
     # was changed behind its back
-    model_manager= ModelManager(OmegaConf.load(config_file_path),precision=precision)
+    model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
 
     external_models = external_models or list()
     if scan_directory:
         external_models.append(str(scan_directory))
 
-    if len(external_models)>0:
+    if len(external_models) > 0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
             try:
                 model_manager.heuristic_import(
                     path_url_or_repo,
                     convert=convert_to_diffusers,
-                    commit_to_conf=config_file_path
+                    commit_to_conf=config_file_path,
                 )
             except KeyboardInterrupt:
                 sys.exit(-1)
@@ -117,17 +122,18 @@ def install_requested_models(
                 pass
 
     if scan_at_startup and scan_directory.is_dir():
-        argument = '--autoconvert' if convert_to_diffusers else '--autoimport'
+        argument = "--autoconvert" if convert_to_diffusers else "--autoimport"
         initfile = Path(Globals.root, Globals.initfile)
-        replacement = Path(Globals.root, f'{Globals.initfile}.new')
-        directory = str(scan_directory).replace('\\','/')
-        with open(initfile,'r') as input:
-            with open(replacement,'w') as output:
+        replacement = Path(Globals.root, f"{Globals.initfile}.new")
+        directory = str(scan_directory).replace("\\", "/")
+        with open(initfile) as input:
+            with open(replacement, "w") as output:
                 while line := input.readline():
                     if not line.startswith(argument):
                         output.writelines([line])
-                output.writelines([f'{argument} {directory}'])
-        os.replace(replacement,initfile)
+                output.writelines([f"{argument} {directory}"])
+        os.replace(replacement, initfile)
+
 
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
@@ -183,7 +189,9 @@ def migrate_models_ckpt():
     if not os.path.exists(os.path.join(model_path, "model.ckpt")):
         return
     new_name = initial_models()["stable-diffusion-1.4"]["file"]
-    print('The Stable Diffusion v4.1 "model.ckpt" is already installed. The name will be changed to {new_name} to avoid confusion.')
+    print(
+        'The Stable Diffusion v4.1 "model.ckpt" is already installed. The name will be changed to {new_name} to avoid confusion.'
+    )
     print(f"model.ckpt => {new_name}")
     os.replace(
         os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name)
@@ -192,7 +200,7 @@ def migrate_models_ckpt():
 
 # ---------------------------------------------
 def download_weight_datasets(
-    models: List[str], access_token: str, precision: str = "float32"
+    models: list[str], access_token: str, precision: str = "float32"
 ):
     migrate_models_ckpt()
     successful = dict()
@@ -383,7 +391,8 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
 
 # ---------------------------------------------
 def new_config_file_contents(
-        successfully_downloaded: dict, config_file: Path,
+    successfully_downloaded: dict,
+    config_file: Path,
 ) -> str:
     if config_file.exists():
         conf = OmegaConf.load(str(config_file.expanduser().resolve()))
@@ -413,7 +422,9 @@ def new_config_file_contents(
             stanza["weights"] = os.path.relpath(
                 successfully_downloaded[model], start=Globals.root
             )
-            stanza["config"] = os.path.normpath(os.path.join(sd_configs(), mod["config"]))
+            stanza["config"] = os.path.normpath(
+                os.path.join(sd_configs(), mod["config"])
+            )
         if "vae" in mod:
             if "file" in mod["vae"]:
                 stanza["vae"] = os.path.normpath(
@@ -445,7 +456,7 @@ def delete_weights(model_name: str, conf_stanza: dict):
     print(
         f"\n** The checkpoint version of {model_name} is superseded by the diffusers version. Deleting the original file {weights}?"
     )
-          
+
     weights = Path(weights)
     if not weights.is_absolute():
         weights = Path(Globals.root) / weights

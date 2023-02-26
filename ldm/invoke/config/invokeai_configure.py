@@ -17,8 +17,8 @@ import traceback
 import warnings
 from argparse import Namespace
 from pathlib import Path
-from urllib import request
 from shutil import get_terminal_size
+from urllib import request
 
 import npyscreen
 import torch
@@ -38,16 +38,15 @@ from transformers import (
 import invokeai.configs as configs
 
 from ..args import PRECISION_CHOICES, Args
-from ..globals import Globals, global_config_dir, global_config_file, global_cache_dir
+from ..globals import Globals, global_cache_dir, global_config_dir, global_config_file
 from .model_install import addModelsForm, process_and_execute
 from .model_install_backend import (
     default_dataset,
     download_from_hf,
-    recommended_datasets,
     hf_download_with_resume,
+    recommended_datasets,
 )
-from .widgets import IntTitleSlider, CenteredButtonPress, set_min_terminal_size
-
+from .widgets import CenteredButtonPress, IntTitleSlider, set_min_terminal_size
 
 warnings.filterwarnings("ignore")
 
@@ -69,7 +68,7 @@ Datasets = OmegaConf.load(Dataset_path)
 MIN_COLS = 135
 MIN_LINES = 45
 
-INIT_FILE_PREAMBLE = """# InvokeAI initialization file
+INIT_FILE_PREAMBLE = r"""# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
 # or renaming it and then running invokeai-configure again.
@@ -81,6 +80,7 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # --steps=20
 # -Ak_euler_a -C10.0
 """
+
 
 # --------------------------------------------
 def postscript(errors: None):
@@ -180,13 +180,11 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
 # ---------------------------------------------
 # this will preload the Bert tokenizer fles
 def download_bert():
-    print(
-        "Installing bert tokenizer...",
-        file=sys.stderr
-    )
+    print("Installing bert tokenizer...", file=sys.stderr)
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         from transformers import BertTokenizerFast
+
         download_from_hf(BertTokenizerFast, "bert-base-uncased")
 
 
@@ -197,12 +195,14 @@ def download_sd1_clip():
     download_from_hf(CLIPTokenizer, version)
     download_from_hf(CLIPTextModel, version)
 
+
 # ---------------------------------------------
 def download_sd2_clip():
-    version = 'stabilityai/stable-diffusion-2'
+    version = "stabilityai/stable-diffusion-2"
     print("Installing SD2 clip model...", file=sys.stderr)
-    download_from_hf(CLIPTokenizer, version, subfolder='tokenizer')
-    download_from_hf(CLIPTextModel, version, subfolder='text_encoder')
+    download_from_hf(CLIPTokenizer, version, subfolder="tokenizer")
+    download_from_hf(CLIPTextModel, version, subfolder="text_encoder")
+
 
 # ---------------------------------------------
 def download_realesrgan():
@@ -323,13 +323,13 @@ def get_root(root: str = None) -> str:
 class editOptsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
     # FIX_MINIMUM_SIZE_WHEN_CREATED = False
-    
+
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
         first_time = not (Globals.root / Globals.initfile).exists()
         access_token = HfFolder.get_token()
-        window_width,window_height = get_terminal_size()
+        window_width, window_height = get_terminal_size()
         for i in [
             "Configure startup settings. You can come back and change these later.",
             "Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.",
@@ -681,6 +681,7 @@ def run_console_ui(
     else:
         return (editApp.new_opts, editApp.user_selections)
 
+
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):
     """
@@ -701,11 +702,11 @@ def write_opts(opts: Namespace, init_file: Path):
         "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
     )
     # fix windows paths
-    opts.outdir = opts.outdir.replace('\\','/')
-    opts.embedding_path = opts.embedding_path.replace('\\','/')
+    opts.outdir = opts.outdir.replace("\\", "/")
+    opts.embedding_path = opts.embedding_path.replace("\\", "/")
     new_file = f"{init_file}.new"
     try:
-        lines = [x.strip() for x in open(init_file, "r").readlines()]
+        lines = [x.strip() for x in open(init_file).readlines()]
         with open(new_file, "w") as out_file:
             for line in lines:
                 if len(line) > 0 and not args_to_skip.match(line):
@@ -854,6 +855,7 @@ def main():
         postscript(errors=errors)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
+
 
 # -------------------------------------
 if __name__ == "__main__":

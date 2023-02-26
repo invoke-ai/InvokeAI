@@ -21,15 +21,20 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 from ldm.invoke.config.widgets import FloatTitleSlider
-from ldm.invoke.globals import (Globals, global_cache_dir, global_config_file,
-                                global_models_dir, global_set_root)
+from ldm.invoke.globals import (
+    Globals,
+    global_cache_dir,
+    global_config_file,
+    global_models_dir,
+    global_set_root,
+)
 from ldm.invoke.model_manager import ModelManager
 
 DEST_MERGED_MODEL_DIR = "merged_models"
 
 
 def merge_diffusion_models(
-    model_ids_or_paths: List[Union[str, Path]],
+    model_ids_or_paths: list[Union[str, Path]],
     alpha: float = 0.5,
     interp: str = None,
     force: bool = False,
@@ -68,7 +73,7 @@ def merge_diffusion_models(
 
 
 def merge_diffusion_models_and_commit(
-    models: List["str"],
+    models: list["str"],
     merged_model_name: str,
     alpha: float = 0.5,
     interp: str = None,
@@ -311,8 +316,8 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         self.merged_model_name.value = merged_model_name
 
         if selected_model3 > 0:
-            self.merge_method.values = ['add_difference ( A+(B-C) )']
-            self.merged_model_name.value += f"+{models[selected_model3 -1]}" # In model3 there is one more element in the list (None). So we have to subtract one.
+            self.merge_method.values = ["add_difference ( A+(B-C) )"]
+            self.merged_model_name.value += f"+{models[selected_model3 -1]}"  # In model3 there is one more element in the list (None). So we have to subtract one.
         else:
             self.merge_method.values = self.interpolations
         self.merge_method.value = 0
@@ -337,9 +342,9 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         ]
         if self.model3.value[0] > 0:
             models.append(model_names[self.model3.value[0] - 1])
-            interp='add_difference'
+            interp = "add_difference"
         else:
-            interp=self.interpolations[self.merge_method.value[0]]
+            interp = self.interpolations[self.merge_method.value[0]]
 
         args = dict(
             models=models,
@@ -362,9 +367,10 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
     def validate_field_values(self) -> bool:
         bad_fields = []
         model_names = self.model_names
-        selected_models = set(
-            (model_names[self.model1.value[0]], model_names[self.model2.value[0]])
-        )
+        selected_models = {
+            model_names[self.model1.value[0]],
+            model_names[self.model2.value[0]],
+        }
         if self.model3.value[0] > 0:
             selected_models.add(model_names[self.model3.value[0] - 1])
         if len(selected_models) < 2:
@@ -380,7 +386,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self) -> List[str]:
+    def get_model_names(self) -> list[str]:
         model_names = [
             name
             for name in self.model_manager.model_names()
@@ -454,7 +460,9 @@ def main():
                 "** You need to have at least two diffusers models defined in models.yaml in order to merge"
             )
         else:
-            print(f"** Not enough room for the user interface. Try making this window larger.")
+            print(
+                f"** Not enough room for the user interface. Try making this window larger."
+            )
         sys.exit(-1)
     except Exception as e:
         print(">> An error occurred:")

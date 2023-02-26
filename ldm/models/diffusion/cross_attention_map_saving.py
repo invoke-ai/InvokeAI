@@ -2,9 +2,11 @@ import math
 
 import PIL
 import torch
-from torchvision.transforms.functional import resize as tv_resize, InterpolationMode
+from torchvision.transforms.functional import InterpolationMode
+from torchvision.transforms.functional import resize as tv_resize
 
-from ldm.models.diffusion.cross_attention_control import get_cross_attention_modules, CrossAttentionType
+from ldm.models.diffusion.cross_attention_control import (
+    CrossAttentionType, get_cross_attention_modules)
 
 
 class AttentionMapSaver():

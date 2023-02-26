@@ -1,20 +1,19 @@
-
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
 
 
 import enum
 import math
-from typing import Optional, Callable
+from typing import Callable, Optional
 
+import diffusers
 import psutil
 import torch
-import diffusers
+from compel.cross_attention_control import Arguments
+from diffusers.models.cross_attention import AttnProcessor
+from diffusers.models.unet_2d_condition import UNet2DConditionModel
 from torch import nn
 
-from compel.cross_attention_control import Arguments
-from diffusers.models.unet_2d_condition import UNet2DConditionModel
-from diffusers.models.cross_attention import AttnProcessor
 from ldm.invoke.devices import torch_dtype
 
 
@@ -344,7 +343,7 @@ def override_cross_attention(model, context: Context, is_running_diffusers = Fal
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
-    from ldm.modules.attention import CrossAttention # avoid circular import
+    from ldm.modules.attention import CrossAttention  # avoid circular import
     cross_attention_class: type = InvokeAIDiffusersCrossAttention if isinstance(model,UNet2DConditionModel) else CrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
@@ -501,11 +500,12 @@ class CrossAttnProcessor:
         return hidden_states
 
 """
-from dataclasses import field, dataclass
+from dataclasses import dataclass, field
 
 import torch
-
-from diffusers.models.cross_attention import CrossAttention, CrossAttnProcessor, SlicedAttnProcessor
+from diffusers.models.cross_attention import (CrossAttention,
+                                              CrossAttnProcessor,
+                                              SlicedAttnProcessor)
 
 
 @dataclass
@@ -638,5 +638,5 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
 class SwapCrossAttnProcessor(SlicedSwapCrossAttnProcesser):
 
     def __init__(self):
-        super(SwapCrossAttnProcessor, self).__init__(slice_size=int(1e9)) # massive slice size = don't slice
+        super().__init__(slice_size=int(1e9)) # massive slice size = don't slice
 

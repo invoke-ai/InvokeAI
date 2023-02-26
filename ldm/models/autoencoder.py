@@ -1,15 +1,13 @@
-import torch
-import pytorch_lightning as pl
-import torch.nn.functional as F
 from contextlib import contextmanager
 
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
-from ldm.modules.diffusionmodules.model import Encoder, Decoder
-from ldm.modules.distributions.distributions import (
-    DiagonalGaussianDistribution,
-)
-
+from ldm.modules.diffusionmodules.model import Decoder, Encoder
+from ldm.modules.distributions.distributions import \
+    DiagonalGaussianDistribution
 from ldm.util import instantiate_from_config
 
 
@@ -94,7 +92,7 @@ class VQModel(pl.LightningModule):
         for k in keys:
             for ik in ignore_keys:
                 if k.startswith(ik):
-                    print('Deleting key {} from state_dict.'.format(k))
+                    print(f'Deleting key {k} from state_dict.')
                     del sd[k]
         missing, unexpected = self.load_state_dict(sd, strict=False)
         print(
@@ -405,7 +403,7 @@ class AutoencoderKL(pl.LightningModule):
         for k in keys:
             for ik in ignore_keys:
                 if k.startswith(ik):
-                    print('Deleting key {} from state_dict.'.format(k))
+                    print(f'Deleting key {k} from state_dict.')
                     del sd[k]
         self.load_state_dict(sd, strict=False)
         print(f'Restored from {path}')

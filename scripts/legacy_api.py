@@ -39,7 +39,7 @@ def main():
         height = models[opt.model].height
         config = models[opt.model].config
         weights = models[opt.model].weights
-    except (FileNotFoundError, IOError, KeyError) as e:
+    except (FileNotFoundError, OSError, KeyError) as e:
         print(f'{e}. Aborting.')
         sys.exit(-1)
 
@@ -85,12 +85,12 @@ def main():
     if opt.infile:
         try:
             if os.path.isfile(opt.infile):
-                infile = open(opt.infile, 'r', encoding='utf-8')
+                infile = open(opt.infile, encoding='utf-8')
             elif opt.infile == '-':  # stdin
                 infile = sys.stdin
             else:
                 raise FileNotFoundError(f'{opt.infile} not found.')
-        except (FileNotFoundError, IOError) as e:
+        except (FileNotFoundError, OSError) as e:
             print(f'{e}. Aborting.')
             sys.exit(-1)
 

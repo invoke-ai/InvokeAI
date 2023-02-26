@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Optional, Union
 
 import torch
+from compel.embeddings_provider import BaseTextualInversionManager
 from picklescan.scanner import scan_file_path
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from compel.embeddings_provider import BaseTextualInversionManager
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 
 
