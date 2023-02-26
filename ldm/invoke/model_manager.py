@@ -624,7 +624,7 @@ class ModelManager(object):
         self,
         repo_or_path: Union[str, Path],
         model_name: str = None,
-        model_description: str = None,
+        description: str = None,
         vae: dict = None,
         commit_to_conf: Path = None,
     ) -> bool:
@@ -640,7 +640,7 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
-        model_description = model_description or f"Imported diffusers model {model_name}"
+        model_description = description or f"Imported diffusers model {model_name}"
         new_config = dict(
             description=model_description,
             vae=vae,

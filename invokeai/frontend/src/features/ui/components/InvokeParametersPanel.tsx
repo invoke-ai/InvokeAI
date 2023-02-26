@@ -18,6 +18,7 @@ import { setParametersPanelScrollPosition } from 'features/ui/store/uiSlice';
 import InvokeAILogo from 'assets/images/logo.png';
 import { isEqual } from 'lodash';
 import { uiSelector } from '../store/uiSelectors';
+import { useTranslation } from 'react-i18next';
 
 type Props = { children: ReactNode };
 
@@ -59,6 +60,8 @@ const InvokeOptionsPanel = (props: Props) => {
   const timeoutIdRef = useRef<number | null>(null);
 
   const { children } = props;
+
+  const { t } = useTranslation();
 
   // Hotkeys
   useHotkeys(
@@ -176,7 +179,7 @@ const InvokeOptionsPanel = (props: Props) => {
               }
             }}
           >
-            <Tooltip label="Pin Options Panel">
+            <Tooltip label={t('common.pinOptionsPanel')}>
               <div
                 className="parameters-panel-pin-button"
                 data-selected={shouldPinParametersPanel}

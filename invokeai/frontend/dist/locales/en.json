@@ -63,7 +63,8 @@
         "statusConvertingModel": "Converting Model",
         "statusModelConverted": "Model Converted",
         "statusMergingModels": "Merging Models",
-        "statusMergedModels": "Models Merged"
+        "statusMergedModels": "Models Merged",
+        "pinOptionsPanel": "Pin Options Panel"
     },
     "gallery": {
         "generations": "Generations",
@@ -393,7 +394,9 @@
         "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above.",
         "inverseSigmoid": "Inverse Sigmoid",
         "sigmoid": "Sigmoid",
-        "weightedSum": "Weighted Sum"
+        "weightedSum": "Weighted Sum",
+        "none": "none",
+        "addDifference": "Add Difference"
     },
     "parameters": {
         "general": "General",
