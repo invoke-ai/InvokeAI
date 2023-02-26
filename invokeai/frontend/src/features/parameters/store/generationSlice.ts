@@ -288,12 +288,8 @@ export const generationSlice = createSlice({
         state.perlin = perlin;
       }
       if (typeof seamless === 'boolean') state.seamless = seamless;
-      // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
       if (width) state.width = width;
       if (height) state.height = height;
-
-      // state.shouldRunESRGAN = false; // TODO: Needs to be fixed after reorg
-      // state.shouldRunFacetool = false; // TODO: Needs to be fixed after reorg
     },
     resetParametersState: (state) => {
       return {

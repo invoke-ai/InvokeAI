@@ -21,6 +21,7 @@ import {
   setInitialImage,
   setSeed,
 } from 'features/parameters/store/generationSlice';
+import { setAllPostProcessingParameters } from 'features/parameters/store/postprocessingSlice';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { SystemState } from 'features/system/store/systemSlice';
@@ -189,11 +190,12 @@ const CurrentImageButtons = () => {
   );
 
   const handleClickUseAllParameters = () => {
-    if (!currentImage) return;
-    currentImage.metadata && dispatch(setAllParameters(currentImage.metadata));
-    if (currentImage.metadata?.image.type === 'img2img') {
+    if (!currentImage?.metadata) return;
+    dispatch(setAllParameters(currentImage.metadata));
+    dispatch(setAllPostProcessingParameters(currentImage.metadata));
+    if (currentImage.metadata.image.type === 'img2img') {
       dispatch(setActiveTab('img2img'));
-    } else if (currentImage.metadata?.image.type === 'txt2img') {
+    } else if (currentImage.metadata.image.type === 'txt2img') {
       dispatch(setActiveTab('txt2img'));
     }
   };
