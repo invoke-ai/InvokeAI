@@ -4,15 +4,15 @@ ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
 ##################
-FROM python:${PYTHON_VERSION}-slim AS python-base
+FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
 
 LABEL org.opencontainers.image.authors="mauwii@outlook.de"
 
-# prepare for buildkit cache
+# Prepare apt for buildkit cache
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
 
-# Install necessary packages
+# Install dependencies
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -23,7 +23,7 @@ RUN \
     libglib2.0-0=2.66.* \
     libopencv-dev=4.5.*
 
-# set working directory and env
+# Set working directory and env
 ARG APPDIR=/usr/src
 ARG APPNAME=InvokeAI
 WORKDIR ${APPDIR}
@@ -32,7 +32,7 @@ ENV PATH ${APPDIR}/${APPNAME}/bin:$PATH
 ENV PYTHONDONTWRITEBYTECODE 1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED 1
-# don't fall back to legacy build system
+# Don't fall back to legacy build system
 ENV PIP_USE_PEP517=1
 
 #######################
@@ -40,7 +40,7 @@ ENV PIP_USE_PEP517=1
 #######################
 FROM python-base AS pyproject-builder
 
-# Install dependencies
+# Install build dependencies
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -51,26 +51,30 @@ RUN \
     gcc=4:10.2.* \
     python3-dev=3.9.*
 
-# prepare pip for buildkit cache
+# Prepare pip for buildkit cache
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
 ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
 RUN mkdir -p ${PIP_CACHE_DIR}
 
-# create virtual environment
-RUN --mount=type=cache,target=${PIP_CACHE_DIR},sharing=locked \
+# Create virtual environment
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
   python3 -m venv "${APPNAME}" \
   --upgrade-deps
 
-# copy sources
-COPY --link . .
-
-# install pyproject.toml
+# Install requirements
+COPY --link pyproject.toml .
+COPY --link ldm/invoke/_version.py ldm/invoke/__init__.py ldm/invoke/
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-RUN --mount=type=cache,target=${PIP_CACHE_DIR},sharing=locked \
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
+  "${APPNAME}"/bin/pip install .
+
+# Install pyproject.toml
+COPY --link . .
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
   "${APPNAME}/bin/pip" install .
 
-# build patchmatch
+# Build patchmatch
 RUN python3 -c "from patchmatch import patch_match"
 
 #####################
@@ -86,14 +90,14 @@ RUN useradd \
   -U \
   "${UNAME}"
 
-# create volume directory
+# Create volume directory
 ARG VOLUME_DIR=/data
 RUN mkdir -p "${VOLUME_DIR}" \
-  && chown -R "${UNAME}" "${VOLUME_DIR}"
+  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
 
-# setup runtime environment
-USER ${UNAME}
-COPY --chown=${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+# Setup runtime environment
+USER ${UNAME}:${UNAME}
+COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
