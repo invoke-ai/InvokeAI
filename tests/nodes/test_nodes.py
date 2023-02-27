@@ -32,6 +32,12 @@ class PromptTestInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
         return PromptTestInvocationOutput(prompt = self.prompt)
 
+class ErrorInvocation(BaseInvocation):
+    type: Literal['test_error'] = 'test_error'
+
+    def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
+        raise Exception("This invocation is supposed to fail")
+
 class ImageTestInvocationOutput(BaseInvocationOutput):
     type: Literal['test_image_output'] = 'test_image_output'
 

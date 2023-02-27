@@ -27,7 +27,7 @@ from .services.events import EventServiceBase
 
 
 class InvocationCommand(BaseModel):
-    invocation: Union[BaseInvocation.get_invocations()] = Field(discriminator="type")
+    invocation: Union[BaseInvocation.get_invocations()] = Field(discriminator="type") # type: ignore
 
 
 class InvalidArgs(Exception):
@@ -84,7 +84,7 @@ def get_invocation_parser() -> argparse.ArgumentParser:
                 for val in allowed_values:
                     allowed_types.add(type(val))
                 allowed_types_list = list(allowed_types)
-                field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]
+                field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list] # type: ignore
 
                 command_parser.add_argument(
                     f"--{name}",
@@ -184,7 +184,7 @@ def invoke_cli():
     )
 
     invoker = Invoker(services)
-    session = invoker.create_execution_state()
+    session: GraphExecutionState = invoker.create_execution_state()
     
     parser = get_invocation_parser()
 
@@ -219,6 +219,9 @@ def invoke_cli():
             current_id = start_id
             new_invocations = list()
             for cmd in cmds:
+                if cmd is None or cmd.strip() == '':
+                    raise InvalidArgs('Empty command')
+
                 # Parse args to create invocation
                 args = vars(parser.parse_args(shlex.split(cmd.strip())))
 
@@ -288,6 +291,15 @@ def invoke_cli():
                 # Wait some time
                 session = invoker.services.graph_execution_manager.get(session.id)
                 time.sleep(0.1)
+            
+            # Print any errors
+            if session.has_error():
+                for n in session.errors:
+                    print(f'Error in node {n} (source node {session.prepared_source_mapping[n]}): {session.errors[n]}')
+                
+                # Start a new session
+                print("Creating a new session")
+                session = invoker.create_execution_state()
 
         except InvalidArgs:
             print('Invalid command, use "help" to list commands')
