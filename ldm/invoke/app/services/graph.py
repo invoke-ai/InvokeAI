@@ -2,6 +2,7 @@
 
 import copy
 import itertools
+import traceback
 from types import NoneType
 import uuid
 import networkx as nx
@@ -153,8 +154,8 @@ class CollectInvocation(BaseInvocation):
         return CollectInvocationOutput(collection = copy.copy(self.collection))
 
 
-InvocationsUnion = Union[BaseInvocation.get_invocations()]
-InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]
+InvocationsUnion = Union[BaseInvocation.get_invocations()] # type: ignore
+InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()] # type: ignore
 
 
 class Graph(BaseModel):
@@ -486,11 +487,11 @@ class Graph(BaseModel):
         type_tree.add_nodes_from(input_field_types)
         type_tree.add_edges_from([e for e in itertools.permutations(input_field_types, 2) if issubclass(e[1], e[0])])
         type_degrees = type_tree.in_degree(type_tree.nodes)
-        if sum((t[1] == 0 for t in type_degrees)) != 1:
+        if sum((t[1] == 0 for t in type_degrees)) != 1: # type: ignore
             return False # There is more than one root type
 
         # Get the input root type
-        input_root_type = next(t[0] for t in type_degrees if t[1] == 0)
+        input_root_type = next(t[0] for t in type_degrees if t[1] == 0) # type: ignore
 
         # Verify that all outputs are lists
         if not all((get_origin(f) == list for f in output_fields)):
@@ -545,6 +546,9 @@ class GraphExecutionState(BaseModel):
     # The results of executed nodes
     results: dict[str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]] = Field(description="The results of node executions", default_factory=dict)
 
+    # Errors raised when executing nodes
+    errors: dict[str, str] = Field(description="Errors raised when executing nodes", default_factory=dict)
+
     # Map of prepared/executed nodes to their original nodes
     prepared_source_mapping: dict[str, str] = Field(description="The map of prepared nodes to original graph nodes", default_factory=dict)
 
@@ -593,10 +597,18 @@ class GraphExecutionState(BaseModel):
         if all([n in self.executed for n in prepared_nodes]):
             self.executed.add(source_node)
             self.executed_history.append(source_node)
+    
+    def set_node_error(self, node_id: str, error: str):
+        """Marks a node as errored"""
+        self.errors[node_id] = error
 
     def is_complete(self) -> bool:
         """Returns true if the graph is complete"""
-        return all((k in self.executed for k in self.graph.nodes))
+        return self.has_error() or all((k in self.executed for k in self.graph.nodes))
+    
+    def has_error(self) -> bool:
+        """Returns true if the graph has any errors"""
+        return len(self.errors) > 0
 
     def _create_execution_node(self, node_path: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
@@ -709,11 +721,11 @@ class GraphExecutionState(BaseModel):
             # For every iterator, the parent must either not be a child of that iterator, or must match the prepared iteration for that iterator
             # TODO: Handle a node mapping to none
             eg = self.execution_graph.nx_graph_flat()
-            prepared_parent_mappings = [[(n,self._get_iteration_node(n, g, eg, it)) for n in next_node_parents] for it in iterator_node_prepared_combinations]
+            prepared_parent_mappings = [[(n,self._get_iteration_node(n, g, eg, it)) for n in next_node_parents] for it in iterator_node_prepared_combinations] # type: ignore
         
             # Create execution node for each iteration
             for iteration_mappings in prepared_parent_mappings:
-                create_results = self._create_execution_node(next_node_id, iteration_mappings)
+                create_results = self._create_execution_node(next_node_id, iteration_mappings) # type: ignore
                 if create_results is not None:
                     new_node_ids.extend(create_results)
 
