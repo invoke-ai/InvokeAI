@@ -69,7 +69,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     error = traceback.format_exc()
 
                     # Save error
-                    graph_execution_state.error(invocation.id, error)
+                    graph_execution_state.set_node_error(invocation.id, error)
 
                     # Save the state changes
                     self.__invoker.services.graph_execution_manager.set(graph_execution_state)
