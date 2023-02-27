@@ -46,32 +46,10 @@ export const postprocessingSlice = createSlice({
       action: PayloadAction<InvokeAI.Metadata>
     ) => {
       const { type, hires_fix } = action.payload.image;
-      const postprocessing: Array<
-        InvokeAI.ESRGANMetadata | InvokeAI.FacetoolMetadata
-      > = action.payload.image.postprocessing || [];
 
       if (type === 'txt2img' && typeof hires_fix === 'boolean')
         state.hiresFix = hires_fix;
       // Strength of img2img used in hires_fix is not currently exposed in the Metadata for the final image.
-
-      let foundFacetool = false;
-      let foundUpscale = false;
-      for (const item of postprocessing) {
-        if (item.type === 'esrgan') {
-          foundUpscale = true;
-          state.upscalingDenoising = item.denoise_str;
-          state.upscalingLevel = item.scale;
-          state.upscalingStrength = item.strength;
-        } else if (item.type === 'gfpgan' || item.type == 'codeformer') {
-          state.facetoolType = item.type;
-          foundFacetool = true;
-          if (item.fidelity !== undefined)
-            state.codeformerFidelity = item.fidelity;
-          state.facetoolStrength = item.strength;
-        }
-      }
-      state.shouldRunESRGAN = foundUpscale;
-      state.shouldRunFacetool = foundFacetool;
     },
     setFacetoolStrength: (state, action: PayloadAction<number>) => {
       state.facetoolStrength = action.payload;
