@@ -712,8 +712,8 @@ def write_opts(opts: Namespace, init_file: Path):
                     out_file.write(line + "\n")
             out_file.write(
                 f"""
---outdir={opts.outdir}
---embedding_path={opts.embedding_path}
+--outdir="{opts.outdir}"
+--embedding_path="{opts.embedding_path}"
 --precision={opts.precision}
 --max_loaded_models={int(opts.max_loaded_models)}
 --{'no-' if not opts.safety_checker else ''}nsfw_checker

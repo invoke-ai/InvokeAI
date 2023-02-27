@@ -126,7 +126,7 @@ def install_requested_models(
                 while line := input.readline():
                     if not line.startswith(argument):
                         output.writelines([line])
-                output.writelines([f'{argument} {directory}'])
+                output.writelines([f'{argument} "{directory}"'])
         os.replace(replacement,initfile)
 
 # -------------------------------------
