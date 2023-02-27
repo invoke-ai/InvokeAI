@@ -598,7 +598,7 @@ class GraphExecutionState(BaseModel):
             self.executed.add(source_node)
             self.executed_history.append(source_node)
     
-    def error(self, node_id: str, error: str):
+    def set_node_error(self, node_id: str, error: str):
         """Marks a node as errored"""
         self.errors[node_id] = error
 
