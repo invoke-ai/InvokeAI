@@ -54,6 +54,21 @@ class EventServiceBase:
                 result = result
             )
         )
+    
+    def emit_invocation_error(self,
+        graph_execution_state_id: str,
+        invocation_id: str,
+        error: str
+    ) -> None:
+        """Emitted when an invocation has completed"""
+        self.__emit_session_event(
+            event_name = 'invocation_error',
+            payload = dict(
+                graph_execution_state_id = graph_execution_state_id,
+                invocation_id = invocation_id,
+                error = error
+            )
+        )
 
     def emit_invocation_started(self,
         graph_execution_state_id: str,

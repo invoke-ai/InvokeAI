@@ -1,4 +1,5 @@
 from threading import Event, Thread
+import traceback
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
@@ -61,18 +62,34 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         result = outputs.dict()
                     )
 
-                    # Queue any further commands if invoking all
-                    is_complete = graph_execution_state.is_complete()
-                    if queue_item.invoke_all and not is_complete:
-                        self.__invoker.invoke(graph_execution_state, invoke_all = True)
-                    elif is_complete:
-                        self.__invoker.services.events.emit_graph_execution_complete(graph_execution_state.id)
                 except KeyboardInterrupt:
                     pass
+
                 except Exception as e:
-                    # TODO: Log the error, mark the invocation as failed, and emit an event
-                    print(f'Error invoking {invocation.id}: {e}')
+                    error = traceback.format_exc()
+
+                    # Save error
+                    graph_execution_state.error(invocation.id, error)
+
+                    # Save the state changes
+                    self.__invoker.services.graph_execution_manager.set(graph_execution_state)
+
+                    # Send error event
+                    self.__invoker.services.events.emit_invocation_error(
+                        graph_execution_state_id = graph_execution_state.id,
+                        invocation_id = invocation.id,
+                        error = error
+                    )      
+
                     pass
+
+
+                # Queue any further commands if invoking all
+                is_complete = graph_execution_state.is_complete()
+                if queue_item.invoke_all and not is_complete:
+                    self.__invoker.invoke(graph_execution_state, invoke_all = True)
+                elif is_complete:
+                    self.__invoker.services.events.emit_graph_execution_complete(graph_execution_state.id)
 
         except KeyboardInterrupt:
             ... # Log something?
