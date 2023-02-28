@@ -52,6 +52,8 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
                     textual_inversion_manager=model.textual_inversion_manager,
                     dtype_for_device_getter=torch_dtype)
 
+    # get rid of any newline characters
+    prompt_string = prompt_string.replace("\n", " ")
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
     legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
     positive_prompt: FlattenedPrompt|Blend
@@ -113,7 +115,7 @@ def get_tokens_for_prompt_object(tokenizer, parsed_prompt: FlattenedPrompt, trun
     return tokens
 
 
-def split_prompt_to_positive_and_negative(prompt_string_uncleaned):
+def split_prompt_to_positive_and_negative(prompt_string_uncleaned: str):
     unconditioned_words = ''
     unconditional_regex = r'\[(.*?)\]'
     unconditionals = re.findall(unconditional_regex, prompt_string_uncleaned)
