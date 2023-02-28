@@ -624,7 +624,7 @@ class ModelManager(object):
         self,
         repo_or_path: Union[str, Path],
         model_name: str = None,
-        model_description: str = None,
+        description: str = None,
         vae: dict = None,
         commit_to_conf: Path = None,
     ) -> bool:
