@@ -746,19 +746,35 @@ class ModelManager(object):
                 f"** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import"
             )
             return
+        
+        if convert:
+            diffuser_path = Path(
+                Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
+            )
+            model_name = self.convert_and_import(
+                model_path,
+                diffusers_path=diffuser_path,
+                vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
+                model_name=model_name,
+                model_description=description,
+                original_config_file=model_config_file,
+                commit_to_conf=commit_to_conf,
+            )
+        else:
+            model_name = self.import_ckpt_model(
+                model_path,
+                config=model_config_file,
+                model_name=model_name,
+                model_description=description,
+                vae=str(
+                    Path(
+                        Globals.root,
+                        "models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt",
+                    )
+                ),
+                commit_to_conf=commit_to_conf,
+            )
 
-        diffuser_path = Path(
-            Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
-        )
-        model_name = self.convert_and_import(
-            model_path,
-            diffusers_path=diffuser_path,
-            vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
-            model_name=model_name,
-            model_description=description,
-            original_config_file=model_config_file,
-            commit_to_conf=commit_to_conf,
-        )
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name
