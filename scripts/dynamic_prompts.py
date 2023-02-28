@@ -5,91 +5,110 @@ Simple script to generate a file of InvokeAI prompts and settings
 that scan across steps and other parameters.
 """
 
-import re
+import argparse
+import io
+import json
 import pydoc
+import re
 import shutil
 import sys
-import argparse
 from dataclasses import dataclass
-from subprocess import Popen, PIPE
-from itertools import product
 from io import TextIOBase
+from itertools import product
 from pathlib import Path
+from subprocess import PIPE, Popen
 from typing import Iterable, List, Union
 
+import yaml
 from omegaconf import OmegaConf, dictconfig, listconfig
 
-def expand_prompts(template_file: Path,
-                   run_invoke: bool=False,
-                   invoke_model: str=None,
-                   invoke_outdir: Path=None,
-                   ):
-    '''
+
+def expand_prompts(
+    template_file: Path,
+    run_invoke: bool = False,
+    invoke_model: str = None,
+    invoke_outdir: Path = None,
+):
+    """
     :param template_file: A YAML file containing templated prompts and args
     :param run_invoke: A boolean which if True will pass expanded prompts to invokeai CLI
     :param invoke_model: Name of the model to load when run_invoke is true; otherwise uses default
     :param invoke_outdir: Directory for outputs when run_invoke is true; otherwise uses default
-    '''
-    conf = OmegaConf.load(template_file)
+    """
+    if template_file.name.endswith(".json"):
+        with open(template_file, "r") as file:
+            with io.StringIO(yaml.dump(json.load(file))) as fh:
+                conf = OmegaConf.load(fh)
+    else:
+        conf = OmegaConf.load(template_file)
     try:
         if run_invoke:
-            invokeai_args = [shutil.which('invokeai')]
+            invokeai_args = [shutil.which("invokeai")]
             if invoke_model:
-                invokeai_args.extend(('--model',invoke_model))
+                invokeai_args.extend(("--model", invoke_model))
             if invoke_outdir:
-                invokeai_args.extend(('--outdir',invoke_outdir))
-            print(f'Calling invokeai with arguments {invokeai_args}',file=sys.stderr)
+                invokeai_args.extend(("--outdir", invoke_outdir))
+            print(f"Calling invokeai with arguments {invokeai_args}", file=sys.stderr)
             process = Popen(invokeai_args, stdin=PIPE, text=True)
             with process.stdin as fh:
-                _do_expand(conf,file=fh)
+                _do_expand(conf, file=fh)
             process.wait()
         else:
             _do_expand(conf)
     except KeyboardInterrupt:
         process.kill()
 
+
 def main():
     parser = argparse.ArgumentParser(
         description=HELP,
     )
     parser.add_argument(
-        'template_file',
+        "template_file",
         type=Path,
-        nargs='?',
-        help='path to a template file, use --example to generate an example file'
+        nargs="?",
+        help="path to a template file, use --example to generate an example file",
     )
     parser.add_argument(
-        '--example',
-        action='store_true',
+        "--example",
+        action="store_true",
         default=False,
-        help=f'Print an example template file. Use "{sys.argv[0]} --example > example.yaml" to save output to a file'
+        help=f'Print an example template file in YAML format. Use "{sys.argv[0]} --example > example.yaml" to save output to a file',
     )
     parser.add_argument(
-        '--instructions',
-        '-i',
-        dest='instructions',
-        action='store_true',
+        "--json-example",
+        action="store_true",
         default=False,
-        help=f'Print verbose instructions.'
+        help=f'Print an example template file in json format. Use "{sys.argv[0]} --json-example > example.json" to save output to a file',
     )
     parser.add_argument(
-        '--invoke',
-        action='store_true',
-        help='Execute invokeai using specified optional --model and --outdir'
+        "--instructions",
+        "-i",
+        dest="instructions",
+        action="store_true",
+        default=False,
+        help=f"Print verbose instructions.",
     )
     parser.add_argument(
-        '--model',
-        help='Feed the generated prompts to the invokeai CLI using the indicated model. Will be overriden by a model: section in template file.'
+        "--invoke",
+        action="store_true",
+        help="Execute invokeai using specified optional --model and --outdir",
     )
     parser.add_argument(
-        '--outdir',
-        type=Path,
-        help='Write images and log into indicated directory'
+        "--model",
+        help="Feed the generated prompts to the invokeai CLI using the indicated model. Will be overriden by a model: section in template file.",
+    )
+    parser.add_argument(
+        "--outdir", type=Path, help="Write images and log into indicated directory"
     )
     opt = parser.parse_args()
 
     if opt.example:
         print(EXAMPLE_TEMPLATE_FILE)
+        sys.exit(0)
+
+    if opt.json_example:
+        print(_yaml_to_json(EXAMPLE_TEMPLATE_FILE))
         sys.exit(0)
 
     if opt.instructions:
@@ -99,32 +118,39 @@ def main():
     if not opt.template_file:
         parser.print_help()
         sys.exit(-1)
-        
+
     expand_prompts(
-        template_file = opt.template_file,
-        run_invoke = opt.invoke,
-        invoke_model = opt.model,
-        invoke_outdir = opt.outdir
+        template_file=opt.template_file,
+        run_invoke=opt.invoke,
+        invoke_model=opt.model,
+        invoke_outdir=opt.outdir,
     )
-    
-def _do_expand(conf: OmegaConf, file: TextIOBase=sys.stdout):
+
+
+def _do_expand(conf: OmegaConf, file: TextIOBase = sys.stdout):
     models = expand_values(conf.get("model"))
     steps = expand_values(conf.get("steps")) or [30]
     cfgs = expand_values(conf.get("cfg")) or [7.5]
     samplers = expand_values(conf.get("sampler")) or ["ddim"]
     seeds = expand_values(conf.get("seed")) or [0]
     prompts = expand_prompt(conf.get("prompt")) or ["banana sushi"]
-    dimensions = expand_prompt(conf.get("dimensions")) or ['512x512']
-    
-    cross_product = product(*[models, seeds, prompts, samplers, cfgs, steps, dimensions])
+    dimensions = expand_prompt(conf.get("dimensions")) or ["512x512"]
+
+    cross_product = product(
+        *[models, seeds, prompts, samplers, cfgs, steps, dimensions]
+    )
     previous_model = None
     for p in cross_product:
         (model, seed, prompt, sampler, cfg, step, dimensions) = tuple(p)
-        (width, height) = dimensions.split('x')
+        (width, height) = dimensions.split("x")
         if previous_model != model:
             previous_model = model
-            print(f'!switch {model}', file=file)
-        print(f'"{prompt}" -S{seed} -A{sampler} -C{cfg} -s{step} -W{width} -H{height}',file=file)
+            print(f"!switch {model}", file=file)
+        print(
+            f'"{prompt}" -S{seed} -A{sampler} -C{cfg} -s{step} -W{width} -H{height}',
+            file=file,
+        )
+
 
 def expand_prompt(
     stanza: str | dict | listconfig.ListConfig | dictconfig.DictConfig,
@@ -148,6 +174,7 @@ def expand_prompt(
     dicts = merge(product(*fragments))
     return [template.format(**x) for x in dicts]
 
+
 def merge(dicts: Iterable) -> List[dict]:
     result = list()
     for x in dicts:
@@ -164,9 +191,22 @@ def expand_values(stanza: str | dict | listconfig.ListConfig) -> list | range:
     if isinstance(stanza, listconfig.ListConfig):
         return stanza
     elif match := re.match("^(\d+);(\d+)(;(\d+))?", str(stanza)):
-        return range(int(match.group(1)), 1+int(match.group(2)), int(match.group(4)) or 1)
+        return range(
+            int(match.group(1)), 1 + int(match.group(2)), int(match.group(4)) or 1
+        )
     else:
         return [stanza]
+
+
+def _yaml_to_json(yaml_input: str) -> str:
+    """
+    Converts a yaml string into a json string. Used internally
+    to generate the example template file.
+    """
+    with io.StringIO(yaml_input) as yaml_in:
+        data = yaml.safe_load(yaml_in)
+    return json.dumps(data, indent=2)
+
 
 HELP = f"""
 This script takes a prompt template file that contains multiple
@@ -208,7 +248,6 @@ output directory will contain a markdown file named `log.md`
 containing annotated images. You can open this file using an e-book
 reader such as the cross-platform Calibre eBook reader
 (https://calibre-ebook.com/).
-
 
 == FORMAT OF THE TEMPLATES FILE ==
 
@@ -281,9 +320,19 @@ field is required. The output will be:
   "a sunny meadow in the mountains in the style of gustav klimt"
   ...
   "a gathering storm in the mountains in the style of donetello"
+
+== SUPPORT FOR JSON FORMAT ==
+
+For those who prefer the JSON format, this script will accept JSON
+template files as well. Please run "{sys.argv[1]} --json-example"
+to print out a version of the example template file in json format.
+You may save it to disk and use it as a starting point for your own
+template this way:
+
+   {sys.argv[1]} --json-example > template.json 
 """
 
-EXAMPLE_TEMPLATE_FILE="""
+EXAMPLE_TEMPLATE_FILE = """
 model: stable-diffusion-1.5
 steps: 30;50;10
 seed: 50
