@@ -214,9 +214,9 @@ gfpgan/
 configs/models.yaml
 
 # weights (will be created by installer)
-models/ldm/stable-diffusion-v1/*.ckpt
-models/clipseg
-models/gfpgan
+# models/ldm/stable-diffusion-v1/*.ckpt
+# models/clipseg
+# models/gfpgan
 
 # ignore initfile
 .invokeai
@@ -232,6 +232,3 @@ installer/install.bat
 installer/install.sh
 installer/update.bat
 installer/update.sh
-
-# no longer stored in source directory
-models
