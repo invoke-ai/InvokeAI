@@ -32,13 +32,13 @@ from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.devices import CPU_DEVICE
-from ..generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import Globals, global_cache_dir
 from ldm.util import (
     ask_user,
     download_with_resume,
     url_attachment_name,
 )
+from ..generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 
 class SDLegacyType(Enum):

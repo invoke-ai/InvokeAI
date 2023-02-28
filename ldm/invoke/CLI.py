@@ -21,11 +21,11 @@ import ldm.invoke
 from ..generate import Generate
 from .args import (Args, dream_cmd_from_png, metadata_dumps,
                              metadata_from_png)
-from invokeai.generator import PipelineIntermediateState
+from invokeai.backend.generator import PipelineIntermediateState
 from .globals import Globals
 from .image_util import make_grid
 from .log import write_log
-from invokeai.models import ModelManager
+from invokeai.backend.models import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
 from ..util import url_attachment_name
@@ -1022,7 +1022,7 @@ def get_next_command(infile=None, model_name="no model") -> str:  # command stri
 
 def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print("\n* --web was specified, starting web server...")
-    from invokeai.backend import InvokeAIWebServer
+    from invokeai.backend.invoke_ai_web_server import InvokeAIWebServer
 
     # Change working directory to the stable-diffusion directory
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

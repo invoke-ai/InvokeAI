@@ -1,5 +1,5 @@
 '''
-Initialization file for the invokeai.models package
+Initialization file for the invokeai.backend.models package
 '''
 from .model_manager import ModelManager, SDLegacyType
 from .diffusion import InvokeAIDiffuserComponent

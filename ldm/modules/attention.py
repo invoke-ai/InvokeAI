@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import nn, einsum
 from einops import rearrange, repeat
 
-from invokeai.models.diffusion.cross_attention_control import InvokeAICrossAttentionMixin
+from invokeai.backend.models.diffusion import InvokeAICrossAttentionMixin
 from ldm.modules.diffusionmodules.util import checkpoint
 
 def exists(val):

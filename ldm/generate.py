@@ -27,9 +27,8 @@ from pytorch_lightning import logging, seed_everything
 
 import ldm.invoke.conditioning
 
-from invokeai.models import ModelManager
-from invokeai.generator import infill_methods
-from invokeai.models import (DDIMSampler, KSampler, PLMSSampler )
+from invokeai.backend.models import (ModelManager,DDIMSampler, KSampler, PLMSSampler)
+from invokeai.backend.generator import infill_methods
 from ldm.invoke.args import metadata_from_png
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
@@ -898,7 +897,7 @@ class Generate:
         return self._load_generator(".inpaint", "Inpaint")
 
     def _load_generator(self, module, class_name):
-        mn = f"invokeai.generator{module}"
+        mn = f"invokeai.backend.generator{module}"
         cn = class_name
         module = importlib.import_module(mn)
         constructor = getattr(module, cn)

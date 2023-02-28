@@ -7,7 +7,7 @@ from diffusers import logging
 
 from .base import Generator
 from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-from ..models.diffusion.shared_invokeai_diffusion import PostprocessingSettings
+from ..models.diffusion import PostprocessingSettings
 
 class Img2Img(Generator):
     def __init__(self, model, precision):

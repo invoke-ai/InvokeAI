@@ -27,7 +27,7 @@ from invokeai.backend.modules.parameters import parameters_to_command
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt_object, get_prompt_structure, get_tokenizer
-from ..generator import infill_methods, PipelineIntermediateState
+from .generator import infill_methods, PipelineIntermediateState
 from ldm.invoke.globals import ( Globals, global_converted_ckpts_dir,
                                  global_models_dir
                                 )
