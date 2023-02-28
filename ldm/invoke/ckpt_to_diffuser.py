@@ -25,7 +25,7 @@ from ldm.invoke.globals import (
     global_cache_dir,
     global_config_dir,
     )
-from ldm.invoke.model_manager import ModelManager, SDLegacyType
+from invokeai.models import ModelManager, SDLegacyType
 from safetensors.torch import load_file
 from typing import Union
 
@@ -56,7 +56,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionS
 from diffusers.utils import is_safetensors_available
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPVisionConfig
 
-from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from invokeai.generator import StableDiffusionGeneratorPipeline
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """

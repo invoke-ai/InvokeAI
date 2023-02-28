@@ -1,6 +1,6 @@
 model:
   base_learning_rate: 1.0e-4
-  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  target: invokeai.models.diffusion.ddpm.LatentDiffusion
   params:
     parameterization: "v"
     linear_start: 0.00085
@@ -38,7 +38,7 @@ model:
         legacy: False
 
     first_stage_config:
-      target: ldm.models.autoencoder.AutoencoderKL
+      target: invokeai.models.autoencoder.AutoencoderKL
       params:
         embed_dim: 4
         monitor: val/rec_loss

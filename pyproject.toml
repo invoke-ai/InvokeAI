@@ -129,7 +129,12 @@ version = { attr = "ldm.invoke.__version__" }
 
 [tool.setuptools.packages.find]
 "where" = ["."]
-"include" = ["invokeai.assets.web*", "invokeai.backend*", "invokeai.frontend.dist*", "invokeai.configs*", "ldm*"]
+"include" = [
+    "invokeai.assets.web*", "invokeai.models*",
+    "invokeai.generator*","invokeai.backend*",
+    "invokeai.frontend.dist*", "invokeai.configs*",
+    "ldm*"
+]
 
 [tool.setuptools.package-data]
 "invokeai.assets.web" = ["**.png"]

@@ -21,11 +21,11 @@ import ldm.invoke
 from ..generate import Generate
 from .args import (Args, dream_cmd_from_png, metadata_dumps,
                              metadata_from_png)
-from .generator.diffusers_pipeline import PipelineIntermediateState
+from invokeai.generator import PipelineIntermediateState
 from .globals import Globals
 from .image_util import make_grid
 from .log import write_log
-from .model_manager import ModelManager
+from invokeai.models import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
 from ..util import url_attachment_name
@@ -64,7 +64,7 @@ def main():
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
     Globals.sequential_guidance = args.sequential_guidance
-    Globals.ckpt_convert = args.ckpt_convert
+    Globals.ckpt_convert = True  # always true now
 
     print(f">> Internet connectivity is {Globals.internet_available}")
 

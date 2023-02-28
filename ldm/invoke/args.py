@@ -434,6 +434,14 @@ class Args(object):
 
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
+        deprecated_group.add_argument(
+            '--ckpt_convert',
+            action=argparse.BooleanOptionalAction,
+            dest='ckpt_convert',
+            default=True,
+            help='Load legacy ckpt files as diffusers (deprecated; always true now).',
+        )
+
         general_group.add_argument(
             '--version','-V',
             action='store_true',
@@ -517,13 +525,6 @@ class Args(object):
             metavar='PRECISION',
             help=f'Set model precision. Defaults to auto selected based on device. Options: {", ".join(PRECISION_CHOICES)}',
             default='auto',
-        )
-        model_group.add_argument(
-            '--ckpt_convert',
-            action=argparse.BooleanOptionalAction,
-            dest='ckpt_convert',
-            default=False,
-            help='Load legacy ckpt files as diffusers. Pass --no-ckpt-convert to inhibit this behavior',
         )
         model_group.add_argument(
             '--internet',

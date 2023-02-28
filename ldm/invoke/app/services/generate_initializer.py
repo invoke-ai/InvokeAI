@@ -3,7 +3,7 @@ import os
 import sys
 import traceback
 
-from ...model_manager import ModelManager
+from invokeai.models import ModelManager
 
 from ...globals import Globals
 from ....generate import Generate

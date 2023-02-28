@@ -20,7 +20,7 @@ from typing import List
 import invokeai.configs as configs
 from ..generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..globals import Globals, global_cache_dir, global_config_dir
-from ..model_manager import ModelManager
+from invokeai.models import ModelManager
 
 warnings.filterwarnings("ignore")
 

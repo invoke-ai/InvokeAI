@@ -26,21 +26,19 @@ from PIL import Image, ImageOps
 from pytorch_lightning import logging, seed_everything
 
 import ldm.invoke.conditioning
+
+from invokeai.models import ModelManager
+from invokeai.generator import infill_methods
+from invokeai.models import (DDIMSampler, KSampler, PLMSSampler )
 from ldm.invoke.args import metadata_from_png
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.devices import choose_precision, choose_torch_device
-from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals, global_cache_dir
 from ldm.invoke.image_util import InitImageResizer
-from ldm.invoke.model_manager import ModelManager
 from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.ksampler import KSampler
-from ldm.models.diffusion.plms import PLMSSampler
-
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -816,16 +814,12 @@ class Generate:
         hires_fix: bool = False,
         force_outpaint: bool = False,
     ):
-        inpainting_model_in_use = self.sampler.uses_inpainting_model()
 
         if hires_fix:
             return self._make_txt2img2img()
 
         if embiggen is not None:
             return self._make_embiggen()
-
-        if inpainting_model_in_use:
-            return self._make_omnibus()
 
         if ((init_image is not None) and (mask_image is not None)) or force_outpaint:
             return self._make_inpaint()
@@ -903,16 +897,9 @@ class Generate:
     def _make_inpaint(self):
         return self._load_generator(".inpaint", "Inpaint")
 
-    def _make_omnibus(self):
-        return self._load_generator(".omnibus", "Omnibus")
-
     def _load_generator(self, module, class_name):
-        if self.is_legacy_model(self.model_name):
-            mn = f"ldm.invoke.ckpt_generator{module}"
-            cn = f"Ckpt{class_name}"
-        else:
-            mn = f"ldm.invoke.generator{module}"
-            cn = class_name
+        mn = f"invokeai.generator{module}"
+        cn = class_name
         module = importlib.import_module(mn)
         constructor = getattr(module, cn)
         return constructor(self.model, self.precision)
