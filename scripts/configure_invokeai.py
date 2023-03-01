@@ -98,7 +98,7 @@ def user_wants_to_download_weights()->str:
     print('''You can download and configure the weights files manually or let this
 script do it for you. Manual installation is described at:
 
-https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/INSTALLING_MODELS.md
+https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/050_INSTALLING_MODELS.md
 
 You may download the recommended models (about 10GB total), select a customized set, or
 completely skip this step.
