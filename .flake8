@@ -1,0 +1,37 @@
+[flake8]
+max-line-length = 120
+extend-ignore =
+    # See https://github.com/PyCQA/pycodestyle/issues/373
+    E203,
+    # use Bugbear's B950 instead
+    E501,
+    # from black repo https://github.com/psf/black/blob/main/.flake8
+    E266, W503, B907
+extend-select =
+    # Bugbear line length
+    B950
+extend-exclude =
+    scripts/orig_scripts/*
+    ldm/models/*
+    ldm/modules/*
+    ldm/data/*
+    ldm/generate.py
+    ldm/util.py
+    ldm/simplet2i.py
+per-file-ignores =
+    # B950 line too long
+    # W605 invalid escape sequence
+    # F841 assigned to but never used
+    # F401 imported but unused
+    tests/test_prompt_parser.py: B950, W605, F401
+    tests/test_textual_inversion.py: F841, B950
+    # B023 Function definition does not bind loop variable
+    scripts/legacy_api.py: F401, B950, B023, F841
+    ldm/invoke/__init__.py: F401
+    # B010 Do not call setattr with a constant attribute value
+    ldm/invoke/server_legacy.py: B010
+# =====================
+# flake-quote settings:
+# =====================
+# Set this to match black style:
+inline-quotes = double
