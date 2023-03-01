@@ -22,8 +22,8 @@ from pytorch_lightning import seed_everything
 from tqdm import trange
 
 import invokeai.assets.web as web_assets
-from ..models.diffusion.ddpm import DiffusionWrapper
-from ldm.util import rand_perlin_2d
+from ..ldm.models.diffusion.ddpm import DiffusionWrapper
+from ..ldm.util import rand_perlin_2d
 
 downsampling = 8
 CAUTION_IMG = 'caution.png'

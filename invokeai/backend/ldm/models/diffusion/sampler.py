@@ -7,10 +7,10 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from functools import partial
-from ldm.invoke.devices import choose_torch_device
+from ...devices import choose_torch_device
 from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
-from ldm.modules.diffusionmodules.util import (
+from ...modules.diffusionmodules.util import (
     make_ddim_sampling_parameters,
     make_ddim_timesteps,
     noise_like,

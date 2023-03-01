@@ -27,11 +27,11 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
 from ldm.invoke.globals import Globals
-from ..models.diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
-from ldm.modules.textual_inversion_manager import TextualInversionManager
-from ldm.invoke.devices import normalize_device, CPU_DEVICE
-from ldm.invoke.offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
-from ..models.diffusion import AttentionMapSaver
+from ..ldm.models.diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
+from ..ldm.modules.textual_inversion_manager import TextualInversionManager
+from ..ldm.devices import normalize_device, CPU_DEVICE
+from ..ldm.offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
+from ..ldm.models.diffusion import AttentionMapSaver
 from compel import EmbeddingsProvider
 
 @dataclass

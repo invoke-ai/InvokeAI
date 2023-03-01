@@ -22,7 +22,7 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 from shutil import get_terminal_size
 
-from ..devices import choose_precision, choose_torch_device
+from invokeai.backend.ldm.devices import choose_precision, choose_torch_device
 from ..globals import Globals, global_config_dir
 from .model_install_backend import (Dataset_path, default_config_file,
                                     default_dataset, get_root,

@@ -7,8 +7,8 @@ from torch.nn.functional import silu
 import numpy as np
 from einops import rearrange
 
-from ldm.util import instantiate_from_config
-from ldm.modules.attention import LinearAttention
+from ...util import instantiate_from_config
+from ..attention import LinearAttention
 
 import psutil
 

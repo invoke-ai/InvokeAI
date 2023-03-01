@@ -14,7 +14,7 @@ from transformers import CLIPTokenizer, CLIPTextModel
 from compel import Compel
 from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser
 from .devices import torch_dtype
-from invokeai.backend.models import InvokeAIDiffuserComponent
+from .models import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
 
 def get_tokenizer(model) -> CLIPTokenizer:

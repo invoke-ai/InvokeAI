@@ -15,7 +15,7 @@ from .diffusers_pipeline import image_resized_to_grid_as_tensor, StableDiffusion
     ConditioningData
 from .img2img import Img2Img
 from ldm.invoke.patchmatch import PatchMatch
-from ldm.util import debug_image
+from ..ldm.util import debug_image
 
 
 def infill_methods()->list[str]:

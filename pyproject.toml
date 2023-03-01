@@ -130,7 +130,7 @@ version = { attr = "ldm.invoke.__version__" }
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*", "invokeai.models*",
+    "invokeai.assets.web*", 
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend.dist*", "invokeai.configs*",
     "ldm*"

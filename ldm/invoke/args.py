@@ -97,7 +97,7 @@ from typing import List
 
 import ldm.invoke
 import ldm.invoke.pngwriter
-from ldm.invoke.conditioning import split_weighted_subprompts
+from invokeai.backend.ldm.conditioning import split_weighted_subprompts
 
 from ldm.invoke.globals import Globals
 

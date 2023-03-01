@@ -25,10 +25,10 @@ from invokeai.backend.generator import PipelineIntermediateState
 from .globals import Globals
 from .image_util import make_grid
 from .log import write_log
-from invokeai.backend.models import ModelManager
+from invokeai.backend.ldm.models import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
-from ..util import url_attachment_name
+from invokeai.backend.ldm.util import url_attachment_name
 
 # global used in multiple functions (fix)
 infile = None

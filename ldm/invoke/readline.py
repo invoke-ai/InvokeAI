@@ -12,7 +12,7 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from invokeai.backend.ldm.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.globals import Globals
 
 # ---------------readline utilities---------------------

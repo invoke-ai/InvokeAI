@@ -15,7 +15,7 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 
-from ldm.invoke.devices import torch_dtype
+from .devices import torch_dtype
 
 
 def log_txt_as_img(wh, xc, size=10):

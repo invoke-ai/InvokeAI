@@ -23,7 +23,7 @@ from omegaconf import OmegaConf
 from ldm.invoke.config.widgets import FloatTitleSlider
 from ldm.invoke.globals import (Globals, global_cache_dir, global_config_file,
                                 global_models_dir, global_set_root)
-from invokeai.backend.models import ModelManager
+from invokeai.backend.ldm.models import ModelManager
 
 DEST_MERGED_MODEL_DIR = "merged_models"
 

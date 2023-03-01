@@ -6,7 +6,7 @@ import torch
 
 from .base import Generator
 from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-from ..models import PostprocessingSettings
+from ..ldm.models import PostprocessingSettings
 
 class Txt2Img(Generator):
     def __init__(self, model, precision):
