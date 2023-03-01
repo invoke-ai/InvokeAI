@@ -52,7 +52,7 @@ export const UPSCALING_LEVELS: Array<{ key: string; value: number }> = [
 
 export const NUMPY_RAND_MIN = 0;
 
-export const NUMPY_RAND_MAX = 4294967295;
+export const NUMPY_RAND_MAX = 9007199254740991;
 
 export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;
 

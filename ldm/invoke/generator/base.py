@@ -18,7 +18,6 @@ from PIL import Image, ImageFilter, ImageChops
 from diffusers import DiffusionPipeline
 from einops import rearrange
 from pathlib import Path
-from pytorch_lightning import seed_everything
 from tqdm import trange
 
 import invokeai.assets.web as web_assets
@@ -98,14 +97,14 @@ class Generator:
             for n in trange(iterations, desc='Generating'):
                 x_T = None
                 if self.variation_amount > 0:
-                    seed_everything(seed)
+                    torch.manual_seed(seed)
                     target_noise = self.get_noise(width,height)
                     x_T = self.slerp(self.variation_amount, initial_noise, target_noise)
                 elif initial_noise is not None:
                     # i.e. we specified particular variations
                     x_T = initial_noise
                 else:
-                    seed_everything(seed)
+                    torch.manual_seed(seed)
                     try:
                         x_T = self.get_noise(width,height)
                     except:
@@ -216,11 +215,11 @@ class Generator:
         initial_noise = None
         if self.variation_amount > 0 or len(self.with_variations) > 0:
             # use fixed initial noise plus random noise per iteration
-            seed_everything(seed)
+            torch.manual_seed(seed)
             initial_noise = self.get_noise(width,height)
             for v_seed, v_weight in self.with_variations:
                 seed = v_seed
-                seed_everything(seed)
+                torch.manual_seed(seed)
                 next_noise = self.get_noise(width,height)
                 initial_noise = self.slerp(v_weight, initial_noise, next_noise)
             if self.variation_amount > 0:

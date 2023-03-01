@@ -17,11 +17,13 @@ export default function MainCFGScale() {
 
   const handleChangeCfgScale = (v: number) => dispatch(setCfgScale(v));
 
+  const minCfgScale = 1.0001;
+
   return shouldUseSliders ? (
     <IAISlider
       label={t('parameters.cfgScale')}
       step={0.5}
-      min={1.01}
+      min={minCfgScale}
       max={30}
       onChange={handleChangeCfgScale}
       handleReset={() => dispatch(setCfgScale(7.5))}
@@ -36,7 +38,7 @@ export default function MainCFGScale() {
     <IAINumberInput
       label={t('parameters.cfgScale')}
       step={0.5}
-      min={1.01}
+      min={minCfgScale}
       max={200}
       onChange={handleChangeCfgScale}
       value={cfgScale}

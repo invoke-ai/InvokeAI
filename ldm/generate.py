@@ -23,7 +23,7 @@ from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
 from PIL import Image, ImageOps
-from pytorch_lightning import logging, seed_everything
+from pytorch_lightning import logging
 
 import ldm.invoke.conditioning
 from ldm.invoke.args import metadata_from_png
@@ -973,7 +973,8 @@ class Generate:
         # uncache generators so they pick up new models
         self.generators = {}
 
-        seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
+        # leave the tiny 32-bit embed seed initialization for now, users can supply larger via the UI
+        torch.manual_seed(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
             print(f'>> Loading embeddings from {self.embedding_path}')
             for root, _, files in os.walk(self.embedding_path):
