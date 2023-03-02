@@ -17,7 +17,6 @@ from tqdm import tqdm
 
 from .devices import torch_dtype
 
-
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot
@@ -278,22 +277,6 @@ def ask_user(question: str, answers: list):
     user_answers = map(input, pose_question)
     valid_response = next(filter(answers.__contains__, user_answers))
     return valid_response
-
-
-def debug_image(
-    debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False
-):
-    if not debug_status:
-        return
-
-    image_copy = debug_image.copy().convert("RGBA")
-    ImageDraw.Draw(image_copy).text((5, 5), debug_text, (255, 0, 0))
-
-    if debug_show:
-        image_copy.show()
-
-    if debug_result:
-        return image_copy
 
 
 # -------------------------------------

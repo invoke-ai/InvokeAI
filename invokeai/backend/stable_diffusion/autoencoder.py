@@ -5,8 +5,8 @@ from contextlib import contextmanager
 
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
-from ..modules.diffusionmodules.model import Encoder, Decoder
-from ..modules.distributions.distributions import (
+from .diffusionmodules.model import Encoder, Decoder
+from .distributions.distributions import (
     DiagonalGaussianDistribution,
 )
 

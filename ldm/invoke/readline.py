@@ -12,8 +12,8 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
-from invokeai.backend.ldm.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.globals import Globals
+from invokeai.backend.stable_diffusion import HuggingFaceConceptsLibrary
 
 # ---------------readline utilities---------------------
 try:

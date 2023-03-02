@@ -125,15 +125,15 @@ dependencies = [
 "Discord" = "https://discord.gg/ZmtBAhwWhy"
 
 [tool.setuptools.dynamic]
-version = { attr = "ldm.invoke.__version__" }
+version = { attr = "invokeai.version.__version__" }
 
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*", 
+    "invokeai.assets.web*","invokeai.version*", 
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend.dist*", "invokeai.configs*",
-    "ldm*"
+    "ldm*",
 ]
 
 [tool.setuptools.package-data]

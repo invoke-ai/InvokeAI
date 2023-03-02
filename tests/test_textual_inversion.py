@@ -4,7 +4,7 @@ from typing import Union
 
 import torch
 
-from ldm.modules.textual_inversion_manager import TextualInversionManager
+from invokeai.backend.stable_diffusion import TextualInversionManager
 
 
 KNOWN_WORDS = ['a', 'b', 'c']

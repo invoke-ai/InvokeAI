@@ -18,9 +18,9 @@ from tqdm import tqdm
 from typing import List
 
 import invokeai.configs as configs
-from invokeai.backend.generator import StableDiffusionGeneratorPipeline
+from invokeai.backend.stable_diffusion import StableDiffusionGeneratorPipeline
 from ..globals import Globals, global_cache_dir, global_config_dir
-from invokeai.backend.ldm.models import ModelManager
+from invokeai.backend import ModelManager
 
 warnings.filterwarnings("ignore")
 

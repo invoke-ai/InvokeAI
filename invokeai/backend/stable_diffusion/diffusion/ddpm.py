@@ -22,7 +22,7 @@ from pytorch_lightning.utilities.distributed import rank_zero_only
 from omegaconf import ListConfig
 import urllib
 
-from ...modules.textual_inversion_manager import TextualInversionManager
+from ..textual_inversion_manager import TextualInversionManager
 from ...util import (
     log_txt_as_img,
     exists,
@@ -33,8 +33,8 @@ from ...util import (
     count_params,
     instantiate_from_config,
 )
-from ...modules.ema import LitEma
-from ...modules.distributions.distributions import (
+from ..ema import LitEma
+from ..distributions.distributions import (
     normal_kl,
     DiagonalGaussianDistribution,
 )
@@ -43,7 +43,7 @@ from ..autoencoder import (
     IdentityFirstStage,
     AutoencoderKL,
 )
-from ...modules.diffusionmodules.util import (
+from ..diffusionmodules.util import (
     make_beta_schedule,
     extract_into_tensor,
     noise_like,

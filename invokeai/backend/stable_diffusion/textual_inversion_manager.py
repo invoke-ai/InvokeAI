@@ -9,7 +9,7 @@ from picklescan.scanner import scan_file_path
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from compel.embeddings_provider import BaseTextualInversionManager
-from ..concepts_lib import HuggingFaceConceptsLibrary
+from .concepts_lib import HuggingFaceConceptsLibrary
 
 
 @dataclass

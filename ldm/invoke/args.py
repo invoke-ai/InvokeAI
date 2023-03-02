@@ -95,15 +95,15 @@ from argparse import Namespace
 from pathlib import Path
 from typing import List
 
-import ldm.invoke
-import ldm.invoke.pngwriter
-from invokeai.backend.ldm.conditioning import split_weighted_subprompts
+from invokeai.backend.image_util import retrieve_metadata
+import invokeai.version
 
 from ldm.invoke.globals import Globals
+from invokeai.backend.prompting import split_weighted_subprompts
 
-APP_ID = ldm.invoke.__app_id__
-APP_NAME = ldm.invoke.__app_name__
-APP_VERSION = ldm.invoke.__version__
+APP_ID = invokeai.version.__app_id__
+APP_NAME = invokeai.version.__app_name__
+APP_VERSION = invokeai.version.__version__
 
 SAMPLER_CHOICES = [
     'ddim',
@@ -182,7 +182,7 @@ class Args(object):
             # and intercept --version request
             switches = self._arg_parser.parse_args(sysargs)
             if switches.version:
-                print(f'{ldm.invoke.__app_name__} {ldm.invoke.__version__}')
+                print(f'{APP_NAME} {APP_VERSION}')
                 sys.exit(0)
 
             print('* Initializing, be patient...')
@@ -1170,8 +1170,8 @@ def metadata_dumps(opt,
         'model'       : 'stable diffusion',
         'model_id'    : opt.model,
         'model_hash'  : model_hash,
-        'app_id'      : ldm.invoke.__app_id__,
-        'app_version' : ldm.invoke.__version__,
+        'app_id'      : APP_ID,
+        'app_version' : APP_VERSION,
     }
 
     # # add some RFC266 fields that are generated internally, and not as
@@ -1242,7 +1242,7 @@ def args_from_png(png_file_path) -> list[Args]:
     data.
     '''
     try:
-        meta = ldm.invoke.pngwriter.retrieve_metadata(png_file_path)
+        meta = retrieve_metadata(png_file_path)
     except AttributeError:
         return [legacy_metadata_load({},png_file_path)]
 

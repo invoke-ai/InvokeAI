@@ -8,7 +8,7 @@ from pathlib import Path
 from queue import Queue
 from typing import Dict
 from PIL.Image import Image
-from ...pngwriter import PngWriter
+from invokeai.backend.image_util import PngWriter
 
 
 class ImageType(str, Enum):

@@ -11,11 +11,12 @@ import numpy as np
 import torch
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 
-from .diffusers_pipeline import image_resized_to_grid_as_tensor, StableDiffusionGeneratorPipeline, \
-    ConditioningData
+from ..stable_diffusion.diffusers_pipeline import (image_resized_to_grid_as_tensor,
+                                                   StableDiffusionGeneratorPipeline,
+                                                   ConditioningData
+                                                   )
 from .img2img import Img2Img
-from ldm.invoke.patchmatch import PatchMatch
-from ..ldm.util import debug_image
+from ..image_util import PatchMatch, debug_image
 
 
 def infill_methods()->list[str]:

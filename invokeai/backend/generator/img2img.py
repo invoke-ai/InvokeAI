@@ -6,8 +6,10 @@ import torch
 from diffusers import logging
 
 from .base import Generator
-from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-from ..ldm.models.diffusion import PostprocessingSettings
+from ..stable_diffusion import (StableDiffusionGeneratorPipeline,
+                                ConditioningData,
+                                PostprocessingSettings
+                                )
 
 class Img2Img(Generator):
     def __init__(self, model, precision):

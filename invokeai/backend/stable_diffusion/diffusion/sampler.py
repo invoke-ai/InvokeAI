@@ -10,7 +10,7 @@ from functools import partial
 from ...devices import choose_torch_device
 from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
-from ...modules.diffusionmodules.util import (
+from ..diffusionmodules.util import (
     make_ddim_sampling_parameters,
     make_ddim_timesteps,
     noise_like,

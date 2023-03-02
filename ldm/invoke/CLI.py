@@ -16,19 +16,18 @@ if sys.platform == "darwin":
 
 import pyparsing  # type: ignore
 
-import ldm.invoke
+import invokeai.version
 
 from ..generate import Generate
 from .args import (Args, dream_cmd_from_png, metadata_dumps,
                              metadata_from_png)
-from invokeai.backend.generator import PipelineIntermediateState
+from invokeai.backend.stable_diffusion import PipelineIntermediateState
+from invokeai.backend.image_util import make_grid, PngWriter, retrieve_metadata, write_metadata
+from invokeai.backend import ModelManager
 from .globals import Globals
-from .image_util import make_grid
 from .log import write_log
-from invokeai.backend.ldm.models import ModelManager
-from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
-from invokeai.backend.ldm.util import url_attachment_name
+from invokeai.backend.util import url_attachment_name
 
 # global used in multiple functions (fix)
 infile = None
@@ -75,7 +74,7 @@ def main():
                 opt, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    print(f">> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}")
+    print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup

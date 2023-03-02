@@ -3,7 +3,7 @@
 import torch
 from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from .sampler import Sampler
-from ...modules.diffusionmodules.util import  noise_like
+from ..diffusionmodules.util import  noise_like
 
 class DDIMSampler(Sampler):
     def __init__(self, model, schedule='linear', device=None, **kwargs):
