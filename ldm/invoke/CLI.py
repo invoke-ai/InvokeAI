@@ -744,8 +744,8 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
         except KeyboardInterrupt:
             return
 
-    manager.commit(opt.conf)    
-    if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
+    manager.commit(opt.conf)
+    if ckpt_path and click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
         print(f"{ckpt_path} deleted")
 
