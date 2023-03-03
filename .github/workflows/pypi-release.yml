@@ -3,7 +3,7 @@ name: PyPI Release
 on:
   push:
     paths:
-      - 'ldm/invoke/_version.py'
+      - 'invokeai/version/invokeai_version.py'
   workflow_dispatch:
 
 jobs:

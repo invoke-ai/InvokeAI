@@ -5,14 +5,14 @@ on:
       - 'main'
     paths:
       - 'pyproject.toml'
-      - 'ldm/**'
+      - 'invokeai/**'
       - 'invokeai/backend/**'
       - 'invokeai/configs/**'
       - 'invokeai/frontend/dist/**'
   pull_request:
     paths:
       - 'pyproject.toml'
-      - 'ldm/**'
+      - 'invokeai/**'
       - 'invokeai/backend/**'
       - 'invokeai/configs/**'
       - 'invokeai/frontend/dist/**'
@@ -112,7 +112,7 @@ jobs:
       - name: set INVOKEAI_OUTDIR
         run: >
           python -c
-          "import os;from ldm.invoke.globals import Globals;OUTDIR=os.path.join(Globals.root,str('outputs'));print(f'INVOKEAI_OUTDIR={OUTDIR}')"
+          "import os;from invokeai.backend.globals import Globals;OUTDIR=os.path.join(Globals.root,str('outputs'));print(f'INVOKEAI_OUTDIR={OUTDIR}')"
           >> ${{ matrix.github-env }}
 
       - name: run invokeai-configure
