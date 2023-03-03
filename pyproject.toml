@@ -105,15 +105,15 @@ dependencies = [
 
 # legacy entrypoints; provided for backwards compatibility
 "invoke.py" = "invokeai.frontend.CLI:command_line_interface"
-"configure_invokeai.py" = "invokeai.frontend.config:invokeai_configure"
-"textual_inversion.py" = "invokeai.frontend.training:textual_inversion"
+"configure_invokeai.py" = "invokeai.frontend.install:invokeai_configure"
+"textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
 # modern entrypoints
 "invokeai" = "invokeai.frontend.CLI:invokeai_command_line_interface"
-"invokeai-configure" = "invokeai.frontend.config:invokeai_configure"
+"invokeai-configure" = "invokeai.frontend.install:invokeai_configure"
 "invokeai-merge" = "invokeai.frontend.merge:invokeai_merge_diffusers"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
-"invokeai-model-install" = "invokeai.frontend.config:invokeai_model_install"
+"invokeai-model-install" = "invokeai.frontend.install:invokeai_model_install"
 "invokeai-update" = "invokeai.frontend.config:invokeai_update"
 
 [project.urls]
@@ -144,3 +144,7 @@ version = { attr = "invokeai.version.__version__" }
 
 [tool.pytest.ini_options]
 addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
+
+[flake8]
+max-line-length = 120
+

@@ -31,13 +31,11 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
-from ..util import CPU_DEVICE
 from invokeai.backend.globals import Globals, global_cache_dir
-from ..util import (
-    ask_user,
-    download_with_resume,
-)
+
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
+from ..util import CPU_DEVICE, ask_user, download_with_resume
+
 
 class SDLegacyType(Enum):
     V1 = 1
@@ -45,10 +43,12 @@ class SDLegacyType(Enum):
     V2 = 3
     UNKNOWN = 99
 
+
 DEFAULT_MAX_MODELS = 2
 VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
     "vae-ft-mse-840000-ema-pruned": "stabilityai/sd-vae-ft-mse",
 }
+
 
 class ModelManager(object):
     def __init__(
@@ -428,11 +428,9 @@ class ModelManager(object):
             weights = os.path.normpath(os.path.join(Globals.root, weights))
 
         # Convert to diffusers and return a diffusers pipeline
-        print(
-            f">> Converting legacy checkpoint {model_name} into a diffusers model..."
-        )
-        
-        from . import  load_pipeline_from_original_stable_diffusion_ckpt
+        print(f">> Converting legacy checkpoint {model_name} into a diffusers model...")
+
+        from . import load_pipeline_from_original_stable_diffusion_ckpt
 
         self.offload_model(self.current_model)
         if vae_config := self._choose_diffusers_vae(model_name):
@@ -444,9 +442,7 @@ class ModelManager(object):
             original_config_file=config,
             vae=vae,
             return_generator_pipeline=True,
-            precision=torch.float16
-            if self.precision == "float16"
-            else torch.float32,
+            precision=torch.float16 if self.precision == "float16" else torch.float32,
         )
         if self.sequential_offload:
             pipeline.enable_offload_submodels(self.device)
@@ -547,7 +543,9 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
-        model_description = model_description or f"Imported diffusers model {model_name}"
+        model_description = (
+            model_description or f"Imported diffusers model {model_name}"
+        )
         new_config = dict(
             description=model_description,
             vae=vae,
@@ -729,7 +727,7 @@ class ModelManager(object):
                 f"** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import"
             )
             return
-        
+
         diffuser_path = Path(
             Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
         )
@@ -781,7 +779,7 @@ class ModelManager(object):
             # By passing the specified VAE to the conversion function, the autoencoder
             # will be built into the model rather than tacked on afterward via the config file
             vae_model = self._load_vae(vae) if vae else None
-            convert_ckpt_to_diffusers (
+            convert_ckpt_to_diffusers(
                 ckpt_path,
                 diffusers_path,
                 extract_ema=True,

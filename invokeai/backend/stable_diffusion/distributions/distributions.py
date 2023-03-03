@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 
 class AbstractDistribution:
@@ -64,9 +64,7 @@ class DiagonalGaussianDistribution(object):
             return torch.Tensor([0.0])
         logtwopi = np.log(2.0 * np.pi)
         return 0.5 * torch.sum(
-            logtwopi
-            + self.logvar
-            + torch.pow(sample - self.mean, 2) / self.var,
+            logtwopi + self.logvar + torch.pow(sample - self.mean, 2) / self.var,
             dim=dims,
         )
 
@@ -86,7 +84,7 @@ def normal_kl(mean1, logvar1, mean2, logvar2):
         if isinstance(obj, torch.Tensor):
             tensor = obj
             break
-    assert tensor is not None, 'at least one argument must be a Tensor'
+    assert tensor is not None, "at least one argument must be a Tensor"
 
     # Force variances to be Tensors. Broadcasting helps convert scalars to
     # Tensors, but it does not work for torch.exp().

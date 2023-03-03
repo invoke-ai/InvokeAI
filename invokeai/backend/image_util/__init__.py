@@ -1,15 +1,12 @@
-'''
+"""
 Initialization file for invokeai.backend.image_util methods.
-'''
+"""
 from .patchmatch import PatchMatch
+from .pngwriter import PngWriter, PromptFormatter, retrieve_metadata, write_metadata
+from .seamless import configure_model_padding
 from .txt2mask import Txt2Mask
 from .util import InitImageResizer, make_grid
-from .pngwriter import (PngWriter,
-                        PromptFormatter,
-                        retrieve_metadata,
-                        write_metadata,
-                        )
-from .seamless import configure_model_padding
+
 
 def debug_image(
     debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False
@@ -25,5 +22,3 @@ def debug_image(
 
     if debug_result:
         return image_copy
-
-

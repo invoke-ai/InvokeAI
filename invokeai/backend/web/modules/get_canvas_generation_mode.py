@@ -1,6 +1,8 @@
+from typing import Literal, Union
+
 from PIL import Image, ImageChops
 from PIL.Image import Image as ImageType
-from typing import Union, Literal
+
 
 # https://stackoverflow.com/questions/43864101/python-pil-check-if-image-is-transparent
 def check_for_any_transparency(img: Union[ImageType, str]) -> bool:
@@ -85,9 +87,7 @@ def main():
 
     print(
         "IMAGE WITH TRANSPARENCY, NO MASK, expect outpainting, got ",
-        get_canvas_generation_mode(
-            init_img_partial_transparency, init_mask_no_mask
-        ),
+        get_canvas_generation_mode(init_img_partial_transparency, init_mask_no_mask),
     )
 
     print(
@@ -102,9 +102,7 @@ def main():
 
     print(
         "IMAGE WITH TRANSPARENCY, WITH MASK, expect outpainting, got ",
-        get_canvas_generation_mode(
-            init_img_partial_transparency, init_mask_has_mask
-        ),
+        get_canvas_generation_mode(init_img_partial_transparency, init_mask_has_mask),
     )
 
     print(

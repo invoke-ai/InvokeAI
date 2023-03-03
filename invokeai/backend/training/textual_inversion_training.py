@@ -47,8 +47,8 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
-from ldm.invoke.args import ArgFormatter, PagingArgumentParser
-from invokeai.backend.globals import Globals, global_cache_dir
+from ..args import ArgFormatter, PagingArgumentParser
+from ..globals import Globals, global_cache_dir
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
     PIL_INTERPOLATION = {
@@ -441,7 +441,10 @@ class TextualInversionDataset(Dataset):
         self.image_paths = [
             self.data_root / file_path
             for file_path in self.data_root.iterdir()
-            if file_path.is_file() and file_path.name.endswith(('.png','.PNG','.jpg','.JPG','.jpeg','.JPEG','.gif','.GIF'))
+            if file_path.is_file()
+            and file_path.name.endswith(
+                (".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG", ".gif", ".GIF")
+            )
         ]
 
         self.num_images = len(self.image_paths)
@@ -490,7 +493,10 @@ class TextualInversionDataset(Dataset):
 
         if self.center_crop:
             crop = min(img.shape[0], img.shape[1])
-            h, w, = (
+            (
+                h,
+                w,
+            ) = (
                 img.shape[0],
                 img.shape[1],
             )

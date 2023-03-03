@@ -1,4 +1,4 @@
-'''
-Initialization file for the ldm.invoke.restoration package
-'''
+"""
+Initialization file for the invokeai.backend.restoration package
+"""
 from .base import Restoration

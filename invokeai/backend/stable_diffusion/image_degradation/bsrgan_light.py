@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-import cv2
-import torch
-
-from functools import partial
 import random
-from scipy import ndimage
+from functools import partial
+
+import albumentations
+import cv2
+import ldm.modules.image_degradation.utils_image as util
+import numpy as np
 import scipy
 import scipy.stats as ss
+import torch
+from scipy import ndimage
 from scipy.interpolate import interp2d
 from scipy.linalg import orth
-import albumentations
-
-import ldm.modules.image_degradation.utils_image as util
 
 """
 # --------------------------------------------
@@ -54,9 +53,7 @@ def analytic_kernel(k):
     # Loop over the small kernel to fill the big one
     for r in range(k_size):
         for c in range(k_size):
-            big_k[2 * r : 2 * r + k_size, 2 * c : 2 * c + k_size] += (
-                k[r, c] * k
-            )
+            big_k[2 * r : 2 * r + k_size, 2 * c : 2 * c + k_size] += k[r, c] * k
     # Crop the edges of the big kernel to ignore very small values and increase run time of SR
     crop = k_size // 2
     cropped_big_k = big_k[crop:-crop, crop:-crop]
@@ -77,9 +74,7 @@ def anisotropic_Gaussian(ksize=15, theta=np.pi, l1=6, l2=6):
     """
 
     v = np.dot(
-        np.array(
-            [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
-        ),
+        np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]),
         np.array([1.0, 0.0]),
     )
     V = np.array([[v[0], v[1]], [v[1], -v[0]]])
@@ -139,13 +134,11 @@ def blur(x, k):
     """
     n, c = x.shape[:2]
     p1, p2 = (k.shape[-2] - 1) // 2, (k.shape[-1] - 1) // 2
-    x = torch.nn.functional.pad(x, pad=(p1, p2, p1, p2), mode='replicate')
+    x = torch.nn.functional.pad(x, pad=(p1, p2, p1, p2), mode="replicate")
     k = k.repeat(1, c, 1, 1)
     k = k.view(-1, 1, k.shape[2], k.shape[3])
     x = x.view(1, -1, x.shape[2], x.shape[3])
-    x = torch.nn.functional.conv2d(
-        x, k, bias=None, stride=1, padding=0, groups=n * c
-    )
+    x = torch.nn.functional.conv2d(x, k, bias=None, stride=1, padding=0, groups=n * c)
     x = x.view(n, c, x.shape[2], x.shape[3])
 
     return x
@@ -172,16 +165,12 @@ def gen_kernel(
 
     # Set COV matrix using Lambdas and Theta
     LAMBDA = np.diag([lambda_1, lambda_2])
-    Q = np.array(
-        [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
-    )
+    Q = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
     SIGMA = Q @ LAMBDA @ Q.T
     INV_SIGMA = np.linalg.inv(SIGMA)[None, None, :, :]
 
     # Set expectation position (shifting kernel for aligned image)
-    MU = k_size // 2 - 0.5 * (
-        scale_factor - 1
-    )  # - 0.5 * (scale_factor - k_size % 2)
+    MU = k_size // 2 - 0.5 * (scale_factor - 1)  # - 0.5 * (scale_factor - k_size % 2)
     MU = MU[None, None, :, None]
 
     # Create meshgrid for Gaussian
@@ -206,9 +195,7 @@ def fspecial_gaussian(hsize, sigma):
     hsize = [hsize, hsize]
     siz = [(hsize[0] - 1.0) / 2.0, (hsize[1] - 1.0) / 2.0]
     std = sigma
-    [x, y] = np.meshgrid(
-        np.arange(-siz[1], siz[1] + 1), np.arange(-siz[0], siz[0] + 1)
-    )
+    [x, y] = np.meshgrid(np.arange(-siz[1], siz[1] + 1), np.arange(-siz[0], siz[0] + 1))
     arg = -(x * x + y * y) / (2 * std * std)
     h = np.exp(arg)
     h[h < scipy.finfo(float).eps * h.max()] = 0
@@ -232,9 +219,9 @@ def fspecial(filter_type, *args, **kwargs):
     python code from:
     https://github.com/ronaldosena/imagens-medicas-2/blob/40171a6c259edec7827a6693a93955de2bd39e76/Aulas/aula_2_-_uniform_filter/matlab_fspecial.py
     """
-    if filter_type == 'gaussian':
+    if filter_type == "gaussian":
         return fspecial_gaussian(*args, **kwargs)
-    if filter_type == 'laplacian':
+    if filter_type == "laplacian":
         return fspecial_laplacian(*args, **kwargs)
 
 
@@ -275,7 +262,7 @@ def srmd_degradation(x, k, sf=3):
         }
     """
     x = ndimage.filters.convolve(
-        x, np.expand_dims(k, axis=2), mode='wrap'
+        x, np.expand_dims(k, axis=2), mode="wrap"
     )  # 'nearest' | 'mirror'
     x = bicubic_degradation(x, sf=sf)
     return x
@@ -299,7 +286,7 @@ def dpsr_degradation(x, k, sf=3):
         }
     """
     x = bicubic_degradation(x, sf=sf)
-    x = ndimage.filters.convolve(x, np.expand_dims(k, axis=2), mode='wrap')
+    x = ndimage.filters.convolve(x, np.expand_dims(k, axis=2), mode="wrap")
     return x
 
 
@@ -312,7 +299,7 @@ def classical_degradation(x, k, sf=3):
     Return:
         downsampled LR image
     """
-    x = ndimage.filters.convolve(x, np.expand_dims(k, axis=2), mode='wrap')
+    x = ndimage.filters.convolve(x, np.expand_dims(k, axis=2), mode="wrap")
     # x = filters.correlate(x, np.expand_dims(np.flip(k), axis=2))
     st = 0
     return x[st::sf, st::sf, ...]
@@ -336,7 +323,7 @@ def add_sharpening(img, weight=0.5, radius=50, threshold=10):
     blur = cv2.GaussianBlur(img, (radius, radius), 0)
     residual = img - blur
     mask = np.abs(residual) * 255 > threshold
-    mask = mask.astype('float32')
+    mask = mask.astype("float32")
     soft_mask = cv2.GaussianBlur(mask, (radius, radius), 0)
 
     K = img + weight * residual
@@ -361,12 +348,8 @@ def add_blur(img, sf=4):
             l2=l2,
         )
     else:
-        k = fspecial(
-            'gaussian', random.randint(2, 4) + 3, wd * random.random()
-        )
-    img = ndimage.filters.convolve(
-        img, np.expand_dims(k, axis=2), mode='mirror'
-    )
+        k = fspecial("gaussian", random.randint(2, 4) + 3, wd * random.random())
+    img = ndimage.filters.convolve(img, np.expand_dims(k, axis=2), mode="mirror")
 
     return img
 
@@ -434,9 +417,9 @@ def add_speckle_noise(img, noise_level1=2, noise_level2=25):
     img = np.clip(img, 0.0, 1.0)
     rnum = random.random()
     if rnum > 0.6:
-        img += img * np.random.normal(
-            0, noise_level / 255.0, img.shape
-        ).astype(np.float32)
+        img += img * np.random.normal(0, noise_level / 255.0, img.shape).astype(
+            np.float32
+        )
     elif rnum < 0.4:
         img += img * np.random.normal(
             0, noise_level / 255.0, (*img.shape[:2], 1)
@@ -462,8 +445,7 @@ def add_Poisson_noise(img):
         img_gray = np.dot(img[..., :3], [0.299, 0.587, 0.114])
         img_gray = np.clip((img_gray * 255.0).round(), 0, 255) / 255.0
         noise_gray = (
-            np.random.poisson(img_gray * vals).astype(np.float32) / vals
-            - img_gray
+            np.random.poisson(img_gray * vals).astype(np.float32) / vals - img_gray
         )
         img += noise_gray[:, :, np.newaxis]
     img = np.clip(img, 0.0, 1.0)
@@ -474,7 +456,7 @@ def add_JPEG_noise(img):
     quality_factor = random.randint(80, 95)
     img = cv2.cvtColor(util.single2uint(img), cv2.COLOR_RGB2BGR)
     result, encimg = cv2.imencode(
-        '.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), quality_factor]
+        ".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality_factor]
     )
     img = cv2.imdecode(encimg, 1)
     img = cv2.cvtColor(util.uint2single(img), cv2.COLOR_BGR2RGB)
@@ -517,7 +499,7 @@ def degradation_bsrgan(img, sf=4, lq_patchsize=72, isp_model=None):
     h, w = img.shape[:2]
 
     if h < lq_patchsize * sf or w < lq_patchsize * sf:
-        raise ValueError(f'img size ({h1}X{w1}) is too small!')
+        raise ValueError(f"img size ({h1}X{w1}) is too small!")
 
     hq = img.copy()
 
@@ -542,7 +524,6 @@ def degradation_bsrgan(img, sf=4, lq_patchsize=72, isp_model=None):
         )
 
     for i in shuffle_order:
-
         if i == 0:
             img = add_blur(img, sf=sf)
 
@@ -560,13 +541,11 @@ def degradation_bsrgan(img, sf=4, lq_patchsize=72, isp_model=None):
                     interpolation=random.choice([1, 2, 3]),
                 )
             else:
-                k = fspecial('gaussian', 25, random.uniform(0.1, 0.6 * sf))
+                k = fspecial("gaussian", 25, random.uniform(0.1, 0.6 * sf))
                 k_shifted = shift_pixel(k, sf)
-                k_shifted = (
-                    k_shifted / k_shifted.sum()
-                )  # blur with shifted kernel
+                k_shifted = k_shifted / k_shifted.sum()  # blur with shifted kernel
                 img = ndimage.filters.convolve(
-                    img, np.expand_dims(k_shifted, axis=2), mode='mirror'
+                    img, np.expand_dims(k_shifted, axis=2), mode="mirror"
                 )
                 img = img[0::sf, 0::sf, ...]  # nearest downsampling
             img = np.clip(img, 0.0, 1.0)
@@ -648,7 +627,6 @@ def degradation_bsrgan_variant(image, sf=4, isp_model=None):
         )
 
     for i in shuffle_order:
-
         if i == 0:
             image = add_blur(image, sf=sf)
 
@@ -672,13 +650,11 @@ def degradation_bsrgan_variant(image, sf=4, isp_model=None):
                     interpolation=random.choice([1, 2, 3]),
                 )
             else:
-                k = fspecial('gaussian', 25, random.uniform(0.1, 0.6 * sf))
+                k = fspecial("gaussian", 25, random.uniform(0.1, 0.6 * sf))
                 k_shifted = shift_pixel(k, sf)
-                k_shifted = (
-                    k_shifted / k_shifted.sum()
-                )  # blur with shifted kernel
+                k_shifted = k_shifted / k_shifted.sum()  # blur with shifted kernel
                 image = ndimage.filters.convolve(
-                    image, np.expand_dims(k_shifted, axis=2), mode='mirror'
+                    image, np.expand_dims(k_shifted, axis=2), mode="mirror"
                 )
                 image = image[0::sf, 0::sf, ...]  # nearest downsampling
 
@@ -711,29 +687,29 @@ def degradation_bsrgan_variant(image, sf=4, isp_model=None):
     # add final JPEG compression noise
     image = add_JPEG_noise(image)
     image = util.single2uint(image)
-    example = {'image': image}
+    example = {"image": image}
     return example
 
 
-if __name__ == '__main__':
-    print('hey')
-    img = util.imread_uint('utils/test.png', 3)
+if __name__ == "__main__":
+    print("hey")
+    img = util.imread_uint("utils/test.png", 3)
     img = img[:448, :448]
     h = img.shape[0] // 4
-    print('resizing to', h)
+    print("resizing to", h)
     sf = 4
     deg_fn = partial(degradation_bsrgan_variant, sf=sf)
     for i in range(20):
         print(i)
         img_hq = img
-        img_lq = deg_fn(img)['image']
+        img_lq = deg_fn(img)["image"]
         img_hq, img_lq = util.uint2single(img_hq), util.uint2single(img_lq)
         print(img_lq)
         img_lq_bicubic = albumentations.SmallestMaxSize(
             max_size=h, interpolation=cv2.INTER_CUBIC
-        )(image=img_hq)['image']
+        )(image=img_hq)["image"]
         print(img_lq.shape)
-        print('bicubic', img_lq_bicubic.shape)
+        print("bicubic", img_lq_bicubic.shape)
         print(img_hq.shape)
         lq_nearest = cv2.resize(
             util.single2uint(img_lq),
@@ -748,4 +724,4 @@ if __name__ == '__main__':
         img_concat = np.concatenate(
             [lq_bicubic_nearest, lq_nearest, util.single2uint(img_hq)], axis=1
         )
-        util.imsave(img_concat, str(i) + '.png')
+        util.imsave(img_concat, str(i) + ".png")

@@ -1,5 +1,6 @@
-from .parse_seed_weights import parse_seed_weights
 import argparse
+
+from .parse_seed_weights import parse_seed_weights
 
 SAMPLER_CHOICES = [
     "ddim",

@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 from .devices import torch_dtype
 
+
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot
@@ -281,14 +282,14 @@ def ask_user(question: str, answers: list):
 
 # -------------------------------------
 def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path:
-    '''
+    """
     Download a model file.
     :param url:  https, http or ftp URL
     :param dest: A Path object. If path exists and is a directory, then we try to derive the filename
                  from the URL's Content-Disposition header and copy the URL contents into
                  dest/filename
     :param access_token: Access token to access this resource
-    '''
+    """
     header = {"Authorization": f"Bearer {access_token}"} if access_token else {}
     open_mode = "wb"
     exist_size = 0
@@ -298,7 +299,9 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
 
     if dest.is_dir():
         try:
-            file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition")).group(1)
+            file_name = re.search(
+                'filename="(.+)"', resp.headers.get("Content-Disposition")
+            ).group(1)
         except:
             file_name = os.path.basename(url)
         dest = dest / file_name
@@ -309,16 +312,14 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         exist_size = dest.stat().st_size
         header["Range"] = f"bytes={exist_size}-"
         open_mode = "ab"
-        resp = requests.get(url, headers=header, stream=True) # new request with range
+        resp = requests.get(url, headers=header, stream=True)  # new request with range
 
     if exist_size > content_length:
-        print('* corrupt existing file found. re-downloading')
+        print("* corrupt existing file found. re-downloading")
         os.remove(dest)
         exist_size = 0
 
-    if (
-        resp.status_code == 416 or exist_size == content_length
-    ):
+    if resp.status_code == 416 or exist_size == content_length:
         print(f"* {dest}: complete file found. Skipping.")
         return dest
     elif resp.status_code == 206 or exist_size > 0:
@@ -334,12 +335,12 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
             return None
 
         with open(dest, open_mode) as file, tqdm(
-                desc=str(dest),
-                initial=exist_size,
-                total=content_length,
-                unit="iB",
-                unit_scale=True,
-                unit_divisor=1000,
+            desc=str(dest),
+            initial=exist_size,
+            total=content_length,
+            unit="iB",
+            unit_scale=True,
+            unit_divisor=1000,
         ) as bar:
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)

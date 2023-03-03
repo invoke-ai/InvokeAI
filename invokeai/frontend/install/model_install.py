@@ -14,34 +14,42 @@ import os
 import sys
 from argparse import Namespace
 from pathlib import Path
+from shutil import get_terminal_size
 from typing import List
 
 import npyscreen
 import torch
 from npyscreen import widget
 from omegaconf import OmegaConf
-from shutil import get_terminal_size
 
-from ...backend.util import choose_precision, choose_torch_device
 from invokeai.backend.globals import Globals, global_config_dir
-from ...backend.config.model_install_backend import (Dataset_path, default_config_file,
-                                                     default_dataset, get_root,
-                                                     install_requested_models,
-                                                     recommended_datasets,
-                                                     )
-from .widgets import (MultiSelectColumns, TextBox,
-                      OffsetButtonPress, CenteredTitleText,
-                      set_min_terminal_size,
-                      )
+
+from ...backend.config.model_install_backend import (
+    Dataset_path,
+    default_config_file,
+    default_dataset,
+    get_root,
+    install_requested_models,
+    recommended_datasets,
+)
+from ...backend.util import choose_precision, choose_torch_device
+from .widgets import (
+    CenteredTitleText,
+    MultiSelectColumns,
+    OffsetButtonPress,
+    TextBox,
+    set_min_terminal_size,
+)
 
 # minimum size for the UI
 MIN_COLS = 120
 MIN_LINES = 45
 
+
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
-    #FIX_MINIMUM_SIZE_WHEN_CREATED = False
-    
+    # FIX_MINIMUM_SIZE_WHEN_CREATED = False
+
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
         self.initial_models = OmegaConf.load(Dataset_path)
@@ -71,13 +79,13 @@ class addModelsForm(npyscreen.FormMultiPage):
             npyscreen.FixedText,
             value="Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields,",
             editable=False,
-            color='CAUTION',
+            color="CAUTION",
         )
         self.add_widget_intelligent(
             npyscreen.FixedText,
             value="Use cursor arrows to make a selection, and space to toggle checkboxes.",
             editable=False,
-            color='CAUTION'
+            color="CAUTION",
         )
         self.nextrely += 1
         if len(self.installed_models) > 0:
@@ -147,30 +155,26 @@ class addModelsForm(npyscreen.FormMultiPage):
             )
         self.add_widget_intelligent(
             CenteredTitleText,
-            name='== IMPORT LOCAL AND REMOTE MODELS ==',
+            name="== IMPORT LOCAL AND REMOTE MODELS ==",
             editable=False,
             color="CONTROL",
         )
         self.nextrely -= 1
 
         for line in [
-                "In the box below, enter URLs, file paths, or HuggingFace repository IDs.",
-                "Separate model names by lines or whitespace (Use shift-control-V to paste):",
+            "In the box below, enter URLs, file paths, or HuggingFace repository IDs.",
+            "Separate model names by lines or whitespace (Use shift-control-V to paste):",
         ]:
             self.add_widget_intelligent(
                 CenteredTitleText,
                 name=line,
                 editable=False,
                 labelColor="CONTROL",
-                relx = 4,
+                relx=4,
             )
             self.nextrely -= 1
         self.import_model_paths = self.add_widget_intelligent(
-            TextBox,
-            max_height=7,
-            scroll_exit=True,
-            editable=True,
-            relx=4
+            TextBox, max_height=7, scroll_exit=True, editable=True, relx=4
         )
         self.nextrely += 1
         self.show_directory_fields = self.add_widget_intelligent(
@@ -245,7 +249,7 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def resize(self):
         super().resize()
-        if hasattr(self,'models_selected'):
+        if hasattr(self, "models_selected"):
             self.models_selected.values = self._get_starter_model_labels()
 
     def _clear_scan_directory(self):
@@ -325,10 +329,11 @@ class addModelsForm(npyscreen.FormMultiPage):
         selections = self.parentApp.user_selections
 
         # starter models to install/remove
-        if hasattr(self,'models_selected'):
+        if hasattr(self, "models_selected"):
             starter_models = dict(
                 map(
-                    lambda x: (self.starter_model_list[x], True), self.models_selected.value
+                    lambda x: (self.starter_model_list[x], True),
+                    self.models_selected.value,
                 )
             )
         else:
@@ -375,6 +380,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         self.main_form = self.addForm(
             "MAIN", addModelsForm, name="Install Stable Diffusion Models"
         )
+
 
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace, selections: Namespace):
@@ -477,9 +483,9 @@ def main():
         print(
             ">> Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )
-        import ldm.invoke.config.invokeai_configure
+        from invokeai.frontend.install import invokeai_configure
 
-        ldm.invoke.config.invokeai_configure.main()
+        invokeai_configure()
         sys.exit(0)
 
     try:
@@ -498,6 +504,7 @@ def main():
             print(
                 "** Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
+
 
 # -------------------------------------
 if __name__ == "__main__":

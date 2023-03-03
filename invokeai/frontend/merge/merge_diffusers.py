@@ -1,5 +1,5 @@
 """
-ldm.invoke.merge_diffusers exports a single function call merge_diffusion_models()
+invokeai.frontend.merge exports a single function call merge_diffusion_models()
 used to merge 2-3 models together and create a new InvokeAI-registered diffusion model.
 
 Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
@@ -20,12 +20,18 @@ from diffusers import logging as dlogging
 from npyscreen import widget
 from omegaconf import OmegaConf
 
-from ...frontend.config.widgets import FloatTitleSlider
-from ...backend.globals import (Globals, global_cache_dir, global_config_file,
-                                global_models_dir, global_set_root)
+from ...backend.globals import (
+    Globals,
+    global_cache_dir,
+    global_config_file,
+    global_models_dir,
+    global_set_root,
+)
 from ...backend.model_management import ModelManager
+from ...frontend.install.widgets import FloatTitleSlider
 
 DEST_MERGED_MODEL_DIR = "merged_models"
+
 
 def merge_diffusion_models(
     model_ids_or_paths: List[Union[str, Path]],
@@ -310,8 +316,8 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         self.merged_model_name.value = merged_model_name
 
         if selected_model3 > 0:
-            self.merge_method.values = ['add_difference ( A+(B-C) )']
-            self.merged_model_name.value += f"+{models[selected_model3 -1]}" # In model3 there is one more element in the list (None). So we have to subtract one.
+            self.merge_method.values = ["add_difference ( A+(B-C) )"]
+            self.merged_model_name.value += f"+{models[selected_model3 -1]}"  # In model3 there is one more element in the list (None). So we have to subtract one.
         else:
             self.merge_method.values = self.interpolations
         self.merge_method.value = 0
@@ -336,9 +342,9 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         ]
         if self.model3.value[0] > 0:
             models.append(model_names[self.model3.value[0] - 1])
-            interp='add_difference'
+            interp = "add_difference"
         else:
-            interp=self.interpolations[self.merge_method.value[0]]
+            interp = self.interpolations[self.merge_method.value[0]]
 
         args = dict(
             models=models,
@@ -453,7 +459,9 @@ def main():
                 "** You need to have at least two diffusers models defined in models.yaml in order to merge"
             )
         else:
-            print("** Not enough room for the user interface. Try making this window larger.")
+            print(
+                "** Not enough room for the user interface. Try making this window larger."
+            )
         sys.exit(-1)
     except Exception:
         print(">> An error occurred:")

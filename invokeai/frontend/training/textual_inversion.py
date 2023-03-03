@@ -21,10 +21,8 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 from invokeai.backend.globals import Globals, global_set_root
-from ...backend.training import (
-    do_textual_inversion_training,
-    parse_args,
-)
+
+from ...backend.training import do_textual_inversion_training, parse_args
 
 TRAINING_DATA = "text-inversion-training-data"
 TRAINING_DIR = "text-inversion-output"
@@ -448,9 +446,9 @@ def main():
             print(
                 "** You need to have at least one diffusers models defined in models.yaml in order to train"
             )
-        elif str(e).startswith('addwstr'):
+        elif str(e).startswith("addwstr"):
             print(
-                '** Not enough window space for the interface. Please make your window larger and try again.'
+                "** Not enough window space for the interface. Please make your window larger and try again."
             )
         else:
             print(f"** An error has occurred: {str(e)}")

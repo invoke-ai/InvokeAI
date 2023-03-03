@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Union
 
 import click
-
 from compel import PromptParser
 
 if sys.platform == "darwin":
@@ -18,21 +17,22 @@ import pyparsing  # type: ignore
 
 import invokeai.version
 
-from ...backend import Generate
-from ...backend.args import (Args,
-                             dream_cmd_from_png,
-                             metadata_dumps,
-                             metadata_from_png)
-from ...backend.stable_diffusion import PipelineIntermediateState
-from ...backend.image_util import make_grid, PngWriter, retrieve_metadata, write_metadata
-from ...backend import ModelManager
+from ...backend import Generate, ModelManager
+from ...backend.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
 from ...backend.globals import Globals
-from ...backend.util import write_log
+from ...backend.image_util import (
+    PngWriter,
+    make_grid,
+    retrieve_metadata,
+    write_metadata,
+)
+from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.util import url_attachment_name, write_log
 from .readline import Completer, get_completer
-from ...backend.util import url_attachment_name
 
 # global used in multiple functions (fix)
 infile = None
+
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
@@ -494,7 +494,7 @@ def main_loop(gen, opt):
 def do_command(command: str, gen, opt: Args, completer) -> tuple:
     global infile
     operation = "generate"  # default operation, alternative is 'postprocess'
-    command = command.replace('\\','/') # windows
+    command = command.replace("\\", "/")  # windows
 
     if command.startswith(
         "!dream"
@@ -537,10 +537,10 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
                 import_model(path[1], gen, opt, completer)
                 completer.add_history(command)
             except KeyboardInterrupt:
-                print('\n')
+                print("\n")
         operation = None
 
-    elif command.startswith(("!convert","!optimize")):
+    elif command.startswith(("!convert", "!optimize")):
         path = shlex.split(command)
         if len(path) < 2:
             print("** please provide the path to a .ckpt or .safetensors model")
@@ -549,9 +549,9 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
                 convert_model(path[1], gen, opt, completer)
                 completer.add_history(command)
             except KeyboardInterrupt:
-                print('\n')
+                print("\n")
         operation = None
- 
+
     elif command.startswith("!edit"):
         path = shlex.split(command)
         if len(path) < 2:
@@ -639,12 +639,12 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     ):
         pass
     else:
-        if model_path.startswith(('http:','https:')):
+        if model_path.startswith(("http:", "https:")):
             try:
                 default_name = url_attachment_name(model_path)
                 default_name = Path(default_name).stem
             except Exception as e:
-                print(f'** URL: {str(e)}')
+                print(f"** URL: {str(e)}")
             model_name, model_desc = _get_model_name_and_desc(
                 gen.model_manager,
                 completer,
@@ -671,6 +671,7 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     gen.model_manager.commit(opt.conf)
     completer.update_models(gen.model_manager.list_models())
     print(f">> {imported_name} successfully installed")
+
 
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")
@@ -704,6 +705,7 @@ def _get_model_name_and_desc(
     )
     return model_name, model_description
 
+
 def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
     model_name_or_path = model_name_or_path.replace("\\", "/")  # windows
     manager = gen.model_manager
@@ -722,7 +724,9 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
         else:
             print(f"** {model_name_or_path} is not a legacy .ckpt weights file")
             return
-        if vae_repo := ldm.invoke.model_manager.VAE_TO_REPO_ID.get(Path(vae).stem):
+        if vae_repo := invokeai.backend.model_management.model_manager.VAE_TO_REPO_ID.get(
+            Path(vae).stem
+        ):
             vae_repo = dict(repo_id=vae_repo)
         else:
             vae_repo = None
@@ -742,7 +746,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
         except KeyboardInterrupt:
             return
 
-    manager.commit(opt.conf)    
+    manager.commit(opt.conf)
     if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
         print(f"{ckpt_path} deleted")
@@ -1106,7 +1110,7 @@ def make_step_callback(gen, opt, prefix):
         if step % opt.save_intermediates == 0 or step == opt.steps - 1:
             filename = os.path.join(destination, f"{step:04}.png")
             image = gen.sample_to_lowres_estimated_image(latents)
-            image = image.resize((image.size[0]*8,image.size[1]*8))
+            image = image.resize((image.size[0] * 8, image.size[1] * 8))
             image.save(filename, "PNG")
 
     return callback
@@ -1190,8 +1194,8 @@ def report_model_error(opt: Namespace, e: Exception):
         )
     else:
         if not click.confirm(
-                'Do you want to run invokeai-configure script to select and/or reinstall models?',
-                default=False
+            "Do you want to run invokeai-configure script to select and/or reinstall models?",
+            default=False,
         ):
             return
 
@@ -1209,9 +1213,9 @@ def report_model_error(opt: Namespace, e: Exception):
         for arg in yes_to_all.split():
             sys.argv.append(arg)
 
-    from ldm.invoke.config import invokeai_configure
+    from ..install import invokeai_configure
 
-    invokeai_configure.main()
+    invokeai_configure()
     print("** InvokeAI will now restart")
     sys.argv = previous_args
     main()  # would rather do a os.exec(), but doesn't exist?
@@ -1232,6 +1236,6 @@ def check_internet() -> bool:
     except:
         return False
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
-    

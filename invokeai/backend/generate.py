@@ -25,18 +25,20 @@ from omegaconf import OmegaConf
 from PIL import Image, ImageOps
 from pytorch_lightning import logging, seed_everything
 
-from . import ModelManager
-from .prompting import get_uc_and_c_and_ec
-from .stable_diffusion import (DDIMSampler, KSampler, PLMSSampler, HuggingFaceConceptsLibrary)
-from .generator import infill_methods
-from .util import choose_precision, choose_torch_device
-from .image_util import (InitImageResizer,
-                                         PngWriter,
-                                         Txt2Mask,
-                                         configure_model_padding)
-
-from .globals import Globals, global_cache_dir
+from .model_management import ModelManager
 from .args import metadata_from_png
+from .generator import infill_methods
+from .globals import Globals, global_cache_dir
+from .image_util import InitImageResizer, PngWriter, Txt2Mask, configure_model_padding
+from .prompting import get_uc_and_c_and_ec
+from .stable_diffusion import (
+    DDIMSampler,
+    HuggingFaceConceptsLibrary,
+    KSampler,
+    PLMSSampler,
+)
+from .util import choose_precision, choose_torch_device
+
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -324,8 +326,8 @@ class Generate:
         variation_amount=0.0,
         threshold=0.0,
         perlin=0.0,
-        h_symmetry_time_pct = None,
-        v_symmetry_time_pct = None,
+        h_symmetry_time_pct=None,
+        v_symmetry_time_pct=None,
         karras_max=None,
         outdir=None,
         # these are specific to img2img and inpaint
@@ -713,7 +715,7 @@ class Generate:
             prompt,
             model=self.model,
             skip_normalize_legacy_blend=opt.skip_normalize,
-            log_tokens=ldm.invoke.conditioning.log_tokenization,
+            log_tokens=invokeai.backend.prompting.conditioning.log_tokenization,
         )
 
         if tool in ("gfpgan", "codeformer", "upscale"):
@@ -737,7 +739,7 @@ class Generate:
             )
 
         elif tool == "outcrop":
-            from ldm.invoke.restoration.outcrop import Outcrop
+            from .restoration.outcrop import Outcrop
 
             extend_instructions = {}
             for direction, pixels in _pairwise(opt.outcrop):
@@ -790,7 +792,7 @@ class Generate:
                 clear_cuda_cache=self.clear_cuda_cache,
             )
         elif tool == "outpaint":
-            from ldm.invoke.restoration.outpaint import Outpaint
+            from .restoration.outpaint import Outpaint
 
             restorer = Outpaint(image, self)
             return restorer.process(opt, args, image_callback=callback, prefix=prefix)
@@ -812,7 +814,6 @@ class Generate:
         hires_fix: bool = False,
         force_outpaint: bool = False,
     ):
-
         if hires_fix:
             return self._make_txt2img2img()
 
@@ -960,7 +961,7 @@ class Generate:
 
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
-            print(f'>> Loading embeddings from {self.embedding_path}')
+            print(f">> Loading embeddings from {self.embedding_path}")
             for root, _, files in os.walk(self.embedding_path):
                 for name in files:
                     ti_path = os.path.join(root, name)
@@ -1015,7 +1016,6 @@ class Generate:
         image_callback=None,
         prefix=None,
     ):
-
         results = []
         for r in image_list:
             image, seed = r

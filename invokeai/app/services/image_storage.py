@@ -1,20 +1,22 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from abc import ABC, abstractmethod
-from enum import Enum
 import datetime
 import os
+from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 from queue import Queue
 from typing import Dict
+
 from PIL.Image import Image
+
 from invokeai.backend.image_util import PngWriter
 
 
 class ImageType(str, Enum):
-    RESULT = 'results'
-    INTERMEDIATE = 'intermediates'
-    UPLOAD = 'uploads'
+    RESULT = "results"
+    INTERMEDIATE = "intermediates"
+    UPLOAD = "uploads"
 
 
 class ImageStorageBase(ABC):
@@ -38,14 +40,15 @@ class ImageStorageBase(ABC):
         pass
 
     def create_name(self, context_id: str, node_id: str) -> str:
-        return f'{context_id}_{node_id}_{str(int(datetime.datetime.now(datetime.timezone.utc).timestamp()))}.png'
+        return f"{context_id}_{node_id}_{str(int(datetime.datetime.now(datetime.timezone.utc).timestamp()))}.png"
 
 
 class DiskImageStorage(ImageStorageBase):
     """Stores images on disk"""
+
     __output_folder: str
     __pngWriter: PngWriter
-    __cache_ids: Queue # TODO: this is an incredibly naive cache
+    __cache_ids: Queue  # TODO: this is an incredibly naive cache
     __cache: Dict[str, Image]
     __max_cache_size: int
 
@@ -54,13 +57,15 @@ class DiskImageStorage(ImageStorageBase):
         self.__pngWriter = PngWriter(output_folder)
         self.__cache = dict()
         self.__cache_ids = Queue()
-        self.__max_cache_size = 10 # TODO: get this from config
+        self.__max_cache_size = 10  # TODO: get this from config
 
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
         # TODO: don't hard-code. get/save/delete should maybe take subpath?
         for image_type in ImageType:
-            Path(os.path.join(output_folder, image_type)).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(output_folder, image_type)).mkdir(
+                parents=True, exist_ok=True
+            )
 
     def get(self, image_type: ImageType, image_name: str) -> Image:
         image_path = self.get_path(image_type, image_name)
@@ -79,7 +84,9 @@ class DiskImageStorage(ImageStorageBase):
 
     def save(self, image_type: ImageType, image_name: str, image: Image) -> None:
         image_subpath = os.path.join(image_type, image_name)
-        self.__pngWriter.save_image_and_prompt_to_png(image, "", image_subpath, None) # TODO: just pass full path to png writer
+        self.__pngWriter.save_image_and_prompt_to_png(
+            image, "", image_subpath, None
+        )  # TODO: just pass full path to png writer
 
         image_path = self.get_path(image_type, image_name)
         self.__set_cache(image_path, image)
@@ -88,7 +95,7 @@ class DiskImageStorage(ImageStorageBase):
         image_path = self.get_path(image_type, image_name)
         if os.path.exists(image_path):
             os.remove(image_path)
-        
+
         if image_path in self.__cache:
             del self.__cache[image_path]
 
@@ -98,7 +105,9 @@ class DiskImageStorage(ImageStorageBase):
     def __set_cache(self, image_name: str, image: Image):
         if not image_name in self.__cache:
             self.__cache[image_name] = image
-            self.__cache_ids.put(image_name) # TODO: this should refresh position for LRU cache
+            self.__cache_ids.put(
+                image_name
+            )  # TODO: this should refresh position for LRU cache
             if len(self.__cache) > self.__max_cache_size:
                 cache_id = self.__cache_ids.get()
                 del self.__cache[cache_id]

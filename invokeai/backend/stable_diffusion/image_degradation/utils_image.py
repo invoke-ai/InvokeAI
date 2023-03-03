@@ -1,16 +1,17 @@
-import os
 import math
+import os
 import random
+from datetime import datetime
+
+import cv2
 import numpy as np
 import torch
-import cv2
 from torchvision.utils import make_grid
-from datetime import datetime
 
 # import matplotlib.pyplot as plt   # TODO: check with Dominik, also bsrgan.py vs bsrgan_light.py
 
 
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 """
@@ -25,17 +26,17 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 
 IMG_EXTENSIONS = [
-    '.jpg',
-    '.JPG',
-    '.jpeg',
-    '.JPEG',
-    '.png',
-    '.PNG',
-    '.ppm',
-    '.PPM',
-    '.bmp',
-    '.BMP',
-    '.tif',
+    ".jpg",
+    ".JPG",
+    ".jpeg",
+    ".JPEG",
+    ".png",
+    ".PNG",
+    ".ppm",
+    ".PPM",
+    ".bmp",
+    ".BMP",
+    ".tif",
 ]
 
 
@@ -44,12 +45,12 @@ def is_image_file(filename):
 
 
 def get_timestamp():
-    return datetime.now().strftime('%y%m%d-%H%M%S')
+    return datetime.now().strftime("%y%m%d-%H%M%S")
 
 
 def imshow(x, title=None, cbar=False, figsize=None):
     plt.figure(figsize=figsize)
-    plt.imshow(np.squeeze(x), interpolation='nearest', cmap='gray')
+    plt.imshow(np.squeeze(x), interpolation="nearest", cmap="gray")
     if title:
         plt.title(title)
     if cbar:
@@ -57,9 +58,9 @@ def imshow(x, title=None, cbar=False, figsize=None):
     plt.show()
 
 
-def surf(Z, cmap='rainbow', figsize=None):
+def surf(Z, cmap="rainbow", figsize=None):
     plt.figure(figsize=figsize)
-    ax3 = plt.axes(projection='3d')
+    ax3 = plt.axes(projection="3d")
 
     w, h = Z.shape[:2]
     xx = np.arange(0, w, 1)
@@ -85,14 +86,14 @@ def get_image_paths(dataroot):
 
 
 def _get_paths_from_images(path):
-    assert os.path.isdir(path), '{:s} is not a valid directory'.format(path)
+    assert os.path.isdir(path), "{:s} is not a valid directory".format(path)
     images = []
     for dirpath, _, fnames in sorted(os.walk(path)):
         for fname in sorted(fnames):
             if is_image_file(fname):
                 img_path = os.path.join(dirpath, fname)
                 images.append(img_path)
-    assert images, '{:s} has no valid image file'.format(path)
+    assert images, "{:s} has no valid image file".format(path)
     return images
 
 
@@ -133,7 +134,7 @@ def imssave(imgs, img_path):
             img = img[:, :, [2, 1, 0]]
         new_path = os.path.join(
             os.path.dirname(img_path),
-            img_name + str('_s{:04d}'.format(i)) + '.png',
+            img_name + str("_s{:04d}".format(i)) + ".png",
         )
         cv2.imwrite(new_path, img)
 
@@ -162,9 +163,7 @@ def split_imageset(
         # img_name, ext = os.path.splitext(os.path.basename(img_path))
         img = imread_uint(img_path, n_channels=n_channels)
         patches = patches_from_image(img, p_size, p_overlap, p_max)
-        imssave(
-            patches, os.path.join(taget_dataroot, os.path.basename(img_path))
-        )
+        imssave(patches, os.path.join(taget_dataroot, os.path.basename(img_path)))
         # if original_dataroot == taget_dataroot:
         # del img_path
 
@@ -191,8 +190,8 @@ def mkdirs(paths):
 
 def mkdir_and_rename(path):
     if os.path.exists(path):
-        new_name = path + '_archived_' + get_timestamp()
-        print('Path already exists. Rename it to [{:s}]'.format(new_name))
+        new_name = path + "_archived_" + get_timestamp()
+        print("Path already exists. Rename it to [{:s}]".format(new_name))
         os.replace(path, new_name)
     os.makedirs(path)
 
@@ -273,22 +272,18 @@ def read_img(path):
 
 
 def uint2single(img):
-
     return np.float32(img / 255.0)
 
 
 def single2uint(img):
-
     return np.uint8((img.clip(0, 1) * 255.0).round())
 
 
 def uint162single(img):
-
     return np.float32(img / 65535.0)
 
 
 def single2uint16(img):
-
     return np.uint16((img.clip(0, 1) * 65535.0).round())
 
 
@@ -315,10 +310,7 @@ def uint2tensor3(img):
     if img.ndim == 2:
         img = np.expand_dims(img, axis=2)
     return (
-        torch.from_numpy(np.ascontiguousarray(img))
-        .permute(2, 0, 1)
-        .float()
-        .div(255.0)
+        torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.0)
     )
 
 
@@ -379,18 +371,11 @@ def single2tensor5(img):
 
 
 def single32tensor5(img):
-    return (
-        torch.from_numpy(np.ascontiguousarray(img))
-        .float()
-        .unsqueeze(0)
-        .unsqueeze(0)
-    )
+    return torch.from_numpy(np.ascontiguousarray(img)).float().unsqueeze(0).unsqueeze(0)
 
 
 def single42tensor4(img):
-    return (
-        torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1, 3).float()
-    )
+    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1, 3).float()
 
 
 # from skimage.io import imread, imsave
@@ -403,15 +388,11 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     tensor = (
         tensor.squeeze().float().cpu().clamp_(*min_max)
     )  # squeeze first, then clamp
-    tensor = (tensor - min_max[0]) / (
-        min_max[1] - min_max[0]
-    )  # to range [0,1]
+    tensor = (tensor - min_max[0]) / (min_max[1] - min_max[0])  # to range [0,1]
     n_dim = tensor.dim()
     if n_dim == 4:
         n_img = len(tensor)
-        img_np = make_grid(
-            tensor, nrow=int(math.sqrt(n_img)), normalize=False
-        ).numpy()
+        img_np = make_grid(tensor, nrow=int(math.sqrt(n_img)), normalize=False).numpy()
         img_np = np.transpose(img_np[[2, 1, 0], :, :], (1, 2, 0))  # HWC, BGR
     elif n_dim == 3:
         img_np = tensor.numpy()
@@ -420,7 +401,7 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
         img_np = tensor.numpy()
     else:
         raise TypeError(
-            'Only support 4D, 3D and 2D tensor. But received with dimension: {:d}'.format(
+            "Only support 4D, 3D and 2D tensor. But received with dimension: {:d}".format(
                 n_dim
             )
         )
@@ -564,7 +545,7 @@ def modcrop(img_in, scale):
         H_r, W_r = H % scale, W % scale
         img = img[: H - H_r, : W - W_r, :]
     else:
-        raise ValueError('Wrong img ndim: [{:d}].'.format(img.ndim))
+        raise ValueError("Wrong img ndim: [{:d}].".format(img.ndim))
     return img
 
 
@@ -675,13 +656,13 @@ def bgr2ycbcr(img, only_y=True):
 
 def channel_convert(in_c, tar_type, img_list):
     # conversion among BGR, gray and y
-    if in_c == 3 and tar_type == 'gray':  # BGR to gray
+    if in_c == 3 and tar_type == "gray":  # BGR to gray
         gray_list = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in gray_list]
-    elif in_c == 3 and tar_type == 'y':  # BGR to y
+    elif in_c == 3 and tar_type == "y":  # BGR to y
         y_list = [bgr2ycbcr(img, only_y=True) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in y_list]
-    elif in_c == 1 and tar_type == 'RGB':  # gray/y to BGR
+    elif in_c == 1 and tar_type == "RGB":  # gray/y to BGR
         return [cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) for img in img_list]
     else:
         return img_list
@@ -702,7 +683,7 @@ def calculate_psnr(img1, img2, border=0):
     # img1 = img1.squeeze()
     # img2 = img2.squeeze()
     if not img1.shape == img2.shape:
-        raise ValueError('Input images must have the same dimensions.')
+        raise ValueError("Input images must have the same dimensions.")
     h, w = img1.shape[:2]
     img1 = img1[border : h - border, border : w - border]
     img2 = img2[border : h - border, border : w - border]
@@ -711,7 +692,7 @@ def calculate_psnr(img1, img2, border=0):
     img2 = img2.astype(np.float64)
     mse = np.mean((img1 - img2) ** 2)
     if mse == 0:
-        return float('inf')
+        return float("inf")
     return 20 * math.log10(255.0 / math.sqrt(mse))
 
 
@@ -726,7 +707,7 @@ def calculate_ssim(img1, img2, border=0):
     # img1 = img1.squeeze()
     # img2 = img2.squeeze()
     if not img1.shape == img2.shape:
-        raise ValueError('Input images must have the same dimensions.')
+        raise ValueError("Input images must have the same dimensions.")
     h, w = img1.shape[:2]
     img1 = img1[border : h - border, border : w - border]
     img2 = img2[border : h - border, border : w - border]
@@ -742,7 +723,7 @@ def calculate_ssim(img1, img2, border=0):
         elif img1.shape[2] == 1:
             return ssim(np.squeeze(img1), np.squeeze(img2))
     else:
-        raise ValueError('Wrong input image dimensions.')
+        raise ValueError("Wrong input image dimensions.")
 
 
 def ssim(img1, img2):
@@ -861,7 +842,7 @@ def imresize(img, scale, antialiasing=True):
         math.ceil(in_W * scale),
     )
     kernel_width = 4
-    kernel = 'cubic'
+    kernel = "cubic"
 
     # Return the desired dimension order for performing the resize.  The
     # strategy is to perform the resize first along the dimension with the
@@ -896,9 +877,7 @@ def imresize(img, scale, antialiasing=True):
         idx = int(indices_H[i][0])
         for j in range(out_C):
             out_1[j, i, :] = (
-                img_aug[j, idx : idx + kernel_width, :]
-                .transpose(0, 1)
-                .mv(weights_H[i])
+                img_aug[j, idx : idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
             )
 
     # process W dimension
@@ -921,9 +900,7 @@ def imresize(img, scale, antialiasing=True):
     for i in range(out_W):
         idx = int(indices_W[i][0])
         for j in range(out_C):
-            out_2[j, :, i] = out_1_aug[j, :, idx : idx + kernel_width].mv(
-                weights_W[i]
-            )
+            out_2[j, :, i] = out_1_aug[j, :, idx : idx + kernel_width].mv(weights_W[i])
     if need_squeeze:
         out_2.squeeze_()
     return out_2
@@ -948,7 +925,7 @@ def imresize_np(img, scale, antialiasing=True):
         math.ceil(in_W * scale),
     )
     kernel_width = 4
-    kernel = 'cubic'
+    kernel = "cubic"
 
     # Return the desired dimension order for performing the resize.  The
     # strategy is to perform the resize first along the dimension with the
@@ -983,9 +960,7 @@ def imresize_np(img, scale, antialiasing=True):
         idx = int(indices_H[i][0])
         for j in range(out_C):
             out_1[i, :, j] = (
-                img_aug[idx : idx + kernel_width, :, j]
-                .transpose(0, 1)
-                .mv(weights_H[i])
+                img_aug[idx : idx + kernel_width, :, j].transpose(0, 1).mv(weights_H[i])
             )
 
     # process W dimension
@@ -1008,17 +983,15 @@ def imresize_np(img, scale, antialiasing=True):
     for i in range(out_W):
         idx = int(indices_W[i][0])
         for j in range(out_C):
-            out_2[:, i, j] = out_1_aug[:, idx : idx + kernel_width, j].mv(
-                weights_W[i]
-            )
+            out_2[:, i, j] = out_1_aug[:, idx : idx + kernel_width, j].mv(weights_W[i])
     if need_squeeze:
         out_2.squeeze_()
 
     return out_2.numpy()
 
 
-if __name__ == '__main__':
-    print('---')
+if __name__ == "__main__":
+    print("---")
 #    img = imread_uint('test.bmp', 3)
 #    img = uint2single(img)
 #    img_bicubic = imresize_np(img, 1/4)
