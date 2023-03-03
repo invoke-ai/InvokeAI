@@ -47,9 +47,10 @@ export const postprocessingSlice = createSlice({
     ) => {
       const { type, hires_fix } = action.payload.image;
 
-      if (type === 'txt2img' && typeof hires_fix === 'boolean')
-        state.hiresFix = hires_fix;
-      // Strength of img2img used in hires_fix is not currently exposed in the Metadata for the final image.
+      if (type === 'txt2img') {
+        state.hiresFix = Boolean(hires_fix);
+        // Strength of img2img used in hires_fix is not currently exposed in the Metadata for the final image.
+      }
     },
     setFacetoolStrength: (state, action: PayloadAction<number>) => {
       state.facetoolStrength = action.payload;
