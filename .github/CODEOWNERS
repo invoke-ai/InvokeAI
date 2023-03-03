@@ -1,51 +1,34 @@
 # continuous integration
-/.github/workflows/ @mauwii @lstein @blessedcoolant
+/.github/workflows/ @mauwii @lstein
 
 # documentation
-/docs/ @lstein @mauwii @tildebyte @blessedcoolant
-mkdocs.yml @lstein @mauwii @blessedcoolant
+/docs/ @lstein @mauwii @tildebyte
+/mkdocs.yml @lstein @mauwii
+
+# nodes
+/invokeai/app/ @Kyle0654 @blessedcoolant
 
 # installation and configuration
-/pyproject.toml @mauwii @lstein @ebr @blessedcoolant
-/docker/ @mauwii @lstein @blessedcoolant
-/scripts/ @ebr @lstein @blessedcoolant
-/installer/ @ebr @lstein @tildebyte  @blessedcoolant
-ldm/invoke/config @lstein @ebr  @blessedcoolant
-invokeai/assets @lstein @ebr  @blessedcoolant
-invokeai/configs @lstein @ebr  @blessedcoolant
-/ldm/invoke/_version.py @lstein @blessedcoolant
+/pyproject.toml @mauwii @lstein @blessedcoolant
+/docker/ @mauwii @lstein
+/scripts/ @ebr @lstein
+/installer/ @lstein @ebr
+/invokeai/assets @lstein @ebr
+/invokeai/configs @lstein
+/invokeai/version @lstein @blessedcoolant
 
 # web ui
 /invokeai/frontend @blessedcoolant @psychedelicious @lstein
 /invokeai/backend @blessedcoolant @psychedelicious @lstein
 
-# generation and model management
-/ldm/*.py @lstein @blessedcoolant
-/ldm/generate.py @lstein @keturn @blessedcoolant
-/ldm/invoke/args.py @lstein @blessedcoolant
-/ldm/invoke/ckpt* @lstein @blessedcoolant
-/ldm/invoke/ckpt_generator @lstein @blessedcoolant
-/ldm/invoke/CLI.py @lstein @blessedcoolant
-/ldm/invoke/config @lstein @ebr @mauwii @blessedcoolant
-/ldm/invoke/generator @keturn @damian0815 @blessedcoolant
-/ldm/invoke/globals.py @lstein @blessedcoolant 
-/ldm/invoke/merge_diffusers.py @lstein @blessedcoolant
-/ldm/invoke/model_manager.py @lstein @blessedcoolant
-/ldm/invoke/txt2mask.py @lstein @blessedcoolant
-/ldm/invoke/patchmatch.py @Kyle0654 @blessedcoolant @lstein
-/ldm/invoke/restoration @lstein @blessedcoolant
+# generation, model management, postprocessing
+/invokeai/backend @keturn @damian0815 @lstein @blessedcoolant @jpphoto
 
-# attention, textual inversion, model configuration
-/ldm/models @damian0815 @keturn @lstein @blessedcoolant
-/ldm/modules @damian0815 @keturn @lstein @blessedcoolant
+# front ends
+/invokeai/frontend/CLI @lstein
+/invokeai/frontend/install @lstein @ebr @mauwii 
+/invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
+/invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
+/invokeai/frontend/web @psychedelicious @blessedcoolant
 
-# Nodes
-apps/ @Kyle0654 @lstein @blessedcoolant
-
-# legacy REST API
-# is CapableWeb still engaged?
-/ldm/invoke/pngwriter.py @CapableWeb @lstein @blessedcoolant
-/ldm/invoke/server_legacy.py @CapableWeb @lstein @blessedcoolant
-/scripts/legacy_api.py @CapableWeb @lstein @blessedcoolant
-/tests/legacy_tests.sh @CapableWeb @lstein @blessedcoolant
 

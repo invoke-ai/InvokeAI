@@ -1,4 +1,4 @@
-from ldm.invoke.app.services.sqlite import SqliteItemStorage, sqlite_memory
+from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from pydantic import BaseModel, Field
 
 
