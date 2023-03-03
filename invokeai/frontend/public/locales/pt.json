@@ -17,7 +17,7 @@
         "langItalian": "Italiano",
         "langJapanese": "日本語",
         "langSimplifiedChinese": "简体中文",
-        "langSpanish": "Español",
+        "langSpanish": "Espanhol",
         "langRussian": "Русский",
         "langUkranian": "Украї́нська",
         "text2img": "Texto para Imagem",
@@ -61,6 +61,8 @@
         "darkTheme": "Escuro",
         "training": "Treinando",
         "statusGeneratingOutpainting": "Geração de Ampliação",
-        "statusGenerationComplete": "Geração Completa"
+        "statusGenerationComplete": "Geração Completa",
+        "statusMergingModels": "Mesclando Modelos",
+        "statusMergedModels": "Modelos Mesclados"
     }
 }
