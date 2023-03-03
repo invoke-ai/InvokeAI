@@ -291,7 +291,7 @@ class InvokeAiInstance:
                     src = Path(__file__).parents[1].expanduser().resolve()
                     # if the above directory contains one of these files, we'll do a source install
                     next(src.glob("pyproject.toml"))
-                    next(src.glob("ldm"))
+                    next(src.glob("invokeai"))
                 except StopIteration:
                     print("Unable to find a wheel or perform a source install. Giving up.")
 
@@ -342,14 +342,14 @@ class InvokeAiInstance:
 
         introduction()
 
-        from ldm.invoke.config import invokeai_configure
+        from invokeai.frontend.install import invokeai_configure
 
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
         # this may change in the future with config refactoring!
         succeeded = False
         try:
-            invokeai_configure.main()
+            invokeai_configure()
             succeeded = True
         except requests.exceptions.ConnectionError as e:
             print(f'\nA network error was encountered during configuration and download: {str(e)}')

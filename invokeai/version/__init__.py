@@ -1,18 +1,10 @@
 """
 initialization file for invokeai
 """
-import invokeai
-
 from .invokeai_version import __version__
 
 __app_id__ = "invoke-ai/InvokeAI"
 __app_name__ = "InvokeAI"
-
-# copy these attributes into the invokeai namespace
-setattr(invokeai, "__version__", __version__)
-setattr(invokeai, "__app_id__", __app_id__)
-setattr(invokeai, "__app_name__", __app_name__)
-
 
 def _ignore_xformers_triton_message_on_windows():
     import logging

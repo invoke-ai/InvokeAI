@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "prepare": "cd ../../ && husky install invokeai/frontend/.husky",
+    "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "vite dev",
     "build": "tsc && vite build",
     "preview": "vite preview",

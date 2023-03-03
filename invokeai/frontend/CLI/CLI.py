@@ -15,7 +15,7 @@ if sys.platform == "darwin":
 
 import pyparsing  # type: ignore
 
-import invokeai.version
+import invokeai.version as invokeai
 
 from ...backend import Generate, ModelManager
 from ...backend.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
