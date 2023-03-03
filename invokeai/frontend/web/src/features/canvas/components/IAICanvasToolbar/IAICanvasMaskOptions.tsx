@@ -111,17 +111,13 @@ const IAICanvasMaskOptions = () => {
             aria-label={t('unifiedCanvas.maskingOptions')}
             tooltip={t('unifiedCanvas.maskingOptions')}
             icon={<FaMask />}
-            style={
-              layer === 'mask'
-                ? { backgroundColor: 'var(--accent-color)' }
-                : { backgroundColor: 'var(--btn-base-color)' }
-            }
+            isChecked={layer === 'mask'}
             isDisabled={isStaging}
           />
         </ButtonGroup>
       }
     >
-      <Flex direction="column" gap="0.5rem">
+      <Flex direction="column" gap={2}>
         <IAICheckbox
           label={`${t('unifiedCanvas.enableMask')} (H)`}
           isChecked={isMaskEnabled}
@@ -135,8 +131,8 @@ const IAICanvasMaskOptions = () => {
           }
         />
         <IAIColorPicker
-          style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
-          color={maskColor}
+          sx={{ paddingTop: 2, paddingBottom: 2 }}
+          pickerColor={maskColor}
           onChange={(newColor) => dispatch(setMaskColor(newColor))}
         />
         <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>

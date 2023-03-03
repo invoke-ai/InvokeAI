@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 
 import warnings
-import ldm.invoke.CLI
+from invokeai.frontend.CLI import invokeai_command_line_interface as main
 warnings.warn("dream.py is being deprecated, please run invoke.py for the "
               "new UI/API or legacy_api.py for the old API",
               DeprecationWarning)
-ldm.invoke.CLI.main()
+main()
 

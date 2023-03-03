@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { ButtonGroup, Link, useToast } from '@chakra-ui/react';
+import { ButtonGroup, Flex, FlexProps, Link, useToast } from '@chakra-ui/react';
 import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -102,11 +102,13 @@ const currentImageButtonsSelector = createSelector(
   }
 );
 
+type CurrentImageButtonsProps = FlexProps;
+
 /**
  * Row of buttons for common actions:
  * Use as init image, use all params, use seed, upscale, fix faces, details, delete.
  */
-const CurrentImageButtons = () => {
+const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
   const {
     isProcessing,
@@ -395,7 +397,14 @@ const CurrentImageButtons = () => {
   };
 
   return (
-    <div className="current-image-options">
+    <Flex
+      sx={{
+        justifyContent: 'center',
+        alignItems: 'center',
+        columnGap: '0.5em',
+      }}
+      {...props}
+    >
       <ButtonGroup isAttached={true}>
         <IAIPopover
           trigger="hover"
@@ -406,7 +415,13 @@ const CurrentImageButtons = () => {
             />
           }
         >
-          <div className="current-image-send-to-popover">
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              rowGap: 2,
+              w: 52,
+            }}
+          >
             <IAIButton
               size="sm"
               onClick={handleClickUseAsInitialImage}
@@ -442,7 +457,7 @@ const CurrentImageButtons = () => {
                 {t('parameters.downloadImage')}
               </IAIButton>
             </Link>
-          </div>
+          </Flex>
         </IAIPopover>
         <IAIIconButton
           icon={<FaExpand />}
@@ -456,7 +471,7 @@ const CurrentImageButtons = () => {
               ? `${t('parameters.openInViewer')} (Z)`
               : `${t('parameters.closeViewer')} (Z)`
           }
-          data-selected={isLightboxOpen}
+          isChecked={isLightboxOpen}
           onClick={handleLightBox}
         />
       </ButtonGroup>
@@ -501,7 +516,12 @@ const CurrentImageButtons = () => {
             />
           }
         >
-          <div className="current-image-postprocessing-popover">
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              rowGap: 4,
+            }}
+          >
             <FaceRestoreSettings />
             <IAIButton
               isDisabled={
@@ -514,7 +534,7 @@ const CurrentImageButtons = () => {
             >
               {t('parameters.restoreFaces')}
             </IAIButton>
-          </div>
+          </Flex>
         </IAIPopover>
 
         <IAIPopover
@@ -526,7 +546,12 @@ const CurrentImageButtons = () => {
             />
           }
         >
-          <div className="current-image-postprocessing-popover">
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
             <UpscaleSettings />
             <IAIButton
               isDisabled={
@@ -539,7 +564,7 @@ const CurrentImageButtons = () => {
             >
               {t('parameters.upscaleImage')}
             </IAIButton>
-          </div>
+          </Flex>
         </IAIPopover>
       </ButtonGroup>
 
@@ -548,7 +573,7 @@ const CurrentImageButtons = () => {
           icon={<FaCode />}
           tooltip={`${t('parameters.info')} (I)`}
           aria-label={`${t('parameters.info')} (I)`}
-          data-selected={shouldShowImageDetails}
+          isChecked={shouldShowImageDetails}
           onClick={handleClickShowImageDetails}
         />
       </ButtonGroup>
@@ -559,10 +584,10 @@ const CurrentImageButtons = () => {
           tooltip={`${t('parameters.deleteImage')} (Del)`}
           aria-label={`${t('parameters.deleteImage')} (Del)`}
           isDisabled={!currentImage || !isConnected || isProcessing}
-          style={{ backgroundColor: 'var(--btn-delete-image)' }}
+          colorScheme="error"
         />
       </DeleteImageModal>
-    </div>
+    </Flex>
   );
 };
 
