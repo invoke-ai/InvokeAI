@@ -72,5 +72,7 @@ class BaseInvocation(ABC, BaseModel):
     def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
         """Invoke with provided context and return outputs."""
         pass
-
+    
+    #fmt: off
     id: str = Field(description="The id of this node. Must be unique among all nodes.")
+    #fmt: on

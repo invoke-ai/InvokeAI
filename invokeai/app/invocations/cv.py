@@ -14,14 +14,13 @@ from .image import ImageField, ImageOutput
 
 class CvInpaintInvocation(BaseInvocation):
     """Simple inpaint using opencv."""
-
+    #fmt: off
     type: Literal["cv_inpaint"] = "cv_inpaint"
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to inpaint")
-    mask: ImageField = Field(
-        default=None, description="The mask to use when inpainting"
-    )
+    mask: ImageField = Field(default=None, description="The mask to use when inpainting")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
