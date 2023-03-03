@@ -13,13 +13,14 @@ from .image import ImageField, ImageOutput
 
 class UpscaleInvocation(BaseInvocation):
     """Upscales an image."""
-
+    #fmt: off
     type: Literal["upscale"] = "upscale"
 
     # Inputs
     image: Union[ImageField, None] = Field(description="The input image", default=None)
     strength: float = Field(default=0.75, gt=0, le=1, description="The strength")
     level: Literal[2, 4] = Field(default=2, description="The upscale level")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(

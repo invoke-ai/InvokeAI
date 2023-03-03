@@ -11,15 +11,14 @@ from .image import ImageField, ImageOutput
 
 class RestoreFaceInvocation(BaseInvocation):
     """Restores faces in an image."""
-
-    type: Literal["restore_face"] = "restore_face"
+    #fmt: off
+    type:  Literal["restore_face"] = "restore_face"
 
     # Inputs
     image: Union[ImageField, None] = Field(description="The input image")
-    strength: float = Field(
-        default=0.75, gt=0, le=1, description="The strength of the restoration"
-    )
-
+    strength:                float = Field(default=0.75, gt=0, le=1, description="The strength of the restoration"  )
+    #fmt: on
+    
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
             self.image.image_type, self.image.image_name

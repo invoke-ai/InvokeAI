@@ -260,14 +260,15 @@ class LerpInvocation(BaseInvocation):
 
 class InverseLerpInvocation(BaseInvocation):
     """Inverse linear interpolation of all pixels of an image"""
-
+    #fmt: off
     type: Literal["ilerp"] = "ilerp"
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to lerp")
     min: int = Field(default=0, ge=0, le=255, description="The minimum input value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum input value")
-
+    #fmt: on
+    
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
             self.image.image_type, self.image.image_name

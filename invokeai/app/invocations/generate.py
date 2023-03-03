@@ -26,45 +26,18 @@ class TextToImageInvocation(BaseInvocation):
 
     # Inputs
     # TODO: consider making prompt optional to enable providing prompt through a link
+    # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
-    seed: int = Field(
-        default=-1,
-        ge=-1,
-        le=np.iinfo(np.uint32).max,
-        description="The seed to use (-1 for a random seed)",
-    )
-    steps: int = Field(
-        default=10, gt=0, description="The number of steps to use to generate the image"
-    )
-    width: int = Field(
-        default=512,
-        multiple_of=64,
-        gt=0,
-        description="The width of the resulting image",
-    )
-    height: int = Field(
-        default=512,
-        multiple_of=64,
-        gt=0,
-        description="The height of the resulting image",
-    )
-    cfg_scale: float = Field(
-        default=7.5,
-        gt=0,
-        description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
-    )
-    sampler_name: SAMPLER_NAME_VALUES = Field(
-        default="k_lms", description="The sampler to use"
-    )
-    seamless: bool = Field(
-        default=False,
-        description="Whether or not to generate an image that can tile without seams",
-    )
-    model: str = Field(default="", description="The model to use (currently ignored)")
-    progress_images: bool = Field(
-        default=False,
-        description="Whether or not to produce progress images during generation",
-    )
+    seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
+    steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
+    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
+    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
+    cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    sampler_name: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The sampler to use" )
+    seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    model:       str = Field(default="", description="The model to use (currently ignored)")
+    progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
+    # fmt: on
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
