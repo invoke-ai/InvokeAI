@@ -9,6 +9,7 @@ from .pngwriter import (PngWriter,
                         retrieve_metadata,
                         write_metadata,
                         )
+from .seamless import configure_model_padding
 
 def debug_image(
     debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False

@@ -1,7 +1,7 @@
 from typing import Any, Callable, Literal
-from ldm.invoke.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
-from ldm.invoke.app.invocations.image import ImageField
-from ldm.invoke.app.services.invocation_services import InvocationServices
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from invokeai.app.invocations.image import ImageField
+from invokeai.app.services.invocation_services import InvocationServices
 from pydantic import Field
 import pytest
 
@@ -63,8 +63,8 @@ class PromptCollectionTestInvocation(BaseInvocation):
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
 
 
-from ldm.invoke.app.services.events import EventServiceBase
-from ldm.invoke.app.services.graph import EdgeConnection
+from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.graph import EdgeConnection
 
 def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> tuple[EdgeConnection, EdgeConnection]:
     return (EdgeConnection(node_id = from_id, field = from_field), EdgeConnection(node_id = to_id, field = to_field))

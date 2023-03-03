@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from functools import partial
-from ...devices import choose_torch_device
+from ...util import choose_torch_device
 from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from .sampler import Sampler
 from ..diffusionmodules.util import noise_like

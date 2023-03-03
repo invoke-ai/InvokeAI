@@ -10,7 +10,7 @@ import traceback
 from typing import Callable
 from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
-from ldm.invoke.globals import Globals
+from invokeai.backend.globals import Globals
 
 class HuggingFaceConceptsLibrary(object):
     def __init__(self, root=None):

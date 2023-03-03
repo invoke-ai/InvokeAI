@@ -1,11 +1,11 @@
 from .test_nodes import ErrorInvocation, ImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation, TestEventService, create_edge, wait_until
-from ldm.invoke.app.services.processor import DefaultInvocationProcessor
-from ldm.invoke.app.services.sqlite import SqliteItemStorage, sqlite_memory
-from ldm.invoke.app.services.invocation_queue import MemoryInvocationQueue
-from ldm.invoke.app.services.invoker import Invoker
-from ldm.invoke.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
-from ldm.invoke.app.services.invocation_services import InvocationServices
-from ldm.invoke.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
+from invokeai.app.services.processor import DefaultInvocationProcessor
+from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
+from invokeai.app.services.invocation_queue import MemoryInvocationQueue
+from invokeai.app.services.invoker import Invoker
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
 import pytest
 
 

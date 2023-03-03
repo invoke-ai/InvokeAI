@@ -198,7 +198,7 @@ checkpoints
 .DS_Store
 
 # Let the frontend manage its own gitignore
-!invokeai/frontend/*
+!invokeai/frontend/web/*
 
 # Scratch folder
 .scratch/

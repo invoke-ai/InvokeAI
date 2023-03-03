@@ -13,9 +13,9 @@ from transformers import CLIPTokenizer, CLIPTextModel
 
 from compel import Compel
 from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser
-from ..devices import torch_dtype
+from ..util import torch_dtype
 from ..stable_diffusion import InvokeAIDiffuserComponent
-from ldm.invoke.globals import Globals
+from invokeai.backend.globals import Globals
 
 def get_tokenizer(model) -> CLIPTokenizer:
     # TODO remove legacy ckpt fallback handling

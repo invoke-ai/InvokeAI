@@ -23,7 +23,7 @@ from tqdm import trange
 
 import invokeai.assets.web as web_assets
 from ..stable_diffusion.diffusion.ddpm import DiffusionWrapper
-from ..util import rand_perlin_2d
+from ..util.util import rand_perlin_2d
 
 downsampling = 8
 CAUTION_IMG = 'caution.png'

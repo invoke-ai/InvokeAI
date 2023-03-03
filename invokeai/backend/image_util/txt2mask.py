@@ -32,7 +32,7 @@ import numpy as  np
 from transformers import AutoProcessor, CLIPSegForImageSegmentation
 from PIL import Image, ImageOps
 from torchvision import transforms
-from ldm.invoke.globals import global_cache_dir
+from invokeai.backend.globals import global_cache_dir
 
 CLIPSEG_MODEL = 'CIDAS/clipseg-rd64-refined'
 CLIPSEG_SIZE = 352

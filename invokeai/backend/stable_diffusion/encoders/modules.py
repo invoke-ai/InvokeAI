@@ -10,7 +10,7 @@ from einops import repeat
 from transformers import CLIPTokenizer, CLIPTextModel
 
 from ldm.invoke.devices import choose_torch_device
-from ldm.invoke.globals import global_cache_dir
+from invokeai.backend.globals import global_cache_dir
 from ldm.modules.x_transformer import (
     Encoder,
     TransformerWrapper,

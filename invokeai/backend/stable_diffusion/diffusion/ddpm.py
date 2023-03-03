@@ -23,7 +23,7 @@ from omegaconf import ListConfig
 import urllib
 
 from ..textual_inversion_manager import TextualInversionManager
-from ...util import (
+from ...util.util import (
     log_txt_as_img,
     exists,
     default,

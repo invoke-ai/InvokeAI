@@ -26,11 +26,11 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
-from ldm.invoke.globals import Globals
-from ..stable_diffusion.diffusion import InvokeAIDiffuserComponent, PostprocessingSettings, AttentionMapSaver
-from ..stable_diffusion.textual_inversion_manager import TextualInversionManager
-from ..stable_diffusion.offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
-from ..devices import normalize_device, CPU_DEVICE
+from invokeai.backend.globals import Globals
+from .diffusion import InvokeAIDiffuserComponent, PostprocessingSettings, AttentionMapSaver
+from .textual_inversion_manager import TextualInversionManager
+from .offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
+from ..util import normalize_device, CPU_DEVICE
 from compel import EmbeddingsProvider
 
 @dataclass

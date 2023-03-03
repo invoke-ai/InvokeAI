@@ -8,7 +8,7 @@ import torch
 from diffusers.models.cross_attention import AttnProcessor
 from typing_extensions import TypeAlias
 
-from ldm.invoke.globals import Globals
+from invokeai.backend.globals import Globals
 from .cross_attention_control import Arguments, \
     restore_default_cross_attention, override_cross_attention, Context, get_cross_attention_modules, \
     CrossAttentionType, SwapCrossAttnContext
