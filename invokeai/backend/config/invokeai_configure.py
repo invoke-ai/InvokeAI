@@ -6,13 +6,14 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-print("Loading Python libraries...\n")
+import sys
+print("Loading Python libraries...\n",file=sys.stderr)
+
 import argparse
 import io
 import os
 import re
 import shutil
-import sys
 import traceback
 import warnings
 from argparse import Namespace
