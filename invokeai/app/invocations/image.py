@@ -23,29 +23,28 @@ class ImageField(BaseModel):
 
 class ImageOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
-
+    #fmt: off
     type: Literal["image"] = "image"
-
-    image: ImageField = Field(default=None, description="The output image")
-
+    image:      ImageField = Field(default=None, description="The output image")
+    #fmt: on
 
 class MaskOutput(BaseInvocationOutput):
     """Base class for invocations that output a mask"""
-
+    #fmt: off
     type: Literal["mask"] = "mask"
-
-    mask: ImageField = Field(default=None, description="The output mask")
-
+    mask:      ImageField = Field(default=None, description="The output mask")
+    #fomt: on
 
 # TODO: this isn't really necessary anymore
 class LoadImageInvocation(BaseInvocation):
     """Load an image from a filename and provide it as output."""
-
+    #fmt: off
     type: Literal["load_image"] = "load_image"
 
     # Inputs
     image_type: ImageType = Field(description="The type of the image")
-    image_name: str = Field(description="The name of the image")
+    image_name:       str = Field(description="The name of the image")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         return ImageOutput(
@@ -79,17 +78,16 @@ class ShowImageInvocation(BaseInvocation):
 
 class CropImageInvocation(BaseInvocation):
     """Crops an image to a specified box. The box can be outside of the image."""
-
+    #fmt: off
     type: Literal["crop"] = "crop"
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to crop")
-    x: int = Field(default=0, description="The left x coordinate of the crop rectangle")
-    y: int = Field(default=0, description="The top y coordinate of the crop rectangle")
-    width: int = Field(default=512, gt=0, description="The width of the crop rectangle")
-    height: int = Field(
-        default=512, gt=0, description="The height of the crop rectangle"
-    )
+    x:      int = Field(default=0, description="The left x coordinate of the crop rectangle")
+    y:      int = Field(default=0, description="The top y coordinate of the crop rectangle")
+    width:  int = Field(default=512, gt=0, description="The width of the crop rectangle")
+    height: int = Field(default=512, gt=0, description="The height of the crop rectangle")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
@@ -113,21 +111,16 @@ class CropImageInvocation(BaseInvocation):
 
 class PasteImageInvocation(BaseInvocation):
     """Pastes an image into another image."""
-
+    #fmt: off
     type: Literal["paste"] = "paste"
 
     # Inputs
-    base_image: ImageField = Field(default=None, description="The base image")
-    image: ImageField = Field(default=None, description="The image to paste")
-    mask: Optional[ImageField] = Field(
-        default=None, description="The mask to use when pasting"
-    )
-    x: int = Field(
-        default=0, description="The left x coordinate at which to paste the image"
-    )
-    y: int = Field(
-        default=0, description="The top y coordinate at which to paste the image"
-    )
+    base_image:     ImageField = Field(default=None, description="The base image")
+    image:          ImageField = Field(default=None, description="The image to paste")
+    mask: Optional[ImageField] = Field(default=None, description="The mask to use when pasting")
+    x:                     int = Field(default=0, description="The left x coordinate at which to paste the image")
+    y:                     int = Field(default=0, description="The top y coordinate at which to paste the image")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get(
@@ -168,14 +161,13 @@ class PasteImageInvocation(BaseInvocation):
 
 class MaskFromAlphaInvocation(BaseInvocation):
     """Extracts the alpha channel of an image as a mask."""
-
+    #fmt: off
     type: Literal["tomask"] = "tomask"
 
     # Inputs
-    image: ImageField = Field(
-        default=None, description="The image to create the mask from"
-    )
-    invert: bool = Field(default=False, description="Whether or not to invert the mask")
+    image: ImageField = Field(default=None, description="The image to create the mask from")
+    invert:      bool = Field(default=False, description="Whether or not to invert the mask")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         image = context.services.images.get(
@@ -197,15 +189,15 @@ class MaskFromAlphaInvocation(BaseInvocation):
 class BlurInvocation(BaseInvocation):
     """Blurs an image"""
 
+    #fmt: off
     type: Literal["blur"] = "blur"
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to blur")
-    radius: float = Field(default=8.0, ge=0, description="The blur radius")
-    blur_type: Literal["gaussian", "box"] = Field(
-        default="gaussian", description="The type of blur"
-    )
-
+    radius:     float = Field(default=8.0, ge=0, description="The blur radius")
+    blur_type: Literal["gaussian", "box"] = Field(default="gaussian", description="The type of blur")
+    #fmt: on
+    
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
             self.image.image_type, self.image.image_name
@@ -230,13 +222,14 @@ class BlurInvocation(BaseInvocation):
 
 class LerpInvocation(BaseInvocation):
     """Linear interpolation of all pixels of an image"""
-
+    #fmt: off
     type: Literal["lerp"] = "lerp"
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to lerp")
     min: int = Field(default=0, ge=0, le=255, description="The minimum output value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum output value")
+    #fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
