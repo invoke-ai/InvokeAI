@@ -1,6 +1,6 @@
 model:
   base_learning_rate: 1.0e-4
-  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  target: invokeai.backend.models.diffusion.ddpm.LatentDiffusion
   params:
     parameterization: "v"
     linear_start: 0.00085
@@ -19,7 +19,7 @@ model:
     use_ema: False # we set this to false because this is an inference only config
 
     unet_config:
-      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      target: invokeai.backend.stable_diffusion.diffusionmodules.openaimodel.UNetModel
       params:
         use_checkpoint: True
         use_fp16: True
@@ -38,7 +38,7 @@ model:
         legacy: False
 
     first_stage_config:
-      target: ldm.models.autoencoder.AutoencoderKL
+      target: invokeai.backend.stable_diffusion.autoencoder.AutoencoderKL
       params:
         embed_dim: 4
         monitor: val/rec_loss
@@ -62,7 +62,7 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.modules.encoders.modules.FrozenOpenCLIPEmbedder
+      target: invokeai.backend.stable_diffusion.encoders.modules.FrozenOpenCLIPEmbedder
       params:
         freeze: True
         layer: "penultimate"

@@ -7,10 +7,9 @@ import pathlib
 from os import path as osp
 from PIL import Image
 
-import invokeai.frontend.dist as frontend
+import invokeai.frontend.web.dist as frontend
 import invokeai.configs as configs
 import invokeai.assets.web as assets_web
-
 
 class ConfigsTestCase(unittest.TestCase):
     """Test the configuration related imports and objects"""
@@ -32,7 +31,7 @@ class ConfigsTestCase(unittest.TestCase):
     def test_frontend_path(self):
         """Test that the frontend path is correct"""
         FRONTEND_PATH = str(self.get_frontend_path())
-        assert FRONTEND_PATH.endswith(osp.join("invokeai", "frontend", "dist"))
+        assert FRONTEND_PATH.endswith(osp.join("invokeai", "frontend", "web", "dist"))
 
     def test_caution_img(self):
         """Verify the caution image"""

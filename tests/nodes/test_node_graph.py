@@ -1,9 +1,9 @@
-from ldm.invoke.app.invocations.image import *
+from invokeai.app.invocations.image import *
 
 from .test_nodes import ListPassThroughInvocation, PromptTestInvocation
-from ldm.invoke.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation
-from ldm.invoke.app.invocations.generate import ImageToImageInvocation, TextToImageInvocation
-from ldm.invoke.app.invocations.upscale import UpscaleInvocation
+from invokeai.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation
+from invokeai.app.invocations.generate import ImageToImageInvocation, TextToImageInvocation
+from invokeai.app.invocations.upscale import UpscaleInvocation
 import pytest
 
 

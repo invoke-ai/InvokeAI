@@ -1,0 +1,101 @@
+{
+  "name": "invoke-ai-ui",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
+    "dev": "vite dev",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "madge": "madge --circular src/main.tsx",
+    "lint": "eslint --fix .",
+    "lint-staged": "lint-staged",
+    "prettier": "prettier *.{json,js,ts,html} public/locales/*.json src/**/*.{ts,tsx,scss} --write --loglevel warn .",
+    "fmt": "npm run prettier -- --write",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@chakra-ui/icons": "^2.0.17",
+    "@chakra-ui/react": "^2.5.1",
+    "@emotion/cache": "^11.10.5",
+    "@emotion/react": "^11.10.6",
+    "@emotion/styled": "^11.10.6",
+    "@radix-ui/react-context-menu": "^2.1.1",
+    "@radix-ui/react-slider": "^1.1.0",
+    "@radix-ui/react-tooltip": "^1.0.3",
+    "@reduxjs/toolkit": "^1.9.2",
+    "@types/uuid": "^9.0.0",
+    "@vitejs/plugin-react-swc": "^3.2.0",
+    "add": "^2.0.6",
+    "dateformat": "^5.0.3",
+    "formik": "^2.2.9",
+    "framer-motion": "^9.0.4",
+    "i18next": "^22.4.10",
+    "i18next-browser-languagedetector": "^7.0.1",
+    "i18next-http-backend": "^2.1.1",
+    "konva": "^8.4.2",
+    "lodash": "^4.17.21",
+    "re-resizable": "^6.9.9",
+    "react": "^18.2.0",
+    "react-colorful": "^5.6.1",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-hotkeys-hook": "4.3.5",
+    "react-i18next": "^12.1.5",
+    "react-icons": "^4.7.1",
+    "react-konva": "^18.2.4",
+    "react-konva-utils": "^0.3.2",
+    "react-redux": "^8.0.5",
+    "react-transition-group": "^4.4.5",
+    "react-zoom-pan-pinch": "^2.6.1",
+    "redux-deep-persist": "^1.0.7",
+    "redux-persist": "^6.0.0",
+    "socket.io": "^4.6.0",
+    "socket.io-client": "^4.6.0",
+    "use-image": "^1.1.0",
+    "uuid": "^9.0.0",
+    "yarn": "^1.22.19"
+  },
+  "devDependencies": {
+    "@types/dateformat": "^5.0.0",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "@types/react-transition-group": "^4.4.5",
+    "@typescript-eslint/eslint-plugin": "^5.52.0",
+    "@typescript-eslint/parser": "^5.52.0",
+    "babel-plugin-transform-imports": "^2.0.0",
+    "eslint": "^8.34.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.1.2",
+    "madge": "^6.0.0",
+    "patch-package": "^6.5.1",
+    "postinstall-postinstall": "^2.1.0",
+    "prettier": "^2.8.4",
+    "rollup-plugin-visualizer": "^5.9.0",
+    "sass": "^1.58.3",
+    "terser": "^5.16.4",
+    "vite": "^4.1.2",
+    "vite-plugin-eslint": "^1.8.1",
+    "vite-tsconfig-paths": "^4.0.5"
+  },
+  "madge": {
+    "detectiveOptions": {
+      "ts": {
+        "skipTypeImports": true
+      },
+      "tsx": {
+        "skipTypeImports": true
+      }
+    }
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx,cjs,json,html,scss}": [
+      "npm run prettier",
+      "npm run lint"
+    ]
+  }
+}

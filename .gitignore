@@ -198,7 +198,7 @@ checkpoints
 .DS_Store
 
 # Let the frontend manage its own gitignore
-!invokeai/frontend/*
+!invokeai/frontend/web/*
 
 # Scratch folder
 .scratch/
@@ -212,11 +212,6 @@ gfpgan/
 
 # config file (will be created by installer)
 configs/models.yaml
-
-# weights (will be created by installer)
-models/ldm/stable-diffusion-v1/*.ckpt
-models/clipseg
-models/gfpgan
 
 # ignore initfile
 .invokeai
@@ -232,6 +227,3 @@ installer/install.bat
 installer/install.sh
 installer/update.bat
 installer/update.sh
-
-# no longer stored in source directory
-models

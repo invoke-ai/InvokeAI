@@ -11,10 +11,10 @@ if [[ -v "VIRTUAL_ENV" ]]; then
     exit -1
 fi
 
-VERSION=$(cd ..; python -c "from ldm.invoke import __version__ as version; print(version)")
+VERSION=$(cd ..; python -c "from invokeai.version import __version__ as version; print(version)")
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
-LATEST_TAG="v2.3-latest"
+LATEST_TAG="v3.0-latest"
 
 echo Building installer for version $VERSION
 echo "Be certain that you're in the 'installer' directory before continuing."

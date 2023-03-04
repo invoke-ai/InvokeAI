@@ -1,6 +1,6 @@
 model:
   base_learning_rate: 5.0e-03
-  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  target: invokeai.backend.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -19,7 +19,7 @@ model:
     embedding_reg_weight: 0.0
 
     personalization_config:
-      target: ldm.modules.embedding_manager.EmbeddingManager
+      target: invokeai.backend.stable_diffusion.embedding_manager.EmbeddingManager
       params:
         placeholder_strings: ["*"]
         initializer_words: ["painting"]
@@ -27,7 +27,7 @@ model:
         num_vectors_per_token: 1
 
     unet_config:
-      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      target: invokeai.backend.stable_diffusion.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 32 # unused
         in_channels: 4
@@ -44,7 +44,7 @@ model:
         legacy: False
 
     first_stage_config:
-      target: ldm.models.autoencoder.AutoencoderKL
+      target: invokeai.backend.stable_diffusion.autoencoder.AutoencoderKL
       params:
         embed_dim: 4
         monitor: val/rec_loss
@@ -67,7 +67,7 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.modules.encoders.modules.FrozenCLIPEmbedder
+      target: invokeai.backend.stable_diffusion.encoders.modules.FrozenCLIPEmbedder
 
 data:
   target: main.DataModuleFromConfig
@@ -76,14 +76,14 @@ data:
     num_workers: 16
     wrap: false
     train:
-      target: ldm.data.personalized_style.PersonalizedBase
+      target: invokeai.backend.stable_diffusion.data.personalized_style.PersonalizedBase
       params:
         size: 512
         set: train
         per_image_tokens: false
         repeats: 100
     validation:
-      target: ldm.data.personalized_style.PersonalizedBase
+      target: invokeai.backend.stable_diffusion.data.personalized_style.PersonalizedBase
       params:
         size: 512
         set: val

@@ -1,6 +1,6 @@
 model:
   base_learning_rate: 7.5e-05
-  target: ldm.models.diffusion.ddpm.LatentInpaintDiffusion
+  target: invokeai.backend.models.diffusion.ddpm.LatentInpaintDiffusion
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -18,7 +18,7 @@ model:
     finetune_keys: null
 
     scheduler_config: # 10000 warmup steps
-      target: ldm.lr_scheduler.LambdaLinearScheduler
+      target: invokeai.backend.stable_diffusion.lr_scheduler.LambdaLinearScheduler
       params:
         warm_up_steps: [ 2500 ] # NOTE for resuming. use 10000 if starting from scratch
         cycle_lengths: [ 10000000000000 ] # incredibly large number to prevent corner cases
@@ -27,7 +27,7 @@ model:
         f_min: [ 1. ]
 
     personalization_config:
-      target: ldm.modules.embedding_manager.EmbeddingManager
+      target: invokeai.backend.stable_diffusion.embedding_manager.EmbeddingManager
       params:
         placeholder_strings: ["*"]
         initializer_words: ['sculpture']
@@ -36,7 +36,7 @@ model:
         progressive_words: False
 
     unet_config:
-      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      target: invokeai.backend.stable_diffusion.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 32 # unused
         in_channels: 9  # 4 data + 4 downscaled image + 1 mask
@@ -53,7 +53,7 @@ model:
         legacy: False
 
     first_stage_config:
-      target: ldm.models.autoencoder.AutoencoderKL
+      target: invokeai.backend.stable_diffusion.autoencoder.AutoencoderKL
       params:
         embed_dim: 4
         monitor: val/rec_loss
@@ -76,4 +76,4 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.modules.encoders.modules.WeightedFrozenCLIPEmbedder
+      target: invokeai.backend.stable_diffusion.encoders.modules.WeightedFrozenCLIPEmbedder
