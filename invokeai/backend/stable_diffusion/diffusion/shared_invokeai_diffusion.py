@@ -580,7 +580,7 @@ class InvokeAIDiffuserComponent:
             and self.last_percent_through < v_symmetry_time_pct
             and percent_through >= v_symmetry_time_pct
         ):
-            # Vertical symmetry occurs on the 3rd dimension of the latent
+            # Vertical symmetry occurs on the 2nd dimension of the latent
             y_flipped = torch.flip(latents, dims=[2])
             if symmetry_type is SymmetryType.MIRROR:
                 latents = torch.cat(
