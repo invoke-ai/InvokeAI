@@ -12,6 +12,7 @@ import pydoc
 import re
 import shutil
 import sys
+import numpy as np
 from dataclasses import dataclass
 from io import TextIOBase
 from itertools import product
@@ -126,28 +127,32 @@ def main():
         invoke_outdir=opt.outdir,
     )
 
-
 def _do_expand(conf: OmegaConf, file: TextIOBase = sys.stdout):
     models = expand_values(conf.get("model"))
     steps = expand_values(conf.get("steps")) or [30]
     cfgs = expand_values(conf.get("cfg")) or [7.5]
     samplers = expand_values(conf.get("sampler")) or ["ddim"]
     seeds = expand_values(conf.get("seed")) or [0]
+    dimensions = expand_values(conf.get("dimensions")) or ["512x512"]
+    init_img = expand_values(conf.get('init_img')) or ['']
+    perlin = expand_values(conf.get('perlin')) or [0]
+    threshold = expand_values(conf.get('threshold')) or [0]
+    strength = expand_values(conf.get('strength')) or [0.75]
     prompts = expand_prompt(conf.get("prompt")) or ["banana sushi"]
-    dimensions = expand_prompt(conf.get("dimensions")) or ["512x512"]
 
     cross_product = product(
-        *[models, seeds, prompts, samplers, cfgs, steps, dimensions]
+        *[models, seeds, prompts, samplers, cfgs, steps, perlin, threshold, init_img, strength, dimensions]
     )
     previous_model = None
     for p in cross_product:
-        (model, seed, prompt, sampler, cfg, step, dimensions) = tuple(p)
+        (model, seed, prompt, sampler, cfg, step, perlin, threshold, init_img, strength, dimensions) = tuple(p)
         (width, height) = dimensions.split("x")
         if previous_model != model:
             previous_model = model
             print(f"!switch {model}", file=file)
+        image_args = f'-I{init_img} -f{strength}' if init_img else ''
         print(
-            f'"{prompt}" -S{seed} -A{sampler} -C{cfg} -s{step} -W{width} -H{height}',
+            f'"{prompt}" -S{seed} -A{sampler} -C{cfg} -s{step} {image_args} --perlin={perlin} --threshold={threshold} -W{width} -H{height}',
             file=file,
         )
 
@@ -190,10 +195,12 @@ def expand_values(stanza: str | dict | listconfig.ListConfig) -> list | range:
         return None
     if isinstance(stanza, listconfig.ListConfig):
         return stanza
-    elif match := re.match("^(\d+);(\d+)(;(\d+))?", str(stanza)):
-        return range(
-            int(match.group(1)), 1 + int(match.group(2)), int(match.group(4)) or 1
-        )
+    elif match := re.match("^(-?\d+);(-?\d+)(;(\d+))?", str(stanza)):
+        (start, stop, step) = (int(match.group(1)), int(match.group(2)), int(match.group(4)) or 1)
+        return range(start, stop+step, step)
+    elif match := re.match("^(-?[\d.]+);(-?[\d.]+)(;([\d.]+))?", str(stanza)):
+            (start, stop, step) = (float(match.group(1)), float(match.group(2)), float(match.group(4)) or 1.0)
+            return np.arange(start, stop+step, step).tolist()
     else:
         return [stanza]
 
@@ -269,7 +276,7 @@ An excerpt from the top of this file looks like this:
    - 12
  prompt: a walk in the park   # constant value
 
-In more detail, the template file can have any of the
+In more detail, the template file can one or more of the
 following sections:
  - model:
  - steps:
@@ -277,6 +284,10 @@ following sections:
  - cfg:
  - sampler:
  - prompt:
+ - init_img:
+ - perlin:
+ - threshold:
+ - strength
 
 - Each section can have a constant value such as this:
      steps: 50
@@ -337,6 +348,8 @@ model: stable-diffusion-1.5
 steps: 30;50;10
 seed: 50
 dimensions: 512x512
+perlin: 0.0
+threshold: 0
 cfg:
   - 7
   - 12
