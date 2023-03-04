@@ -10,12 +10,9 @@ from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_
 
 from ..stable_diffusion import PostprocessingSettings
 from .base import Generator
-from ..stable_diffusion.diffusers_pipeline import (
-    ConditioningData,
-    StableDiffusionGeneratorPipeline,
-    trim_to_multiple_of,
-)
-
+from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ..stable_diffusion.diffusers_pipeline import ConditioningData
+from ..stable_diffusion.diffusers_pipeline import trim_to_multiple_of
 
 class Txt2Img2Img(Generator):
     def __init__(self, model, precision):
