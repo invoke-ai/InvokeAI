@@ -1,4 +1,5 @@
 #!/usr/bin/env python
 
-import ldm.invoke.CLI
-ldm.invoke.CLI.main()
+from invokeai.frontend.CLI import invokeai_command_line_interface as main
+main()
+

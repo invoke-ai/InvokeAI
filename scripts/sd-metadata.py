@@ -2,7 +2,7 @@
 
 import sys
 import json
-from ldm.invoke.pngwriter import retrieve_metadata
+from invokeai.backend.image_util import retrieve_metadata
 
 if len(sys.argv) < 2:
     print("Usage: file2prompt.py <file1.png> <file2.png> <file3.png>...")

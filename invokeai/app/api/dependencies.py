@@ -3,7 +3,7 @@
 import os
 from argparse import Namespace
 
-from ...globals import Globals
+from ...backend import Globals
 from ..services.generate_initializer import get_generate
 from ..services.graph import GraphExecutionState
 from ..services.image_storage import DiskImageStorage
