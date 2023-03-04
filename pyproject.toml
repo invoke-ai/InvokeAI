@@ -104,7 +104,7 @@ dependencies = [
 [project.scripts]
 
 # legacy entrypoints; provided for backwards compatibility
-"invoke.py" = "invokeai.frontend.CLI:command_line_interface"
+"invoke.py" = "invokeai.frontend.CLI:invokeai_command_line_interface"
 "configure_invokeai.py" = "invokeai.frontend.install:invokeai_configure"
 "textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
@@ -115,6 +115,9 @@ dependencies = [
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install:invokeai_model_install"
 "invokeai-update" = "invokeai.frontend.config:invokeai_update"
+"invokeai-metadata" = "invokeai.frontend.CLI.sd_metadata:print_metadata"
+"invokeai-node-cli" = "invokeai.app.cli_app:invoke_cli"
+"invokeai-node-web" = "invokeai.app.api_app:invoke_api"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"

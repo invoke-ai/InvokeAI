@@ -18,7 +18,7 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
-from ..args import Args
+from ..backend import Args
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .invocations.image import ImageField
