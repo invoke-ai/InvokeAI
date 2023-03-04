@@ -8,9 +8,9 @@ from typing import Callable, Optional
 import torch
 from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 
-from ..models import PostprocessingSettings
+from ..stable_diffusion import PostprocessingSettings
 from .base import Generator
-from .diffusers_pipeline import (
+from ..stable_diffusion.diffusers_pipeline import (
     ConditioningData,
     StableDiffusionGeneratorPipeline,
     trim_to_multiple_of,
