@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
@@ -8,11 +10,11 @@ def main():
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
     if '--web' in sys.argv:
-        from ldm.invoke.app.api_app import invoke_api
+        from invokeai.app.api_app import invoke_api
         invoke_api()
     else:
         # TODO: Parse some top-level args here.
-        from ldm.invoke.app.cli_app import invoke_cli
+        from invokeai.app.cli_app import invoke_cli
         invoke_cli()
 
 
