@@ -65,6 +65,7 @@ dependencies = [
   "pyreadline3",
   "realesrgan",
   "requests==2.28.2",
+  "rich~=13.3",
   "safetensors",
   "scikit-image>=0.19",
   "send2trash",
