@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { VStack } from '@chakra-ui/react';
 import SeedWeights from './SeedWeights';
 import VariationAmount from './VariationAmount';
 
@@ -7,10 +7,10 @@ import VariationAmount from './VariationAmount';
  */
 const VariationsSettings = () => {
   return (
-    <Flex gap={2} direction="column">
+    <VStack gap={2} alignItems="stretch">
       <VariationAmount />
       <SeedWeights />
-    </Flex>
+    </VStack>
   );
 };
 

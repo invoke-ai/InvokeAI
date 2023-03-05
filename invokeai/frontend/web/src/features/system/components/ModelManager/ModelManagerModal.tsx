@@ -1,8 +1,10 @@
 import {
   Flex,
   Modal,
+  ModalBody,
   ModalCloseButton,
   ModalContent,
+  ModalFooter,
   ModalHeader,
   ModalOverlay,
   useDisclosure,
@@ -53,19 +55,20 @@ export default function ModelManagerModal({
         size="6xl"
       >
         <ModalOverlay />
-        <ModalContent className="modal" fontFamily="Inter">
-          <ModalCloseButton className="modal-close-btn" />
-          <ModalHeader fontWeight="bold">
-            {t('modelManager.modelManager')}
-          </ModalHeader>
-          <Flex padding="0 1.5rem 1.5rem 1.5rem" width="100%" columnGap="2rem">
-            <ModelList />
-            {openModel && model_list[openModel]['format'] === 'diffusers' ? (
-              <DiffusersModelEdit />
-            ) : (
-              <CheckpointModelEdit />
-            )}
-          </Flex>
+        <ModalContent paddingInlineEnd={4}>
+          <ModalCloseButton />
+          <ModalHeader>{t('modelManager.modelManager')}</ModalHeader>
+          <ModalBody>
+            <Flex width="100%" columnGap={8}>
+              <ModelList />
+              {openModel && model_list[openModel]['format'] === 'diffusers' ? (
+                <DiffusersModelEdit />
+              ) : (
+                <CheckpointModelEdit />
+              )}
+            </Flex>
+          </ModalBody>
+          <ModalFooter />
         </ModalContent>
       </Modal>
     </>

@@ -23,30 +23,30 @@ const UnifiedCanvasToolbarBeta = () => {
   );
 
   return (
-    <Flex flexDirection="column" rowGap="0.5rem" width="6rem">
+    <Flex flexDirection="column" rowGap={2}>
       <UnifiedCanvasLayerSelect />
       <UnifiedCanvasToolSelect />
 
-      <Flex gap="0.5rem">
+      <Flex gap={2}>
         <UnifiedCanvasMoveTool />
         <UnifiedCanvasResetView />
       </Flex>
 
-      <Flex columnGap="0.5rem">
+      <Flex columnGap={2}>
         <UnifiedCanvasMergeVisible />
         <UnifiedCanvasSaveToGallery />
       </Flex>
-      <Flex columnGap="0.5rem">
+      <Flex columnGap={2}>
         <UnifiedCanvasCopyToClipboard />
         <UnifiedCanvasDownloadImage />
       </Flex>
 
-      <Flex gap="0.5rem">
+      <Flex gap={2}>
         <IAICanvasUndoButton />
         <IAICanvasRedoButton />
       </Flex>
 
-      <Flex gap="0.5rem">
+      <Flex gap={2}>
         <UnifiedCanvasFileUploader />
         <UnifiedCanvasResetCanvas />
       </Flex>

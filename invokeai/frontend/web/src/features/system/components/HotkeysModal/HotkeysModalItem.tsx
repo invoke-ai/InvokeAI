@@ -1,3 +1,5 @@
+import { Box, Grid, Text } from '@chakra-ui/react';
+
 interface HotkeysModalProps {
   hotkey: string;
   title: string;
@@ -7,12 +9,36 @@ interface HotkeysModalProps {
 export default function HotkeysModalItem(props: HotkeysModalProps) {
   const { title, hotkey, description } = props;
   return (
-    <div className="hotkey-modal-item">
-      <div className="hotkey-info">
-        <p className="hotkey-title">{title}</p>
-        {description && <p className="hotkey-description">{description}</p>}
-      </div>
-      <div className="hotkey-key">{hotkey}</div>
-    </div>
+    <Grid
+      sx={{
+        gridTemplateColumns: 'auto max-content',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
+      <Grid>
+        <Text fontWeight={600}>{title}</Text>
+        {description && (
+          <Text
+            sx={{
+              fontSize: 'sm',
+            }}
+            variant="subtext"
+          >
+            {description}
+          </Text>
+        )}
+      </Grid>
+      <Box
+        sx={{
+          fontSize: 'sm',
+          fontWeight: 600,
+          px: 2,
+          py: 1,
+        }}
+      >
+        {hotkey}
+      </Box>
+    </Grid>
   );
 }

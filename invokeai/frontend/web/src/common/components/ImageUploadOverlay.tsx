@@ -1,4 +1,4 @@
-import { Heading } from '@chakra-ui/react';
+import { Box, Flex, Heading } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 type ImageUploadOverlayProps = {
@@ -11,7 +11,7 @@ type ImageUploadOverlayProps = {
 const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
   const {
     isDragAccept,
-    isDragReject,
+    isDragReject: _isDragAccept,
     overlaySecondaryText,
     setIsHandlingUpload,
   } = props;
@@ -21,19 +21,42 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
   });
 
   return (
-    <div className="dropzone-container">
-      {isDragAccept && (
-        <div className="dropzone-overlay is-drag-accept">
+    <Box
+      sx={{
+        position: 'absolute',
+        top: 0,
+        insetInlineStart: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 999,
+        backdropFilter: 'blur(20px)',
+      }}
+    >
+      <Flex
+        sx={{
+          opacity: 0.4,
+          width: '100%',
+          height: '100%',
+          flexDirection: 'column',
+          rowGap: 4,
+          alignItems: 'center',
+          justifyContent: 'center',
+          bg: 'base.900',
+          boxShadow: `inset 0 0 20rem 1rem var(--invokeai-colors-${
+            isDragAccept ? 'accent' : 'error'
+          }-500)`,
+        }}
+      >
+        {isDragAccept ? (
           <Heading size="lg">Upload Image{overlaySecondaryText}</Heading>
-        </div>
-      )}
-      {isDragReject && (
-        <div className="dropzone-overlay is-drag-reject">
-          <Heading size="lg">Invalid Upload</Heading>
-          <Heading size="md">Must be single JPEG or PNG image</Heading>
-        </div>
-      )}
-    </div>
+        ) : (
+          <>
+            <Heading size="lg">Invalid Upload</Heading>
+            <Heading size="md">Must be single JPEG or PNG image</Heading>
+          </>
+        )}
+      </Flex>
+    </Box>
   );
 };
 export default ImageUploadOverlay;

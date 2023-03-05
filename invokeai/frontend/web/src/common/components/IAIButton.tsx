@@ -10,19 +10,15 @@ import { ReactNode } from 'react';
 export interface IAIButtonProps extends ButtonProps {
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
-  styleClass?: string;
+  isChecked?: boolean;
   children: ReactNode;
 }
 
 const IAIButton = forwardRef((props: IAIButtonProps, forwardedRef) => {
-  const { children, tooltip = '', tooltipProps, styleClass, ...rest } = props;
+  const { children, tooltip = '', tooltipProps, isChecked, ...rest } = props;
   return (
     <Tooltip label={tooltip} {...tooltipProps}>
-      <Button
-        ref={forwardedRef}
-        className={['invokeai__button', styleClass].join(' ')}
-        {...rest}
-      >
+      <Button ref={forwardedRef} aria-checked={isChecked} {...rest}>
         {children}
       </Button>
     </Tooltip>

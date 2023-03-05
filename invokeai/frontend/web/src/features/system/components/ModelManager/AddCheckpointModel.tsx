@@ -71,7 +71,7 @@ export default function AddCheckpointModel() {
   const [addManually, setAddmanually] = React.useState<boolean>(false);
 
   return (
-    <>
+    <VStack gap={2} alignItems="flex-start">
       <IAIIconButton
         aria-label={t('common.back')}
         tooltip={t('common.back')}
@@ -80,7 +80,7 @@ export default function AddCheckpointModel() {
         position="absolute"
         zIndex={1}
         size="sm"
-        right={12}
+        insetInlineEnd={12}
         top={3}
         icon={<BiArrowBack />}
       />
@@ -99,7 +99,7 @@ export default function AddCheckpointModel() {
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap="0.5rem">
+              <VStack rowGap={2}>
                 <Text fontSize={20} fontWeight="bold" alignSelf="start">
                   {t('modelManager.manual')}
                 </Text>
@@ -323,6 +323,6 @@ export default function AddCheckpointModel() {
           )}
         </Formik>
       )}
-    </>
+    </VStack>
   );
 }

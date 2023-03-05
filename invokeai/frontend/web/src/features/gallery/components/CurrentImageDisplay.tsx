@@ -1,10 +1,6 @@
+import { Flex, Icon } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
-import {
-  activeTabNameSelector,
-  uiSelector,
-} from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 
 import { MdPhoto } from 'react-icons/md';
@@ -13,14 +9,11 @@ import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
 
 export const currentImageDisplaySelector = createSelector(
-  [gallerySelector, uiSelector, activeTabNameSelector],
-  (gallery: GalleryState, ui, activeTabName) => {
+  [gallerySelector],
+  (gallery) => {
     const { currentImage, intermediateImage } = gallery;
-    const { shouldShowImageDetails } = ui;
 
     return {
-      activeTabName,
-      shouldShowImageDetails,
       hasAnImageToDisplay: currentImage || intermediateImage,
     };
   },
@@ -35,23 +28,42 @@ export const currentImageDisplaySelector = createSelector(
  * Displays the current image if there is one, plus associated actions.
  */
 const CurrentImageDisplay = () => {
-  const { hasAnImageToDisplay, activeTabName } = useAppSelector(
-    currentImageDisplaySelector
-  );
+  const { hasAnImageToDisplay } = useAppSelector(currentImageDisplaySelector);
 
   return (
-    <div className="current-image-area" data-tab-name={activeTabName}>
+    <Flex
+      sx={{
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+        rowGap: 4,
+        borderRadius: 'base',
+      }}
+    >
       {hasAnImageToDisplay ? (
         <>
           <CurrentImageButtons />
           <CurrentImagePreview />
         </>
       ) : (
-        <div className="current-image-display-placeholder">
-          <MdPhoto />
-        </div>
+        <Flex
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
+          }}
+        >
+          <Icon
+            as={MdPhoto}
+            sx={{
+              boxSize: 24,
+              color: 'base.500',
+            }}
+          />
+        </Flex>
       )}
-    </div>
+    </Flex>
   );
 };
 
