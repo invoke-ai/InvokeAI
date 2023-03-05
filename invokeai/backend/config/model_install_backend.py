@@ -270,7 +270,6 @@ def _download_diffusion_weights(
             path = download_from_hf(
                 model_class,
                 repo_id,
-                cache_subdir="diffusers",
                 safety_checker=None,
                 **extra_args,
             )
