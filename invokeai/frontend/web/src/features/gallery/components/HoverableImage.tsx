@@ -1,9 +1,15 @@
-import { Box, Icon, IconButton, Image, useToast } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
-  setCurrentImage,
-  setShouldHoldGalleryOpen,
-} from 'features/gallery/store/gallerySlice';
+  Box,
+  Flex,
+  Icon,
+  Image,
+  MenuItem,
+  MenuList,
+  useTheme,
+  useToast,
+} from '@chakra-ui/react';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { setCurrentImage } from 'features/gallery/store/gallerySlice';
 import {
   setAllImageToImageParameters,
   setAllParameters,
@@ -13,8 +19,7 @@ import {
 import { DragEvent, memo, useState } from 'react';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
-
-import * as ContextMenu from '@radix-ui/react-context-menu';
+import { ContextMenu } from 'chakra-ui-contextmenu';
 import * as InvokeAI from 'app/invokeai';
 import {
   resizeAndScaleCanvas,
@@ -24,6 +29,8 @@ import { hoverableImageSelector } from 'features/gallery/store/gallerySelectors'
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
+import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
+import IAIIconButton from 'common/components/IAIIconButton';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -53,6 +60,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
+  const { direction } = useTheme();
   const { t } = useTranslation();
   const setBothPrompts = useSetBothPrompts();
 
@@ -156,110 +164,146 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const handleLightBox = () => {
     dispatch(setCurrentImage(image));
+    dispatch(setIsLightboxOpen(true));
   };
 
   return (
-    <ContextMenu.Root
-      onOpenChange={(open: boolean) => {
-        dispatch(setShouldHoldGalleryOpen(open));
-      }}
+    <ContextMenu<HTMLDivElement>
+      menuProps={{ size: 'sm', isLazy: true }}
+      renderMenu={() => (
+        <MenuList>
+          <MenuItem onClickCapture={handleLightBox}>
+            {t('parameters.openInViewer')}
+          </MenuItem>
+          <MenuItem
+            onClickCapture={handleUsePrompt}
+            isDisabled={image?.metadata?.image?.prompt === undefined}
+          >
+            {t('parameters.usePrompt')}
+          </MenuItem>
+
+          <MenuItem
+            onClickCapture={handleUseSeed}
+            isDisabled={image?.metadata?.image?.seed === undefined}
+          >
+            {t('parameters.useSeed')}
+          </MenuItem>
+          <MenuItem
+            onClickCapture={handleUseAllParameters}
+            isDisabled={
+              !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
+            }
+          >
+            {t('parameters.useAll')}
+          </MenuItem>
+          <MenuItem
+            onClickCapture={handleUseInitialImage}
+            isDisabled={image?.metadata?.image?.type !== 'img2img'}
+          >
+            {t('parameters.useInitImg')}
+          </MenuItem>
+          <MenuItem onClickCapture={handleSendToImageToImage}>
+            {t('parameters.sendToImg2Img')}
+          </MenuItem>
+          <MenuItem onClickCapture={handleSendToCanvas}>
+            {t('parameters.sendToUnifiedCanvas')}
+          </MenuItem>
+          <MenuItem data-warning>
+            <DeleteImageModal image={image}>
+              <p>{t('parameters.deleteImage')}</p>
+            </DeleteImageModal>
+          </MenuItem>
+        </MenuList>
+      )}
     >
-      <ContextMenu.Trigger>
+      {(ref) => (
         <Box
           position="relative"
           key={uuid}
-          className="hoverable-image"
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
           userSelect="none"
           draggable={true}
           onDragStart={handleDragStart}
+          ref={ref}
+          sx={{
+            padding: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            transition: 'transform 0.2s ease-out',
+            _hover: {
+              cursor: 'pointer',
+
+              zIndex: 2,
+            },
+            _before: { content: '""', display: 'block', paddingBottom: '100%' },
+          }}
         >
           <Image
-            className="hoverable-image-image"
             objectFit={
               shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
             }
             rounded="md"
             src={thumbnail || url}
             loading="lazy"
+            sx={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              top: '50%',
+              transform: 'translate(-50%,-50%)',
+              ...(direction === 'rtl'
+                ? { insetInlineEnd: '50%' }
+                : { insetInlineStart: '50%' }),
+            }}
           />
-          <div className="hoverable-image-content" onClick={handleSelectImage}>
+          <Flex
+            onClick={handleSelectImage}
+            sx={{
+              position: 'absolute',
+              top: '0',
+              insetInlineStart: '0',
+              width: '100%',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             {isSelected && (
               <Icon
-                width="50%"
-                height="50%"
                 as={FaCheck}
-                className="hoverable-image-check"
+                sx={{
+                  width: '50%',
+                  height: '50%',
+                  fill: 'ok.500',
+                }}
               />
             )}
-          </div>
+          </Flex>
           {isHovered && galleryImageMinimumWidth >= 64 && (
-            <div className="hoverable-image-delete-button">
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 1,
+                insetInlineEnd: 1,
+              }}
+            >
               <DeleteImageModal image={image}>
-                <IconButton
+                <IAIIconButton
                   aria-label={t('parameters.deleteImage')}
                   icon={<FaTrashAlt />}
                   size="xs"
-                  variant="imageHoverIconButton"
                   fontSize={14}
                   isDisabled={!mayDeleteImage}
                 />
               </DeleteImageModal>
-            </div>
+            </Box>
           )}
         </Box>
-      </ContextMenu.Trigger>
-      <ContextMenu.Content
-        className="hoverable-image-context-menu"
-        sticky="always"
-        onInteractOutside={(e) => {
-          e.detail.originalEvent.preventDefault();
-        }}
-      >
-        <ContextMenu.Item onClickCapture={handleLightBox}>
-          {t('parameters.openInViewer')}
-        </ContextMenu.Item>
-        <ContextMenu.Item
-          onClickCapture={handleUsePrompt}
-          disabled={image?.metadata?.image?.prompt === undefined}
-        >
-          {t('parameters.usePrompt')}
-        </ContextMenu.Item>
-
-        <ContextMenu.Item
-          onClickCapture={handleUseSeed}
-          disabled={image?.metadata?.image?.seed === undefined}
-        >
-          {t('parameters.useSeed')}
-        </ContextMenu.Item>
-        <ContextMenu.Item
-          onClickCapture={handleUseAllParameters}
-          disabled={
-            !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
-          }
-        >
-          {t('parameters.useAll')}
-        </ContextMenu.Item>
-        <ContextMenu.Item
-          onClickCapture={handleUseInitialImage}
-          disabled={image?.metadata?.image?.type !== 'img2img'}
-        >
-          {t('parameters.useInitImg')}
-        </ContextMenu.Item>
-        <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
-          {t('parameters.sendToImg2Img')}
-        </ContextMenu.Item>
-        <ContextMenu.Item onClickCapture={handleSendToCanvas}>
-          {t('parameters.sendToUnifiedCanvas')}
-        </ContextMenu.Item>
-        <ContextMenu.Item data-warning>
-          <DeleteImageModal image={image}>
-            <p>{t('parameters.deleteImage')}</p>
-          </DeleteImageModal>
-        </ContextMenu.Item>
-      </ContextMenu.Content>
-    </ContextMenu.Root>
+      )}
+    </ContextMenu>
   );
 }, memoEqualityCheck);
 

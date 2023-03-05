@@ -49,7 +49,6 @@ export default function UnifiedCanvasBrushSize() {
       onChange={(newSize) => dispatch(setBrushSize(newSize))}
       sliderNumberInputProps={{ max: 500 }}
       inputReadOnly={false}
-      width="100px"
       isCompact
     />
   );

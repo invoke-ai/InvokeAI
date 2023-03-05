@@ -6,12 +6,11 @@ import { useTranslation } from 'react-i18next';
 
 interface ImageToImageStrengthProps {
   label?: string;
-  styleClass?: string;
 }
 
 export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
   const { t } = useTranslation();
-  const { label = `${t('parameters.strength')}`, styleClass } = props;
+  const { label = `${t('parameters.strength')}` } = props;
   const img2imgStrength = useAppSelector(
     (state: RootState) => state.generation.img2imgStrength
   );
@@ -33,10 +32,9 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       onChange={handleChangeStrength}
       value={img2imgStrength}
       isInteger={false}
-      styleClass={styleClass}
       withInput
       withSliderMarks
-      inputWidth="5.5rem"
+      inputWidth={22}
       withReset
       handleReset={handleImg2ImgStrengthReset}
     />
