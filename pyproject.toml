@@ -34,13 +34,13 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Image Processing',
 ]
 dependencies = [
-  "accelerate",
+  "accelerate~=0.16",
   "albumentations",
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==0.1.7",
   "datasets",
-  "diffusers[torch]~=0.13",
+  "diffusers[torch]~=0.14",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
@@ -52,38 +52,28 @@ dependencies = [
   "flask_cors==3.0.10",
   "flask_socketio==5.3.0",
   "flaskwebgui==1.0.3",
-  "getpass_asterisk",
   "gfpgan==1.3.8",
   "huggingface-hub>=0.11.1",
-  "imageio",
-  "imageio-ffmpeg",
-  "k-diffusion",              # replacing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
-  "kornia",
   "npyscreen",
   "numpy<1.24",
   "omegaconf",
   "opencv-python",
   "picklescan",
   "pillow",
-  "pudb",
   "prompt-toolkit",
   "pypatchmatch",
   "pyreadline3",
-  "python-multipart==0.0.5",
-  "pytorch-lightning==1.7.7",
   "realesrgan",
   "requests==2.28.2",
-  "safetensors",
+  "rich~=13.3",
+  "safetensors~=0.3.0",
   "scikit-image>=0.19",
   "send2trash",
-  "streamlit",
-  "taming-transformers-rom1504",
   "test-tube>=0.7.5",
   "torch>=1.13.1",
-  "torch-fidelity",
   "torchvision>=0.14.1",
   "torchmetrics",
-  "transformers~=4.25",
+  "transformers~=4.26",
   "uvicorn[standard]==0.20.0",
   "windows-curses; sys_platform=='win32'",
 ]
@@ -94,6 +84,9 @@ dependencies = [
   "mkdocs-material<9.0",
   "mkdocs-git-revision-date-localized-plugin",
   "mkdocs-redirects==1.2.0",
+]
+"dev" = [
+  "pudb",
 ]
 "test" = ["pytest>6.0.0", "pytest-cov"]
 "xformers" = [
@@ -132,7 +125,7 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*","invokeai.version*", 
+    "invokeai.assets.web*","invokeai.version*",
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend*", "invokeai.frontend.web.dist*",
     "invokeai.configs*",
