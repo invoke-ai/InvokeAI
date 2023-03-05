@@ -52,10 +52,10 @@ export default function ModelManagerModal({
       <Modal
         isOpen={isModelManagerModalOpen}
         onClose={onModelManagerModalClose}
-        size="6xl"
+        size="full"
       >
         <ModalOverlay />
-        <ModalContent paddingInlineEnd={4}>
+        <ModalContent>
           <ModalCloseButton />
           <ModalHeader>{t('modelManager.modelManager')}</ModalHeader>
           <ModalBody>

@@ -83,7 +83,7 @@ export default function AddModel() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent margin="auto">
+        <ModalContent margin="auto" paddingInlineEnd={4}>
           <ModalHeader>{t('modelManager.addNewModel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>

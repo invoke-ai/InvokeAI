@@ -136,7 +136,7 @@ export default function CheckpointModelEdit() {
                       id="description"
                       name="description"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.description && touched.description ? (
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
@@ -162,7 +162,7 @@ export default function CheckpointModelEdit() {
                       id="config"
                       name="config"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.config && touched.config ? (
                       <FormErrorMessage>{errors.config}</FormErrorMessage>
@@ -188,7 +188,7 @@ export default function CheckpointModelEdit() {
                       id="weights"
                       name="weights"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.weights && touched.weights ? (
                       <FormErrorMessage>{errors.weights}</FormErrorMessage>
@@ -211,7 +211,7 @@ export default function CheckpointModelEdit() {
                       id="vae"
                       name="vae"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.vae && touched.vae ? (
                       <FormErrorMessage>{errors.vae}</FormErrorMessage>

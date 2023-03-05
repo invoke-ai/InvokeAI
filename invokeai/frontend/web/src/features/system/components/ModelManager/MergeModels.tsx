@@ -111,7 +111,7 @@ export default function MergeModels() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent fontFamily="Inter" margin="auto">
+        <ModalContent fontFamily="Inter" margin="auto" paddingInlineEnd={4}>
           <ModalHeader>{t('modelManager.mergeModels')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>

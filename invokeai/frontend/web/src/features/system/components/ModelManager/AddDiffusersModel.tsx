@@ -292,11 +292,7 @@ export default function AddDiffusersModel() {
                 </FormControl>
               </FormItemWrapper>
 
-              <IAIButton
-                type="submit"
-                className="modal-close-btn"
-                isLoading={isProcessing}
-              >
+              <IAIButton type="submit" isLoading={isProcessing}>
                 {t('modelManager.addModel')}
               </IAIButton>
             </VStack>

@@ -276,14 +276,13 @@ export default function SearchModels() {
         >
           {({ handleSubmit }) => (
             <form onSubmit={handleSubmit}>
-              <HStack columnGap={2} alignItems="flex-end">
-                <FormControl isRequired width="max-content">
+              <HStack columnGap={2} alignItems="flex-end" width="100%">
+                <FormControl isRequired width="lg">
                   <Field
                     as={IAIInput}
                     id="checkpointFolder"
                     name="checkpointFolder"
                     type="text"
-                    width="lg"
                     size="md"
                     label={t('modelManager.checkpointFolder')}
                   />
@@ -294,6 +293,7 @@ export default function SearchModels() {
                   tooltip={t('modelManager.findModels')}
                   type="submit"
                   disabled={isProcessing}
+                  paddingX={10}
                 >
                   {t('modelManager.findModels')}
                 </IAIButton>
