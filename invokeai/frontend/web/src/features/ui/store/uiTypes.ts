@@ -7,7 +7,6 @@ export interface UIState {
   shouldHoldParametersPanelOpen: boolean;
   shouldPinParametersPanel: boolean;
   shouldShowParametersPanel: boolean;
-  shouldShowDualDisplay: boolean;
   shouldShowImageDetails: boolean;
   shouldUseCanvasBetaLayout: boolean;
   shouldShowExistingModelsInSearch: boolean;

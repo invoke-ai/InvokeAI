@@ -109,7 +109,7 @@ export default function DiffusersModelEdit() {
   };
 
   return openModel ? (
-    <Flex flexDirection="column" rowGap="1rem" width="100%">
+    <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex alignItems="center">
         <Text fontSize="lg" fontWeight="bold">
           {openModel}
@@ -119,7 +119,7 @@ export default function DiffusersModelEdit() {
         flexDirection="column"
         maxHeight={window.innerHeight - 270}
         overflowY="scroll"
-        paddingRight="2rem"
+        paddingInlineEnd={8}
       >
         <Formik
           enableReinitialize={true}
@@ -128,7 +128,7 @@ export default function DiffusersModelEdit() {
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap="0.5rem" alignItems="start">
+              <VStack rowGap={2} alignItems="start">
                 {/* Description */}
                 <FormControl
                   isInvalid={!!errors.description && touched.description}
@@ -269,15 +269,15 @@ export default function DiffusersModelEdit() {
     </Flex>
   ) : (
     <Flex
-      width="100%"
-      justifyContent="center"
-      alignItems="center"
-      backgroundColor="var(--background-color)"
-      borderRadius="0.5rem"
+      sx={{
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 'base',
+        bg: 'base.900',
+      }}
     >
-      <Text fontWeight="bold" color="var(--subtext-color-bright)">
-        Pick A Model To Edit
-      </Text>
+      <Text fontWeight={'500'}>Pick A Model To Edit</Text>
     </Flex>
   );
 }

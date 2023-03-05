@@ -5,11 +5,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogOverlay,
-  Button,
+  forwardRef,
   Flex,
-  FormControl,
-  FormLabel,
-  Switch,
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
@@ -17,6 +14,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
 import { deleteImage } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIButton from 'common/components/IAIButton';
+import IAISwitch from 'common/components/IAISwitch';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   setShouldConfirmOnDelete,
@@ -27,7 +26,6 @@ import { isEqual } from 'lodash';
 import {
   ChangeEvent,
   cloneElement,
-  forwardRef,
   ReactElement,
   SyntheticEvent,
   useRef,
@@ -110,7 +108,7 @@ const DeleteImageModal = forwardRef(
           onClose={onClose}
         >
           <AlertDialogOverlay>
-            <AlertDialogContent className="modal">
+            <AlertDialogContent>
               <AlertDialogHeader fontSize="lg" fontWeight="bold">
                 Delete image
               </AlertDialogHeader>
@@ -121,28 +119,20 @@ const DeleteImageModal = forwardRef(
                     Are you sure? Deleted images will be sent to the Bin. You
                     can restore from there if you wish to.
                   </Text>
-                  <FormControl>
-                    <Flex alignItems="center">
-                      <FormLabel mb={0}>Don&apos;t ask me again</FormLabel>
-                      <Switch
-                        checked={!shouldConfirmOnDelete}
-                        onChange={handleChangeShouldConfirmOnDelete}
-                      />
-                    </Flex>
-                  </FormControl>
+                  <IAISwitch
+                    label="Don't ask me again"
+                    isChecked={!shouldConfirmOnDelete}
+                    onChange={handleChangeShouldConfirmOnDelete}
+                  />
                 </Flex>
               </AlertDialogBody>
               <AlertDialogFooter>
-                <Button
-                  ref={cancelRef}
-                  onClick={onClose}
-                  className="modal-close-btn"
-                >
+                <IAIButton ref={cancelRef} onClick={onClose}>
                   Cancel
-                </Button>
-                <Button colorScheme="red" onClick={handleDelete} ml={3}>
+                </IAIButton>
+                <IAIButton colorScheme="error" onClick={handleDelete} ml={3}>
                   Delete
-                </Button>
+                </IAIButton>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialogOverlay>

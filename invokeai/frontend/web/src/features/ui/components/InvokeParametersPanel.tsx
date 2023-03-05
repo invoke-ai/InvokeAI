@@ -1,4 +1,4 @@
-import { Tooltip } from '@chakra-ui/react';
+import { Box, Flex, Tooltip, Icon, useTheme } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
@@ -15,9 +15,18 @@ import { CSSTransition } from 'react-transition-group';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import { setParametersPanelScrollPosition } from 'features/ui/store/uiSlice';
 
-import InvokeAILogo from 'assets/images/logo.png';
 import { isEqual } from 'lodash';
 import { uiSelector } from '../store/uiSelectors';
+import { useTranslation } from 'react-i18next';
+import {
+  APP_CONTENT_HEIGHT,
+  OPTIONS_BAR_MAX_WIDTH,
+  PROGRESS_BAR_THICKNESS,
+} from 'theme/util/constants';
+import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
+
+import './InvokeParametersPanel.css';
+import { no_scrollbar } from 'theme/components/scrollbar';
 
 type Props = { children: ReactNode };
 
@@ -47,6 +56,8 @@ const optionsPanelSelector = createSelector(
 
 const InvokeOptionsPanel = (props: Props) => {
   const dispatch = useAppDispatch();
+  const { direction } = useTheme();
+
   const {
     shouldShowParametersPanel,
     shouldHoldParametersPanelOpen,
@@ -59,6 +70,8 @@ const InvokeOptionsPanel = (props: Props) => {
   const timeoutIdRef = useRef<number | null>(null);
 
   const { children } = props;
+
+  const { t } = useTranslation();
 
   // Hotkeys
   useHotkeys(
@@ -145,11 +158,10 @@ const InvokeOptionsPanel = (props: Props) => {
       }
       unmountOnExit
       timeout={200}
-      classNames="parameters-panel-wrapper"
+      classNames={`${direction}-parameters-panel-transition`}
     >
-      <div
-        className="parameters-panel-wrapper"
-        data-pinned={shouldPinParametersPanel}
+      <Box
+        className={`${direction}-parameters-panel-transition`}
         tabIndex={1}
         ref={optionsPanelRef}
         onMouseEnter={
@@ -158,15 +170,32 @@ const InvokeOptionsPanel = (props: Props) => {
         onMouseOver={
           !shouldPinParametersPanel ? cancelCloseOptionsPanelTimer : undefined
         }
-        style={{
-          borderRight: !shouldPinParametersPanel
-            ? '0.3rem solid var(--tab-list-text-inactive)'
-            : '',
+        sx={{
+          borderInlineEndWidth: !shouldPinParametersPanel ? 5 : 0,
+          borderInlineEndStyle: 'solid',
+          bg: 'base.900',
+          borderColor: 'base.700',
+          height: APP_CONTENT_HEIGHT,
+          width: OPTIONS_BAR_MAX_WIDTH,
+          maxWidth: OPTIONS_BAR_MAX_WIDTH,
+          flexShrink: 0,
+          position: 'relative',
+          overflowY: 'scroll',
+          overflowX: 'hidden',
+          ...no_scrollbar,
+          ...(!shouldPinParametersPanel && {
+            zIndex: 20,
+            position: 'fixed',
+            top: 0,
+            insetInlineStart: 0,
+            width: `calc(${OPTIONS_BAR_MAX_WIDTH} + 2rem)`,
+            maxWidth: `calc(${OPTIONS_BAR_MAX_WIDTH} + 2rem)`,
+            height: '100%',
+          }),
         }}
       >
-        <div className="parameters-panel-margin">
-          <div
-            className="parameters-panel"
+        <Box sx={{ margin: !shouldPinParametersPanel && 4 }}>
+          <Flex
             ref={optionsPanelContainerRef}
             onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
               if (e.target !== optionsPanelContainerRef.current) {
@@ -175,28 +204,44 @@ const InvokeOptionsPanel = (props: Props) => {
                 !shouldPinParametersPanel && setCloseOptionsPanelTimer();
               }
             }}
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              rowGap: 2,
+              height: '100%',
+            }}
           >
-            <Tooltip label="Pin Options Panel">
-              <div
-                className="parameters-panel-pin-button"
-                data-selected={shouldPinParametersPanel}
+            <Tooltip label={t('common.pinOptionsPanel')}>
+              <Box
                 onClick={handleClickPinOptionsPanel}
+                sx={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  padding: 2,
+                  top: 4,
+                  insetInlineEnd: 4,
+                  zIndex: 20,
+                  ...(shouldPinParametersPanel && {
+                    top: 0,
+                    insetInlineEnd: 0,
+                  }),
+                }}
               >
-                {shouldPinParametersPanel ? <BsPinAngleFill /> : <BsPinAngle />}
-              </div>
+                <Icon
+                  sx={{ opacity: 0.2 }}
+                  as={shouldPinParametersPanel ? BsPinAngleFill : BsPinAngle}
+                />
+              </Box>
             </Tooltip>
             {!shouldPinParametersPanel && (
-              <div className="invoke-ai-logo-wrapper">
-                <img src={InvokeAILogo} alt="invoke-ai-logo" />
-                <h1>
-                  invoke <strong>ai</strong>
-                </h1>
-              </div>
+              <Box sx={{ pt: PROGRESS_BAR_THICKNESS, pb: 2 }}>
+                <InvokeAILogoComponent />
+              </Box>
             )}
             {children}
-          </div>
-        </div>
-      </div>
+          </Flex>
+        </Box>
+      </Box>
     </CSSTransition>
   );
 };

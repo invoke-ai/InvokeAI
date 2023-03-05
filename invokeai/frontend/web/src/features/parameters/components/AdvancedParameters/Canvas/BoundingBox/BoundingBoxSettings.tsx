@@ -1,4 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, VStack } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
@@ -68,7 +68,7 @@ const BoundingBoxSettings = () => {
   };
 
   return (
-    <Flex direction="column" gap={2}>
+    <VStack gap={2} alignItems="stretch">
       <IAISlider
         label={t('parameters.width')}
         min={64}
@@ -82,7 +82,6 @@ const BoundingBoxSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetWidth}
-        sliderMarkRightOffset={-7}
       />
       <IAISlider
         label={t('parameters.height')}
@@ -97,9 +96,8 @@ const BoundingBoxSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetHeight}
-        sliderMarkRightOffset={-7}
       />
-    </Flex>
+    </VStack>
   );
 };
 
@@ -108,7 +106,7 @@ export default BoundingBoxSettings;
 export const BoundingBoxSettingsHeader = () => {
   const { t } = useTranslation();
   return (
-    <Box flex="1" textAlign="left">
+    <Box flex="1" textAlign="start">
       {t('parameters.boundingBoxHeader')}
     </Box>
   );
