@@ -966,7 +966,10 @@ class ModelManager(object):
                 if dest.is_symlink():
                     print(f"** Found symlink at {dest.name}. Not migrating.")
                 elif dest.exists():
-                    rmtree(source)
+                    if source.is_dir():
+                        rmtree(source)
+                    else:
+                        source.unlink()
                 else:
                     move(source, dest)
 
