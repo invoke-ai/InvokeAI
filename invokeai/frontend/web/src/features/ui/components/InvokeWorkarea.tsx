@@ -1,4 +1,4 @@
-import { Tooltip } from '@chakra-ui/react';
+import { Box, BoxProps, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageGallery from 'features/gallery/components/ImageGallery';
@@ -8,27 +8,20 @@ import {
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { DragEvent, ReactNode } from 'react';
-import { VscSplitHorizontal } from 'react-icons/vsc';
 
-import {
-  setDoesCanvasNeedScaling,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import useGetImageByUuid from 'features/gallery/hooks/useGetImageByUuid';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
-import { setShouldShowDualDisplay } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash';
 
 const workareaSelector = createSelector(
   [uiSelector, lightboxSelector, activeTabNameSelector],
   (ui, lightbox, activeTabName) => {
-    const { shouldShowDualDisplay, shouldPinParametersPanel } = ui;
+    const { shouldPinParametersPanel } = ui;
     const { isLightboxOpen } = lightbox;
     return {
-      shouldShowDualDisplay,
       shouldPinParametersPanel,
       isLightboxOpen,
-      shouldShowDualDisplayButton: ['inpainting'].includes(activeTabName),
       activeTabName,
     };
   },
@@ -39,28 +32,17 @@ const workareaSelector = createSelector(
   }
 );
 
-type InvokeWorkareaProps = {
+type InvokeWorkareaProps = BoxProps & {
   optionsPanel: ReactNode;
   children: ReactNode;
-  styleClass?: string;
 };
 
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const dispatch = useAppDispatch();
-  const { optionsPanel, children, styleClass } = props;
-  const {
-    activeTabName,
-    shouldShowDualDisplay,
-    isLightboxOpen,
-    shouldShowDualDisplayButton,
-  } = useAppSelector(workareaSelector);
+  const { optionsPanel, children, ...rest } = props;
+  const { activeTabName, isLightboxOpen } = useAppSelector(workareaSelector);
 
   const getImageByUuid = useGetImageByUuid();
-
-  const handleDualDisplay = () => {
-    dispatch(setShouldShowDualDisplay(!shouldShowDualDisplay));
-    dispatch(setDoesCanvasNeedScaling(true));
-  };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     const uuid = e.dataTransfer.getData('invokeai/imageUuid');
@@ -74,30 +56,15 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   };
 
   return (
-    <div
-      className={
-        styleClass ? `workarea-wrapper ${styleClass}` : `workarea-wrapper`
-      }
-    >
-      <div className="workarea-main">
+    <Box {...rest} pos="relative" w="100%" h="100%">
+      <Flex gap={4} h="100%">
         {optionsPanel}
-        <div className="workarea-children-wrapper" onDrop={handleDrop}>
+        <Box pos="relative" w="100%" h="100%" onDrop={handleDrop}>
           {children}
-          {shouldShowDualDisplayButton && (
-            <Tooltip label="Toggle Split View">
-              <div
-                className="workarea-split-button"
-                data-selected={shouldShowDualDisplay}
-                onClick={handleDualDisplay}
-              >
-                <VscSplitHorizontal />
-              </div>
-            </Tooltip>
-          )}
-        </div>
+        </Box>
         {!isLightboxOpen && <ImageGallery />}
-      </div>
-    </div>
+      </Flex>
+    </Box>
   );
 };
 

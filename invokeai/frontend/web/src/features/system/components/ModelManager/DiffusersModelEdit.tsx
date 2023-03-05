@@ -109,18 +109,13 @@ export default function DiffusersModelEdit() {
   };
 
   return openModel ? (
-    <Flex flexDirection="column" rowGap="1rem" width="100%">
+    <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex alignItems="center">
         <Text fontSize="lg" fontWeight="bold">
           {openModel}
         </Text>
       </Flex>
-      <Flex
-        flexDirection="column"
-        maxHeight={window.innerHeight - 270}
-        overflowY="scroll"
-        paddingRight="2rem"
-      >
+      <Flex flexDirection="column" overflowY="scroll" paddingInlineEnd={8}>
         <Formik
           enableReinitialize={true}
           initialValues={editModelFormValues}
@@ -128,7 +123,7 @@ export default function DiffusersModelEdit() {
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap="0.5rem" alignItems="start">
+              <VStack rowGap={2} alignItems="start">
                 {/* Description */}
                 <FormControl
                   isInvalid={!!errors.description && touched.description}
@@ -143,7 +138,7 @@ export default function DiffusersModelEdit() {
                       id="description"
                       name="description"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.description && touched.description ? (
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
@@ -169,7 +164,7 @@ export default function DiffusersModelEdit() {
                       id="path"
                       name="path"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.path && touched.path ? (
                       <FormErrorMessage>{errors.path}</FormErrorMessage>
@@ -192,7 +187,7 @@ export default function DiffusersModelEdit() {
                       id="repo_id"
                       name="repo_id"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.repo_id && touched.repo_id ? (
                       <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
@@ -217,7 +212,7 @@ export default function DiffusersModelEdit() {
                       id="vae.path"
                       name="vae.path"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.vae?.path && touched.vae?.path ? (
                       <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
@@ -242,7 +237,7 @@ export default function DiffusersModelEdit() {
                       id="vae.repo_id"
                       name="vae.repo_id"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
                       <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
@@ -269,15 +264,15 @@ export default function DiffusersModelEdit() {
     </Flex>
   ) : (
     <Flex
-      width="100%"
-      justifyContent="center"
-      alignItems="center"
-      backgroundColor="var(--background-color)"
-      borderRadius="0.5rem"
+      sx={{
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 'base',
+        bg: 'base.900',
+      }}
     >
-      <Text fontWeight="bold" color="var(--subtext-color-bright)">
-        Pick A Model To Edit
-      </Text>
+      <Text fontWeight={'500'}>Pick A Model To Edit</Text>
     </Flex>
   );
 }

@@ -1,6 +1,7 @@
-import { IconButton, Tooltip } from '@chakra-ui/react';
+import { Flex, Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
 import {
   errorSeen,
   setShouldShowLogViewer,
@@ -105,23 +106,47 @@ const Console = () => {
           style={{
             display: 'flex',
             position: 'fixed',
-            left: 0,
+            insetInlineStart: 0,
             bottom: 0,
             zIndex: 9999,
           }}
           maxHeight="90vh"
         >
-          <div className="console" ref={viewerRef} onScroll={handleOnScroll}>
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              width: '100vw',
+              overflow: 'auto',
+              direction: 'column',
+              fontFamily: 'monospace',
+              pt: 0,
+              pr: 4,
+              pb: 4,
+              pl: 12,
+              borderTopWidth: 5,
+              bg: 'base.850',
+              borderColor: 'base.700',
+            }}
+            ref={viewerRef}
+            onScroll={handleOnScroll}
+          >
             {log.map((entry, i) => {
               const { timestamp, message, level } = entry;
+              const colorScheme = level === 'info' ? 'base' : level;
               return (
-                <div key={i} className={`console-entry console-${level}-color`}>
-                  <p className="console-timestamp">{timestamp}:</p>
-                  <p className="console-message">{message}</p>
-                </div>
+                <Flex
+                  key={i}
+                  sx={{
+                    gap: 2,
+                    color: `${colorScheme}.300`,
+                  }}
+                >
+                  <Text fontWeight="600">{timestamp}:</Text>
+                  <Text wordBreak="break-all">{message}</Text>
+                </Flex>
               );
             })}
-          </div>
+          </Flex>
         </Resizable>
       )}
       {shouldShowLogViewer && (
@@ -129,14 +154,18 @@ const Console = () => {
           hasArrow
           label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}
         >
-          <IconButton
-            className="console-autoscroll-icon-button"
-            data-autoscroll-enabled={shouldAutoscroll}
+          <IAIIconButton
             size="sm"
             aria-label="Toggle autoscroll"
-            variant="solid"
             icon={<FaAngleDoubleDown />}
             onClick={() => setShouldAutoscroll(!shouldAutoscroll)}
+            isChecked={shouldAutoscroll}
+            sx={{
+              position: 'fixed',
+              insetInlineStart: 2,
+              bottom: 12,
+              zIndex: '10000',
+            }}
           />
         </Tooltip>
       )}
@@ -144,15 +173,18 @@ const Console = () => {
         hasArrow
         label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}
       >
-        <IconButton
-          className="console-toggle-icon-button"
-          data-error-seen={hasError || !wasErrorSeen}
+        <IAIIconButton
           size="sm"
-          position="fixed"
-          variant="solid"
           aria-label="Toggle Log Viewer"
           icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
           onClick={handleClickLogViewerToggle}
+          sx={{
+            position: 'fixed',
+            insetInlineStart: 2,
+            bottom: 2,
+            zIndex: '10000',
+          }}
+          colorScheme={hasError || !wasErrorSeen ? 'error' : 'base'}
         />
       </Tooltip>
     </>
