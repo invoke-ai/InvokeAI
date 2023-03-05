@@ -4,7 +4,7 @@ import UnifiedCanvasColorPicker from './UnifiedCanvasColorPicker';
 
 export default function UnifiedCanvasBrushSettings() {
   return (
-    <Flex columnGap="1rem" alignItems="center">
+    <Flex columnGap={4} alignItems="center">
       <UnifiedCanvasBrushSize />
       <UnifiedCanvasColorPicker />
     </Flex>

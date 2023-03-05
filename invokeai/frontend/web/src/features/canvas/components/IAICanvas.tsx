@@ -1,3 +1,4 @@
+import { Box, chakra, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import {
@@ -88,6 +89,10 @@ const selector = createSelector(
   }
 );
 
+const ChakraStage = chakra(Stage, {
+  shouldForwardProp: (prop) => !['sx'].includes(prop),
+});
+
 const IAICanvas = () => {
   const {
     isMaskEnabled,
@@ -135,14 +140,26 @@ const IAICanvas = () => {
     useCanvasDragMove();
 
   return (
-    <div className="inpainting-canvas-container">
-      <div className="inpainting-canvas-wrapper">
-        <Stage
+    <Flex
+      sx={{
+        position: 'relative',
+        height: '100%',
+        width: '100%',
+        borderRadius: 'base',
+      }}
+    >
+      <Box sx={{ position: 'relative' }}>
+        <ChakraStage
           tabIndex={-1}
           ref={canvasStageRefCallback}
-          className="inpainting-canvas-stage"
-          style={{
-            ...(stageCursor ? { cursor: stageCursor } : {}),
+          sx={{
+            outline: 'none',
+            // boxShadow: '0px 0px 0px 1px var(--border-color-light)',
+            overflow: 'hidden',
+            cursor: stageCursor ? stageCursor : undefined,
+            canvas: {
+              outline: 'none',
+            },
           }}
           x={stageCoordinates.x}
           y={stageCoordinates.y}
@@ -197,11 +214,11 @@ const IAICanvas = () => {
               visible={shouldShowBoundingBox && !isStaging}
             />
           </Layer>
-        </Stage>
+        </ChakraStage>
         <IAICanvasStatusText />
         <IAICanvasStagingAreaToolbar />
-      </div>
-    </div>
+      </Box>
+    </Flex>
   );
 };
 

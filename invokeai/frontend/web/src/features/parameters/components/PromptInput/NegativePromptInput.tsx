@@ -19,19 +19,11 @@ const NegativePromptInput = () => {
         name="negativePrompt"
         value={negativePrompt}
         onChange={(e) => dispatch(setNegativePrompt(e.target.value))}
-        background="var(--prompt-bg-color)"
         placeholder={t('parameters.negativePrompts')}
-        _placeholder={{ fontSize: '0.8rem' }}
-        borderColor="var(--border-color)"
-        _hover={{
-          borderColor: 'var(--border-color-light)',
-        }}
         _focusVisible={{
-          borderColor: 'var(--border-color-invalid)',
-          boxShadow: '0 0 10px var(--box-shadow-color-invalid)',
+          borderColor: 'error.600',
         }}
-        fontSize="0.9rem"
-        color="var(--text-color-secondary)"
+        fontSize="sm"
       />
     </FormControl>
   );

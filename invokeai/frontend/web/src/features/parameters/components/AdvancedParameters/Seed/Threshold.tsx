@@ -23,7 +23,6 @@ export default function Threshold() {
       withInput
       withReset
       withSliderMarks
-      sliderMarkRightOffset={-4}
     />
   );
 }

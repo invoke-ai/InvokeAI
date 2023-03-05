@@ -115,7 +115,7 @@ const IAICanvasStagingAreaToolbar = () => {
   return (
     <Flex
       pos="absolute"
-      bottom="1rem"
+      bottom={4}
       w="100%"
       align="center"
       justify="center"
@@ -129,7 +129,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}
           icon={<FaArrowLeft />}
           onClick={handlePrevImage}
-          data-selected={true}
+          colorScheme="accent"
           isDisabled={isOnFirstImage}
         />
         <IAIIconButton
@@ -137,7 +137,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.next')} (Right)`}
           icon={<FaArrowRight />}
           onClick={handleNextImage}
-          data-selected={true}
+          colorScheme="accent"
           isDisabled={isOnLastImage}
         />
         <IAIIconButton
@@ -145,7 +145,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
           icon={<FaCheck />}
           onClick={handleAccept}
-          data-selected={true}
+          colorScheme="accent"
         />
         <IAIIconButton
           tooltip={t('unifiedCanvas.showHide')}
@@ -155,7 +155,7 @@ const IAICanvasStagingAreaToolbar = () => {
           onClick={() =>
             dispatch(setShouldShowStagingImage(!shouldShowStagingImage))
           }
-          data-selected={true}
+          colorScheme="accent"
         />
         <IAIIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
@@ -166,15 +166,14 @@ const IAICanvasStagingAreaToolbar = () => {
               saveStagingAreaImageToGallery(currentStagingAreaImage.image.url)
             )
           }
-          data-selected={true}
+          colorScheme="accent"
         />
         <IAIIconButton
           tooltip={t('unifiedCanvas.discardAll')}
           aria-label={t('unifiedCanvas.discardAll')}
           icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
           onClick={() => dispatch(discardStagedImages())}
-          data-selected={true}
-          style={{ backgroundColor: 'var(--btn-delete-image)' }}
+          colorScheme="error"
           fontSize={20}
         />
       </ButtonGroup>

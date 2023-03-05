@@ -23,8 +23,8 @@ export default function UnifiedCanvasResetCanvas() {
       tooltip={t('unifiedCanvas.clearCanvas')}
       icon={<FaTrash />}
       onClick={handleResetCanvas}
-      style={{ backgroundColor: 'var(--btn-delete-image)' }}
       isDisabled={isStaging}
+      colorScheme="error"
     />
   );
 }

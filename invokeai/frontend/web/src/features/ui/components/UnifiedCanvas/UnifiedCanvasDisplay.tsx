@@ -1,9 +1,10 @@
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 // import IAICanvas from 'features/canvas/components/IAICanvas';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
-import IAICanvasOutpaintingControls from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
+import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import { debounce, isEqual } from 'lodash';
@@ -43,16 +44,39 @@ const UnifiedCanvasDisplay = () => {
   }, [dispatch]);
 
   return (
-    <div className="workarea-single-view">
-      <div className="workarea-split-view-left">
-        <div className="inpainting-main-area">
-          <IAICanvasOutpaintingControls />
-          <div className="inpainting-canvas-area">
-            {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
-          </div>
-        </div>
-      </div>
-    </div>
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        padding: 4,
+        borderRadius: 'base',
+        bg: 'base.850',
+      }}
+    >
+      <Flex
+        sx={{
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        <IAICanvasToolbar />
+        <Flex
+          sx={{
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            width: '100%',
+            height: '100%',
+          }}
+        >
+          {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
+        </Flex>
+      </Flex>
+    </Box>
   );
 };
 
