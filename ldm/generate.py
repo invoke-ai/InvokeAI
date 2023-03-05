@@ -200,6 +200,8 @@ class Generate:
         # it wasn't actually doing anything. This logic could be reinstated.
         self.device = torch.device(choose_torch_device())
         print(f">> Using device_type {self.device.type}")
+        if self.device.type == 'cuda':
+            print(f">> CUDA device '{torch.cuda.get_device_name(torch.cuda.current_device())}' (GPU {os.environ.get('CUDA_VISIBLE_DEVICES') or 0})")
         if full_precision:
             if self.precision != "auto":
                 raise ValueError("Remove --full_precision / -F if using --precision")

@@ -8,17 +8,19 @@ that scan across steps and other parameters.
 import argparse
 import io
 import json
+import os
 import pydoc
 import re
 import shutil
 import sys
 import numpy as np
-from dataclasses import dataclass
 from io import TextIOBase
 from itertools import product
 from pathlib import Path
+from multiprocessing import Process, Pipe
+from multiprocessing.connection import Connection
 from subprocess import PIPE, Popen
-from typing import Iterable, List, Union
+from typing import Iterable, List
 
 import yaml
 from omegaconf import OmegaConf, dictconfig, listconfig
@@ -29,6 +31,7 @@ def expand_prompts(
     run_invoke: bool = False,
     invoke_model: str = None,
     invoke_outdir: Path = None,
+    processes_per_gpu: int = 1
 ):
     """
     :param template_file: A YAML file containing templated prompts and args
@@ -42,24 +45,98 @@ def expand_prompts(
                 conf = OmegaConf.load(fh)
     else:
         conf = OmegaConf.load(template_file)
+
+    # loading here to avoid long wait for help message
+    import torch
+    torch.multiprocessing.set_start_method('spawn')
+    gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 1
+    commands = expanded_invokeai_commands(conf, run_invoke)
+    children = list()
+    
     try:
         if run_invoke:
-            invokeai_args = [shutil.which("invokeai")]
+            invokeai_args = [shutil.which("invokeai"),"--from_file","-"]
             if invoke_model:
                 invokeai_args.extend(("--model", invoke_model))
             if invoke_outdir:
-                invokeai_args.extend(("--outdir", invoke_outdir))
-            print(f"Calling invokeai with arguments {invokeai_args}", file=sys.stderr)
-            process = Popen(invokeai_args, stdin=PIPE, text=True)
-            with process.stdin as fh:
-                _do_expand(conf, file=fh)
-            process.wait()
+                invokeai_args.extend(("--outdir", os.path.expanduser(invoke_outdir)))
+
+            processes_to_launch = gpu_count * processes_per_gpu
+            print(f'>> Spawning {processes_to_launch} invokeai processes across {gpu_count} CUDA gpus', file=sys.stderr)
+            import ldm.invoke.CLI
+            parent_conn, child_conn = Pipe()
+            children = set()
+            for i in range(processes_to_launch):
+                p = Process(target=_run_invoke,
+                            args=(child_conn,
+                                  parent_conn,
+                                  invokeai_args,
+                                  i%gpu_count,
+                                  )
+                            )
+                p.start()
+                children.add(p)
+            child_conn.close()
+            sequence = 0
+            for command in commands:
+                sequence += 1
+                parent_conn.send(command+f' --fnformat=dp.{sequence:04}.{{prompt}}.png')
+            parent_conn.close()
         else:
-            _do_expand(conf)
+            for command in commands:
+                print(command)
     except KeyboardInterrupt:
-        process.kill()
+        for p in children:
+            p.terminate()
 
+class MessageToStdin(object):
+    def __init__(self, connection: Connection):
+        self.connection = connection
+        self.linebuffer = list()
 
+    def readline(self)->str:
+        try:
+            if len(self.linebuffer) == 0:
+                message = self.connection.recv()
+                self.linebuffer = message.split("\n")
+            result = self.linebuffer.pop(0)
+            return result
+        except EOFError:
+            return None
+
+class FilterStream(object):
+    def __init__(self, stream: TextIOBase, include: re.Pattern=None, exclude: re.Pattern=None):
+        self.stream = stream
+        self.include = include
+        self.exclude = exclude
+        
+    def write(self, data: str):
+        if self.include and self.include.match(data):
+            self.stream.write(data)
+            self.stream.flush()
+        elif self.exclude and not self.exclude.match(data):
+            self.stream.write(data)
+            self.stream.flush()
+
+    def flush(self):
+        self.stream.flush()
+    
+def _run_invoke(conn_in: Connection, conn_out: Connection, args: List[str], gpu: int=0):
+    print(f'>> Process {os.getpid()} running on GPU {gpu}', file=sys.stderr)
+    conn_out.close()
+    os.environ['CUDA_VISIBLE_DEVICES'] = f"{gpu}"
+    from ldm.invoke.CLI import main
+    sys.argv = args
+    sys.stdin = MessageToStdin(conn_in)
+    sys.stdout = FilterStream(sys.stdout,include=re.compile('^\[\d+\]'))
+    sys.stderr = FilterStream(sys.stdout,exclude=re.compile('^(>>|\s*\d+%|Fetching)'))
+    main()
+
+def _filter_output(stream: TextIOBase):
+    while line := stream.readline():
+        if re.match('^\[\d+\]',line):
+            print(line)
+    
 def main():
     parser = argparse.ArgumentParser(
         description=HELP,
@@ -88,12 +165,12 @@ def main():
         dest="instructions",
         action="store_true",
         default=False,
-        help=f"Print verbose instructions.",
+        help="Print verbose instructions.",
     )
     parser.add_argument(
         "--invoke",
         action="store_true",
-        help="Execute invokeai using specified optional --model and --outdir",
+        help="Execute invokeai using specified optional --model, --processes_per_gpu and --outdir",
     )
     parser.add_argument(
         "--model",
@@ -101,6 +178,12 @@ def main():
     )
     parser.add_argument(
         "--outdir", type=Path, help="Write images and log into indicated directory"
+    )
+    parser.add_argument(
+        "--processes_per_gpu",
+        type=int,
+        default=1,
+        help="When executing invokeai, how many parallel processes to execute per CUDA GPU.",
     )
     opt = parser.parse_args()
 
@@ -125,9 +208,10 @@ def main():
         run_invoke=opt.invoke,
         invoke_model=opt.model,
         invoke_outdir=opt.outdir,
+        processes_per_gpu=opt.processes_per_gpu,
     )
 
-def _do_expand(conf: OmegaConf, file: TextIOBase = sys.stdout):
+def expanded_invokeai_commands(conf: OmegaConf, always_switch_models: bool=False)->List[List[str]]:
     models = expand_values(conf.get("model"))
     steps = expand_values(conf.get("steps")) or [30]
     cfgs = expand_values(conf.get("cfg")) or [7.5]
@@ -144,17 +228,17 @@ def _do_expand(conf: OmegaConf, file: TextIOBase = sys.stdout):
         *[models, seeds, prompts, samplers, cfgs, steps, perlin, threshold, init_img, strength, dimensions]
     )
     previous_model = None
+    
+    result = list()
     for p in cross_product:
         (model, seed, prompt, sampler, cfg, step, perlin, threshold, init_img, strength, dimensions) = tuple(p)
         (width, height) = dimensions.split("x")
-        if previous_model != model:
-            previous_model = model
-            print(f"!switch {model}", file=file)
+        switch_args = f"!switch {model}\n" if always_switch_models or previous_model != model else ''
         image_args = f'-I{init_img} -f{strength}' if init_img else ''
-        print(
-            f'"{prompt}" -S{seed} -A{sampler} -C{cfg} -s{step} {image_args} --perlin={perlin} --threshold={threshold} -W{width} -H{height}',
-            file=file,
-        )
+        command = f'{switch_args}{prompt} -S{seed} -A{sampler} -C{cfg} -s{step} {image_args} --perlin={perlin} --threshold={threshold} -W{width} -H{height}'
+        result.append(command)
+        previous_model = model
+    return result
 
 
 def expand_prompt(
@@ -215,7 +299,7 @@ def _yaml_to_json(yaml_input: str) -> str:
     return json.dumps(data, indent=2)
 
 
-HELP = f"""
+HELP = """
 This script takes a prompt template file that contains multiple
 alternative values for the prompt and its generation arguments (such
 as steps). It then expands out the prompts using all combinations of
