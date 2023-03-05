@@ -937,9 +937,17 @@ class ModelManager(object):
             return
 
         print(
-            "** Old model directory layout (< v3.0) detected. Reorganizing."
+            """
+>> ALERT:
+>> The location of your previously-installed diffusers models needs to move from
+>> invokeai/models/diffusers to invokeai/models/hub due to a change introduced by
+>> diffusers version 0.14. InvokeAI will now move all models from the "diffusers" directory
+>> into "hub" and then remove the diffusers directory. This is a quick, safe, one-time
+>> operation. However if you have customized either of these directories and need to
+>> make adjustments, please press ctrl-C now to abort and relaunch InvokeAI when you are ready.
+>> Otherwise press <enter> to continue."""
         )
-        print("** This is a quick one-time operation.")
+        input('continue> ')
 
         # transformer files get moved into the hub directory
         if cls._is_huggingface_hub_directory_present():
