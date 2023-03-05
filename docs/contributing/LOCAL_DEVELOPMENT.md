@@ -11,7 +11,7 @@ focus.
 
 ## Documentation
 
-We use [mkdcos](https://www.mkdocs.org) for our documentation with the
+We use [mkdocs](https://www.mkdocs.org) for our documentation with the
 [material theme](https://squidfunk.github.io/mkdocs-material/). Documentation is
 written in markdown files under the `./docs` folder and then built into a static
 website for hosting with GitHub Pages at
@@ -51,7 +51,7 @@ code.
 ### Running Tests
 
 We use [pytest](https://docs.pytest.org/en/7.2.x/) for our test suite. Tests can
-be found under the `./tests` folder and can be run with a single `pyest`
+be found under the `./tests` folder and can be run with a single `pytest`
 command. Optionally, to review test coverage you can append `--cov`.
 
 ```zsh
@@ -78,10 +78,6 @@ pytest --cov; open ./coverage/html/index.html
 
 ## Front End
 
-<!--#TODO: get input from blessedcoolant here-->
+<!--#TODO: get input from blessedcoolant here, for the moment inserted the frontend README via snippets extension.-->
 
-1. Run the backend using `invokeai --web --web_develop`
-2. Go to ./invokeai/frontend/web
-3. `yarn install` to install all packages.
-4. `yarn dev` to boot dev mode
-5. Go to `http://localhost:5173`
+--8<-- "invokeai/frontend/web/README.md"
