@@ -5,6 +5,7 @@
 
 import gc
 import importlib
+import logging
 import os
 import random
 import re
@@ -19,24 +20,20 @@ import numpy as np
 import skimage
 import torch
 import transformers
+from PIL import Image, ImageOps
+from accelerate.utils import set_seed
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
-from PIL import Image, ImageOps
-from pytorch_lightning import logging, seed_everything
 
-from .model_management import ModelManager
 from .args import metadata_from_png
 from .generator import infill_methods
 from .globals import Globals, global_cache_dir
 from .image_util import InitImageResizer, PngWriter, Txt2Mask, configure_model_padding
+from .model_management import ModelManager
 from .prompting import get_uc_and_c_and_ec
-from .stable_diffusion import (
-    DDIMSampler,
-    HuggingFaceConceptsLibrary,
-    KSampler,
-    PLMSSampler,
-)
+from .prompting.conditioning import log_tokenization
+from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device
 
 
@@ -484,7 +481,7 @@ class Generate:
 
         if sampler_name and (sampler_name != self.sampler_name):
             self.sampler_name = sampler_name
-            self._set_sampler()
+            self._set_scheduler()
 
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
@@ -492,11 +489,6 @@ class Generate:
             lambda concepts: self.load_huggingface_concepts(concepts),
             self.model.textual_inversion_manager.get_all_trigger_strings(),
         )
-
-        # bit of a hack to change the cached sampler's karras threshold to
-        # whatever the user asked for
-        if karras_max is not None and isinstance(self.sampler, KSampler):
-            self.sampler.adjust_settings(karras_max=karras_max)
 
         tic = time.time()
         if self._has_cuda():
@@ -715,7 +707,7 @@ class Generate:
             prompt,
             model=self.model,
             skip_normalize_legacy_blend=opt.skip_normalize,
-            log_tokens=invokeai.backend.prompting.conditioning.log_tokenization,
+            log_tokens=log_tokenization,
         )
 
         if tool in ("gfpgan", "codeformer", "upscale"):
@@ -959,7 +951,7 @@ class Generate:
         # uncache generators so they pick up new models
         self.generators = {}
 
-        seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
+        set_seed(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
             print(f">> Loading embeddings from {self.embedding_path}")
             for root, _, files in os.walk(self.embedding_path):
@@ -973,7 +965,7 @@ class Generate:
             )
 
         self.model_name = model_name
-        self._set_sampler()  # requires self.model_name to be set first
+        self._set_scheduler()  # requires self.model_name to be set first
         return self.model
 
     def load_huggingface_concepts(self, concepts: list[str]):
@@ -1104,44 +1096,6 @@ class Generate:
 
     def is_legacy_model(self, model_name) -> bool:
         return self.model_manager.is_legacy(model_name)
-
-    def _set_sampler(self):
-        if isinstance(self.model, DiffusionPipeline):
-            return self._set_scheduler()
-        else:
-            return self._set_sampler_legacy()
-
-    # very repetitive code - can this be simplified? The KSampler names are
-    # consistent, at least
-    def _set_sampler_legacy(self):
-        msg = f">> Setting Sampler to {self.sampler_name}"
-        if self.sampler_name == "plms":
-            self.sampler = PLMSSampler(self.model, device=self.device)
-        elif self.sampler_name == "ddim":
-            self.sampler = DDIMSampler(self.model, device=self.device)
-        elif self.sampler_name == "k_dpm_2_a":
-            self.sampler = KSampler(self.model, "dpm_2_ancestral", device=self.device)
-        elif self.sampler_name == "k_dpm_2":
-            self.sampler = KSampler(self.model, "dpm_2", device=self.device)
-        elif self.sampler_name == "k_dpmpp_2_a":
-            self.sampler = KSampler(
-                self.model, "dpmpp_2s_ancestral", device=self.device
-            )
-        elif self.sampler_name == "k_dpmpp_2":
-            self.sampler = KSampler(self.model, "dpmpp_2m", device=self.device)
-        elif self.sampler_name == "k_euler_a":
-            self.sampler = KSampler(self.model, "euler_ancestral", device=self.device)
-        elif self.sampler_name == "k_euler":
-            self.sampler = KSampler(self.model, "euler", device=self.device)
-        elif self.sampler_name == "k_heun":
-            self.sampler = KSampler(self.model, "heun", device=self.device)
-        elif self.sampler_name == "k_lms":
-            self.sampler = KSampler(self.model, "lms", device=self.device)
-        else:
-            msg = f">> Unsupported Sampler: {self.sampler_name}, Defaulting to plms"
-            self.sampler = PLMSSampler(self.model, device=self.device)
-
-        print(msg)
 
     def _set_scheduler(self):
         default = self.model.scheduler
