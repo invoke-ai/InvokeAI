@@ -9,15 +9,12 @@ on:
       - 'dev/docker/*'
     paths:
       - 'pyproject.toml'
+      - '.dockerignore'
       - 'invokeai/**'
-      - 'invokeai/backend/**'
-      - 'invokeai/configs/**'
-      - 'invokeai/frontend/dist/**'
       - 'docker/Dockerfile'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
-
 
 jobs:
   docker:
@@ -56,9 +53,9 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=tag
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=pep440,pattern={{version}}
+            type=pep440,pattern={{major}}.{{minor}}
+            type=pep440,pattern={{major}}
             type=sha,enable=true,prefix=sha-,format=short
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
