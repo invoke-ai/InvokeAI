@@ -928,7 +928,7 @@ class ModelManager(object):
                 "openai/clip-vit-large-patch14/models--openai--clip-vit-large-patch14"
             ),
         ]
-        legacy_locations.extend(list(Path(models_dir,"diffusers").glob('*')))
+        legacy_locations.extend(list(global_cache_dir("diffusers").glob('*')))
         
         legacy_layout = False
         for model in legacy_locations:
