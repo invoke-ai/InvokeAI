@@ -34,13 +34,13 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Image Processing',
 ]
 dependencies = [
-  "accelerate",
+  "accelerate~=0.16",
   "albumentations",
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==0.1.7",
   "datasets",
-  "diffusers[torch]~=0.13",
+  "diffusers[torch]~=0.14",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
@@ -73,7 +73,7 @@ dependencies = [
   "pytorch-lightning==1.7.7",
   "realesrgan",
   "requests==2.28.2",
-  "safetensors",
+  "safetensors~=0.3.0",
   "scikit-image>=0.19",
   "send2trash",
   "streamlit",
@@ -83,7 +83,7 @@ dependencies = [
   "torch-fidelity",
   "torchvision>=0.14.1",
   "torchmetrics",
-  "transformers~=4.25",
+  "transformers~=4.26",
   "uvicorn[standard]==0.20.0",
   "windows-curses; sys_platform=='win32'",
 ]
@@ -132,7 +132,7 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*","invokeai.version*", 
+    "invokeai.assets.web*","invokeai.version*",
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend*", "invokeai.frontend.web.dist*",
     "invokeai.configs*",
