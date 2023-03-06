@@ -2,7 +2,6 @@ model:
   base_learning_rate: 1.0e-4
   target: invokeai.backend.stable_diffusion.diffusion.ddpm.LatentDiffusion
   params:
-    parameterization: "v"
     linear_start: 0.00085
     linear_end: 0.0120
     num_timesteps_cond: 1

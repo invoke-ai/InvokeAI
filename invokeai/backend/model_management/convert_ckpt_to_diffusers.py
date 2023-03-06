@@ -1101,14 +1101,17 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         if original_config_file is None:
             model_type = ModelManager.probe_model_type(checkpoint)
 
-            if model_type == SDLegacyType.V2:
+            if model_type == SDLegacyType.V2_v:
                 original_config_file = (
                     global_config_dir() / "stable-diffusion" / "v2-inference-v.yaml"
                 )
                 if global_step == 110000:
                     # v2.1 needs to upcast attention
                     upcast_attention = True
-
+            elif model_type == SDLegacyType.V2_e:
+                original_config_file = (
+                    global_config_dir() / "stable-diffusion" / "v2-inference.yaml"
+                )
             elif model_type == SDLegacyType.V1_INPAINT:
                 original_config_file = (
                     global_config_dir()

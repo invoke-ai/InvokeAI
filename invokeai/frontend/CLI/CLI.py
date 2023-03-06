@@ -19,7 +19,7 @@ import invokeai.version as invokeai
 
 from ...backend import Generate, ModelManager
 from ...backend.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
-from ...backend.globals import Globals
+from ...backend.globals import Globals, global_config_dir
 from ...backend.image_util import (
     PngWriter,
     make_grid,
@@ -65,6 +65,9 @@ def main():
     Globals.disable_xformers = not args.xformers
     Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = True  # always true now
+
+    # run any post-install patches needed
+    run_patches()
 
     print(f">> Internet connectivity is {Globals.internet_available}")
 
@@ -658,7 +661,16 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     )
 
     if not imported_name:
-        print("** Import failed or was skipped")
+        if config_file := _pick_configuration_file(completer):
+            imported_name = gen.model_manager.heuristic_import(
+                model_path,
+                model_name=model_name,
+                description=model_desc,
+                convert=convert,
+                model_config_file=config_file,
+            )
+    if not imported_name:
+        print("** Aborting import.")
         return
 
     if not _verify_load(imported_name, gen):
@@ -672,6 +684,46 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     completer.update_models(gen.model_manager.list_models())
     print(f">> {imported_name} successfully installed")
 
+def _pick_configuration_file(completer)->Path:
+    print(
+"""
+Please select the type of this model:
+[1] A Stable Diffusion v1.x ckpt/safetensors model
+[2] A Stable Diffusion v1.x inpainting ckpt/safetensors model
+[3] A Stable Diffusion v2.x base model (512 pixels)
+[4] A Stable Diffusion v2.x v-predictive model (768 pixels)
+[5] Other (you will be prompted to enter the config file path)
+[Q] I have no idea! Skip the import.
+""")
+    choices = [
+        global_config_dir() / 'stable-diffusion' / x
+        for x in [
+                'v1-inference.yaml',
+                'v1-inpainting-inference.yaml',
+                'v2-inference.yaml',
+                'v2-inference-v.yaml',
+        ]
+    ]
+
+    ok = False
+    while not ok:
+        try:
+            choice = input('select 0-5, Q > ').strip()
+            if choice.startswith(('q','Q')):
+                return
+            if choice == '5':
+                completer.complete_extensions(('.yaml'))
+                choice = Path(input('Select config file for this model> ').strip()).absolute()
+                completer.complete_extensions(None)
+                ok = choice.exists()
+            else:
+                choice = choices[int(choice)-1]
+                ok = True
+        except (ValueError, IndexError):
+            print(f'{choice} is not a valid choice')
+        except EOFError:
+            return
+    return choice
 
 def _verify_load(model_name: str, gen) -> bool:
     print(">> Verifying that new model loads...")
@@ -1236,6 +1288,19 @@ def check_internet() -> bool:
     except:
         return False
 
-
+# This routine performs any patch-ups needed after installation
+def run_patches():
+    # install ckpt configuration files that may have been added to the
+    # distro after original root directory configuration
+    import invokeai.configs as conf
+    from shutil import copyfile
+    
+    root_configs = Path(global_config_dir(), 'stable-diffusion')
+    repo_configs = Path(conf.__path__[0], 'stable-diffusion')
+    for src in repo_configs.iterdir():
+        dest = root_configs / src.name
+        if not dest.exists():
+            copyfile(src,dest)
+    
 if __name__ == "__main__":
     main()
