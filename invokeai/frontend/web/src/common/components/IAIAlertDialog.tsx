@@ -5,11 +5,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogOverlay,
+  Button,
   forwardRef,
   useDisclosure,
 } from '@chakra-ui/react';
 import { cloneElement, ReactElement, ReactNode, useRef } from 'react';
-import IAIButton from './IAIButton';
 
 type Props = {
   acceptButtonText?: string;
@@ -58,7 +58,7 @@ const IAIAlertDialog = forwardRef((props: Props, ref) => {
         onClose={onClose}
       >
         <AlertDialogOverlay>
-          <AlertDialogContent>
+          <AlertDialogContent className="modal">
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               {title}
             </AlertDialogHeader>
@@ -66,12 +66,16 @@ const IAIAlertDialog = forwardRef((props: Props, ref) => {
             <AlertDialogBody>{children}</AlertDialogBody>
 
             <AlertDialogFooter>
-              <IAIButton ref={cancelRef} onClick={handleCancel}>
+              <Button
+                ref={cancelRef}
+                onClick={handleCancel}
+                className="modal-close-btn"
+              >
                 {cancelButtonText}
-              </IAIButton>
-              <IAIButton colorScheme="error" onClick={handleAccept} ml={3}>
+              </Button>
+              <Button colorScheme="red" onClick={handleAccept} ml={3}>
                 {acceptButtonText}
-              </IAIButton>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>

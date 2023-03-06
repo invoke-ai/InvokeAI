@@ -95,7 +95,12 @@ export default function CancelButton(
   ];
 
   return (
-    <ButtonGroup isAttached width={btnGroupWidth}>
+    <ButtonGroup
+      isAttached
+      variant="link"
+      minHeight="2.5rem"
+      width={btnGroupWidth}
+    >
       {cancelType === 'immediate' ? (
         <IAIIconButton
           icon={<MdCancel />}
@@ -103,13 +108,17 @@ export default function CancelButton(
           aria-label={t('parameters.cancel.immediate')}
           isDisabled={!isConnected || !isProcessing || !isCancelable}
           onClick={handleClickCancel}
-          colorScheme="error"
+          className="cancel-btn"
           {...rest}
         />
       ) : (
         <IAIIconButton
           icon={
-            isCancelScheduled ? <ButtonSpinner /> : <MdCancelScheduleSend />
+            isCancelScheduled ? (
+              <ButtonSpinner color="var(--text-color)" />
+            ) : (
+              <MdCancelScheduleSend />
+            )
           }
           tooltip={
             isCancelScheduled
@@ -132,7 +141,7 @@ export default function CancelButton(
             if (isCancelScheduled) dispatch(setCancelAfter(null));
             else dispatch(setCancelAfter(currentIteration));
           }}
-          colorScheme="error"
+          className="cancel-btn"
           {...rest}
         />
       )}
@@ -140,8 +149,13 @@ export default function CancelButton(
         menuItems={cancelMenuItems}
         iconTooltip={t('parameters.cancel.setType')}
         menuButtonProps={{
-          colorScheme: 'error',
-          minWidth: 5,
+          backgroundColor: 'var(--destructive-color)',
+          color: 'var(--text-color)',
+          minWidth: '1.5rem',
+          minHeight: '1.5rem',
+          _hover: {
+            backgroundColor: 'var(--destructive-color-hover)',
+          },
         }}
       />
     </ButtonGroup>

@@ -31,6 +31,7 @@ export interface GalleryState {
   };
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
+  galleryScrollPosition: number;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldHoldGalleryOpen: boolean;
@@ -48,6 +49,7 @@ const initialState: GalleryState = {
   currentImageUuid: '',
   shouldPinGallery: true,
   shouldShowGallery: true,
+  galleryScrollPosition: 0,
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
   shouldHoldGalleryOpen: false,
@@ -240,6 +242,9 @@ export const gallerySlice = createSlice({
       state.shouldShowGallery = action.payload;
     },
 
+    setGalleryScrollPosition: (state, action: PayloadAction<number>) => {
+      state.galleryScrollPosition = action.payload;
+    },
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
@@ -281,6 +286,7 @@ export const {
   selectPrevImage,
   setShouldPinGallery,
   setShouldShowGallery,
+  setGalleryScrollPosition,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setShouldHoldGalleryOpen,

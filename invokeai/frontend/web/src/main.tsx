@@ -1,36 +1,38 @@
-import React, { lazy } from 'react';
+import { ChakraProvider } from '@chakra-ui/react';
+import createCache from '@emotion/cache';
+import { CacheProvider } from '@emotion/react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store } from './app/store';
 import { persistor } from './persistor';
-import '@fontsource/inter/100.css';
-import '@fontsource/inter/200.css';
-import '@fontsource/inter/300.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
-import '@fontsource/inter/900.css';
 
+import App from './app/App';
 import Loading from './Loading';
+
+export const emotionCache = createCache({
+  key: 'invokeai-style-cache',
+  prepend: true,
+});
+
+// Custom Styling
+import './styles/index.scss';
 
 // Localization
 import './i18n';
-
-const App = lazy(() => import('./app/App'));
-const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <Provider store={store}>
       <PersistGate loading={<Loading />} persistor={persistor}>
-        <React.Suspense fallback={<Loading showText />}>
-          <ThemeLocaleProvider>
-            <App />
-          </ThemeLocaleProvider>
-        </React.Suspense>
+        <CacheProvider value={emotionCache}>
+          <ChakraProvider>
+            <React.Suspense fallback={<Loading />}>
+              <App />
+            </React.Suspense>
+          </ChakraProvider>
+        </CacheProvider>
       </PersistGate>
     </Provider>
   </React.StrictMode>

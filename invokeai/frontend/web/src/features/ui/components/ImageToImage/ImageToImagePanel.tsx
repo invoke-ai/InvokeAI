@@ -10,29 +10,19 @@ import UpscaleSettings from 'features/parameters/components/AdvancedParameters/U
 import UpscaleToggle from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleToggle';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
-import MainSettings from 'features/parameters/components/MainParameters/MainSettings';
+import MainSettings from 'features/parameters/components/MainParameters/MainParameters';
 import ParametersAccordion from 'features/parameters/components/ParametersAccordion';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
-import ImageToImageSettings from './ImageToImageSettings';
+import ImageToImageOptions from './ImageToImageOptions';
 
 export default function ImageToImagePanel() {
   const { t } = useTranslation();
 
   const imageToImageAccordions = {
-    general: {
-      header: `${t('parameters.general')}`,
-      feature: undefined,
-      content: <MainSettings />,
-    },
-    imageToImage: {
-      header: `${t('parameters.imageToImage')}`,
-      feature: undefined,
-      content: <ImageToImageSettings />,
-    },
     seed: {
       header: `${t('parameters.seed')}`,
       feature: Feature.SEED,
@@ -70,11 +60,13 @@ export default function ImageToImagePanel() {
 
   return (
     <InvokeOptionsPanel>
-      <Flex flexDir="column" rowGap={2}>
+      <Flex flexDir="column" rowGap="0.5rem">
         <PromptInput />
         <NegativePromptInput />
       </Flex>
       <ProcessButtons />
+      <MainSettings />
+      <ImageToImageOptions />
       <ParametersAccordion accordionInfo={imageToImageAccordions} />
     </InvokeOptionsPanel>
   );

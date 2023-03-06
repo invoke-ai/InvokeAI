@@ -1,11 +1,11 @@
-import { VStack } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import SeamlessSettings from './SeamlessSettings';
 
 const ImageToImageOutputSettings = () => {
   return (
-    <VStack gap={2} alignItems="stretch">
+    <Flex gap={2} direction="column">
       <SeamlessSettings />
-    </VStack>
+    </Flex>
   );
 };
 

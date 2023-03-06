@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 // import IAICanvas from 'features/canvas/components/IAICanvas';
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
@@ -45,28 +45,21 @@ const UnifiedCanvasDisplayBeta = () => {
   }, [dispatch]);
 
   return (
-    <Box
-      sx={{
-        width: '100%',
-        height: '100%',
-        borderRadius: 'base',
-        bg: 'base.850',
-      }}
-    >
+    <div className="workarea-single-view">
       <Flex
         flexDirection="row"
         width="100%"
         height="100%"
-        columnGap={4}
-        padding={4}
+        columnGap="1rem"
+        padding="1rem"
       >
         <UnifiedCanvasToolbarBeta />
-        <Flex width="100%" height="100%" flexDirection="column" rowGap={4}>
+        <Flex width="100%" height="100%" flexDirection="column" rowGap="1rem">
           <UnifiedCanvasToolSettingsBeta />
           {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
         </Flex>
       </Flex>
-    </Box>
+    </div>
   );
 };
 

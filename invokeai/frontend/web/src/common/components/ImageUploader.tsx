@@ -1,4 +1,4 @@
-import { Box, useToast } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/react';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
@@ -139,7 +139,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   return (
     <ImageUploaderTriggerContext.Provider value={open}>
-      <Box
+      <div
         {...getRootProps({ style: {} })}
         onKeyDown={(e: KeyboardEvent) => {
           // Bail out if user hits spacebar - do not open the uploader
@@ -156,7 +156,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
             setIsHandlingUpload={setIsHandlingUpload}
           />
         )}
-      </Box>
+      </div>
     </ImageUploaderTriggerContext.Provider>
   );
 };

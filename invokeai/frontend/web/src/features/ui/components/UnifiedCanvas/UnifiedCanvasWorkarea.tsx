@@ -10,7 +10,10 @@ export default function UnifiedCanvasWorkarea() {
     (state: RootState) => state.ui.shouldUseCanvasBetaLayout
   );
   return (
-    <InvokeWorkarea optionsPanel={<UnifiedCanvasPanel />}>
+    <InvokeWorkarea
+      optionsPanel={<UnifiedCanvasPanel />}
+      styleClass="inpainting-workarea-overrides"
+    >
       {shouldUseCanvasBetaLayout ? (
         <UnifiedCanvasDisplayBeta />
       ) : (

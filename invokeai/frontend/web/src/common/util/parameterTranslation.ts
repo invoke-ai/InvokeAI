@@ -144,8 +144,8 @@ export const frontendToBackendParameters = (
     variationAmount,
     width,
     shouldUseSymmetry,
-    horizontalSymmetrySteps,
-    verticalSymmetrySteps,
+    horizontalSymmetryTimePercentage,
+    verticalSymmetryTimePercentage,
   } = generationState;
 
   const {
@@ -185,17 +185,17 @@ export const frontendToBackendParameters = (
 
   // Symmetry Settings
   if (shouldUseSymmetry) {
-    if (horizontalSymmetrySteps > 0) {
+    if (horizontalSymmetryTimePercentage > 0) {
       generationParameters.h_symmetry_time_pct = Math.max(
         0,
-        Math.min(1, horizontalSymmetrySteps / steps)
+        Math.min(1, horizontalSymmetryTimePercentage / steps)
       );
     }
 
-    if (verticalSymmetrySteps > 0) {
+    if (horizontalSymmetryTimePercentage > 0) {
       generationParameters.v_symmetry_time_pct = Math.max(
         0,
-        Math.min(1, verticalSymmetrySteps / steps)
+        Math.min(1, verticalSymmetryTimePercentage / steps)
       );
     }
   }

@@ -5,36 +5,36 @@
   $btn-height: 100%,
   $icon-size: 20px
 ) {
-  // min-width: $btn-width;
-  // min-height: $btn-height;
-  // background-color: $btn-color;
+  min-width: $btn-width;
+  min-height: $btn-height;
+  background-color: $btn-color !important;
 
-  // &:hover {
-  //   background-color: $btn-color-hover;
-  // }
+  &:hover {
+    background-color: $btn-color-hover;
+  }
 
-  // &:disabled {
-  //   background-color: var(--btn-base-color);
-  //   &:hover {
-  //     background-color: var(--btn-base-color);
-  //   }
-  // }
+  &:disabled {
+    background-color: var(--btn-base-color);
+    &:hover {
+      background-color: var(--btn-base-color);
+    }
+  }
 
-  // svg {
-  //   width: $icon-size;
-  //   height: $icon-size;
-  //   color: var(--btn-svg-color);
-  // }
+  svg {
+    width: $icon-size;
+    height: $icon-size;
+    color: var(--btn-svg-color);
+  }
 }
 
 @mixin BaseButton {
-  // background-color: var(--btn-base-color);
-  // &:hover {
-  //   background-color: var(--btn-base-color-hover);
-  // }
-  // &:disabled {
-  //   &:hover {
-  //     background-color: var(--btn-base-color);
-  //   }
-  // }
+  background-color: var(--btn-base-color);
+  &:hover {
+    background-color: var(--btn-base-color-hover);
+  }
+  &:disabled {
+    &:hover {
+      background-color: var(--btn-base-color);
+    }
+  }
 }

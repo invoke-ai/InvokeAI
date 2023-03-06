@@ -10,6 +10,7 @@ import {
 interface Props extends SwitchProps {
   label?: string;
   width?: string | number;
+  styleClass?: string;
   formControlProps?: FormControlProps;
   formLabelProps?: FormLabelProps;
 }
@@ -24,22 +25,34 @@ const IAISwitch = (props: Props) => {
     width = 'auto',
     formControlProps,
     formLabelProps,
+    styleClass,
     ...rest
   } = props;
   return (
     <FormControl
       isDisabled={isDisabled}
       width={width}
+      className={`invokeai__switch-form-control ${styleClass}`}
       display="flex"
-      gap={4}
+      columnGap="1rem"
       alignItems="center"
       justifyContent="space-between"
       {...formControlProps}
     >
-      <FormLabel my={1} {...formLabelProps}>
+      <FormLabel
+        className="invokeai__switch-form-label"
+        whiteSpace="nowrap"
+        marginRight={0}
+        marginTop={0.5}
+        marginBottom={0.5}
+        fontSize="sm"
+        fontWeight="bold"
+        width="auto"
+        {...formLabelProps}
+      >
         {label}
       </FormLabel>
-      <Switch {...rest} />
+      <Switch className="invokeai__switch-root" {...rest} />
     </FormControl>
   );
 };

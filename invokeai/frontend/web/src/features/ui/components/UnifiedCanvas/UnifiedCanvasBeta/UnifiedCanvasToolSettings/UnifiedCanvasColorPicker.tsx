@@ -80,38 +80,38 @@ export default function UnifiedCanvasColorPicker() {
       trigger="hover"
       triggerComponent={
         <Box
-          sx={{
-            width: 7,
-            height: 7,
-            minWidth: 7,
-            minHeight: 7,
-            borderRadius: 'full',
-            bg: currentColorDisplay(),
+          style={{
+            width: '30px',
+            height: '30px',
+            minWidth: '30px',
+            minHeight: '30px',
+            borderRadius: '99999999px',
+            backgroundColor: currentColorDisplay(),
             cursor: 'pointer',
           }}
         />
       }
     >
-      <Flex minWidth={60} direction="column" gap={4} width="100%">
+      <Flex minWidth="15rem" direction="column" gap="1rem" width="100%">
         {layer === 'base' && (
           <IAIColorPicker
-            sx={{
+            style={{
               width: '100%',
-              paddingTop: 2,
-              paddingBottom: 2,
+              paddingTop: '0.5rem',
+              paddingBottom: '0.5rem',
             }}
-            pickerColor={brushColor}
+            color={brushColor}
             onChange={(newColor) => dispatch(setBrushColor(newColor))}
           />
         )}
         {layer === 'mask' && (
           <IAIColorPicker
-            sx={{
+            style={{
               width: '100%',
-              paddingTop: 2,
-              paddingBottom: 2,
+              paddingTop: '0.5rem',
+              paddingBottom: '0.5rem',
             }}
-            pickerColor={maskColor}
+            color={maskColor}
             onChange={(newColor) => dispatch(setMaskColor(newColor))}
           />
         )}

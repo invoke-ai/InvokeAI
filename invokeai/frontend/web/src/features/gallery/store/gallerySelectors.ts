@@ -19,6 +19,7 @@ export const imageGallerySelector = createSelector(
       currentImageUuid,
       shouldPinGallery,
       shouldShowGallery,
+      galleryScrollPosition,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldHoldGalleryOpen,
@@ -33,6 +34,7 @@ export const imageGallerySelector = createSelector(
       currentImageUuid,
       shouldPinGallery,
       shouldShowGallery,
+      galleryScrollPosition,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       galleryGridTemplateColumns: shouldUseSingleGalleryColumn

@@ -26,7 +26,8 @@ export default function MainSampler() {
       validValues={
         activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
       }
-      minWidth={36}
+      styleClass="main-settings-block"
+      minWidth="9rem"
     />
   );
 }

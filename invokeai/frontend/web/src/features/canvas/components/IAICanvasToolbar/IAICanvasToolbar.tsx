@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -68,7 +68,7 @@ export const selector = createSelector(
   }
 );
 
-const IAICanvasToolbar = () => {
+const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
   const {
     isProcessing,
@@ -230,12 +230,7 @@ const IAICanvasToolbar = () => {
   };
 
   return (
-    <Flex
-      sx={{
-        alignItems: 'center',
-        gap: 2,
-      }}
-    >
+    <div className="inpainting-settings">
       <IAISelect
         tooltip={`${t('unifiedCanvas.layer')} (Q)`}
         tooltipProps={{ hasArrow: true, placement: 'top' }}
@@ -253,7 +248,7 @@ const IAICanvasToolbar = () => {
           aria-label={`${t('unifiedCanvas.move')} (V)`}
           tooltip={`${t('unifiedCanvas.move')} (V)`}
           icon={<FaArrowsAlt />}
-          isChecked={tool === 'move' || isStaging}
+          data-selected={tool === 'move' || isStaging}
           onClick={handleSelectMoveTool}
         />
         <IAIIconButton
@@ -312,15 +307,15 @@ const IAICanvasToolbar = () => {
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}
           icon={<FaTrash />}
           onClick={handleResetCanvas}
-          colorScheme="error"
+          style={{ backgroundColor: 'var(--btn-delete-image)' }}
           isDisabled={isStaging}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>
         <IAICanvasSettingsButtonPopover />
       </ButtonGroup>
-    </Flex>
+    </div>
   );
 };
 
-export default IAICanvasToolbar;
+export default IAICanvasOutpaintingControls;

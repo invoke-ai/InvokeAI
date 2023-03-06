@@ -1,20 +1,19 @@
-import { VStack } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import {
-  setHorizontalSymmetrySteps,
-  setVerticalSymmetrySteps,
+  setHorizontalSymmetryTimePercentage,
+  setVerticalSymmetryTimePercentage,
 } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 
 export default function SymmetrySettings() {
-  const horizontalSymmetrySteps = useAppSelector(
-    (state: RootState) => state.generation.horizontalSymmetrySteps
+  const horizontalSymmetryTimePercentage = useAppSelector(
+    (state: RootState) => state.generation.horizontalSymmetryTimePercentage
   );
 
-  const verticalSymmetrySteps = useAppSelector(
-    (state: RootState) => state.generation.verticalSymmetrySteps
+  const verticalSymmetryTimePercentage = useAppSelector(
+    (state: RootState) => state.generation.verticalSymmetryTimePercentage
   );
 
   const steps = useAppSelector((state: RootState) => state.generation.steps);
@@ -24,31 +23,33 @@ export default function SymmetrySettings() {
   const { t } = useTranslation();
 
   return (
-    <VStack gap={2} alignItems="stretch">
+    <>
       <IAISlider
         label={t('parameters.hSymmetryStep')}
-        value={horizontalSymmetrySteps}
-        onChange={(v) => dispatch(setHorizontalSymmetrySteps(v))}
+        value={horizontalSymmetryTimePercentage}
+        onChange={(v) => dispatch(setHorizontalSymmetryTimePercentage(v))}
         min={0}
         max={steps}
         step={1}
         withInput
         withSliderMarks
         withReset
-        handleReset={() => dispatch(setHorizontalSymmetrySteps(0))}
-      />
+        handleReset={() => dispatch(setHorizontalSymmetryTimePercentage(0))}
+        sliderMarkRightOffset={-6}
+      ></IAISlider>
       <IAISlider
         label={t('parameters.vSymmetryStep')}
-        value={verticalSymmetrySteps}
-        onChange={(v) => dispatch(setVerticalSymmetrySteps(v))}
+        value={verticalSymmetryTimePercentage}
+        onChange={(v) => dispatch(setVerticalSymmetryTimePercentage(v))}
         min={0}
         max={steps}
         step={1}
         withInput
         withSliderMarks
         withReset
-        handleReset={() => dispatch(setVerticalSymmetrySteps(0))}
-      />
-    </VStack>
+        handleReset={() => dispatch(setVerticalSymmetryTimePercentage(0))}
+        sliderMarkRightOffset={-6}
+      ></IAISlider>
+    </>
   );
 }

@@ -5,7 +5,7 @@ import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { useTranslation } from 'react-i18next';
-import { FaCheck, FaLanguage } from 'react-icons/fa';
+import { FaLanguage } from 'react-icons/fa';
 
 export default function LanguagePicker() {
   const { t, i18n } = useTranslation();
@@ -15,15 +15,12 @@ export default function LanguagePicker() {
     en: t('common.langEnglish', { lng: 'en' }),
     fr: t('common.langFrench', { lng: 'fr' }),
     de: t('common.langGerman', { lng: 'de' }),
-    he: t('common.langHebrew', { lng: 'he' }),
     it: t('common.langItalian', { lng: 'it' }),
     ja: t('common.langJapanese', { lng: 'ja' }),
-    ko: t('common.langKorean', { lng: 'ko' }),
     pl: t('common.langPolish', { lng: 'pl' }),
-    pt_BR: t('common.langBrPortuguese', { lng: 'pt_BR' }),
-    pt: t('common.langPortuguese', { lng: 'pt' }),
+    pt_Br: t('common.langBrPortuguese', { lng: 'pt_Br' }),
     ru: t('common.langRussian', { lng: 'ru' }),
-    zh_CN: t('common.langSimplifiedChinese', { lng: 'zh_CN' }),
+    zh_Cn: t('common.langSimplifiedChinese', { lng: 'zh_Cn' }),
     es: t('common.langSpanish', { lng: 'es' }),
     uk: t('common.langUkranian', { lng: 'ua' }),
   };
@@ -34,13 +31,9 @@ export default function LanguagePicker() {
       languagesToRender.push(
         <IAIButton
           key={lang}
-          isChecked={localStorage.getItem('i18nextLng') === lang}
-          leftIcon={
-            localStorage.getItem('i18nextLng') === lang ? (
-              <FaCheck />
-            ) : undefined
-          }
+          data-selected={localStorage.getItem('i18nextLng') === lang}
           onClick={() => i18n.changeLanguage(lang)}
+          className="modal-close-btn lang-select-btn"
           aria-label={LANGUAGES[lang as keyof typeof LANGUAGES]}
           size="sm"
           minWidth="200px"

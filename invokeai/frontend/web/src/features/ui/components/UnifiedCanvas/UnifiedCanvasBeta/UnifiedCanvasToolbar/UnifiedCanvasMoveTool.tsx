@@ -32,7 +32,7 @@ export default function UnifiedCanvasMoveTool() {
       aria-label={`${t('unifiedCanvas.move')} (V)`}
       tooltip={`${t('unifiedCanvas.move')} (V)`}
       icon={<FaArrowsAlt />}
-      isChecked={tool === 'move' || isStaging}
+      data-selected={tool === 'move' || isStaging}
       onClick={handleSelectMoveTool}
     />
   );

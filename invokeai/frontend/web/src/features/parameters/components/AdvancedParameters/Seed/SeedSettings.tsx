@@ -1,7 +1,8 @@
-import { VStack } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import Perlin from './Perlin';
 import RandomizeSeed from './RandomizeSeed';
 import Seed from './Seed';
+import ShuffleSeed from './ShuffleSeed';
 import Threshold from './Threshold';
 
 /**
@@ -9,12 +10,19 @@ import Threshold from './Threshold';
  */
 const SeedSettings = () => {
   return (
-    <VStack gap={2} alignItems="stretch">
+    <Flex gap={2} direction="column">
       <RandomizeSeed />
-      <Seed />
-      <Threshold />
-      <Perlin />
-    </VStack>
+      <Flex gap={2}>
+        <Seed />
+        <ShuffleSeed />
+      </Flex>
+      <Flex gap={2}>
+        <Threshold />
+      </Flex>
+      <Flex gap={2}>
+        <Perlin />
+      </Flex>
+    </Flex>
   );
 };
 
