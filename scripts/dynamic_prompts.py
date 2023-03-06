@@ -398,10 +398,10 @@ them together into a prompt template in this way:
 
   prompt:
     style:
-         - greg rutkowski
-         - gustav klimt
-         - renoir
-         - donetello
+         - oil painting
+         - watercolor
+         - comic book
+         - studio photography
     subject:
          - sunny meadow in the mountains
          - gathering storm in the mountains
@@ -411,10 +411,10 @@ In the example above, the phrase names "style" and "subject" are
 examples only. You can use whatever you like. However, the "template:"
 field is required. The output will be:
 
-  "a sunny meadow in the mountains in the style of greg rutkowski"
-  "a sunny meadow in the mountains in the style of gustav klimt"
+  "a sunny meadow in the mountains in the style of an oil painting"
+  "a sunny meadow in the mountains in the style of watercolor masterpiece"
   ...
-  "a gathering storm in the mountains in the style of donetello"
+  "a gathering storm in the mountains in the style of an ink sketch"
 
 == SUPPORT FOR JSON FORMAT ==
 
@@ -442,8 +442,8 @@ sampler:
   - k_lms
 prompt:
   style:
-       - greg rutkowski
-       - gustav klimt
+       - oil painting
+       - watercolor
   location:
        - the mountains
        - a desert
