@@ -1,7 +1,14 @@
-import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable } from 're-resizable';
 
-import { ButtonGroup } from '@chakra-ui/react';
+import {
+  Box,
+  ButtonGroup,
+  Flex,
+  Grid,
+  Icon,
+  chakra,
+  useTheme,
+} from '@chakra-ui/react';
 import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -17,7 +24,6 @@ import {
   setCurrentCategory,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
-  setGalleryScrollPosition,
   setGalleryWidth,
   setShouldAutoSwitchToNewImages,
   setShouldHoldGalleryOpen,
@@ -38,12 +44,19 @@ import React, {
 } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { BiReset } from 'react-icons/bi';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { CSSTransition } from 'react-transition-group';
 import HoverableImage from './HoverableImage';
+import { APP_GALLERY_HEIGHT_PINNED } from 'theme/util/constants';
+
+import './ImageGallery.css';
+import { no_scrollbar } from 'theme/components/scrollbar';
+
+const ChakraResizeable = chakra(Resizable, {
+  shouldForwardProp: (prop) => !['sx'].includes(prop),
+});
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 const GALLERY_IMAGE_WIDTH_OFFSET = 40;
@@ -64,6 +77,7 @@ const LIGHTBOX_GALLERY_WIDTH = 400;
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
+  const { direction } = useTheme();
 
   const { t } = useTranslation();
 
@@ -73,7 +87,6 @@ export default function ImageGallery() {
     currentImageUuid,
     shouldPinGallery,
     shouldShowGallery,
-    galleryScrollPosition,
     galleryImageMinimumWidth,
     galleryGridTemplateColumns,
     activeTabName,
@@ -107,12 +120,11 @@ export default function ImageGallery() {
   const timeoutIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH) {
-      setShouldShowButtons(false);
-    }
+    setShouldShowButtons(galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH);
   }, [galleryWidth]);
 
   const handleSetShouldPinGallery = () => {
+    !shouldPinGallery && dispatch(setShouldShowGallery(true));
     dispatch(setShouldPinGallery(!shouldPinGallery));
     dispatch(setDoesCanvasNeedScaling(true));
   };
@@ -129,11 +141,6 @@ export default function ImageGallery() {
   const handleCloseGallery = useCallback(() => {
     dispatch(setShouldShowGallery(false));
     dispatch(setShouldHoldGalleryOpen(false));
-    dispatch(
-      setGalleryScrollPosition(
-        galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
-      )
-    );
     setTimeout(
       () => shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true)),
       400
@@ -239,12 +246,6 @@ export default function ImageGallery() {
     [galleryImageMinimumWidth]
   );
 
-  // set gallery scroll position
-  useEffect(() => {
-    if (!galleryContainerRef.current) return;
-    galleryContainerRef.current.scrollTop = galleryScrollPosition;
-  }, [galleryScrollPosition, shouldShowGallery]);
-
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -267,29 +268,63 @@ export default function ImageGallery() {
       in={shouldShowGallery || shouldHoldGalleryOpen}
       unmountOnExit
       timeout={200}
-      classNames="image-gallery-wrapper"
+      classNames={`${direction}-image-gallery-css-transition`}
     >
-      <div
-        className="image-gallery-wrapper"
-        style={{ zIndex: shouldPinGallery ? 1 : 100 }}
-        data-pinned={shouldPinGallery}
+      <Box
+        className={`${direction}-image-gallery-css-transition`}
+        sx={
+          shouldPinGallery
+            ? { zIndex: 1, insetInlineEnd: 0 }
+            : {
+                zIndex: 100,
+                position: 'fixed',
+                height: '100vh',
+                top: 0,
+                insetInlineEnd: 0,
+              }
+        }
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}
         onMouseEnter={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
         onMouseOver={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
       >
-        <Resizable
+        <ChakraResizeable
+          sx={{
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            rowGap: 4,
+            borderRadius: shouldPinGallery ? 'base' : 0,
+            borderInlineStartWidth: 5,
+            // boxShadow: '0 0 1rem blackAlpha.700',
+            bg: 'base.850',
+            borderColor: 'base.700',
+          }}
           minWidth={galleryMinWidth}
           maxWidth={shouldPinGallery ? galleryMaxWidth : window.innerWidth}
-          className="image-gallery-popup"
-          handleStyles={{
-            left: {
-              width: '15px',
-            },
-          }}
-          enable={{
-            left: shouldEnableResize,
-          }}
+          data-pinned={shouldPinGallery}
+          handleStyles={
+            direction === 'rtl'
+              ? {
+                  right: {
+                    width: '15px',
+                  },
+                }
+              : {
+                  left: {
+                    width: '15px',
+                  },
+                }
+          }
+          enable={
+            direction === 'rtl'
+              ? {
+                  right: shouldEnableResize,
+                }
+              : {
+                  left: shouldEnableResize,
+                }
+          }
           size={{
             width: galleryWidth,
             height: shouldPinGallery ? '100%' : '100vh',
@@ -305,7 +340,7 @@ export default function ImageGallery() {
             elementRef.style.height = `${elementRef.clientHeight}px`;
             if (shouldPinGallery) {
               elementRef.style.position = 'fixed';
-              elementRef.style.right = '1rem';
+              elementRef.style.insetInlineEnd = '1rem';
               setIsResizing(true);
             }
           }}
@@ -327,8 +362,9 @@ export default function ImageGallery() {
             elementRef.removeAttribute('data-resize-alert');
 
             if (shouldPinGallery) {
+              console.log('unpin');
               elementRef.style.position = 'relative';
-              elementRef.style.removeProperty('right');
+              elementRef.style.removeProperty('inset-inline-end');
               elementRef.style.setProperty(
                 'height',
                 shouldPinGallery ? '100%' : '100vh'
@@ -385,26 +421,28 @@ export default function ImageGallery() {
             elementRef.style.height = `${galleryResizeHeight}px`;
           }}
         >
-          <div className="image-gallery-header">
+          <Flex alignItems="center" gap={2} justifyContent="space-between">
             <ButtonGroup
               size="sm"
               isAttached
-              variant="solid"
-              className="image-gallery-category-btn-group"
+              w="max-content"
+              justifyContent="stretch"
             >
               {shouldShowButtons ? (
                 <>
                   <IAIButton
                     size="sm"
-                    data-selected={currentCategory === 'result'}
+                    isChecked={currentCategory === 'result'}
                     onClick={() => dispatch(setCurrentCategory('result'))}
+                    flexGrow={1}
                   >
                     {t('gallery.generations')}
                   </IAIButton>
                   <IAIButton
                     size="sm"
-                    data-selected={currentCategory === 'user'}
+                    isChecked={currentCategory === 'user'}
                     onClick={() => dispatch(setCurrentCategory('user'))}
+                    flexGrow={1}
                   >
                     {t('gallery.uploads')}
                   </IAIButton>
@@ -414,14 +452,14 @@ export default function ImageGallery() {
                   <IAIIconButton
                     aria-label={t('gallery.showGenerations')}
                     tooltip={t('gallery.showGenerations')}
-                    data-selected={currentCategory === 'result'}
+                    isChecked={currentCategory === 'result'}
                     icon={<FaImage />}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   />
                   <IAIIconButton
                     aria-label={t('gallery.showUploads')}
                     tooltip={t('gallery.showUploads')}
-                    data-selected={currentCategory === 'user'}
+                    isChecked={currentCategory === 'user'}
                     icon={<FaUser />}
                     onClick={() => dispatch(setCurrentCategory('user'))}
                   />
@@ -429,96 +467,85 @@ export default function ImageGallery() {
               )}
             </ButtonGroup>
 
-            <div className="image-gallery-header-right-icons">
+            <Flex gap={2}>
               <IAIPopover
-                isLazy
-                trigger="hover"
-                placement="left"
                 triggerComponent={
                   <IAIIconButton
                     size="sm"
                     aria-label={t('gallery.gallerySettings')}
                     icon={<FaWrench />}
-                    className="image-gallery-icon-btn"
-                    cursor="pointer"
                   />
                 }
               >
-                <div className="image-gallery-settings-popover">
-                  <div>
-                    <IAISlider
-                      value={galleryImageMinimumWidth}
-                      onChange={handleChangeGalleryImageMinimumWidth}
-                      min={32}
-                      max={256}
-                      hideTooltip={true}
-                      label={t('gallery.galleryImageSize')}
-                    />
-                    <IAIIconButton
-                      size="sm"
-                      aria-label={t('gallery.galleryImageResetSize')}
-                      tooltip={t('gallery.galleryImageResetSize')}
-                      onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
-                      icon={<BiReset />}
-                      data-selected={shouldPinGallery}
-                      styleClass="image-gallery-icon-btn"
-                    />
-                  </div>
-                  <div>
-                    <IAICheckbox
-                      label={t('gallery.maintainAspectRatio')}
-                      isChecked={galleryImageObjectFit === 'contain'}
-                      onChange={() =>
-                        dispatch(
-                          setGalleryImageObjectFit(
-                            galleryImageObjectFit === 'contain'
-                              ? 'cover'
-                              : 'contain'
-                          )
+                <Flex direction="column" gap={2}>
+                  <IAISlider
+                    value={galleryImageMinimumWidth}
+                    onChange={handleChangeGalleryImageMinimumWidth}
+                    min={32}
+                    max={256}
+                    hideTooltip={true}
+                    label={t('gallery.galleryImageSize')}
+                    withReset
+                    handleReset={() =>
+                      dispatch(setGalleryImageMinimumWidth(64))
+                    }
+                  />
+                  <IAICheckbox
+                    label={t('gallery.maintainAspectRatio')}
+                    isChecked={galleryImageObjectFit === 'contain'}
+                    onChange={() =>
+                      dispatch(
+                        setGalleryImageObjectFit(
+                          galleryImageObjectFit === 'contain'
+                            ? 'cover'
+                            : 'contain'
                         )
-                      }
-                    />
-                  </div>
-                  <div>
-                    <IAICheckbox
-                      label={t('gallery.autoSwitchNewImages')}
-                      isChecked={shouldAutoSwitchToNewImages}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        dispatch(
-                          setShouldAutoSwitchToNewImages(e.target.checked)
-                        )
-                      }
-                    />
-                  </div>
-                  <div>
-                    <IAICheckbox
-                      label={t('gallery.singleColumnLayout')}
-                      isChecked={shouldUseSingleGalleryColumn}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        dispatch(
-                          setShouldUseSingleGalleryColumn(e.target.checked)
-                        )
-                      }
-                    />
-                  </div>
-                </div>
+                      )
+                    }
+                  />
+                  <IAICheckbox
+                    label={t('gallery.autoSwitchNewImages')}
+                    isChecked={shouldAutoSwitchToNewImages}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldAutoSwitchToNewImages(e.target.checked))
+                    }
+                  />
+                  <IAICheckbox
+                    label={t('gallery.singleColumnLayout')}
+                    isChecked={shouldUseSingleGalleryColumn}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(
+                        setShouldUseSingleGalleryColumn(e.target.checked)
+                      )
+                    }
+                  />
+                </Flex>
               </IAIPopover>
 
               <IAIIconButton
                 size="sm"
-                className="image-gallery-icon-btn"
                 aria-label={t('gallery.pinGallery')}
                 tooltip={`${t('gallery.pinGallery')} (Shift+G)`}
                 onClick={handleSetShouldPinGallery}
                 icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />
-            </div>
-          </div>
-          <div className="image-gallery-container" ref={galleryContainerRef}>
+            </Flex>
+          </Flex>
+          <Flex
+            direction="column"
+            gap={2}
+            h={shouldPinGallery ? APP_GALLERY_HEIGHT_PINNED : '100vh'}
+            maxH={shouldPinGallery ? APP_GALLERY_HEIGHT_PINNED : '100vh'}
+            overflowY="scroll"
+            ref={galleryContainerRef}
+            sx={{
+              ...no_scrollbar,
+            }}
+          >
             {images.length || areMoreImagesAvailable ? (
               <>
-                <div
-                  className="image-gallery"
+                <Grid
+                  gap={2}
                   style={{ gridTemplateColumns: galleryGridTemplateColumns }}
                 >
                   {images.map((image) => {
@@ -532,34 +559,51 @@ export default function ImageGallery() {
                       />
                     );
                   })}
-                </div>
-                <Button
+                </Grid>
+                <IAIButton
                   onClick={handleClickLoadMore}
                   isDisabled={!areMoreImagesAvailable}
-                  className="image-gallery-load-more-btn"
+                  flexShrink={0}
                 >
                   {areMoreImagesAvailable
                     ? t('gallery.loadMore')
                     : t('gallery.allImagesLoaded')}
-                </Button>
+                </IAIButton>
               </>
             ) : (
-              <div className="image-gallery-container-placeholder">
-                <MdPhotoLibrary />
+              <Flex
+                sx={{
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  padding: 8,
+                  h: '100%',
+                  w: '100%',
+                  color: 'base.500',
+                }}
+              >
+                <Icon
+                  as={MdPhotoLibrary}
+                  sx={{
+                    w: 16,
+                    h: 16,
+                  }}
+                />
                 <p>{t('gallery.noImagesInGallery')}</p>
-              </div>
+              </Flex>
             )}
-          </div>
-        </Resizable>
+          </Flex>
+        </ChakraResizeable>
         {isResizing && (
-          <div
+          <Box
             style={{
               width: `${galleryWidth}px`,
               height: '100%',
             }}
           />
         )}
-      </div>
+      </Box>
     </CSSTransition>
   );
 }

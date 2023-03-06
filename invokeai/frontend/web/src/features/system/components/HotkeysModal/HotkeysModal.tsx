@@ -4,9 +4,14 @@ import {
   AccordionIcon,
   AccordionItem,
   AccordionPanel,
+  Divider,
+  Flex,
   Modal,
+  ModalBody,
   ModalCloseButton,
   ModalContent,
+  ModalFooter,
+  ModalHeader,
   ModalOverlay,
   useDisclosure,
 } from '@chakra-ui/react';
@@ -297,24 +302,20 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     },
   ];
 
-  const renderHotkeyModalItems = (hotkeys: HotkeyList[]) => {
-    const hotkeyModalItemsToRender: ReactElement[] = [];
-
-    hotkeys.forEach((hotkey, i) => {
-      hotkeyModalItemsToRender.push(
-        <HotkeysModalItem
-          key={i}
-          title={hotkey.title}
-          description={hotkey.desc}
-          hotkey={hotkey.hotkey}
-        />
-      );
-    });
-
-    return (
-      <div className="hotkey-modal-category">{hotkeyModalItemsToRender}</div>
-    );
-  };
+  const renderHotkeyModalItems = (hotkeys: HotkeyList[]) => (
+    <Flex flexDir="column" gap={4}>
+      {hotkeys.map((hotkey, i) => (
+        <Flex flexDir="column" px={2} gap={4} key={i}>
+          <HotkeysModalItem
+            title={hotkey.title}
+            description={hotkey.desc}
+            hotkey={hotkey.hotkey}
+          />
+          {i < hotkeys.length - 1 && <Divider />}
+        </Flex>
+      ))}
+    </Flex>
+  );
 
   return (
     <>
@@ -323,16 +324,21 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       })}
       <Modal isOpen={isHotkeyModalOpen} onClose={onHotkeysModalClose}>
         <ModalOverlay />
-        <ModalContent className=" modal hotkeys-modal">
-          <ModalCloseButton className="modal-close-btn" />
-
-          <h1>Keyboard Shorcuts</h1>
-          <div className="hotkeys-modal-items">
+        <ModalContent>
+          <ModalHeader>{t('hotkeys.keyboardShortcuts')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
             <Accordion allowMultiple>
               <AccordionItem>
-                <AccordionButton className="hotkeys-modal-button">
-                  <h2>{t('hotkeys.appHotkeys')}</h2>
-                  <AccordionIcon />
+                <AccordionButton>
+                  <Flex
+                    width="100%"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <h2>{t('hotkeys.appHotkeys')}</h2>
+                    <AccordionIcon />
+                  </Flex>
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(appHotkeys)}
@@ -340,9 +346,15 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
               </AccordionItem>
 
               <AccordionItem>
-                <AccordionButton className="hotkeys-modal-button">
-                  <h2>{t('hotkeys.generalHotkeys')}</h2>
-                  <AccordionIcon />
+                <AccordionButton>
+                  <Flex
+                    width="100%"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <h2>{t('hotkeys.generalHotkeys')}</h2>
+                    <AccordionIcon />
+                  </Flex>
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(generalHotkeys)}
@@ -350,9 +362,15 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
               </AccordionItem>
 
               <AccordionItem>
-                <AccordionButton className="hotkeys-modal-button">
-                  <h2>{t('hotkeys.galleryHotkeys')}</h2>
-                  <AccordionIcon />
+                <AccordionButton>
+                  <Flex
+                    width="100%"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <h2>{t('hotkeys.galleryHotkeys')}</h2>
+                    <AccordionIcon />
+                  </Flex>
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(galleryHotkeys)}
@@ -360,16 +378,23 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
               </AccordionItem>
 
               <AccordionItem>
-                <AccordionButton className="hotkeys-modal-button">
-                  <h2>{t('hotkeys.unifiedCanvasHotkeys')}</h2>
-                  <AccordionIcon />
+                <AccordionButton>
+                  <Flex
+                    width="100%"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <h2>{t('hotkeys.unifiedCanvasHotkeys')}</h2>
+                    <AccordionIcon />
+                  </Flex>
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(unifiedCanvasHotkeys)}
                 </AccordionPanel>
               </AccordionItem>
             </Accordion>
-          </div>
+          </ModalBody>
+          <ModalFooter />
         </ModalContent>
       </Modal>
     </>

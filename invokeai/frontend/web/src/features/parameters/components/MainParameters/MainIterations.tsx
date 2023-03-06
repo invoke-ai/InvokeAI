@@ -32,7 +32,6 @@ export default function MainIterations() {
       withInput
       withReset
       withSliderMarks
-      sliderMarkRightOffset={-5}
       sliderNumberInputProps={{ max: 9999 }}
     />
   ) : (
@@ -43,10 +42,7 @@ export default function MainIterations() {
       max={9999}
       onChange={handleChangeIterations}
       value={iterations}
-      width="auto"
-      labelFontSize={0.5}
-      styleClass="main-settings-block"
-      textAlign="center"
+      numberInputFieldProps={{ textAlign: 'center' }}
     />
   );
 }

@@ -40,7 +40,9 @@ from ..util import CPU_DEVICE, ask_user, download_with_resume
 class SDLegacyType(Enum):
     V1 = 1
     V1_INPAINT = 2
-    V2 = 3
+    V2   = 3
+    V2_e = 4
+    V2_v = 5
     UNKNOWN = 99
 
 DEFAULT_MAX_MODELS = 2
@@ -580,15 +582,24 @@ class ModelManager(object):
         format. Valid return values include:
         SDLegacyType.V1
         SDLegacyType.V1_INPAINT
-        SDLegacyType.V2
+        SDLegacyType.V2     (V2 prediction type unknown)
+        SDLegacyType.V2_e   (V2 using 'epsilon' prediction type)
+        SDLegacyType.V2_v   (V2 using 'v_prediction' prediction type)
         SDLegacyType.UNKNOWN
         """
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-            return SDLegacyType.V2
+        global_step = checkpoint.get('global_step')
+        state_dict = checkpoint.get("state_dict") or checkpoint
 
         try:
-            state_dict = checkpoint.get("state_dict") or checkpoint
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+            if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+                if global_step == 220000:
+                    return SDLegacyType.V2_e
+                elif global_step == 110000:
+                    return SDLegacyType.V2_v
+                else:
+                    return SDLegacyType.V2
+            # otherwise we assume a V1 file
             in_channels = state_dict[
                 "model.diffusion_model.input_blocks.0.0.weight"
             ].shape[1]
@@ -602,12 +613,13 @@ class ModelManager(object):
             return SDLegacyType.UNKNOWN
 
     def heuristic_import(
-        self,
-        path_url_or_repo: str,
-        convert: bool = True,
-        model_name: str = None,
-        description: str = None,
-        commit_to_conf: Path = None,
+            self,
+            path_url_or_repo: str,
+            convert: bool = True,
+            model_name: str = None,
+            description: str = None,
+            model_config_file: Path = None,
+            commit_to_conf: Path = None,
     ) -> str:
         """
         Accept a string which could be:
@@ -704,7 +716,7 @@ class ModelManager(object):
 
         if model_path.stem in self.config:  # already imported
             print("  | Already imported. Skipping")
-            return
+            return model_path.stem
 
         # another round of heuristics to guess the correct config file.
         checkpoint = (
@@ -712,32 +724,46 @@ class ModelManager(object):
             if model_path.suffix == ".safetensors"
             else torch.load(model_path)
         )
-        model_type = self.probe_model_type(checkpoint)
 
-        model_config_file = None
-        if model_type == SDLegacyType.V1:
-            print("  | SD-v1 model detected")
-            model_config_file = Path(
-                Globals.root, "configs/stable-diffusion/v1-inference.yaml"
-            )
-        elif model_type == SDLegacyType.V1_INPAINT:
-            print("  | SD-v1 inpainting model detected")
-            model_config_file = Path(
-                Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
-            )
-        elif model_type == SDLegacyType.V2:
-            print(
-                "  | SD-v2 model detected; model will be converted to diffusers format"
-            )
-            model_config_file = Path(
-                Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
-            )
-            convert = True
-        else:
-            print(
-                f"** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import"
-            )
-            return
+        # additional probing needed if no config file provided
+        if model_config_file is None:
+            model_type = self.probe_model_type(checkpoint)
+            if model_type == SDLegacyType.V1:
+                print("  | SD-v1 model detected")
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v1-inference.yaml"
+                )
+            elif model_type == SDLegacyType.V1_INPAINT:
+                print("  | SD-v1 inpainting model detected")
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
+                )
+            elif model_type == SDLegacyType.V2_v:
+                print(
+                    "  | SD-v2-v model detected; model will be converted to diffusers format"
+                )
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
+                )
+                convert = True
+            elif model_type == SDLegacyType.V2_e:
+                print(
+                    "  | SD-v2-e model detected; model will be converted to diffusers format"
+                )
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v2-inference.yaml"
+                )
+                convert = True
+            elif model_type == SDLegacyType.V2:
+                print(
+                    f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                )
+                return
+            else:
+                print(
+                    f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                )
+                return
 
         diffuser_path = Path(
             Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
