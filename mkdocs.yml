@@ -2,14 +2,14 @@
 
 # General
 site_name: InvokeAI Stable Diffusion Toolkit Docs
-site_url: https://invoke-ai.github.io/InvokeAI
+site_url: !ENV [SITE_URL, 'https://invoke-ai.github.io/InvokeAI']
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
 
 # Repository
-repo_name: 'invoke-ai/InvokeAI'
-repo_url: 'https://github.com/invoke-ai/InvokeAI'
-edit_uri: edit/main/docs/
+repo_name: !ENV [REPO_NAME, 'invoke-ai/InvokeAI']
+repo_url: !ENV [REPO_URL, 'https://github.com/invoke-ai/InvokeAI']
+edit_uri: blob/main/docs/
 
 # Copyright
 copyright: Copyright &copy; 2022 InvokeAI Team
@@ -19,7 +19,8 @@ theme:
   name: material
   icon:
     repo: fontawesome/brands/github
-    edit: material/file-document-edit-outline
+    edit: material/pencil
+    view: material/eye
   palette:
     - media: '(prefers-color-scheme: light)'
       scheme: default
@@ -33,6 +34,11 @@ theme:
         icon: material/lightbulb-outline
         name: Switch to light mode
   features:
+    - content.action.edit
+    - content.action.view
+    - content.code.copy
+    - content.tabs.link
+    - navigation.indexes
     - navigation.instant
     - navigation.tabs
     - navigation.top
@@ -89,9 +95,9 @@ plugins:
       enable_creation_date: true
   - redirects:
       redirect_maps:
-          'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
-          'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
-          'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
-          'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
-          'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
-          'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
+        'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
+        'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
+        'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
+        'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
+        'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
+        'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
