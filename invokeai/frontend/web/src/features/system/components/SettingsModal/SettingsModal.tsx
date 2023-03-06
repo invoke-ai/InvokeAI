@@ -1,6 +1,7 @@
 import {
-  Button,
+  ChakraProps,
   Flex,
+  Grid,
   Heading,
   Modal,
   ModalBody,
@@ -16,6 +17,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIButton from 'common/components/IAIButton';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
 import IAISwitch from 'common/components/IAISwitch';
@@ -69,6 +71,13 @@ const selector = createSelector(
     memoizeOptions: { resultEqualityCheck: isEqual },
   }
 );
+
+const modalSectionStyles: ChakraProps['sx'] = {
+  flexDirection: 'column',
+  gap: 2,
+  p: 4,
+  bg: 'base.900',
+};
 
 type SettingsModalProps = {
   /* The button to open the Settings Modal */
@@ -135,20 +144,15 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
       <Modal
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
-        size="lg"
+        size="xl"
       >
         <ModalOverlay />
-        <ModalContent className="modal settings-modal">
-          <ModalHeader className="settings-modal-header">
-            {t('common.settingsLabel')}
-          </ModalHeader>
-          <ModalCloseButton className="modal-close-btn" />
-          <ModalBody className="settings-modal-content">
-            <div className="settings-modal-items">
-              <div
-                className="settings-modal-item"
-                style={{ gridAutoFlow: 'row', rowGap: '0.5rem' }}
-              >
+        <ModalContent paddingInlineEnd={4}>
+          <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Grid gap={4}>
+              <Flex sx={modalSectionStyles}>
                 <IAISelect
                   label={t('settings.displayInProgress')}
                   validValues={IN_PROGRESS_IMAGE_TYPES}
@@ -173,67 +177,64 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                     textAlign="center"
                   />
                 )}
-              </div>
-              <IAISwitch
-                styleClass="settings-modal-item"
-                label={t('settings.confirmOnDelete')}
-                isChecked={shouldConfirmOnDelete}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldConfirmOnDelete(e.target.checked))
-                }
-              />
-              <IAISwitch
-                styleClass="settings-modal-item"
-                label={t('settings.displayHelpIcons')}
-                isChecked={shouldDisplayGuides}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldDisplayGuides(e.target.checked))
-                }
-              />
-              <IAISwitch
-                styleClass="settings-modal-item"
-                label={t('settings.useCanvasBeta')}
-                isChecked={shouldUseCanvasBetaLayout}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                }
-              />
-              <IAISwitch
-                styleClass="settings-modal-item"
-                label={t('settings.useSlidersForAll')}
-                isChecked={shouldUseSliders}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldUseSliders(e.target.checked))
-                }
-              />
-            </div>
+                <IAISwitch
+                  label={t('settings.confirmOnDelete')}
+                  isChecked={shouldConfirmOnDelete}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldConfirmOnDelete(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.displayHelpIcons')}
+                  isChecked={shouldDisplayGuides}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldDisplayGuides(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.useCanvasBeta')}
+                  isChecked={shouldUseCanvasBetaLayout}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.useSlidersForAll')}
+                  isChecked={shouldUseSliders}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldUseSliders(e.target.checked))
+                  }
+                />
+              </Flex>
 
-            <div className="settings-modal-items">
-              <h2 style={{ fontWeight: 'bold' }}>Developer</h2>
-              <IAISwitch
-                styleClass="settings-modal-item"
-                label={t('settings.enableImageDebugging')}
-                isChecked={enableImageDebugging}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setEnableImageDebugging(e.target.checked))
-                }
-              />
-            </div>
+              <Flex sx={modalSectionStyles}>
+                <Heading size="sm" style={{ fontWeight: 'bold' }}>
+                  Developer
+                </Heading>
+                <IAISwitch
+                  label={t('settings.enableImageDebugging')}
+                  isChecked={enableImageDebugging}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setEnableImageDebugging(e.target.checked))
+                  }
+                />
+              </Flex>
 
-            <div className="settings-modal-reset">
-              <Heading size="md">{t('settings.resetWebUI')}</Heading>
-              <Button colorScheme="red" onClick={handleClickResetWebUI}>
-                {t('settings.resetWebUI')}
-              </Button>
-              <Text>{t('settings.resetWebUIDesc1')}</Text>
-              <Text>{t('settings.resetWebUIDesc2')}</Text>
-            </div>
+              <Flex sx={modalSectionStyles}>
+                <Heading size="sm">{t('settings.resetWebUI')}</Heading>
+                <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
+                  {t('settings.resetWebUI')}
+                </IAIButton>
+                <Text>{t('settings.resetWebUIDesc1')}</Text>
+                <Text>{t('settings.resetWebUIDesc2')}</Text>
+              </Flex>
+            </Grid>
           </ModalBody>
 
           <ModalFooter>
-            <Button onClick={onSettingsModalClose} className="modal-close-btn">
+            <IAIButton onClick={onSettingsModalClose}>
               {t('common.close')}
-            </Button>
+            </IAIButton>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -244,15 +245,17 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         onClose={onRefreshModalClose}
         isCentered
       >
-        <ModalOverlay bg="blackAlpha.300" backdropFilter="blur(40px)" />
+        <ModalOverlay backdropFilter="blur(40px)" />
         <ModalContent>
-          <ModalBody pb={6} pt={6}>
+          <ModalHeader />
+          <ModalBody>
             <Flex justifyContent="center">
               <Text fontSize="lg">
                 <Text>{t('settings.resetComplete')}</Text>
               </Text>
             </Flex>
           </ModalBody>
+          <ModalFooter />
         </ModalContent>
       </Modal>
     </>

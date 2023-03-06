@@ -9,6 +9,8 @@ import useToastWatcher from 'features/system/hooks/useToastWatcher';
 
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
+import { Box, Grid } from '@chakra-ui/react';
+import { APP_HEIGHT, APP_PADDING, APP_WIDTH } from 'theme/util/constants';
 
 keepGUIAlive();
 
@@ -16,20 +18,26 @@ const App = () => {
   useToastWatcher();
 
   return (
-    <div className="App">
+    <Grid w="100vw" h="100vh">
       <ImageUploader>
         <ProgressBar />
-        <div className="app-content">
+        <Grid
+          gap={4}
+          p={APP_PADDING}
+          gridAutoRows="min-content auto"
+          w={APP_WIDTH}
+          h={APP_HEIGHT}
+        >
           <SiteHeader />
           <InvokeTabs />
-        </div>
-        <div className="app-console">
+        </Grid>
+        <Box>
           <Console />
-        </div>
+        </Box>
       </ImageUploader>
       <FloatingParametersPanelButtons />
       <FloatingGalleryButton />
-    </div>
+    </Grid>
   );
 };
 

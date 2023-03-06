@@ -14,7 +14,6 @@ export default function SeamSize() {
 
   return (
     <IAISlider
-      sliderMarkRightOffset={-6}
       label={t('parameters.seamSize')}
       min={1}
       max={256}

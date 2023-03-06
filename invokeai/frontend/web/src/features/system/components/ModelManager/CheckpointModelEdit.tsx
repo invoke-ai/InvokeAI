@@ -101,7 +101,7 @@ export default function CheckpointModelEdit() {
   };
 
   return openModel ? (
-    <Flex flexDirection="column" rowGap="1rem" width="100%">
+    <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex alignItems="center" gap={4} justifyContent="space-between">
         <Text fontSize="lg" fontWeight="bold">
           {openModel}
@@ -112,7 +112,7 @@ export default function CheckpointModelEdit() {
         flexDirection="column"
         maxHeight={window.innerHeight - 270}
         overflowY="scroll"
-        paddingRight="2rem"
+        paddingInlineEnd={8}
       >
         <Formik
           enableReinitialize={true}
@@ -121,7 +121,7 @@ export default function CheckpointModelEdit() {
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap="0.5rem" alignItems="start">
+              <VStack rowGap={2} alignItems="start">
                 {/* Description */}
                 <FormControl
                   isInvalid={!!errors.description && touched.description}
@@ -136,7 +136,7 @@ export default function CheckpointModelEdit() {
                       id="description"
                       name="description"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.description && touched.description ? (
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
@@ -162,7 +162,7 @@ export default function CheckpointModelEdit() {
                       id="config"
                       name="config"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.config && touched.config ? (
                       <FormErrorMessage>{errors.config}</FormErrorMessage>
@@ -188,7 +188,7 @@ export default function CheckpointModelEdit() {
                       id="weights"
                       name="weights"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.weights && touched.weights ? (
                       <FormErrorMessage>{errors.weights}</FormErrorMessage>
@@ -211,7 +211,7 @@ export default function CheckpointModelEdit() {
                       id="vae"
                       name="vae"
                       type="text"
-                      width="lg"
+                      width="full"
                     />
                     {!!errors.vae && touched.vae ? (
                       <FormErrorMessage>{errors.vae}</FormErrorMessage>
@@ -316,15 +316,15 @@ export default function CheckpointModelEdit() {
     </Flex>
   ) : (
     <Flex
-      width="100%"
-      justifyContent="center"
-      alignItems="center"
-      backgroundColor="var(--background-color)"
-      borderRadius="0.5rem"
+      sx={{
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 'base',
+        bg: 'base.900',
+      }}
     >
-      <Text fontWeight="bold" color="var(--subtext-color-bright)">
-        Pick A Model To Edit
-      </Text>
+      <Text fontWeight={500}>Pick A Model To Edit</Text>
     </Flex>
   );
 }
