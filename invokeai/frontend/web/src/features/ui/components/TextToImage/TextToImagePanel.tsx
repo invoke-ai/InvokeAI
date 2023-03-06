@@ -10,7 +10,7 @@ import UpscaleSettings from 'features/parameters/components/AdvancedParameters/U
 import UpscaleToggle from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleToggle';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
-import MainSettings from 'features/parameters/components/MainParameters/MainParameters';
+import MainSettings from 'features/parameters/components/MainParameters/MainSettings';
 import ParametersAccordion from 'features/parameters/components/ParametersAccordion';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
@@ -22,6 +22,11 @@ export default function TextToImagePanel() {
   const { t } = useTranslation();
 
   const textToImageAccordions = {
+    general: {
+      header: `${t('parameters.general')}`,
+      feature: undefined,
+      content: <MainSettings />,
+    },
     seed: {
       header: `${t('parameters.seed')}`,
       feature: Feature.SEED,
@@ -59,12 +64,11 @@ export default function TextToImagePanel() {
 
   return (
     <InvokeOptionsPanel>
-      <Flex flexDir="column" rowGap="0.5rem">
+      <Flex flexDir="column" rowGap={2}>
         <PromptInput />
         <NegativePromptInput />
       </Flex>
       <ProcessButtons />
-      <MainSettings />
       <ParametersAccordion accordionInfo={textToImageAccordions} />
     </InvokeOptionsPanel>
   );

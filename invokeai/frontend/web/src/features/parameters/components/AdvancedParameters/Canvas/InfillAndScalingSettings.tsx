@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { VStack } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
@@ -107,7 +107,7 @@ const InfillAndScalingSettings = () => {
   };
 
   return (
-    <Flex direction="column" gap={4}>
+    <VStack gap={2} alignItems="stretch">
       <IAISelect
         label={t('parameters.scaleBeforeProcessing')}
         validValues={BOUNDING_BOX_SCALES_DICT}
@@ -130,7 +130,6 @@ const InfillAndScalingSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetScaledWidth}
-        sliderMarkRightOffset={-7}
       />
       <IAISlider
         isInputDisabled={!isManual}
@@ -148,7 +147,6 @@ const InfillAndScalingSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetScaledHeight}
-        sliderMarkRightOffset={-7}
       />
       <IAISelect
         label={t('parameters.infillMethod')}
@@ -160,7 +158,6 @@ const InfillAndScalingSettings = () => {
         isInputDisabled={infillMethod !== 'tile'}
         isResetDisabled={infillMethod !== 'tile'}
         isSliderDisabled={infillMethod !== 'tile'}
-        sliderMarkRightOffset={-4}
         label={t('parameters.tileSize')}
         min={16}
         max={64}
@@ -176,7 +173,7 @@ const InfillAndScalingSettings = () => {
           dispatch(setTileSize(32));
         }}
       />
-    </Flex>
+    </VStack>
   );
 };
 
