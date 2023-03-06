@@ -372,7 +372,7 @@
         "convertToDiffusersSaveLocation": "Save Location",
         "v1": "v1",
         "v2_base": "v2 (512px)",
-	"v2_768": "v2 (768px)",
+        "v2_768": "v2 (768px)",
         "inpainting": "v1 Inpainting",
         "customConfig": "Custom Config",
         "pathToCustomConfig": "Path To Custom Config",
