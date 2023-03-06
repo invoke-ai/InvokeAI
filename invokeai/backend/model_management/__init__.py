@@ -6,5 +6,4 @@ from .convert_ckpt_to_diffusers import (
     load_pipeline_from_original_stable_diffusion_ckpt,
 )
 from .model_manager import ModelManager
-from invokeai.frontend.merge import merge_diffusion_models
 
