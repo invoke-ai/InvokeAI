@@ -38,6 +38,7 @@
     "@chakra-ui/anatomy": "^2.1.1",
     "@chakra-ui/icons": "^2.0.17",
     "@chakra-ui/react": "^2.5.1",
+    "@chakra-ui/styled-system": "^2.6.1",
     "@chakra-ui/theme-tools": "^2.0.16",
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
