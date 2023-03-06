@@ -46,37 +46,30 @@ export default function ModelListItem(props: ModelListItemProps) {
   const statusTextColor = () => {
     switch (status) {
       case 'active':
-        return 'ok.500';
+        return 'var(--status-good-color)';
       case 'cached':
-        return 'warning.500';
+        return 'var(--status-working-color)';
       case 'not loaded':
-        return 'inherit';
+        return 'var(--text-color-secondary)';
     }
   };
 
   return (
     <Flex
       alignItems="center"
-      p={2}
-      borderRadius="base"
-      sx={
-        name === openModel
-          ? {
-              bg: 'accent.750',
-              _hover: {
-                bg: 'accent.750',
-              },
-            }
-          : {
-              _hover: {
-                bg: 'base.750',
-              },
-            }
-      }
+      padding="0.5rem 0.5rem"
+      borderRadius="0.2rem"
+      backgroundColor={name === openModel ? 'var(--accent-color)' : ''}
+      _hover={{
+        backgroundColor:
+          name === openModel
+            ? 'var(--accent-color)'
+            : 'var(--background-color)',
+      }}
     >
       <Box onClick={openModelHandler} cursor="pointer">
         <Tooltip label={description} hasArrow placement="bottom">
-          <Text fontWeight="600">{name}</Text>
+          <Text fontWeight="bold">{name}</Text>
         </Tooltip>
       </Box>
       <Spacer onClick={openModelHandler} cursor="pointer" />
@@ -86,6 +79,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           size="sm"
           onClick={handleChangeModel}
           isDisabled={status === 'active' || isProcessing || !isConnected}
+          className="modal-close-btn"
         >
           {t('modelManager.load')}
         </Button>
@@ -96,6 +90,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           onClick={openModelHandler}
           aria-label="Modify Config"
           isDisabled={status === 'active' || isProcessing || !isConnected}
+          className=" modal-close-btn"
         />
         <IAIAlertDialog
           title={t('modelManager.deleteModel')}
@@ -107,13 +102,16 @@ export default function ModelListItem(props: ModelListItemProps) {
               size="sm"
               aria-label={t('modelManager.deleteConfig')}
               isDisabled={status === 'active' || isProcessing || !isConnected}
-              colorScheme="error"
+              className=" modal-close-btn"
+              style={{ backgroundColor: 'var(--btn-delete-image)' }}
             />
           }
         >
-          <Flex rowGap={4} flexDirection="column">
+          <Flex rowGap="1rem" flexDirection="column">
             <p style={{ fontWeight: 'bold' }}>{t('modelManager.deleteMsg1')}</p>
-            <p>{t('modelManager.deleteMsg2')}</p>
+            <p style={{ color: 'var(--text-color-secondary' }}>
+              {t('modelManager.deleteMsg2')}
+            </p>
           </Flex>
         </IAIAlertDialog>
       </Flex>

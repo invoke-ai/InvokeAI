@@ -1,4 +1,4 @@
-import { Flex, Spinner } from '@chakra-ui/react';
+import { Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
@@ -70,19 +70,9 @@ const IAICanvasResizer = () => {
   ]);
 
   return (
-    <Flex
-      ref={ref}
-      sx={{
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        width: '100%',
-        height: '100%',
-      }}
-    >
+    <div ref={ref} className="inpainting-canvas-area">
       <Spinner thickness="2px" speed="1s" size="xl" />
-    </Flex>
+    </div>
   );
 };
 

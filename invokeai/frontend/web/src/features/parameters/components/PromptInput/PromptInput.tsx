@@ -1,4 +1,4 @@
-import { Box, FormControl, Textarea } from '@chakra-ui/react';
+import { FormControl, Textarea } from '@chakra-ui/react';
 import { generateImage } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -63,7 +63,7 @@ const PromptInput = () => {
   };
 
   return (
-    <Box>
+    <div className="prompt-bar">
       <FormControl
         isInvalid={prompt.length === 0 || Boolean(prompt.match(/^[\s\r\n]+$/))}
       >
@@ -71,15 +71,19 @@ const PromptInput = () => {
           id="prompt"
           name="prompt"
           placeholder={t('parameters.promptPlaceholder')}
+          size="lg"
           value={prompt}
           onChange={handleChangePrompt}
           onKeyDown={handleKeyDown}
           resize="vertical"
+          height={30}
           ref={promptRef}
-          minH={40}
+          _placeholder={{
+            color: 'var(--text-color-secondary)',
+          }}
         />
       </FormControl>
-    </Box>
+    </div>
   );
 };
 

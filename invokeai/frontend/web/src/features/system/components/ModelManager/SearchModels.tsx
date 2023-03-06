@@ -4,13 +4,12 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import React from 'react';
 
 import {
-  Badge,
+  Box,
   Flex,
   FormControl,
   HStack,
   Radio,
   RadioGroup,
-  Spacer,
   Text,
   VStack,
 } from '@chakra-ui/react';
@@ -19,7 +18,8 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 
-import { FaPlus, FaSearch } from 'react-icons/fa';
+import { FaPlus } from 'react-icons/fa';
+import { MdFindInPage } from 'react-icons/md';
 
 import { addNewModel, searchForModels } from 'app/socketio/actions';
 import {
@@ -48,6 +48,26 @@ const existingModelsSelector = createSelector([systemSelector], (system) => {
   return existingModels;
 });
 
+function ModelExistsTag() {
+  const { t } = useTranslation();
+  return (
+    <Box
+      position="absolute"
+      zIndex={2}
+      right={4}
+      top={4}
+      fontSize="0.7rem"
+      fontWeight="bold"
+      backgroundColor="var(--accent-color)"
+      padding="0.2rem 0.5rem"
+      borderRadius="0.2rem"
+      alignItems="center"
+    >
+      {t('modelManager.modelExists')}
+    </Box>
+  );
+}
+
 interface SearchModelEntry {
   model: FoundModel;
   modelsToAdd: string[];
@@ -59,7 +79,6 @@ function SearchModelEntry({
   modelsToAdd,
   setModelsToAdd,
 }: SearchModelEntry) {
-  const { t } = useTranslation();
   const existingModels = useAppSelector(existingModelsSelector);
 
   const foundModelsChangeHandler = (e: ChangeEvent<HTMLInputElement>) => {
@@ -71,34 +90,33 @@ function SearchModelEntry({
   };
 
   return (
-    <VStack>
-      <Flex
-        flexDirection="column"
-        gap={2}
-        backgroundColor={
-          modelsToAdd.includes(model.name) ? 'accent.650' : 'base.800'
+    <Box position="relative">
+      {existingModels.includes(model.location) ? <ModelExistsTag /> : null}
+      <IAICheckbox
+        value={model.name}
+        label={
+          <>
+            <VStack alignItems="start">
+              <p style={{ fontWeight: 'bold' }}>{model.name}</p>
+              <p style={{ fontStyle: 'italic' }}>{model.location}</p>
+            </VStack>
+          </>
         }
-        paddingX={4}
-        paddingY={2}
-        borderRadius={4}
-      >
-        <Flex gap={4}>
-          <IAICheckbox
-            value={model.name}
-            label={<Text fontWeight={500}>{model.name}</Text>}
-            isChecked={modelsToAdd.includes(model.name)}
-            isDisabled={existingModels.includes(model.location)}
-            onChange={foundModelsChangeHandler}
-          ></IAICheckbox>
-          {existingModels.includes(model.location) && (
-            <Badge colorScheme="accent">{t('modelManager.modelExists')}</Badge>
-          )}
-        </Flex>
-        <Text fontStyle="italic" variant="subtext">
-          {model.location}
-        </Text>
-      </Flex>
-    </VStack>
+        isChecked={modelsToAdd.includes(model.name)}
+        isDisabled={existingModels.includes(model.location)}
+        onChange={foundModelsChangeHandler}
+        padding="1rem"
+        backgroundColor="var(--background-color)"
+        borderRadius="0.5rem"
+        _checked={{
+          backgroundColor: 'var(--accent-color)',
+          color: 'var(--text-color)',
+        }}
+        _disabled={{
+          backgroundColor: 'var(--background-color-secondary)',
+        }}
+      ></IAICheckbox>
+    </Box>
   );
 }
 
@@ -225,38 +243,36 @@ export default function SearchModels() {
     <>
       {searchFolder ? (
         <Flex
-          sx={{
-            padding: 4,
-            gap: 2,
-            position: 'relative',
-            borderRadius: 'base',
-            alignItems: 'center',
-            w: 'full',
-            bg: 'base.900',
-          }}
+          flexDirection="column"
+          padding="1rem"
+          backgroundColor="var(--background-color)"
+          borderRadius="0.5rem"
+          rowGap="0.5rem"
+          position="relative"
         >
-          <Flex
-            sx={{
-              flexDir: 'column',
-              gap: 2,
+          <p
+            style={{
+              fontWeight: 'bold',
+              fontSize: '0.8rem',
+              backgroundColor: 'var(--background-color-secondary)',
+              padding: '0.2rem 1rem',
+              width: 'max-content',
+              borderRadius: '0.2rem',
             }}
           >
-            <Text
-              sx={{
-                fontWeight: 500,
-                fontSize: 'sm',
-              }}
-              variant="subtext"
-            >
-              {t('modelManager.checkpointFolder')}
-            </Text>
-            <Text sx={{ fontWeight: 500, fontSize: 'sm' }}>{searchFolder}</Text>
-          </Flex>
-          <Spacer />
+            {t('modelManager.checkpointFolder')}
+          </p>
+          <p
+            style={{ fontWeight: 'bold', fontSize: '0.8rem', maxWidth: '80%' }}
+          >
+            {searchFolder}
+          </p>
           <IAIIconButton
             aria-label={t('modelManager.scanAgain')}
             tooltip={t('modelManager.scanAgain')}
             icon={<BiReset />}
+            position="absolute"
+            right={16}
             fontSize={18}
             disabled={isProcessing}
             onClick={() => dispatch(searchForModels(searchFolder))}
@@ -264,6 +280,8 @@ export default function SearchModels() {
           <IAIIconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
             icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
+            position="absolute"
+            right={5}
             onClick={resetSearchModelHandler}
           />
         </Flex>
@@ -276,34 +294,32 @@ export default function SearchModels() {
         >
           {({ handleSubmit }) => (
             <form onSubmit={handleSubmit}>
-              <HStack columnGap={2} alignItems="flex-end" width="100%">
-                <FormControl isRequired width="lg">
+              <HStack columnGap="0.5rem">
+                <FormControl isRequired width="max-content">
                   <Field
                     as={IAIInput}
                     id="checkpointFolder"
                     name="checkpointFolder"
                     type="text"
+                    width="lg"
                     size="md"
                     label={t('modelManager.checkpointFolder')}
                   />
                 </FormControl>
-                <IAIButton
-                  leftIcon={<FaSearch />}
+                <IAIIconButton
+                  icon={<MdFindInPage />}
                   aria-label={t('modelManager.findModels')}
                   tooltip={t('modelManager.findModels')}
                   type="submit"
                   disabled={isProcessing}
-                  paddingX={10}
-                >
-                  {t('modelManager.findModels')}
-                </IAIButton>
+                />
               </HStack>
             </form>
           )}
         </Formik>
       )}
       {foundModels && (
-        <Flex flexDirection="column" rowGap={4} width="full">
+        <Flex flexDirection="column" rowGap="1rem">
           <Flex justifyContent="space-between" alignItems="center">
             <p>
               {t('modelManager.modelsFound')}: {foundModels.length}
@@ -312,8 +328,8 @@ export default function SearchModels() {
               {t('modelManager.selected')}: {modelsToAdd.length}
             </p>
           </Flex>
-          <Flex columnGap={2} justifyContent="space-between">
-            <Flex columnGap={2}>
+          <Flex columnGap="0.5rem" justifyContent="space-between">
+            <Flex columnGap="0.5rem">
               <IAIButton
                 isDisabled={modelsToAdd.length === foundModels.length}
                 onClick={addAllToSelected}
@@ -342,25 +358,24 @@ export default function SearchModels() {
             <IAIButton
               isDisabled={modelsToAdd.length === 0}
               onClick={addSelectedModels}
-              colorScheme="accent"
+              backgroundColor={
+                modelsToAdd.length > 0 ? 'var(--accent-color) !important' : ''
+              }
             >
               {t('modelManager.addSelected')}
             </IAIButton>
           </Flex>
 
           <Flex
-            sx={{
-              flexDirection: 'column',
-              padding: 4,
-              rowGap: 4,
-              borderRadius: 'base',
-              width: 'full',
-              bg: 'base.900',
-            }}
+            gap={4}
+            backgroundColor="var(--background-color)"
+            padding="1rem 1rem"
+            borderRadius="0.2rem"
+            flexDirection="column"
           >
             <Flex gap={4}>
-              <Text fontWeight={500} variant="subtext">
-                {t('modelManager.pickModelType')}
+              <Text fontWeight="bold" color="var(--text-color-secondary)">
+                Pick Model Type:
               </Text>
               <RadioGroup
                 value={modelType}
@@ -369,25 +384,23 @@ export default function SearchModels() {
                 name="model_type"
               >
                 <Flex gap={4}>
-                  <Radio value="v1">
-                    <Text fontSize="sm">{t('modelManager.v1')}</Text>
-                  </Radio>
-                  <Radio value="v2">
-                    <Text fontSize="sm">{t('modelManager.v2')}</Text>
-                  </Radio>
+                  <Radio value="v1">{t('modelManager.v1')}</Radio>
+                  <Radio value="v2">{t('modelManager.v2')}</Radio>
                   <Radio value="inpainting">
-                    <Text fontSize="sm">{t('modelManager.inpainting')}</Text>
+                    {t('modelManager.inpainting')}
                   </Radio>
-                  <Radio value="custom">
-                    <Text fontSize="sm">{t('modelManager.customConfig')}</Text>
-                  </Radio>
+                  <Radio value="custom">{t('modelManager.customConfig')}</Radio>
                 </Flex>
               </RadioGroup>
             </Flex>
 
             {modelType === 'custom' && (
               <Flex flexDirection="column" rowGap={2}>
-                <Text fontWeight="500" fontSize="sm" variant="subtext">
+                <Text
+                  fontWeight="bold"
+                  fontSize="sm"
+                  color="var(--text-color-secondary)"
+                >
                   {t('modelManager.pathToCustomConfig')}
                 </Text>
                 <IAIInput
@@ -395,33 +408,52 @@ export default function SearchModels() {
                   onChange={(e) => {
                     if (e.target.value !== '') setPathToConfig(e.target.value);
                   }}
-                  width="full"
+                  width="42.5rem"
                 />
               </Flex>
             )}
           </Flex>
 
           <Flex
+            rowGap="1rem"
             flexDirection="column"
-            maxHeight={72}
+            maxHeight="18rem"
             overflowY="scroll"
-            borderRadius="sm"
-            paddingInlineEnd={4}
-            gap={2}
+            paddingRight="1rem"
+            paddingLeft="0.2rem"
+            borderRadius="0.2rem"
           >
             {foundModels.length > 0 ? (
-              renderFoundModels()
+              modelsToAdd.length === 0 && (
+                <Text
+                  fontWeight="bold"
+                  fontSize={14}
+                  padding="0.5rem"
+                  borderRadius="0.2rem"
+                  margin="0 0.5rem 0 1rem"
+                  textAlign="center"
+                  backgroundColor="var(--notice-color)"
+                  boxShadow="0 0 200px 6px var(--notice-color)"
+                  marginTop="1rem"
+                  width="max-content"
+                >
+                  {t('modelManager.selectAndAdd')}
+                </Text>
+              )
             ) : (
               <Text
-                fontWeight="500"
-                padding={2}
-                borderRadius="sm"
+                fontWeight="bold"
+                fontSize={14}
+                padding="0.5rem"
+                borderRadius="0.2rem"
                 textAlign="center"
-                variant="subtext"
+                backgroundColor="var(--status-bad-color)"
               >
                 {t('modelManager.noModelsFound')}
               </Text>
             )}
+
+            {renderFoundModels()}
           </Flex>
         </Flex>
       )}

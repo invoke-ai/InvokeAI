@@ -68,7 +68,7 @@ const UnifiedCanvasSettings = () => {
         />
       }
     >
-      <Flex direction="column" gap={2}>
+      <Flex direction="column" gap="0.5rem">
         <IAICheckbox
           label={t('unifiedCanvas.showIntermediates')}
           isChecked={shouldShowIntermediates}

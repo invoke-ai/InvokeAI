@@ -1,4 +1,3 @@
-import { Box } from '@chakra-ui/react';
 import { readinessSelector } from 'app/selectors/readinessSelector';
 import { generateImage } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -6,7 +5,6 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +30,6 @@ export default function InvokeButton(props: InvokeButton) {
   useHotkeys(
     ['ctrl+enter', 'meta+enter'],
     () => {
-      dispatch(clampSymmetrySteps());
       dispatch(generateImage(activeTabName));
     },
     {
@@ -44,7 +41,7 @@ export default function InvokeButton(props: InvokeButton) {
   );
 
   return (
-    <Box style={{ flexGrow: 4 }}>
+    <div style={{ flexGrow: 4 }}>
       {iconButton ? (
         <IAIIconButton
           aria-label={t('parameters.invoke')}
@@ -52,11 +49,9 @@ export default function InvokeButton(props: InvokeButton) {
           icon={<FaPlay />}
           isDisabled={!isReady}
           onClick={handleClickGenerate}
-          flexGrow={1}
-          w="100%"
+          className="invoke-btn"
           tooltip={t('parameters.invoke')}
           tooltipProps={{ placement: 'bottom' }}
-          colorScheme="accent"
           {...rest}
         />
       ) : (
@@ -65,15 +60,12 @@ export default function InvokeButton(props: InvokeButton) {
           type="submit"
           isDisabled={!isReady}
           onClick={handleClickGenerate}
-          flexGrow={1}
-          w="100%"
-          colorScheme="accent"
-          fontWeight={700}
+          className="invoke-btn"
           {...rest}
         >
           Invoke
         </IAIButton>
       )}
-    </Box>
+    </div>
   );
 }

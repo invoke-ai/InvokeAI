@@ -1,0 +1,32 @@
+.current-image-options {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  column-gap: 0.5em;
+
+  .current-image-send-to-popover,
+  .current-image-postprocessing-popover {
+    display: flex;
+    flex-direction: column;
+    row-gap: 0.5rem;
+    max-width: 25rem;
+  }
+
+  .current-image-send-to-popover {
+    .invokeai__button {
+      place-content: start;
+    }
+  }
+
+  .chakra-popover__popper {
+    z-index: 11;
+  }
+
+  .delete-image-btn {
+    background-color: var(--btn-base-color);
+    svg {
+      fill: var(--btn-delete-image);
+    }
+  }
+}

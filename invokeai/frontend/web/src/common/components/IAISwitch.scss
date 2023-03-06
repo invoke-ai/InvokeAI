@@ -1,0 +1,24 @@
+.invokeai__switch-form-control {
+  .invokeai__switch-form-label {
+    color: var(--text-color-secondary);
+  }
+
+  .invokeai__switch-root {
+    span {
+      background-color: var(--switch-bg-color);
+      span {
+        background-color: var(--white);
+      }
+    }
+
+    &[data-checked] {
+      span {
+        background: var(--switch-bg-active-color);
+
+        span {
+          background-color: var(--white);
+        }
+      }
+    }
+  }
+}

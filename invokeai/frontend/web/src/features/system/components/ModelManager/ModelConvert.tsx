@@ -77,7 +77,7 @@ export default function ModelConvert(props: ModelConvertProps) {
             retrievedModel.status === 'active' || isProcessing || !isConnected
           }
           className=" modal-close-btn"
-          marginInlineEnd={8}
+          marginRight="2rem"
         >
           🧨 {t('modelManager.convertToDiffusers')}
         </IAIButton>
@@ -96,8 +96,8 @@ export default function ModelConvert(props: ModelConvertProps) {
       </Flex>
 
       <Flex flexDir="column" gap={4}>
-        <Flex marginTop={4} flexDir="column" gap={2}>
-          <Text fontWeight="600">
+        <Flex marginTop="1rem" flexDir="column" gap={2}>
+          <Text fontWeight="bold">
             {t('modelManager.convertToDiffusersSaveLocation')}
           </Text>
           <RadioGroup value={saveLocation} onChange={(v) => setSaveLocation(v)}>
@@ -125,7 +125,11 @@ export default function ModelConvert(props: ModelConvertProps) {
 
         {saveLocation === 'custom' && (
           <Flex flexDirection="column" rowGap={2}>
-            <Text fontWeight="500" fontSize="sm" variant="subtext">
+            <Text
+              fontWeight="bold"
+              fontSize="sm"
+              color="var(--text-color-secondary)"
+            >
               {t('modelManager.customSaveLocation')}
             </Text>
             <IAIInput
@@ -134,7 +138,7 @@ export default function ModelConvert(props: ModelConvertProps) {
                 if (e.target.value !== '')
                   setCustomSaveLocation(e.target.value);
               }}
-              width="full"
+              width="25rem"
             />
           </Flex>
         )}

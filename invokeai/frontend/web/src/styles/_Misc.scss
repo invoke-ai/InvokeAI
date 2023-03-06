@@ -1,0 +1,45 @@
+// .checkerboard {
+//   background-position: 0px 0px, 10px 10px;
+//   // background-size: 20px 20px;
+//   // background-image: linear-gradient(
+//   //     45deg,
+//   //     #eee 25%,
+//   //     transparent 25%,
+//   //     transparent 75%,
+//   //     #eee 75%,
+//   //     #eee 100%
+//   //   ),
+//   //   linear-gradient(45deg, #eee 25%, white 25%, white 75%, #eee 75%, #eee 100%);
+//   background: radial-gradient(var(--checkboard-dots-color) 3px, transparent 1px),
+//     var(--background-color-secondary);
+//   background-size: 64px 64px;
+// }
+
+* {
+  scrollbar-width: thick; /* none | auto  */
+  scrollbar-color: var(--scrollbar-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px; // Vertical Scrollbar Width
+  height: 8px; // Horizontal Scrollbar Height
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-color);
+  border-radius: 8px;
+  border: calc(8px / 4) solid var(--scrollbar-color);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-color-hover);
+  border: calc(8px / 4) solid var(--scrollbar-color-hover);
+}
+
+::-webkit-scrollbar-button {
+  background: transparent;
+}

@@ -22,20 +22,8 @@ const FloatingGalleryButton = () => {
       tooltip="Show Gallery (G)"
       tooltipProps={{ placement: 'top' }}
       aria-label="Show Gallery"
+      styleClass="floating-show-hide-button right show-hide-button-gallery"
       onClick={handleShowGallery}
-      sx={{
-        pos: 'absolute',
-        top: '50%',
-        transform: 'translate(0, -50%)',
-        zIndex: 31,
-        p: 0,
-        insetInlineEnd: 0,
-        px: 3,
-        h: 48,
-        w: 8,
-        borderStartEndRadius: 0,
-        borderEndEndRadius: 0,
-      }}
     >
       <MdPhotoLibrary />
     </IAIIconButton>

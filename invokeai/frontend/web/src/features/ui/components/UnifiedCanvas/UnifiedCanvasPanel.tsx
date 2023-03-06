@@ -10,7 +10,7 @@ import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Ou
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
-import MainSettings from 'features/parameters/components/MainParameters/MainSettings';
+import MainSettings from 'features/parameters/components/MainParameters/MainParameters';
 import ParametersAccordion from 'features/parameters/components/ParametersAccordion';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
@@ -22,16 +22,6 @@ export default function UnifiedCanvasPanel() {
   const { t } = useTranslation();
 
   const unifiedCanvasAccordions = {
-    general: {
-      header: `${t('parameters.general')}`,
-      feature: undefined,
-      content: <MainSettings />,
-    },
-    unifiedCanvasImg2Img: {
-      header: `${t('parameters.imageToImage')}`,
-      feature: undefined,
-      content: <ImageToImageStrength label={t('parameters.img2imgStrength')} />,
-    },
     seed: {
       header: `${t('parameters.seed')}`,
       feature: Feature.SEED,
@@ -65,14 +55,28 @@ export default function UnifiedCanvasPanel() {
     },
   };
 
+  const unifiedCanvasImg2ImgAccordion = {
+    unifiedCanvasImg2Img: {
+      header: `${t('parameters.imageToImage')}`,
+      feature: undefined,
+      content: (
+        <ImageToImageStrength
+          label={t('parameters.img2imgStrength')}
+          styleClass="main-settings-block image-to-image-strength-main-option"
+        />
+      ),
+    },
+  };
+
   return (
     <InvokeOptionsPanel>
-      <Flex flexDir="column" rowGap={2}>
+      <Flex flexDir="column" rowGap="0.5rem">
         <PromptInput />
         <NegativePromptInput />
       </Flex>
       <ProcessButtons />
-      {/* <ParametersAccordion accordionInfo={unifiedCanvasImg2ImgAccordion} /> */}
+      <MainSettings />
+      <ParametersAccordion accordionInfo={unifiedCanvasImg2ImgAccordion} />
       <ParametersAccordion accordionInfo={unifiedCanvasAccordions} />
     </InvokeOptionsPanel>
   );

@@ -3,10 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
-import {
-  clampSymmetrySteps,
-  setSteps,
-} from 'features/parameters/store/generationSlice';
+import { setSteps } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 
 export default function MainSteps() {
@@ -17,13 +14,7 @@ export default function MainSteps() {
   );
   const { t } = useTranslation();
 
-  const handleChangeSteps = (v: number) => {
-    dispatch(setSteps(v));
-  };
-
-  const handleBlur = () => {
-    dispatch(clampSymmetrySteps());
-  };
+  const handleChangeSteps = (v: number) => dispatch(setSteps(v));
 
   return shouldUseSliders ? (
     <IAISlider
@@ -36,6 +27,7 @@ export default function MainSteps() {
       withInput
       withReset
       withSliderMarks
+      sliderMarkRightOffset={-6}
       sliderNumberInputProps={{ max: 9999 }}
     />
   ) : (
@@ -46,8 +38,9 @@ export default function MainSteps() {
       step={1}
       onChange={handleChangeSteps}
       value={steps}
-      numberInputFieldProps={{ textAlign: 'center' }}
-      onBlur={handleBlur}
+      width="auto"
+      styleClass="main-settings-block"
+      textAlign="center"
     />
   );
 }

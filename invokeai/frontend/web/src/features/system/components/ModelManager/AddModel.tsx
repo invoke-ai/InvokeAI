@@ -1,11 +1,9 @@
 import {
-  Button,
   Flex,
   Modal,
   ModalBody,
   ModalCloseButton,
   ModalContent,
-  ModalFooter,
   ModalHeader,
   ModalOverlay,
   Text,
@@ -35,11 +33,16 @@ function AddModelBox({
     <Flex
       position="relative"
       width="50%"
-      height={40}
+      height="200px"
+      backgroundColor="var(--background-color)"
+      borderRadius="0.5rem"
       justifyContent="center"
       alignItems="center"
+      _hover={{
+        cursor: 'pointer',
+        backgroundColor: 'var(--accent-color)',
+      }}
       onClick={onClick}
-      as={Button}
     >
       <Text fontWeight="bold">{text}</Text>
     </Flex>
@@ -68,9 +71,10 @@ export default function AddModel() {
         aria-label={t('modelManager.addNewModel')}
         tooltip={t('modelManager.addNewModel')}
         onClick={onOpen}
+        className="modal-close-btn"
         size="sm"
       >
-        <Flex columnGap={2} alignItems="center">
+        <Flex columnGap="0.5rem" alignItems="center">
           <FaPlus />
           {t('modelManager.addNew')}
         </Flex>
@@ -83,12 +87,16 @@ export default function AddModel() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent margin="auto" paddingInlineEnd={4}>
+        <ModalContent
+          className="modal add-model-modal"
+          fontFamily="Inter"
+          margin="auto"
+        >
           <ModalHeader>{t('modelManager.addNewModel')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+          <ModalCloseButton marginTop="0.3rem" />
+          <ModalBody className="add-model-modal-body">
             {addNewModelUIOption == null && (
-              <Flex columnGap={4}>
+              <Flex columnGap="1rem">
                 <AddModelBox
                   text={t('modelManager.addCheckpointModel')}
                   onClick={() => dispatch(setAddNewModelUIOption('ckpt'))}
@@ -102,7 +110,6 @@ export default function AddModel() {
             {addNewModelUIOption == 'ckpt' && <AddCheckpointModel />}
             {addNewModelUIOption == 'diffusers' && <AddDiffusersModel />}
           </ModalBody>
-          <ModalFooter />
         </ModalContent>
       </Modal>
     </>

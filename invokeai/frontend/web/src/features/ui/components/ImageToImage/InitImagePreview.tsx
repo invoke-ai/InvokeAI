@@ -1,4 +1,4 @@
-import { Flex, Image, Text, useToast } from '@chakra-ui/react';
+import { Image, useToast } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
@@ -28,49 +28,22 @@ export default function InitImagePreview() {
 
   return (
     <>
-      <Flex
-        sx={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          w: '100%',
-          gap: 4,
-        }}
-      >
-        <Text
-          sx={{
-            fontSize: 'lg',
-          }}
-          variant="subtext"
-        >
-          {t('parameters.initialImage')}
-        </Text>
+      <div className="init-image-preview-header">
+        <h2>{t('parameters.initialImage')}</h2>
         <ImageUploaderIconButton />
-      </Flex>
+      </div>
       {initialImage && (
-        <Flex
-          sx={{
-            position: 'relative',
-            height: '100%',
-            width: '100%',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <div className="init-image-preview">
           <Image
-            sx={{
-              fit: 'contain',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              borderRadius: 'base',
-              objectFit: 'contain',
-              position: 'absolute',
-            }}
+            fit="contain"
+            maxWidth="100%"
+            maxHeight="100%"
             src={
               typeof initialImage === 'string' ? initialImage : initialImage.url
             }
             onError={alertMissingInitImage}
           />
-        </Flex>
+        </div>
       )}
     </>
   );

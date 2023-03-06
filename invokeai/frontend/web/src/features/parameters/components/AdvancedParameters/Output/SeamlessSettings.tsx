@@ -1,3 +1,4 @@
+import { Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
@@ -21,12 +22,14 @@ const SeamlessSettings = () => {
   const { t } = useTranslation();
 
   return (
-    <IAISwitch
-      label={t('parameters.seamlessTiling')}
-      fontSize="md"
-      isChecked={seamless}
-      onChange={handleChangeSeamless}
-    />
+    <Flex gap={2} direction="column">
+      <IAISwitch
+        label={t('parameters.seamlessTiling')}
+        fontSize="md"
+        isChecked={seamless}
+        onChange={handleChangeSeamless}
+      />
+    </Flex>
   );
 };
 

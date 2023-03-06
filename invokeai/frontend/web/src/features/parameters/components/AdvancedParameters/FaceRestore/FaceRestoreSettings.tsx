@@ -1,4 +1,4 @@
-import { VStack } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/storeHooks';
 import type { RootState } from 'app/store';
 import FaceRestoreType from './FaceRestoreType';
@@ -14,11 +14,11 @@ const FaceRestoreSettings = () => {
   );
 
   return (
-    <VStack gap={2} alignItems="stretch">
+    <Flex direction="column" gap={2} minWidth="20rem">
       <FaceRestoreType />
       <FaceRestoreStrength />
       {facetoolType === 'codeformer' && <CodeformerFidelity />}
-    </VStack>
+    </Flex>
   );
 };
 

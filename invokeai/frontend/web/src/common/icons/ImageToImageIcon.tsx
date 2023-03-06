@@ -13,8 +13,5 @@ const ImageToImageIcon = createIcon({
       />
     </g>
   ),
-  defaultProps: {
-    boxSize: '24px',
-  },
 });
 export default ImageToImageIcon;

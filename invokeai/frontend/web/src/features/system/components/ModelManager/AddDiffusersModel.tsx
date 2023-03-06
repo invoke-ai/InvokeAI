@@ -28,14 +28,12 @@ function FormItemWrapper({
 }) {
   return (
     <Flex
-      sx={{
-        flexDirection: 'column',
-        padding: 4,
-        rowGap: 4,
-        borderRadius: 'base',
-        width: 'full',
-        bg: 'base.900',
-      }}
+      flexDirection="column"
+      backgroundColor="var(--background-color)"
+      padding="1rem 1rem"
+      borderRadius="0.5rem"
+      rowGap="1rem"
+      width="100%"
     >
       {children}
     </Flex>
@@ -97,7 +95,7 @@ export default function AddDiffusersModel() {
         position="absolute"
         zIndex={1}
         size="sm"
-        insetInlineEnd={12}
+        right={12}
         top={3}
         icon={<BiArrowBack />}
       />
@@ -107,7 +105,7 @@ export default function AddDiffusersModel() {
       >
         {({ handleSubmit, errors, touched }) => (
           <form onSubmit={handleSubmit}>
-            <VStack rowGap={2}>
+            <VStack rowGap="0.5rem">
               <FormItemWrapper>
                 {/* Name */}
                 <FormControl
@@ -172,11 +170,9 @@ export default function AddDiffusersModel() {
                   {t('modelManager.formMessageDiffusersModelLocation')}
                 </Text>
                 <Text
-                  sx={{
-                    fontSize: 'sm',
-                    fontStyle: 'italic',
-                  }}
-                  variant="subtext"
+                  fontSize="sm"
+                  fontStyle="italic"
+                  color="var(--text-color-secondary)"
                 >
                   {t('modelManager.formMessageDiffusersModelLocationDesc')}
                 </Text>
@@ -234,11 +230,9 @@ export default function AddDiffusersModel() {
                   {t('modelManager.formMessageDiffusersVAELocation')}
                 </Text>
                 <Text
-                  sx={{
-                    fontSize: 'sm',
-                    fontStyle: 'italic',
-                  }}
-                  variant="subtext"
+                  fontSize="sm"
+                  fontStyle="italic"
+                  color="var(--text-color-secondary)"
                 >
                   {t('modelManager.formMessageDiffusersVAELocationDesc')}
                 </Text>
@@ -292,7 +286,11 @@ export default function AddDiffusersModel() {
                 </FormControl>
               </FormItemWrapper>
 
-              <IAIButton type="submit" isLoading={isProcessing}>
+              <IAIButton
+                type="submit"
+                className="modal-close-btn"
+                isLoading={isProcessing}
+              >
                 {t('modelManager.addModel')}
               </IAIButton>
             </VStack>

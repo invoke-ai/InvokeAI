@@ -6,7 +6,7 @@ import UnifiedCanvasPreserveMask from './UnifiedCanvasPreserveMask';
 
 export default function UnifiedCanvasMaskBrushSettings() {
   return (
-    <Flex gap={4} alignItems="center">
+    <Flex gap="1rem" alignItems="center">
       <UnifiedCanvasBrushSettings />
       <UnifiedCanvasEnableMask />
       <UnifiedCanvasPreserveMask />

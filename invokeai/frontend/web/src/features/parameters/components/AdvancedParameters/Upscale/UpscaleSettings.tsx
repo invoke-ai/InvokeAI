@@ -1,4 +1,4 @@
-import { VStack } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import UpscaleDenoisingStrength from './UpscaleDenoisingStrength';
 import UpscaleStrength from './UpscaleStrength';
 import UpscaleScale from './UpscaleScale';
@@ -8,11 +8,11 @@ import UpscaleScale from './UpscaleScale';
  */
 const UpscaleSettings = () => {
   return (
-    <VStack gap={2} alignItems="stretch">
+    <Flex flexDir="column" rowGap={2} minWidth="20rem">
       <UpscaleScale />
       <UpscaleDenoisingStrength />
       <UpscaleStrength />
-    </VStack>
+    </Flex>
   );
 };
 

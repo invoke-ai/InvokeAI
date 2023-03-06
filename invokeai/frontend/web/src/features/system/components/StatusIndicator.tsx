@@ -37,18 +37,25 @@ const StatusIndicator = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  let statusIdentifier;
-
+  let statusStyle;
   if (isConnected && !hasError) {
-    statusIdentifier = 'ok';
+    statusStyle = 'status-good';
   } else {
-    statusIdentifier = 'error';
+    statusStyle = 'status-bad';
   }
 
   let statusMessage = currentStatus;
 
-  if (isProcessing) {
-    statusIdentifier = 'working';
+  const intermediateStatuses = [
+    t('common.statusGenerating'),
+    t('common.statusPreparing'),
+    t('common.statusSavingImage'),
+    t('common.statusRestoringFaces'),
+    t('common.statusUpscaling'),
+  ];
+
+  if (intermediateStatuses.includes(statusMessage)) {
+    statusStyle = 'status-working';
   }
 
   if (statusMessage)
@@ -79,11 +86,7 @@ const StatusIndicator = () => {
       <Text
         cursor={statusIndicatorCursor}
         onClick={handleClickStatusIndicator}
-        sx={{
-          fontSize: 'xs',
-          fontWeight: '600',
-          color: `${statusIdentifier}.400`,
-        }}
+        className={`status ${statusStyle}`}
       >
         {t(statusMessage as keyof typeof t)}
       </Text>
