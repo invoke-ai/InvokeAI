@@ -1294,13 +1294,15 @@ def run_patches():
     # distro after original root directory configuration
     import invokeai.configs as conf
     from shutil import copyfile
-    
+
     root_configs = Path(global_config_dir(), 'stable-diffusion')
     repo_configs = Path(conf.__path__[0], 'stable-diffusion')
+    if not root_configs.exists():
+        os.makedirs(root_configs, exist_ok=True)
     for src in repo_configs.iterdir():
         dest = root_configs / src.name
         if not dest.exists():
-            copyfile(src,dest)
-    
+            copyfile(src, dest)
+
 if __name__ == "__main__":
     main()
