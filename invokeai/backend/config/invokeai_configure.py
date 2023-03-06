@@ -295,7 +295,7 @@ def download_vaes():
         # first the diffusers version
         repo_id = "stabilityai/sd-vae-ft-mse"
         args = dict(
-            cache_dir=global_cache_dir("diffusers"),
+            cache_dir=global_cache_dir("hub"),
         )
         if not AutoencoderKL.from_pretrained(repo_id, **args):
             raise Exception(f"download of {repo_id} failed")
