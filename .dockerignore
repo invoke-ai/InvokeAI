@@ -4,9 +4,9 @@
 !ldm
 !pyproject.toml
 
-# ignore frontend but whitelist dist
-invokeai/frontend/
-!invokeai/frontend/dist/
+# ignore frontend/web but whitelist dist
+invokeai/frontend/web/
+!invokeai/frontend/web/dist/
 
 # ignore invokeai/assets but whitelist invokeai/assets/web
 invokeai/assets/

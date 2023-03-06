@@ -1,7 +1,6 @@
 import math
-import warnings
 
-from PIL import Image, ImageFilter
+from PIL import Image
 
 
 class Outcrop(object):
@@ -27,7 +26,7 @@ class Outcrop(object):
         # switch samplers temporarily
         curr_sampler = self.generate.sampler
         self.generate.sampler_name = opt.sampler_name
-        self.generate._set_sampler()
+        self.generate._set_scheduler()
 
         def wrapped_callback(img, seed, **kwargs):
             preferred_seed = (
