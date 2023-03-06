@@ -1,13 +1,14 @@
-import { Flex } from '@chakra-ui/react';
-import HiresSettings from './HiresSettings';
+import { VStack } from '@chakra-ui/react';
+import { HiresStrength, HiresToggle } from './HiresSettings';
 import SeamlessSettings from './SeamlessSettings';
 
 const OutputSettings = () => {
   return (
-    <Flex gap={2} direction="column">
+    <VStack gap={2} alignItems="stretch">
       <SeamlessSettings />
-      <HiresSettings />
-    </Flex>
+      <HiresToggle />
+      <HiresStrength />
+    </VStack>
   );
 };
 

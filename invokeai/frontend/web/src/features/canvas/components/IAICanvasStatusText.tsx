@@ -1,3 +1,4 @@
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -6,6 +7,8 @@ import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 import roundToHundreth from '../util/roundToHundreth';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
+
+const warningColor = 'var(--invokeai-colors-warning-500)';
 
 const selector = createSelector(
   [canvasSelector],
@@ -34,11 +37,10 @@ const selector = createSelector(
       (boundingBoxScaleMethod === 'manual' &&
         scaledBoxWidth * scaledBoxHeight < 512 * 512)
     ) {
-      boundingBoxColor = 'var(--status-working-color)';
+      boundingBoxColor = warningColor;
     }
 
-    const activeLayerColor =
-      layer === 'mask' ? 'var(--status-working-color)' : 'inherit';
+    const activeLayerColor = layer === 'mask' ? warningColor : 'inherit';
 
     return {
       activeLayerColor,
@@ -87,55 +89,72 @@ const IAICanvasStatusText = () => {
   const { t } = useTranslation();
 
   return (
-    <div className="canvas-status-text">
-      <div
+    <Flex
+      sx={{
+        flexDirection: 'column',
+        position: 'absolute',
+        top: 0,
+        insetInlineStart: 0,
+        opacity: 0.65,
+        display: 'flex',
+        fontSize: 'sm',
+        padding: 1,
+        px: 2,
+        minWidth: 48,
+        margin: 1,
+        borderRadius: 'base',
+        pointerEvents: 'none',
+        bg: 'blackAlpha.500',
+      }}
+    >
+      <Box
         style={{
           color: activeLayerColor,
         }}
-      >{`${t('unifiedCanvas.activeLayer')}: ${activeLayerString}`}</div>
-      <div>{`${t('unifiedCanvas.canvasScale')}: ${canvasScaleString}%`}</div>
+      >{`${t('unifiedCanvas.activeLayer')}: ${activeLayerString}`}</Box>
+      <Box>{`${t('unifiedCanvas.canvasScale')}: ${canvasScaleString}%`}</Box>
       {shouldPreserveMaskedArea && (
-        <div
+        <Box
           style={{
-            color: 'var(--status-working-color)',
+            color: warningColor,
           }}
         >
           Preserve Masked Area: On
-        </div>
+        </Box>
       )}
       {shouldShowBoundingBox && (
-        <div
+        <Box
           style={{
             color: boundingBoxColor,
           }}
         >{`${t(
-          'unifiedcanvas:boundingBox'
-        )}: ${boundingBoxDimensionsString}`}</div>
+          'unifiedCanvas.boundingBox'
+        )}: ${boundingBoxDimensionsString}`}</Box>
       )}
       {shouldShowScaledBoundingBox && (
-        <div
+        <Box
           style={{
             color: boundingBoxColor,
           }}
         >{`${t(
-          'unifiedcanvas:scaledBoundingBox'
-        )}: ${scaledBoundingBoxDimensionsString}`}</div>
+          'unifiedCanvas.scaledBoundingBox'
+        )}: ${scaledBoundingBoxDimensionsString}`}</Box>
       )}
       {shouldShowCanvasDebugInfo && (
         <>
-          <div>{`${t(
-            'unifiedcanvas:boundingBoxPosition'
-          )}: ${boundingBoxCoordinatesString}`}</div>
-          <div>{`${t(
-            'unifiedcanvas:canvasDimensions'
-          )}: ${canvasDimensionsString}`}</div>
-          <div>{`${t(
-            'unifiedcanvas:canvasPosition'
-          )}: ${canvasCoordinatesString}`}</div>
+          <Box>{`${t(
+            'unifiedCanvas.boundingBoxPosition'
+          )}: ${boundingBoxCoordinatesString}`}</Box>
+          <Box>{`${t(
+            'unifiedCanvas.canvasDimensions'
+          )}: ${canvasDimensionsString}`}</Box>
+          <Box>{`${t(
+            'unifiedCanvas.canvasPosition'
+          )}: ${canvasCoordinatesString}`}</Box>
           <IAICanvasStatusTextCursorPos />
         </>
       )}
-    </div>
+    </Flex>
   );
 };
 

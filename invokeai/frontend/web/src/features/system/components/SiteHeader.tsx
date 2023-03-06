@@ -1,8 +1,7 @@
-import { Flex, Link, Text } from '@chakra-ui/react';
+import { Flex, Grid, Link } from '@chakra-ui/react';
 
 import { FaBug, FaCube, FaDiscord, FaGithub, FaKeyboard } from 'react-icons/fa';
 
-import InvokeAILogo from 'assets/images/logo.png';
 import IAIIconButton from 'common/components/IAIIconButton';
 
 import HotkeysModal from './HotkeysModal/HotkeysModal';
@@ -15,39 +14,21 @@ import ThemeChanger from './ThemeChanger';
 
 import LanguagePicker from './LanguagePicker';
 
-import type { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 import { MdSettings } from 'react-icons/md';
+import InvokeAILogoComponent from './InvokeAILogoComponent';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
   const { t } = useTranslation();
-  const appVersion = useAppSelector(
-    (state: RootState) => state.system.app_version
-  );
 
   return (
-    <div className="site-header">
-      <div className="site-header-left-side">
-        <img src={InvokeAILogo} alt="invoke-ai-logo" />
-        <Flex alignItems="center" columnGap="0.6rem">
-          <Text fontSize="1.4rem">
-            invoke <strong>ai</strong>
-          </Text>
-          <Text
-            fontWeight="bold"
-            color="var(--text-color-secondary)"
-            marginTop="0.2rem"
-          >
-            {appVersion}
-          </Text>
-        </Flex>
-      </div>
+    <Grid gridTemplateColumns="auto max-content">
+      <InvokeAILogoComponent />
 
-      <div className="site-header-right-side">
+      <Flex alignItems="center" gap={2}>
         <StatusIndicator />
 
         <ModelSelect />
@@ -133,8 +114,8 @@ const SiteHeader = () => {
             icon={<MdSettings />}
           />
         </SettingsModal>
-      </div>
-    </div>
+      </Flex>
+    </Grid>
   );
 };
 

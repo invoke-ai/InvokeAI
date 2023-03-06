@@ -33,11 +33,11 @@ const ModelSelect = () => {
   return (
     <Flex
       style={{
-        paddingLeft: '0.3rem',
+        paddingInlineStart: 1.5,
       }}
     >
       <IAISelect
-        style={{ fontSize: '0.8rem' }}
+        style={{ fontSize: 'sm' }}
         tooltip={activeModel.description}
         isDisabled={isProcessing}
         value={activeModel.name}
