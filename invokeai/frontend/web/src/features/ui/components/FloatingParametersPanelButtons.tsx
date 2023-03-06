@@ -28,7 +28,6 @@ export const floatingSelector = createSelector(
     const {
       shouldPinParametersPanel,
       shouldShowParametersPanel,
-      shouldHoldParametersPanelOpen,
       shouldUseCanvasBetaLayout,
     } = ui;
 
@@ -40,10 +39,7 @@ export const floatingSelector = createSelector(
 
     const shouldShowParametersPanelButton =
       !canvasBetaLayoutCheck &&
-      !(
-        shouldShowParametersPanel ||
-        (shouldHoldParametersPanelOpen && !shouldPinParametersPanel)
-      ) &&
+      !shouldPinParametersPanel &&
       ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     const shouldShowGalleryButton =
@@ -51,8 +47,7 @@ export const floatingSelector = createSelector(
       ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     const shouldShowProcessButtons =
-      !canvasBetaLayoutCheck &&
-      (!shouldPinParametersPanel || !shouldShowParametersPanel);
+      !canvasBetaLayoutCheck && !shouldPinParametersPanel;
 
     return {
       shouldPinParametersPanel,

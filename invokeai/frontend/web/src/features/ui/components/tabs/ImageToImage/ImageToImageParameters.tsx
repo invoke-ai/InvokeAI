@@ -1,13 +1,13 @@
-// import { Feature } from 'app/features';
 import { Flex } from '@chakra-ui/react';
 import { Feature } from 'app/features';
-import BoundingBoxSettings from 'features/parameters/components/AdvancedParameters/Canvas/BoundingBox/BoundingBoxSettings';
-import InfillAndScalingSettings from 'features/parameters/components/AdvancedParameters/Canvas/InfillAndScalingSettings';
-import SeamCorrectionSettings from 'features/parameters/components/AdvancedParameters/Canvas/SeamCorrection/SeamCorrectionSettings';
-import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
+import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
+import FaceRestoreToggle from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreToggle';
+import ImageToImageOutputSettings from 'features/parameters/components/AdvancedParameters/Output/ImageToImageOutputSettings';
 import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
 import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
+import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
+import UpscaleToggle from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleToggle';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
 import MainSettings from 'features/parameters/components/MainParameters/MainSettings';
@@ -15,42 +15,28 @@ import ParametersAccordion from 'features/parameters/components/ParametersAccord
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
-import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
+import PinParametersPanelButton from 'features/ui/components/common/PinParametersPanelButton';
+import ImageToImageSettings from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageSettings';
 
-export default function UnifiedCanvasPanel() {
+export default function ImageToImageParameters() {
   const { t } = useTranslation();
 
-  const unifiedCanvasAccordions = {
+  const imageToImageAccordions = {
     general: {
       header: `${t('parameters.general')}`,
       feature: undefined,
       content: <MainSettings />,
     },
-    unifiedCanvasImg2Img: {
+    imageToImage: {
       header: `${t('parameters.imageToImage')}`,
       feature: undefined,
-      content: <ImageToImageStrength label={t('parameters.img2imgStrength')} />,
+      content: <ImageToImageSettings />,
     },
     seed: {
       header: `${t('parameters.seed')}`,
       feature: Feature.SEED,
       content: <SeedSettings />,
-    },
-    boundingBox: {
-      header: `${t('parameters.boundingBoxHeader')}`,
-      feature: Feature.BOUNDING_BOX,
-      content: <BoundingBoxSettings />,
-    },
-    seamCorrection: {
-      header: `${t('parameters.seamCorrectionHeader')}`,
-      feature: Feature.SEAM_CORRECTION,
-      content: <SeamCorrectionSettings />,
-    },
-    infillAndScaling: {
-      header: `${t('parameters.infillScalingHeader')}`,
-      feature: Feature.INFILL_AND_SCALING,
-      content: <InfillAndScalingSettings />,
     },
     variations: {
       header: `${t('parameters.variations')}`,
@@ -58,22 +44,37 @@ export default function UnifiedCanvasPanel() {
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
     },
+    face_restore: {
+      header: `${t('parameters.faceRestoration')}`,
+      feature: Feature.FACE_CORRECTION,
+      content: <FaceRestoreSettings />,
+      additionalHeaderComponents: <FaceRestoreToggle />,
+    },
+    upscale: {
+      header: `${t('parameters.upscaling')}`,
+      feature: Feature.UPSCALE,
+      content: <UpscaleSettings />,
+      additionalHeaderComponents: <UpscaleToggle />,
+    },
     symmetry: {
       header: `${t('parameters.symmetry')}`,
       content: <SymmetrySettings />,
       additionalHeaderComponents: <SymmetryToggle />,
     },
+    other: {
+      header: `${t('parameters.otherOptions')}`,
+      feature: Feature.OTHER,
+      content: <ImageToImageOutputSettings />,
+    },
   };
 
   return (
-    <InvokeOptionsPanel>
-      <Flex flexDir="column" rowGap={2}>
-        <PromptInput />
-        <NegativePromptInput />
-      </Flex>
+    <Flex flexDir="column" gap={2} position="relative">
+      <PromptInput />
+      <NegativePromptInput />
       <ProcessButtons />
-      {/* <ParametersAccordion accordionInfo={unifiedCanvasImg2ImgAccordion} /> */}
-      <ParametersAccordion accordionInfo={unifiedCanvasAccordions} />
-    </InvokeOptionsPanel>
+      <ParametersAccordion accordionInfo={imageToImageAccordions} />
+      <PinParametersPanelButton />
+    </Flex>
   );
 }

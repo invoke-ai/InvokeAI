@@ -14,7 +14,7 @@ const workareaSplitViewStyle: ChakraProps['sx'] = {
   padding: 4,
 };
 
-const ImageToImageDisplay = () => {
+const ImageToImageContent = () => {
   const initialImage = useAppSelector(
     (state: RootState) => state.generation.initialImage
   );
@@ -47,4 +47,4 @@ const ImageToImageDisplay = () => {
   );
 };
 
-export default ImageToImageDisplay;
+export default ImageToImageContent;

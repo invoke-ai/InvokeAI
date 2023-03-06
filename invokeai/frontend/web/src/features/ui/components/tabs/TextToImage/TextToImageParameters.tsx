@@ -15,10 +15,10 @@ import ParametersAccordion from 'features/parameters/components/ParametersAccord
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
-import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
+import PinParametersPanelButton from 'features/ui/components/common/PinParametersPanelButton';
 
-export default function TextToImagePanel() {
+export default function TextToImageParameters() {
   const { t } = useTranslation();
 
   const textToImageAccordions = {
@@ -63,13 +63,12 @@ export default function TextToImagePanel() {
   };
 
   return (
-    <InvokeOptionsPanel>
-      <Flex flexDir="column" rowGap={2}>
-        <PromptInput />
-        <NegativePromptInput />
-      </Flex>
+    <Flex flexDir="column" gap={2} position="relative">
+      <PromptInput />
+      <NegativePromptInput />
       <ProcessButtons />
       <ParametersAccordion accordionInfo={textToImageAccordions} />
-    </InvokeOptionsPanel>
+      <PinParametersPanelButton />
+    </Flex>
   );
 }

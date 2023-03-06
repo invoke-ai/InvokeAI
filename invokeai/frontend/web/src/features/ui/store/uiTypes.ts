@@ -4,7 +4,6 @@ export interface UIState {
   activeTab: number;
   currentTheme: string;
   parametersPanelScrollPosition: number;
-  shouldHoldParametersPanelOpen: boolean;
   shouldPinParametersPanel: boolean;
   shouldShowParametersPanel: boolean;
   shouldShowImageDetails: boolean;

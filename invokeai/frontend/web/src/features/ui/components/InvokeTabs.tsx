@@ -36,9 +36,9 @@ import {
 } from 'react-icons/md';
 import { activeTabIndexSelector } from '../store/uiSelectors';
 import { floatingSelector } from './FloatingParametersPanelButtons';
-import ImageToImageWorkarea from './ImageToImage';
-import TextToImageWorkarea from './TextToImage';
-import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
+import ImageToImageWorkarea from 'features/ui/components/tabs/ImageToImage/ImageToImageWorkarea';
+import TextToImageWorkarea from 'features/ui/components/tabs/TextToImage/TextToImageWorkarea';
+import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
 
 export interface InvokeTabInfo {
   title: ReactElement;

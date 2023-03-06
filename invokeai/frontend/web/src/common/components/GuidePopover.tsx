@@ -30,7 +30,7 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
   if (!shouldDisplayGuides) return null;
 
   return (
-    <Popover trigger="hover">
+    <Popover trigger="hover" isLazy>
       <PopoverTrigger>
         <Box>{children}</Box>
       </PopoverTrigger>

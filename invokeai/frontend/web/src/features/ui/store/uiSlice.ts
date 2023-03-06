@@ -7,7 +7,6 @@ const initialtabsState: UIState = {
   activeTab: 0,
   currentTheme: 'dark',
   parametersPanelScrollPosition: 0,
-  shouldHoldParametersPanelOpen: false,
   shouldPinParametersPanel: true,
   shouldShowParametersPanel: true,
   shouldShowImageDetails: false,
@@ -41,15 +40,10 @@ export const uiSlice = createSlice({
     },
     setShouldPinParametersPanel: (state, action: PayloadAction<boolean>) => {
       state.shouldPinParametersPanel = action.payload;
+      state.shouldShowParametersPanel = true;
     },
     setShouldShowParametersPanel: (state, action: PayloadAction<boolean>) => {
       state.shouldShowParametersPanel = action.payload;
-    },
-    setShouldHoldParametersPanelOpen: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
-      state.shouldHoldParametersPanelOpen = action.payload;
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
@@ -76,7 +70,6 @@ export const {
   setActiveTab,
   setCurrentTheme,
   setParametersPanelScrollPosition,
-  setShouldHoldParametersPanelOpen,
   setShouldPinParametersPanel,
   setShouldShowParametersPanel,
   setShouldShowImageDetails,

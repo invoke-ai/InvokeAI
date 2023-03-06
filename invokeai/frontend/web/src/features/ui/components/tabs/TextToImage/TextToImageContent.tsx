@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
 
-const TextToImageDisplay = () => {
+const TextToImageContent = () => {
   return (
     <Box
       sx={{
@@ -18,4 +18,4 @@ const TextToImageDisplay = () => {
   );
 };
 
-export default TextToImageDisplay;
+export default TextToImageContent;
