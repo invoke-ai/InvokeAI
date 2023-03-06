@@ -3,7 +3,6 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
@@ -20,16 +19,16 @@ const invokeAIButton = defineStyle((props) => {
     fontSize: 'sm',
     border: 'none',
     borderRadius: 'base',
-    bg: mode(`${c}.250`, `${c}.800`)(props),
-    color: mode('base.900', 'base.100')(props),
+    bg: `${c}.800`,
+    color: 'base.100',
     _hover: {
-      bg: mode(`${c}.300`, `${c}.700`)(props),
+      bg: `${c}.700`,
     },
     _expanded: {
-      bg: mode(`${c}.250`, `${c}.750`)(props),
+      bg: `${c}.750`,
       borderBottomRadius: 'none',
       _hover: {
-        bg: mode(`${c}.300`, `${c}.700`)(props),
+        bg: `${c}.700`,
       },
     },
   };
@@ -38,7 +37,7 @@ const invokeAIButton = defineStyle((props) => {
 const invokeAIPanel = defineStyle((props) => {
   const { colorScheme: c } = props;
   return {
-    bg: mode(`${c}.200`, `${c}.800`)(props),
+    bg: `${c}.800`,
     borderRadius: 'base',
     borderTopRadius: 'none',
     p: 4,

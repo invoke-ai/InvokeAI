@@ -1,6 +1,6 @@
 import { ThemeOverride } from '@chakra-ui/react';
 import type { StyleFunctionProps } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
+
 import { invokeAIThemeColors } from './colors/invokeAI';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
@@ -22,15 +22,13 @@ import { textareaTheme } from './components/textarea';
 
 export const theme: ThemeOverride = {
   config: {
-    initialColorMode: 'dark',
-    useSystemColorMode: false,
     cssVarPrefix: 'invokeai',
   },
   styles: {
-    global: (props: StyleFunctionProps) => ({
+    global: (_props: StyleFunctionProps) => ({
       body: {
-        bg: mode('base.100', 'base.900')(props),
-        color: mode('base.800', 'base.50')(props),
+        bg: 'base.900',
+        color: 'base.50',
         overflow: 'hidden',
       },
       ...scrollbar,

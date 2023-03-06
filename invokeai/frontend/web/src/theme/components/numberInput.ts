@@ -3,7 +3,7 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
+
 import { getInputOutlineStyles } from '../util/getInputOutlineStyles';
 
 const { defineMultiStyleConfig, definePartsStyle } =
@@ -33,7 +33,7 @@ const invokeAIStepperGroup = defineStyle((_props) => {
   };
 });
 
-const invokeAIStepper = defineStyle((props) => {
+const invokeAIStepper = defineStyle((_props) => {
   return {
     border: 'none',
     // expand arrow hitbox
@@ -43,11 +43,11 @@ const invokeAIStepper = defineStyle((props) => {
     my: 0,
 
     svg: {
-      color: mode('base.600', 'base.300')(props),
+      color: 'base.300',
       width: 2.5,
       height: 2.5,
       _hover: {
-        color: mode('base.900', 'base.50')(props),
+        color: 'base.50',
       },
     },
   };

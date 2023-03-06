@@ -1,14 +1,13 @@
 import { selectAnatomy as parts } from '@chakra-ui/anatomy';
 import { createMultiStyleConfigHelpers, defineStyle } from '@chakra-ui/react';
 import { getInputOutlineStyles } from '../util/getInputOutlineStyles';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
 
-const invokeAIIcon = defineStyle((props) => {
+const invokeAIIcon = defineStyle((_props) => {
   return {
-    color: mode('base.600', 'base.300')(props),
+    color: 'base.300',
   };
 });
 

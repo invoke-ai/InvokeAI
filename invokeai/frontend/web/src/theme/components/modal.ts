@@ -3,7 +3,6 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
@@ -14,18 +13,18 @@ const invokeAIOverlay = defineStyle({
 
 const invokeAIDialogContainer = defineStyle({});
 
-const invokeAIDialog = defineStyle((props) => {
+const invokeAIDialog = defineStyle((_props) => {
   return {
-    bg: mode('base.300', 'base.850')(props),
+    bg: 'base.850',
     maxH: '80vh',
   };
 });
 
-const invokeAIHeader = defineStyle((props) => {
+const invokeAIHeader = defineStyle((_props) => {
   return {
     fontWeight: '600',
     fontSize: 'lg',
-    color: mode('base.700', 'base.200')(props),
+    color: 'base.200',
   };
 });
 

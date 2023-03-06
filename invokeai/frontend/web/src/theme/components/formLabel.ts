@@ -1,7 +1,6 @@
 import { defineStyle, defineStyleConfig } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
 
-const invokeAI = defineStyle((props) => {
+const invokeAI = defineStyle((_props) => {
   return {
     fontSize: 'sm',
     marginEnd: 0,
@@ -13,7 +12,7 @@ const invokeAI = defineStyle((props) => {
     _disabled: {
       opacity: 0.4,
     },
-    color: mode('base.600', 'base.300')(props),
+    color: 'base.300',
   };
 });
 

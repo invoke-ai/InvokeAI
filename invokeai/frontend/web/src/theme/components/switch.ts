@@ -3,7 +3,6 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
@@ -12,13 +11,13 @@ const invokeAITrack = defineStyle((props) => {
   const { colorScheme: c } = props;
 
   return {
-    bg: mode(`base.400`, `base.600`)(props),
+    bg: 'base.600',
 
     _focusVisible: {
       boxShadow: 'none',
     },
     _checked: {
-      bg: mode(`${c}.400`, `${c}.600`)(props),
+      bg: `${c}.600`,
     },
   };
 });
@@ -27,7 +26,7 @@ const invokeAIThumb = defineStyle((props) => {
   const { colorScheme: c } = props;
 
   return {
-    bg: mode(`${c}.50`, `${c}.50`)(props),
+    bg: `${c}.50`,
   };
 });
 
