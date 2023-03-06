@@ -114,37 +114,37 @@ class addModelsForm(npyscreen.FormMultiPage):
                 relx=4,
             )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            CenteredTitleText,
-            name="== STARTER MODELS (recommended ones selected) ==",
-            editable=False,
-            color="CONTROL",
-        )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
-            CenteredTitleText,
-            name="Select from a starter set of Stable Diffusion models from HuggingFace:",
-            editable=False,
-            labelColor="CAUTION",
-        )
-
-        self.nextrely -= 1
-        # if user has already installed some initial models, then don't patronize them
-        # by showing more recommendations
-        show_recommended = not self.existing_models
-        self.models_selected = self.add_widget_intelligent(
-            npyscreen.MultiSelect,
-            name="Install Starter Models",
-            values=starter_model_labels,
-            value=[
-                self.starter_model_list.index(x)
-                for x in self.starter_model_list
-                if show_recommended and x in recommended_models
-            ],
-            max_height=len(starter_model_labels) + 1,
-            relx=4,
-            scroll_exit=True,
-        )
+        if len(self.starter_model_list) > 0:
+            self.add_widget_intelligent(
+                CenteredTitleText,
+                name="== STARTER MODELS (recommended ones selected) ==",
+                editable=False,
+                color="CONTROL",
+            )
+            self.nextrely -= 1
+            self.add_widget_intelligent(
+                CenteredTitleText,
+                name="Select from a starter set of Stable Diffusion models from HuggingFace.",
+                editable=False,
+                labelColor="CAUTION",
+            )
+            self.nextrely -= 1
+            # if user has already installed some initial models, then don't patronize them
+            # by showing more recommendations
+            show_recommended = not self.existing_models
+            self.models_selected = self.add_widget_intelligent(
+                npyscreen.MultiSelect,
+                name="Install Starter Models",
+                values=starter_model_labels,
+                value=[
+                    self.starter_model_list.index(x)
+                    for x in self.starter_model_list
+                    if show_recommended and x in recommended_models
+                ],
+                max_height=len(starter_model_labels) + 1,
+                relx=4,
+                scroll_exit=True,
+            )
         self.add_widget_intelligent(
             CenteredTitleText,
             name='== IMPORT LOCAL AND REMOTE MODELS ==',
@@ -166,7 +166,11 @@ class addModelsForm(npyscreen.FormMultiPage):
             )
             self.nextrely -= 1
         self.import_model_paths = self.add_widget_intelligent(
-            TextBox, max_height=5, scroll_exit=True, editable=True, relx=4
+            TextBox,
+            max_height=7,
+            scroll_exit=True,
+            editable=True,
+            relx=4
         )
         self.nextrely += 1
         self.show_directory_fields = self.add_widget_intelligent(
@@ -241,7 +245,8 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def resize(self):
         super().resize()
-        self.models_selected.values = self._get_starter_model_labels()
+        if hasattr(self,'models_selected'):
+            self.models_selected.values = self._get_starter_model_labels()
 
     def _clear_scan_directory(self):
         if not self.show_directory_fields.value:
@@ -320,11 +325,14 @@ class addModelsForm(npyscreen.FormMultiPage):
         selections = self.parentApp.user_selections
 
         # starter models to install/remove
-        starter_models = dict(
-            map(
-                lambda x: (self.starter_model_list[x], True), self.models_selected.value
+        if hasattr(self,'models_selected'):
+            starter_models = dict(
+                map(
+                    lambda x: (self.starter_model_list[x], True), self.models_selected.value
+                )
             )
-        )
+        else:
+            starter_models = dict()
         selections.purge_deleted_models = False
         if hasattr(self, "previously_installed_models"):
             unchecked = [

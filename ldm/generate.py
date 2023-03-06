@@ -650,6 +650,8 @@ class Generate:
     def clear_cuda_cache(self):
         if self._has_cuda():
             self.gather_cuda_stats()
+            # Run garbage collection prior to emptying the CUDA cache
+            gc.collect()
             torch.cuda.empty_cache()
 
     def clear_cuda_stats(self):

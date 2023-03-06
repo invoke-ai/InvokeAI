@@ -1,9 +1,9 @@
-endOfLine: lf
-tabWidth: 2
-useTabs: false
-singleQuote: true
-quoteProps: as-needed
 embeddedLanguageFormatting: auto
+endOfLine: lf
+singleQuote: true
+semi: true
+trailingComma: es5
+useTabs: false
 overrides:
   - files: '*.md'
     options:
@@ -11,3 +11,9 @@ overrides:
       printWidth: 80
       parser: markdown
       cursorOffset: -1
+  - files: docs/**/*.md
+    options:
+      tabWidth: 4
+  - files: 'invokeai/frontend/public/locales/*.json'
+    options:
+      tabWidth: 4

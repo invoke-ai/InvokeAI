@@ -191,14 +191,18 @@ def download_bert():
 
 
 # ---------------------------------------------
-def download_clip():
-    print("Installing CLIP model...", file=sys.stderr)
+def download_sd1_clip():
+    print("Installing SD1 clip model...", file=sys.stderr)
     version = "openai/clip-vit-large-patch14"
-    print("Tokenizer...", file=sys.stderr)
     download_from_hf(CLIPTokenizer, version)
-    print("Text model...", file=sys.stderr)
     download_from_hf(CLIPTextModel, version)
 
+# ---------------------------------------------
+def download_sd2_clip():
+    version = 'stabilityai/stable-diffusion-2'
+    print("Installing SD2 clip model...", file=sys.stderr)
+    download_from_hf(CLIPTokenizer, version, subfolder='tokenizer')
+    download_from_hf(CLIPTextModel, version, subfolder='text_encoder')
 
 # ---------------------------------------------
 def download_realesrgan():
@@ -708,8 +712,8 @@ def write_opts(opts: Namespace, init_file: Path):
                     out_file.write(line + "\n")
             out_file.write(
                 f"""
---outdir={opts.outdir}
---embedding_path={opts.embedding_path}
+--outdir="{opts.outdir}"
+--embedding_path="{opts.embedding_path}"
 --precision={opts.precision}
 --max_loaded_models={int(opts.max_loaded_models)}
 --{'no-' if not opts.safety_checker else ''}nsfw_checker
@@ -832,7 +836,8 @@ def main():
         else:
             print("\n** DOWNLOADING SUPPORT MODELS **")
             download_bert()
-            download_clip()
+            download_sd1_clip()
+            download_sd2_clip()
             download_realesrgan()
             download_gfpgan()
             download_codeformer()

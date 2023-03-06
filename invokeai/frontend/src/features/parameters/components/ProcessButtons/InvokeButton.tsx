@@ -5,6 +5,7 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
+import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +31,7 @@ export default function InvokeButton(props: InvokeButton) {
   useHotkeys(
     ['ctrl+enter', 'meta+enter'],
     () => {
+      dispatch(clampSymmetrySteps());
       dispatch(generateImage(activeTabName));
     },
     {

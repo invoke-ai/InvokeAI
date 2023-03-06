@@ -1,5 +1,8 @@
+root = true
+
 # All files
 [*]
+max_line_length = 80
 charset = utf-8
 end_of_line = lf
 indent_size = 2
@@ -10,3 +13,18 @@ trim_trailing_whitespace = true
 # Python
 [*.py]
 indent_size = 4
+max_line_length = 120
+
+# css
+[*.css]
+indent_size = 4
+
+# flake8
+[.flake8]
+indent_size = 4
+
+# Markdown MkDocs
+[docs/**/*.md]
+max_line_length = 80
+indent_size = 4
+indent_style = unset
