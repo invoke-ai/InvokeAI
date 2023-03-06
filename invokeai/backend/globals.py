@@ -98,16 +98,13 @@ def global_cache_dir(subdir: Union[str, Path] = "") -> Path:
     """
     Returns Path to the model cache directory. If a subdirectory
     is provided, it will be appended to the end of the path, allowing
-    for huggingface-style conventions:
-         global_cache_dir('diffusers')
+    for Hugging Face-style conventions. Currently, Hugging Face has
+    moved all models into the "hub" subfolder, so for any pretrained
+    HF model, use:
          global_cache_dir('hub')
-    Current HuggingFace documentation (mid-Jan 2023) indicates that
-    transformers models will be cached into a "transformers" subdirectory,
-    but in practice they seem to go into "hub". But if needed:
-         global_cache_dir('transformers')
-    One other caveat is that HuggingFace is moving some diffusers models
-    into the "hub" subdirectory as well, so this will need to be revisited
-    from time to time.
+
+    The legacy location for transformers used to be global_cache_dir('transformers')
+    and global_cache_dir('diffusers') for diffusers.
     """
     home: str = os.getenv("HF_HOME")
 
@@ -115,7 +112,7 @@ def global_cache_dir(subdir: Union[str, Path] = "") -> Path:
         home = os.getenv("XDG_CACHE_HOME")
 
         if home is not None:
-            # Set `home` to $XDG_CACHE_HOME/huggingface, which is the default location mentioned in HuggingFace Hub Client Library.
+            # Set `home` to $XDG_CACHE_HOME/huggingface, which is the default location mentioned in Hugging Face Hub Client Library.
             # See: https://huggingface.co/docs/huggingface_hub/main/en/package_reference/environment_variables#xdgcachehome
             home += os.sep + "huggingface"
 

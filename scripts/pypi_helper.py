@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import requests
 
 from ldm.invoke import __app_name__, __version__

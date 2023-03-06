@@ -6,7 +6,7 @@ from argparse import Namespace
 import invokeai.version
 from invokeai.backend import Generate, ModelManager
 
-from ...globals import Globals
+from ...backend import Globals
 
 
 # TODO: most of this code should be split into individual services as the Generate.py code is deprecated

@@ -63,7 +63,7 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
 
 # Install requirements
 COPY --link pyproject.toml .
-COPY --link ldm/invoke/_version.py ldm/invoke/__init__.py ldm/invoke/
+COPY --link invokeai/version/invokeai_version.py invokeai/version/__init__.py invokeai/version/
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \

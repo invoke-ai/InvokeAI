@@ -13,7 +13,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 
-from ..args import Args
+from ..backend import Args
 from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions
 from .api.sockets import SocketIO

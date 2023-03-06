@@ -5,7 +5,6 @@ including img2img, txt2img, and inpaint
 from __future__ import annotations
 
 import os
-import os.path as osp
 import random
 import traceback
 from contextlib import nullcontext
@@ -14,15 +13,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
-from diffusers import DiffusionPipeline
-from einops import rearrange
 from PIL import Image, ImageChops, ImageFilter
-from pytorch_lightning import seed_everything
+from accelerate.utils import set_seed
+from diffusers import DiffusionPipeline
 from tqdm import trange
 
 import invokeai.assets.web as web_assets
-
-from ..stable_diffusion.diffusion.ddpm import DiffusionWrapper
 from ..util.util import rand_perlin_2d
 
 downsampling = 8
@@ -33,9 +29,9 @@ class Generator:
     downsampling_factor: int
     latent_channels: int
     precision: str
-    model: DiffusionWrapper | DiffusionPipeline
+    model: DiffusionPipeline
 
-    def __init__(self, model: DiffusionWrapper | DiffusionPipeline, precision: str):
+    def __init__(self, model: DiffusionPipeline, precision: str):
         self.model = model
         self.precision = precision
         self.seed = None
@@ -116,14 +112,14 @@ class Generator:
             for n in trange(iterations, desc="Generating"):
                 x_T = None
                 if self.variation_amount > 0:
-                    seed_everything(seed)
+                    set_seed(seed)
                     target_noise = self.get_noise(width, height)
                     x_T = self.slerp(self.variation_amount, initial_noise, target_noise)
                 elif initial_noise is not None:
                     # i.e. we specified particular variations
                     x_T = initial_noise
                 else:
-                    seed_everything(seed)
+                    set_seed(seed)
                     try:
                         x_T = self.get_noise(width, height)
                     except:
@@ -283,11 +279,11 @@ class Generator:
         initial_noise = None
         if self.variation_amount > 0 or len(self.with_variations) > 0:
             # use fixed initial noise plus random noise per iteration
-            seed_everything(seed)
+            set_seed(seed)
             initial_noise = self.get_noise(width, height)
             for v_seed, v_weight in self.with_variations:
                 seed = v_seed
-                seed_everything(seed)
+                set_seed(seed)
                 next_noise = self.get_noise(width, height)
                 initial_noise = self.slerp(v_weight, initial_noise, next_noise)
             if self.variation_amount > 0:
