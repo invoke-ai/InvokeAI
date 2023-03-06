@@ -442,7 +442,7 @@ def main():
     args = _parse_args()
     global_set_root(args.root_dir)
 
-    cache_dir = str(global_cache_dir("diffusers"))
+    cache_dir = str(global_cache_dir("hub"))
     os.environ[
         "HF_HOME"
     ] = cache_dir  # because not clear the merge pipeline is honoring cache_dir
