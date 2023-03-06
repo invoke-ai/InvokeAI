@@ -26,7 +26,6 @@ export default function MainCFGScale() {
       onChange={handleChangeCfgScale}
       handleReset={() => dispatch(setCfgScale(7.5))}
       value={cfgScale}
-      sliderMarkRightOffset={-5}
       sliderNumberInputProps={{ max: 200 }}
       withInput
       withReset
@@ -40,10 +39,8 @@ export default function MainCFGScale() {
       max={200}
       onChange={handleChangeCfgScale}
       value={cfgScale}
-      width="auto"
-      styleClass="main-settings-block"
-      textAlign="center"
       isInteger={false}
+      numberInputFieldProps={{ textAlign: 'center' }}
     />
   );
 }

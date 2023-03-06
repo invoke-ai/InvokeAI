@@ -13,7 +13,6 @@ export default function SeamBlur() {
 
   return (
     <IAISlider
-      sliderMarkRightOffset={-4}
       label={t('parameters.seamBlur')}
       min={0}
       max={64}

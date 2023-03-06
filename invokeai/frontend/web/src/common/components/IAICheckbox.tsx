@@ -3,13 +3,12 @@ import type { ReactNode } from 'react';
 
 type IAICheckboxProps = CheckboxProps & {
   label: string | ReactNode;
-  styleClass?: string;
 };
 
 const IAICheckbox = (props: IAICheckboxProps) => {
-  const { label, styleClass, ...rest } = props;
+  const { label, ...rest } = props;
   return (
-    <Checkbox className={`invokeai__checkbox ${styleClass}`} {...rest}>
+    <Checkbox colorScheme="accent" {...rest}>
       {label}
     </Checkbox>
   );

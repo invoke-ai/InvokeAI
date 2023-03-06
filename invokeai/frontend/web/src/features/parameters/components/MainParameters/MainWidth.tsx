@@ -32,8 +32,6 @@ export default function MainWidth() {
       withInput
       withReset
       withSliderMarks
-      sliderMarkRightOffset={-8}
-      inputWidth="6.2rem"
       inputReadOnly
       sliderNumberInputProps={{ max: 15360 }}
     />
@@ -45,8 +43,6 @@ export default function MainWidth() {
       flexGrow={1}
       onChange={(e) => dispatch(setWidth(Number(e.target.value)))}
       validValues={WIDTHS}
-      styleClass="main-settings-block"
-      width="5.5rem"
     />
   );
 }

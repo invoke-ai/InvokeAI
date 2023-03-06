@@ -21,10 +21,10 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
   const { header, feature, content, additionalHeaderComponents } = props;
 
   return (
-    <AccordionItem className="advanced-parameters-item">
-      <AccordionButton className="advanced-parameters-header">
-        <Flex width="100%" gap="0.5rem" align="center">
-          <Box flexGrow={1} textAlign="left">
+    <AccordionItem>
+      <AccordionButton>
+        <Flex width="100%" gap={2} align="center">
+          <Box flexGrow={1} textAlign="start">
             {header}
           </Box>
           {additionalHeaderComponents}
@@ -32,9 +32,7 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
           <AccordionIcon />
         </Flex>
       </AccordionButton>
-      <AccordionPanel className="advanced-parameters-panel">
-        {content}
-      </AccordionPanel>
+      <AccordionPanel>{content}</AccordionPanel>
     </AccordionItem>
   );
 }
