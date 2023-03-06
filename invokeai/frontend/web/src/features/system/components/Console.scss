@@ -1,0 +1,75 @@
+.console {
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--console-bg-color);
+  overflow: auto;
+  direction: column;
+  font-family: monospace;
+  padding: 0 1rem 1rem 3rem;
+  border-top-width: 0.3rem;
+  border-color: var(--resizeable-handle-border-color);
+
+  .console-info-color {
+    color: var(--error-level-info);
+  }
+
+  .console-warning-color {
+    color: var(--error-level-warning);
+  }
+
+  .console-error-color {
+    color: var(--status-bad-color);
+  }
+
+  .console-entry {
+    display: flex;
+    column-gap: 0.5rem;
+
+    .console-timestamp {
+      font-weight: semibold;
+    }
+
+    .console-message {
+      word-break: break-all;
+    }
+  }
+}
+
+.console-toggle-icon-button {
+  background: var(--console-icon-button-bg-color);
+  position: fixed;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 10000;
+
+  &:hover {
+    background: var(--console-icon-button-bg-color-hover);
+  }
+
+  &[data-error-seen='true'] {
+    background: var(--status-bad-color);
+    &:hover {
+      background: var(--status-bad-color);
+    }
+  }
+}
+
+.console-autoscroll-icon-button {
+  background: var(--console-icon-button-bg-color);
+  position: fixed;
+  left: 0.5rem;
+  bottom: 3rem;
+  z-index: 10000;
+
+  &:hover {
+    background: var(--console-icon-button-bg-color-hover);
+  }
+
+  &[data-autoscroll-enabled='true'] {
+    background: var(--accent-color);
+    &:hover {
+      background: var(--accent-color-hover);
+    }
+  }
+}

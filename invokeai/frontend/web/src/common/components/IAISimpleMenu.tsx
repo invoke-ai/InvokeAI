@@ -4,15 +4,14 @@ import {
   MenuItem,
   MenuList,
   MenuProps,
+  MenuButtonProps,
   MenuListProps,
   MenuItemProps,
-  IconButton,
-  Button,
-  IconButtonProps,
-  ButtonProps,
 } from '@chakra-ui/react';
 import { MouseEventHandler, ReactNode } from 'react';
 import { MdArrowDropDown, MdArrowDropUp } from 'react-icons/md';
+import IAIButton from './IAIButton';
+import IAIIconButton from './IAIIconButton';
 
 interface IAIMenuItem {
   item: ReactNode | string;
@@ -23,10 +22,9 @@ interface IAIMenuProps {
   menuType?: 'icon' | 'regular';
   buttonText?: string;
   iconTooltip?: string;
-  isLazy?: boolean;
   menuItems: IAIMenuItem[];
   menuProps?: MenuProps;
-  menuButtonProps?: IconButtonProps | ButtonProps;
+  menuButtonProps?: MenuButtonProps;
   menuListProps?: MenuListProps;
   menuItemProps?: MenuItemProps;
 }
@@ -36,7 +34,6 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
     menuType = 'icon',
     iconTooltip,
     buttonText,
-    isLazy = true,
     menuItems,
     menuProps,
     menuButtonProps,
@@ -51,7 +48,13 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
         <MenuItem
           key={index}
           onClick={menuItem.onClick}
-          fontSize="sm"
+          fontSize="0.9rem"
+          color="var(--text-color-secondary)"
+          backgroundColor="var(--background-color-secondary)"
+          _focus={{
+            color: 'var(--text-color)',
+            backgroundColor: 'var(--border-color)',
+          }}
           {...menuItemProps}
         >
           {menuItem.item}
@@ -62,20 +65,34 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
   };
 
   return (
-    <Menu {...menuProps} isLazy={isLazy}>
+    <Menu {...menuProps}>
       {({ isOpen }) => (
         <>
           <MenuButton
-            as={menuType === 'icon' ? IconButton : Button}
+            as={menuType === 'icon' ? IAIIconButton : IAIButton}
             tooltip={iconTooltip}
             icon={isOpen ? <MdArrowDropUp /> : <MdArrowDropDown />}
-            paddingX={0}
-            paddingY={menuType === 'regular' ? 2 : 0}
+            padding={menuType === 'regular' ? '0 0.5rem' : 0}
+            backgroundColor="var(--btn-base-color)"
+            _hover={{
+              backgroundColor: 'var(--btn-base-color-hover)',
+            }}
+            minWidth="1rem"
+            minHeight="1rem"
+            fontSize="1.5rem"
             {...menuButtonProps}
           >
             {menuType === 'regular' && buttonText}
           </MenuButton>
-          <MenuList zIndex={15} padding={0} {...menuListProps}>
+          <MenuList
+            zIndex={15}
+            padding={0}
+            borderRadius="0.5rem"
+            backgroundColor="var(--background-color-secondary)"
+            color="var(--text-color-secondary)"
+            borderColor="var(--border-color)"
+            {...menuListProps}
+          >
             {renderMenuItems()}
           </MenuList>
         </>

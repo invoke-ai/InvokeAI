@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { ButtonGroup, Flex, FlexProps, Link, useToast } from '@chakra-ui/react';
+import { ButtonGroup, Link, useToast } from '@chakra-ui/react';
 import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -102,13 +102,11 @@ const currentImageButtonsSelector = createSelector(
   }
 );
 
-type CurrentImageButtonsProps = FlexProps;
-
 /**
  * Row of buttons for common actions:
  * Use as init image, use all params, use seed, upscale, fix faces, details, delete.
  */
-const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
+const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const {
     isProcessing,
@@ -397,14 +395,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   return (
-    <Flex
-      sx={{
-        justifyContent: 'center',
-        alignItems: 'center',
-        columnGap: '0.5em',
-      }}
-      {...props}
-    >
+    <div className="current-image-options">
       <ButtonGroup isAttached={true}>
         <IAIPopover
           trigger="hover"
@@ -415,13 +406,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             />
           }
         >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              rowGap: 2,
-              w: 52,
-            }}
-          >
+          <div className="current-image-send-to-popover">
             <IAIButton
               size="sm"
               onClick={handleClickUseAsInitialImage}
@@ -457,7 +442,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.downloadImage')}
               </IAIButton>
             </Link>
-          </Flex>
+          </div>
         </IAIPopover>
         <IAIIconButton
           icon={<FaExpand />}
@@ -471,7 +456,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               ? `${t('parameters.openInViewer')} (Z)`
               : `${t('parameters.closeViewer')} (Z)`
           }
-          isChecked={isLightboxOpen}
+          data-selected={isLightboxOpen}
           onClick={handleLightBox}
         />
       </ButtonGroup>
@@ -516,12 +501,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             />
           }
         >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              rowGap: 4,
-            }}
-          >
+          <div className="current-image-postprocessing-popover">
             <FaceRestoreSettings />
             <IAIButton
               isDisabled={
@@ -534,7 +514,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             >
               {t('parameters.restoreFaces')}
             </IAIButton>
-          </Flex>
+          </div>
         </IAIPopover>
 
         <IAIPopover
@@ -546,12 +526,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             />
           }
         >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
+          <div className="current-image-postprocessing-popover">
             <UpscaleSettings />
             <IAIButton
               isDisabled={
@@ -564,7 +539,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             >
               {t('parameters.upscaleImage')}
             </IAIButton>
-          </Flex>
+          </div>
         </IAIPopover>
       </ButtonGroup>
 
@@ -573,7 +548,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           icon={<FaCode />}
           tooltip={`${t('parameters.info')} (I)`}
           aria-label={`${t('parameters.info')} (I)`}
-          isChecked={shouldShowImageDetails}
+          data-selected={shouldShowImageDetails}
           onClick={handleClickShowImageDetails}
         />
       </ButtonGroup>
@@ -584,10 +559,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           tooltip={`${t('parameters.deleteImage')} (Del)`}
           aria-label={`${t('parameters.deleteImage')} (Del)`}
           isDisabled={!currentImage || !isConnected || isProcessing}
-          colorScheme="error"
+          style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />
       </DeleteImageModal>
-    </Flex>
+    </div>
   );
 };
 

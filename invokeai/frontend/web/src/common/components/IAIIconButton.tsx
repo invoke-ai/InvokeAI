@@ -7,13 +7,22 @@ import {
 } from '@chakra-ui/react';
 
 export type IAIIconButtonProps = IconButtonProps & {
+  styleClass?: string;
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
+  asCheckbox?: boolean;
   isChecked?: boolean;
 };
 
 const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
-  const { tooltip = '', tooltipProps, isChecked, ...rest } = props;
+  const {
+    tooltip = '',
+    styleClass,
+    tooltipProps,
+    asCheckbox,
+    isChecked,
+    ...rest
+  } = props;
 
   return (
     <Tooltip
@@ -26,7 +35,13 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
     >
       <IconButton
         ref={forwardedRef}
-        aria-checked={isChecked !== undefined ? isChecked : undefined}
+        className={
+          styleClass
+            ? `invokeai__icon-button ${styleClass}`
+            : `invokeai__icon-button`
+        }
+        data-as-checkbox={asCheckbox}
+        data-selected={isChecked !== undefined ? isChecked : undefined}
         {...rest}
       />
     </Tooltip>

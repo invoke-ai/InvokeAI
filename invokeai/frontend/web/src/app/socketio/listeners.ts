@@ -392,7 +392,7 @@ const makeSocketIOListeners = (
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
           message: `${i18n.t(
-            'modelManager.modelAdded'
+            'modelmanager:modelAdded'
           )}: ${deleted_model_name}`,
           level: 'info',
         })
@@ -400,7 +400,7 @@ const makeSocketIOListeners = (
       dispatch(
         addToast({
           title: `${i18n.t(
-            'modelManager.modelEntryDeleted'
+            'modelmanager:modelEntryDeleted'
           )}: ${deleted_model_name}`,
           status: 'success',
           duration: 2500,
@@ -424,7 +424,7 @@ const makeSocketIOListeners = (
       dispatch(
         addToast({
           title: `${i18n.t(
-            'modelManager.modelConverted'
+            'modelmanager:modelConverted'
           )}: ${converted_model_name}`,
           status: 'success',
           duration: 2500,

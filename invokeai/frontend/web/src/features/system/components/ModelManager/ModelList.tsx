@@ -1,4 +1,4 @@
-import { Box, Flex, Heading, Spacer, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, Spinner, Text } from '@chakra-ui/react';
 import IAIInput from 'common/components/IAIInput';
 import IAIButton from 'common/components/IAIButton';
 
@@ -45,10 +45,9 @@ function ModelFilterButton({
     <IAIButton
       onClick={onClick}
       isActive={isActive}
-      sx={{
-        _active: {
-          bg: 'accent.750',
-        },
+      _active={{
+        backgroundColor: 'var(--accent-color)',
+        _hover: { backgroundColor: 'var(--accent-color)' },
       }}
       size="sm"
     >
@@ -134,27 +133,23 @@ const ModelList = () => {
 
     return searchText !== '' ? (
       isSelectedFilter === 'all' ? (
-        <Box marginTop={4}>{filteredModelListItemsToRender}</Box>
+        <Box marginTop="1rem">{filteredModelListItemsToRender}</Box>
       ) : (
-        <Box marginTop={4}>{localFilteredModelListItemsToRender}</Box>
+        <Box marginTop="1rem">{localFilteredModelListItemsToRender}</Box>
       )
     ) : (
-      <Flex flexDirection="column" rowGap={6}>
+      <Flex flexDirection="column" rowGap="1.5rem">
         {isSelectedFilter === 'all' && (
           <>
             <Box>
               <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  my: 4,
-                  mx: 0,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
+                fontWeight="bold"
+                backgroundColor="var(--background-color)"
+                padding="0.5rem 1rem"
+                borderRadius="0.5rem"
+                margin="1rem 0"
+                width="max-content"
+                fontSize="14"
               >
                 {t('modelManager.checkpointModels')}
               </Text>
@@ -162,16 +157,13 @@ const ModelList = () => {
             </Box>
             <Box>
               <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  mb: 4,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
+                fontWeight="bold"
+                backgroundColor="var(--background-color)"
+                padding="0.5rem 1rem"
+                borderRadius="0.5rem"
+                marginBottom="0.5rem"
+                width="max-content"
+                fontSize="14"
               >
                 {t('modelManager.diffusersModels')}
               </Text>
@@ -181,13 +173,13 @@ const ModelList = () => {
         )}
 
         {isSelectedFilter === 'ckpt' && (
-          <Flex flexDirection="column" marginTop={4}>
+          <Flex flexDirection="column" marginTop="1rem">
             {ckptModelListItemsToRender}
           </Flex>
         )}
 
         {isSelectedFilter === 'diffusers' && (
-          <Flex flexDirection="column" marginTop={4}>
+          <Flex flexDirection="column" marginTop="1rem">
             {diffusersModelListItemsToRender}
           </Flex>
         )}
@@ -196,12 +188,15 @@ const ModelList = () => {
   }, [models, searchText, t, isSelectedFilter]);
 
   return (
-    <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
-      <Flex justifyContent="space-between" alignItems="center" gap={2}>
-        <Heading size="md">{t('modelManager.availableModels')}</Heading>
-        <Spacer />
-        <AddModel />
-        <MergeModels />
+    <Flex flexDirection="column" rowGap="2rem" width="50%" minWidth="50%">
+      <Flex justifyContent="space-between">
+        <Text fontSize="1.4rem" fontWeight="bold">
+          {t('modelManager.availableModels')}
+        </Text>
+        <Flex gap={2}>
+          <AddModel />
+          <MergeModels />
+        </Flex>
       </Flex>
 
       <IAIInput
@@ -212,11 +207,11 @@ const ModelList = () => {
       <Flex
         flexDirection="column"
         gap={1}
-        maxHeight={window.innerHeight - 240}
+        maxHeight={window.innerHeight - 360}
         overflow="scroll"
-        paddingInlineEnd={4}
+        paddingRight="1rem"
       >
-        <Flex columnGap={2}>
+        <Flex columnGap="0.5rem">
           <ModelFilterButton
             label={t('modelManager.allModels')}
             onClick={() => setIsSelectedFilter('all')}
@@ -239,7 +234,7 @@ const ModelList = () => {
         ) : (
           <Flex
             width="100%"
-            minHeight={96}
+            minHeight="30rem"
             justifyContent="center"
             alignItems="center"
           >

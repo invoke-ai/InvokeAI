@@ -1,8 +1,10 @@
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
+import SubItemHook from 'common/components/SubItemHook';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import {
   setHiresFix,
@@ -22,7 +24,7 @@ const hiresStrengthSelector = createSelector(
   }
 );
 
-export const HiresStrength = () => {
+const HiresStrength = () => {
   const { hiresFix, hiresStrength } = useAppSelector(hiresStrengthSelector);
 
   const dispatch = useAppDispatch();
@@ -38,30 +40,34 @@ export const HiresStrength = () => {
   };
 
   return (
-    <IAISlider
-      label={t('parameters.hiresStrength')}
-      step={0.01}
-      min={0.01}
-      max={0.99}
-      onChange={handleHiresStrength}
-      value={hiresStrength}
-      isInteger={false}
-      withInput
-      withSliderMarks
-      // inputWidth={22}
-      withReset
-      handleReset={handleHiResStrengthReset}
-      isSliderDisabled={!hiresFix}
-      isInputDisabled={!hiresFix}
-      isResetDisabled={!hiresFix}
-    />
+    <Flex>
+      <SubItemHook active={hiresFix} />
+      <IAISlider
+        label={t('parameters.hiresStrength')}
+        step={0.01}
+        min={0.01}
+        max={0.99}
+        onChange={handleHiresStrength}
+        value={hiresStrength}
+        isInteger={false}
+        withInput
+        withSliderMarks
+        inputWidth={'5.5rem'}
+        withReset
+        handleReset={handleHiResStrengthReset}
+        isSliderDisabled={!hiresFix}
+        isInputDisabled={!hiresFix}
+        isResetDisabled={!hiresFix}
+        sliderMarkRightOffset={-7}
+      />
+    </Flex>
   );
 };
 
 /**
  * Hires Fix Toggle
  */
-export const HiresToggle = () => {
+const HiresSettings = () => {
   const dispatch = useAppDispatch();
 
   const hiresFix = useAppSelector(
@@ -74,11 +80,16 @@ export const HiresToggle = () => {
     dispatch(setHiresFix(e.target.checked));
 
   return (
-    <IAISwitch
-      label={t('parameters.hiresOptim')}
-      fontSize="md"
-      isChecked={hiresFix}
-      onChange={handleChangeHiresFix}
-    />
+    <Flex rowGap="0.8rem" direction={'column'}>
+      <IAISwitch
+        label={t('parameters.hiresOptim')}
+        fontSize="md"
+        isChecked={hiresFix}
+        onChange={handleChangeHiresFix}
+      />
+      <HiresStrength />
+    </Flex>
   );
 };
+
+export default HiresSettings;

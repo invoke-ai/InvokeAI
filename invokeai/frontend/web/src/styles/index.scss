@@ -1,0 +1,93 @@
+// General Imports
+@use 'Fonts';
+@use 'Animations';
+@use 'Misc';
+
+// Themes
+@use './Themes/Colors_Dark';
+@use './Themes/Colors_Light';
+@use './Themes/Colors_Green';
+
+// Component Styles
+
+// app
+@use '../app/App.scss';
+
+// system
+@use '../features/system/components/SiteHeader.scss';
+@use '../features/system/components/StatusIndicator.scss';
+@use '../features/system/components/SettingsModal/SettingsModal.scss';
+@use '../features/system/components/ModelManager/AddModel.scss';
+@use '../features/system/components/HotkeysModal/HotkeysModal.scss';
+@use '../features/system/components/Console.scss';
+@use '../features/system/components/ProgressBar.scss';
+
+// parameters
+@use '../features/parameters/components/PromptInput/PromptInput.scss';
+@use '../features/parameters/components/ProcessButtons/ProcessButtons.scss';
+@use '../features/parameters/components/MainParameters/MainParameters.scss';
+@use '../features/parameters/components/AccordionItems/AdvancedSettings.scss';
+@use '../features/parameters/components/AdvancedParameters/Canvas/BoundingBox/BoundingBoxSettings.scss';
+
+// gallery
+@use '../features/gallery/components/CurrentImageDisplay.scss';
+@use '../features/gallery/components/CurrentImageButtons.scss';
+@use '../features/gallery/components/ImageGallery.scss';
+@use '../features/gallery/components/HoverableImage.scss';
+@use '../features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer.scss';
+
+// Lightbox
+@use '../features/lightbox/components/Lightbox.scss';
+
+// Tabs
+@use '../features/ui/components/InvokeTabs.scss';
+@use '../features/ui/components/InvokeWorkarea.scss';
+@use '../features/ui/components/InvokeParametersPanel.scss';
+@use '../features/ui/components/TextToImage/TextToImage.scss';
+@use '../features/ui/components/ImageToImage/ImageToImage.scss';
+@use '../features/ui/components/FloatingButton.scss';
+@use '../features/ui/components/UnifiedCanvas/CanvasWorkarea.scss';
+
+// Component Shared
+@use '../common/components/IAINumberInput.scss';
+@use '../common/components/IAIInput.scss';
+@use '../common/components/IAIIconButton.scss';
+@use '../common/components/IAIButton.scss';
+@use '../common/components/IAISwitch.scss';
+@use '../common/components/IAISelect.scss';
+@use '../common/components/IAISlider.scss';
+@use '../common/components/IAICheckbox.scss';
+@use '../common/components/IAIPopover.scss';
+@use '../common/components/IAIColorPicker.scss';
+@use '../common/components/ImageUploader.scss';
+@use '../common/components/WorkInProgress/WorkInProgress.scss';
+@use '../common/components/GuidePopover.scss';
+
+// Component Shared - Radix UI
+// @use 'common/components/radix-ui/IAISlider.scss';
+// @use 'common/components/radix-ui/IAITooltip.scss';
+
+// Shared Styles
+@use './Mixins/' as *;
+@use '../features/system/components/Modal.scss';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  @include HideScrollbar;
+  background-color: var(--root-bg-color);
+  overflow: hidden;
+}
+
+#root {
+  background-color: var(--root-bg-color);
+  color: var(--text-color);
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+}

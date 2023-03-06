@@ -1,20 +1,12 @@
-import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
 
 const TextToImageDisplay = () => {
   return (
-    <Box
-      sx={{
-        width: '100%',
-        height: '100%',
-        borderRadius: 'base',
-        bg: 'base.850',
-      }}
-    >
-      <Flex sx={{ p: 4, width: '100%', height: '100%' }}>
+    <div className="workarea-single-view">
+      <div className="text-to-image-area">
         <CurrentImageDisplay />
-      </Flex>
-    </Box>
+      </div>
+    </div>
   );
 };
 

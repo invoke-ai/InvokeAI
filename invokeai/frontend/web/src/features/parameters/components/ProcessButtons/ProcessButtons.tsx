@@ -1,4 +1,3 @@
-import { Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import CancelButton from './CancelButton';
@@ -12,11 +11,11 @@ const ProcessButtons = () => {
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   return (
-    <Flex gap={2}>
+    <div className="process-buttons">
       <InvokeButton />
       {activeTabName === 'img2img' && <LoopbackButton />}
       <CancelButton />
-    </Flex>
+    </div>
   );
 };
 

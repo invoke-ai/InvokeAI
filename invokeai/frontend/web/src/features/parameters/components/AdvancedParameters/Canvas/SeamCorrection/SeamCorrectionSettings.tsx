@@ -1,4 +1,4 @@
-import { VStack } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import SeamBlur from './SeamBlur';
 import SeamSize from './SeamSize';
 import SeamSteps from './SeamSteps';
@@ -6,12 +6,12 @@ import SeamStrength from './SeamStrength';
 
 const SeamCorrectionSettings = () => {
   return (
-    <VStack gap={2} alignItems="stretch">
+    <Flex direction="column" gap={2}>
       <SeamSize />
       <SeamBlur />
       <SeamStrength />
       <SeamSteps />
-    </VStack>
+    </Flex>
   );
 };
 

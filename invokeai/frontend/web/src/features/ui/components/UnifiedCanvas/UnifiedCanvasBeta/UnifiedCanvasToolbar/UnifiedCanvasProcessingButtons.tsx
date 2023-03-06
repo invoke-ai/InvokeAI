@@ -25,7 +25,7 @@ export default function UnifiedCanvasProcessingButtons() {
   };
 
   return (
-    <Flex flexDirection="column" gap={2}>
+    <Flex flexDirection="column" gap="0.5rem">
       <IAIIconButton
         tooltip={`${t('parameters.showOptionsPanel')} (O)`}
         tooltipProps={{ placement: 'top' }}

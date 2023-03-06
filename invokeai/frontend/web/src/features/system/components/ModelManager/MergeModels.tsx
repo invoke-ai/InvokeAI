@@ -1,10 +1,8 @@
 import {
   Flex,
   Modal,
-  ModalBody,
   ModalCloseButton,
   ModalContent,
-  ModalFooter,
   ModalHeader,
   ModalOverlay,
   Radio,
@@ -59,19 +57,19 @@ export default function MergeModels() {
 
   const [modelMergeForce, setModelMergeForce] = useState<boolean>(false);
 
-  const modelOneList = Object.keys(diffusersModels).filter(
-    (model) => model !== modelTwo && model !== modelThree
-  );
+  const modelOneList = Object.keys(diffusersModels).filter((model) => {
+    if (model !== modelTwo && model !== modelThree) return model;
+  });
 
-  const modelTwoList = Object.keys(diffusersModels).filter(
-    (model) => model !== modelOne && model !== modelThree
-  );
+  const modelTwoList = Object.keys(diffusersModels).filter((model) => {
+    if (model !== modelOne && model !== modelThree) return model;
+  });
 
   const modelThreeList = [
-    { key: t('modelManager.none'), value: 'none' },
-    ...Object.keys(diffusersModels)
-      .filter((model) => model !== modelOne && model !== modelTwo)
-      .map((model) => ({ key: model, value: model })),
+    'none',
+    ...Object.keys(diffusersModels).filter((model) => {
+      if (model !== modelOne && model !== modelTwo) return model;
+    }),
   ];
 
   const isProcessing = useAppSelector(
@@ -98,8 +96,8 @@ export default function MergeModels() {
 
   return (
     <>
-      <IAIButton onClick={onOpen} size="sm">
-        <Flex columnGap={2} alignItems="center">
+      <IAIButton onClick={onOpen} className="modal-close-btn" size="sm">
+        <Flex columnGap="0.5rem" alignItems="center">
           {t('modelManager.mergeModels')}
         </Flex>
       </IAIButton>
@@ -111,201 +109,183 @@ export default function MergeModels() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent fontFamily="Inter" margin="auto" paddingInlineEnd={4}>
+        <ModalContent className="modal" fontFamily="Inter" margin="auto">
           <ModalHeader>{t('modelManager.mergeModels')}</ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
-            <Flex flexDirection="column" rowGap={4}>
-              <Flex
-                sx={{
-                  flexDirection: 'column',
-                  marginBottom: 4,
-                  padding: 4,
-                  borderRadius: 'base',
-                  rowGap: 1,
-                  bg: 'base.900',
-                }}
-              >
-                <Text>{t('modelManager.modelMergeHeaderHelp1')}</Text>
-                <Text fontSize="sm" variant="subtext">
-                  {t('modelManager.modelMergeHeaderHelp2')}
-                </Text>
-              </Flex>
-              <Flex columnGap={4}>
-                <IAISelect
-                  label={t('modelManager.modelOne')}
-                  validValues={modelOneList}
-                  onChange={(e) => setModelOne(e.target.value)}
-                />
-                <IAISelect
-                  label={t('modelManager.modelTwo')}
-                  validValues={modelTwoList}
-                  onChange={(e) => setModelTwo(e.target.value)}
-                />
-                <IAISelect
-                  label={t('modelManager.modelThree')}
-                  validValues={modelThreeList}
-                  onChange={(e) => {
-                    if (e.target.value !== 'none') {
-                      setModelThree(e.target.value);
-                      setModelMergeInterp('add_difference');
-                    } else {
-                      setModelThree('none');
-                      setModelMergeInterp('weighted_sum');
-                    }
-                  }}
-                />
-              </Flex>
-
-              <IAIInput
-                label={t('modelManager.mergedModelName')}
-                value={mergedModelName}
-                onChange={(e) => setMergedModelName(e.target.value)}
+          <Flex flexDirection="column" padding="1rem" rowGap={4}>
+            <Flex
+              flexDirection="column"
+              marginBottom="1rem"
+              padding="1rem"
+              borderRadius="0.3rem"
+              backgroundColor="var(--background-color)"
+              rowGap={1}
+            >
+              <Text>{t('modelManager.modelMergeHeaderHelp1')}</Text>
+              <Text fontSize="0.9rem" color="var(--text-color-secondary)">
+                {t('modelManager.modelMergeHeaderHelp2')}
+              </Text>
+            </Flex>
+            <Flex columnGap={4}>
+              <IAISelect
+                label={t('modelManager.modelOne')}
+                validValues={modelOneList}
+                onChange={(e) => setModelOne(e.target.value)}
               />
-
-              <Flex
-                sx={{
-                  flexDirection: 'column',
-                  padding: 4,
-                  borderRadius: 'base',
-                  gap: 4,
-                  bg: 'base.900',
+              <IAISelect
+                label={t('modelManager.modelTwo')}
+                validValues={modelTwoList}
+                onChange={(e) => setModelTwo(e.target.value)}
+              />
+              <IAISelect
+                label={t('modelManager.modelThree')}
+                validValues={modelThreeList}
+                onChange={(e) => {
+                  if (e.target.value !== 'none') {
+                    setModelThree(e.target.value);
+                    setModelMergeInterp('add_difference');
+                  } else {
+                    setModelThree('none');
+                    setModelMergeInterp('weighted_sum');
+                  }
                 }}
-              >
-                <IAISlider
-                  label={t('modelManager.alpha')}
-                  min={0.01}
-                  max={0.99}
-                  step={0.01}
-                  value={modelMergeAlpha}
-                  onChange={(v) => setModelMergeAlpha(v)}
-                  withInput
-                  withReset
-                  handleReset={() => setModelMergeAlpha(0.5)}
-                  withSliderMarks
-                />
-                <Text variant="subtext" fontSize="sm">
-                  {t('modelManager.modelMergeAlphaHelp')}
-                </Text>
-              </Flex>
+              />
+            </Flex>
 
-              <Flex
-                sx={{
-                  padding: 4,
-                  borderRadius: 'base',
-                  gap: 4,
-                  bg: 'base.900',
-                }}
+            <IAIInput
+              label={t('modelManager.mergedModelName')}
+              value={mergedModelName}
+              onChange={(e) => setMergedModelName(e.target.value)}
+            />
+
+            <Flex
+              flexDir="column"
+              backgroundColor="var(--background-color)"
+              padding="1rem 1rem"
+              borderRadius="0.2rem"
+              rowGap={2}
+            >
+              <IAISlider
+                label={t('modelManager.alpha')}
+                min={0.01}
+                max={0.99}
+                step={0.01}
+                value={modelMergeAlpha}
+                onChange={(v) => setModelMergeAlpha(v)}
+                withInput
+                withReset
+                handleReset={() => setModelMergeAlpha(0.5)}
+                withSliderMarks
+                sliderMarkRightOffset={-7}
+              />
+              <Text fontSize="0.9rem" color="var(--text-color-secondary)">
+                {t('modelManager.modelMergeAlphaHelp')}
+              </Text>
+            </Flex>
+
+            <Flex
+              columnGap={4}
+              backgroundColor="var(--background-color)"
+              padding="1rem 1rem"
+              borderRadius="0.2rem"
+            >
+              <Text
+                fontWeight="bold"
+                fontSize="0.9rem"
+                color="var(--text-color-secondary)"
               >
-                <Text fontWeight={500} fontSize="sm" variant="subtext">
-                  {t('modelManager.interpolationType')}
+                {t('modelManager.interpolationType')}
+              </Text>
+              <RadioGroup
+                value={modelMergeInterp}
+                onChange={(
+                  v:
+                    | 'weighted_sum'
+                    | 'sigmoid'
+                    | 'inv_sigmoid'
+                    | 'add_difference'
+                ) => setModelMergeInterp(v)}
+              >
+                <Flex columnGap={4}>
+                  {modelThree === 'none' ? (
+                    <>
+                      <Radio value="weighted_sum">weighted_sum</Radio>
+                      <Radio value="sigmoid">sigmoid</Radio>
+                      <Radio value="inv_sigmoid">inv_sigmoid</Radio>
+                    </>
+                  ) : (
+                    <Radio value="add_difference">
+                      <Tooltip
+                        label={t(
+                          'modelmanager:modelMergeInterpAddDifferenceHelp'
+                        )}
+                      >
+                        add_difference
+                      </Tooltip>
+                    </Radio>
+                  )}
+                </Flex>
+              </RadioGroup>
+            </Flex>
+
+            <Flex
+              gap={4}
+              flexDirection="column"
+              backgroundColor="var(--background-color)"
+              padding="1rem 1rem"
+              borderRadius="0.2rem"
+            >
+              <Flex columnGap={4}>
+                <Text
+                  fontWeight="bold"
+                  fontSize="0.9rem"
+                  color="var(--text-color-secondary)"
+                >
+                  {t('modelManager.mergedModelSaveLocation')}
                 </Text>
                 <RadioGroup
-                  value={modelMergeInterp}
-                  onChange={(
-                    v:
-                      | 'weighted_sum'
-                      | 'sigmoid'
-                      | 'inv_sigmoid'
-                      | 'add_difference'
-                  ) => setModelMergeInterp(v)}
+                  value={modelMergeSaveLocType}
+                  onChange={(v: 'root' | 'custom') =>
+                    setModelMergeSaveLocType(v)
+                  }
                 >
                   <Flex columnGap={4}>
-                    {modelThree === 'none' ? (
-                      <>
-                        <Radio value="weighted_sum">
-                          <Text fontSize="sm">
-                            {t('modelManager.weightedSum')}
-                          </Text>
-                        </Radio>
-                        <Radio value="sigmoid">
-                          <Text fontSize="sm">{t('modelManager.sigmoid')}</Text>
-                        </Radio>
-                        <Radio value="inv_sigmoid">
-                          <Text fontSize="sm">
-                            {t('modelManager.inverseSigmoid')}
-                          </Text>
-                        </Radio>
-                      </>
-                    ) : (
-                      <Radio value="add_difference">
-                        <Tooltip
-                          label={t(
-                            'modelManager.modelMergeInterpAddDifferenceHelp'
-                          )}
-                        >
-                          <Text fontSize="sm">
-                            {t('modelManager.addDifference')}
-                          </Text>
-                        </Tooltip>
-                      </Radio>
-                    )}
+                    <Radio value="root">
+                      {t('modelManager.invokeAIFolder')}
+                    </Radio>
+                    <Radio value="custom">{t('modelManager.custom')}</Radio>
                   </Flex>
                 </RadioGroup>
               </Flex>
 
-              <Flex
-                sx={{
-                  flexDirection: 'column',
-                  padding: 4,
-                  borderRadius: 'base',
-                  gap: 4,
-                  bg: 'base.900',
-                }}
-              >
-                <Flex columnGap={4}>
-                  <Text fontWeight="500" fontSize="sm" variant="subtext">
-                    {t('modelManager.mergedModelSaveLocation')}
-                  </Text>
-                  <RadioGroup
-                    value={modelMergeSaveLocType}
-                    onChange={(v: 'root' | 'custom') =>
-                      setModelMergeSaveLocType(v)
-                    }
-                  >
-                    <Flex columnGap={4}>
-                      <Radio value="root">
-                        <Text fontSize="sm">
-                          {t('modelManager.invokeAIFolder')}
-                        </Text>
-                      </Radio>
-
-                      <Radio value="custom">
-                        <Text fontSize="sm">{t('modelManager.custom')}</Text>
-                      </Radio>
-                    </Flex>
-                  </RadioGroup>
-                </Flex>
-
-                {modelMergeSaveLocType === 'custom' && (
-                  <IAIInput
-                    label={t('modelManager.mergedModelCustomSaveLocation')}
-                    value={modelMergeCustomSaveLoc}
-                    onChange={(e) => setModelMergeCustomSaveLoc(e.target.value)}
-                  />
-                )}
-              </Flex>
-
-              <IAICheckbox
-                label={t('modelManager.ignoreMismatch')}
-                isChecked={modelMergeForce}
-                onChange={(e) => setModelMergeForce(e.target.checked)}
-                fontWeight="500"
-              />
-
-              <IAIButton
-                onClick={mergeModelsHandler}
-                isLoading={isProcessing}
-                isDisabled={
-                  modelMergeSaveLocType === 'custom' &&
-                  modelMergeCustomSaveLoc === ''
-                }
-              >
-                {t('modelManager.merge')}
-              </IAIButton>
+              {modelMergeSaveLocType === 'custom' && (
+                <IAIInput
+                  label={t('modelManager.mergedModelCustomSaveLocation')}
+                  value={modelMergeCustomSaveLoc}
+                  onChange={(e) => setModelMergeCustomSaveLoc(e.target.value)}
+                />
+              )}
             </Flex>
-          </ModalBody>
-          <ModalFooter />
+
+            <IAICheckbox
+              label={t('modelManager.ignoreMismatch')}
+              isChecked={modelMergeForce}
+              onChange={(e) => setModelMergeForce(e.target.checked)}
+              fontWeight="bold"
+            />
+
+            <IAIButton
+              onClick={mergeModelsHandler}
+              isLoading={isProcessing}
+              isDisabled={
+                modelMergeSaveLocType === 'custom' &&
+                modelMergeCustomSaveLoc === ''
+              }
+              className="modal modal-close-btn"
+            >
+              {t('modelManager.merge')}
+            </IAIButton>
+          </Flex>
         </ModalContent>
       </Modal>
     </>

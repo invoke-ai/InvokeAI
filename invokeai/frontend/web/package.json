@@ -5,44 +5,28 @@
   "scripts": {
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "vite dev",
-    "build": "npm run lint && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint:madge": "madge --circular src/main.tsx",
-    "lint:eslint": "eslint --max-warnings=0",
-    "lint:prettier": "prettier --check .",
-    "lint:tsc": "tsc --noEmit",
-    "lint": "npm run lint:eslint && npm run lint:prettier && npm run lint:tsc && npm run lint:madge",
-    "fix": "eslint --fix . && prettier --loglevel warn --write . && tsc --noEmit",
+    "madge": "madge --circular src/main.tsx",
+    "lint": "eslint --fix .",
     "lint-staged": "lint-staged",
-    "postinstall": "patch-package && yarn run theme",
-    "theme": "chakra-cli tokens src/theme/theme.ts",
-    "theme:watch": "chakra-cli tokens src/theme/theme.ts --watch"
-  },
-  "madge": {
-    "detectiveOptions": {
-      "ts": {
-        "skipTypeImports": true
-      },
-      "tsx": {
-        "skipTypeImports": true
-      }
-    }
-  },
-  "lint-staged": {
-    "**/*.{js,jsx,ts,tsx,cjs,json,html,scss}": [
-      "prettier --write",
-      "eslint --fix"
-    ]
+    "prettier": "prettier *.{json,js,ts,html} public/locales/*.json src/**/*.{ts,tsx,scss} --write --loglevel warn .",
+    "fmt": "npm run prettier -- --write",
+    "postinstall": "patch-package"
   },
   "dependencies": {
-    "@chakra-ui/anatomy": "^2.1.1",
     "@chakra-ui/icons": "^2.0.17",
     "@chakra-ui/react": "^2.5.1",
-    "@chakra-ui/theme-tools": "^2.0.16",
+    "@emotion/cache": "^11.10.5",
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
+    "@radix-ui/react-context-menu": "^2.1.1",
+    "@radix-ui/react-slider": "^1.1.0",
+    "@radix-ui/react-tooltip": "^1.0.3",
     "@reduxjs/toolkit": "^1.9.2",
-    "chakra-ui-contextmenu": "^1.0.5",
+    "@types/uuid": "^9.0.0",
+    "@vitejs/plugin-react-swc": "^3.2.0",
+    "add": "^2.0.6",
     "dateformat": "^5.0.3",
     "formik": "^2.2.9",
     "framer-motion": "^9.0.4",
@@ -66,21 +50,19 @@
     "react-zoom-pan-pinch": "^2.6.1",
     "redux-deep-persist": "^1.0.7",
     "redux-persist": "^6.0.0",
+    "socket.io": "^4.6.0",
     "socket.io-client": "^4.6.0",
     "use-image": "^1.1.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "yarn": "^1.22.19"
   },
   "devDependencies": {
-    "@chakra-ui/cli": "^2.3.0",
-    "@fontsource/inter": "^4.5.15",
     "@types/dateformat": "^5.0.0",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@types/react-transition-group": "^4.4.5",
-    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.52.0",
     "@typescript-eslint/parser": "^5.52.0",
-    "@vitejs/plugin-react-swc": "^3.2.0",
     "babel-plugin-transform-imports": "^2.0.0",
     "eslint": "^8.34.0",
     "eslint-config-prettier": "^8.6.0",
@@ -94,10 +76,26 @@
     "postinstall-postinstall": "^2.1.0",
     "prettier": "^2.8.4",
     "rollup-plugin-visualizer": "^5.9.0",
+    "sass": "^1.58.3",
     "terser": "^5.16.4",
     "vite": "^4.1.2",
     "vite-plugin-eslint": "^1.8.1",
-    "vite-tsconfig-paths": "^4.0.5",
-    "yarn": "^1.22.19"
+    "vite-tsconfig-paths": "^4.0.5"
+  },
+  "madge": {
+    "detectiveOptions": {
+      "ts": {
+        "skipTypeImports": true
+      },
+      "tsx": {
+        "skipTypeImports": true
+      }
+    }
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx,cjs,json,html,scss}": [
+      "npm run prettier",
+      "npm run lint"
+    ]
   }
 }

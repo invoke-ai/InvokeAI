@@ -4,7 +4,6 @@ import * as InvokeAI from 'app/invokeai';
 import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
-import { clamp } from 'lodash';
 
 export interface GenerationState {
   cfgScale: number;
@@ -34,8 +33,8 @@ export interface GenerationState {
   variationAmount: number;
   width: number;
   shouldUseSymmetry: boolean;
-  horizontalSymmetrySteps: number;
-  verticalSymmetrySteps: number;
+  horizontalSymmetryTimePercentage: number;
+  verticalSymmetryTimePercentage: number;
 }
 
 const initialGenerationState: GenerationState = {
@@ -65,8 +64,8 @@ const initialGenerationState: GenerationState = {
   variationAmount: 0.1,
   width: 512,
   shouldUseSymmetry: false,
-  horizontalSymmetrySteps: 0,
-  verticalSymmetrySteps: 0,
+  horizontalSymmetryTimePercentage: 0,
+  verticalSymmetryTimePercentage: 0,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -99,18 +98,6 @@ export const generationSlice = createSlice({
     },
     setSteps: (state, action: PayloadAction<number>) => {
       state.steps = action.payload;
-    },
-    clampSymmetrySteps: (state) => {
-      state.horizontalSymmetrySteps = clamp(
-        state.horizontalSymmetrySteps,
-        0,
-        state.steps
-      );
-      state.verticalSymmetrySteps = clamp(
-        state.verticalSymmetrySteps,
-        0,
-        state.steps
-      );
     },
     setCfgScale: (state, action: PayloadAction<number>) => {
       state.cfgScale = action.payload;
@@ -187,7 +174,7 @@ export const generationSlice = createSlice({
         threshold,
         perlin,
         seamless,
-        _hires_fix,
+        hires_fix,
         width,
         height,
       } = action.payload.image;
@@ -250,7 +237,7 @@ export const generationSlice = createSlice({
         threshold,
         perlin,
         seamless,
-        _hires_fix,
+        hires_fix,
         width,
         height,
         strength,
@@ -347,17 +334,22 @@ export const generationSlice = createSlice({
     setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSymmetry = action.payload;
     },
-    setHorizontalSymmetrySteps: (state, action: PayloadAction<number>) => {
-      state.horizontalSymmetrySteps = action.payload;
+    setHorizontalSymmetryTimePercentage: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.horizontalSymmetryTimePercentage = action.payload;
     },
-    setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
-      state.verticalSymmetrySteps = action.payload;
+    setVerticalSymmetryTimePercentage: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.verticalSymmetryTimePercentage = action.payload;
     },
   },
 });
 
 export const {
-  clampSymmetrySteps,
   clearInitialImage,
   resetParametersState,
   resetSeed,
@@ -392,8 +384,8 @@ export const {
   setVariationAmount,
   setWidth,
   setShouldUseSymmetry,
-  setHorizontalSymmetrySteps,
-  setVerticalSymmetrySteps,
+  setHorizontalSymmetryTimePercentage,
+  setVerticalSymmetryTimePercentage,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

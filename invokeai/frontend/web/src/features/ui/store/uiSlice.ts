@@ -10,6 +10,7 @@ const initialtabsState: UIState = {
   shouldHoldParametersPanelOpen: false,
   shouldPinParametersPanel: true,
   shouldShowParametersPanel: true,
+  shouldShowDualDisplay: true,
   shouldShowImageDetails: false,
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
@@ -51,6 +52,9 @@ export const uiSlice = createSlice({
     ) => {
       state.shouldHoldParametersPanelOpen = action.payload;
     },
+    setShouldShowDualDisplay: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowDualDisplay = action.payload;
+    },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
     },
@@ -79,6 +83,7 @@ export const {
   setShouldHoldParametersPanelOpen,
   setShouldPinParametersPanel,
   setShouldShowParametersPanel,
+  setShouldShowDualDisplay,
   setShouldShowImageDetails,
   setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,

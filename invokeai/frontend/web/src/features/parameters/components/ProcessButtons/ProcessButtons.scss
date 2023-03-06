@@ -1,0 +1,56 @@
+@use '../../../../styles/Mixins/' as *;
+
+.process-buttons {
+  display: flex;
+  column-gap: 0.5rem;
+}
+
+.invoke-btn {
+  flex-grow: 1;
+  width: 100%;
+
+  @include Button(
+    $btn-color: var(--accent-color),
+    $btn-color-hover: var(--accent-color-hover),
+    $icon-size: 16px
+  );
+}
+
+.cancel-btn {
+  @include Button(
+    $btn-color: var(--destructive-color),
+    $btn-color-hover: var(--destructive-color-hover),
+    $btn-width: 3rem
+  );
+}
+
+.loopback-btn {
+  &[data-as-checkbox='true'] {
+    background-color: var(--btn-btn-base-color);
+    border: 3px solid var(--btn-btn-base-color);
+    svg {
+      fill: var(--text-color);
+    }
+    &:hover {
+      background-color: var(--btn-btn-base-color);
+      border-color: var(--btn-checkbox-border-hover);
+      svg {
+        fill: var(--text-color);
+      }
+    }
+    &[data-selected='true'] {
+      border-color: var(--accent-color);
+      background-color: var(--btn-btn-base-color);
+      svg {
+        fill: var(--text-color);
+      }
+      &:hover {
+        border-color: var(--accent-color);
+        background-color: var(--btn-btn-base-color);
+        svg {
+          fill: var(--text-color);
+        }
+      }
+    }
+  }
+}

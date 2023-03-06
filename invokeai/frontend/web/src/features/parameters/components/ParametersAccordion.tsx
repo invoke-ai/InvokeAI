@@ -1,4 +1,4 @@
-import { Accordion } from '@chakra-ui/react';
+import { Accordion, ExpandedIndex } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setOpenAccordions } from 'features/system/store/systemSlice';
@@ -30,7 +30,7 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
   /**
    * Stores accordion state in redux so preferred UI setup is retained.
    */
-  const handleChangeAccordionState = (openAccordions: number | number[]) =>
+  const handleChangeAccordionState = (openAccordions: ExpandedIndex) =>
     dispatch(setOpenAccordions(openAccordions));
 
   const renderAccordions = () => {
@@ -59,6 +59,7 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
       allowMultiple
       reduceMotion
       onChange={handleChangeAccordionState}
+      className="advanced-parameters"
     >
       {renderAccordions()}
     </Accordion>
