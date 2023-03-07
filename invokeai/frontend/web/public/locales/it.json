@@ -361,7 +361,6 @@
         "convertToDiffusersHelpText5": "Assicurati di avere spazio su disco sufficiente. I modelli generalmente variano tra 4 GB e 7 GB di dimensioni.",
         "convertToDiffusersHelpText6": "Vuoi convertire questo modello?",
         "convertToDiffusersSaveLocation": "Ubicazione salvataggio",
-        "v2": "v2",
         "inpainting": "v1 Inpainting",
         "customConfig": "Configurazione personalizzata",
         "statusConverting": "Conversione in corso",
