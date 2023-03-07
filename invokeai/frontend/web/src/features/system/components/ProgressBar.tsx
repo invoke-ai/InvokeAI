@@ -30,6 +30,7 @@ const ProgressBar = () => {
   return (
     <Progress
       value={value}
+      aria-label="Invoking progress bar"
       isIndeterminate={isProcessing && !currentStatusHasSteps}
       height={PROGRESS_BAR_THICKNESS}
       zIndex={99}
