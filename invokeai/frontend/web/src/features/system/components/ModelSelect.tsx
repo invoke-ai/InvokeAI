@@ -38,6 +38,7 @@ const ModelSelect = () => {
     >
       <IAISelect
         style={{ fontSize: 'sm' }}
+        aria-label="Model Select"
         tooltip={activeModel.description}
         isDisabled={isProcessing}
         value={activeModel.name}
