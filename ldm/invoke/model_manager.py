@@ -781,6 +781,7 @@ class ModelManager(object):
         """
         model_path: Path = None
         thing = path_url_or_repo  # to save typing
+        is_temporary = False
 
         print(f">> Probing {thing} for import")
 
@@ -789,7 +790,7 @@ class ModelManager(object):
             model_path = self._resolve_path(
                 thing, "models/ldm/stable-diffusion-v1"
             )  # _resolve_path does a download if needed
-
+            is_temporary = True
         elif Path(thing).is_file() and thing.endswith((".ckpt", ".safetensors")):
             if Path(thing).stem in ["model", "diffusion_pytorch_model"]:
                 print(
@@ -896,6 +897,10 @@ class ModelManager(object):
                 original_config_file=model_config_file,
                 commit_to_conf=commit_to_conf,
             )
+            # in the event that this file was downloaded automatically prior to conversion
+            # we do not keep the original .ckpt/.safetensors around
+            if is_temporary:
+                model_path.unlink(missing_ok=True)
         else:
             model_name = self.import_ckpt_model(
                 model_path,
