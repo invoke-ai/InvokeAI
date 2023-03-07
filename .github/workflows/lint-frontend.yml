@@ -4,9 +4,17 @@ on:
   pull_request:
     paths:
       - 'invokeai/frontend/web/**'
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
   push:
+    branches:
+      - 'main'
     paths:
       - 'invokeai/frontend/web/**'
+  merge_group:
+  workflow_dispatch:
 
 defaults:
   run:
