@@ -1,13 +1,12 @@
 import { sliderAnatomy as parts } from '@chakra-ui/anatomy';
 import { createMultiStyleConfigHelpers, defineStyle } from '@chakra-ui/react';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
 
-const invokeAITrack = defineStyle((props) => {
+const invokeAITrack = defineStyle((_props) => {
   return {
-    bg: mode('base.300', 'base.400')(props),
+    bg: 'base.400',
     h: 1.5,
   };
 });
@@ -15,7 +14,7 @@ const invokeAITrack = defineStyle((props) => {
 const invokeAIFilledTrack = defineStyle((props) => {
   const { colorScheme: c } = props;
   return {
-    bg: mode(`${c}.400`, `${c}.600`)(props),
+    bg: `${c}.600`,
     h: 1.5,
   };
 });
@@ -27,11 +26,11 @@ const invokeAIThumb = defineStyle((_props) => {
   };
 });
 
-const invokeAIMark = defineStyle((props) => {
+const invokeAIMark = defineStyle((_props) => {
   return {
     fontSize: 'xs',
     fontWeight: '500',
-    color: mode('base.800', 'base.200')(props),
+    color: 'base.200',
     mt: 2,
     insetInlineStart: 'unset',
   };

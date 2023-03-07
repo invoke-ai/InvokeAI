@@ -40,15 +40,15 @@ from ..util import CPU_DEVICE, ask_user, download_with_resume
 class SDLegacyType(Enum):
     V1 = 1
     V1_INPAINT = 2
-    V2 = 3
+    V2   = 3
+    V2_e = 4
+    V2_v = 5
     UNKNOWN = 99
-
 
 DEFAULT_MAX_MODELS = 2
 VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
     "vae-ft-mse-840000-ema-pruned": "stabilityai/sd-vae-ft-mse",
 }
-
 
 class ModelManager(object):
     def __init__(
@@ -335,10 +335,23 @@ class ModelManager(object):
 
         tic = time.time()
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model, width, height, model_hash = self._load_diffusers_model(mconfig)
-
+        # this does the work
+        model_format = mconfig.get("format", "ckpt")
+        if model_format == "ckpt":
+            weights = mconfig.weights
+            print(f">> Loading {model_name} from {weights}")
+            model, width, height, model_hash = self._load_ckpt_model(
+                model_name, mconfig
+            )
+        elif model_format == "diffusers":
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model, width, height, model_hash = self._load_diffusers_model(mconfig)
+        else:
+            raise NotImplementedError(
+                f"Unknown model format {model_name}: {model_format}"
+            )
+        
         # usage statistics
         toc = time.time()
         print(">> Model loaded in", "%4.2fs" % (toc - tic))
@@ -369,7 +382,7 @@ class ModelManager(object):
             if vae := self._load_vae(mconfig["vae"]):
                 pipeline_args.update(vae=vae)
         if not isinstance(name_or_path, Path):
-            pipeline_args.update(cache_dir=global_cache_dir("diffusers"))
+            pipeline_args.update(cache_dir=global_cache_dir("hub"))
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{"revision": "fp16"}, {}]
@@ -527,7 +540,7 @@ class ModelManager(object):
         self,
         repo_or_path: Union[str, Path],
         model_name: str = None,
-        model_description: str = None,
+        description: str = None,
         vae: dict = None,
         commit_to_conf: Path = None,
     ) -> bool:
@@ -569,15 +582,24 @@ class ModelManager(object):
         format. Valid return values include:
         SDLegacyType.V1
         SDLegacyType.V1_INPAINT
-        SDLegacyType.V2
+        SDLegacyType.V2     (V2 prediction type unknown)
+        SDLegacyType.V2_e   (V2 using 'epsilon' prediction type)
+        SDLegacyType.V2_v   (V2 using 'v_prediction' prediction type)
         SDLegacyType.UNKNOWN
         """
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-            return SDLegacyType.V2
+        global_step = checkpoint.get('global_step')
+        state_dict = checkpoint.get("state_dict") or checkpoint
 
         try:
-            state_dict = checkpoint.get("state_dict") or checkpoint
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+            if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+                if global_step == 220000:
+                    return SDLegacyType.V2_e
+                elif global_step == 110000:
+                    return SDLegacyType.V2_v
+                else:
+                    return SDLegacyType.V2
+            # otherwise we assume a V1 file
             in_channels = state_dict[
                 "model.diffusion_model.input_blocks.0.0.weight"
             ].shape[1]
@@ -591,12 +613,13 @@ class ModelManager(object):
             return SDLegacyType.UNKNOWN
 
     def heuristic_import(
-        self,
-        path_url_or_repo: str,
-        convert: bool = True,
-        model_name: str = None,
-        description: str = None,
-        commit_to_conf: Path = None,
+            self,
+            path_url_or_repo: str,
+            convert: bool = True,
+            model_name: str = None,
+            description: str = None,
+            model_config_file: Path = None,
+            commit_to_conf: Path = None,
     ) -> str:
         """
         Accept a string which could be:
@@ -693,7 +716,7 @@ class ModelManager(object):
 
         if model_path.stem in self.config:  # already imported
             print("  | Already imported. Skipping")
-            return
+            return model_path.stem
 
         # another round of heuristics to guess the correct config file.
         checkpoint = (
@@ -701,32 +724,46 @@ class ModelManager(object):
             if model_path.suffix == ".safetensors"
             else torch.load(model_path)
         )
-        model_type = self.probe_model_type(checkpoint)
 
-        model_config_file = None
-        if model_type == SDLegacyType.V1:
-            print("  | SD-v1 model detected")
-            model_config_file = Path(
-                Globals.root, "configs/stable-diffusion/v1-inference.yaml"
-            )
-        elif model_type == SDLegacyType.V1_INPAINT:
-            print("  | SD-v1 inpainting model detected")
-            model_config_file = Path(
-                Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
-            )
-        elif model_type == SDLegacyType.V2:
-            print(
-                "  | SD-v2 model detected; model will be converted to diffusers format"
-            )
-            model_config_file = Path(
-                Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
-            )
-            convert = True
-        else:
-            print(
-                f"** {thing} is a legacy checkpoint file but not in a known Stable Diffusion model. Skipping import"
-            )
-            return
+        # additional probing needed if no config file provided
+        if model_config_file is None:
+            model_type = self.probe_model_type(checkpoint)
+            if model_type == SDLegacyType.V1:
+                print("  | SD-v1 model detected")
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v1-inference.yaml"
+                )
+            elif model_type == SDLegacyType.V1_INPAINT:
+                print("  | SD-v1 inpainting model detected")
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
+                )
+            elif model_type == SDLegacyType.V2_v:
+                print(
+                    "  | SD-v2-v model detected; model will be converted to diffusers format"
+                )
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
+                )
+                convert = True
+            elif model_type == SDLegacyType.V2_e:
+                print(
+                    "  | SD-v2-e model detected; model will be converted to diffusers format"
+                )
+                model_config_file = Path(
+                    Globals.root, "configs/stable-diffusion/v2-inference.yaml"
+                )
+                convert = True
+            elif model_type == SDLegacyType.V2:
+                print(
+                    f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                )
+                return
+            else:
+                print(
+                    f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                )
+                return
 
         diffuser_path = Path(
             Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
@@ -916,27 +953,40 @@ class ModelManager(object):
         to the 2.3.0 "diffusers" version. This should be a one-time operation, called at
         script startup time.
         """
-        # Three transformer models to check: bert, clip and safety checker
+        # Three transformer models to check: bert, clip and safety checker, and
+        # the diffusers as well
+        models_dir = Path(Globals.root, "models")
         legacy_locations = [
             Path(
+                models_dir,
                 "CompVis/stable-diffusion-safety-checker/models--CompVis--stable-diffusion-safety-checker"
             ),
-            Path("bert-base-uncased/models--bert-base-uncased"),
+            Path(models_dir, "bert-base-uncased/models--bert-base-uncased"),
             Path(
+                models_dir,
                 "openai/clip-vit-large-patch14/models--openai--clip-vit-large-patch14"
             ),
         ]
-        models_dir = Path(Globals.root, "models")
+        legacy_locations.extend(list(global_cache_dir("diffusers").glob('*')))
+        
         legacy_layout = False
         for model in legacy_locations:
-            legacy_layout = legacy_layout or Path(models_dir, model).exists()
+            legacy_layout = legacy_layout or model.exists()
         if not legacy_layout:
             return
 
         print(
-            "** Legacy version <= 2.2.5 model directory layout detected. Reorganizing."
+            """
+>> ALERT:
+>> The location of your previously-installed diffusers models needs to move from
+>> invokeai/models/diffusers to invokeai/models/hub due to a change introduced by
+>> diffusers version 0.14. InvokeAI will now move all models from the "diffusers" directory
+>> into "hub" and then remove the diffusers directory. This is a quick, safe, one-time
+>> operation. However if you have customized either of these directories and need to
+>> make adjustments, please press ctrl-C now to abort and relaunch InvokeAI when you are ready.
+>> Otherwise press <enter> to continue."""
         )
-        print("** This is a quick one-time operation.")
+        input('continue> ')
 
         # transformer files get moved into the hub directory
         if cls._is_huggingface_hub_directory_present():
@@ -948,32 +998,19 @@ class ModelManager(object):
         for model in legacy_locations:
             source = models_dir / model
             dest = hub / model.stem
+            if dest.exists() and not source.exists():
+                continue
             print(f"** {source} => {dest}")
             if source.exists():
-                if dest.exists():
-                    rmtree(source)
+                if dest.is_symlink():
+                    print(f"** Found symlink at {dest.name}. Not migrating.")
+                elif dest.exists():
+                    if source.is_dir():
+                        rmtree(source)
+                    else:
+                        source.unlink()
                 else:
                     move(source, dest)
-
-        # anything else gets moved into the diffusers directory
-        if cls._is_huggingface_hub_directory_present():
-            diffusers = global_cache_dir("diffusers")
-        else:
-            diffusers = models_dir / "diffusers"
-
-        os.makedirs(diffusers, exist_ok=True)
-        for root, dirs, _ in os.walk(models_dir, topdown=False):
-            for dir in dirs:
-                full_path = Path(root, dir)
-                if full_path.is_relative_to(hub) or full_path.is_relative_to(diffusers):
-                    continue
-                if Path(dir).match("models--*--*"):
-                    dest = diffusers / dir
-                    print(f"** {full_path} => {dest}")
-                    if dest.exists():
-                        rmtree(full_path)
-                    else:
-                        move(full_path, dest)
 
         # now clean up by removing any empty directories
         empty = [
@@ -1072,7 +1109,7 @@ class ModelManager(object):
             path = name_or_path
         else:
             owner, repo = name_or_path.split("/")
-            path = Path(global_cache_dir("diffusers") / f"models--{owner}--{repo}")
+            path = Path(global_cache_dir("hub") / f"models--{owner}--{repo}")
         if not path.exists():
             return None
         hashpath = path / "checksum.sha256"
@@ -1133,7 +1170,7 @@ class ModelManager(object):
         using_fp16 = self.precision == "float16"
 
         vae_args.update(
-            cache_dir=global_cache_dir("diffusers"),
+            cache_dir=global_cache_dir("hub"),
             local_files_only=not Globals.internet_available,
         )
 
@@ -1172,7 +1209,7 @@ class ModelManager(object):
 
     @staticmethod
     def _delete_model_from_cache(repo_id):
-        cache_info = scan_cache_dir(global_cache_dir("diffusers"))
+        cache_info = scan_cache_dir(global_cache_dir("hub"))
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!

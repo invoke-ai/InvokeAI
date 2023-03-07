@@ -4,7 +4,6 @@ import {
   defineStyle,
 } from '@chakra-ui/styled-system';
 import { cssVar } from '@chakra-ui/theme-tools';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
@@ -13,7 +12,7 @@ const $popperBg = cssVar('popper-bg');
 const $arrowBg = cssVar('popper-arrow-bg');
 const $arrowShadowColor = cssVar('popper-arrow-shadow-color');
 
-const invokeAIContent = defineStyle((props) => {
+const invokeAIContent = defineStyle((_props) => {
   return {
     [$arrowBg.variable]: `colors.base.800`,
     [$popperBg.variable]: `colors.base.800`,
@@ -23,8 +22,8 @@ const invokeAIContent = defineStyle((props) => {
     p: 4,
     borderWidth: '2px',
     borderStyle: 'solid',
-    borderColor: mode('base.500', 'base.600')(props),
-    bg: mode('base.200', 'base.800')(props),
+    borderColor: 'base.600',
+    bg: 'base.800',
   };
 });
 

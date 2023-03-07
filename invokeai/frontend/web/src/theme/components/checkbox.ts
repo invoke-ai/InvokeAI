@@ -3,7 +3,6 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
@@ -13,31 +12,31 @@ const invokeAIControl = defineStyle((props) => {
 
   return {
     _checked: {
-      bg: mode(`${c}.500`, `${c}.200`)(props),
-      borderColor: mode(`${c}.500`, `${c}.200`)(props),
-      color: mode('white', 'base.900')(props),
+      bg: `${c}.200`,
+      borderColor: `${c}.200`,
+      color: 'base.900',
 
       _hover: {
-        bg: mode(`${c}.600`, `${c}.300`)(props),
-        borderColor: mode(`${c}.600`, `${c}.300`)(props),
+        bg: `${c}.300`,
+        borderColor: `${c}.300`,
       },
 
       _disabled: {
-        borderColor: mode('base.200', 'transparent')(props),
-        bg: mode('base.200', 'whiteAlpha.300')(props),
-        color: mode('base.500', 'whiteAlpha.500')(props),
+        borderColor: 'transparent',
+        bg: 'whiteAlpha.300',
+        color: 'whiteAlpha.500',
       },
     },
 
     _indeterminate: {
-      bg: mode(`${c}.500`, `${c}.200`)(props),
-      borderColor: mode(`${c}.500`, `${c}.200`)(props),
-      color: mode('white', 'base.900')(props),
+      bg: `${c}.200`,
+      borderColor: `${c}.200`,
+      color: 'base.900',
     },
 
     _disabled: {
-      bg: mode('base.100', 'whiteAlpha.100')(props),
-      borderColor: mode('base.100', 'transparent')(props),
+      bg: 'whiteAlpha.100',
+      borderColor: 'transparent',
     },
 
     _focusVisible: {
@@ -45,7 +44,7 @@ const invokeAIControl = defineStyle((props) => {
     },
 
     _invalid: {
-      borderColor: mode('red.500', 'red.300')(props),
+      borderColor: 'red.300',
     },
   };
 });

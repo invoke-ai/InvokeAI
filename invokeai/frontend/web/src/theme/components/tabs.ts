@@ -3,7 +3,6 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
-import { mode } from '@chakra-ui/theme-tools';
 
 const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
@@ -17,26 +16,26 @@ const invokeAIRoot = defineStyle((_props) => {
 
 const invokeAITab = defineStyle((_props) => ({}));
 
-const invokeAITablist = defineStyle((props) => ({
+const invokeAITablist = defineStyle((_props) => ({
   display: 'flex',
   flexDirection: 'column',
   gap: 1,
-  color: mode('base.500', 'base.700')(props),
+  color: 'base.700',
   button: {
     fontSize: 'sm',
     padding: 2,
     borderRadius: 'base',
     _selected: {
-      bg: mode('accent.200', 'accent.700')(props),
-      color: mode('accent.800', 'accent.100')(props),
+      bg: 'accent.700',
+      color: 'accent.100',
       _hover: {
-        bg: mode('accent.300', 'accent.600')(props),
-        color: mode('accent.900', 'accent.50')(props),
+        bg: 'accent.600',
+        color: 'accent.50',
       },
     },
     _hover: {
-      bg: mode('base.300', 'base.600')(props),
-      color: mode('base.900', 'base.50')(props),
+      bg: 'base.600',
+      color: 'base.50',
     },
   },
 }));

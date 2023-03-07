@@ -26,7 +26,7 @@ from ..args import APP_ID, APP_VERSION, Args, calculate_init_img_hash
 from ..generator import infill_methods
 from ..globals import Globals, global_converted_ckpts_dir, global_models_dir
 from ..image_util import PngWriter, retrieve_metadata
-from ..model_management import merge_diffusion_models
+from ...frontend.merge.merge_diffusers import merge_diffusion_models
 from ..prompting import (
     get_prompt_structure,
     get_tokenizer,

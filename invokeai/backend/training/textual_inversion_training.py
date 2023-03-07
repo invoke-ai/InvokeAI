@@ -640,7 +640,7 @@ def do_textual_inversion_training(
     assert (
         pretrained_model_name_or_path
     ), f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
-    pipeline_args = dict(cache_dir=global_cache_dir("diffusers"))
+    pipeline_args = dict(cache_dir=global_cache_dir("hub"))
 
     # Load tokenizer
     if tokenizer_name:
