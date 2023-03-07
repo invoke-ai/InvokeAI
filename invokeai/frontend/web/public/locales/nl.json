@@ -364,7 +364,6 @@
         "convertToDiffusersHelpText5": "Zorg ervoor dat je genoeg schijfruimte hebt. Modellen nemen gewoonlijk ongeveer 4 - 7 GB ruimte in beslag.",
         "convertToDiffusersSaveLocation": "Bewaarlocatie",
         "v1": "v1",
-        "v2": "v2",
         "inpainting": "v1-inpainting",
         "customConfig": "Eigen configuratie",
         "pathToCustomConfig": "Pad naar eigen configuratie",
