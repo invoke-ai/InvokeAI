@@ -74,6 +74,7 @@ cov.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.pytest.ini
 cover/
 junit/
 
