@@ -2,6 +2,7 @@ import {
   Box,
   Popover,
   PopoverArrow,
+  PopoverBody,
   PopoverContent,
   PopoverTrigger,
 } from '@chakra-ui/react';
@@ -34,13 +35,12 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
         <Box>{children}</Box>
       </PopoverTrigger>
       <PopoverContent
-        className="guide-popover-content"
         maxWidth="400px"
         onClick={(e) => e.preventDefault()}
         cursor="initial"
       >
-        <PopoverArrow className="guide-popover-arrow" />
-        <div className="guide-popover-guide-content">{text}</div>
+        <PopoverArrow />
+        <PopoverBody>{text}</PopoverBody>
       </PopoverContent>
     </Popover>
   );

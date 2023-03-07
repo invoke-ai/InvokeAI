@@ -9,6 +9,7 @@ import {
   NumberInputField,
   NumberInputFieldProps,
   NumberInputProps,
+  NumberInputStepper,
   NumberInputStepperProps,
   Tooltip,
   TooltipProps,
@@ -20,10 +21,7 @@ import { FocusEvent, useEffect, useState } from 'react';
 const numberStringRegex = /^-?(0\.)?\.?$/;
 
 interface Props extends Omit<NumberInputProps, 'onChange'> {
-  styleClass?: string;
   label?: string;
-  labelFontSize?: string | number;
-  width?: string | number;
   showStepper?: boolean;
   value?: number;
   onChange: (v: number) => void;
@@ -45,12 +43,8 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
 const IAINumberInput = (props: Props) => {
   const {
     label,
-    labelFontSize = 'sm',
-    styleClass,
     isDisabled = false,
     showStepper = true,
-    width,
-    textAlign,
     isInvalid,
     value,
     onChange,
@@ -119,29 +113,10 @@ const IAINumberInput = (props: Props) => {
       <FormControl
         isDisabled={isDisabled}
         isInvalid={isInvalid}
-        className={
-          styleClass
-            ? `invokeai__number-input-form-control ${styleClass}`
-            : `invokeai__number-input-form-control`
-        }
         {...formControlProps}
       >
-        {label && (
-          <FormLabel
-            className="invokeai__number-input-form-label"
-            style={{ display: label ? 'block' : 'none' }}
-            fontSize={labelFontSize}
-            fontWeight="bold"
-            marginRight={0}
-            marginBottom={0}
-            whiteSpace="nowrap"
-            {...formLabelProps}
-          >
-            {label}
-          </FormLabel>
-        )}
+        {label && <FormLabel {...formLabelProps}>{label}</FormLabel>}
         <NumberInput
-          className="invokeai__number-input-root"
           value={valueAsString}
           min={min}
           max={max}
@@ -149,25 +124,14 @@ const IAINumberInput = (props: Props) => {
           clampValueOnBlur={false}
           onChange={handleOnChange}
           onBlur={handleBlur}
-          width={width}
           {...rest}
         >
-          <NumberInputField
-            className="invokeai__number-input-field"
-            textAlign={textAlign}
-            {...numberInputFieldProps}
-          />
+          <NumberInputField {...numberInputFieldProps} />
           {showStepper && (
-            <div className="invokeai__number-input-stepper">
-              <NumberIncrementStepper
-                {...numberInputStepperProps}
-                className="invokeai__number-input-stepper-button"
-              />
-              <NumberDecrementStepper
-                {...numberInputStepperProps}
-                className="invokeai__number-input-stepper-button"
-              />
-            </div>
+            <NumberInputStepper>
+              <NumberIncrementStepper {...numberInputStepperProps} />
+              <NumberDecrementStepper {...numberInputStepperProps} />
+            </NumberInputStepper>
           )}
         </NumberInput>
       </FormControl>

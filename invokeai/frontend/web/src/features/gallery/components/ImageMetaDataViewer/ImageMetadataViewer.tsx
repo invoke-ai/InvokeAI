@@ -1,5 +1,6 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
+  Box,
   Center,
   Flex,
   Heading,
@@ -43,6 +44,7 @@ import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -163,7 +165,22 @@ const ImageMetadataViewer = memo(
     const metadataJSON = JSON.stringify(image.metadata, null, 2);
 
     return (
-      <div className={`image-metadata-viewer ${styleClass}`}>
+      <Box
+        className={styleClass}
+        sx={{
+          position: 'absolute',
+          top: '0',
+          width: '100%',
+          borderRadius: 'base',
+          padding: 4,
+          overflow: 'scroll',
+          maxHeight: APP_METADATA_HEIGHT,
+          height: '100%',
+          zIndex: '10',
+          backdropFilter: 'blur(10px)',
+          bg: 'blackAlpha.600',
+        }}
+      >
         <Flex gap={1} direction="column" width="100%">
           <Flex gap={2}>
             <Text fontWeight="semibold">File:</Text>
@@ -316,7 +333,7 @@ const ImageMetadataViewer = memo(
                       if (postprocess.type === 'esrgan') {
                         const { scale, strength, denoise_str } = postprocess;
                         return (
-                          <Flex key={i} pl="2rem" gap={1} direction="column">
+                          <Flex key={i} pl={8} gap={1} direction="column">
                             <Text size="md">{`${
                               i + 1
                             }: Upscale (ESRGAN)`}</Text>
@@ -346,7 +363,7 @@ const ImageMetadataViewer = memo(
                       } else if (postprocess.type === 'gfpgan') {
                         const { strength } = postprocess;
                         return (
-                          <Flex key={i} pl="2rem" gap={1} direction="column">
+                          <Flex key={i} pl={8} gap={1} direction="column">
                             <Text size="md">{`${
                               i + 1
                             }: Face restoration (GFPGAN)`}</Text>
@@ -364,7 +381,7 @@ const ImageMetadataViewer = memo(
                       } else if (postprocess.type === 'codeformer') {
                         const { strength, fidelity } = postprocess;
                         return (
-                          <Flex key={i} pl="2rem" gap={1} direction="column">
+                          <Flex key={i} pl={8} gap={1} direction="column">
                             <Text size="md">{`${
                               i + 1
                             }: Face restoration (Codeformer)`}</Text>
@@ -417,9 +434,21 @@ const ImageMetadataViewer = memo(
                   </Tooltip>
                   <Text fontWeight="semibold">Metadata JSON:</Text>
                 </Flex>
-                <div className="image-json-viewer">
+                <Box
+                  sx={{
+                    mt: 0,
+                    mr: 2,
+                    mb: 4,
+                    ml: 2,
+                    padding: 4,
+                    borderRadius: 'base',
+                    overflowX: 'scroll',
+                    wordBreak: 'break-all',
+                    bg: 'whiteAlpha.100',
+                  }}
+                >
                   <pre>{metadataJSON}</pre>
-                </div>
+                </Box>
               </Flex>
             </>
           ) : (
@@ -430,7 +459,7 @@ const ImageMetadataViewer = memo(
             </Center>
           )}
         </Flex>
-      </div>
+      </Box>
     );
   },
   memoEqualityCheck

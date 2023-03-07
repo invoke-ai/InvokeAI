@@ -1,0 +1,24 @@
+{
+    "common": {
+        "nodes": "節點",
+        "img2img": "圖片轉圖片",
+        "langSimplifiedChinese": "簡體中文",
+        "statusError": "錯誤",
+        "statusDisconnected": "已中斷連線",
+        "statusConnected": "已連線",
+        "back": "返回",
+        "load": "載入",
+        "close": "關閉",
+        "langEnglish": "英語",
+        "settingsLabel": "設定",
+        "upload": "上傳",
+        "langArabic": "阿拉伯語",
+        "greenTheme": "綠色",
+        "lightTheme": "淺色",
+        "darkTheme": "深色",
+        "discordLabel": "Discord",
+        "nodesDesc": "使用Node生成圖像的系統正在開發中。敬請期待有關於這項功能的更新。",
+        "reportBugLabel": "回報錯誤",
+        "githubLabel": "GitHub"
+    }
+}

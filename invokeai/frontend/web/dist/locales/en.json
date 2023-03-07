@@ -10,14 +10,18 @@
         "darkTheme": "Dark",
         "lightTheme": "Light",
         "greenTheme": "Green",
+        "oceanTheme": "Ocean",
         "langArabic": "العربية",
         "langEnglish": "English",
         "langDutch": "Nederlands",
         "langFrench": "Français",
         "langGerman": "Deutsch",
+        "langHebrew": "עברית",
         "langItalian": "Italiano",
         "langJapanese": "日本語",
+        "langKorean": "한국어",
         "langPolish": "Polski",
+        "langPortuguese": "Português",
         "langBrPortuguese": "Português do Brasil",
         "langRussian": "Русский",
         "langSimplifiedChinese": "简体中文",
@@ -63,7 +67,10 @@
         "statusConvertingModel": "Converting Model",
         "statusModelConverted": "Model Converted",
         "statusMergingModels": "Merging Models",
-        "statusMergedModels": "Models Merged"
+        "statusMergedModels": "Models Merged",
+        "pinOptionsPanel": "Pin Options Panel",
+        "loading": "Loading",
+        "loadingInvokeAI": "Loading Invoke AI"
     },
     "gallery": {
         "generations": "Generations",
@@ -82,7 +89,7 @@
         "noImagesInGallery": "No Images In Gallery"
     },
     "hotkeys": {
-        "keyboardShortcuts": "Keyboard Shorcuts",
+        "keyboardShortcuts": "Keyboard Shortcuts",
         "appHotkeys": "App Hotkeys",
         "generalHotkeys": "General Hotkeys",
         "galleryHotkeys": "Gallery Hotkeys",
@@ -364,7 +371,8 @@
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
         "convertToDiffusersSaveLocation": "Save Location",
         "v1": "v1",
-        "v2": "v2",
+        "v2_base": "v2 (512px)",
+        "v2_768": "v2 (768px)",
         "inpainting": "v1 Inpainting",
         "customConfig": "Custom Config",
         "pathToCustomConfig": "Path To Custom Config",
@@ -387,13 +395,16 @@
         "mergedModelCustomSaveLocation": "Custom Path",
         "invokeAIFolder": "Invoke AI Folder",
         "ignoreMismatch": "Ignore Mismatches Between Selected Models",
-        "modelMergeHeaderHelp1": "You can merge upto three different models to create a blend that suits your needs.",
+        "modelMergeHeaderHelp1": "You can merge up to three different models to create a blend that suits your needs.",
         "modelMergeHeaderHelp2": "Only Diffusers are available for merging. If you want to merge a checkpoint model, please convert it to Diffusers first.",
         "modelMergeAlphaHelp": "Alpha controls blend strength for the models. Lower alpha values lead to lower influence of the second model.",
         "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above.",
         "inverseSigmoid": "Inverse Sigmoid",
         "sigmoid": "Sigmoid",
-        "weightedSum": "Weighted Sum"
+        "weightedSum": "Weighted Sum",
+        "none": "none",
+        "addDifference": "Add Difference",
+        "pickModelType": "Pick Model Type"
     },
     "parameters": {
         "general": "General",

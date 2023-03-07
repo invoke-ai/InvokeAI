@@ -184,7 +184,7 @@ const IAICanvasToolChooserOptions = () => {
         aria-label={`${t('unifiedCanvas.brush')} (B)`}
         tooltip={`${t('unifiedCanvas.brush')} (B)`}
         icon={<FaPaintBrush />}
-        data-selected={tool === 'brush' && !isStaging}
+        isChecked={tool === 'brush' && !isStaging}
         onClick={handleSelectBrushTool}
         isDisabled={isStaging}
       />
@@ -192,7 +192,7 @@ const IAICanvasToolChooserOptions = () => {
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
         tooltip={`${t('unifiedCanvas.eraser')} (E)`}
         icon={<FaEraser />}
-        data-selected={tool === 'eraser' && !isStaging}
+        isChecked={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
       />
@@ -214,7 +214,7 @@ const IAICanvasToolChooserOptions = () => {
         aria-label={`${t('unifiedCanvas.colorPicker')} (C)`}
         tooltip={`${t('unifiedCanvas.colorPicker')} (C)`}
         icon={<FaEyeDropper />}
-        data-selected={tool === 'colorPicker' && !isStaging}
+        isChecked={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectColorPickerTool}
       />
@@ -228,8 +228,8 @@ const IAICanvasToolChooserOptions = () => {
           />
         }
       >
-        <Flex minWidth="15rem" direction="column" gap="1rem" width="100%">
-          <Flex gap="1rem" justifyContent="space-between">
+        <Flex minWidth={60} direction="column" gap={4} width="100%">
+          <Flex gap={4} justifyContent="space-between">
             <IAISlider
               label={t('unifiedCanvas.brushSize')}
               value={brushSize}
@@ -240,12 +240,12 @@ const IAICanvasToolChooserOptions = () => {
             />
           </Flex>
           <IAIColorPicker
-            style={{
+            sx={{
               width: '100%',
-              paddingTop: '0.5rem',
-              paddingBottom: '0.5rem',
+              paddingTop: 2,
+              paddingBottom: 2,
             }}
-            color={brushColor}
+            pickerColor={brushColor}
             onChange={(newColor) => dispatch(setBrushColor(newColor))}
           />
         </Flex>

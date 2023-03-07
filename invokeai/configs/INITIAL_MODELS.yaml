@@ -20,7 +20,7 @@ stable-diffusion-2.1:
    recommended: True
 sd-inpainting-2.0:
    description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
-   repo_id: stabilityai/stable-diffusion-2-1
+   repo_id: stabilityai/stable-diffusion-2-inpainting
    format: diffusers
    recommended: False
 analog-diffusion-1.0:

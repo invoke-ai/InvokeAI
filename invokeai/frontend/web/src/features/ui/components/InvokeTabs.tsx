@@ -1,16 +1,18 @@
-import { Tab, TabPanel, TabPanels, Tabs, Tooltip } from '@chakra-ui/react';
+import {
+  Icon,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tooltip,
+} from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
 import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
 import useUpdateTranslations from 'common/hooks/useUpdateTranslations';
-import ImageToImageIcon from 'common/icons/ImageToImageIcon';
-import NodesIcon from 'common/icons/NodesIcon';
-import PostprocessingIcon from 'common/icons/PostprocessingIcon';
-import TextToImageIcon from 'common/icons/TextToImageIcon';
-import TrainingIcon from 'common/icons/TrainingIcon';
-import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
 import Lightbox from 'features/lightbox/components/Lightbox';
@@ -23,6 +25,14 @@ import {
 import i18n from 'i18n';
 import { ReactElement } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import {
+  MdDeviceHub,
+  MdFlashOn,
+  MdGridOn,
+  MdPhotoFilter,
+  MdPhotoLibrary,
+  MdTextFields,
+} from 'react-icons/md';
 import { activeTabIndexSelector } from '../store/uiSelectors';
 import { floatingSelector } from './FloatingParametersPanelButtons';
 import ImageToImageWorkarea from './ImageToImage';
@@ -37,32 +47,32 @@ export interface InvokeTabInfo {
 
 export const tabDict: Record<InvokeTabName, InvokeTabInfo> = {
   txt2img: {
-    title: <TextToImageIcon fill="black" boxSize="2.5rem" />,
+    title: <Icon as={MdTextFields} boxSize={6} />,
     workarea: <TextToImageWorkarea />,
     tooltip: 'Text To Image',
   },
   img2img: {
-    title: <ImageToImageIcon fill="black" boxSize="2.5rem" />,
+    title: <Icon as={MdPhotoLibrary} boxSize={6} />,
     workarea: <ImageToImageWorkarea />,
     tooltip: 'Image To Image',
   },
   unifiedCanvas: {
-    title: <UnifiedCanvasIcon fill="black" boxSize="2.5rem" />,
+    title: <Icon as={MdGridOn} boxSize={6} />,
     workarea: <UnifiedCanvasWorkarea />,
     tooltip: 'Unified Canvas',
   },
   nodes: {
-    title: <NodesIcon fill="black" boxSize="2.5rem" />,
+    title: <Icon as={MdDeviceHub} boxSize={6} />,
     workarea: <NodesWIP />,
     tooltip: 'Nodes',
   },
   postprocess: {
-    title: <PostprocessingIcon fill="black" boxSize="2.5rem" />,
+    title: <Icon as={MdPhotoFilter} boxSize={6} />,
     workarea: <PostProcessingWIP />,
     tooltip: 'Post Processing',
   },
   training: {
-    title: <TrainingIcon fill="black" boxSize="2.5rem" />,
+    title: <Icon as={MdFlashOn} boxSize={6} />,
     workarea: <TrainingWIP />,
     tooltip: 'Training',
   },
@@ -152,7 +162,7 @@ export default function InvokeTabs() {
           key={key}
           hasArrow
           label={tabDict[key as keyof typeof tabDict].tooltip}
-          placement="right"
+          placement="end"
         >
           <Tab>{tabDict[key as keyof typeof tabDict].title}</Tab>
         </Tooltip>
@@ -165,7 +175,7 @@ export default function InvokeTabs() {
     const tabPanelsToRender: ReactElement[] = [];
     Object.keys(tabDict).forEach((key) => {
       tabPanelsToRender.push(
-        <TabPanel className="app-tabs-panel" key={key}>
+        <TabPanel key={key}>
           {tabDict[key as keyof typeof tabDict].workarea}
         </TabPanel>
       );
@@ -176,18 +186,14 @@ export default function InvokeTabs() {
   return (
     <Tabs
       isLazy
-      className="app-tabs"
-      variant="unstyled"
       defaultIndex={activeTab}
       index={activeTab}
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
       }}
     >
-      <div className="app-tabs-list">{renderTabs()}</div>
-      <TabPanels className="app-tabs-panels">
-        {isLightBoxOpen ? <Lightbox /> : renderTabPanels()}
-      </TabPanels>
+      <TabList>{renderTabs()}</TabList>
+      <TabPanels>{isLightBoxOpen ? <Lightbox /> : renderTabPanels()}</TabPanels>
     </Tabs>
   );
 }

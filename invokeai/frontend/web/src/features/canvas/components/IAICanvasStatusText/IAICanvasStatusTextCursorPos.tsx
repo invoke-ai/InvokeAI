@@ -1,3 +1,4 @@
+import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -33,8 +34,8 @@ export default function IAICanvasStatusTextCursorPos() {
   const { t } = useTranslation();
 
   return (
-    <div>{`${t(
-      'unifiedcanvas:cursorPosition'
-    )}: ${cursorCoordinatesString}`}</div>
+    <Box>{`${t(
+      'unifiedCanvas.cursorPosition'
+    )}: ${cursorCoordinatesString}`}</Box>
   );
 }

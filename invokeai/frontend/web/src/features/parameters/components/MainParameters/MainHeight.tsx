@@ -32,8 +32,6 @@ export default function MainHeight() {
       withInput
       withReset
       withSliderMarks
-      sliderMarkRightOffset={-8}
-      inputWidth="6.2rem"
       sliderNumberInputProps={{ max: 15360 }}
     />
   ) : (
@@ -44,8 +42,6 @@ export default function MainHeight() {
       flexGrow={1}
       onChange={(e) => dispatch(setHeight(Number(e.target.value)))}
       validValues={HEIGHTS}
-      styleClass="main-settings-block"
-      width="5.5rem"
     />
   );
 }
