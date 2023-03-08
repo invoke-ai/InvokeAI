@@ -690,6 +690,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         run_id=None,
         noise_func=None,
+        seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
         if isinstance(init_image, PIL.Image.Image):
             init_image = image_resized_to_grid_as_tensor(init_image.convert("RGB"))
@@ -703,7 +704,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device=self._model_group.device_for(self.unet),
             dtype=self.unet.dtype,
         )
-        noise = noise_func(initial_latents)
+        noise = noise_func(initial_latents, seed)
 
         return self.img2img_from_latents_and_embeddings(
             initial_latents,
@@ -781,6 +782,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         run_id=None,
         noise_func=None,
+        seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
         device = self._model_group.device_for(self.unet)
         latents_dtype = self.unet.dtype
@@ -804,7 +806,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         init_image_latents = self.non_noised_latents_from_image(
             init_image, device=device, dtype=latents_dtype
         )
-        noise = noise_func(init_image_latents)
+        noise = noise_func(init_image_latents, seed)
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)

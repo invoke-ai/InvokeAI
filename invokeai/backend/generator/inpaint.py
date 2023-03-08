@@ -223,6 +223,7 @@ class Inpaint(Img2Img):
         inpaint_height=None,
         inpaint_fill: tuple(int) = (0x7F, 0x7F, 0x7F, 0xFF),
         attention_maps_callback=None,
+        seed=None,
         **kwargs,
     ):
         """
@@ -319,6 +320,7 @@ class Inpaint(Img2Img):
                 conditioning_data=conditioning_data,
                 noise_func=self.get_noise_like,
                 callback=step_callback,
+                seed=seed
             )
 
             if (
