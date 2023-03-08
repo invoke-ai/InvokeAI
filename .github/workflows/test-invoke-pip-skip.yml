@@ -6,7 +6,7 @@ on:
       - 'invokeai/**'
       - 'invokeai/backend/**'
       - 'invokeai/configs/**'
-      - 'invokeai/frontend/dist/**'
+      - 'invokeai/frontend/web/dist/**'
   merge_group:
   workflow_dispatch:
 
