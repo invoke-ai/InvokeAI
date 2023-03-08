@@ -131,7 +131,7 @@ def get_prompt_structure(
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=True
+    tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=False
 ) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
@@ -247,7 +247,7 @@ def log_tokenization_for_prompt_object(
             )
 
 
-def log_tokenization_for_text(text, tokenizer, display_label=None):
+def log_tokenization_for_text(text, tokenizer, display_label=None, truncate_if_too_long=False):
     """shows how the prompt is tokenized
     # usually tokens have '</w>' to indicate end-of-word,
     # but for readability it has been replaced with ' '
@@ -262,11 +262,11 @@ def log_tokenization_for_text(text, tokenizer, display_label=None):
         token = tokens[i].replace("</w>", " ")
         # alternate color
         s = (usedTokens % 6) + 1
-        if i < tokenizer.model_max_length:
+        if truncate_if_too_long and i >= tokenizer.model_max_length:
+            discarded = discarded + f"\x1b[0;3{s};40m{token}"
+        else:
             tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
             usedTokens += 1
-        else:  # over max token length
-            discarded = discarded + f"\x1b[0;3{s};40m{token}"
 
     if usedTokens > 0:
         print(f'\n>> [TOKENLOG] Tokens {display_label or ""} ({usedTokens}):')
