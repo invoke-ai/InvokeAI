@@ -71,6 +71,7 @@ def get_uc_and_c_and_ec(
         text_encoder=text_encoder,
         textual_inversion_manager=model.textual_inversion_manager,
         dtype_for_device_getter=torch_dtype,
+        truncate_too_long_prompts=False
     )
 
     # get rid of any newline characters
@@ -82,12 +83,12 @@ def get_uc_and_c_and_ec(
     legacy_blend = try_parse_legacy_blend(
         positive_prompt_string, skip_normalize_legacy_blend
     )
-    positive_prompt: FlattenedPrompt | Blend
+    positive_prompt: Union[FlattenedPrompt, Blend]
     if legacy_blend is not None:
         positive_prompt = legacy_blend
     else:
         positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt: FlattenedPrompt | Blend = Compel.parse_prompt_string(
+    negative_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(
         negative_prompt_string
     )
 
@@ -96,6 +97,7 @@ def get_uc_and_c_and_ec(
 
     c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
     uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+    c, uc = compel.pad_conditioning_tensors_to_same_length(c, uc)
 
     tokens_count = get_max_token_count(tokenizer, positive_prompt)
 
