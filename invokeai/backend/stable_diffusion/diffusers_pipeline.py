@@ -731,9 +731,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device=self._model_group.device_for(self.unet),
         )
         result_latents, result_attention_maps = self.latents_from_embeddings(
-            initial_latents,
-            num_inference_steps,
-            conditioning_data,
+            latents=initial_latents if strength < 1.0 else torch.zeros_like(
+                initial_latents, device=initial_latents.device, dtype=initial_latents.dtype
+            ),
+            num_inference_steps=num_inference_steps,
+            conditioning_data=conditioning_data,
             timesteps=timesteps,
             noise=noise,
             run_id=run_id,
@@ -831,9 +833,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         try:
             result_latents, result_attention_maps = self.latents_from_embeddings(
-                init_image_latents,
-                num_inference_steps,
-                conditioning_data,
+                latents=init_image_latents if strength < 1.0 else torch.zeros_like(
+                    init_image_latents, device=init_image_latents.device, dtype=init_image_latents.dtype
+                ),
+                num_inference_steps=num_inference_steps,
+                conditioning_data=conditioning_data,
                 noise=noise,
                 timesteps=timesteps,
                 additional_guidance=guidance,
