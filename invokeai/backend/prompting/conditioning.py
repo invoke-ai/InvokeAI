@@ -97,7 +97,7 @@ def get_uc_and_c_and_ec(
 
     c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
     uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
-    c, uc = compel.pad_conditioning_tensors_to_same_length(c, uc)
+    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
     tokens_count = get_max_token_count(tokenizer, positive_prompt)
 
