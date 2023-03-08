@@ -690,6 +690,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         run_id=None,
         noise_func=None,
+        seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
         if isinstance(init_image, PIL.Image.Image):
             init_image = image_resized_to_grid_as_tensor(init_image.convert("RGB"))
@@ -703,7 +704,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device=self._model_group.device_for(self.unet),
             dtype=self.unet.dtype,
         )
-        noise = noise_func(initial_latents)
+        noise = noise_func(initial_latents, seed)
 
         return self.img2img_from_latents_and_embeddings(
             initial_latents,
@@ -731,9 +732,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device=self._model_group.device_for(self.unet),
         )
         result_latents, result_attention_maps = self.latents_from_embeddings(
-            initial_latents,
-            num_inference_steps,
-            conditioning_data,
+            latents=initial_latents if strength < 1.0 else torch.zeros_like(
+                initial_latents, device=initial_latents.device, dtype=initial_latents.dtype
+            ),
+            num_inference_steps=num_inference_steps,
+            conditioning_data=conditioning_data,
             timesteps=timesteps,
             noise=noise,
             run_id=run_id,
@@ -779,6 +782,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         run_id=None,
         noise_func=None,
+        seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
         device = self._model_group.device_for(self.unet)
         latents_dtype = self.unet.dtype
@@ -802,7 +806,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         init_image_latents = self.non_noised_latents_from_image(
             init_image, device=device, dtype=latents_dtype
         )
-        noise = noise_func(init_image_latents)
+        noise = noise_func(init_image_latents, seed)
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)
@@ -831,9 +835,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         try:
             result_latents, result_attention_maps = self.latents_from_embeddings(
-                init_image_latents,
-                num_inference_steps,
-                conditioning_data,
+                latents=init_image_latents if strength < 1.0 else torch.zeros_like(
+                    init_image_latents, device=init_image_latents.device, dtype=init_image_latents.dtype
+                ),
+                num_inference_steps=num_inference_steps,
+                conditioning_data=conditioning_data,
                 noise=noise,
                 timesteps=timesteps,
                 additional_guidance=guidance,
