@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import * as InvokeAI from 'app/invokeai';
 import { FACETOOL_TYPES } from 'app/constants';
 
 export type UpscalingLevel = 2 | 4;
@@ -40,6 +41,17 @@ export const postprocessingSlice = createSlice({
   name: 'postprocessing',
   initialState,
   reducers: {
+    setAllPostProcessingParameters: (
+      state,
+      action: PayloadAction<InvokeAI.Metadata>
+    ) => {
+      const { type, hires_fix } = action.payload.image;
+
+      if (type === 'txt2img') {
+        state.hiresFix = Boolean(hires_fix);
+        // Strength of img2img used in hires_fix is not currently exposed in the Metadata for the final image.
+      }
+    },
     setFacetoolStrength: (state, action: PayloadAction<number>) => {
       state.facetoolStrength = action.payload;
     },
@@ -83,6 +95,7 @@ export const postprocessingSlice = createSlice({
 });
 
 export const {
+  setAllPostProcessingParameters,
   resetPostprocessingState,
   setCodeformerFidelity,
   setFacetoolStrength,

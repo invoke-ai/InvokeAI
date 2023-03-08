@@ -1180,7 +1180,7 @@ def metadata_dumps(opt,
     )
 
     # remove any image keys not mentioned in RFC #266
-    rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
+    rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps','hires_fix',
                          'cfg_scale','threshold','perlin','step_number','width','height','extra','strength','seamless'
                          'init_img','init_mask','facetool','facetool_strength','upscale','h_symmetry_time_pct',
                          'v_symmetry_time_pct']
