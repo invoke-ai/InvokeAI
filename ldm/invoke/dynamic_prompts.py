@@ -82,7 +82,7 @@ def expand_prompts(
             sequence = 0
             for command in commands:
                 sequence += 1
-                parent_conn.send(command+f' --fnformat=dp.{sequence:04}.{{prompt}}.png')
+                parent_conn.send(command+f' --fnformat="dp.{sequence:04}.{{prompt}}.png"')
             parent_conn.close()
         else:
             for command in commands:
@@ -354,7 +354,7 @@ An excerpt from the top of this file looks like this:
  model:
    - stable-diffusion-1.5
    - stable-diffusion-2.1-base
- steps: 30:50:1  # start steps at 30 and go up to 50, incrementing by 1 each time
+ steps: 30;50;1  # start steps at 30 and go up to 50, incrementing by 1 each time
  seed: 50        # fixed constant, seed=50
  cfg:            # list of CFG values to try
    - 7
