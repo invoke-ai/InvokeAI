@@ -63,6 +63,7 @@ dependencies = [
   "prompt-toolkit",
   "pypatchmatch",
   "pyreadline3",
+  "pytorch-lightning==1.7.7",
   "realesrgan",
   "requests==2.28.2",
   "rich~=13.3",
