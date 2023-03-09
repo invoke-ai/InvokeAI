@@ -12,9 +12,10 @@ from ..services.image_storage import ImageType
 from ..services.invocation_services import InvocationServices
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
+from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
 
 SAMPLER_NAME_VALUES = Literal[
-    "ddim", "plms", "k_lms", "k_dpm_2", "k_dpm_2_a", "k_euler", "k_euler_a", "k_heun"
+    tuple(InvokeAIGenerator.schedulers())
 ]
 
 
@@ -57,19 +58,24 @@ class TextToImageInvocation(BaseInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        if self.model is None or self.model == "":
-            self.model = context.services.generate.model_name
+        factory = context.services.generator_factory
+        if self.model:
+            factory.model_name = self.model
+        else:
+            self.model = factory.model_name
 
-        # Set the model (if already cached, this does nothing)
-        context.services.generate.set_model(self.model)
+        txt2img = factory.make_generator(Txt2Img)
 
-        results = context.services.generate.prompt2image(
+        outputs = txt2img.generate(
             prompt=self.prompt,
             step_callback=step_callback,
             **self.dict(
                 exclude={"prompt"}
             ),  # Shorthand for passing all of the parameters above manually
         )
+        # Outputs is an infinite iterator that will return a new InvokeAIGeneratorOutput object
+        # each time it is called. We only need the first one.
+        generate_output = next(outputs)
 
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
@@ -78,7 +84,7 @@ class TextToImageInvocation(BaseInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, results[0][0])
+        context.services.images.save(image_type, image_name, generate_output.image)
         return ImageOutput(
             image=ImageField(image_type=image_type, image_name=image_name)
         )
@@ -115,23 +121,24 @@ class ImageToImageInvocation(TextToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        if self.model is None or self.model == "":
-            self.model = context.services.generate.model_name
+        factory = context.services.generator_factory
+        self.model = self.model or factory.model_name
+        factory.model_name = self.model
+        img2img = factory.make_generator(Img2Img)
 
-        # Set the model (if already cached, this does nothing)
-        context.services.generate.set_model(self.model)
-
-        results = context.services.generate.prompt2image(
-            prompt=self.prompt,
-            init_img=image,
-            init_mask=mask,
-            step_callback=step_callback,
-            **self.dict(
-                exclude={"prompt", "image", "mask"}
-            ),  # Shorthand for passing all of the parameters above manually
+        generator_output = next(
+            img2img.generate(
+                prompt=self.prompt,
+                init_img=image,
+                init_mask=mask,
+                step_callback=step_callback,
+                **self.dict(
+                    exclude={"prompt", "image", "mask"}
+                ),  # Shorthand for passing all of the parameters above manually
+            )
         )
 
-        result_image = results[0][0]
+        result_image = generator_output.image
 
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
@@ -144,7 +151,6 @@ class ImageToImageInvocation(TextToImageInvocation):
         return ImageOutput(
             image=ImageField(image_type=image_type, image_name=image_name)
         )
-
 
 class InpaintInvocation(ImageToImageInvocation):
     """Generates an image using inpaint."""
@@ -180,23 +186,24 @@ class InpaintInvocation(ImageToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        if self.model is None or self.model == "":
-            self.model = context.services.generate.model_name
+        factory = context.services.generator_factory
+        self.model = self.model or factory.model_name
+        factory.model_name = self.model
+        inpaint = factory.make_generator(Inpaint)
 
-        # Set the model (if already cached, this does nothing)
-        context.services.generate.set_model(self.model)
-
-        results = context.services.generate.prompt2image(
-            prompt=self.prompt,
-            init_img=image,
-            init_mask=mask,
-            step_callback=step_callback,
-            **self.dict(
-                exclude={"prompt", "image", "mask"}
-            ),  # Shorthand for passing all of the parameters above manually
+        generator_output = next(
+            inpaint.generate(
+                prompt=self.prompt,
+                init_img=image,
+                init_mask=mask,
+                step_callback=step_callback,
+                **self.dict(
+                    exclude={"prompt", "image", "mask"}
+                ),  # Shorthand for passing all of the parameters above manually
+            )
         )
 
-        result_image = results[0][0]
+        result_image = generator_output.image
 
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?

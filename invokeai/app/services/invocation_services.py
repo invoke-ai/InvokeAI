@@ -1,5 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-from invokeai.backend import Generate
+from invokeai.backend import InvokeAIGeneratorFactory
 
 from .events import EventServiceBase
 from .image_storage import ImageStorageBase
@@ -10,7 +10,7 @@ from .item_storage import ItemStorageABC
 class InvocationServices:
     """Services that can be used by invocations"""
 
-    generate: Generate  # TODO: wrap Generate, or split it up from model?
+    generator_factory: InvokeAIGeneratorFactory
     events: EventServiceBase
     images: ImageStorageBase
     queue: InvocationQueueABC
@@ -20,15 +20,15 @@ class InvocationServices:
     processor: "InvocationProcessorABC"
 
     def __init__(
-        self,
-        generate: Generate,
-        events: EventServiceBase,
-        images: ImageStorageBase,
-        queue: InvocationQueueABC,
-        graph_execution_manager: ItemStorageABC["GraphExecutionState"],
-        processor: "InvocationProcessorABC",
+            self,
+            generator_factory: InvokeAIGeneratorFactory,
+            events: EventServiceBase,
+            images: ImageStorageBase,
+            queue: InvocationQueueABC,
+            graph_execution_manager: ItemStorageABC["GraphExecutionState"],
+            processor: "InvocationProcessorABC",
     ):
-        self.generate = generate
+        self.generator_factory = generator_factory
         self.events = events
         self.images = images
         self.queue = queue
