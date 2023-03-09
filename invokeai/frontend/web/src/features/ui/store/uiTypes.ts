@@ -11,4 +11,6 @@ export interface UIState {
   shouldShowExistingModelsInSearch: boolean;
   shouldUseSliders: boolean;
   addNewModelUIOption: AddNewModelType;
+  shouldPinGallery: boolean;
+  shouldShowGallery: boolean;
 }

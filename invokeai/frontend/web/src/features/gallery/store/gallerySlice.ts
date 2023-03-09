@@ -29,11 +29,8 @@ export interface GalleryState {
     boundingBox?: IRect;
     generationMode?: InvokeTabName;
   };
-  shouldPinGallery: boolean;
-  shouldShowGallery: boolean;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
-  shouldHoldGalleryOpen: boolean;
   shouldAutoSwitchToNewImages: boolean;
   categories: {
     user: Gallery;
@@ -46,11 +43,8 @@ export interface GalleryState {
 
 const initialState: GalleryState = {
   currentImageUuid: '',
-  shouldPinGallery: true,
-  shouldShowGallery: true,
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
-  shouldHoldGalleryOpen: false,
   shouldAutoSwitchToNewImages: true,
   currentCategory: 'result',
   categories: {
@@ -233,13 +227,6 @@ export const gallerySlice = createSlice({
           areMoreImagesAvailable;
       }
     },
-    setShouldPinGallery: (state, action: PayloadAction<boolean>) => {
-      state.shouldPinGallery = action.payload;
-    },
-    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowGallery = action.payload;
-    },
-
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
@@ -248,9 +235,6 @@ export const gallerySlice = createSlice({
       action: PayloadAction<GalleryImageObjectFitType>
     ) => {
       state.galleryImageObjectFit = action.payload;
-    },
-    setShouldHoldGalleryOpen: (state, action: PayloadAction<boolean>) => {
-      state.shouldHoldGalleryOpen = action.payload;
     },
     setShouldAutoSwitchToNewImages: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitchToNewImages = action.payload;
@@ -279,11 +263,8 @@ export const {
   setIntermediateImage,
   selectNextImage,
   selectPrevImage,
-  setShouldPinGallery,
-  setShouldShowGallery,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
-  setShouldHoldGalleryOpen,
   setShouldAutoSwitchToNewImages,
   setCurrentCategory,
   setGalleryWidth,

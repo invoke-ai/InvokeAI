@@ -1,4 +1,3 @@
-// import { Feature } from 'app/features';
 import { Flex } from '@chakra-ui/react';
 import { Feature } from 'app/features';
 import BoundingBoxSettings from 'features/parameters/components/AdvancedParameters/Canvas/BoundingBox/BoundingBoxSettings';
@@ -16,7 +15,6 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import { useTranslation } from 'react-i18next';
-import PinParametersPanelButton from 'features/ui/components/common/PinParametersPanelButton';
 
 export default function UnifiedCanvasParameters() {
   const { t } = useTranslation();
@@ -71,7 +69,6 @@ export default function UnifiedCanvasParameters() {
       <NegativePromptInput />
       <ProcessButtons />
       <ParametersAccordion accordionInfo={unifiedCanvasAccordions} />
-      <PinParametersPanelButton />
     </Flex>
   );
 }

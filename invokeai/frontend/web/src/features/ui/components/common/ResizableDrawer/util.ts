@@ -52,10 +52,10 @@ export const getDefaultSize = ({
 
 export type GetMinMaxDimensionsOptions = {
   direction: SlideDirection;
-  minWidth?: string | number;
-  maxWidth?: string | number;
-  minHeight?: string | number;
-  maxHeight?: string | number;
+  minWidth?: number;
+  maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
 };
 
 // Get the min/max width/height based on direction and provided values
@@ -78,7 +78,12 @@ export const getMinMaxDimensions = ({
   const maxH =
     maxHeight ?? (['top', 'bottom'].includes(direction) ? '95vh' : undefined);
 
-  return { minWidth: minW, maxWidth: maxW, minHeight: minH, maxHeight: maxH };
+  return {
+    ...(minW ? { minWidth: minW } : {}),
+    ...(maxW ? { maxWidth: maxW } : {}),
+    ...(minH ? { minHeight: minH } : {}),
+    ...(maxH ? { maxHeight: maxH } : {}),
+  };
 };
 
 export type GetHandleStylesOptions = {
@@ -171,41 +176,76 @@ export const getAnimations = ({
 };
 
 export type GetResizableStylesProps = {
-  sx: ChakraProps['sx'];
   direction: SlideDirection;
-  handleWidth: number;
+  handleWidth: string | number;
   isPinned: boolean;
+  isResizable: boolean;
 };
 
 export const getResizableStyles = ({
   isPinned, // TODO add borderRadius for pinned?
-  sx,
   direction,
   handleWidth,
+  isResizable,
 }: GetResizableStylesProps): ChakraProps['sx'] => {
-  if (isPinned) {
-    return sx;
+  if (isPinned && !isResizable) {
+    return {};
   }
 
   if (direction === 'top') {
     return {
       borderBottomWidth: handleWidth,
-      ...sx,
     };
   }
 
   if (direction === 'right') {
-    return { borderInlineStartWidth: handleWidth, ...sx };
+    return { borderInlineStartWidth: handleWidth };
   }
 
   if (direction === 'bottom') {
     return {
       borderTopWidth: handleWidth,
-      ...sx,
     };
   }
 
   if (direction === 'left') {
-    return { borderInlineEndWidth: handleWidth, ...sx };
+    return { borderInlineEndWidth: handleWidth };
   }
+};
+
+export const getSlideDirection = (
+  direction: SlideDirection,
+  langDirection: LangDirection
+) => {
+  if (['top', 'bottom'].includes(direction)) {
+    return direction;
+  }
+
+  if (direction === 'left') {
+    if (langDirection === 'rtl') {
+      return 'right';
+    }
+    return 'left';
+  }
+
+  if (direction === 'right') {
+    if (langDirection === 'rtl') {
+      return 'left';
+    }
+    return 'right';
+  }
+
+  return 'left';
+};
+
+export const parseAndPadSize = (size?: number, padding?: number) => {
+  if (!size) {
+    return undefined;
+  }
+
+  if (!padding) {
+    return size;
+  }
+
+  return size + padding;
 };

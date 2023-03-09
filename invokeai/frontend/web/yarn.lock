@@ -4204,16 +4204,6 @@ os-tmpdir@~1.0.2:
   resolved "https://registry.yarnpkg.com/os-tmpdir/-/os-tmpdir-1.0.2.tgz#bbe67406c79aa85c5cfec766fe5734555dfa1274"
   integrity sha512-D2FR03Vir7FIu45XBY20mTb+/ZSWB00sjU9jdQXt83gDrI4Ztz5Fs7/yy74g2N5SVQY4xY1qDr4rNddwYRVX0g==
 
-overlayscrollbars-react@^0.5.0:
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/overlayscrollbars-react/-/overlayscrollbars-react-0.5.0.tgz#0272bdc6304c7228a58d30e5b678e97fd5c5d8dd"
-  integrity sha512-uCNTnkfWW74veoiEv3kSwoLelKt4e8gTNv65D771X3il0x5g5Yo0fUbro7SpQzR9yNgi23cvB2mQHTTdQH96pA==
-
-overlayscrollbars@^2.1.0:
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/overlayscrollbars/-/overlayscrollbars-2.1.0.tgz#d647034ef388980e0e5e092f7429c501215330a1"
-  integrity sha512-L6p4o4aWse5pDstRnJjZaos+al+bkuAgzGIlWwlsxRSgW6+7Kvrp+kAzlWoTZ1bgB4CJj+8u5bjdq8XHEhWjrw==
-
 p-cancelable@^1.0.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/p-cancelable/-/p-cancelable-1.1.0.tgz#d078d15a3af409220c886f1d9a0ca2e441ab26cc"

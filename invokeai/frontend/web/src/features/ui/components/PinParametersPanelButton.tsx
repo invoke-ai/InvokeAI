@@ -1,14 +1,17 @@
-import { Box, Icon, Tooltip } from '@chakra-ui/react';
+import { Tooltip } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { setShouldPinParametersPanel } from '../../store/uiSlice';
+import { setShouldPinParametersPanel } from '../store/uiSlice';
 
-const PinParametersPanelButton = () => {
+type PinParametersPanelButtonProps = Omit<IAIIconButtonProps, 'aria-label'>;
+
+const PinParametersPanelButton = (props: PinParametersPanelButtonProps) => {
+  const { sx } = props;
   const dispatch = useAppDispatch();
   const shouldPinParametersPanel = useAppSelector(
     (state) => state.ui.shouldPinParametersPanel
@@ -18,23 +21,27 @@ const PinParametersPanelButton = () => {
 
   const handleClickPinOptionsPanel = () => {
     dispatch(setShouldPinParametersPanel(!shouldPinParametersPanel));
-    dispatch(setDoesCanvasNeedScaling(true));
+    dispatch(requestCanvasRescale());
   };
 
   return (
     <Tooltip label={t('common.pinOptionsPanel')}>
       <IAIIconButton
+        {...props}
         aria-label={t('common.pinOptionsPanel')}
-        opacity={0.2}
         onClick={handleClickPinOptionsPanel}
         icon={shouldPinParametersPanel ? <BsPinAngleFill /> : <BsPinAngle />}
-        variant="unstyled"
+        variant="ghost"
         size="sm"
-        padding={2}
         sx={{
-          position: 'absolute',
-          top: 1,
-          insetInlineEnd: 1,
+          color: 'base.700',
+          _hover: {
+            color: 'base.550',
+          },
+          _active: {
+            color: 'base.500',
+          },
+          ...sx,
         }}
       />
     </Tooltip>

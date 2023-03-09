@@ -6,8 +6,8 @@ import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
-import { debounce, isEqual } from 'lodash';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { isEqual } from 'lodash';
 
 import { useLayoutEffect } from 'react';
 
@@ -32,11 +32,11 @@ const UnifiedCanvasContent = () => {
   const { doesCanvasNeedScaling } = useAppSelector(selector);
 
   useLayoutEffect(() => {
-    dispatch(setDoesCanvasNeedScaling(true));
+    dispatch(requestCanvasRescale());
 
-    const resizeCallback = debounce(() => {
-      dispatch(setDoesCanvasNeedScaling(true));
-    }, 250);
+    const resizeCallback = () => {
+      dispatch(requestCanvasRescale());
+    };
 
     window.addEventListener('resize', resizeCallback);
 

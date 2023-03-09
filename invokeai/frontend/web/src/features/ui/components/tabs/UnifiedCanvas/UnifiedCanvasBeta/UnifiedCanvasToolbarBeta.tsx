@@ -1,7 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
 import IAICanvasRedoButton from 'features/canvas/components/IAICanvasToolbar/IAICanvasRedoButton';
 import IAICanvasUndoButton from 'features/canvas/components/IAICanvasToolbar/IAICanvasUndoButton';
 import UnifiedCanvasCopyToClipboard from './UnifiedCanvasToolbar/UnifiedCanvasCopyToClipboard';
@@ -18,10 +16,6 @@ import UnifiedCanvasToolSelect from './UnifiedCanvasToolbar/UnifiedCanvasToolSel
 import UnifiedCanvasSettings from './UnifiedCanvasToolSettings/UnifiedCanvasSettings';
 
 const UnifiedCanvasToolbarBeta = () => {
-  const shouldShowParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldShowParametersPanel
-  );
-
   return (
     <Flex flexDirection="column" rowGap={2}>
       <UnifiedCanvasLayerSelect />
@@ -52,7 +46,7 @@ const UnifiedCanvasToolbarBeta = () => {
       </Flex>
 
       <UnifiedCanvasSettings />
-      {!shouldShowParametersPanel && <UnifiedCanvasProcessingButtons />}
+      <UnifiedCanvasProcessingButtons />
     </Flex>
   );
 };

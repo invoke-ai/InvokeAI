@@ -63,7 +63,14 @@
         "back": "Atrás",
         "statusConvertingModel": "Convertir el modelo",
         "statusModelConverted": "Modelo adaptado",
-        "statusMergingModels": "Fusionar modelos"
+        "statusMergingModels": "Fusionar modelos",
+        "oceanTheme": "Océano",
+        "langPortuguese": "Portugués",
+        "langKorean": "Coreano",
+        "langHebrew": "Hebreo",
+        "pinOptionsPanel": "Pin del panel de opciones",
+        "loading": "Cargando",
+        "loadingInvokeAI": "Cargando invocar a la IA"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -385,14 +392,19 @@
         "modelMergeAlphaHelp": "Alfa controla la fuerza de mezcla de los modelos. Los valores alfa más bajos reducen la influencia del segundo modelo.",
         "modelMergeInterpAddDifferenceHelp": "En este modo, el Modelo 3 se sustrae primero del Modelo 2. La versión resultante se mezcla con el Modelo 1 con la tasa alfa establecida anteriormente. La versión resultante se mezcla con el Modelo 1 con la tasa alfa establecida anteriormente.",
         "ignoreMismatch": "Ignorar discrepancias entre modelos seleccionados",
-        "modelMergeHeaderHelp1": "Puede combinar hasta tres modelos diferentes para crear una mezcla que se adapte a sus necesidades.",
+        "modelMergeHeaderHelp1": "Puede unir hasta tres modelos diferentes para crear una combinación que se adapte a sus necesidades.",
         "inverseSigmoid": "Sigmoideo inverso",
         "weightedSum": "Modelo de suma ponderada",
         "sigmoid": "Función sigmoide",
         "allModels": "Todos los modelos",
         "repo_id": "Identificador del repositorio",
         "pathToCustomConfig": "Ruta a la configuración personalizada",
-        "customConfig": "Configuración personalizada"
+        "customConfig": "Configuración personalizada",
+        "v2_base": "v2 (512px)",
+        "none": "ninguno",
+        "pickModelType": "Elige el tipo de modelo",
+        "v2_768": "v2 (768px)",
+        "addDifference": "Añadir una diferencia"
     },
     "parameters": {
         "images": "Imágenes",
@@ -588,5 +600,27 @@
         "betaDarkenOutside": "Oscurecer fuera",
         "betaLimitToBox": "Limitar a caja",
         "betaPreserveMasked": "Preservar área enmascarada"
+    },
+    "accessibility": {
+        "invokeProgressBar": "Activar la barra de progreso",
+        "modelSelect": "Seleccionar modelo",
+        "reset": "Reiniciar",
+        "uploadImage": "Cargar imagen",
+        "previousImage": "Imagen anterior",
+        "nextImage": "Siguiente imagen",
+        "useThisParameter": "Utiliza este parámetro",
+        "copyMetadataJson": "Copiar los metadatos JSON",
+        "exitViewer": "Salir del visor",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "rotateCounterClockwise": "Girar en sentido antihorario",
+        "rotateClockwise": "Girar en sentido horario",
+        "flipHorizontally": "Voltear horizontalmente",
+        "flipVertically": "Voltear verticalmente",
+        "modifyConfig": "Modificar la configuración",
+        "toggleAutoscroll": "Activar el autodesplazamiento",
+        "toggleLogViewer": "Alternar el visor de registros",
+        "showGallery": "Mostrar galería",
+        "showOptionsPanel": "Mostrar el panel de opciones"
     }
 }

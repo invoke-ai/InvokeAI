@@ -1,113 +1,84 @@
 import { Box, ChakraProps } from '@chakra-ui/react';
-import { useOverlayScrollbars } from 'overlayscrollbars-react';
+import { throttle } from 'lodash';
 import { ReactNode, useEffect, useRef } from 'react';
+
+const scrollShadowBaseStyles: ChakraProps['sx'] = {
+  position: 'absolute',
+  width: 'full',
+  height: 24,
+  left: 0,
+  pointerEvents: 'none',
+  transition: 'opacity 0.2s',
+};
 
 type ScrollableProps = {
   children: ReactNode;
-  containerProps?: ChakraProps;
 };
 
-const Scrollable = ({
-  children,
-  containerProps = {
-    width: 'full',
-    height: 'full',
-    flexShrink: 0,
-  },
-}: ScrollableProps) => {
+const Scrollable = ({ children }: ScrollableProps) => {
   const scrollableRef = useRef<HTMLDivElement>(null);
   const topShadowRef = useRef<HTMLDivElement>(null);
   const bottomShadowRef = useRef<HTMLDivElement>(null);
 
-  const [initialize, _instance] = useOverlayScrollbars({
-    defer: true,
-    events: {
-      initialized(instance) {
-        if (!topShadowRef.current || !bottomShadowRef.current) {
-          return;
-        }
+  const updateScrollShadowOpacity = throttle(
+    () => {
+      if (
+        !scrollableRef.current ||
+        !topShadowRef.current ||
+        !bottomShadowRef.current
+      ) {
+        return;
+      }
+      const { scrollTop, scrollHeight, offsetHeight } = scrollableRef.current;
 
-        const { scrollTop, scrollHeight, offsetHeight } =
-          instance.elements().content;
+      if (scrollTop > 0) {
+        topShadowRef.current.style.opacity = '1';
+      } else {
+        topShadowRef.current.style.opacity = '0';
+      }
 
-        const scrollPercentage = scrollTop / (scrollHeight - offsetHeight);
-
-        topShadowRef.current.style.opacity = String(scrollPercentage * 5);
-
-        bottomShadowRef.current.style.opacity = String(
-          (1 - scrollPercentage) * 5
-        );
-      },
-      scroll: (_instance, event) => {
-        if (
-          !topShadowRef.current ||
-          !bottomShadowRef.current ||
-          !scrollableRef.current
-        ) {
-          return;
-        }
-
-        const { scrollTop, scrollHeight, offsetHeight } =
-          event.target as HTMLDivElement;
-
-        const scrollPercentage = scrollTop / (scrollHeight - offsetHeight);
-
-        topShadowRef.current.style.opacity = String(scrollPercentage * 5);
-
-        bottomShadowRef.current.style.opacity = String(
-          (1 - scrollPercentage) * 5
-        );
-      },
+      if (scrollTop >= scrollHeight - offsetHeight) {
+        bottomShadowRef.current.style.opacity = '0';
+      } else {
+        bottomShadowRef.current.style.opacity = '1';
+      }
     },
-  });
+    33,
+    { leading: true }
+  );
 
   useEffect(() => {
-    if (
-      !scrollableRef.current ||
-      !topShadowRef.current ||
-      !bottomShadowRef.current
-    ) {
-      return;
-    }
-
-    topShadowRef.current.style.opacity = '0';
-
-    bottomShadowRef.current.style.opacity = '0';
-
-    initialize(scrollableRef.current);
-  }, [initialize]);
+    updateScrollShadowOpacity();
+  }, [updateScrollShadowOpacity]);
 
   return (
     <Box position="relative" w="full" h="full">
-      <Box ref={scrollableRef} {...containerProps} overflowY="scroll">
-        <Box paddingInlineEnd={5}>{children}</Box>
+      <Box
+        ref={scrollableRef}
+        position="absolute"
+        w="full"
+        h="full"
+        overflowY="scroll"
+        onScroll={updateScrollShadowOpacity}
+      >
+        {children}
       </Box>
       <Box
         ref={bottomShadowRef}
         sx={{
-          position: 'absolute',
+          ...scrollShadowBaseStyles,
+          bottom: 0,
           boxShadow:
             'inset 0 -3.5rem 2rem -2rem var(--invokeai-colors-base-900)',
-          width: 'full',
-          height: 24,
-          bottom: 0,
-          left: 0,
-          pointerEvents: 'none',
-          transition: 'opacity 0.2s',
         }}
       ></Box>
       <Box
         ref={topShadowRef}
         sx={{
-          position: 'absolute',
+          ...scrollShadowBaseStyles,
+          top: 0,
           boxShadow:
             'inset 0 3.5rem 2rem -2rem var(--invokeai-colors-base-900)',
-          width: 'full',
-          height: 24,
-          top: 0,
-          left: 0,
-          pointerEvents: 'none',
-          transition: 'opacity 0.2s',
         }}
       ></Box>
     </Box>

@@ -2,7 +2,7 @@ import { Flex } from '@chakra-ui/layout';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
 import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
@@ -19,9 +19,7 @@ export default function UnifiedCanvasProcessingButtons() {
 
   const handleShowOptionsPanel = () => {
     dispatch(setShouldShowParametersPanel(true));
-    if (shouldPinParametersPanel) {
-      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
-    }
+    shouldPinParametersPanel && dispatch(requestCanvasRescale());
   };
 
   return (

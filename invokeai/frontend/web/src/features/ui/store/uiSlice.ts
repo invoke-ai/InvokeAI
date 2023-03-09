@@ -14,6 +14,8 @@ const initialtabsState: UIState = {
   shouldShowExistingModelsInSearch: false,
   shouldUseSliders: false,
   addNewModelUIOption: null,
+  shouldPinGallery: true,
+  shouldShowGallery: true,
 };
 
 const initialState: UIState = initialtabsState;
@@ -63,6 +65,33 @@ export const uiSlice = createSlice({
     setAddNewModelUIOption: (state, action: PayloadAction<AddNewModelType>) => {
       state.addNewModelUIOption = action.payload;
     },
+    setShouldPinGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldPinGallery = action.payload;
+    },
+    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowGallery = action.payload;
+    },
+    togglePinGalleryPanel: (state) => {
+      state.shouldPinGallery = !state.shouldPinGallery;
+    },
+    togglePinParametersPanel: (state) => {
+      state.shouldPinParametersPanel = !state.shouldPinParametersPanel;
+    },
+    toggleParametersPanel: (state) => {
+      state.shouldShowParametersPanel = !state.shouldShowParametersPanel;
+    },
+    toggleGalleryPanel: (state) => {
+      state.shouldShowGallery = !state.shouldShowGallery;
+    },
+    togglePanels: (state) => {
+      if (state.shouldShowGallery || state.shouldShowParametersPanel) {
+        state.shouldShowGallery = false;
+        state.shouldShowParametersPanel = false;
+      } else {
+        state.shouldShowGallery = true;
+        state.shouldShowParametersPanel = true;
+      }
+    },
   },
 });
 
@@ -77,6 +106,13 @@ export const {
   setShouldShowExistingModelsInSearch,
   setShouldUseSliders,
   setAddNewModelUIOption,
+  setShouldPinGallery,
+  setShouldShowGallery,
+  togglePanels,
+  togglePinGalleryPanel,
+  togglePinParametersPanel,
+  toggleParametersPanel,
+  toggleGalleryPanel,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

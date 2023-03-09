@@ -6,7 +6,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { MouseEvent } from 'react';
+import { memo, MouseEvent } from 'react';
 
 type IAISelectProps = SelectProps & {
   label?: string;
@@ -52,4 +52,4 @@ const IAISelect = (props: IAISelectProps) => {
   );
 };
 
-export default IAISelect;
+export default memo(IAISelect);

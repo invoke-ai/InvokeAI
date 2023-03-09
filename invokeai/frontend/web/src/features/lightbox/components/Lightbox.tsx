@@ -4,7 +4,7 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import CurrentImageButtons from 'features/gallery/components/CurrentImageButtons';
-import ImageGallery from 'features/gallery/components/ImageGallery';
+import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
@@ -164,7 +164,7 @@ export default function Lightbox() {
               <CurrentImageButtons />
             </Box>
           </Grid>
-          <ImageGallery />
+          <ImageGalleryPanel />
         </Flex>
       </Box>
     </TransformWrapper>

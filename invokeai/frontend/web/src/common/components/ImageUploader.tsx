@@ -7,6 +7,7 @@ import { tabDict } from 'features/ui/components/InvokeTabs';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   KeyboardEvent,
+  memo,
   ReactNode,
   useCallback,
   useEffect,
@@ -161,4 +162,4 @@ const ImageUploader = (props: ImageUploaderProps) => {
   );
 };
 
-export default ImageUploader;
+export default memo(ImageUploader);

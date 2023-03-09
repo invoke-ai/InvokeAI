@@ -16,13 +16,13 @@ import {
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { LangDirection } from './types';
 import {
-  getDefaultSize,
   getHandleEnables,
   getHandleStyles,
   getMinMaxDimensions,
   getResizableStyles,
+  getSlideDirection,
+  parseAndPadSize,
 } from './util';
-import Scrollable from '../Scrollable';
 
 type ResizableDrawerProps = ResizableProps & {
   children: ReactNode;
@@ -31,21 +31,18 @@ type ResizableDrawerProps = ResizableProps & {
   isOpen: boolean;
   onClose: () => void;
   direction?: SlideDirection;
-  initialWidth?: string | number;
-  minWidth?: string | number;
-  maxWidth?: string | number;
-  initialHeight?: string | number;
-  minHeight?: string | number;
-  maxHeight?: string | number;
-  shouldAllowResize?: boolean;
+  initialWidth?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  initialHeight?: number;
+  minHeight?: number;
+  maxHeight?: number;
   onResizeStart?: ResizeStartCallback;
   onResizeStop?: ResizeCallback;
   onResize?: ResizeCallback;
-  handleWidth?: number;
+  handleWidth?: string | number;
   handleInteractWidth?: string | number;
   sx?: ChakraProps['sx'];
-  pinnedWidth: number;
-  pinnedHeight: string | number;
 };
 
 const ChakraResizeable = chakra(Resizable, {
@@ -59,25 +56,34 @@ const ResizableDrawer = ({
   isOpen,
   onClose,
   children,
-  initialWidth = undefined,
-  minWidth = undefined,
-  maxWidth = undefined,
-  initialHeight = undefined,
-  minHeight = undefined,
-  maxHeight = undefined,
-  shouldAllowResize,
+  initialWidth,
+  minWidth,
+  maxWidth,
+  initialHeight,
+  minHeight,
+  maxHeight,
   onResizeStart,
   onResizeStop,
   onResize,
-  handleWidth = 5,
+  handleWidth = '5px',
   handleInteractWidth = '15px',
-  pinnedWidth,
-  pinnedHeight,
   sx = {},
 }: ResizableDrawerProps) => {
   const langDirection = useTheme().direction as LangDirection;
 
   const outsideClickRef = useRef<HTMLDivElement>(null);
+
+  const [width, setWidth] = useState<number | string>(
+    initialWidth ??
+      minWidth ??
+      (['left', 'right'].includes(direction) ? 500 : '100vw')
+  );
+
+  const [height, setHeight] = useState<number | string>(
+    initialHeight ??
+      minHeight ??
+      (['top', 'bottom'].includes(direction) ? 500 : '100vh')
+  );
 
   useOutsideClick({
     ref: outsideClickRef,
@@ -90,15 +96,9 @@ const ResizableDrawer = ({
     },
   });
 
-  const [width, setWidth] = useState<number | string>(0);
-  const [height, setHeight] = useState<number | string>(0);
-
   const handleEnables = useMemo(
-    () =>
-      isResizable && shouldAllowResize
-        ? getHandleEnables({ direction, langDirection })
-        : {},
-    [isResizable, shouldAllowResize, langDirection, direction]
+    () => (isResizable ? getHandleEnables({ direction, langDirection }) : {}),
+    [isResizable, langDirection, direction]
   );
 
   const handleStyles = useMemo(
@@ -116,29 +116,31 @@ const ResizableDrawer = ({
     () =>
       getMinMaxDimensions({
         direction,
-        minWidth,
-        maxWidth,
-        minHeight,
-        maxHeight,
+        minWidth: isPinned
+          ? parseAndPadSize(minWidth)
+          : parseAndPadSize(minWidth, 36),
+        maxWidth: isPinned
+          ? parseAndPadSize(maxWidth)
+          : parseAndPadSize(maxWidth, 36),
+        minHeight: isPinned
+          ? parseAndPadSize(minHeight)
+          : parseAndPadSize(minHeight, 36),
+        maxHeight: isPinned
+          ? parseAndPadSize(maxHeight)
+          : parseAndPadSize(maxHeight, 36),
       }),
-    [minWidth, maxWidth, minHeight, maxHeight, direction]
+    [minWidth, maxWidth, minHeight, maxHeight, direction, isPinned]
   );
 
   const resizableStyles = useMemo(
-    () => getResizableStyles({ isPinned, direction, sx, handleWidth }),
-    [sx, handleWidth, direction, isPinned]
+    () => getResizableStyles({ isPinned, direction, handleWidth, isResizable }),
+    [handleWidth, direction, isPinned, isResizable]
   );
 
-  useEffect(() => {
-    const { width, height } = getDefaultSize({
-      initialWidth,
-      initialHeight,
-      direction,
-    });
-
-    setWidth(width);
-    setHeight(height);
-  }, [initialWidth, initialHeight, direction, langDirection]);
+  const slideDirection = useMemo(
+    () => getSlideDirection(direction, langDirection),
+    [direction, langDirection]
+  );
 
   useEffect(() => {
     if (['left', 'right'].includes(direction)) {
@@ -151,7 +153,7 @@ const ResizableDrawer = ({
 
   return (
     <Slide
-      direction={direction}
+      direction={slideDirection}
       in={isOpen}
       motionProps={{ initial: false }}
       {...(isPinned
@@ -165,29 +167,34 @@ const ResizableDrawer = ({
             },
           }
         : {
-            transition: { enter: { duration: 0.2 }, exit: { duration: 0.2 } },
-            style: { zIndex: 98 },
+            transition: { enter: { duration: 0.15 }, exit: { duration: 0.15 } },
+            style: { zIndex: 99, width: 'full' },
           })}
     >
       <Box
         ref={outsideClickRef}
         sx={{
-          width: ['left', 'right'].includes(direction) ? 'min-content' : 'full',
-          height: ['left', 'right'].includes(direction)
-            ? '100%'
-            : 'min-content',
-          position: 'relative',
+          width: 'full',
+          height: 'full',
         }}
       >
         <ChakraResizeable
           size={{
-            width: isPinned ? '100%' : width,
-            height: isPinned ? '100%' : height,
+            width,
+            height,
           }}
           enable={handleEnables}
           handleStyles={handleStyles}
           {...minMaxDimensions}
-          sx={{ ...resizableStyles, height: 'full' }}
+          sx={{
+            borderColor: 'base.700',
+            p: isPinned ? 0 : 4,
+            bg: 'base.900',
+            height: 'full',
+            boxShadow: !isPinned ? '0 0 4rem 0 rgba(0, 0, 0, 0.8)' : '',
+            ...resizableStyles,
+            ...sx,
+          }}
           onResizeStart={(event, direction, elementRef) => {
             onResizeStart && onResizeStart(event, direction, elementRef);
           }}
@@ -195,19 +202,16 @@ const ResizableDrawer = ({
             onResize && onResize(event, direction, elementRef, delta);
           }}
           onResizeStop={(event, direction, elementRef, delta) => {
-            event.stopPropagation();
-            event.stopImmediatePropagation();
-            event.preventDefault();
-            if (direction === 'left' || direction === 'right') {
+            if (['left', 'right'].includes(direction)) {
               setWidth(Number(width) + delta.width);
             }
-            if (direction === 'top' || direction === 'bottom') {
+            if (['top', 'bottom'].includes(direction)) {
               setHeight(Number(height) + delta.height);
             }
             onResizeStop && onResizeStop(event, direction, elementRef, delta);
           }}
         >
-          <Scrollable>{children}</Scrollable>
+          {children}
         </ChakraResizeable>
       </Box>
     </Slide>
