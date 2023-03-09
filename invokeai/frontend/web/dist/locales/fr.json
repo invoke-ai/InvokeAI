@@ -45,7 +45,9 @@
         "statusUpscaling": "Mise à échelle",
         "statusUpscalingESRGAN": "Mise à échelle (ESRGAN)",
         "statusLoadingModel": "Chargement du modèle",
-        "statusModelChanged": "Modèle changé"
+        "statusModelChanged": "Modèle changé",
+        "discordLabel": "Discord",
+        "githubLabel": "Github"
     },
     "gallery": {
         "generations": "Générations",
