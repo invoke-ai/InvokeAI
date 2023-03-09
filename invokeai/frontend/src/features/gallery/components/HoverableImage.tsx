@@ -10,6 +10,7 @@ import {
   setInitialImage,
   setSeed,
 } from 'features/parameters/store/generationSlice';
+import { setAllPostProcessingParameters } from 'features/parameters/store/postprocessingSlice';
 import { DragEvent, memo, useState } from 'react';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
@@ -114,7 +115,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseAllParameters = () => {
-    metadata && dispatch(setAllParameters(metadata));
+    if (metadata) {
+      dispatch(setAllParameters(metadata));
+      dispatch(setAllPostProcessingParameters(metadata));
+    }
     toast({
       title: t('toast.parametersSet'),
       status: 'success',
