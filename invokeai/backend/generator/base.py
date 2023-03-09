@@ -158,11 +158,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             scheduler_name=self.params.scheduler
         )
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt,model=model)
-
-        def _wrap_results(image: Image, seed: int, **kwargs):
-            nonlocal results
-            results.append(output)
-
         generator = self.load_generator(model, self._generator_name())
         if self.params.variation_amount > 0:
             generator.set_variation(self.params.seed,
