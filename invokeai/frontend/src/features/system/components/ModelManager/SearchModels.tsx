@@ -181,7 +181,8 @@ export default function SearchModels() {
 
     const configFiles = {
       v1: 'configs/stable-diffusion/v1-inference.yaml',
-      v2: 'configs/stable-diffusion/v2-inference-v.yaml',
+      v2_base: 'configs/stable-diffusion/v2-inference-v.yaml',
+      v2_768: 'configs/stable-diffusion/v2-inference-v.yaml',
       inpainting: 'configs/stable-diffusion/v1-inpainting-inference.yaml',
       custom: pathToConfig,
     };
@@ -385,7 +386,8 @@ export default function SearchModels() {
               >
                 <Flex gap={4}>
                   <Radio value="v1">{t('modelManager.v1')}</Radio>
-                  <Radio value="v2">{t('modelManager.v2')}</Radio>
+                  <Radio value="v2_base">{t('modelManager.v2_base')}</Radio>
+                  <Radio value="v2_768">{t('modelManager.v2_768')}</Radio>
                   <Radio value="inpainting">
                     {t('modelManager.inpainting')}
                   </Radio>
