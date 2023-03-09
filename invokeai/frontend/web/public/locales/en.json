@@ -1,4 +1,8 @@
 {
+    "accessibility": {
+        "modelSelect": "Model Select",
+        "invokeProgressBar": "Invoke progress bar"
+    },
     "common": {
         "hotkeysLabel": "Hotkeys",
         "themeLabel": "Theme",

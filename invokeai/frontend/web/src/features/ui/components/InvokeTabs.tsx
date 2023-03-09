@@ -6,6 +6,7 @@ import {
   TabPanels,
   Tabs,
   Tooltip,
+  VisuallyHidden,
 } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -164,7 +165,12 @@ export default function InvokeTabs() {
           label={tabDict[key as keyof typeof tabDict].tooltip}
           placement="end"
         >
-          <Tab>{tabDict[key as keyof typeof tabDict].title}</Tab>
+          <Tab>
+            <VisuallyHidden>
+              {tabDict[key as keyof typeof tabDict].tooltip}
+            </VisuallyHidden>
+            {tabDict[key as keyof typeof tabDict].title}
+          </Tab>
         </Tooltip>
       );
     });

@@ -347,6 +347,7 @@ class Generator:
             h_symmetry_time_pct=h_symmetry_time_pct,
             v_symmetry_time_pct=v_symmetry_time_pct,
             attention_maps_callback=attention_maps_callback,
+            seed=seed,
             **kwargs,
         )
         results = []
@@ -537,9 +538,7 @@ class Generator:
             if self.variation_amount > 0:
                 random.seed()  # reset RNG to an actually random state, so we can get a random seed for variations
                 seed = random.randrange(0, np.iinfo(np.uint32).max)
-            return (seed, initial_noise)
-        else:
-            return (seed, None)
+        return (seed, initial_noise)
 
     def get_perlin_noise(self, width, height):
         fixdevice = "cpu" if (self.model.device.type == "mps") else self.model.device
