@@ -1,10 +1,7 @@
 {
-  "name": "@invoke-ai/invoke-ai-ui",
-  "version": "0.0.1-dev5",
-  "publishConfig": {
-    "access": "restricted",
-    "registry": "https://npm.pkg.github.com"
-  },
+  "name": "invoke-ai-ui",
+  "private": true,
+  "version": "0.0.1",
   "scripts": {
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
