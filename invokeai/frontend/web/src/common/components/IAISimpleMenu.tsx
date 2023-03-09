@@ -68,6 +68,7 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
           <MenuButton
             as={menuType === 'icon' ? IconButton : Button}
             tooltip={iconTooltip}
+            aria-label={iconTooltip}
             icon={isOpen ? <MdArrowDropUp /> : <MdArrowDropDown />}
             paddingX={0}
             paddingY={menuType === 'regular' ? 2 : 0}

@@ -6,6 +6,7 @@ import IAISelect from 'common/components/IAISelect';
 import { isEqual, map } from 'lodash';
 
 import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { activeModelSelector, systemSelector } from '../store/systemSelectors';
 
 const selector = createSelector(
@@ -24,6 +25,7 @@ const selector = createSelector(
 
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const { models, isProcessing } = useAppSelector(selector);
   const activeModel = useAppSelector(activeModelSelector);
   const handleChangeModel = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -38,6 +40,7 @@ const ModelSelect = () => {
     >
       <IAISelect
         style={{ fontSize: 'sm' }}
+        aria-label={t('accessibility.modelSelect')}
         tooltip={activeModel.description}
         isDisabled={isProcessing}
         value={activeModel.name}
