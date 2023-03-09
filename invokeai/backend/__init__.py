@@ -6,7 +6,10 @@ from .generator import (
     InvokeAIGeneratorBasicParams,
     InvokeAIGeneratorFactory,
     InvokeAIGenerator,
-    InvokeAIGeneratorOutput
+    InvokeAIGeneratorOutput,
+    Txt2Img,
+    Img2Img,
+    Inpaint
 )
 from .model_management import ModelManager
 from .args import Args

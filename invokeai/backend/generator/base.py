@@ -5,6 +5,7 @@ including img2img, txt2img, and inpaint
 from __future__ import annotations
 
 import importlib
+import itertools
 import dataclasses
 import diffusers
 import os
@@ -20,7 +21,7 @@ from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
 from tqdm import trange
-from typing import List, Type
+from typing import List, Type, Iterator
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
@@ -77,7 +78,7 @@ class InvokeAIGeneratorOutput:
 class InvokeAIGeneratorFactory(object):
     def __init__(self,
                  model_manager: ModelManager,
-                 params: InvokeAIGeneratorBasicParams
+                 params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
                  ):
         self.model_manager = model_manager
         self.params = params
@@ -115,7 +116,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
     def __init__(self,
                  model_manager: ModelManager,
-                 params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
+                 params: InvokeAIGeneratorBasicParams,
                  ):
         self.model_manager=model_manager
         self.params=params
@@ -124,9 +125,30 @@ class InvokeAIGenerator(metaclass=ABCMeta):
                  prompt: str='',
                  callback: callable=None,
                  step_callback: callable=None,
+                 iterations: int=1,
                  **keyword_args,
-                 )->List[InvokeAIGeneratorOutput]:
+                 )->Iterator[InvokeAIGeneratorOutput]:
+        '''
+        Return an iterator across the indicated number of generations.
+        Each time the iterator is called it will return an InvokeAIGeneratorOutput
+        object. Use like this:
 
+           outputs = txt2img.generate(prompt='banana sushi', iterations=5)
+           for result in outputs:
+               print(result.image, result.seed)
+
+        In the typical case of wanting to get just a single image, iterations
+        defaults to 1 and do:
+
+           output = next(txt2img.generate(prompt='banana sushi')
+
+        Pass None to get an infinite iterator.
+
+           outputs = txt2img.generate(prompt='banana sushi', iterations=None)
+           for o in outputs:
+               print(o.image, o.seed)
+        
+        '''
         model_name = self.params.model_name or self.model_manager.current_model
         model_info: dict = self.model_manager.get_model(model_name)
         model:StableDiffusionGeneratorPipeline = model_info['model']
@@ -149,8 +171,9 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
-        
-        while True:
+
+        iteration_count = range(iterations) if iterations else itertools.count(start=0, step=1)
+        for i in iteration_count:
             results = generator.generate(prompt,
                                          conditioning=(uc, c, extra_conditioning_info),
                                          sampler=scheduler,
