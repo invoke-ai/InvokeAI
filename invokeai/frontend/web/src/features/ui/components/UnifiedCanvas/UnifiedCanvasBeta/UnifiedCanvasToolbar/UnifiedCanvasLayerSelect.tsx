@@ -61,6 +61,7 @@ export default function UnifiedCanvasLayerSelect() {
   return (
     <IAISelect
       tooltip={`${t('unifiedCanvas.layer')} (Q)`}
+      aria-label={`${t('unifiedCanvas.layer')} (Q)`}
       tooltipProps={{ hasArrow: true, placement: 'top' }}
       value={layer}
       validValues={LAYER_NAMES_DICT}
