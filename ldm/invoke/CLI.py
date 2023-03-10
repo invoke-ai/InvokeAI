@@ -389,6 +389,7 @@ def main_loop(gen, opt):
                         prior_variations,
                         postprocessed,
                         first_seed,
+                        gen.model_name,
                     )
                     path = file_writer.save_image_and_prompt_to_png(
                         image=image,
@@ -402,6 +403,7 @@ def main_loop(gen, opt):
                                 else first_seed
                             ],
                             model_hash=gen.model_hash,
+                            model_id=gen.model_name,
                         ),
                         name=filename,
                         compress_level=opt.png_compression,
@@ -941,13 +943,14 @@ def add_postprocessing_to_metadata(opt, original_file, new_file, tool, command):
 
 
 def prepare_image_metadata(
-    opt,
-    prefix,
-    seed,
-    operation="generate",
-    prior_variations=[],
-    postprocessed=False,
-    first_seed=None,
+        opt,
+        prefix,
+        seed,
+        operation="generate",
+        prior_variations=[],
+        postprocessed=False,
+        first_seed=None,
+        model_id='unknown',
 ):
     if postprocessed and opt.save_original:
         filename = choose_postprocess_name(opt, prefix, seed)
@@ -955,7 +958,9 @@ def prepare_image_metadata(
         wildcards = dict(opt.__dict__)
         wildcards["prefix"] = prefix
         wildcards["seed"] = seed
+        wildcards["model_id"] = model_id
         try:
+            print(f'DEBUG: fnformat={opt.fnformat}')
             filename = opt.fnformat.format(**wildcards)
         except KeyError as e:
             print(
@@ -972,17 +977,16 @@ def prepare_image_metadata(
         first_seed = first_seed or seed
         this_variation = [[seed, opt.variation_amount]]
         opt.with_variations = prior_variations + this_variation
-        formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed)
+        formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed,model_id=model_id)
     elif len(prior_variations) > 0:
-        formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed)
+        formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed,model_id=model_id)
     elif operation == "postprocess":
         formatted_dream_prompt = "!fix " + opt.dream_prompt_str(
-            seed=seed, prompt=opt.input_file_path
+            seed=seed, prompt=opt.input_file_path, model_id=model_id,
         )
     else:
-        formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
+        formatted_dream_prompt = opt.dream_prompt_str(seed=seed,model_id=model_id)
     return filename, formatted_dream_prompt
-
 
 def choose_postprocess_name(opt, prefix, seed) -> str:
     match = re.search("postprocess:(\w+)", opt.last_operation)
