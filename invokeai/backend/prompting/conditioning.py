@@ -7,7 +7,7 @@ get_uc_and_c_and_ec()           get the conditioned and unconditioned latent, an
 
 """
 import re
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from compel import Compel
 from compel.prompt_parser import (
@@ -17,42 +17,11 @@ from compel.prompt_parser import (
     Fragment,
     PromptParser,
 )
-from transformers import CLIPTokenizer
 
 from invokeai.backend.globals import Globals
 
 from ..stable_diffusion import InvokeAIDiffuserComponent
 from ..util import torch_dtype
-
-
-def get_tokenizer(model) -> CLIPTokenizer:
-    # TODO remove legacy ckpt fallback handling
-    return (
-        getattr(model, "tokenizer", None)  # diffusers
-        or model.cond_stage_model.tokenizer
-    )  # ldm
-
-
-def get_text_encoder(model) -> Any:
-    # TODO remove legacy ckpt fallback handling
-    return getattr(
-        model, "text_encoder", None
-    ) or UnsqueezingLDMTransformer(  # diffusers
-        model.cond_stage_model.transformer
-    )  # ldm
-
-
-class UnsqueezingLDMTransformer:
-    def __init__(self, ldm_transformer):
-        self.ldm_transformer = ldm_transformer
-
-    @property
-    def device(self):
-        return self.ldm_transformer.device
-
-    def __call__(self, *args, **kwargs):
-        insufficiently_unsqueezed_tensor = self.ldm_transformer(*args, **kwargs)
-        return insufficiently_unsqueezed_tensor.unsqueeze(0)
 
 
 def get_uc_and_c_and_ec(
@@ -64,11 +33,10 @@ def get_uc_and_c_and_ec(
         prompt_string
     )
 
-    tokenizer = get_tokenizer(model)
-    text_encoder = get_text_encoder(model)
+    tokenizer = model.tokenizer
     compel = Compel(
         tokenizer=tokenizer,
-        text_encoder=text_encoder,
+        text_encoder=model.text_encoder,
         textual_inversion_manager=model.textual_inversion_manager,
         dtype_for_device_getter=torch_dtype,
         truncate_long_prompts=False
