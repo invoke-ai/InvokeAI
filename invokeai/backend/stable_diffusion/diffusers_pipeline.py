@@ -440,7 +440,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         self._model_group.ready()
 
-    def to(self, torch_device: Optional[Union[str, torch.device]] = None):
+    def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
         if torch_device is None:
             return self
