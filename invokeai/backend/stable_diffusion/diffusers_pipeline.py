@@ -54,16 +54,6 @@ class PipelineIntermediateState:
     attention_map_saver: Optional[AttentionMapSaver] = None
 
 
-# copied from configs/stable-diffusion/v1-inference.yaml
-_default_personalization_config_params = dict(
-    placeholder_strings=["*"],
-    initializer_wods=["sculpture"],
-    per_image_tokens=False,
-    num_vectors_per_token=1,
-    progressive_words=False,
-)
-
-
 @dataclass
 class AddsMaskLatents:
     """Add the channels required for inpainting model input.
@@ -915,20 +905,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             fragment_weights_batch=fragment_weights,
             should_return_tokens=return_tokens,
             device=self._model_group.device_for(self.unet),
-        )
-
-    @property
-    def cond_stage_model(self):
-        return self.embeddings_provider
-
-    @torch.inference_mode()
-    def _tokenize(self, prompt: Union[str, List[str]]):
-        return self.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="pt",
         )
 
     @property
