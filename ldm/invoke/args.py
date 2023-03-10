@@ -333,7 +333,7 @@ class Args(object):
             switches.append(f'-V {formatted_variations}')
         if 'variations' in a and len(a['variations'])>0:
             switches.append(f'-V {a["variations"]}')
-        return ' '.join(switches)
+        return ' '.join(switches) + f' # model_id={kwargs.get("model_id","unknown model")}'
 
     def __getattribute__(self,name):
         '''
@@ -878,7 +878,7 @@ class Args(object):
         )
         render_group.add_argument(
             '--fnformat',
-            default='{prefix}.{seed}.png',
+            default=None,
             type=str,
             help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
         )
@@ -1155,6 +1155,7 @@ def format_metadata(**kwargs):
 def metadata_dumps(opt,
                    seeds=[],
                    model_hash=None,
+                   model_id=None,
                    postprocessing=None):
     '''
     Given an Args object, returns a dict containing the keys and
@@ -1167,7 +1168,7 @@ def metadata_dumps(opt,
     # top-level metadata minus `image` or `images`
     metadata = {
         'model'       : 'stable diffusion',
-        'model_id'    : opt.model,
+        'model_id'    : model_id or opt.model,
         'model_hash'  : model_hash,
         'app_id'      : ldm.invoke.__app_id__,
         'app_version' : ldm.invoke.__version__,
