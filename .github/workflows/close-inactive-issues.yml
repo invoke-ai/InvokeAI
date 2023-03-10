@@ -2,8 +2,6 @@ name: Close inactive issues
 on:
   schedule:
     - cron: "00 6 * * *"
-  issue_comment:
-    types: [ "created" ]
 
 env:
   DAYS_BEFORE_ISSUE_STALE: 14
@@ -12,7 +10,6 @@ env:
 jobs:
   close-issues:
     runs-on: ubuntu-latest
-    if: ${{ !github.event.issue.pull_request }}
     permissions:
       issues: write
       pull-requests: write
@@ -21,9 +18,9 @@ jobs:
         with:
           days-before-issue-stale: ${{ env.DAYS_BEFORE_ISSUE_STALE }}
           days-before-issue-close: ${{ env.DAYS_BEFORE_ISSUE_CLOSE }}
-          stale-issue-label: "stale"
-          stale-issue-message: "There has been no activity in this issue for ${{ env.DAYS_BEFORE_ISSUE_STALE }} days. Please reply with a comment to keep the issue open. We recommend testing with the latest release to make sure it hasn't been already fixed."
-          close-issue-message: "Due to inactivity, this issue was automatically closed. If you are still experiencing the issue, please open a new one and reference issue ${{ github.event.issue.number }}."
+          stale-issue-label: "Inactive Issue"
+          stale-issue-message: "There has been no activity in this issue for ${{ env.DAYS_BEFORE_ISSUE_STALE }} days. If this issue is still being experienced, please reply with an updated confirmation that the issue is still being experienced with the latest release."
+          close-issue-message: "Due to inactivity, this issue was automatically closed. If you are still experiencing the issue, please recreate the issue."
           days-before-pr-stale: -1
           days-before-pr-close: -1
           repo-token: ${{ secrets.GITHUB_TOKEN }}
