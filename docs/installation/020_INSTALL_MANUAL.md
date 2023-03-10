@@ -148,7 +148,7 @@ manager, please follow these steps:
     === "CUDA (NVidia)"
 
         ```bash
-        pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
         ```
 
     === "ROCm (AMD)"
