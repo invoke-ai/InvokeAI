@@ -500,7 +500,6 @@ class ModelManager(object):
         print(f">> Offloading {model_name} to CPU")
         model = self.models[model_name]["model"]
         model.offload_all()
-        self.models[model_name]["model"] = self._model_to_cpu(model)
 
         gc.collect()
         if self._has_cuda():
@@ -558,7 +557,7 @@ class ModelManager(object):
         """
         model_name = model_name or Path(repo_or_path).stem
         model_description = (
-            model_description or f"Imported diffusers model {model_name}"
+            description or f"Imported diffusers model {model_name}"
         )
         new_config = dict(
             description=model_description,
