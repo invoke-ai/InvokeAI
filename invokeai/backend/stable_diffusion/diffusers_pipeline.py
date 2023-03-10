@@ -175,7 +175,7 @@ def image_resized_to_grid_as_tensor(
     :param normalize: scale the range to [-1, 1] instead of [0, 1]
     :param multiple_of: resize the input so both dimensions are a multiple of this
     """
-    w, h = trim_to_multiple_of(*image.size)
+    w, h = trim_to_multiple_of(*image.size, multiple_of=multiple_of)
     transformation = T.Compose(
         [
             T.Resize((h, w), T.InterpolationMode.LANCZOS),
