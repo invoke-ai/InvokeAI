@@ -942,11 +942,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         return super().decode_latents(latents)
 
     def debug_latents(self, latents, msg):
+        from invokeai.backend.image_util import debug_image
         with torch.inference_mode():
-            from ldm.util import debug_image
-
             decoded = self.numpy_to_pil(self.decode_latents(latents))
-            for i, img in enumerate(decoded):
-                debug_image(
-                    img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True
-                )
+        for i, img in enumerate(decoded):
+            debug_image(
+                img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True
+            )
