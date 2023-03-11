@@ -1013,7 +1013,6 @@ def prepare_image_metadata(
         wildcards["seed"] = seed
         wildcards["model_id"] = model_id
         try:
-            print(f'DEBUG: fnformat={opt.fnformat}')
             filename = opt.fnformat.format(**wildcards)
         except KeyError as e:
             print(

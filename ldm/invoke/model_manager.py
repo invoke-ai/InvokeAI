@@ -509,7 +509,7 @@ class ModelManager(object):
             if vae := self._load_vae(mconfig["vae"]):
                 pipeline_args.update(vae=vae)
         if not isinstance(name_or_path, Path):
-            pipeline_args.update(cache_dir=global_cache_dir("diffusers"))
+            pipeline_args.update(cache_dir=global_cache_dir("hub"))
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{"revision": "fp16"}, {}]
@@ -1123,9 +1123,12 @@ class ModelManager(object):
         to the 2.3.0 "diffusers" version. This should be a one-time operation, called at
         script startup time.
         """
-        # Three transformer models to check: bert, clip and safety checker
+        # Three transformer models to check: bert, clip and safety checker, and
+        # the diffusers as well
+        models_dir = Path(Globals.root, "models")
         legacy_locations = [
             Path(
+                models_dir,
                 "CompVis/stable-diffusion-safety-checker/models--CompVis--stable-diffusion-safety-checker"
             ),
             Path("bert-base-uncased/models--bert-base-uncased"),
@@ -1133,17 +1136,26 @@ class ModelManager(object):
                 "openai/clip-vit-large-patch14/models--openai--clip-vit-large-patch14"
             ),
         ]
-        models_dir = Path(Globals.root, "models")
+        legacy_locations.extend(list(global_cache_dir("diffusers").glob('*')))
         legacy_layout = False
         for model in legacy_locations:
-            legacy_layout = legacy_layout or Path(models_dir, model).exists()
+            legacy_layout = legacy_layout or model.exists()
         if not legacy_layout:
             return
 
         print(
-            "** Legacy version <= 2.2.5 model directory layout detected. Reorganizing."
+            """
+>> ALERT:
+>> The location of your previously-installed diffusers models needs to move from
+>> invokeai/models/diffusers to invokeai/models/hub due to a change introduced by
+>> diffusers version 0.14. InvokeAI will now move all models from the "diffusers" directory
+>> into "hub" and then remove the diffusers directory. This is a quick, safe, one-time
+>> operation. However if you have customized either of these directories and need to
+>> make adjustments, please press ctrl-C now to abort and relaunch InvokeAI when you are ready.
+>> Otherwise press <enter> to continue."""
         )
         print("** This is a quick one-time operation.")
+        input("continue> ")
 
         # transformer files get moved into the hub directory
         if cls._is_huggingface_hub_directory_present():
@@ -1155,33 +1167,20 @@ class ModelManager(object):
         for model in legacy_locations:
             source = models_dir / model
             dest = hub / model.stem
+            if dest.exists() and not source.exists():
+                continue
             print(f"** {source} => {dest}")
             if source.exists():
-                if dest.exists():
-                    rmtree(source)
+                if dest.is_symlink():
+                    print(f"** Found symlink at {dest.name}. Not migrating.")
+                elif dest.exists():
+                    if source.is_dir():
+                        rmtree(source)
+                    else:
+                        source.unlink()
                 else:
                     move(source, dest)
-
-        # anything else gets moved into the diffusers directory
-        if cls._is_huggingface_hub_directory_present():
-            diffusers = global_cache_dir("diffusers")
-        else:
-            diffusers = models_dir / "diffusers"
-
-        os.makedirs(diffusers, exist_ok=True)
-        for root, dirs, _ in os.walk(models_dir, topdown=False):
-            for dir in dirs:
-                full_path = Path(root, dir)
-                if full_path.is_relative_to(hub) or full_path.is_relative_to(diffusers):
-                    continue
-                if Path(dir).match("models--*--*"):
-                    dest = diffusers / dir
-                    print(f"** {full_path} => {dest}")
-                    if dest.exists():
-                        rmtree(full_path)
-                    else:
-                        move(full_path, dest)
-
+                    
         # now clean up by removing any empty directories
         empty = [
             root
@@ -1279,7 +1278,7 @@ class ModelManager(object):
             path = name_or_path
         else:
             owner, repo = name_or_path.split("/")
-            path = Path(global_cache_dir("diffusers") / f"models--{owner}--{repo}")
+            path = Path(global_cache_dir("hub") / f"models--{owner}--{repo}")
         if not path.exists():
             return None
         hashpath = path / "checksum.sha256"
@@ -1340,7 +1339,7 @@ class ModelManager(object):
         using_fp16 = self.precision == "float16"
 
         vae_args.update(
-            cache_dir=global_cache_dir("diffusers"),
+            cache_dir=global_cache_dir("hug"),
             local_files_only=not Globals.internet_available,
         )
 
