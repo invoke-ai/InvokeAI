@@ -94,7 +94,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           icon={<EditIcon />}
           size="sm"
           onClick={openModelHandler}
-          aria-label="Modify Config"
+          aria-label={t('accessibility.modifyConfig')}
           isDisabled={status === 'active' || isProcessing || !isConnected}
         />
         <IAIAlertDialog
