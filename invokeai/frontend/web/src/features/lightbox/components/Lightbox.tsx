@@ -12,6 +12,7 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { BiExit } from 'react-icons/bi';
 import { TransformWrapper } from 'react-zoom-pan-pinch';
 import useImageTransform from '../hooks/useImageTransform';
