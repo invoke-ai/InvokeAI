@@ -495,18 +495,6 @@ class Generate:
             torch.cuda.reset_peak_memory_stats()
 
         results = list()
-        init_image = None
-        mask_image = None
-
-        try:
-            if (
-                self.free_gpu_mem
-                and self.model.cond_stage_model.device != self.model.device
-            ):
-                self.model.cond_stage_model.device = self.model.device
-                self.model.cond_stage_model.to(self.model.device)
-        except AttributeError:
-            pass
 
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
