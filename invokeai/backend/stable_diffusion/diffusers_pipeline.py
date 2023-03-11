@@ -343,6 +343,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self._model_group = FullyLoadedModelGroup(self.unet.device)
         self._model_group.install(*self._submodels)
 
+        self.enable_vae_tiling()
+
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
         """
         if xformers is available, use it, otherwise use sliced attention.
