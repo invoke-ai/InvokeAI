@@ -12,6 +12,7 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { BiExit } from 'react-icons/bi';
 import { TransformWrapper } from 'react-zoom-pan-pinch';
 import useImageTransform from '../hooks/useImageTransform';
@@ -38,6 +39,7 @@ export const lightboxSelector = createSelector(
 
 export default function Lightbox() {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
@@ -96,7 +98,7 @@ export default function Lightbox() {
         >
           <IAIIconButton
             icon={<BiExit />}
-            aria-label="Exit Viewer"
+            aria-label={t('accessibility.exitViewer')}
             onClick={() => {
               dispatch(setIsLightboxOpen(false));
             }}

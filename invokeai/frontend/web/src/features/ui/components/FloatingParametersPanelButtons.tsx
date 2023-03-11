@@ -13,6 +13,7 @@ import {
 } from 'features/ui/store/uiSelectors';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash';
+import { useTranslation } from 'react-i18next';
 
 import { FaSlidersH } from 'react-icons/fa';
 
@@ -68,6 +69,7 @@ export const floatingSelector = createSelector(
 
 const FloatingParametersPanelButtons = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const {
     shouldShowParametersPanelButton,
     shouldShowProcessButtons,
@@ -95,7 +97,7 @@ const FloatingParametersPanelButtons = () => {
       <IAIIconButton
         tooltip="Show Options Panel (O)"
         tooltipProps={{ placement: 'top' }}
-        aria-label="Show Options Panel"
+        aria-label={t('accessibility.showOptionsPanel')}
         onClick={handleShowOptionsPanel}
         sx={floatingButtonStyles}
       >
