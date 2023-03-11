@@ -45,6 +45,8 @@ export default function CurrentImagePreview() {
       {imageToDisplay && (
         <Image
           src={imageToDisplay.url}
+          width={imageToDisplay.width}
+          height={imageToDisplay.height}
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',
@@ -54,10 +56,6 @@ export default function CurrentImagePreview() {
             imageRendering: isIntermediate ? 'pixelated' : 'initial',
             borderRadius: 'base',
           }}
-          {...(isIntermediate && {
-            width: imageToDisplay.width,
-            height: imageToDisplay.height,
-          })}
         />
       )}
       {!shouldShowImageDetails && <NextPrevImageButtons />}
