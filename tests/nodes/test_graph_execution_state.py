@@ -21,7 +21,7 @@ def simple_graph():
 def mock_services():
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        generate = None,
+        model_manager = None,
         events = None,
         images = None,
         queue = MemoryInvocationQueue(),

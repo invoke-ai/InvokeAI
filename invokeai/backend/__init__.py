@@ -11,5 +11,6 @@ from .generator import (
     Inpaint
 )
 from .model_management import ModelManager
+from .safety_checker import SafetyChecker
 from .args import Args
 from .globals import Globals
