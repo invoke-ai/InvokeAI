@@ -64,6 +64,7 @@ class InvokeAIGeneratorOutput:
     image: Image
     seed: int
     model_hash: str
+    attention_maps_images: List[Image]
     params: Namespace
 
 # we are interposing a wrapper around the original Generator classes so that
@@ -147,6 +148,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             output = InvokeAIGeneratorOutput(
                 image=results[0][0],
                 seed=results[0][1],
+                attention_maps_images=results[0][2],
                 model_hash = model_hash,
                 params=Namespace(**generator_args),
             )
@@ -366,7 +368,7 @@ class Generator:
                 if self.safety_checker is not None:
                     image = self.safety_checker.check(image)
 
-                results.append([image, seed])
+                results.append([image, seed, attention_maps_images])
 
                 if image_callback is not None:
                     attention_maps_image = (
