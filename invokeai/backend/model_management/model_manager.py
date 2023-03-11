@@ -54,12 +54,13 @@ class ModelManager(object):
     Model manager handles loading, caching, importing, deleting, converting, and editing models.
     '''
     def __init__(
-        self,
-        config: OmegaConf|Path,
-        device_type: torch.device = CUDA_DEVICE,
-        precision: str = "float16",
-        max_loaded_models=DEFAULT_MAX_MODELS,
-        sequential_offload=False,
+            self,
+            config: OmegaConf|Path,
+            device_type: torch.device = CUDA_DEVICE,
+            precision: str = "float16",
+            max_loaded_models=DEFAULT_MAX_MODELS,
+            sequential_offload=False,
+            embedding_path: Path=None,
     ):
         """
         Initialize with the path to the models.yaml config file or
@@ -80,6 +81,7 @@ class ModelManager(object):
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
         self.sequential_offload = sequential_offload
+        self.embedding_path = embedding_path
 
     def valid_model(self, model_name: str) -> bool:
         """
@@ -434,6 +436,7 @@ class ModelManager(object):
         height = width
 
         print(f"  | Default image dimensions = {width} x {height}")
+        self._add_embeddings_to_model(pipeline)
 
         return pipeline, width, height, model_hash
 
@@ -1070,6 +1073,19 @@ class ModelManager(object):
             self.stack.remove(model_name)
         self.stack.append(model_name)
 
+    def _add_embeddings_to_model(self, model: StableDiffusionGeneratorPipeline):
+        if self.embedding_path is not None:
+            print(f">> Loading embeddings from {self.embedding_path}")
+            for root, _, files in os.walk(self.embedding_path):
+                for name in files:
+                    ti_path = os.path.join(root, name)
+                    model.textual_inversion_manager.load_textual_inversion(
+                        ti_path, defer_injecting_tokens=True
+                    )
+            print(
+                f'>> Textual inversion triggers: {", ".join(sorted(model.textual_inversion_manager.get_all_trigger_strings()))}'
+            )
+            
     def _has_cuda(self) -> bool:
         return self.device.type == "cuda"
 

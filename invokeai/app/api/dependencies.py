@@ -4,7 +4,7 @@ import os
 from argparse import Namespace
 
 from ...backend import Globals
-from ..services.generate_initializer import get_model_manager
+from ..services.model_manager_initializer import get_model_manager
 from ..services.graph import GraphExecutionState
 from ..services.image_storage import DiskImageStorage
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -47,8 +47,6 @@ class ApiDependencies:
         # TODO: Use a logger
         print(f">> Internet connectivity is {Globals.internet_available}")
 
-        model_manager = get_model_manager(args, config)
-
         events = FastAPIEventService(event_handler_id)
 
         output_folder = os.path.abspath(
@@ -61,7 +59,7 @@ class ApiDependencies:
         db_location = os.path.join(output_folder, "invokeai.db")
 
         services = InvocationServices(
-            generator_factory=generator_factory,
+            model_manager=get_model_manager(args, config),
             events=events,
             images=images,
             queue=MemoryInvocationQueue(),
