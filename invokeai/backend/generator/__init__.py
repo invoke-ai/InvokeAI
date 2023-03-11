@@ -2,7 +2,6 @@
 Initialization file for the invokeai.generator package
 """
 from .base import (
-    InvokeAIGeneratorFactory,
     InvokeAIGenerator,
     InvokeAIGeneratorBasicParams,
     InvokeAIGeneratorOutput,

@@ -4,7 +4,7 @@ import os
 from argparse import Namespace
 
 from ...backend import Globals
-from ..services.generate_initializer import get_generator_factory
+from ..services.generate_initializer import get_model_manager
 from ..services.graph import GraphExecutionState
 from ..services.image_storage import DiskImageStorage
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -47,7 +47,7 @@ class ApiDependencies:
         # TODO: Use a logger
         print(f">> Internet connectivity is {Globals.internet_available}")
 
-        generator_factory = get_generator_factory(args, config)
+        model_manager = get_model_manager(args, config)
 
         events = FastAPIEventService(event_handler_id)
 

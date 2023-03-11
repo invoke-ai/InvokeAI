@@ -1,5 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-from invokeai.backend import InvokeAIGeneratorFactory
+from invokeai.backend import ModelManager
 
 from .events import EventServiceBase
 from .image_storage import ImageStorageBase
@@ -10,7 +10,7 @@ from .item_storage import ItemStorageABC
 class InvocationServices:
     """Services that can be used by invocations"""
 
-    generator_factory: InvokeAIGeneratorFactory
+    model_manager: ModelManager
     events: EventServiceBase
     images: ImageStorageBase
     queue: InvocationQueueABC
@@ -21,14 +21,14 @@ class InvocationServices:
 
     def __init__(
             self,
-            generator_factory: InvokeAIGeneratorFactory,
+            model_manager: ModelManager,
             events: EventServiceBase,
             images: ImageStorageBase,
             queue: InvocationQueueABC,
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
             processor: "InvocationProcessorABC",
     ):
-        self.generator_factory = generator_factory
+        self.model_manager = model_manager
         self.events = events
         self.images = images
         self.queue = queue

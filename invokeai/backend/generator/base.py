@@ -11,7 +11,8 @@ import diffusers
 import os
 import random
 import traceback
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
+from argparse import Namespace
 from contextlib import nullcontext
 
 import cv2
@@ -21,7 +22,7 @@ from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
 from tqdm import trange
-from typing import List, Type, Iterator
+from typing import List, Iterator
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
@@ -35,13 +36,13 @@ downsampling = 8
 
 @dataclass
 class InvokeAIGeneratorBasicParams:
+    model_name: str='stable-diffusion-1.5'
     seed: int=None
     width: int=512
     height: int=512
     cfg_scale: int=7.5
     steps: int=20
     ddim_eta: float=0.0
-    model_name: str='stable-diffusion-1.5'
     scheduler: int='ddim'
     precision: str='float16'
     perlin: float=0.0
@@ -62,41 +63,8 @@ class InvokeAIGeneratorOutput:
     '''
     image: Image
     seed: int
-    model_name: str
     model_hash: str
-    params: dict
-
-    def __getattribute__(self,name):
-        try:
-            return object.__getattribute__(self, name)
-        except AttributeError:
-            params = object.__getattribute__(self, 'params')
-            if name in params:
-                return params[name]
-        raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
-
-class InvokeAIGeneratorFactory(object):
-    def __init__(self,
-                 model_manager: ModelManager,
-                 params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
-                 ):
-        self.model_manager = model_manager
-        self.params = params
-                 
-    def make_generator(self, generatorclass: Type[InvokeAIGenerator], **keyword_args)->InvokeAIGenerator:
-        return generatorclass(self.model_manager,
-                              self.params,
-                              **keyword_args
-                              )
-
-    # getter and setter shortcuts for commonly used parameters
-    @property
-    def model_name(self)->str:
-        return self.params.model_name
-
-    @model_name.setter
-    def model_name(self, model_name: str):
-        self.params.model_name=model_name
+    params: Namespace
 
 # we are interposing a wrapper around the original Generator classes so that
 # old code that calls Generate will continue to work.
@@ -116,7 +84,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
     def __init__(self,
                  model_manager: ModelManager,
-                 params: InvokeAIGeneratorBasicParams,
+                 params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
                  ):
         self.model_manager=model_manager
         self.params=params
@@ -149,23 +117,24 @@ class InvokeAIGenerator(metaclass=ABCMeta):
                print(o.image, o.seed)
         
         '''
-        model_name = self.params.model_name or self.model_manager.current_model
+        generator_args = dataclasses.asdict(self.params)
+        generator_args.update(keyword_args)
+
+        model_name = generator_args.get('model_name') or self.model_manager.current_model
         model_info: dict = self.model_manager.get_model(model_name)
         model:StableDiffusionGeneratorPipeline = model_info['model']
         model_hash = model_info['hash']
         scheduler: Scheduler = self.get_scheduler(
             model=model,
-            scheduler_name=self.params.scheduler
+            scheduler_name=generator_args.get('scheduler')
         )
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt,model=model)
         generator = self.load_generator(model, self._generator_name())
         if self.params.variation_amount > 0:
-            generator.set_variation(self.params.seed,
-                                    self.params.variation_amount,
-                                    self.params.with_variations)
-
-        generator_args = dataclasses.asdict(self.params)
-        generator_args.update(keyword_args)
+            generator.set_variation(generator_args.get('seed'),
+                                    generator_args.get('variation_amount'),
+                                    generator_args.get('with_variations')
+                                    )
 
         iteration_count = range(iterations) if iterations else itertools.count(start=0, step=1)
         for i in iteration_count:
@@ -177,9 +146,8 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             output = InvokeAIGeneratorOutput(
                 image=results[0][0],
                 seed=results[0][1],
-                model_name = model_name,
                 model_hash = model_hash,
-                params=generator_args,
+                params=Namespace(**generator_args),
             )
             if callback:
                 callback(output)
@@ -205,18 +173,19 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         if not hasattr(scheduler, 'uses_inpainting_model'):
             scheduler.uses_inpainting_model = lambda: False
         return scheduler
-        
-    @abstractmethod
-    def _generator_name(self)->str:
+
+    @classmethod
+    def _generator_name(cls):
         '''
-        In derived classes will return the name of the generator to use.
+        In derived classes return the name of the generator to apply.
+        If you don't override will return the name of the derived
+        class, which nicely parallels the generator class names.
         '''
-        pass
+        return cls.__name__
 
 # ------------------------------------
 class Txt2Img(InvokeAIGenerator):
-    def _generator_name(self)->str:
-        return 'Txt2Img'
+    pass
 
 # ------------------------------------
 class Img2Img(InvokeAIGenerator):
@@ -229,9 +198,6 @@ class Img2Img(InvokeAIGenerator):
                                 strength=strength,
                                 **keyword_args
                                 )
-
-    def _generator_name(self)->str:
-        return 'Img2Img'
 
 # ------------------------------------
 # Takes all the arguments of Img2Img and adds the mask image and the seam/infill stuff
@@ -266,9 +232,6 @@ class Inpaint(Img2Img):
             **keyword_args
         )
 
-    def _generator_name(self)->str:
-        return 'Inpaint'
-    
 class Generator:
     downsampling_factor: int
     latent_channels: int

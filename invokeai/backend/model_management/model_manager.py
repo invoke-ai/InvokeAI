@@ -34,7 +34,7 @@ from picklescan.scanner import scan_file_path
 from invokeai.backend.globals import Globals, global_cache_dir
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
-from ..util import CUDA_DEVICE, ask_user, download_with_resume
+from ..util import CUDA_DEVICE, CPU_DEVICE, ask_user, download_with_resume
 
 class SDLegacyType(Enum):
     V1 = 1

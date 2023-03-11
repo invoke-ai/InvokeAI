@@ -17,7 +17,7 @@ from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_gra
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
-from .services.generate_initializer import get_generator_factory
+from .services.generate_initializer import get_model_manager
 from .services.graph import EdgeConnection, GraphExecutionState
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
@@ -129,7 +129,7 @@ def invoke_cli():
     args = Args()
     config = args.parse_args()
 
-    generator_factory = get_generator_factory(args, config)
+    model_manager = get_model_manager(args, config)
 
     events = EventServiceBase()
 
@@ -141,7 +141,7 @@ def invoke_cli():
     db_location = os.path.join(output_folder, "invokeai.db")
 
     services = InvocationServices(
-        generator_factory=generator_factory,
+        model_manager=model_manager,
         events=events,
         images=DiskImageStorage(output_folder),
         queue=MemoryInvocationQueue(),

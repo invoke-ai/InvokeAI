@@ -18,7 +18,6 @@ SAMPLER_NAME_VALUES = Literal[
     tuple(InvokeAIGenerator.schedulers())
 ]
 
-
 # Text to image
 class TextToImageInvocation(BaseInvocation):
     """Generates an image using text2img."""
@@ -58,15 +57,8 @@ class TextToImageInvocation(BaseInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        factory = context.services.generator_factory
-        if self.model:
-            factory.model_name = self.model
-        else:
-            self.model = factory.model_name
-
-        txt2img = factory.make_generator(Txt2Img)
-
-        outputs = txt2img.generate(
+        manager = context.services.model_manager
+        outputs = Txt2Img(manager).generate(
             prompt=self.prompt,
             step_callback=step_callback,
             **self.dict(
@@ -121,13 +113,9 @@ class ImageToImageInvocation(TextToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        factory = context.services.generator_factory
-        self.model = self.model or factory.model_name
-        factory.model_name = self.model
-        img2img = factory.make_generator(Img2Img)
-
+        manager = context.services.model_manager
         generator_output = next(
-            img2img.generate(
+            Img2Img(manager).generate(
                 prompt=self.prompt,
                 init_img=image,
                 init_mask=mask,
@@ -186,13 +174,9 @@ class InpaintInvocation(ImageToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        factory = context.services.generator_factory
-        self.model = self.model or factory.model_name
-        factory.model_name = self.model
-        inpaint = factory.make_generator(Inpaint)
-
+        manager = context.services.model_manager
         generator_output = next(
-            inpaint.generate(
+            Inpaint(manager).generate(
                 prompt=self.prompt,
                 init_img=image,
                 init_mask=mask,

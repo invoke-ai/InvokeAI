@@ -6,12 +6,12 @@ from argparse import Namespace
 from omegaconf import OmegaConf
 
 import invokeai.version
-from ...backend import ModelManager, InvokeAIGeneratorBasicParams, InvokeAIGeneratorFactory
+from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
 
 # TODO: most of this code should be split into individual services as the Generate.py code is deprecated
-def get_generator_factory(args, config) -> InvokeAIGeneratorFactory:
+def get_model_manager(args, config) -> ModelManager:
     if not args.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
         if not os.path.exists(config_file):
@@ -64,7 +64,7 @@ def get_generator_factory(args, config) -> InvokeAIGeneratorFactory:
             print(f"{e}. Aborting.")
             sys.exit(-1)
 
-    # creating an InvokeAIGeneratorFactory object:
+    # creating the model manager
     try:
         device = torch.device(choose_torch_device())
         precision = 'float16' if args.precision=='float16' \
@@ -77,11 +77,6 @@ def get_generator_factory(args, config) -> InvokeAIGeneratorFactory:
             device_type=device,
             max_loaded_models=args.max_loaded_models,
         )
-        # TO DO: initialize and pass safety checker!!!
-        params = InvokeAIGeneratorBasicParams(
-            precision=precision,
-        )
-        factory = InvokeAIGeneratorFactory(model_manager, params)
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(args, e)
     except (IOError, KeyError) as e:
@@ -100,7 +95,7 @@ def get_generator_factory(args, config) -> InvokeAIGeneratorFactory:
             weights_directory=path,
         )
 
-    return factory
+    return model_manager
 
 def load_face_restoration(opt):
     try:
