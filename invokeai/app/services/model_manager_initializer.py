@@ -2,6 +2,7 @@ import os
 import sys
 import torch
 from argparse import Namespace
+from invokeai.backend import Args
 from omegaconf import OmegaConf
 from pathlib import Path
 
@@ -11,12 +12,12 @@ from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
 
 # TODO: most of this code should be split into individual services as the Generate.py code is deprecated
-def get_model_manager(args, config) -> ModelManager:
-    if not args.conf:
+def get_model_manager(config: Args) -> ModelManager:
+    if not config.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
         if not os.path.exists(config_file):
             report_model_error(
-                args, FileNotFoundError(f"The file {config_file} could not be found.")
+                config, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
     print(f">> {invokeai.version.__app_name__}, version {invokeai.version.__version__}")
@@ -32,64 +33,47 @@ def get_model_manager(args, config) -> ModelManager:
     diffusers.logging.set_verbosity_error()
 
     # normalize the config directory relative to root
-    if not os.path.isabs(args.conf):
-        args.conf = os.path.normpath(os.path.join(Globals.root, args.conf))
+    if not os.path.isabs(config.conf):
+        config.conf = os.path.normpath(os.path.join(Globals.root, config.conf))
 
-    if args.embeddings:
-        if not os.path.isabs(args.embedding_path):
+    if config.embeddings:
+        if not os.path.isabs(config.embedding_path):
             embedding_path = os.path.normpath(
-                os.path.join(Globals.root, args.embedding_path)
+                os.path.join(Globals.root, config.embedding_path)
             )
         else:
-            embedding_path = args.embedding_path
+            embedding_path = config.embedding_path
     else:
         embedding_path = None
 
     # migrate legacy models
     ModelManager.migrate_models()
 
-    # load the infile as a list of lines
-    if args.infile:
-        try:
-            if os.path.isfile(args.infile):
-                infile = open(args.infile, "r", encoding="utf-8")
-            elif args.infile == "-":  # stdin
-                infile = sys.stdin
-            else:
-                raise FileNotFoundError(f"{args.infile} not found.")
-        except (FileNotFoundError, IOError) as e:
-            print(f"{e}. Aborting.")
-            sys.exit(-1)
-
     # creating the model manager
     try:
         device = torch.device(choose_torch_device())
-        precision = 'float16' if args.precision=='float16' \
-        else 'float32' if args.precision=='float32' \
+        precision = 'float16' if config.precision=='float16' \
+        else 'float32' if config.precision=='float32' \
         else choose_precision(device)
         
         model_manager = ModelManager(
-            OmegaConf.load(args.conf),
+            OmegaConf.load(config.conf),
             precision=precision,
             device_type=device,
-            max_loaded_models=args.max_loaded_models,
+            max_loaded_models=config.max_loaded_models,
             embedding_path = Path(embedding_path),
         )
     except (FileNotFoundError, TypeError, AssertionError) as e:
-        report_model_error(args, e)
+        report_model_error(config, e)
     except (IOError, KeyError) as e:
         print(f"{e}. Aborting.")
         sys.exit(-1)
 
-    if args.seamless:
-        #TODO: do something here ?
-        print(">> changed to seamless tiling mode")
-
     # try to autoconvert new models
     # autoimport new .ckpt files
-    if path := args.autoconvert:
+    if path := config.autoconvert:
         model_manager.autoconvert_weights(
-            conf_path=args.conf,
+            conf_path=config.conf,
             weights_directory=path,
         )
 
@@ -118,10 +102,10 @@ def report_model_error(opt: Namespace, e: Exception):
     # only the arguments accepted by the configuration script are parsed
     root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
     config = ["--config", opt.conf] if opt.conf is not None else []
-    previous_args = sys.argv
+    previous_config = sys.argv
     sys.argv = ["invokeai-configure"]
     sys.argv.extend(root_dir)
-    sys.argv.extend(config)
+    sys.argv.extend(config.to_dict())
     if yes_to_all is not None:
         for arg in yes_to_all.split():
             sys.argv.append(arg)

@@ -37,12 +37,12 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(args, config, event_handler_id: int):
-        Globals.try_patchmatch = args.patchmatch
-        Globals.always_use_cpu = args.always_use_cpu
-        Globals.internet_available = args.internet_available and check_internet()
-        Globals.disable_xformers = not args.xformers
-        Globals.ckpt_convert = args.ckpt_convert
+    def initialize(config, event_handler_id: int):
+        Globals.try_patchmatch = config.patchmatch
+        Globals.always_use_cpu = config.always_use_cpu
+        Globals.internet_available = config.internet_available and check_internet()
+        Globals.disable_xformers = not config.xformers
+        Globals.ckpt_convert = config.ckpt_convert
 
         # TODO: Use a logger
         print(f">> Internet connectivity is {Globals.internet_available}")
@@ -59,7 +59,7 @@ class ApiDependencies:
         db_location = os.path.join(output_folder, "invokeai.db")
 
         services = InvocationServices(
-            model_manager=get_model_manager(args, config),
+            model_manager=get_model_manager(config),
             events=events,
             images=images,
             queue=MemoryInvocationQueue(),

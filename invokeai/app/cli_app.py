@@ -17,7 +17,7 @@ from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_gra
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
-from .services.generate_initializer import get_model_manager
+from .services.model_manager_initializer import get_model_manager
 from .services.graph import EdgeConnection, GraphExecutionState
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
@@ -126,10 +126,9 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    args = Args()
-    config = args.parse_args()
-
-    model_manager = get_model_manager(args, config)
+    config = Args()
+    config.parse_args()
+    model_manager = get_model_manager(config)
 
     events = EventServiceBase()
 
