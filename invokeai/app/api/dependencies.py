@@ -5,6 +5,7 @@ from argparse import Namespace
 
 from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
+from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState
 from ..services.image_storage import DiskImageStorage
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -67,6 +68,7 @@ class ApiDependencies:
                 filename=db_location, table_name="graph_executions"
             ),
             processor=DefaultInvocationProcessor(),
+            restoration=RestorationServices(config),
         )
 
         ApiDependencies.invoker = Invoker(services)

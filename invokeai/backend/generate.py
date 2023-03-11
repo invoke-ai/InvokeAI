@@ -956,7 +956,7 @@ class Generate:
     ):
         results = []
         for r in image_list:
-            image, seed = r
+            image, seed, _ = r
             try:
                 if strength > 0:
                     if self.gfpgan is not None or self.codeformer is not None:

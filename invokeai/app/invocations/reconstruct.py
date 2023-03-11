@@ -8,7 +8,6 @@ from ..services.invocation_services import InvocationServices
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
 
-
 class RestoreFaceInvocation(BaseInvocation):
     """Restores faces in an image."""
     #fmt: off
@@ -23,7 +22,7 @@ class RestoreFaceInvocation(BaseInvocation):
         image = context.services.images.get(
             self.image.image_type, self.image.image_name
         )
-        results = context.services.generate.upscale_and_reconstruct(
+        results = context.services.restoration.upscale_and_reconstruct(
             image_list=[[image, 0]],
             upscale=None,
             strength=self.strength,  # GFPGAN strength

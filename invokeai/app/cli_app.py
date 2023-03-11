@@ -18,6 +18,7 @@ from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
 from .services.model_manager_initializer import get_model_manager
+from .services.restoration_services import RestorationServices
 from .services.graph import EdgeConnection, GraphExecutionState
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
@@ -148,6 +149,7 @@ def invoke_cli():
             filename=db_location, table_name="graph_executions"
         ),
         processor=DefaultInvocationProcessor(),
+        restoration=RestorationServices(config),
     )
 
     invoker = Invoker(services)

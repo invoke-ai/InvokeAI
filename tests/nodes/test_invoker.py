@@ -26,7 +26,8 @@ def mock_services() -> InvocationServices:
         images = None, # type: ignore
         queue = MemoryInvocationQueue(),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
-        processor = DefaultInvocationProcessor()
+        processor = DefaultInvocationProcessor(),
+        restoration = None,
     )
 
 @pytest.fixture()
