@@ -38,6 +38,7 @@ export const lightboxSelector = createSelector(
 
 export default function Lightbox() {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
@@ -96,7 +97,7 @@ export default function Lightbox() {
         >
           <IAIIconButton
             icon={<BiExit />}
-            aria-label="Exit Viewer"
+            aria-label={t('accessibility.exitViewer')}
             onClick={() => {
               dispatch(setIsLightboxOpen(false));
             }}

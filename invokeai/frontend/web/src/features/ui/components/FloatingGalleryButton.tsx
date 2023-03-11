@@ -2,10 +2,12 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
+import { useTranslation } from 'react-i18next';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { floatingSelector } from './FloatingParametersPanelButtons';
 
 const FloatingGalleryButton = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { shouldShowGalleryButton, shouldPinGallery } =
     useAppSelector(floatingSelector);
@@ -21,7 +23,7 @@ const FloatingGalleryButton = () => {
     <IAIIconButton
       tooltip="Show Gallery (G)"
       tooltipProps={{ placement: 'top' }}
-      aria-label="Show Gallery"
+      aria-label={t('accessibility.showGallery')}
       onClick={handleShowGallery}
       sx={{
         pos: 'absolute',

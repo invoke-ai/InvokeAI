@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { isEqual } from 'lodash';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { gallerySelector } from '../store/gallerySelectors';
 import {
@@ -51,6 +52,7 @@ export const nextPrevImageButtonsSelector = createSelector(
 
 const NextPrevImageButtons = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const { isOnFirstImage, isOnLastImage } = useAppSelector(
     nextPrevImageButtonsSelector
@@ -95,7 +97,7 @@ const NextPrevImageButtons = () => {
       >
         {shouldShowNextPrevButtons && !isOnFirstImage && (
           <IconButton
-            aria-label="Previous image"
+            aria-label={t('accessibility.previousImage')}
             icon={<FaAngleLeft size={64} />}
             variant="unstyled"
             onClick={handleClickPrevButton}
@@ -114,7 +116,7 @@ const NextPrevImageButtons = () => {
       >
         {shouldShowNextPrevButtons && !isOnLastImage && (
           <IconButton
-            aria-label="Next image"
+            aria-label={t('accessibility.nextImage')}
             icon={<FaAngleRight size={64} />}
             variant="unstyled"
             onClick={handleClickNextButton}
