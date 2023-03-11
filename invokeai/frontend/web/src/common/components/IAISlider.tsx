@@ -26,6 +26,7 @@ import {
 import { clamp } from 'lodash';
 
 import { FocusEvent, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 
@@ -95,6 +96,8 @@ export default function IAISlider(props: IAIFullSliderProps) {
     sliderIAIIconButtonProps,
     ...rest
   } = props;
+
+  const { t } = useTranslation();
 
   const [localInputValue, setLocalInputValue] = useState<
     string | number | undefined
@@ -234,7 +237,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
         {withReset && (
           <IAIIconButton
             size="sm"
-            aria-label="Reset"
+            aria-label={t('accessibility.reset')}
             tooltip="Reset"
             icon={<BiReset />}
             onClick={handleResetDisable}

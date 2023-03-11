@@ -42,6 +42,7 @@ import {
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { APP_METADATA_HEIGHT } from 'theme/util/constants';
@@ -66,12 +67,14 @@ const MetadataItem = ({
   labelPosition,
   withCopy = false,
 }: MetadataItemProps) => {
+  const { t } = useTranslation();
+
   return (
     <Flex gap={2}>
       {onClick && (
         <Tooltip label={`Recall ${label}`}>
           <IconButton
-            aria-label="Use this parameter"
+            aria-label={t('accessibility.useThisParameter')}
             icon={<IoArrowUndoCircleOutline />}
             size="xs"
             variant="ghost"
@@ -161,6 +164,8 @@ const ImageMetadataViewer = memo(
       variations,
       width,
     } = metadata;
+
+    const { t } = useTranslation();
 
     const metadataJSON = JSON.stringify(image.metadata, null, 2);
 
@@ -422,7 +427,7 @@ const ImageMetadataViewer = memo(
                 <Flex gap={2}>
                   <Tooltip label="Copy metadata JSON">
                     <IconButton
-                      aria-label="Copy metadata JSON"
+                      aria-label={t('accessibility.copyMetadataJson')}
                       icon={<FaCopy />}
                       size="xs"
                       variant="ghost"
