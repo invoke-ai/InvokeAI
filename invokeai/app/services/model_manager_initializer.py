@@ -11,7 +11,7 @@ from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
 
-# TODO: most of this code should be split into individual services as the Generate.py code is deprecated
+# TODO: Replace with an abstract class base ModelManagerBase
 def get_model_manager(config: Args) -> ModelManager:
     if not config.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
