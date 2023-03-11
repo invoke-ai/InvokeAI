@@ -63,7 +63,10 @@
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
         "langRussian": "Russo",
-        "langSpanish": "Espanhol"
+        "langSpanish": "Espanhol",
+        "pinOptionsPanel": "Fixar painel de opções",
+        "loadingInvokeAI": "Carregando Invoke AI",
+        "loading": "Carregando"
     },
     "gallery": {
         "generations": "Gerações",
