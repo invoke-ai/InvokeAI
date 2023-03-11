@@ -90,7 +90,7 @@ class ModelManager(object):
         """
         return model_name in self.config
 
-    def get_model(self, model_name: str=None):
+    def get_model(self, model_name: str=None)->dict:
         """
         Given a model named identified in models.yaml, return
         the model object. If in RAM will load into GPU VRAM.
