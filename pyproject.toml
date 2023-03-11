@@ -116,8 +116,10 @@ requires-python = ">=3.9, <3.11"
 # modern entrypoints
 "invokeai" = "ldm.invoke.CLI:main"
 "invokeai-configure" = "ldm.invoke.config.invokeai_configure:main"
+"invokeai-model-install" = "ldm.invoke.config.model_install:main"
 "invokeai-merge" = "ldm.invoke.merge_diffusers:main"
 "invokeai-ti" = "ldm.invoke.training.textual_inversion:main"
+"invokeai-update" = "ldm.invoke.config.invokeai_update:main"
 "invokeai-batch" = "ldm.invoke.dynamic_prompts:main"
 
 [project.urls]
