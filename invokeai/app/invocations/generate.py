@@ -57,8 +57,9 @@ class TextToImageInvocation(BaseInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        manager = context.services.model_manager
-        outputs = Txt2Img(manager).generate(
+        #       (right now uses whatever current model is set in model manager)
+        model= context.services.model_manager.get_model()
+        outputs = Txt2Img(model).generate(
             prompt=self.prompt,
             step_callback=step_callback,
             **self.dict(
@@ -113,9 +114,9 @@ class ImageToImageInvocation(TextToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        manager = context.services.model_manager
+        model = context.services.model_manager.get_model()
         generator_output = next(
-            Img2Img(manager).generate(
+            Img2Img(model).generate(
                 prompt=self.prompt,
                 init_img=image,
                 init_mask=mask,
@@ -174,9 +175,9 @@ class InpaintInvocation(ImageToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        manager = context.services.model_manager
+        manager = context.services.model_manager.get_model()
         generator_output = next(
-            Inpaint(manager).generate(
+            Inpaint(model).generate(
                 prompt=self.prompt,
                 init_img=image,
                 init_mask=mask,

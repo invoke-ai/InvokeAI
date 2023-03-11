@@ -29,14 +29,12 @@ from ..image_util import configure_model_padding
 from ..util.util import rand_perlin_2d
 from ..safety_checker import SafetyChecker
 from ..prompting.conditioning import get_uc_and_c_and_ec
-from ..model_management.model_manager import ModelManager
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 downsampling = 8
 
 @dataclass
 class InvokeAIGeneratorBasicParams:
-    model_name: str='stable-diffusion-1.5'
     seed: int=None
     width: int=512
     height: int=512
@@ -86,10 +84,10 @@ class InvokeAIGenerator(metaclass=ABCMeta):
     )
 
     def __init__(self,
-                 model_manager: ModelManager,
+                 model_info: dict,
                  params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
                  ):
-        self.model_manager=model_manager
+        self.model_info=model_info
         self.params=params
 
     def generate(self,
@@ -123,8 +121,8 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
 
-        model_name = generator_args.get('model_name') or self.model_manager.current_model
-        model_info: dict = self.model_manager.get_model(model_name)
+        model_info = self.model_info
+        model_name = model_info['model_name']
         model:StableDiffusionGeneratorPipeline = model_info['model']
         model_hash = model_info['hash']
         scheduler: Scheduler = self.get_scheduler(
@@ -164,7 +162,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
                 seed=results[0][1],
                 attention_maps_images=results[0][2],
                 model_hash = model_hash,
-                params=Namespace(**generator_args),
+                params=Namespace(model_name=model_name,**generator_args),
             )
             if callback:
                 callback(output)

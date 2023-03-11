@@ -88,12 +88,15 @@ class ModelManager(object):
         """
         return model_name in self.config
 
-    def get_model(self, model_name: str):
+    def get_model(self, model_name: str=None):
         """
         Given a model named identified in models.yaml, return
         the model object. If in RAM will load into GPU VRAM.
         If on disk, will load from there.
         """
+        if not model_name:
+            return self.current_model if self.current_model else self.get_model(self.default_model())
+        
         if not self.valid_model(model_name):
             print(
                 f'** "{model_name}" is not a known model name. Please check your models.yaml file'
@@ -116,6 +119,7 @@ class ModelManager(object):
         else:  # we're about to load a new model, so potentially offload the least recently used one
             requested_model, width, height, hash = self._load_model(model_name)
             self.models[model_name] = {
+                "model_name": model_name,
                 "model": requested_model,
                 "width": width,
                 "height": height,
@@ -125,6 +129,7 @@ class ModelManager(object):
         self.current_model = model_name
         self._push_newest_model(model_name)
         return {
+            "model_name": model_name,
             "model": requested_model,
             "width": width,
             "height": height,
