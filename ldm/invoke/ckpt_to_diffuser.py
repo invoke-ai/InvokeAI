@@ -1006,7 +1006,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
                 tokenizer=tokenizer,
                 unet=unet.to(precision),
                 scheduler=scheduler,
-                safety_checker=safety_checker.to(precision),
+                safety_checker=None if return_generator_pipeline else safety_checker.to(precision),
                 feature_extractor=feature_extractor,
             )
         else:
