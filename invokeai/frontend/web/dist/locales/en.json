@@ -1,7 +1,25 @@
 {
     "accessibility": {
         "modelSelect": "Model Select",
-        "invokeProgressBar": "Invoke progress bar"
+        "invokeProgressBar": "Invoke progress bar",
+        "reset": "Reset",
+        "uploadImage": "Upload Image",
+        "previousImage": "Previous Image",
+        "nextImage": "Next Image",
+        "useThisParameter": "Use this parameter",
+        "copyMetadataJson": "Copy metadata JSON",
+        "exitViewer": "ExitViewer",
+        "zoomIn": "Zoom In",
+        "zoomOut": "Zoom Out",
+        "rotateCounterClockwise": "Rotate Counter-Clockwise",
+        "rotateClockwise": "Rotate Clockwise",
+        "flipHorizontally": "Flip Horizontally",
+        "flipVertically": "Flip Vertically",
+        "modifyConfig": "Modify Config",
+        "toggleAutoscroll": "Toggle autoscroll",
+        "toggleLogViewer": "Toggle Log Viewer",
+        "showGallery": "Show Gallery",
+        "showOptionsPanel": "Show Options Panel"
     },
     "common": {
         "hotkeysLabel": "Hotkeys",
