@@ -596,7 +596,7 @@
         "autoSaveToGallery": "Auto Save to Gallery",
         "saveBoxRegionOnly": "Save Box Region Only",
         "limitStrokesToBox": "Limit Strokes to Box",
-        "showCanvasDebugInfo": "Show Canvas Debug Info",
+        "showCanvasDebugInfo": "Show Additional Canvas Info",
         "clearCanvasHistory": "Clear Canvas History",
         "clearHistory": "Clear History",
         "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
