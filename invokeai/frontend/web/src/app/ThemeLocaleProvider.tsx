@@ -42,6 +42,7 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   const theme = extendTheme({
     ...invokeAITheme,
     colors: THEMES[currentTheme as keyof typeof THEMES],
+    initialColorMode: ['light'].includes(currentTheme) ? 'light' : 'dark',
     direction,
   });
 
