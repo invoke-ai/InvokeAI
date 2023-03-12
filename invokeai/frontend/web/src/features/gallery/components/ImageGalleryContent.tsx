@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex, Grid, Icon } from '@chakra-ui/react';
+import { ButtonGroup, Flex, Grid, Icon, Text } from '@chakra-ui/react';
 import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -242,7 +242,7 @@ const ImageGalleryContent = () => {
                   h: 16,
                 }}
               />
-              <p>{t('gallery.noImagesInGallery')}</p>
+              <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
             </Flex>
           )}
         </Flex>
