@@ -18,16 +18,19 @@ import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvas
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 import { isEqual } from 'lodash';
+import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 
 const parametersPanelSelector = createSelector(
-  [uiSelector, activeTabNameSelector],
-  (ui, activeTabName) => {
+  [uiSelector, activeTabNameSelector, lightboxSelector],
+  (ui, activeTabName, lightbox) => {
     const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;
+    const { isLightboxOpen } = lightbox;
 
     return {
       shouldPinParametersPanel,
       shouldShowParametersPanel,
       isResizable: activeTabName !== 'unifiedCanvas',
+      isLightboxOpen,
     };
   },
   {
@@ -44,8 +47,12 @@ type ParametersPanelProps = {
 const ParametersPanel = ({ children }: ParametersPanelProps) => {
   const dispatch = useAppDispatch();
 
-  const { shouldPinParametersPanel, shouldShowParametersPanel, isResizable } =
-    useAppSelector(parametersPanelSelector);
+  const {
+    shouldPinParametersPanel,
+    shouldShowParametersPanel,
+    isResizable,
+    isLightboxOpen,
+  } = useAppSelector(parametersPanelSelector);
 
   const closeParametersPanel = () => {
     dispatch(setShouldShowParametersPanel(false));
@@ -57,7 +64,8 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
       dispatch(toggleParametersPanel());
       shouldPinParametersPanel && dispatch(requestCanvasRescale());
     },
-    [shouldPinParametersPanel]
+    { enabled: () => !isLightboxOpen },
+    [shouldPinParametersPanel, isLightboxOpen]
   );
 
   useHotkeys(
@@ -86,7 +94,7 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
       isResizable={isResizable || !shouldPinParametersPanel}
       isOpen={shouldShowParametersPanel}
       onClose={closeParametersPanel}
-      isPinned={shouldPinParametersPanel}
+      isPinned={shouldPinParametersPanel || isLightboxOpen}
       sx={{
         borderColor: 'base.700',
         p: shouldPinParametersPanel ? 0 : 4,

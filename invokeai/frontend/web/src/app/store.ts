@@ -60,6 +60,10 @@ const galleryBlacklist = [
   'intermediateImage',
 ].map((blacklistItem) => `gallery.${blacklistItem}`);
 
+const lightboxBlacklist = ['isLightboxOpen'].map(
+  (blacklistItem) => `lightbox.${blacklistItem}`
+);
+
 const rootReducer = combineReducers({
   generation: generationReducer,
   postprocessing: postprocessingReducer,
@@ -74,7 +78,12 @@ const rootPersistConfig = getPersistConfig({
   key: 'root',
   storage,
   rootReducer,
-  blacklist: [...canvasBlacklist, ...systemBlacklist, ...galleryBlacklist],
+  blacklist: [
+    ...canvasBlacklist,
+    ...systemBlacklist,
+    ...galleryBlacklist,
+    ...lightboxBlacklist,
+  ],
   debounce: 300,
 });
 

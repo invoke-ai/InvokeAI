@@ -30,6 +30,7 @@ const App = () => {
 
   return (
     <Grid w="100vw" h="100vh">
+      <Lightbox />
       <ImageUploader>
         <ProgressBar />
         <Grid
@@ -55,7 +56,6 @@ const App = () => {
       <Portal>
         <FloatingGalleryButton />
       </Portal>
-      <Lightbox />
     </Grid>
   );
 };

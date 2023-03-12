@@ -189,7 +189,7 @@ export default function InvokeTabs() {
       flexGrow={1}
     >
       <TabList>{tabs}</TabList>
-      <TabPanels>{isLightBoxOpen ? <Lightbox /> : tabPanels}</TabPanels>
+      <TabPanels>{tabPanels}</TabPanels>
     </Tabs>
   );
 }

@@ -1,9 +1,10 @@
-import { Flex, Image } from '@chakra-ui/react';
+import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
+import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
 import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
@@ -60,10 +61,22 @@ export default function CurrentImagePreview() {
       )}
       {!shouldShowImageDetails && <NextPrevImageButtons />}
       {shouldShowImageDetails && imageToDisplay && (
-        <ImageMetadataViewer
-          image={imageToDisplay}
-          styleClass="current-image-metadata"
-        />
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '0',
+            width: '100%',
+            height: '100%',
+            borderRadius: 'base',
+            overflow: 'scroll',
+            maxHeight: APP_METADATA_HEIGHT,
+          }}
+        >
+          <ImageMetadataViewer
+            image={imageToDisplay}
+            styleClass="current-image-metadata"
+          />
+        </Box>
       )}
     </Flex>
   );

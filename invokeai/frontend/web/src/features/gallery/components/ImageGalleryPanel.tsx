@@ -25,6 +25,7 @@ import {
 } from 'features/ui/store/uiSelectors';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 
 const GALLERY_TAB_WIDTHS: Record<
   InvokeTabName,
@@ -39,10 +40,17 @@ const GALLERY_TAB_WIDTHS: Record<
 };
 
 const galleryPanelSelector = createSelector(
-  [activeTabNameSelector, uiSelector, gallerySelector, isStagingSelector],
-  (activeTabName, ui, gallery, isStaging) => {
+  [
+    activeTabNameSelector,
+    uiSelector,
+    gallerySelector,
+    isStagingSelector,
+    lightboxSelector,
+  ],
+  (activeTabName, ui, gallery, isStaging, lightbox) => {
     const { shouldPinGallery, shouldShowGallery } = ui;
     const { galleryImageMinimumWidth } = gallery;
+    const { isLightboxOpen } = lightbox;
 
     return {
       activeTabName,
@@ -51,6 +59,7 @@ const galleryPanelSelector = createSelector(
       shouldShowGallery,
       galleryImageMinimumWidth,
       isResizable: activeTabName !== 'unifiedCanvas',
+      isLightboxOpen,
     };
   },
   {
@@ -69,6 +78,7 @@ export default function ImageGalleryPanel() {
     activeTabName,
     isStaging,
     isResizable,
+    isLightboxOpen,
   } = useAppSelector(galleryPanelSelector);
 
   const handleSetShouldPinGallery = () => {
@@ -174,7 +184,7 @@ export default function ImageGalleryPanel() {
       isResizable={isResizable || !shouldPinGallery}
       isOpen={shouldShowGallery}
       onClose={handleCloseGallery}
-      isPinned={shouldPinGallery}
+      isPinned={shouldPinGallery && !isLightboxOpen}
       minWidth={
         shouldPinGallery
           ? GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
