@@ -1,4 +1,4 @@
-import { Box, chakra, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -12,7 +12,6 @@ import { uiSelector } from 'features/ui/store/uiSelectors';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isEqual } from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useTranslation } from 'react-i18next';
 import { BiExit } from 'react-icons/bi';
 import { TransformWrapper } from 'react-zoom-pan-pinch';
 import { PROGRESS_BAR_THICKNESS } from 'theme/util/constants';
@@ -38,11 +37,8 @@ export const lightboxSelector = createSelector(
   }
 );
 
-const ChakraMotionBox = chakra(motion.div);
-
 export default function Lightbox() {
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );

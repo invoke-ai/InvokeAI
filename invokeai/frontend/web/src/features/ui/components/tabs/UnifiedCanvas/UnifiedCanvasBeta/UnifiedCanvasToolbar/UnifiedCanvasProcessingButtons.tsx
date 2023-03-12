@@ -1,5 +1,4 @@
 import { Flex } from '@chakra-ui/layout';
-import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';

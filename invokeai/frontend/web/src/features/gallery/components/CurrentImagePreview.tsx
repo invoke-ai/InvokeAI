@@ -72,10 +72,7 @@ export default function CurrentImagePreview() {
             maxHeight: APP_METADATA_HEIGHT,
           }}
         >
-          <ImageMetadataViewer
-            image={imageToDisplay}
-            styleClass="current-image-metadata"
-          />
+          <ImageMetadataViewer image={imageToDisplay} />
         </Box>
       )}
     </Flex>

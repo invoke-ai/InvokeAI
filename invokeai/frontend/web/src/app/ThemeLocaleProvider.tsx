@@ -1,4 +1,4 @@
-import { ChakraProvider, extendTheme, useColorMode } from '@chakra-ui/react';
+import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import { ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme as invokeAITheme } from 'theme/theme';

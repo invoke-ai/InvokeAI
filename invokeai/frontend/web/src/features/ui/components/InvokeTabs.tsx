@@ -14,7 +14,6 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
 import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
-import Lightbox from 'features/lightbox/components/Lightbox';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
