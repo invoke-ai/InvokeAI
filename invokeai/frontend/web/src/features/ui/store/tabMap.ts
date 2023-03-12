@@ -3,7 +3,7 @@ export const tabMap = [
   'img2img',
   'unifiedCanvas',
   'nodes',
-  'postprocess',
+  'postprocessing',
   'training',
 ] as const;
 

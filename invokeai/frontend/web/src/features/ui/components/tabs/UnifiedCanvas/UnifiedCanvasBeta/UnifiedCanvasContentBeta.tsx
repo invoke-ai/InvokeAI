@@ -1,15 +1,16 @@
-import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 // import IAICanvas from 'features/canvas/components/IAICanvas';
+import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
-import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
-import { debounce, isEqual } from 'lodash';
 
+import { isEqual } from 'lodash';
 import { useLayoutEffect } from 'react';
+import UnifiedCanvasToolbarBeta from './UnifiedCanvasToolbarBeta';
+import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasToolSettingsBeta';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 
 const selector = createSelector(
   [canvasSelector],
@@ -26,17 +27,16 @@ const selector = createSelector(
   }
 );
 
-const UnifiedCanvasDisplay = () => {
+const UnifiedCanvasContentBeta = () => {
   const dispatch = useAppDispatch();
 
   const { doesCanvasNeedScaling } = useAppSelector(selector);
 
   useLayoutEffect(() => {
-    dispatch(setDoesCanvasNeedScaling(true));
-
-    const resizeCallback = debounce(() => {
-      dispatch(setDoesCanvasNeedScaling(true));
-    }, 250);
+    dispatch(requestCanvasRescale());
+    const resizeCallback = () => {
+      dispatch(requestCanvasRescale());
+    };
 
     window.addEventListener('resize', resizeCallback);
 
@@ -48,31 +48,20 @@ const UnifiedCanvasDisplay = () => {
       sx={{
         width: '100%',
         height: '100%',
-        padding: 4,
         borderRadius: 'base',
         bg: 'base.850',
       }}
     >
       <Flex
-        sx={{
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 4,
-          width: '100%',
-          height: '100%',
-        }}
+        flexDirection="row"
+        width="100%"
+        height="100%"
+        columnGap={4}
+        padding={4}
       >
-        <IAICanvasToolbar />
-        <Flex
-          sx={{
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            width: '100%',
-            height: '100%',
-          }}
-        >
+        <UnifiedCanvasToolbarBeta />
+        <Flex width="100%" height="100%" flexDirection="column" rowGap={4}>
+          <UnifiedCanvasToolSettingsBeta />
           {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
         </Flex>
       </Flex>
@@ -80,4 +69,4 @@ const UnifiedCanvasDisplay = () => {
   );
 };
 
-export default UnifiedCanvasDisplay;
+export default UnifiedCanvasContentBeta;

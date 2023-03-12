@@ -5,6 +5,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
+import { memo } from 'react';
 
 export type IAIIconButtonProps = IconButtonProps & {
   tooltip?: string;
@@ -33,4 +34,4 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
   );
 });
 
-export default IAIIconButton;
+export default memo(IAIIconButton);

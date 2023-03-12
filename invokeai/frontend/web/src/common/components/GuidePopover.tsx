@@ -11,7 +11,7 @@ import { Feature, useFeatureHelpInfo } from 'app/features';
 import { useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { SystemState } from 'features/system/store/systemSlice';
-import { ReactElement } from 'react';
+import { memo, ReactElement } from 'react';
 
 type GuideProps = {
   children: ReactElement;
@@ -30,7 +30,7 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
   if (!shouldDisplayGuides) return null;
 
   return (
-    <Popover trigger="hover">
+    <Popover trigger="hover" isLazy>
       <PopoverTrigger>
         <Box>{children}</Box>
       </PopoverTrigger>
@@ -46,4 +46,4 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
   );
 };
 
-export default GuidePopover;
+export default memo(GuidePopover);

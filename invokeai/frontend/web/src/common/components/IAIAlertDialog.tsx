@@ -8,7 +8,7 @@ import {
   forwardRef,
   useDisclosure,
 } from '@chakra-ui/react';
-import { cloneElement, ReactElement, ReactNode, useRef } from 'react';
+import { cloneElement, memo, ReactElement, ReactNode, useRef } from 'react';
 import IAIButton from './IAIButton';
 
 type Props = {
@@ -79,4 +79,4 @@ const IAIAlertDialog = forwardRef((props: Props, ref) => {
     </>
   );
 });
-export default IAIAlertDialog;
+export default memo(IAIAlertDialog);
