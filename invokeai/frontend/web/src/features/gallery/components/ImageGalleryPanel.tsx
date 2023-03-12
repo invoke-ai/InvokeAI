@@ -78,6 +78,7 @@ export default function ImageGalleryPanel() {
 
   const handleToggleGallery = () => {
     dispatch(toggleGalleryPanel());
+    shouldPinGallery && dispatch(requestCanvasRescale());
   };
 
   const handleCloseGallery = () => {
@@ -90,7 +91,7 @@ export default function ImageGalleryPanel() {
     () => {
       handleToggleGallery();
     },
-    [shouldShowGallery, shouldPinGallery]
+    [shouldPinGallery]
   );
 
   useHotkeys(
