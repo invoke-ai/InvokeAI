@@ -417,7 +417,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             sx={{
               flexDirection: 'column',
               rowGap: 2,
-              w: 52,
             }}
           >
             <IAIButton
