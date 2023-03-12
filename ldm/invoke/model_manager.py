@@ -19,7 +19,7 @@ import warnings
 from enum import Enum
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Callable
 
 import safetensors
 import safetensors.torch
@@ -765,6 +765,7 @@ class ModelManager(object):
             description: str = None,
             model_config_file: Path = None,
             commit_to_conf: Path = None,
+            config_file_callback: Callable[[Path],Path] = None,
     ) -> str:
         """
         Accept a string which could be:
@@ -838,7 +839,10 @@ class ModelManager(object):
                     Path(thing).rglob("*.safetensors")
                 ):
                     if model_name := self.heuristic_import(
-                        str(m), convert, commit_to_conf=commit_to_conf
+                            str(m),
+                            convert,
+                            commit_to_conf=commit_to_conf,
+                            config_file_callback=config_file_callback,
                     ):
                         print(f" >> {model_name} successfully imported")
                 return model_name
@@ -901,11 +905,14 @@ class ModelManager(object):
                 print(
                     f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
                 )
-                return
             else:
                 print(
                     f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
                 )
+
+            if not model_config_file and config_file_callback:
+                model_config_file = config_file_callback(model_path)
+            if not model_config_file:
                 return
 
         if model_config_file.name.startswith('v2'):

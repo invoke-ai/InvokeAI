@@ -158,10 +158,16 @@ def main():
     except Exception as e:
         report_model_error(opt, e)
 
+    # completer is the readline object
+    completer = get_completer(opt, models=gen.model_manager.list_models())
+            
     # try to autoconvert new models
     if path := opt.autoimport:
         gen.model_manager.heuristic_import(
-            str(path), convert=False, commit_to_conf=opt.conf
+            str(path),
+            convert=False,
+            commit_to_conf=opt.conf,
+            config_file_callback=lambda x: _pick_configuration_file(completer,x),
         )
 
     if path := opt.autoconvert:
@@ -180,7 +186,7 @@ def main():
         )
 
     try:
-        main_loop(gen, opt)
+        main_loop(gen, opt, completer)
     except KeyboardInterrupt:
         print(
             f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
@@ -191,7 +197,7 @@ def main():
 
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
-def main_loop(gen, opt):
+def main_loop(gen, opt, completer):
     """prompt/read/execute loop"""
     global infile
     done = False
@@ -202,7 +208,6 @@ def main_loop(gen, opt):
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    completer = get_completer(opt, models=gen.model_manager.list_models())
     set_default_output_dir(opt, completer)
     if gen.model:
         add_embedding_terms(gen, completer)
@@ -661,17 +666,8 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
         model_name=model_name,
         description=model_desc,
         convert=convert,
+        config_file_callback=lambda x: _pick_configuration_file(completer,x),
     )
-
-    if not imported_name:
-        if config_file := _pick_configuration_file(completer):
-            imported_name = gen.model_manager.heuristic_import(
-                model_path,
-                model_name=model_name,
-                description=model_desc,
-                convert=convert,
-                model_config_file=config_file,
-            )
     if not imported_name:
         print("** Aborting import.")
         return
@@ -687,14 +683,14 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
     completer.update_models(gen.model_manager.list_models())
     print(f">> {imported_name} successfully installed")
 
-def _pick_configuration_file(completer)->Path:
+def _pick_configuration_file(completer, checkpoint_path: Path)->Path:
     print(
-"""
-Please select the type of this model:
+f"""
+Please select the type of the model at checkpoint {checkpoint_path}:
 [1] A Stable Diffusion v1.x ckpt/safetensors model
 [2] A Stable Diffusion v1.x inpainting ckpt/safetensors model
-[3] A Stable Diffusion v2.x base model (512 pixels)
-[4] A Stable Diffusion v2.x v-predictive model (768 pixels)
+[3] A Stable Diffusion v2.x base model (512 pixels; there should be no 'parameterization:' line in its yaml file)
+[4] A Stable Diffusion v2.x v-predictive model (768 pixels; look for a 'parameterization: "v"' line in its yaml file)
 [5] Other (you will be prompted to enter the config file path)
 [Q] I have no idea! Skip the import.
 """)
