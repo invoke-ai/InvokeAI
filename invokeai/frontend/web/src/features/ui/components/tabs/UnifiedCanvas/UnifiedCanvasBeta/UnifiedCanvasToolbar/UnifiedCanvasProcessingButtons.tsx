@@ -22,7 +22,7 @@ export default function UnifiedCanvasProcessingButtons() {
     shouldPinParametersPanel && dispatch(requestCanvasRescale());
   };
 
-  return (
+  return !shouldPinParametersPanel ? (
     <Flex flexDirection="column" gap={2}>
       <IAIIconButton
         tooltip={`${t('parameters.showOptionsPanel')} (O)`}
@@ -39,5 +39,5 @@ export default function UnifiedCanvasProcessingButtons() {
         <CancelButton width="100%" height="40px" btnGroupWidth="100%" />
       </Flex>
     </Flex>
-  );
+  ) : null;
 }
