@@ -78,7 +78,7 @@ const Scrollable = ({ children }: ScrollableProps) => {
           ...scrollShadowBaseStyles,
           top: 0,
           boxShadow:
-            'inset 0 3.5 rem 2rem -2rem var(--invokeai-colors-base-900)',
+            'inset 0 3.5rem 2rem -2rem var(--invokeai-colors-base-900)',
         }}
       ></Box>
     </Box>
