@@ -74,7 +74,7 @@ const ResizableDrawer = ({
     () =>
       initialWidth ??
       minWidth ??
-      (['left', 'right'].includes(direction) ? 500 : '100vw'),
+      (['left', 'right'].includes(direction) ? 500 : '100%'),
     [initialWidth, minWidth, direction]
   );
 
@@ -82,7 +82,7 @@ const ResizableDrawer = ({
     () =>
       initialHeight ??
       minHeight ??
-      (['top', 'bottom'].includes(direction) ? 500 : '100vh'),
+      (['top', 'bottom'].includes(direction) ? 500 : '100%'),
     [initialHeight, minHeight, direction]
   );
 
