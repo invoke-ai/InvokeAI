@@ -109,6 +109,7 @@ def install_requested_models(
                 model_manager.heuristic_import(
                     path_url_or_repo,
                     convert=convert_to_diffusers,
+                    config_file_callback=_pick_configuration_file,
                     commit_to_conf=config_file_path
                 )
             except KeyboardInterrupt:
@@ -138,6 +139,45 @@ def yes_or_no(prompt: str, default_yes=True):
     else:
         return response[0] in ("y", "Y")
 
+# -------------------------------------
+def _pick_configuration_file(checkpoint_path: Path)->Path:
+    print(
+"""
+Please select the type of this model:
+[1] A Stable Diffusion v1.x ckpt/safetensors model
+[2] A Stable Diffusion v1.x inpainting ckpt/safetensors model
+[3] A Stable Diffusion v2.x base model (512 pixels; no 'parameterization:' in its yaml file)
+[4] A Stable Diffusion v2.x v-predictive model (768 pixels; look for 'parameterization: "v"' in its yaml file)
+[5] Other (you will be prompted to enter the config file path)
+[Q] I have no idea! Skip the import.
+""")
+    choices = [
+        global_config_dir() / 'stable-diffusion' / x
+        for x in [
+                'v1-inference.yaml',
+                'v1-inpainting-inference.yaml',
+                'v2-inference.yaml',
+                'v2-inference-v.yaml',
+        ]
+    ]
+
+    ok = False
+    while not ok:
+        try:
+            choice = input('select 0-5, Q > ').strip()
+            if choice.startswith(('q','Q')):
+                return
+            if choice == '5':
+                choice = Path(input('Select config file for this model> ').strip()).absolute()
+                ok = choice.exists()
+            else:
+                choice = choices[int(choice)-1]
+                ok = True
+        except (ValueError, IndexError):
+            print(f'{choice} is not a valid choice')
+        except EOFError:
+            return
+    return choice
 
 # -------------------------------------
 def get_root(root: str = None) -> str:
