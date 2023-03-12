@@ -11,7 +11,10 @@ import { FaSlidersH } from 'react-icons/fa';
 
 export default function UnifiedCanvasProcessingButtons() {
   const shouldPinParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldPinParametersPanel
+    (state) => state.ui.shouldPinParametersPanel
+  );
+  const shouldShowParametersPanel = useAppSelector(
+    (state) => state.ui.shouldShowParametersPanel
   );
 
   const dispatch = useAppDispatch();
@@ -22,7 +25,7 @@ export default function UnifiedCanvasProcessingButtons() {
     shouldPinParametersPanel && dispatch(requestCanvasRescale());
   };
 
-  return !shouldPinParametersPanel ? (
+  return !shouldPinParametersPanel || !shouldShowParametersPanel ? (
     <Flex flexDirection="column" gap={2}>
       <IAIIconButton
         tooltip={`${t('parameters.showOptionsPanel')} (O)`}
