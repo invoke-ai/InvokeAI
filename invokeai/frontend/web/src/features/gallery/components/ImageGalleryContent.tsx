@@ -32,7 +32,7 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
-  const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(false);
+  const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
 
   const {
     images,
