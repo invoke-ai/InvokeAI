@@ -116,8 +116,8 @@ SAMPLER_CHOICES = [
     "k_heun",
     "k_lms",
     "plms",
-    # diffusers:
     "pndm",
+    "unipc",
 ]
 
 PRECISION_CHOICES = [

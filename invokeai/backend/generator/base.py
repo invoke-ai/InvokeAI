@@ -58,7 +58,7 @@ class InvokeAIGeneratorOutput:
     '''
     InvokeAIGeneratorOutput is a dataclass that contains the outputs of a generation
     operation, including the image, its seed, the model name used to generate the image
-    and the model hash, as well as all the generate() parameters that went into 
+    and the model hash, as well as all the generate() parameters that went into
     generating the image (in .params, also available as attributes)
     '''
     image: Image
@@ -81,6 +81,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         k_heun=diffusers.HeunDiscreteScheduler,
         k_lms=diffusers.LMSDiscreteScheduler,
         plms=diffusers.PNDMScheduler,
+        unipc=diffusers.UniPCMultistepScheduler,
     )
 
     def __init__(self,
@@ -116,7 +117,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
            outputs = txt2img.generate(prompt='banana sushi', iterations=None)
            for o in outputs:
                print(o.image, o.seed)
-        
+
         '''
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
@@ -167,7 +168,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             if callback:
                 callback(output)
             yield output
-            
+
     @classmethod
     def schedulers(self)->List[str]:
         '''
@@ -177,7 +178,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
     def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
         return generator_class(model, self.params.precision)
-               
+
     def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
         scheduler_class = self.scheduler_map.get(scheduler_name,'ddim')
         scheduler = scheduler_class.from_config(model.scheduler.config)
@@ -267,12 +268,12 @@ class Embiggen(Txt2Img):
                                 embiggen_tiles=embiggen_tiles,
                                 strength=strength,
                                 **kwargs)
-    
+
     @classmethod
     def _generator_class(cls):
         from .embiggen import Embiggen
         return Embiggen
-    
+
 
 class Generator:
     downsampling_factor: int

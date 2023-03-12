@@ -1061,6 +1061,7 @@ class Generate:
             k_heun=diffusers.HeunDiscreteScheduler,
             k_lms=diffusers.LMSDiscreteScheduler,
             plms=diffusers.PNDMScheduler,
+            unipc=diffusers.UniPCMultistepScheduler,
         )
 
         if self.sampler_name in scheduler_map:
