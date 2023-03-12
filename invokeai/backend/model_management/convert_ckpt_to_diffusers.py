@@ -396,6 +396,10 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                 "  | Extracting only the non-EMA weights (usually better for fine-tuning)"
             )
 
+    for key in keys:
+        if key.startswith("model.diffusion_model") and key in checkpoint:
+            unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
+
     new_checkpoint = {}
 
     new_checkpoint["time_embedding.linear_1.weight"] = unet_state_dict[
