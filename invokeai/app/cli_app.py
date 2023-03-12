@@ -17,7 +17,8 @@ from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_gra
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
-from .services.generate_initializer import get_generate
+from .services.model_manager_initializer import get_model_manager
+from .services.restoration_services import RestorationServices
 from .services.graph import EdgeConnection, GraphExecutionState
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
@@ -126,14 +127,9 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    args = Args()
-    config = args.parse_args()
-
-    generate = get_generate(args, config)
-
-    # NOTE: load model on first use, uncomment to load at startup
-    # TODO: Make this a config option?
-    # generate.load_model()
+    config = Args()
+    config.parse_args()
+    model_manager = get_model_manager(config)
 
     events = EventServiceBase()
 
@@ -145,7 +141,7 @@ def invoke_cli():
     db_location = os.path.join(output_folder, "invokeai.db")
 
     services = InvocationServices(
-        generate=generate,
+        model_manager=model_manager,
         events=events,
         images=DiskImageStorage(output_folder),
         queue=MemoryInvocationQueue(),
@@ -153,6 +149,7 @@ def invoke_cli():
             filename=db_location, table_name="graph_executions"
         ),
         processor=DefaultInvocationProcessor(),
+        restoration=RestorationServices(config),
     )
 
     invoker = Invoker(services)
