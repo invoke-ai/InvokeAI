@@ -154,19 +154,21 @@ const ResizableDrawer = ({
     <Slide
       direction={slideDirection}
       in={isOpen}
-      motionProps={{ initial: false }}
+      unmountOnExit={isPinned}
+      motionProps={{ initial: isPinned }}
       {...(isPinned
         ? {
             style: {
               position: undefined,
               left: undefined,
+              right: undefined,
               top: undefined,
               bottom: undefined,
               width: undefined,
             },
           }
         : {
-            transition: { enter: { duration: 0.15 }, exit: { duration: 0.15 } },
+            // transition: { enter: { duration: 0.15 }, exit: { duration: 0.15 } },
             style: { zIndex: 99, width: 'full' },
           })}
     >

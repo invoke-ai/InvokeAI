@@ -23,17 +23,22 @@ const floatingButtonStyles: ChakraProps['sx'] = {
 export const floatingParametersPanelButtonSelector = createSelector(
   [uiSelector, activeTabNameSelector],
   (ui, activeTabName) => {
-    const { shouldPinParametersPanel, shouldUseCanvasBetaLayout } = ui;
+    const {
+      shouldPinParametersPanel,
+      shouldUseCanvasBetaLayout,
+      shouldShowParametersPanel,
+    } = ui;
 
     const canvasBetaLayoutCheck =
       shouldUseCanvasBetaLayout && activeTabName === 'unifiedCanvas';
 
     const shouldShowProcessButtons =
-      !canvasBetaLayoutCheck && !shouldPinParametersPanel;
+      !canvasBetaLayoutCheck &&
+      (!shouldPinParametersPanel || !shouldShowParametersPanel);
 
     const shouldShowParametersPanelButton =
       !canvasBetaLayoutCheck &&
-      !shouldPinParametersPanel &&
+      (!shouldPinParametersPanel || !shouldShowParametersPanel) &&
       ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     return {

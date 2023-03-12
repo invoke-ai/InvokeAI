@@ -11,12 +11,12 @@ import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 const floatingGalleryButtonSelector = createSelector(
   [activeTabNameSelector, uiSelector],
   (activeTabName, ui) => {
-    const { shouldPinGallery } = ui;
+    const { shouldPinGallery, shouldShowGallery } = ui;
 
     return {
       shouldPinGallery,
       shouldShowGalleryButton:
-        !shouldPinGallery &&
+        (!shouldPinGallery || !shouldShowGallery) &&
         ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName),
     };
   },
