@@ -4,11 +4,15 @@ including img2img, txt2img, and inpaint
 """
 from __future__ import annotations
 
+import itertools
+import dataclasses
+import diffusers
 import os
 import random
 import traceback
+from abc import ABCMeta
+from argparse import Namespace
 from contextlib import nullcontext
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -17,13 +21,258 @@ from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
 from tqdm import trange
+from typing import List, Iterator, Type
+from dataclasses import dataclass, field
+from diffusers.schedulers import SchedulerMixin as Scheduler
 
-import invokeai.assets.web as web_assets
+from ..image_util import configure_model_padding
 from ..util.util import rand_perlin_2d
+from ..safety_checker import SafetyChecker
+from ..prompting.conditioning import get_uc_and_c_and_ec
+from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 downsampling = 8
-CAUTION_IMG = "caution.png"
 
+@dataclass
+class InvokeAIGeneratorBasicParams:
+    seed: int=None
+    width: int=512
+    height: int=512
+    cfg_scale: int=7.5
+    steps: int=20
+    ddim_eta: float=0.0
+    scheduler: int='ddim'
+    precision: str='float16'
+    perlin: float=0.0
+    threshold: int=0.0
+    seamless: bool=False
+    seamless_axes: List[str]=field(default_factory=lambda: ['x', 'y'])
+    h_symmetry_time_pct: float=None
+    v_symmetry_time_pct: float=None
+    variation_amount: float = 0.0
+    with_variations: list=field(default_factory=list)
+    safety_checker: SafetyChecker=None
+
+@dataclass
+class InvokeAIGeneratorOutput:
+    '''
+    InvokeAIGeneratorOutput is a dataclass that contains the outputs of a generation
+    operation, including the image, its seed, the model name used to generate the image
+    and the model hash, as well as all the generate() parameters that went into 
+    generating the image (in .params, also available as attributes)
+    '''
+    image: Image
+    seed: int
+    model_hash: str
+    attention_maps_images: List[Image]
+    params: Namespace
+
+# we are interposing a wrapper around the original Generator classes so that
+# old code that calls Generate will continue to work.
+class InvokeAIGenerator(metaclass=ABCMeta):
+    scheduler_map = dict(
+        ddim=diffusers.DDIMScheduler,
+        dpmpp_2=diffusers.DPMSolverMultistepScheduler,
+        k_dpm_2=diffusers.KDPM2DiscreteScheduler,
+        k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
+        k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
+        k_euler=diffusers.EulerDiscreteScheduler,
+        k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
+        k_heun=diffusers.HeunDiscreteScheduler,
+        k_lms=diffusers.LMSDiscreteScheduler,
+        plms=diffusers.PNDMScheduler,
+    )
+
+    def __init__(self,
+                 model_info: dict,
+                 params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
+                 ):
+        self.model_info=model_info
+        self.params=params
+
+    def generate(self,
+                 prompt: str='',
+                 callback: callable=None,
+                 step_callback: callable=None,
+                 iterations: int=1,
+                 **keyword_args,
+                 )->Iterator[InvokeAIGeneratorOutput]:
+        '''
+        Return an iterator across the indicated number of generations.
+        Each time the iterator is called it will return an InvokeAIGeneratorOutput
+        object. Use like this:
+
+           outputs = txt2img.generate(prompt='banana sushi', iterations=5)
+           for result in outputs:
+               print(result.image, result.seed)
+
+        In the typical case of wanting to get just a single image, iterations
+        defaults to 1 and do:
+
+           output = next(txt2img.generate(prompt='banana sushi')
+
+        Pass None to get an infinite iterator.
+
+           outputs = txt2img.generate(prompt='banana sushi', iterations=None)
+           for o in outputs:
+               print(o.image, o.seed)
+        
+        '''
+        generator_args = dataclasses.asdict(self.params)
+        generator_args.update(keyword_args)
+
+        model_info = self.model_info
+        model_name = model_info['model_name']
+        model:StableDiffusionGeneratorPipeline = model_info['model']
+        model_hash = model_info['hash']
+        scheduler: Scheduler = self.get_scheduler(
+            model=model,
+            scheduler_name=generator_args.get('scheduler')
+        )
+        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt,model=model)
+        gen_class = self._generator_class()
+        generator = gen_class(model, self.params.precision)
+        if self.params.variation_amount > 0:
+            generator.set_variation(generator_args.get('seed'),
+                                    generator_args.get('variation_amount'),
+                                    generator_args.get('with_variations')
+                                    )
+
+        if isinstance(model, DiffusionPipeline):
+            for component in [model.unet, model.vae]:
+                configure_model_padding(component,
+                                        generator_args.get('seamless',False),
+                                        generator_args.get('seamless_axes')
+                                        )
+        else:
+            configure_model_padding(model,
+                                    generator_args.get('seamless',False),
+                                    generator_args.get('seamless_axes')
+                                    )
+
+        iteration_count = range(iterations) if iterations else itertools.count(start=0, step=1)
+        for i in iteration_count:
+            results = generator.generate(prompt,
+                                         conditioning=(uc, c, extra_conditioning_info),
+                                         sampler=scheduler,
+                                         **generator_args,
+                                         )
+            output = InvokeAIGeneratorOutput(
+                image=results[0][0],
+                seed=results[0][1],
+                attention_maps_images=results[0][2],
+                model_hash = model_hash,
+                params=Namespace(model_name=model_name,**generator_args),
+            )
+            if callback:
+                callback(output)
+            yield output
+            
+    @classmethod
+    def schedulers(self)->List[str]:
+        '''
+        Return list of all the schedulers that we currently handle.
+        '''
+        return list(self.scheduler_map.keys())
+
+    def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
+        return generator_class(model, self.params.precision)
+               
+    def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
+        scheduler_class = self.scheduler_map.get(scheduler_name,'ddim')
+        scheduler = scheduler_class.from_config(model.scheduler.config)
+        # hack copied over from generate.py
+        if not hasattr(scheduler, 'uses_inpainting_model'):
+            scheduler.uses_inpainting_model = lambda: False
+        return scheduler
+
+    @classmethod
+    def _generator_class(cls)->Type[Generator]:
+        '''
+        In derived classes return the name of the generator to apply.
+        If you don't override will return the name of the derived
+        class, which nicely parallels the generator class names.
+        '''
+        return Generator
+
+# ------------------------------------
+class Txt2Img(InvokeAIGenerator):
+    @classmethod
+    def _generator_class(cls):
+        from .txt2img import Txt2Img
+        return Txt2Img
+
+# ------------------------------------
+class Img2Img(InvokeAIGenerator):
+    def generate(self,
+               init_image: Image | torch.FloatTensor,
+               strength: float=0.75,
+               **keyword_args
+               )->List[InvokeAIGeneratorOutput]:
+        return super().generate(init_image=init_image,
+                                strength=strength,
+                                **keyword_args
+                                )
+    @classmethod
+    def _generator_class(cls):
+        from .img2img import Img2Img
+        return Img2Img
+
+# ------------------------------------
+# Takes all the arguments of Img2Img and adds the mask image and the seam/infill stuff
+class Inpaint(Img2Img):
+    def generate(self,
+                 mask_image: Image | torch.FloatTensor,
+                 # Seam settings - when 0, doesn't fill seam
+                 seam_size: int = 0,
+                 seam_blur: int = 0,
+                 seam_strength: float = 0.7,
+                 seam_steps: int = 10,
+                 tile_size: int = 32,
+                 inpaint_replace=False,
+                 infill_method=None,
+                 inpaint_width=None,
+                 inpaint_height=None,
+                 inpaint_fill: tuple(int) = (0x7F, 0x7F, 0x7F, 0xFF),
+                 **keyword_args
+                 )->List[InvokeAIGeneratorOutput]:
+        return super().generate(
+            mask_image=mask_image,
+            seam_size=seam_size,
+            seam_blur=seam_blur,
+            seam_strength=seam_strength,
+            seam_steps=seam_steps,
+            tile_size=tile_size,
+            inpaint_replace=inpaint_replace,
+            infill_method=infill_method,
+            inpaint_width=inpaint_width,
+            inpaint_height=inpaint_height,
+            inpaint_fill=inpaint_fill,
+            **keyword_args
+        )
+    @classmethod
+    def _generator_class(cls):
+        from .inpaint import Inpaint
+        return Inpaint
+
+# ------------------------------------
+class Embiggen(Txt2Img):
+    def generate(
+            self,
+            embiggen: list=None,
+            embiggen_tiles: list = None,
+            strength: float=0.75,
+            **kwargs)->List[InvokeAIGeneratorOutput]:
+        return super().generate(embiggen=embiggen,
+                                embiggen_tiles=embiggen_tiles,
+                                strength=strength,
+                                **kwargs)
+    
+    @classmethod
+    def _generator_class(cls):
+        from .embiggen import Embiggen
+        return Embiggen
+    
 
 class Generator:
     downsampling_factor: int
@@ -44,7 +293,6 @@ class Generator:
         self.with_variations = []
         self.use_mps_noise = False
         self.free_gpu_mem = None
-        self.caution_img = None
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
     def get_make_image(self, prompt, **kwargs):
@@ -64,10 +312,10 @@ class Generator:
     def generate(
         self,
         prompt,
-        init_image,
         width,
         height,
         sampler,
+        init_image=None,
         iterations=1,
         seed=None,
         image_callback=None,
@@ -76,7 +324,7 @@ class Generator:
         perlin=0.0,
         h_symmetry_time_pct=None,
         v_symmetry_time_pct=None,
-        safety_checker: dict = None,
+        safety_checker: SafetyChecker=None,
         free_gpu_mem: bool = False,
         **kwargs,
     ):
@@ -130,9 +378,9 @@ class Generator:
                 image = make_image(x_T)
 
                 if self.safety_checker is not None:
-                    image = self.safety_check(image)
+                    image = self.safety_checker.check(image)
 
-                results.append([image, seed])
+                results.append([image, seed, attention_maps_images])
 
                 if image_callback is not None:
                     attention_maps_image = (
@@ -292,16 +540,6 @@ class Generator:
                 seed = random.randrange(0, np.iinfo(np.uint32).max)
         return (seed, initial_noise)
 
-    # returns a tensor filled with random numbers from a normal distribution
-    def get_noise(self, width, height):
-        """
-        Returns a tensor filled with random numbers, either form a normal distribution
-        (txt2img) or from the latent image (img2img, inpaint)
-        """
-        raise NotImplementedError(
-            "get_noise() must be implemented in a descendent class"
-        )
-
     def get_perlin_noise(self, width, height):
         fixdevice = "cpu" if (self.model.device.type == "mps") else self.model.device
         # limit noise to only the diffusion image channels, not the mask channels
@@ -360,53 +598,6 @@ class Generator:
             v2 = torch.from_numpy(v2).to(self.model.device)
 
         return v2
-
-    def safety_check(self, image: Image.Image):
-        """
-        If the CompViz safety checker flags an NSFW image, we
-        blur it out.
-        """
-        import diffusers
-
-        checker = self.safety_checker["checker"]
-        extractor = self.safety_checker["extractor"]
-        features = extractor([image], return_tensors="pt")
-        features.to(self.model.device)
-
-        # unfortunately checker requires the numpy version, so we have to convert back
-        x_image = np.array(image).astype(np.float32) / 255.0
-        x_image = x_image[None].transpose(0, 3, 1, 2)
-
-        diffusers.logging.set_verbosity_error()
-        checked_image, has_nsfw_concept = checker(
-            images=x_image, clip_input=features.pixel_values
-        )
-        if has_nsfw_concept[0]:
-            print(
-                "** An image with potential non-safe content has been detected. A blurred image will be returned. **"
-            )
-            return self.blur(image)
-        else:
-            return image
-
-    def blur(self, input):
-        blurry = input.filter(filter=ImageFilter.GaussianBlur(radius=32))
-        try:
-            caution = self.get_caution_img()
-            if caution:
-                blurry.paste(caution, (0, 0), caution)
-        except FileNotFoundError:
-            pass
-        return blurry
-
-    def get_caution_img(self):
-        path = None
-        if self.caution_img:
-            return self.caution_img
-        path = Path(web_assets.__path__[0]) / CAUTION_IMG
-        caution = Image.open(path)
-        self.caution_img = caution.resize((caution.width // 2, caution.height // 2))
-        return self.caution_img
 
     # this is a handy routine for debugging use. Given a generated sample,
     # convert it into a PNG image and store it at the indicated path
