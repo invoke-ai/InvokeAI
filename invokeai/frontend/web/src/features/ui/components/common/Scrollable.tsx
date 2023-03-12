@@ -8,7 +8,7 @@ const scrollShadowBaseStyles: ChakraProps['sx'] = {
   height: 24,
   left: 0,
   pointerEvents: 'none',
-  transition: 'opacity 0.2s',
+  transition: 'opacity 0.2s ease-in-out',
 };
 
 type ScrollableProps = {
@@ -68,8 +68,7 @@ const Scrollable = ({ children }: ScrollableProps) => {
         sx={{
           ...scrollShadowBaseStyles,
           bottom: 0,
-          boxShadow:
-            'inset 0 -3.5rem 2rem -2rem var(--invokeai-colors-base-900)',
+          boxShadow: 'inset 0 -5rem 2rem -2rem var(--invokeai-colors-base-900)',
         }}
       ></Box>
       <Box
@@ -77,8 +76,7 @@ const Scrollable = ({ children }: ScrollableProps) => {
         sx={{
           ...scrollShadowBaseStyles,
           top: 0,
-          boxShadow:
-            'inset 0 3.5rem 2rem -2rem var(--invokeai-colors-base-900)',
+          boxShadow: 'inset 0 5rem 2rem -2rem var(--invokeai-colors-base-900)',
         }}
       ></Box>
     </Box>

@@ -1,4 +1,5 @@
 import {
+  ChakraProps,
   Icon,
   Tab,
   TabList,
@@ -36,89 +37,47 @@ import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 
 export interface InvokeTabInfo {
-  id: string;
+  id: InvokeTabName;
   icon: ReactNode;
   workarea: ReactNode;
-  tooltip: string;
 }
+
+const tabIconStyles: ChakraProps['sx'] = {
+  boxSize: 6,
+};
 
 const tabInfo: InvokeTabInfo[] = [
   {
-    id: 'text2img',
-    icon: <Icon as={MdTextFields} boxSize={6} />,
+    id: 'txt2img',
+    icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
     workarea: <TextToImageWorkarea />,
-    tooltip: 'Text To Image',
   },
   {
     id: 'img2img',
-    icon: <Icon as={MdPhotoLibrary} boxSize={6} />,
+    icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
     workarea: <ImageToImageWorkarea />,
-    tooltip: 'Image To Image',
   },
   {
     id: 'unifiedCanvas',
-    icon: <Icon as={MdGridOn} boxSize={6} />,
+    icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
     workarea: <UnifiedCanvasWorkarea />,
-    tooltip: 'Unified Canvas',
   },
   {
     id: 'nodes',
-    icon: <Icon as={MdDeviceHub} boxSize={6} />,
+    icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
     workarea: <NodesWIP />,
-    tooltip: 'Nodes',
   },
   {
-    id: 'postProcessing',
-    icon: <Icon as={MdPhotoFilter} boxSize={6} />,
+    id: 'postprocessing',
+    icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
     workarea: <PostProcessingWIP />,
-    tooltip: 'Post Processing',
   },
   {
     id: 'training',
-    icon: <Icon as={MdFlashOn} boxSize={6} />,
+    icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
     workarea: <TrainingWIP />,
-    tooltip: 'Training',
   },
 ];
-
-export interface InvokeTabInfo2 {
-  icon: ReactNode;
-  workarea: ReactNode;
-  tooltip: string;
-}
-
-export const tabDict: Record<InvokeTabName, InvokeTabInfo2> = {
-  txt2img: {
-    icon: <Icon as={MdTextFields} boxSize={6} />,
-    workarea: <TextToImageWorkarea />,
-    tooltip: 'Text To Image',
-  },
-  img2img: {
-    icon: <Icon as={MdPhotoLibrary} boxSize={6} />,
-    workarea: <ImageToImageWorkarea />,
-    tooltip: 'Image To Image',
-  },
-  unifiedCanvas: {
-    icon: <Icon as={MdGridOn} boxSize={6} />,
-    workarea: <UnifiedCanvasWorkarea />,
-    tooltip: 'Unified Canvas',
-  },
-  nodes: {
-    icon: <Icon as={MdDeviceHub} boxSize={6} />,
-    workarea: <NodesWIP />,
-    tooltip: 'Nodes',
-  },
-  postprocess: {
-    icon: <Icon as={MdPhotoFilter} boxSize={6} />,
-    workarea: <PostProcessingWIP />,
-    tooltip: 'Post Processing',
-  },
-  training: {
-    icon: <Icon as={MdFlashOn} boxSize={6} />,
-    workarea: <TrainingWIP />,
-    tooltip: 'Training',
-  },
-};
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -192,7 +151,9 @@ export default function InvokeTabs() {
           placement="end"
         >
           <Tab>
-            <VisuallyHidden>{tab.tooltip}</VisuallyHidden>
+            <VisuallyHidden>
+              {String(t(`common.${tab.id}` as ResourceKey))}
+            </VisuallyHidden>
             {tab.icon}
           </Tab>
         </Tooltip>
@@ -206,6 +167,17 @@ export default function InvokeTabs() {
     []
   );
 
+  /**
+   * isLazy means the tabs are mounted and unmounted when changing them. There is a tradeoff here,
+   * as mounting is expensive, but so is retaining all tabs in the DOM at all times.
+   *
+   * Removing isLazy messes with the outside click watcher, which is used by ResizableDrawer.
+   * Because you have multiple handlers listening for an outside click, any click anywhere triggers
+   * the watcher for the hidden drawers, closing the open drawer.
+   *
+   * TODO: Add logic to the `useOutsideClick` in ResizableDrawer to enable it only for the active
+   * tab's drawer.
+   */
   return (
     <Tabs
       isLazy

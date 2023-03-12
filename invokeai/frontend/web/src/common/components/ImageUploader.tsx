@@ -3,8 +3,8 @@ import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerCo
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
 import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
-import { tabDict } from 'features/ui/components/InvokeTabs';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { ResourceKey } from 'i18next';
 import {
   KeyboardEvent,
   memo,
@@ -135,7 +135,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
   const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(
     activeTabName
   )
-    ? ` to ${tabDict[activeTabName as keyof typeof tabDict].tooltip}`
+    ? ` to ${String(t(`common.${activeTabName}` as ResourceKey))}`
     : ``;
 
   return (

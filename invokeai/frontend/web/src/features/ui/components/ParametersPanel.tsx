@@ -15,6 +15,27 @@ import InvokeAILogoComponent from 'features/system/components/InvokeAILogoCompon
 import Scrollable from './common/Scrollable';
 import PinParametersPanelButton from './PinParametersPanelButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { createSelector } from '@reduxjs/toolkit';
+import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
+import { isEqual } from 'lodash';
+
+const parametersPanelSelector = createSelector(
+  [uiSelector, activeTabNameSelector],
+  (ui, activeTabName) => {
+    const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;
+
+    return {
+      shouldPinParametersPanel,
+      shouldShowParametersPanel,
+      isResizable: activeTabName !== 'unifiedCanvas',
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: isEqual,
+    },
+  }
+);
 
 type ParametersPanelProps = {
   children: ReactNode;
@@ -23,12 +44,8 @@ type ParametersPanelProps = {
 const ParametersPanel = ({ children }: ParametersPanelProps) => {
   const dispatch = useAppDispatch();
 
-  const shouldPinParametersPanel = useAppSelector(
-    (state) => state.ui.shouldPinParametersPanel
-  );
-  const shouldShowParametersPanel = useAppSelector(
-    (state) => state.ui.shouldShowParametersPanel
-  );
+  const { shouldPinParametersPanel, shouldShowParametersPanel, isResizable } =
+    useAppSelector(parametersPanelSelector);
 
   const closeParametersPanel = () => {
     dispatch(setShouldShowParametersPanel(false));
@@ -66,8 +83,8 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
   return (
     <ResizableDrawer
       direction="left"
-      isResizable={false}
-      isOpen={shouldShowParametersPanel || shouldPinParametersPanel}
+      isResizable={isResizable || !shouldPinParametersPanel}
+      isOpen={shouldShowParametersPanel}
       onClose={closeParametersPanel}
       isPinned={shouldPinParametersPanel}
       sx={{

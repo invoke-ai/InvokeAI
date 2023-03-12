@@ -1,7 +1,7 @@
-import { ChakraProps, SlideDirection } from '@chakra-ui/react';
+import { SlideDirection } from '@chakra-ui/react';
 import { AnimationProps } from 'framer-motion';
-import { Enable } from 're-resizable';
-import React from 'react';
+import { HandleStyles } from 're-resizable';
+import { CSSProperties } from 'react';
 import { LangDirection } from './types';
 
 export type GetHandleEnablesOptions = {
@@ -9,7 +9,9 @@ export type GetHandleEnablesOptions = {
   langDirection: LangDirection;
 };
 
-// Determine handles to enable, taking into account language direction
+/**
+ * Determine handles to enable. `re-resizable` doesn't handle RTL, so we have to do that here.
+ */
 export const getHandleEnables = ({
   direction,
   langDirection,
@@ -26,7 +28,12 @@ export const getHandleEnables = ({
     (langDirection !== 'rtl' && direction === 'right') ||
     (langDirection === 'rtl' && direction === 'left');
 
-  return { top, right, bottom, left };
+  return {
+    top,
+    right,
+    bottom,
+    left,
+  };
 };
 
 export type GetDefaultSizeOptions = {
@@ -83,34 +90,6 @@ export const getMinMaxDimensions = ({
     ...(maxW ? { maxWidth: maxW } : {}),
     ...(minH ? { minHeight: minH } : {}),
     ...(maxH ? { maxHeight: maxH } : {}),
-  };
-};
-
-export type GetHandleStylesOptions = {
-  handleEnables: Enable;
-  handleStyle?: React.CSSProperties;
-};
-
-// Get handle styles, the enables already have language direction factored in so
-// that does not need to be handled here
-export const getHandleStyles = ({
-  handleEnables,
-  handleStyle,
-}: GetHandleStylesOptions) => {
-  if (!handleStyle) {
-    return {};
-  }
-
-  const top = handleEnables.top ? handleStyle : {};
-  const right = handleEnables.right ? handleStyle : {};
-  const bottom = handleEnables.bottom ? handleStyle : {};
-  const left = handleEnables.left ? handleStyle : {};
-
-  return {
-    top,
-    right,
-    bottom,
-    left,
   };
 };
 
@@ -176,43 +155,106 @@ export const getAnimations = ({
 };
 
 export type GetResizableStylesProps = {
-  direction: SlideDirection;
-  handleWidth: string | number;
   isPinned: boolean;
   isResizable: boolean;
+  direction: SlideDirection;
 };
 
-export const getResizableStyles = ({
-  isPinned, // TODO add borderRadius for pinned?
-  direction,
-  handleWidth,
+// Expand the handle hitbox
+const HANDLE_INTERACT_PADDING = '0.75rem';
+
+// Visible padding around handle
+const HANDLE_PADDING = '1rem';
+
+const HANDLE_WIDTH_PINNED = '2px';
+const HANDLE_WIDTH_UNPINNED = '5px';
+
+// Get the styles for the container and handle. Do not need to handle langDirection here bc we use direction-agnostic CSS
+export const getStyles = ({
+  isPinned,
   isResizable,
-}: GetResizableStylesProps): ChakraProps['sx'] => {
-  if (isPinned && !isResizable) {
-    return {};
+  direction,
+}: GetResizableStylesProps): {
+  containerStyles: CSSProperties; // technically this could be ChakraProps['sx'], but we cannot use this for HandleStyles so leave it as CSSProperties to be consistent
+  handleStyles: HandleStyles;
+} => {
+  if (!isResizable) {
+    return { containerStyles: {}, handleStyles: {} };
   }
+
+  const handleWidth = isPinned ? HANDLE_WIDTH_PINNED : HANDLE_WIDTH_UNPINNED;
+
+  // Calculate the positioning offset of the handle hitbox so it is centered over the handle
+  const handleOffset = `calc((2 * ${HANDLE_INTERACT_PADDING} + ${handleWidth}) / -2)`;
 
   if (direction === 'top') {
     return {
-      borderBottomWidth: handleWidth,
-    };
-  }
-
-  if (direction === 'right') {
-    return { borderInlineStartWidth: handleWidth };
-  }
-
-  if (direction === 'bottom') {
-    return {
-      borderTopWidth: handleWidth,
+      containerStyles: {
+        borderBottomWidth: handleWidth,
+        paddingBottom: HANDLE_PADDING,
+      },
+      handleStyles: {
+        top: {
+          paddingTop: HANDLE_INTERACT_PADDING,
+          paddingBottom: HANDLE_INTERACT_PADDING,
+          bottom: handleOffset,
+        },
+      },
     };
   }
 
   if (direction === 'left') {
-    return { borderInlineEndWidth: handleWidth };
+    return {
+      containerStyles: {
+        borderInlineEndWidth: handleWidth,
+        paddingInlineEnd: HANDLE_PADDING,
+      },
+      handleStyles: {
+        right: {
+          paddingInlineStart: HANDLE_INTERACT_PADDING,
+          paddingInlineEnd: HANDLE_INTERACT_PADDING,
+          insetInlineEnd: handleOffset,
+        },
+      },
+    };
   }
+
+  if (direction === 'bottom') {
+    return {
+      containerStyles: {
+        borderTopWidth: handleWidth,
+        paddingTop: HANDLE_PADDING,
+      },
+      handleStyles: {
+        bottom: {
+          paddingTop: HANDLE_INTERACT_PADDING,
+          paddingBottom: HANDLE_INTERACT_PADDING,
+          top: handleOffset,
+        },
+      },
+    };
+  }
+
+  if (direction === 'right') {
+    return {
+      containerStyles: {
+        borderInlineStartWidth: handleWidth,
+        paddingInlineStart: HANDLE_PADDING,
+      },
+      handleStyles: {
+        left: {
+          paddingInlineStart: HANDLE_INTERACT_PADDING,
+          paddingInlineEnd: HANDLE_INTERACT_PADDING,
+          insetInlineStart: handleOffset,
+        },
+      },
+    };
+  }
+
+  return { containerStyles: {}, handleStyles: {} };
 };
 
+// Chakra's Slide does not handle langDirection, so we need to do it here
 export const getSlideDirection = (
   direction: SlideDirection,
   langDirection: LangDirection
@@ -238,6 +280,7 @@ export const getSlideDirection = (
   return 'left';
 };
 
+// Hack to correct the width of panels while pinned and unpinned, due to different padding in pinned vs unpinned
 export const parseAndPadSize = (size?: number, padding?: number) => {
   if (!size) {
     return undefined;

@@ -17,10 +17,9 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { LangDirection } from './types';
 import {
   getHandleEnables,
-  getHandleStyles,
   getMinMaxDimensions,
-  getResizableStyles,
   getSlideDirection,
+  getStyles,
   parseAndPadSize,
 } from './util';
 
@@ -65,25 +64,31 @@ const ResizableDrawer = ({
   onResizeStart,
   onResizeStop,
   onResize,
-  handleWidth = '5px',
-  handleInteractWidth = '15px',
   sx = {},
 }: ResizableDrawerProps) => {
   const langDirection = useTheme().direction as LangDirection;
 
   const outsideClickRef = useRef<HTMLDivElement>(null);
 
-  const [width, setWidth] = useState<number | string>(
-    initialWidth ??
+  const defaultWidth = useMemo(
+    () =>
+      initialWidth ??
       minWidth ??
-      (['left', 'right'].includes(direction) ? 500 : '100vw')
+      (['left', 'right'].includes(direction) ? 500 : '100vw'),
+    [initialWidth, minWidth, direction]
   );
 
-  const [height, setHeight] = useState<number | string>(
-    initialHeight ??
+  const defaultHeight = useMemo(
+    () =>
+      initialHeight ??
       minHeight ??
-      (['top', 'bottom'].includes(direction) ? 500 : '100vh')
+      (['top', 'bottom'].includes(direction) ? 500 : '100vh'),
+    [initialHeight, minHeight, direction]
   );
+
+  const [width, setWidth] = useState<number | string>(defaultWidth);
+
+  const [height, setHeight] = useState<number | string>(defaultHeight);
 
   useOutsideClick({
     ref: outsideClickRef,
@@ -101,40 +106,34 @@ const ResizableDrawer = ({
     [isResizable, langDirection, direction]
   );
 
-  const handleStyles = useMemo(
-    () =>
-      getHandleStyles({
-        handleEnables,
-        handleStyle: {
-          width: handleInteractWidth,
-        },
-      }),
-    [handleEnables, handleInteractWidth]
-  );
-
   const minMaxDimensions = useMemo(
     () =>
       getMinMaxDimensions({
         direction,
-        minWidth: isPinned
-          ? parseAndPadSize(minWidth)
-          : parseAndPadSize(minWidth, 36),
-        maxWidth: isPinned
-          ? parseAndPadSize(maxWidth)
-          : parseAndPadSize(maxWidth, 36),
-        minHeight: isPinned
-          ? parseAndPadSize(minHeight)
-          : parseAndPadSize(minHeight, 36),
-        maxHeight: isPinned
-          ? parseAndPadSize(maxHeight)
-          : parseAndPadSize(maxHeight, 36),
+        minWidth: isResizable
+          ? parseAndPadSize(minWidth, 18)
+          : parseAndPadSize(minWidth),
+        maxWidth: isResizable
+          ? parseAndPadSize(maxWidth, 18)
+          : parseAndPadSize(maxWidth),
+        minHeight: isResizable
+          ? parseAndPadSize(minHeight, 18)
+          : parseAndPadSize(minHeight),
+        maxHeight: isResizable
+          ? parseAndPadSize(maxHeight, 18)
+          : parseAndPadSize(maxHeight),
       }),
-    [minWidth, maxWidth, minHeight, maxHeight, direction, isPinned]
+    [minWidth, maxWidth, minHeight, maxHeight, direction, isResizable]
   );
 
-  const resizableStyles = useMemo(
-    () => getResizableStyles({ isPinned, direction, handleWidth, isResizable }),
-    [handleWidth, direction, isPinned, isResizable]
+  const { containerStyles, handleStyles } = useMemo(
+    () =>
+      getStyles({
+        isPinned,
+        isResizable,
+        direction,
+      }),
+    [isPinned, isResizable, direction]
   );
 
   const slideDirection = useMemo(
@@ -180,19 +179,19 @@ const ResizableDrawer = ({
       >
         <ChakraResizeable
           size={{
-            width,
-            height,
+            width: isResizable ? width : defaultWidth,
+            height: isResizable ? height : defaultHeight,
           }}
           enable={handleEnables}
           handleStyles={handleStyles}
           {...minMaxDimensions}
           sx={{
-            borderColor: 'base.700',
+            borderColor: 'base.800',
             p: isPinned ? 0 : 4,
             bg: 'base.900',
             height: 'full',
             boxShadow: !isPinned ? '0 0 4rem 0 rgba(0, 0, 0, 0.8)' : '',
-            ...resizableStyles,
+            ...containerStyles,
             ...sx,
           }}
           onResizeStart={(event, direction, elementRef) => {
