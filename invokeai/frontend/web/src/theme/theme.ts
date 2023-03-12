@@ -12,7 +12,7 @@ import { modalTheme } from './components/modal';
 import { numberInputTheme } from './components/numberInput';
 import { popoverTheme } from './components/popover';
 import { progressTheme } from './components/progress';
-import { scrollbar } from './components/scrollbar';
+import { no_scrollbar, scrollbar as _scrollbar } from './components/scrollbar';
 import { selectTheme } from './components/select';
 import { sliderTheme } from './components/slider';
 import { switchTheme } from './components/switch';
@@ -31,7 +31,7 @@ export const theme: ThemeOverride = {
         color: 'base.50',
         overflow: 'hidden',
       },
-      ...scrollbar,
+      '*': { ...no_scrollbar },
     }),
   },
   direction: 'ltr',

@@ -1,8 +1,7 @@
 import { Flex } from '@chakra-ui/layout';
-import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
 import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
@@ -11,7 +10,10 @@ import { FaSlidersH } from 'react-icons/fa';
 
 export default function UnifiedCanvasProcessingButtons() {
   const shouldPinParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldPinParametersPanel
+    (state) => state.ui.shouldPinParametersPanel
+  );
+  const shouldShowParametersPanel = useAppSelector(
+    (state) => state.ui.shouldShowParametersPanel
   );
 
   const dispatch = useAppDispatch();
@@ -19,12 +21,10 @@ export default function UnifiedCanvasProcessingButtons() {
 
   const handleShowOptionsPanel = () => {
     dispatch(setShouldShowParametersPanel(true));
-    if (shouldPinParametersPanel) {
-      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
-    }
+    shouldPinParametersPanel && dispatch(requestCanvasRescale());
   };
 
-  return (
+  return !shouldPinParametersPanel || !shouldShowParametersPanel ? (
     <Flex flexDirection="column" gap={2}>
       <IAIIconButton
         tooltip={`${t('parameters.showOptionsPanel')} (O)`}
@@ -41,5 +41,5 @@ export default function UnifiedCanvasProcessingButtons() {
         <CancelButton width="100%" height="40px" btnGroupWidth="100%" />
       </Flex>
     </Flex>
-  );
+  ) : null;
 }

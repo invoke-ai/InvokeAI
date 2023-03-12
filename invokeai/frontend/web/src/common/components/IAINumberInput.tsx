@@ -16,7 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { clamp } from 'lodash';
 
-import { FocusEvent, useEffect, useState } from 'react';
+import { FocusEvent, memo, useEffect, useState } from 'react';
 
 const numberStringRegex = /^-?(0\.)?\.?$/;
 
@@ -139,4 +139,4 @@ const IAINumberInput = (props: Props) => {
   );
 };
 
-export default IAINumberInput;
+export default memo(IAINumberInput);

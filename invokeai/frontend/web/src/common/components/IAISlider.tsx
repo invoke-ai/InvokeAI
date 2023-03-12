@@ -25,8 +25,8 @@ import {
 } from '@chakra-ui/react';
 import { clamp } from 'lodash';
 
-import { FocusEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FocusEvent, memo, useEffect, useMemo, useState } from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 
@@ -62,7 +62,7 @@ export type IAIFullSliderProps = {
   sliderIAIIconButtonProps?: IAIIconButtonProps;
 };
 
-export default function IAISlider(props: IAIFullSliderProps) {
+const IAISlider = (props: IAIFullSliderProps) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const {
     label,
@@ -174,16 +174,22 @@ export default function IAISlider(props: IAIFullSliderProps) {
             <>
               <SliderMark
                 value={min}
-                insetInlineStart={0}
-                sx={{ insetInlineStart: 'unset !important' }}
+                // insetInlineStart={0}
+                sx={{
+                  insetInlineStart: '0 !important',
+                  insetInlineEnd: 'unset !important',
+                }}
                 {...sliderMarkProps}
               >
                 {min}
               </SliderMark>
               <SliderMark
                 value={max}
-                insetInlineEnd={0}
-                sx={{ insetInlineStart: 'unset !important' }}
+                // insetInlineEnd={0}
+                sx={{
+                  insetInlineStart: 'unset !important',
+                  insetInlineEnd: '0 !important',
+                }}
                 {...sliderMarkProps}
               >
                 {max}
@@ -248,4 +254,6 @@ export default function IAISlider(props: IAIFullSliderProps) {
       </HStack>
     </FormControl>
   );
-}
+};
+
+export default memo(IAISlider);

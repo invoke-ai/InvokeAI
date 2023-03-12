@@ -15,11 +15,11 @@ import ParametersAccordion from 'features/parameters/components/ParametersAccord
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
-import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
-import ImageToImageSettings from './ImageToImageSettings';
+import ImageToImageSettings from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageSettings';
+import { memo } from 'react';
 
-export default function ImageToImagePanel() {
+const ImageToImageParameters = () => {
   const { t } = useTranslation();
 
   const imageToImageAccordions = {
@@ -69,13 +69,13 @@ export default function ImageToImagePanel() {
   };
 
   return (
-    <InvokeOptionsPanel>
-      <Flex flexDir="column" rowGap={2}>
-        <PromptInput />
-        <NegativePromptInput />
-      </Flex>
+    <Flex flexDir="column" gap={2} position="relative">
+      <PromptInput />
+      <NegativePromptInput />
       <ProcessButtons />
       <ParametersAccordion accordionInfo={imageToImageAccordions} />
-    </InvokeOptionsPanel>
+    </Flex>
   );
-}
+};
+
+export default memo(ImageToImageParameters);

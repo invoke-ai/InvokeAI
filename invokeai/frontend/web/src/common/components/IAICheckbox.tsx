@@ -1,5 +1,5 @@
 import { Checkbox, CheckboxProps } from '@chakra-ui/react';
-import type { ReactNode } from 'react';
+import { memo, ReactNode } from 'react';
 
 type IAICheckboxProps = CheckboxProps & {
   label: string | ReactNode;
@@ -14,4 +14,4 @@ const IAICheckbox = (props: IAICheckboxProps) => {
   );
 };
 
-export default IAICheckbox;
+export default memo(IAICheckbox);

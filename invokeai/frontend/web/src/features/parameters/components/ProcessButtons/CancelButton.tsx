@@ -11,7 +11,7 @@ import {
   setCancelType,
 } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, memo } from 'react';
 import { ButtonSpinner, ButtonGroup } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -44,9 +44,9 @@ interface CancelButtonProps {
   btnGroupWidth?: string | number;
 }
 
-export default function CancelButton(
+const CancelButton = (
   props: CancelButtonProps & Omit<IAIIconButtonProps, 'aria-label'>
-) {
+) => {
   const dispatch = useAppDispatch();
   const { btnGroupWidth = 'auto', ...rest } = props;
   const {
@@ -146,4 +146,6 @@ export default function CancelButton(
       />
     </ButtonGroup>
   );
-}
+};
+
+export default memo(CancelButton);
