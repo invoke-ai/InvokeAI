@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 import asyncio
 from inspect import signature
 
@@ -53,11 +52,11 @@ config = {}
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    args = Args()
-    config = args.parse_args()
+    config = Args()
+    config.parse_args()
 
     ApiDependencies.initialize(
-        args=args, config=config, event_handler_id=event_handler_id
+        config=config, event_handler_id=event_handler_id
     )
 
 

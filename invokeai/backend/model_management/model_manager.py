@@ -34,8 +34,7 @@ from picklescan.scanner import scan_file_path
 from invokeai.backend.globals import Globals, global_cache_dir
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
-from ..util import CPU_DEVICE, ask_user, download_with_resume
-
+from ..util import CUDA_DEVICE, CPU_DEVICE, ask_user, download_with_resume
 
 class SDLegacyType(Enum):
     V1 = 1
@@ -51,23 +50,29 @@ VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
 }
 
 class ModelManager(object):
+    '''
+    Model manager handles loading, caching, importing, deleting, converting, and editing models.
+    '''
     def __init__(
-        self,
-        config: OmegaConf,
-        device_type: torch.device = CPU_DEVICE,
-        precision: str = "float16",
-        max_loaded_models=DEFAULT_MAX_MODELS,
-        sequential_offload=False,
+            self,
+            config: OmegaConf|Path,
+            device_type: torch.device = CUDA_DEVICE,
+            precision: str = "float16",
+            max_loaded_models=DEFAULT_MAX_MODELS,
+            sequential_offload=False,
+            embedding_path: Path=None,
     ):
         """
-        Initialize with the path to the models.yaml config file,
-        the torch device type, and precision. The optional
-        min_avail_mem argument specifies how much unused system
-        (CPU) memory to preserve. The cache of models in RAM will
-        grow until this value is approached. Default is 2G.
+        Initialize with the path to the models.yaml config file or
+        an initialized OmegaConf dictionary. Optional parameters
+        are the torch device type, precision, max_loaded_models,
+        and sequential_offload boolean. Note that the default device 
+        type and precision are set up for a CUDA system running at half precision.
         """
         # prevent nasty-looking CLIP log message
         transformers.logging.set_verbosity_error()
+        if not isinstance(config, DictConfig):
+            config = OmegaConf.load(config)
         self.config = config
         self.precision = precision
         self.device = torch.device(device_type)
@@ -76,6 +81,7 @@ class ModelManager(object):
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
         self.sequential_offload = sequential_offload
+        self.embedding_path = embedding_path
 
     def valid_model(self, model_name: str) -> bool:
         """
@@ -84,12 +90,15 @@ class ModelManager(object):
         """
         return model_name in self.config
 
-    def get_model(self, model_name: str):
+    def get_model(self, model_name: str=None)->dict:
         """
         Given a model named identified in models.yaml, return
         the model object. If in RAM will load into GPU VRAM.
         If on disk, will load from there.
         """
+        if not model_name:
+            return self.current_model if self.current_model else self.get_model(self.default_model())
+        
         if not self.valid_model(model_name):
             print(
                 f'** "{model_name}" is not a known model name. Please check your models.yaml file'
@@ -112,6 +121,7 @@ class ModelManager(object):
         else:  # we're about to load a new model, so potentially offload the least recently used one
             requested_model, width, height, hash = self._load_model(model_name)
             self.models[model_name] = {
+                "model_name": model_name,
                 "model": requested_model,
                 "width": width,
                 "height": height,
@@ -121,6 +131,7 @@ class ModelManager(object):
         self.current_model = model_name
         self._push_newest_model(model_name)
         return {
+            "model_name": model_name,
             "model": requested_model,
             "width": width,
             "height": height,
@@ -425,6 +436,7 @@ class ModelManager(object):
         height = width
 
         print(f"  | Default image dimensions = {width} x {height}")
+        self._add_embeddings_to_model(pipeline)
 
         return pipeline, width, height, model_hash
 
@@ -1061,6 +1073,19 @@ class ModelManager(object):
             self.stack.remove(model_name)
         self.stack.append(model_name)
 
+    def _add_embeddings_to_model(self, model: StableDiffusionGeneratorPipeline):
+        if self.embedding_path is not None:
+            print(f">> Loading embeddings from {self.embedding_path}")
+            for root, _, files in os.walk(self.embedding_path):
+                for name in files:
+                    ti_path = os.path.join(root, name)
+                    model.textual_inversion_manager.load_textual_inversion(
+                        ti_path, defer_injecting_tokens=True
+                    )
+            print(
+                f'>> Textual inversion triggers: {", ".join(sorted(model.textual_inversion_manager.get_all_trigger_strings()))}'
+            )
+            
     def _has_cuda(self) -> bool:
         return self.device.type == "cuda"
 
