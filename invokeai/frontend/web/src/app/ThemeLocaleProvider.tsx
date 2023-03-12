@@ -1,4 +1,4 @@
-import { ChakraProvider, extendTheme } from '@chakra-ui/react';
+import { ChakraProvider, extendTheme, useColorMode } from '@chakra-ui/react';
 import { ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme as invokeAITheme } from 'theme/theme';
@@ -42,7 +42,6 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   const theme = extendTheme({
     ...invokeAITheme,
     colors: THEMES[currentTheme as keyof typeof THEMES],
-    initialColorMode: ['light'].includes(currentTheme) ? 'light' : 'dark',
     direction,
   });
 

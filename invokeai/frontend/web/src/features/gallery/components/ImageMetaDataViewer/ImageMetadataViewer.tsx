@@ -181,9 +181,11 @@ const ImageMetadataViewer = memo(
           overflow: 'scroll',
           maxHeight: APP_METADATA_HEIGHT,
           height: '100%',
-          zIndex: '10',
           backdropFilter: 'blur(10px)',
-          bg: 'blackAlpha.600',
+          bg: 'whiteAlpha.600',
+          _dark: {
+            bg: 'blackAlpha.600',
+          },
         }}
       >
         <Flex gap={1} direction="column" width="100%">
@@ -449,7 +451,8 @@ const ImageMetadataViewer = memo(
                     borderRadius: 'base',
                     overflowX: 'scroll',
                     wordBreak: 'break-all',
-                    bg: 'whiteAlpha.100',
+                    bg: 'whiteAlpha.200',
+                    _dark: { bg: 'blackAlpha.200' },
                   }}
                 >
                   <pre>{metadataJSON}</pre>

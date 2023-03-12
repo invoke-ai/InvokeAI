@@ -9,14 +9,24 @@ import useToastWatcher from 'features/system/hooks/useToastWatcher';
 
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
-import { Box, Flex, Grid, Portal } from '@chakra-ui/react';
+import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
+import Lightbox from 'features/lightbox/components/Lightbox';
+import { useAppSelector } from './storeHooks';
+import { useEffect } from 'react';
 
 keepGUIAlive();
 
 const App = () => {
   useToastWatcher();
+
+  const currentTheme = useAppSelector((state) => state.ui.currentTheme);
+  const { setColorMode } = useColorMode();
+
+  useEffect(() => {
+    setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
+  }, [setColorMode, currentTheme]);
 
   return (
     <Grid w="100vw" h="100vh">
@@ -45,6 +55,7 @@ const App = () => {
       <Portal>
         <FloatingGalleryButton />
       </Portal>
+      <Lightbox />
     </Grid>
   );
 };
