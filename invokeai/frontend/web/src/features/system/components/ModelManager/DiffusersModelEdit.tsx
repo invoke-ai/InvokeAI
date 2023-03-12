@@ -16,8 +16,8 @@ import { useTranslation } from 'react-i18next';
 import type { InvokeDiffusersModelConfigProps } from 'app/invokeai';
 import type { RootState } from 'app/store';
 import { isEqual, pickBy } from 'lodash';
-import IAIFormHelperText from 'features/canvas/components/IAIForms/IAIFormHelperText';
-import IAIFormErrorMessage from 'features/canvas/components/IAIForms/IAIFormErrorMessage';
+import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
+import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
 
 const selector = createSelector(
   [systemSelector],
