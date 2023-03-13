@@ -67,7 +67,7 @@ def main():
 
     # run any post-install patches needed
     # temporarily disabled
-    # run_patches()
+    run_patches()
 
     print(f">> Internet connectivity is {Globals.internet_available}")
 
