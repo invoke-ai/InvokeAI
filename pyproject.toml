@@ -136,18 +136,18 @@ license-files = ["LICENSE"]
 version = {attr = "ldm.invoke.__version__"}
 
 [tool.setuptools.packages.find]
-"where" = ["."]
 "include" = [
-	  "invokeai.assets.web*",
-	  "invokeai.backend*",
-	  "invokeai.frontend.dist*",
-	  "invokeai.configs*",
-	  "ldm*"]
+  "invokeai.assets.web",
+  "invokeai.backend*",
+  "invokeai.configs*",
+  "invokeai.frontend.dist*",
+  "ldm*",
+]
+"where" = ["."]
 
 [tool.setuptools.package-data]
 "invokeai.assets.web" = ["**.png"]
-"invokeai.backend" = ["**.png"]
-"invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
+"invokeai.configs" = ["**.example", "**.txt", "**.yaml", "**/*.yaml"]
 "invokeai.frontend.dist" = ["**"]
 
 [tool.black]
