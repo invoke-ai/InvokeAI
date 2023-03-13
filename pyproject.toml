@@ -147,7 +147,7 @@ version = {attr = "ldm.invoke.__version__"}
 
 [tool.setuptools.package-data]
 "invokeai.assets.web" = ["**.png"]
-"invokeai.configs" = ["**.example", "**.txt", "**.yaml"]
+"invokeai.configs" = ["**.example", "**.txt", "**.yaml", "**/*.yaml"]
 "invokeai.frontend.dist" = ["**"]
 
 [tool.black]

@@ -72,7 +72,7 @@ def main():
         tag = Prompt.ask('Enter an InvokeAI tag or branch name')
 
     print(f':crossed_fingers: Upgrading to [yellow]{tag}[/yellow]')
-    cmd = f'pip install {INVOKE_AI_SRC}/{tag}.zip --use-pep517'
+    cmd = f'pip install {INVOKE_AI_SRC}/{tag}.zip --use-pep517 --upgrade'
     print('')
     print('')
     if os.system(cmd)==0:
