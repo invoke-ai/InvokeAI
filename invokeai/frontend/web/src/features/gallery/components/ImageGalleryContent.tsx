@@ -101,12 +101,14 @@ const ImageGalleryContent = () => {
                 aria-label={t('gallery.showGenerations')}
                 tooltip={t('gallery.showGenerations')}
                 isChecked={currentCategory === 'result'}
+                role="radio"
                 icon={<FaImage />}
                 onClick={() => dispatch(setCurrentCategory('result'))}
               />
               <IAIIconButton
                 aria-label={t('gallery.showUploads')}
                 tooltip={t('gallery.showUploads')}
+                role="radio"
                 isChecked={currentCategory === 'user'}
                 icon={<FaUser />}
                 onClick={() => dispatch(setCurrentCategory('user'))}
@@ -251,4 +253,5 @@ const ImageGalleryContent = () => {
   );
 };
 
+ImageGalleryContent.displayName = 'ImageGalleryContent';
 export default ImageGalleryContent;
