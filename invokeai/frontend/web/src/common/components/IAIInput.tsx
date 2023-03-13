@@ -5,7 +5,7 @@ import {
   Input,
   InputProps,
 } from '@chakra-ui/react';
-import { ChangeEvent } from 'react';
+import { ChangeEvent, memo } from 'react';
 
 interface IAIInputProps extends InputProps {
   label?: string;
@@ -15,7 +15,7 @@ interface IAIInputProps extends InputProps {
   formControlProps?: Omit<FormControlProps, 'isInvalid' | 'isDisabled'>;
 }
 
-export default function IAIInput(props: IAIInputProps) {
+const IAIInput = (props: IAIInputProps) => {
   const {
     label = '',
     isDisabled = false,
@@ -34,4 +34,6 @@ export default function IAIInput(props: IAIInputProps) {
       <Input {...rest} />
     </FormControl>
   );
-}
+};
+
+export default memo(IAIInput);

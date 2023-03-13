@@ -6,7 +6,8 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { MouseEvent } from 'react';
+import { memo, MouseEvent } from 'react';
+import IAIOption from './IAIOption';
 
 type IAISelectProps = SelectProps & {
   label?: string;
@@ -37,13 +38,13 @@ const IAISelect = (props: IAISelectProps) => {
         <Select {...rest}>
           {validValues.map((opt) => {
             return typeof opt === 'string' || typeof opt === 'number' ? (
-              <option key={opt} value={opt}>
+              <IAIOption key={opt} value={opt}>
                 {opt}
-              </option>
+              </IAIOption>
             ) : (
-              <option key={opt.value} value={opt.value}>
+              <IAIOption key={opt.value} value={opt.value}>
                 {opt.key}
-              </option>
+              </IAIOption>
             );
           })}
         </Select>
@@ -52,4 +53,4 @@ const IAISelect = (props: IAISelectProps) => {
   );
 };
 
-export default IAISelect;
+export default memo(IAISelect);

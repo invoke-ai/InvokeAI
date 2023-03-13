@@ -1,4 +1,5 @@
 import { chakra, ChakraProps } from '@chakra-ui/react';
+import { memo } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
 
@@ -35,4 +36,4 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
   );
 };
 
-export default IAIColorPicker;
+export default memo(IAIColorPicker);

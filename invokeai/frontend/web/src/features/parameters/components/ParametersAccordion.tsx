@@ -59,6 +59,11 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
       allowMultiple
       reduceMotion
       onChange={handleChangeAccordionState}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+      }}
     >
       {renderAccordions()}
     </Accordion>

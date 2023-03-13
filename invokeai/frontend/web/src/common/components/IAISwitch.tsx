@@ -6,6 +6,7 @@ import {
   Switch,
   SwitchProps,
 } from '@chakra-ui/react';
+import { memo } from 'react';
 
 interface Props extends SwitchProps {
   label?: string;
@@ -44,4 +45,4 @@ const IAISwitch = (props: Props) => {
   );
 };
 
-export default IAISwitch;
+export default memo(IAISwitch);
