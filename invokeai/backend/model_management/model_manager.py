@@ -97,7 +97,7 @@ class ModelManager(object):
         If on disk, will load from there.
         """
         if not model_name:
-            return self.current_model if self.current_model else self.get_model(self.default_model())
+            return self.get_model(self.current_model) if self.current_model else self.get_model(self.default_model())
         
         if not self.valid_model(model_name):
             print(
