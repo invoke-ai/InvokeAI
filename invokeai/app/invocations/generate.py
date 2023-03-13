@@ -118,7 +118,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         generator_output = next(
             Img2Img(model).generate(
                 prompt=self.prompt,
-                init_img=image,
+                init_image=image,
                 init_mask=mask,
                 step_callback=step_callback,
                 **self.dict(
@@ -179,8 +179,8 @@ class InpaintInvocation(ImageToImageInvocation):
         generator_output = next(
             Inpaint(model).generate(
                 prompt=self.prompt,
-                init_img=image,
-                init_mask=mask,
+                init_image=image,
+                mask_image=mask,
                 step_callback=step_callback,
                 **self.dict(
                     exclude={"prompt", "image", "mask"}
