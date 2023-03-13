@@ -9,6 +9,7 @@ from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
 
 import einops
 import PIL.Image
+from accelerate.utils import set_seed
 import psutil
 import torch
 import torchvision.transforms as T
@@ -694,7 +695,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device=self._model_group.device_for(self.unet),
             dtype=self.unet.dtype,
         )
-        noise = noise_func(initial_latents, seed)
+        if seed is not None:
+            set_seed(seed)
+        noise = noise_func(initial_latents)
 
         return self.img2img_from_latents_and_embeddings(
             initial_latents,
@@ -796,7 +799,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         init_image_latents = self.non_noised_latents_from_image(
             init_image, device=device, dtype=latents_dtype
         )
-        noise = noise_func(init_image_latents, seed)
+        if seed is not None:
+            set_seed(seed)
+        noise = noise_func(init_image_latents)
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)
