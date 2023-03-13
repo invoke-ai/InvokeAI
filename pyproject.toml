@@ -140,6 +140,7 @@ version = {attr = "ldm.invoke.__version__"}
   "invokeai.assets.web",
   "invokeai.backend*",
   "invokeai.configs*",
+  "invokeai.configs.stable-diffusion*",
   "invokeai.frontend.dist*",
   "ldm*",
 ]
