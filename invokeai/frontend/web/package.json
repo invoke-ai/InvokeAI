@@ -9,7 +9,7 @@
     "build:package": "vite build --mode=package",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
-    "lint:eslint": "eslint --max-warnings=0",
+    "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
     "lint": "yarn run lint:eslint && yarn run lint:prettier && yarn run lint:tsc && yarn run lint:madge",

@@ -11,6 +11,7 @@ import { isEqual } from 'lodash';
 import { Resizable } from 're-resizable';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { systemSelector } from '../store/systemSelectors';
 
@@ -46,6 +47,7 @@ const consoleSelector = createSelector(
  */
 const Console = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const log = useAppSelector(logSelector);
   const { shouldShowLogViewer, hasError, wasErrorSeen } =
     useAppSelector(consoleSelector);
@@ -156,7 +158,7 @@ const Console = () => {
         >
           <IAIIconButton
             size="sm"
-            aria-label="Toggle autoscroll"
+            aria-label={t('accessibility.toggleAutoscroll')}
             icon={<FaAngleDoubleDown />}
             onClick={() => setShouldAutoscroll(!shouldAutoscroll)}
             isChecked={shouldAutoscroll}
@@ -175,7 +177,7 @@ const Console = () => {
       >
         <IAIIconButton
           size="sm"
-          aria-label="Toggle Log Viewer"
+          aria-label={t('accessibility.toggleLogViewer')}
           icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
           onClick={handleClickLogViewerToggle}
           sx={{

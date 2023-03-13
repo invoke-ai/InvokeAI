@@ -1,5 +1,6 @@
 import { ButtonGroup } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useTranslation } from 'react-i18next';
 import {
   BiReset,
   BiRotateLeft,
@@ -26,12 +27,13 @@ const ReactPanZoomButtons = ({
   reset,
 }: ReactPanZoomButtonsProps) => {
   const { zoomIn, zoomOut, resetTransform } = useTransformContext();
+  const { t } = useTranslation();
 
   return (
     <ButtonGroup isAttached orientation="vertical">
       <IAIIconButton
         icon={<BiZoomIn />}
-        aria-label="Zoom In"
+        aria-label={t('accessibility.zoomIn')}
         tooltip="Zoom In"
         onClick={() => zoomIn()}
         fontSize={20}
@@ -39,7 +41,7 @@ const ReactPanZoomButtons = ({
 
       <IAIIconButton
         icon={<BiZoomOut />}
-        aria-label="Zoom Out"
+        aria-label={t('accessibility.zoomOut')}
         tooltip="Zoom Out"
         onClick={() => zoomOut()}
         fontSize={20}
@@ -47,7 +49,7 @@ const ReactPanZoomButtons = ({
 
       <IAIIconButton
         icon={<BiRotateLeft />}
-        aria-label="Rotate Counter-Clockwise"
+        aria-label={t('accessibility.rotateCounterClockwise')}
         tooltip="Rotate Counter-Clockwise"
         onClick={rotateCounterClockwise}
         fontSize={20}
@@ -55,7 +57,7 @@ const ReactPanZoomButtons = ({
 
       <IAIIconButton
         icon={<BiRotateRight />}
-        aria-label="Rotate Clockwise"
+        aria-label={t('accessibility.rotateClockwise')}
         tooltip="Rotate Clockwise"
         onClick={rotateClockwise}
         fontSize={20}
@@ -63,7 +65,7 @@ const ReactPanZoomButtons = ({
 
       <IAIIconButton
         icon={<MdFlip />}
-        aria-label="Flip Horizontally"
+        aria-label={t('accessibility.flipHorizontally')}
         tooltip="Flip Horizontally"
         onClick={flipHorizontally}
         fontSize={20}
@@ -71,7 +73,7 @@ const ReactPanZoomButtons = ({
 
       <IAIIconButton
         icon={<MdFlip style={{ transform: 'rotate(90deg)' }} />}
-        aria-label="Flip Vertically"
+        aria-label={t('accessibility.flipVertically')}
         tooltip="Flip Vertically"
         onClick={flipVertically}
         fontSize={20}
@@ -79,7 +81,7 @@ const ReactPanZoomButtons = ({
 
       <IAIIconButton
         icon={<BiReset />}
-        aria-label="Reset"
+        aria-label={t('accessibility.reset')}
         tooltip="Reset"
         onClick={() => {
           resetTransform();

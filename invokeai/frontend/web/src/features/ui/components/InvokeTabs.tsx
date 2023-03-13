@@ -1,4 +1,5 @@
 import {
+  ChakraProps,
   Icon,
   Tab,
   TabList,
@@ -13,18 +14,10 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
 import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
-import useUpdateTranslations from 'common/hooks/useUpdateTranslations';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
-import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
-import Lightbox from 'features/lightbox/components/Lightbox';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
-import {
-  setActiveTab,
-  setShouldShowParametersPanel,
-} from 'features/ui/store/uiSlice';
-import i18n from 'i18n';
-import { ReactElement } from 'react';
+import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
+import { ReactNode, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
   MdDeviceHub,
@@ -35,58 +28,55 @@ import {
   MdTextFields,
 } from 'react-icons/md';
 import { activeTabIndexSelector } from '../store/uiSelectors';
-import { floatingSelector } from './FloatingParametersPanelButtons';
-import ImageToImageWorkarea from './ImageToImage';
-import TextToImageWorkarea from './TextToImage';
-import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
+import ImageToImageWorkarea from 'features/ui/components/tabs/ImageToImage/ImageToImageWorkarea';
+import TextToImageWorkarea from 'features/ui/components/tabs/TextToImage/TextToImageWorkarea';
+import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
+import { useTranslation } from 'react-i18next';
+import { ResourceKey } from 'i18next';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 
 export interface InvokeTabInfo {
-  title: ReactElement;
-  workarea: ReactElement;
-  tooltip: string;
+  id: InvokeTabName;
+  icon: ReactNode;
+  workarea: ReactNode;
 }
 
-export const tabDict: Record<InvokeTabName, InvokeTabInfo> = {
-  txt2img: {
-    title: <Icon as={MdTextFields} boxSize={6} />,
-    workarea: <TextToImageWorkarea />,
-    tooltip: 'Text To Image',
-  },
-  img2img: {
-    title: <Icon as={MdPhotoLibrary} boxSize={6} />,
-    workarea: <ImageToImageWorkarea />,
-    tooltip: 'Image To Image',
-  },
-  unifiedCanvas: {
-    title: <Icon as={MdGridOn} boxSize={6} />,
-    workarea: <UnifiedCanvasWorkarea />,
-    tooltip: 'Unified Canvas',
-  },
-  nodes: {
-    title: <Icon as={MdDeviceHub} boxSize={6} />,
-    workarea: <NodesWIP />,
-    tooltip: 'Nodes',
-  },
-  postprocess: {
-    title: <Icon as={MdPhotoFilter} boxSize={6} />,
-    workarea: <PostProcessingWIP />,
-    tooltip: 'Post Processing',
-  },
-  training: {
-    title: <Icon as={MdFlashOn} boxSize={6} />,
-    workarea: <TrainingWIP />,
-    tooltip: 'Training',
-  },
+const tabIconStyles: ChakraProps['sx'] = {
+  boxSize: 6,
 };
 
-function updateTabTranslations() {
-  tabDict.txt2img.tooltip = i18n.t('common.text2img');
-  tabDict.img2img.tooltip = i18n.t('common.img2img');
-  tabDict.unifiedCanvas.tooltip = i18n.t('common.unifiedCanvas');
-  tabDict.nodes.tooltip = i18n.t('common.nodes');
-  tabDict.postprocess.tooltip = i18n.t('common.postProcessing');
-  tabDict.training.tooltip = i18n.t('common.training');
-}
+const tabInfo: InvokeTabInfo[] = [
+  {
+    id: 'txt2img',
+    icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
+    workarea: <TextToImageWorkarea />,
+  },
+  {
+    id: 'img2img',
+    icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
+    workarea: <ImageToImageWorkarea />,
+  },
+  {
+    id: 'unifiedCanvas',
+    icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
+    workarea: <UnifiedCanvasWorkarea />,
+  },
+  {
+    id: 'nodes',
+    icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
+    workarea: <NodesWIP />,
+  },
+  {
+    id: 'postprocessing',
+    icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
+    workarea: <PostProcessingWIP />,
+  },
+  {
+    id: 'training',
+    icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
+    workarea: <TrainingWIP />,
+  },
+];
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -95,14 +85,15 @@ export default function InvokeTabs() {
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const {
-    shouldShowGallery,
-    shouldShowParametersPanel,
-    shouldPinGallery,
-    shouldPinParametersPanel,
-  } = useAppSelector(floatingSelector);
+  const shouldPinGallery = useAppSelector(
+    (state: RootState) => state.ui.shouldPinGallery
+  );
 
-  useUpdateTranslations(updateTabTranslations);
+  const shouldPinParametersPanel = useAppSelector(
+    (state: RootState) => state.ui.shouldPinParametersPanel
+  );
+
+  const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
 
@@ -142,53 +133,50 @@ export default function InvokeTabs() {
   useHotkeys(
     'f',
     () => {
-      if (shouldShowGallery || shouldShowParametersPanel) {
-        dispatch(setShouldShowParametersPanel(false));
-        dispatch(setShouldShowGallery(false));
-      } else {
-        dispatch(setShouldShowParametersPanel(true));
-        dispatch(setShouldShowGallery(true));
-      }
-      if (shouldPinGallery || shouldPinParametersPanel)
-        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+      dispatch(togglePanels());
+      (shouldPinGallery || shouldPinParametersPanel) &&
+        dispatch(requestCanvasRescale());
     },
-    [shouldShowGallery, shouldShowParametersPanel]
+    [shouldPinGallery, shouldPinParametersPanel]
   );
 
-  const renderTabs = () => {
-    const tabsToRender: ReactElement[] = [];
-    Object.keys(tabDict).forEach((key) => {
-      tabsToRender.push(
+  const tabs = useMemo(
+    () =>
+      tabInfo.map((tab) => (
         <Tooltip
-          key={key}
+          key={tab.id}
           hasArrow
-          label={tabDict[key as keyof typeof tabDict].tooltip}
+          label={String(t(`common.${tab.id}` as ResourceKey))}
           placement="end"
         >
           <Tab>
             <VisuallyHidden>
-              {tabDict[key as keyof typeof tabDict].tooltip}
+              {String(t(`common.${tab.id}` as ResourceKey))}
             </VisuallyHidden>
-            {tabDict[key as keyof typeof tabDict].title}
+            {tab.icon}
           </Tab>
         </Tooltip>
-      );
-    });
-    return tabsToRender;
-  };
+      )),
+    [t]
+  );
 
-  const renderTabPanels = () => {
-    const tabPanelsToRender: ReactElement[] = [];
-    Object.keys(tabDict).forEach((key) => {
-      tabPanelsToRender.push(
-        <TabPanel key={key}>
-          {tabDict[key as keyof typeof tabDict].workarea}
-        </TabPanel>
-      );
-    });
-    return tabPanelsToRender;
-  };
+  const tabPanels = useMemo(
+    () =>
+      tabInfo.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
+    []
+  );
 
+  /**
+   * isLazy means the tabs are mounted and unmounted when changing them. There is a tradeoff here,
+   * as mounting is expensive, but so is retaining all tabs in the DOM at all times.
+   *
+   * Removing isLazy messes with the outside click watcher, which is used by ResizableDrawer.
+   * Because you have multiple handlers listening for an outside click, any click anywhere triggers
+   * the watcher for the hidden drawers, closing the open drawer.
+   *
+   * TODO: Add logic to the `useOutsideClick` in ResizableDrawer to enable it only for the active
+   * tab's drawer.
+   */
   return (
     <Tabs
       isLazy
@@ -197,9 +185,10 @@ export default function InvokeTabs() {
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
       }}
+      flexGrow={1}
     >
-      <TabList>{renderTabs()}</TabList>
-      <TabPanels>{isLightBoxOpen ? <Lightbox /> : renderTabPanels()}</TabPanels>
+      <TabList>{tabs}</TabList>
+      <TabPanels>{tabPanels}</TabPanels>
     </Tabs>
   );
 }

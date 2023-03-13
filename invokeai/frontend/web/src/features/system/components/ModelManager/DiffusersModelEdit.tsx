@@ -7,15 +7,7 @@ import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
-import {
-  Flex,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  Text,
-  VStack,
-} from '@chakra-ui/react';
+import { Flex, FormControl, FormLabel, Text, VStack } from '@chakra-ui/react';
 
 import { addNewModel } from 'app/socketio/actions';
 import { Field, Formik } from 'formik';
@@ -24,6 +16,8 @@ import { useTranslation } from 'react-i18next';
 import type { InvokeDiffusersModelConfigProps } from 'app/invokeai';
 import type { RootState } from 'app/store';
 import { isEqual, pickBy } from 'lodash';
+import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
+import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
 
 const selector = createSelector(
   [systemSelector],
@@ -141,11 +135,13 @@ export default function DiffusersModelEdit() {
                       width="full"
                     />
                     {!!errors.description && touched.description ? (
-                      <FormErrorMessage>{errors.description}</FormErrorMessage>
+                      <IAIFormErrorMessage>
+                        {errors.description}
+                      </IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.descriptionValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -167,11 +163,11 @@ export default function DiffusersModelEdit() {
                       width="full"
                     />
                     {!!errors.path && touched.path ? (
-                      <FormErrorMessage>{errors.path}</FormErrorMessage>
+                      <IAIFormErrorMessage>{errors.path}</IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.modelLocationValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -190,11 +186,13 @@ export default function DiffusersModelEdit() {
                       width="full"
                     />
                     {!!errors.repo_id && touched.repo_id ? (
-                      <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
+                      <IAIFormErrorMessage>
+                        {errors.repo_id}
+                      </IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.repoIDValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -215,11 +213,13 @@ export default function DiffusersModelEdit() {
                       width="full"
                     />
                     {!!errors.vae?.path && touched.vae?.path ? (
-                      <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
+                      <IAIFormErrorMessage>
+                        {errors.vae?.path}
+                      </IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.vaeLocationValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -240,11 +240,13 @@ export default function DiffusersModelEdit() {
                       width="full"
                     />
                     {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
-                      <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
+                      <IAIFormErrorMessage>
+                        {errors.vae?.repo_id}
+                      </IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.vaeRepoIDValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>

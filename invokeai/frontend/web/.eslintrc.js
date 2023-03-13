@@ -35,6 +35,7 @@ module.exports = {
       { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
     ],
     'prettier/prettier': ['error', { endOfLine: 'auto' }],
+    '@typescript-eslint/ban-ts-comment': 'warn',
   },
   settings: {
     react: {
