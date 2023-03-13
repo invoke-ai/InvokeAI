@@ -5,7 +5,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { ReactNode } from 'react';
+import { memo, ReactNode } from 'react';
 
 export interface IAIButtonProps extends ButtonProps {
   tooltip?: string;
@@ -25,4 +25,4 @@ const IAIButton = forwardRef((props: IAIButtonProps, forwardedRef) => {
   );
 });
 
-export default IAIButton;
+export default memo(IAIButton);

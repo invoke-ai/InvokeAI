@@ -223,7 +223,6 @@ class Inpaint(Img2Img):
         inpaint_height=None,
         inpaint_fill: tuple(int) = (0x7F, 0x7F, 0x7F, 0xFF),
         attention_maps_callback=None,
-        seed=None,
         **kwargs,
     ):
         """
@@ -311,7 +310,7 @@ class Inpaint(Img2Img):
             uc, c, cfg_scale
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
-        def make_image(x_T):
+        def make_image(x_T: torch.Tensor, seed: int):
             pipeline_output = pipeline.inpaint_from_embeddings(
                 init_image=init_image,
                 mask=1 - mask,  # expects white means "paint here."
@@ -320,7 +319,7 @@ class Inpaint(Img2Img):
                 conditioning_data=conditioning_data,
                 noise_func=self.get_noise_like,
                 callback=step_callback,
-                seed=seed
+                seed=seed,
             )
 
             if (

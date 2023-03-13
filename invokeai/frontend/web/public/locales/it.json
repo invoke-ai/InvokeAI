@@ -63,7 +63,14 @@
         "langSimplifiedChinese": "Cinese semplificato",
         "langDutch": "Olandese",
         "statusModelConverted": "Modello Convertito",
-        "statusConvertingModel": "Conversione Modello"
+        "statusConvertingModel": "Conversione Modello",
+        "langKorean": "Coreano",
+        "langPortuguese": "Portoghese",
+        "pinOptionsPanel": "Blocca il pannello Opzioni",
+        "loading": "Caricamento in corso",
+        "oceanTheme": "Oceano",
+        "langHebrew": "Ebraico",
+        "loadingInvokeAI": "Caricamento Invoke AI"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -392,7 +399,12 @@
         "customSaveLocation": "Ubicazione salvataggio personalizzata",
         "weightedSum": "Somma pesata",
         "sigmoid": "Sigmoide",
-        "inverseSigmoid": "Sigmoide inverso"
+        "inverseSigmoid": "Sigmoide inverso",
+        "v2_base": "v2 (512px)",
+        "v2_768": "v2 (768px)",
+        "none": "niente",
+        "addDifference": "Aggiungi differenza",
+        "pickModelType": "Scegli il tipo di modello"
     },
     "parameters": {
         "images": "Immagini",
@@ -588,5 +600,27 @@
         "betaDarkenOutside": "Oscura all'esterno",
         "betaLimitToBox": "Limita al rettangolo",
         "betaPreserveMasked": "Conserva quanto mascherato"
+    },
+    "accessibility": {
+        "modelSelect": "Seleziona modello",
+        "invokeProgressBar": "Barra di avanzamento generazione",
+        "uploadImage": "Carica immagine",
+        "previousImage": "Immagine precedente",
+        "nextImage": "Immagine successiva",
+        "useThisParameter": "Usa questo parametro",
+        "reset": "Reimposta",
+        "copyMetadataJson": "Copia i metadati JSON",
+        "exitViewer": "Esci dal visualizzatore",
+        "zoomIn": "Zoom avanti",
+        "zoomOut": "Zoom Indietro",
+        "rotateCounterClockwise": "Ruotare in senso antiorario",
+        "rotateClockwise": "Ruotare in senso orario",
+        "flipHorizontally": "Capovolgi orizzontalmente",
+        "toggleLogViewer": "Attiva/disattiva visualizzatore registro",
+        "showGallery": "Mostra la galleria immagini",
+        "showOptionsPanel": "Mostra il pannello opzioni",
+        "flipVertically": "Capovolgi verticalmente",
+        "toggleAutoscroll": "Attiva/disattiva lo scorrimento automatico",
+        "modifyConfig": "Modifica configurazione"
     }
 }

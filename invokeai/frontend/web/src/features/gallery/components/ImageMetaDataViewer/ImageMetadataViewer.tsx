@@ -42,9 +42,9 @@ import {
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -66,12 +66,14 @@ const MetadataItem = ({
   labelPosition,
   withCopy = false,
 }: MetadataItemProps) => {
+  const { t } = useTranslation();
+
   return (
     <Flex gap={2}>
       {onClick && (
         <Tooltip label={`Recall ${label}`}>
           <IconButton
-            aria-label="Use this parameter"
+            aria-label={t('accessibility.useThisParameter')}
             icon={<IoArrowUndoCircleOutline />}
             size="xs"
             variant="ghost"
@@ -112,7 +114,6 @@ const MetadataItem = ({
 
 type ImageMetadataViewerProps = {
   image: InvokeAI.Image;
-  styleClass?: string;
 };
 
 // TODO: I don't know if this is needed.
@@ -127,343 +128,328 @@ const memoEqualityCheck = (
  * Image metadata viewer overlays currently selected image and provides
  * access to any of its metadata for use in processing.
  */
-const ImageMetadataViewer = memo(
-  ({ image, styleClass }: ImageMetadataViewerProps) => {
-    const dispatch = useAppDispatch();
+const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
+  const dispatch = useAppDispatch();
 
-    const setBothPrompts = useSetBothPrompts();
+  const setBothPrompts = useSetBothPrompts();
 
-    useHotkeys('esc', () => {
-      dispatch(setShouldShowImageDetails(false));
-    });
+  useHotkeys('esc', () => {
+    dispatch(setShouldShowImageDetails(false));
+  });
 
-    const metadata = image?.metadata?.image || {};
-    const dreamPrompt = image?.dreamPrompt;
+  const metadata = image?.metadata?.image || {};
+  const dreamPrompt = image?.dreamPrompt;
 
-    const {
-      cfg_scale,
-      fit,
-      height,
-      hires_fix,
-      init_image_path,
-      mask_image_path,
-      orig_path,
-      perlin,
-      postprocessing,
-      prompt,
-      sampler,
-      seamless,
-      seed,
-      steps,
-      strength,
-      threshold,
-      type,
-      variations,
-      width,
-    } = metadata;
+  const {
+    cfg_scale,
+    fit,
+    height,
+    hires_fix,
+    init_image_path,
+    mask_image_path,
+    orig_path,
+    perlin,
+    postprocessing,
+    prompt,
+    sampler,
+    seamless,
+    seed,
+    steps,
+    strength,
+    threshold,
+    type,
+    variations,
+    width,
+  } = metadata;
 
-    const metadataJSON = JSON.stringify(image.metadata, null, 2);
+  const { t } = useTranslation();
 
-    return (
-      <Box
-        className={styleClass}
-        sx={{
-          position: 'absolute',
-          top: '0',
-          width: '100%',
-          borderRadius: 'base',
-          padding: 4,
-          overflow: 'scroll',
-          maxHeight: APP_METADATA_HEIGHT,
-          height: '100%',
-          zIndex: '10',
-          backdropFilter: 'blur(10px)',
+  const metadataJSON = JSON.stringify(image.metadata, null, 2);
+
+  return (
+    <Flex
+      sx={{
+        padding: 4,
+        gap: 1,
+        flexDirection: 'column',
+        width: 'full',
+        height: 'full',
+        backdropFilter: 'blur(20px)',
+        bg: 'whiteAlpha.600',
+        _dark: {
           bg: 'blackAlpha.600',
-        }}
-      >
-        <Flex gap={1} direction="column" width="100%">
-          <Flex gap={2}>
-            <Text fontWeight="semibold">File:</Text>
-            <Link href={image.url} isExternal maxW="calc(100% - 3rem)">
-              {image.url.length > 64
-                ? image.url.substring(0, 64).concat('...')
-                : image.url}
-              <ExternalLinkIcon mx="2px" />
-            </Link>
-          </Flex>
-          {Object.keys(metadata).length > 0 ? (
-            <>
-              {type && <MetadataItem label="Generation type" value={type} />}
-              {image.metadata?.model_weights && (
-                <MetadataItem
-                  label="Model"
-                  value={image.metadata.model_weights}
-                />
-              )}
-              {['esrgan', 'gfpgan'].includes(type) && (
-                <MetadataItem label="Original image" value={orig_path} />
-              )}
-              {prompt && (
-                <MetadataItem
-                  label="Prompt"
-                  labelPosition="top"
-                  value={
-                    typeof prompt === 'string' ? prompt : promptToString(prompt)
-                  }
-                  onClick={() => setBothPrompts(prompt)}
-                />
-              )}
-              {seed !== undefined && (
-                <MetadataItem
-                  label="Seed"
-                  value={seed}
-                  onClick={() => dispatch(setSeed(seed))}
-                />
-              )}
-              {threshold !== undefined && (
-                <MetadataItem
-                  label="Noise Threshold"
-                  value={threshold}
-                  onClick={() => dispatch(setThreshold(threshold))}
-                />
-              )}
-              {perlin !== undefined && (
-                <MetadataItem
-                  label="Perlin Noise"
-                  value={perlin}
-                  onClick={() => dispatch(setPerlin(perlin))}
-                />
-              )}
-              {sampler && (
-                <MetadataItem
-                  label="Sampler"
-                  value={sampler}
-                  onClick={() => dispatch(setSampler(sampler))}
-                />
-              )}
-              {steps && (
-                <MetadataItem
-                  label="Steps"
-                  value={steps}
-                  onClick={() => dispatch(setSteps(steps))}
-                />
-              )}
-              {cfg_scale !== undefined && (
-                <MetadataItem
-                  label="CFG scale"
-                  value={cfg_scale}
-                  onClick={() => dispatch(setCfgScale(cfg_scale))}
-                />
-              )}
-              {variations && variations.length > 0 && (
-                <MetadataItem
-                  label="Seed-weight pairs"
-                  value={seedWeightsToString(variations)}
-                  onClick={() =>
-                    dispatch(setSeedWeights(seedWeightsToString(variations)))
-                  }
-                />
-              )}
-              {seamless && (
-                <MetadataItem
-                  label="Seamless"
-                  value={seamless}
-                  onClick={() => dispatch(setSeamless(seamless))}
-                />
-              )}
-              {hires_fix && (
-                <MetadataItem
-                  label="High Resolution Optimization"
-                  value={hires_fix}
-                  onClick={() => dispatch(setHiresFix(hires_fix))}
-                />
-              )}
-              {width && (
-                <MetadataItem
-                  label="Width"
-                  value={width}
-                  onClick={() => dispatch(setWidth(width))}
-                />
-              )}
-              {height && (
-                <MetadataItem
-                  label="Height"
-                  value={height}
-                  onClick={() => dispatch(setHeight(height))}
-                />
-              )}
-              {init_image_path && (
-                <MetadataItem
-                  label="Initial image"
-                  value={init_image_path}
-                  isLink
-                  onClick={() => dispatch(setInitialImage(init_image_path))}
-                />
-              )}
-              {mask_image_path && (
-                <MetadataItem
-                  label="Mask image"
-                  value={mask_image_path}
-                  isLink
-                  onClick={() => dispatch(setMaskPath(mask_image_path))}
-                />
-              )}
-              {type === 'img2img' && strength && (
-                <MetadataItem
-                  label="Image to image strength"
-                  value={strength}
-                  onClick={() => dispatch(setImg2imgStrength(strength))}
-                />
-              )}
-              {fit && (
-                <MetadataItem
-                  label="Image to image fit"
-                  value={fit}
-                  onClick={() => dispatch(setShouldFitToWidthHeight(fit))}
-                />
-              )}
-              {postprocessing && postprocessing.length > 0 && (
-                <>
-                  <Heading size="sm">Postprocessing</Heading>
-                  {postprocessing.map(
-                    (
-                      postprocess: InvokeAI.PostProcessedImageMetadata,
-                      i: number
-                    ) => {
-                      if (postprocess.type === 'esrgan') {
-                        const { scale, strength, denoise_str } = postprocess;
-                        return (
-                          <Flex key={i} pl={8} gap={1} direction="column">
-                            <Text size="md">{`${
-                              i + 1
-                            }: Upscale (ESRGAN)`}</Text>
-                            <MetadataItem
-                              label="Scale"
-                              value={scale}
-                              onClick={() => dispatch(setUpscalingLevel(scale))}
-                            />
-                            <MetadataItem
-                              label="Strength"
-                              value={strength}
-                              onClick={() =>
-                                dispatch(setUpscalingStrength(strength))
-                              }
-                            />
-                            {denoise_str !== undefined && (
-                              <MetadataItem
-                                label="Denoising strength"
-                                value={denoise_str}
-                                onClick={() =>
-                                  dispatch(setUpscalingDenoising(denoise_str))
-                                }
-                              />
-                            )}
-                          </Flex>
-                        );
-                      } else if (postprocess.type === 'gfpgan') {
-                        const { strength } = postprocess;
-                        return (
-                          <Flex key={i} pl={8} gap={1} direction="column">
-                            <Text size="md">{`${
-                              i + 1
-                            }: Face restoration (GFPGAN)`}</Text>
-
-                            <MetadataItem
-                              label="Strength"
-                              value={strength}
-                              onClick={() => {
-                                dispatch(setFacetoolStrength(strength));
-                                dispatch(setFacetoolType('gfpgan'));
-                              }}
-                            />
-                          </Flex>
-                        );
-                      } else if (postprocess.type === 'codeformer') {
-                        const { strength, fidelity } = postprocess;
-                        return (
-                          <Flex key={i} pl={8} gap={1} direction="column">
-                            <Text size="md">{`${
-                              i + 1
-                            }: Face restoration (Codeformer)`}</Text>
-
-                            <MetadataItem
-                              label="Strength"
-                              value={strength}
-                              onClick={() => {
-                                dispatch(setFacetoolStrength(strength));
-                                dispatch(setFacetoolType('codeformer'));
-                              }}
-                            />
-                            {fidelity && (
-                              <MetadataItem
-                                label="Fidelity"
-                                value={fidelity}
-                                onClick={() => {
-                                  dispatch(setCodeformerFidelity(fidelity));
-                                  dispatch(setFacetoolType('codeformer'));
-                                }}
-                              />
-                            )}
-                          </Flex>
-                        );
-                      }
-                    }
-                  )}
-                </>
-              )}
-              {dreamPrompt && (
-                <MetadataItem
-                  withCopy
-                  label="Dream Prompt"
-                  value={dreamPrompt}
-                />
-              )}
-              <Flex gap={2} direction="column">
-                <Flex gap={2}>
-                  <Tooltip label="Copy metadata JSON">
-                    <IconButton
-                      aria-label="Copy metadata JSON"
-                      icon={<FaCopy />}
-                      size="xs"
-                      variant="ghost"
-                      fontSize={14}
-                      onClick={() =>
-                        navigator.clipboard.writeText(metadataJSON)
-                      }
-                    />
-                  </Tooltip>
-                  <Text fontWeight="semibold">Metadata JSON:</Text>
-                </Flex>
-                <Box
-                  sx={{
-                    mt: 0,
-                    mr: 2,
-                    mb: 4,
-                    ml: 2,
-                    padding: 4,
-                    borderRadius: 'base',
-                    overflowX: 'scroll',
-                    wordBreak: 'break-all',
-                    bg: 'whiteAlpha.100',
-                  }}
-                >
-                  <pre>{metadataJSON}</pre>
-                </Box>
-              </Flex>
-            </>
-          ) : (
-            <Center width="100%" pt={10}>
-              <Text fontSize="lg" fontWeight="semibold">
-                No metadata available
-              </Text>
-            </Center>
+        },
+      }}
+    >
+      <Flex gap={2}>
+        <Text fontWeight="semibold">File:</Text>
+        <Link href={image.url} isExternal maxW="calc(100% - 3rem)">
+          {image.url.length > 64
+            ? image.url.substring(0, 64).concat('...')
+            : image.url}
+          <ExternalLinkIcon mx="2px" />
+        </Link>
+      </Flex>
+      {Object.keys(metadata).length > 0 ? (
+        <>
+          {type && <MetadataItem label="Generation type" value={type} />}
+          {image.metadata?.model_weights && (
+            <MetadataItem label="Model" value={image.metadata.model_weights} />
           )}
-        </Flex>
-      </Box>
-    );
-  },
-  memoEqualityCheck
-);
+          {['esrgan', 'gfpgan'].includes(type) && (
+            <MetadataItem label="Original image" value={orig_path} />
+          )}
+          {prompt && (
+            <MetadataItem
+              label="Prompt"
+              labelPosition="top"
+              value={
+                typeof prompt === 'string' ? prompt : promptToString(prompt)
+              }
+              onClick={() => setBothPrompts(prompt)}
+            />
+          )}
+          {seed !== undefined && (
+            <MetadataItem
+              label="Seed"
+              value={seed}
+              onClick={() => dispatch(setSeed(seed))}
+            />
+          )}
+          {threshold !== undefined && (
+            <MetadataItem
+              label="Noise Threshold"
+              value={threshold}
+              onClick={() => dispatch(setThreshold(threshold))}
+            />
+          )}
+          {perlin !== undefined && (
+            <MetadataItem
+              label="Perlin Noise"
+              value={perlin}
+              onClick={() => dispatch(setPerlin(perlin))}
+            />
+          )}
+          {sampler && (
+            <MetadataItem
+              label="Sampler"
+              value={sampler}
+              onClick={() => dispatch(setSampler(sampler))}
+            />
+          )}
+          {steps && (
+            <MetadataItem
+              label="Steps"
+              value={steps}
+              onClick={() => dispatch(setSteps(steps))}
+            />
+          )}
+          {cfg_scale !== undefined && (
+            <MetadataItem
+              label="CFG scale"
+              value={cfg_scale}
+              onClick={() => dispatch(setCfgScale(cfg_scale))}
+            />
+          )}
+          {variations && variations.length > 0 && (
+            <MetadataItem
+              label="Seed-weight pairs"
+              value={seedWeightsToString(variations)}
+              onClick={() =>
+                dispatch(setSeedWeights(seedWeightsToString(variations)))
+              }
+            />
+          )}
+          {seamless && (
+            <MetadataItem
+              label="Seamless"
+              value={seamless}
+              onClick={() => dispatch(setSeamless(seamless))}
+            />
+          )}
+          {hires_fix && (
+            <MetadataItem
+              label="High Resolution Optimization"
+              value={hires_fix}
+              onClick={() => dispatch(setHiresFix(hires_fix))}
+            />
+          )}
+          {width && (
+            <MetadataItem
+              label="Width"
+              value={width}
+              onClick={() => dispatch(setWidth(width))}
+            />
+          )}
+          {height && (
+            <MetadataItem
+              label="Height"
+              value={height}
+              onClick={() => dispatch(setHeight(height))}
+            />
+          )}
+          {init_image_path && (
+            <MetadataItem
+              label="Initial image"
+              value={init_image_path}
+              isLink
+              onClick={() => dispatch(setInitialImage(init_image_path))}
+            />
+          )}
+          {mask_image_path && (
+            <MetadataItem
+              label="Mask image"
+              value={mask_image_path}
+              isLink
+              onClick={() => dispatch(setMaskPath(mask_image_path))}
+            />
+          )}
+          {type === 'img2img' && strength && (
+            <MetadataItem
+              label="Image to image strength"
+              value={strength}
+              onClick={() => dispatch(setImg2imgStrength(strength))}
+            />
+          )}
+          {fit && (
+            <MetadataItem
+              label="Image to image fit"
+              value={fit}
+              onClick={() => dispatch(setShouldFitToWidthHeight(fit))}
+            />
+          )}
+          {postprocessing && postprocessing.length > 0 && (
+            <>
+              <Heading size="sm">Postprocessing</Heading>
+              {postprocessing.map(
+                (
+                  postprocess: InvokeAI.PostProcessedImageMetadata,
+                  i: number
+                ) => {
+                  if (postprocess.type === 'esrgan') {
+                    const { scale, strength, denoise_str } = postprocess;
+                    return (
+                      <Flex key={i} pl={8} gap={1} direction="column">
+                        <Text size="md">{`${i + 1}: Upscale (ESRGAN)`}</Text>
+                        <MetadataItem
+                          label="Scale"
+                          value={scale}
+                          onClick={() => dispatch(setUpscalingLevel(scale))}
+                        />
+                        <MetadataItem
+                          label="Strength"
+                          value={strength}
+                          onClick={() =>
+                            dispatch(setUpscalingStrength(strength))
+                          }
+                        />
+                        {denoise_str !== undefined && (
+                          <MetadataItem
+                            label="Denoising strength"
+                            value={denoise_str}
+                            onClick={() =>
+                              dispatch(setUpscalingDenoising(denoise_str))
+                            }
+                          />
+                        )}
+                      </Flex>
+                    );
+                  } else if (postprocess.type === 'gfpgan') {
+                    const { strength } = postprocess;
+                    return (
+                      <Flex key={i} pl={8} gap={1} direction="column">
+                        <Text size="md">{`${
+                          i + 1
+                        }: Face restoration (GFPGAN)`}</Text>
+
+                        <MetadataItem
+                          label="Strength"
+                          value={strength}
+                          onClick={() => {
+                            dispatch(setFacetoolStrength(strength));
+                            dispatch(setFacetoolType('gfpgan'));
+                          }}
+                        />
+                      </Flex>
+                    );
+                  } else if (postprocess.type === 'codeformer') {
+                    const { strength, fidelity } = postprocess;
+                    return (
+                      <Flex key={i} pl={8} gap={1} direction="column">
+                        <Text size="md">{`${
+                          i + 1
+                        }: Face restoration (Codeformer)`}</Text>
+
+                        <MetadataItem
+                          label="Strength"
+                          value={strength}
+                          onClick={() => {
+                            dispatch(setFacetoolStrength(strength));
+                            dispatch(setFacetoolType('codeformer'));
+                          }}
+                        />
+                        {fidelity && (
+                          <MetadataItem
+                            label="Fidelity"
+                            value={fidelity}
+                            onClick={() => {
+                              dispatch(setCodeformerFidelity(fidelity));
+                              dispatch(setFacetoolType('codeformer'));
+                            }}
+                          />
+                        )}
+                      </Flex>
+                    );
+                  }
+                }
+              )}
+            </>
+          )}
+          {dreamPrompt && (
+            <MetadataItem withCopy label="Dream Prompt" value={dreamPrompt} />
+          )}
+          <Flex gap={2} direction="column">
+            <Flex gap={2}>
+              <Tooltip label="Copy metadata JSON">
+                <IconButton
+                  aria-label={t('accessibility.copyMetadataJson')}
+                  icon={<FaCopy />}
+                  size="xs"
+                  variant="ghost"
+                  fontSize={14}
+                  onClick={() => navigator.clipboard.writeText(metadataJSON)}
+                />
+              </Tooltip>
+              <Text fontWeight="semibold">Metadata JSON:</Text>
+            </Flex>
+            <Box
+              sx={{
+                mt: 0,
+                mr: 2,
+                mb: 4,
+                ml: 2,
+                padding: 4,
+                borderRadius: 'base',
+                overflowX: 'scroll',
+                wordBreak: 'break-all',
+                bg: 'whiteAlpha.500',
+                _dark: { bg: 'blackAlpha.500' },
+              }}
+            >
+              <pre>{metadataJSON}</pre>
+            </Box>
+          </Flex>
+        </>
+      ) : (
+        <Center width="100%" pt={10}>
+          <Text fontSize="lg" fontWeight="semibold">
+            No metadata available
+          </Text>
+        </Center>
+      )}
+    </Flex>
+  );
+}, memoEqualityCheck);
 
 ImageMetadataViewer.displayName = 'ImageMetadataViewer';
 

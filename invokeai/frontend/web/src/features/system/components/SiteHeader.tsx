@@ -61,47 +61,53 @@ const SiteHeader = () => {
 
         <LanguagePicker />
 
-        <IAIIconButton
-          aria-label={t('common.reportBugLabel')}
-          tooltip={t('common.reportBugLabel')}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size="sm"
-          icon={
-            <Link isExternal href="http://github.com/invoke-ai/InvokeAI/issues">
-              <FaBug />
-            </Link>
-          }
-        />
+        <Link
+          isExternal
+          href="http://github.com/invoke-ai/InvokeAI/issues"
+          marginBottom="-0.25rem"
+        >
+          <IAIIconButton
+            aria-label={t('common.reportBugLabel')}
+            tooltip={t('common.reportBugLabel')}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            size="sm"
+            icon={<FaBug />}
+          />
+        </Link>
 
-        <IAIIconButton
-          aria-label={t('common.githubLabel')}
-          tooltip={t('common.githubLabel')}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size="sm"
-          icon={
-            <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
-              <FaGithub />
-            </Link>
-          }
-        />
+        <Link
+          isExternal
+          href="http://github.com/invoke-ai/InvokeAI"
+          marginBottom="-0.25rem"
+        >
+          <IAIIconButton
+            aria-label={t('common.githubLabel')}
+            tooltip={t('common.githubLabel')}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            size="sm"
+            icon={<FaGithub />}
+          />
+        </Link>
 
-        <IAIIconButton
-          aria-label={t('common.discordLabel')}
-          tooltip={t('common.discordLabel')}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size="sm"
-          icon={
-            <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
-              <FaDiscord />
-            </Link>
-          }
-        />
+        <Link
+          isExternal
+          href="https://discord.gg/ZmtBAhwWhy"
+          marginBottom="-0.25rem"
+        >
+          <IAIIconButton
+            aria-label={t('common.discordLabel')}
+            tooltip={t('common.discordLabel')}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            size="sm"
+            icon={<FaDiscord />}
+          />
+        </Link>
 
         <SettingsModal>
           <IAIIconButton
@@ -119,4 +125,5 @@ const SiteHeader = () => {
   );
 };
 
+SiteHeader.displayName = 'SiteHeader';
 export default SiteHeader;

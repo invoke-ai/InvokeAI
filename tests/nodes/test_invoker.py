@@ -21,12 +21,13 @@ def simple_graph():
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        generate = None, # type: ignore
+        model_manager = None, # type: ignore
         events = TestEventService(),
         images = None, # type: ignore
         queue = MemoryInvocationQueue(),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
-        processor = DefaultInvocationProcessor()
+        processor = DefaultInvocationProcessor(),
+        restoration = None,
     )
 
 @pytest.fixture()

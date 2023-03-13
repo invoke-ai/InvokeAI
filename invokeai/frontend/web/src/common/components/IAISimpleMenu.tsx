@@ -11,7 +11,7 @@ import {
   IconButtonProps,
   ButtonProps,
 } from '@chakra-ui/react';
-import { MouseEventHandler, ReactNode } from 'react';
+import { memo, MouseEventHandler, ReactNode } from 'react';
 import { MdArrowDropDown, MdArrowDropUp } from 'react-icons/md';
 
 interface IAIMenuItem {
@@ -31,7 +31,7 @@ interface IAIMenuProps {
   menuItemProps?: MenuItemProps;
 }
 
-export default function IAISimpleMenu(props: IAIMenuProps) {
+const IAISimpleMenu = (props: IAIMenuProps) => {
   const {
     menuType = 'icon',
     iconTooltip,
@@ -83,4 +83,6 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
       )}
     </Menu>
   );
-}
+};
+
+export default memo(IAISimpleMenu);

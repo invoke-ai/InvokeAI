@@ -1,5 +1,6 @@
 import { Box, forwardRef, Icon } from '@chakra-ui/react';
 import { Feature } from 'app/features';
+import { memo } from 'react';
 import { IconType } from 'react-icons';
 import { MdHelp } from 'react-icons/md';
 import GuidePopover from './GuidePopover';
@@ -19,4 +20,4 @@ const GuideIcon = forwardRef(
   )
 );
 
-export default GuideIcon;
+export default memo(GuideIcon);
