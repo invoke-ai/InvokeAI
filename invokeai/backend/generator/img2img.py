@@ -37,7 +37,6 @@ class Img2Img(Generator):
         h_symmetry_time_pct=None,
         v_symmetry_time_pct=None,
         attention_maps_callback=None,
-        seed=None,
         **kwargs,
     ):
         """
@@ -64,7 +63,7 @@ class Img2Img(Generator):
             ),
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
-        def make_image(x_T):
+        def make_image(x_T: torch.Tensor, seed: int):
             # FIXME: use x_T for initial seeded noise
             # We're not at the moment because the pipeline automatically resizes init_image if
             # necessary, which the x_T input might not match.
@@ -77,7 +76,7 @@ class Img2Img(Generator):
                 conditioning_data,
                 noise_func=self.get_noise_like,
                 callback=step_callback,
-                seed=seed
+                seed=seed,
             )
             if (
                 pipeline_output.attention_map_saver is not None
@@ -88,9 +87,7 @@ class Img2Img(Generator):
 
         return make_image
 
-    def get_noise_like(self, like: torch.Tensor, seed: Optional[int]):
-        if seed is not None:
-            set_seed(seed)
+    def get_noise_like(self, like: torch.Tensor):
         device = like.device
         if device.type == "mps":
             x = torch.randn_like(like, device="cpu").to(device)

@@ -112,10 +112,8 @@ def custom_openapi():
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
-        if "additionalProperties" not in invoker_schema:
-            invoker_schema["additionalProperties"] = {}
 
-        invoker_schema["additionalProperties"]["outputs"] = outputs_ref
+        invoker_schema["output"] = outputs_ref
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
