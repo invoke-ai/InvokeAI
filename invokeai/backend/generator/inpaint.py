@@ -223,7 +223,6 @@ class Inpaint(Img2Img):
         inpaint_height=None,
         inpaint_fill: tuple(int) = (0x7F, 0x7F, 0x7F, 0xFF),
         attention_maps_callback=None,
-        seed=None,
         **kwargs,
     ):
         """
