@@ -66,7 +66,6 @@ def main():
     Globals.ckpt_convert = args.ckpt_convert
 
     # run any post-install patches needed
-    # temporarily disabled
     run_patches()
 
     print(f">> Internet connectivity is {Globals.internet_available}")
