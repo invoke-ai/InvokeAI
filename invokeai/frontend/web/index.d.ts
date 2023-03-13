@@ -39,3 +39,6 @@ declare global {
   }
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
+
+declare function Invoke(): React.JSX;
+export = Invoke;
