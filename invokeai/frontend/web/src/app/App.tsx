@@ -40,7 +40,7 @@ const App = (props: PropsWithChildren) => {
           w={APP_WIDTH}
           h={APP_HEIGHT}
         >
-          {props.children ? props.children : <SiteHeader />}
+          {props.children || <SiteHeader />}
           <Flex gap={4} w="full" h="full">
             <InvokeTabs />
             <ImageGalleryPanel />
