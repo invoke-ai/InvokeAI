@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
       build: {
         ...common.build,
         lib: {
-          entry: path.resolve(__dirname, 'src/component.tsx'),
+          entry: path.resolve(__dirname, 'src/exports.tsx'),
           name: 'InvokeAI UI',
           fileName: (format) => `invoke-ai-ui.${format}.js`,
         },

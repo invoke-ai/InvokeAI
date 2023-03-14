@@ -1,9 +1,19 @@
 {
-  "name": "invoke-ai-ui",
-  "private": true,
-  "version": "0.0.1",
+  "name": "@invoke-ai/invoke-ai-ui",
+  "version": "0.0.3",
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  },
+  "main": "./dist/invoke-ai-ui.umd.js",
+  "module": "./dist/invoke-ai-ui.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/invoke-ai-ui.es.js",
+      "require": "./dist/invoke-ai-ui.umd.js"
+    }
+  },
   "scripts": {
-    "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
     "build:package": "vite build --mode=package",
@@ -49,6 +59,7 @@
     "dateformat": "^5.0.3",
     "formik": "^2.2.9",
     "framer-motion": "^9.0.4",
+    "husky": "^8.0.3",
     "i18next": "^22.4.10",
     "i18next-browser-languagedetector": "^7.0.1",
     "i18next-http-backend": "^2.1.1",
@@ -91,7 +102,6 @@
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "husky": "^8.0.3",
     "lint-staged": "^13.1.2",
     "madge": "^6.0.0",
     "postinstall-postinstall": "^2.1.0",
