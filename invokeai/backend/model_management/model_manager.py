@@ -45,9 +45,6 @@ class SDLegacyType(Enum):
     UNKNOWN = 99
 
 DEFAULT_MAX_MODELS = 2
-VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
-    "vae-ft-mse-840000-ema-pruned": "stabilityai/sd-vae-ft-mse",
-}
 
 class ModelManager(object):
     '''
@@ -458,14 +455,15 @@ class ModelManager(object):
         from . import load_pipeline_from_original_stable_diffusion_ckpt
 
         self.offload_model(self.current_model)
-        if vae_config := self._choose_diffusers_vae(model_name):
-            vae = self._load_vae(vae_config)
+        vae_path = None
+        if vae:
+            vae_path = vae if os.path.isabs(vae) else os.path.normpath(os.path.join(Globals.root, vae))
         if self._has_cuda():
             torch.cuda.empty_cache()
         pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
             checkpoint_path=weights,
             original_config_file=config,
-            vae=vae,
+            vae_path=vae_path,
             return_generator_pipeline=True,
             precision=torch.float16 if self.precision == "float16" else torch.float32,
         )
@@ -519,7 +517,7 @@ class ModelManager(object):
 
     def scan_model(self, model_name, checkpoint):
         """
-        Apply picklescanner to the indicated checkpoint and issue a warning
+v        Apply picklescanner to the indicated checkpoint and issue a warning
         and option to exit if an infected file is identified.
         """
         # scan model
@@ -878,36 +876,6 @@ class ModelManager(object):
                 found_models.append({"name": file.stem, "location": location})
 
         return search_folder, found_models
-
-    def _choose_diffusers_vae(
-        self, model_name: str, vae: str = None
-    ) -> Union[dict, str]:
-        # In the event that the original entry is using a custom ckpt VAE, we try to
-        # map that VAE onto a diffuser VAE using a hard-coded dictionary.
-        # I would prefer to do this differently: We load the ckpt model into memory, swap the
-        # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
-        # VAE is built into the model. However, when I tried this I got obscure key errors.
-        if vae:
-            return vae
-        if model_name in self.config and (
-            vae_ckpt_path := self.model_info(model_name).get("vae", None)
-        ):
-            vae_basename = Path(vae_ckpt_path).stem
-            diffusers_vae = None
-            if diffusers_vae := VAE_TO_REPO_ID.get(vae_basename, None):
-                print(
-                    f">> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version"
-                )
-                vae = {"repo_id": diffusers_vae}
-            else:
-                print(
-                    f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown'
-                )
-                print(
-                    '** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config'
-                )
-                vae = {"repo_id": "stabilityai/sd-vae-ft-mse"}
-        return vae
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
