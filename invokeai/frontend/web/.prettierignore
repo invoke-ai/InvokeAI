@@ -4,3 +4,4 @@ node_modules/
 patches/
 stats.html
 .yarn/
+src/services/api/
