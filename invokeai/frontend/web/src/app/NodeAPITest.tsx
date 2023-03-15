@@ -1,14 +1,25 @@
-import { Flex, Heading, Text } from '@chakra-ui/react';
+import { Flex, Image, Text } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
-import { useEffect, useState } from 'react';
-import { SessionsService } from 'services/api';
+import {
+  setProgress,
+  setProgressImage,
+  setSessionId,
+  setStatus,
+} from 'services/apiSlice';
+import { useEffect } from 'react';
+import { STATUS, ProgressImage } from 'services/apiSliceTypes';
+import { getImage } from 'services/thunks/image';
+import { createSession, invokeSession } from 'services/thunks/session';
 import { io } from 'socket.io-client';
+import { useAppDispatch, useAppSelector } from './storeHooks';
+import { RootState } from './store';
 
 type GeneratorProgress = {
   session_id: string;
   invocation_id: string;
+  progress_image: ProgressImage;
   step: number;
-  percent: number;
+  total_steps: number;
 };
 
 const socket_url = `ws://${window.location.host}`;
@@ -16,98 +27,102 @@ const socket = io(socket_url, {
   path: '/ws/socket.io',
 });
 
-enum STATUS {
-  waiting = 'WAITING',
-  ready = 'READY',
-  preparing = 'PREPARING',
-  generating = 'GENERATING',
-  finished = 'FINISHED',
-}
-
 const NodeAPITest = () => {
-  const [invocationProgress, setInvocationProgress] = useState<number>();
-  const [status, setStatus] = useState<STATUS>(STATUS.waiting);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { sessionId, status, progress, progressImage } = useAppSelector(
+    (state: RootState) => state.api
+  );
 
-  const handleCreateSession = async () => {
-    // create a session with a simple graph
-    const payload = await SessionsService.createSession({
-      nodes: {
-        a: {
-          id: 'a',
-          type: 'txt2img',
-          prompt: 'pizza',
-          steps: 10,
+  const handleCreateSession = () => {
+    dispatch(
+      createSession({
+        requestBody: {
+          nodes: {
+            a: {
+              id: 'a',
+              type: 'txt2img',
+              prompt: 'pizza',
+              steps: 10,
+            },
+            b: {
+              id: 'b',
+              type: 'show_image',
+            },
+          },
+          edges: [
+            {
+              source: { node_id: 'a', field: 'image' },
+              destination: { node_id: 'b', field: 'image' },
+            },
+          ],
         },
-        b: {
-          id: 'b',
-          type: 'show_image',
-        },
-      },
-      edges: [
-        {
-          source: { node_id: 'a', field: 'image' },
-          destination: { node_id: 'b', field: 'image' },
-        },
-      ],
-    });
-
-    // the generated types have `id` as optional but i'm pretty sure we always get the id
-    setSessionId(payload.id!);
-    setStatus(STATUS.ready);
-    console.log('payload', payload);
-
-    // subscribe to this session
-    socket.emit('subscribe', { session: payload.id });
-    console.log('subscribe', { session: payload.id });
+      })
+    );
   };
 
-  const handleInvokeSession = async () => {
+  const handleInvokeSession = () => {
+    dispatch(invokeSession());
+  };
+
+  useEffect(() => {
     if (!sessionId) {
       return;
     }
 
-    setStatus(STATUS.preparing);
-    // invoke the session, the resultant image should open in your platform's native image viewer when completed
-    await SessionsService.invokeSession(sessionId, true);
-  };
+    // set up socket.io listeners
 
-  useEffect(() => {
+    // TODO: suppose this should be handled in the socket.io middleware
+    // TODO: write types for the socket.io payloads, haven't found a generator for them yet...
+
+    // subscribe to the current session
+    socket.emit('subscribe', { session: sessionId });
+    console.log('subscribe', { session: sessionId });
+
+    // received on each generation step
     socket.on('generator_progress', (data: GeneratorProgress) => {
-      // this is broken on the backend, the nodes web server does not get `step` or `steps`, so we don't get a percentage
-      // see https://github.com/invoke-ai/InvokeAI/issues/2951
       console.log('generator_progress', data);
-      setInvocationProgress(data.percent);
+      dispatch(setProgress(data.step / data.total_steps));
+      dispatch(setProgressImage(data.progress_image));
     });
+
+    // received after invokeSession called
     socket.on('invocation_started', (data) => {
       console.log('invocation_started', data);
-      setStatus(STATUS.generating);
+      dispatch(setStatus(STATUS.busy));
     });
+
+    // received when generation complete
     socket.on('invocation_complete', (data) => {
       // for now, just unsubscribe from the session when we finish a generation
       // in the future we will want to continue building the graph and executing etc
-      setStatus(STATUS.finished);
       console.log('invocation_complete', data);
-      socket.emit('unsubscribe', { session: data.session_id });
-      console.log('unsubscribe', { session: data.session_id });
-      setTimeout(() => {
-        setSessionId(null);
-        setStatus(STATUS.waiting);
-      }, 2000);
+      dispatch(setProgress(null));
+      dispatch(setSessionId(null));
+      dispatch(setStatus(STATUS.idle));
+
+      // think this gets a blob...
+      // dispatch(
+      //   getImage({
+      //     imageType: data.result.image.image_type,
+      //     imageName: data.result.image.image_name,
+      //   })
+      // );
+      socket.emit('unsubscribe', { session: sessionId });
+      console.log('unsubscribe', { session: sessionId });
     });
+
+    // not sure when we get this?
     socket.on('session_complete', (data) => {
-      console.log('session_complete', data);
-      socket.emit('unsubscribe', { session: data.session_id });
-      console.log('unsubscribe', { session: data.session_id });
-      setSessionId(null);
-      setStatus(STATUS.waiting);
+      // console.log('session_complete', data);
     });
 
     () => {
+      // cleanup
+      socket.emit('unsubscribe', { session: sessionId });
       socket.removeAllListeners();
       socket.disconnect();
     };
-  }, []);
+  }, [dispatch, sessionId]);
 
   return (
     <Flex
@@ -119,28 +134,33 @@ const NodeAPITest = () => {
         borderRadius: 'base',
       }}
     >
-      <Heading size="lg">Status: {status}</Heading>
       <Text>Session: {sessionId ? sessionId : '...'}</Text>
       <IAIButton
         onClick={handleCreateSession}
-        isDisabled={!!sessionId}
+        isDisabled={status === STATUS.busy || Boolean(sessionId)}
         colorScheme="accent"
       >
         Create Session
       </IAIButton>
       <IAIButton
         onClick={handleInvokeSession}
-        isDisabled={!sessionId || status !== STATUS.ready}
-        isLoading={[STATUS.preparing, STATUS.generating].includes(status)}
+        isDisabled={status === STATUS.busy}
+        isLoading={status === STATUS.busy}
         loadingText={`Invoking ${
-          invocationProgress === undefined
-            ? '...'
-            : `${Math.round(invocationProgress * 100)}%`
+          progress === null ? '...' : `${Math.round(progress * 100)}%`
         }`}
         colorScheme="accent"
       >
         Invoke
       </IAIButton>
+      <Image
+        src={progressImage?.dataURL}
+        width={progressImage?.width}
+        height={progressImage?.height}
+        sx={{
+          imageRendering: 'pixelated',
+        }}
+      />
     </Flex>
   );
 };
