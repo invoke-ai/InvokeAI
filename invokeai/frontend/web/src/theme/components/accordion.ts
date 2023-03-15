@@ -9,7 +9,6 @@ const { definePartsStyle, defineMultiStyleConfig } =
 
 const invokeAIContainer = defineStyle({
   border: 'none',
-  pt: 2,
 });
 
 const invokeAIButton = defineStyle((props) => {
@@ -40,7 +39,6 @@ const invokeAIPanel = defineStyle((props) => {
     bg: `${c}.800`,
     borderRadius: 'base',
     borderTopRadius: 'none',
-    p: 4,
   };
 });
 

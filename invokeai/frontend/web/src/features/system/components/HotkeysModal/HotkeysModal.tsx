@@ -329,69 +329,71 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
           <ModalCloseButton />
           <ModalBody>
             <Accordion allowMultiple>
-              <AccordionItem>
-                <AccordionButton>
-                  <Flex
-                    width="100%"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <h2>{t('hotkeys.appHotkeys')}</h2>
-                    <AccordionIcon />
-                  </Flex>
-                </AccordionButton>
-                <AccordionPanel>
-                  {renderHotkeyModalItems(appHotkeys)}
-                </AccordionPanel>
-              </AccordionItem>
+              <Flex flexDir="column" gap={2}>
+                <AccordionItem>
+                  <AccordionButton>
+                    <Flex
+                      width="100%"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <h2>{t('hotkeys.appHotkeys')}</h2>
+                      <AccordionIcon />
+                    </Flex>
+                  </AccordionButton>
+                  <AccordionPanel>
+                    {renderHotkeyModalItems(appHotkeys)}
+                  </AccordionPanel>
+                </AccordionItem>
 
-              <AccordionItem>
-                <AccordionButton>
-                  <Flex
-                    width="100%"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <h2>{t('hotkeys.generalHotkeys')}</h2>
-                    <AccordionIcon />
-                  </Flex>
-                </AccordionButton>
-                <AccordionPanel>
-                  {renderHotkeyModalItems(generalHotkeys)}
-                </AccordionPanel>
-              </AccordionItem>
+                <AccordionItem>
+                  <AccordionButton>
+                    <Flex
+                      width="100%"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <h2>{t('hotkeys.generalHotkeys')}</h2>
+                      <AccordionIcon />
+                    </Flex>
+                  </AccordionButton>
+                  <AccordionPanel>
+                    {renderHotkeyModalItems(generalHotkeys)}
+                  </AccordionPanel>
+                </AccordionItem>
 
-              <AccordionItem>
-                <AccordionButton>
-                  <Flex
-                    width="100%"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <h2>{t('hotkeys.galleryHotkeys')}</h2>
-                    <AccordionIcon />
-                  </Flex>
-                </AccordionButton>
-                <AccordionPanel>
-                  {renderHotkeyModalItems(galleryHotkeys)}
-                </AccordionPanel>
-              </AccordionItem>
+                <AccordionItem>
+                  <AccordionButton>
+                    <Flex
+                      width="100%"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <h2>{t('hotkeys.galleryHotkeys')}</h2>
+                      <AccordionIcon />
+                    </Flex>
+                  </AccordionButton>
+                  <AccordionPanel>
+                    {renderHotkeyModalItems(galleryHotkeys)}
+                  </AccordionPanel>
+                </AccordionItem>
 
-              <AccordionItem>
-                <AccordionButton>
-                  <Flex
-                    width="100%"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <h2>{t('hotkeys.unifiedCanvasHotkeys')}</h2>
-                    <AccordionIcon />
-                  </Flex>
-                </AccordionButton>
-                <AccordionPanel>
-                  {renderHotkeyModalItems(unifiedCanvasHotkeys)}
-                </AccordionPanel>
-              </AccordionItem>
+                <AccordionItem>
+                  <AccordionButton>
+                    <Flex
+                      width="100%"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <h2>{t('hotkeys.unifiedCanvasHotkeys')}</h2>
+                      <AccordionIcon />
+                    </Flex>
+                  </AccordionButton>
+                  <AccordionPanel>
+                    {renderHotkeyModalItems(unifiedCanvasHotkeys)}
+                  </AccordionPanel>
+                </AccordionItem>
+              </Flex>
             </Accordion>
           </ModalBody>
           <ModalFooter />

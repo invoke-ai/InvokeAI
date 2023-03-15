@@ -1,3 +1,5 @@
+import React, { PropsWithChildren } from 'react';
+
 export {};
 
 declare module 'redux-socket.io-middleware';
@@ -39,3 +41,18 @@ declare global {
   }
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
+
+declare module '@invoke-ai/invoke-ai-ui' {
+  declare class ThemeChanger extends React.Component<ThemeChangerProps> {
+    public constructor(props: ThemeChangerProps);
+  }
+
+  declare class InvokeAiLogoComponent extends React.Component<InvokeAILogoComponentProps> {
+    public constructor(props: InvokeAILogoComponentProps);
+  }
+}
+
+declare function Invoke(props: PropsWithChildren): JSX.Element;
+
+export { ThemeChanger, InvokeAiLogoComponent };
+export = Invoke;

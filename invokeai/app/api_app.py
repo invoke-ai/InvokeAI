@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 import asyncio
 from inspect import signature
 
@@ -53,11 +52,11 @@ config = {}
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    args = Args()
-    config = args.parse_args()
+    config = Args()
+    config.parse_args()
 
     ApiDependencies.initialize(
-        args=args, config=config, event_handler_id=event_handler_id
+        config=config, event_handler_id=event_handler_id
     )
 
 
@@ -113,10 +112,8 @@ def custom_openapi():
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
-        if "additionalProperties" not in invoker_schema:
-            invoker_schema["additionalProperties"] = {}
 
-        invoker_schema["additionalProperties"]["outputs"] = outputs_ref
+        invoker_schema["output"] = outputs_ref
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

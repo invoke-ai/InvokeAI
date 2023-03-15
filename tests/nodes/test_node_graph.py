@@ -1,15 +1,18 @@
 from invokeai.app.invocations.image import *
 
 from .test_nodes import ListPassThroughInvocation, PromptTestInvocation
-from invokeai.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation
+from invokeai.app.services.graph import Edge, Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation
 from invokeai.app.invocations.generate import ImageToImageInvocation, TextToImageInvocation
 from invokeai.app.invocations.upscale import UpscaleInvocation
 import pytest
 
 
 # Helpers
-def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> tuple[EdgeConnection, EdgeConnection]:
-    return (EdgeConnection(node_id = from_id, field = from_field), EdgeConnection(node_id = to_id, field = to_field))
+def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:
+    return Edge(
+        source=EdgeConnection(node_id = from_id, field = from_field),
+        destination=EdgeConnection(node_id = to_id, field = to_field)
+    )
 
 # Tests
 def test_connections_are_compatible():
@@ -108,7 +111,7 @@ def test_graph_allows_non_conflicting_id_change():
     assert g.get_node("3").prompt == "Banana sushi"
 
     assert len(g.edges) == 1
-    assert (EdgeConnection(node_id = "3", field = "image"), EdgeConnection(node_id = "2", field = "image")) in g.edges
+    assert Edge(source=EdgeConnection(node_id = "3", field = "image"), destination=EdgeConnection(node_id = "2", field = "image")) in g.edges
 
 def test_graph_fails_to_update_node_id_if_conflict():
     g = Graph()
@@ -490,10 +493,10 @@ def test_graph_can_deserialize():
     assert g2.nodes['1'] is not None
     assert g2.nodes['2'] is not None
     assert len(g2.edges) == 1
-    assert g2.edges[0][0].node_id == '1'
-    assert g2.edges[0][0].field == 'image'
-    assert g2.edges[0][1].node_id == '2'
-    assert g2.edges[0][1].field == 'image'
+    assert g2.edges[0].source.node_id == '1'
+    assert g2.edges[0].source.field == 'image'
+    assert g2.edges[0].destination.node_id == '2'
+    assert g2.edges[0].destination.field == 'image'
 
 def test_graph_can_generate_schema():
     # Not throwing on this line is sufficient

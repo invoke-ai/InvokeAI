@@ -1,19 +1,20 @@
-import { Box, Flex, Grid } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import CurrentImageButtons from 'features/gallery/components/CurrentImageButtons';
-import ImageGallery from 'features/gallery/components/ImageGallery';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
+import { AnimatePresence, motion } from 'framer-motion';
 import { isEqual } from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BiExit } from 'react-icons/bi';
 import { TransformWrapper } from 'react-zoom-pan-pinch';
+import { PROGRESS_BAR_THICKNESS } from 'theme/util/constants';
 import useImageTransform from '../hooks/useImageTransform';
 import ReactPanZoomButtons from './ReactPanZoomButtons';
 import ReactPanZoomImage from './ReactPanZoomImage';
@@ -65,106 +66,102 @@ export default function Lightbox() {
   );
 
   return (
-    <TransformWrapper
-      centerOnInit
-      minScale={0.1}
-      initialPositionX={50}
-      initialPositionY={50}
-    >
-      <Box
-        sx={{
-          width: '100%',
-          height: '100%',
-          overflow: 'hidden',
-          position: 'absolute',
-          insetInlineStart: 0,
-          top: 0,
-          zIndex: 30,
-          animation: 'popIn 0.3s ease-in',
-          bg: 'base.800',
-        }}
-      >
-        <Flex
-          sx={{
-            flexDir: 'column',
-            position: 'absolute',
-            top: 4,
-            insetInlineStart: 4,
-            gap: 4,
-            zIndex: 3,
+    <AnimatePresence>
+      {isLightBoxOpen && (
+        <motion.div
+          key="lightbox"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15, ease: 'easeInOut' }}
+          style={{
+            display: 'flex',
+            width: '100vw',
+            height: `calc(100vh - ${PROGRESS_BAR_THICKNESS * 4}px)`,
+            position: 'fixed',
+            top: `${PROGRESS_BAR_THICKNESS * 4}px`,
+            background: 'var(--invokeai-colors-base-900)',
+            zIndex: 99,
           }}
         >
-          <IAIIconButton
-            icon={<BiExit />}
-            aria-label="Exit Viewer"
-            onClick={() => {
-              dispatch(setIsLightboxOpen(false));
-            }}
-            fontSize={20}
-          />
-          <ReactPanZoomButtons
-            flipHorizontally={flipHorizontally}
-            flipVertically={flipVertically}
-            rotateCounterClockwise={rotateCounterClockwise}
-            rotateClockwise={rotateClockwise}
-            reset={reset}
-          />
-        </Flex>
-
-        <Flex>
-          <Grid
-            sx={{
-              overflow: 'hidden',
-              gridTemplateColumns: 'auto max-content',
-              placeItems: 'center',
-              width: '100vw',
-              height: '100vh',
-              bg: 'base.850',
-            }}
+          <TransformWrapper
+            centerOnInit
+            minScale={0.1}
+            initialPositionX={50}
+            initialPositionY={50}
           >
+            <Flex
+              sx={{
+                flexDir: 'column',
+                position: 'absolute',
+                insetInlineStart: 4,
+                gap: 4,
+                zIndex: 3,
+                top: 4,
+              }}
+            >
+              <IAIIconButton
+                icon={<BiExit />}
+                aria-label="Exit Viewer"
+                className="lightbox-close-btn"
+                onClick={() => {
+                  dispatch(setIsLightboxOpen(false));
+                }}
+                fontSize={20}
+              />
+              <ReactPanZoomButtons
+                flipHorizontally={flipHorizontally}
+                flipVertically={flipVertically}
+                rotateCounterClockwise={rotateCounterClockwise}
+                rotateClockwise={rotateClockwise}
+                reset={reset}
+              />
+            </Flex>
+            <Flex
+              sx={{
+                position: 'absolute',
+                top: 4,
+                zIndex: 3,
+                insetInlineStart: '50%',
+                transform: 'translate(-50%, 0)',
+              }}
+            >
+              <CurrentImageButtons />
+            </Flex>
+
             {viewerImageToDisplay && (
               <>
                 <ReactPanZoomImage
                   rotation={rotation}
                   scaleX={scaleX}
                   scaleY={scaleY}
-                  image={viewerImageToDisplay.url}
+                  image={viewerImageToDisplay}
                   styleClass="lightbox-image"
                 />
                 {shouldShowImageDetails && (
                   <ImageMetadataViewer image={viewerImageToDisplay} />
                 )}
+
+                {!shouldShowImageDetails && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      insetInlineStart: 0,
+                      w: '100vw',
+                      h: '100vh',
+                      px: 16,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <NextPrevImageButtons />
+                  </Box>
+                )}
               </>
             )}
-
-            {!shouldShowImageDetails && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  insetInlineStart: 0,
-                  w: `calc(100vw - ${8 * 2 * 4}px)`,
-                  h: '100vh',
-                  mx: 8,
-                  pointerEvents: 'none',
-                }}
-              >
-                <NextPrevImageButtons />
-              </Box>
-            )}
-
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 4,
-              }}
-            >
-              <CurrentImageButtons />
-            </Box>
-          </Grid>
-          <ImageGallery />
-        </Flex>
-      </Box>
-    </TransformWrapper>
+          </TransformWrapper>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

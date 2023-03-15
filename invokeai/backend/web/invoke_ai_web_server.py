@@ -29,7 +29,6 @@ from ..image_util import PngWriter, retrieve_metadata
 from ...frontend.merge.merge_diffusers import merge_diffusion_models
 from ..prompting import (
     get_prompt_structure,
-    get_tokenizer,
     get_tokens_for_prompt_object,
 )
 from ..stable_diffusion import PipelineIntermediateState
@@ -1274,7 +1273,7 @@ class InvokeAIWebServer:
                     None
                     if type(parsed_prompt) is Blend
                     else get_tokens_for_prompt_object(
-                        get_tokenizer(self.generate.model), parsed_prompt
+                        self.generate.model.tokenizer, parsed_prompt
                     )
                 )
                 attention_maps_image_base64_url = (

@@ -9,6 +9,7 @@ from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
 
 import einops
 import PIL.Image
+from accelerate.utils import set_seed
 import psutil
 import torch
 import torchvision.transforms as T
@@ -52,16 +53,6 @@ class PipelineIntermediateState:
     latents: torch.Tensor
     predicted_original: Optional[torch.Tensor] = None
     attention_map_saver: Optional[AttentionMapSaver] = None
-
-
-# copied from configs/stable-diffusion/v1-inference.yaml
-_default_personalization_config_params = dict(
-    placeholder_strings=["*"],
-    initializer_wods=["sculpture"],
-    per_image_tokens=False,
-    num_vectors_per_token=1,
-    progressive_words=False,
-)
 
 
 @dataclass
@@ -175,7 +166,7 @@ def image_resized_to_grid_as_tensor(
     :param normalize: scale the range to [-1, 1] instead of [0, 1]
     :param multiple_of: resize the input so both dimensions are a multiple of this
     """
-    w, h = trim_to_multiple_of(*image.size)
+    w, h = trim_to_multiple_of(*image.size, multiple_of=multiple_of)
     transformation = T.Compose(
         [
             T.Resize((h, w), T.InterpolationMode.LANCZOS),
@@ -290,10 +281,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
-            Classification module that estimates whether generated images could be considered offsensive or harmful.
+            Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/CompVis/stable-diffusion-v1-4) for details.
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
@@ -436,11 +427,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         Ready this pipeline's models.
 
-        i.e. pre-load them to the GPU if appropriate.
+        i.e. preload them to the GPU if appropriate.
         """
         self._model_group.ready()
 
-    def to(self, torch_device: Optional[Union[str, torch.device]] = None):
+    def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
         if torch_device is None:
             return self
@@ -704,7 +695,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device=self._model_group.device_for(self.unet),
             dtype=self.unet.dtype,
         )
-        noise = noise_func(initial_latents, seed)
+        if seed is not None:
+            set_seed(seed)
+        noise = noise_func(initial_latents)
 
         return self.img2img_from_latents_and_embeddings(
             initial_latents,
@@ -806,7 +799,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         init_image_latents = self.non_noised_latents_from_image(
             init_image, device=device, dtype=latents_dtype
         )
-        noise = noise_func(init_image_latents, seed)
+        if seed is not None:
+            set_seed(seed)
+        noise = noise_func(init_image_latents)
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)
@@ -918,20 +913,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
     @property
-    def cond_stage_model(self):
-        return self.embeddings_provider
-
-    @torch.inference_mode()
-    def _tokenize(self, prompt: Union[str, List[str]]):
-        return self.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="pt",
-        )
-
-    @property
     def channels(self) -> int:
         """Compatible with DiffusionWrapper"""
         return self.unet.in_channels
@@ -942,11 +923,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         return super().decode_latents(latents)
 
     def debug_latents(self, latents, msg):
+        from invokeai.backend.image_util import debug_image
         with torch.inference_mode():
-            from ldm.util import debug_image
-
             decoded = self.numpy_to_pil(self.decode_latents(latents))
-            for i, img in enumerate(decoded):
-                debug_image(
-                    img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True
-                )
+        for i, img in enumerate(decoded):
+            debug_image(
+                img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True
+            )

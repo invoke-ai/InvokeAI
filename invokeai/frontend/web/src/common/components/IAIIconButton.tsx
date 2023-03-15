@@ -5,15 +5,17 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
+import { memo } from 'react';
 
 export type IAIIconButtonProps = IconButtonProps & {
+  role?: string;
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
   isChecked?: boolean;
 };
 
 const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
-  const { tooltip = '', tooltipProps, isChecked, ...rest } = props;
+  const { role, tooltip = '', tooltipProps, isChecked, ...rest } = props;
 
   return (
     <Tooltip
@@ -26,6 +28,7 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
     >
       <IconButton
         ref={forwardedRef}
+        role={role}
         aria-checked={isChecked !== undefined ? isChecked : undefined}
         {...rest}
       />
@@ -33,4 +36,5 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
   );
 });
 
-export default IAIIconButton;
+IAIIconButton.displayName = 'IAIIconButton';
+export default memo(IAIIconButton);
