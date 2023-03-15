@@ -12,6 +12,7 @@ import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
+import apiReducer from 'services/apiSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 
@@ -64,6 +65,10 @@ const lightboxBlacklist = ['isLightboxOpen'].map(
   (blacklistItem) => `lightbox.${blacklistItem}`
 );
 
+const apiBlacklist = ['sessionId', 'status', 'progress', 'progressImage'].map(
+  (blacklistItem) => `api.${blacklistItem}`
+);
+
 const rootReducer = combineReducers({
   generation: generationReducer,
   postprocessing: postprocessingReducer,
@@ -72,6 +77,7 @@ const rootReducer = combineReducers({
   canvas: canvasReducer,
   ui: uiReducer,
   lightbox: lightboxReducer,
+  api: apiReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -83,6 +89,7 @@ const rootPersistConfig = getPersistConfig({
     ...systemBlacklist,
     ...galleryBlacklist,
     ...lightboxBlacklist,
+    ...apiBlacklist,
   ],
   debounce: 300,
 });
