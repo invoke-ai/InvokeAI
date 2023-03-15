@@ -13,15 +13,22 @@ export class ImagesService {
   /**
    * Get Image
    * Gets a result
-   * @param imageType The type of image to get
-   * @param imageName The name of the image to get
    * @returns any Successful Response
    * @throws ApiError
    */
-  public static getImage(
+  public static getImage({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of image to get
+     */
     imageType: ImageType,
+    /**
+     * The name of the image to get
+     */
     imageName: string,
-  ): CancelablePromise<any> {
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/images/{image_type}/{image_name}',
@@ -37,13 +44,14 @@ export class ImagesService {
 
   /**
    * Upload Image
-   * @param formData
    * @returns any Successful Response
    * @throws ApiError
    */
-  public static uploadImage(
+  public static uploadImage({
+    formData,
+  }: {
     formData: Body_upload_image,
-  ): CancelablePromise<any> {
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/images/uploads/',
