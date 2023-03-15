@@ -71,10 +71,10 @@ dependencies = [
   "scikit-image>=0.19",
   "send2trash",
   "test-tube>=0.7.5",
-  "torch>=1.13.1",
+  "torch~=2.0",
   "torchvision>=0.14.1",
   "torchmetrics",
-  "transformers~=4.26",
+  "transformers~=4.27",
   "uvicorn[standard]==0.20.0",
   "windows-curses; sys_platform=='win32'",
 ]
@@ -90,10 +90,6 @@ dependencies = [
   "pudb",
 ]
 "test" = ["pytest>6.0.0", "pytest-cov"]
-"xformers" = [
-	   "xformers~=0.0.16; sys_platform!='darwin'",
-	   "triton; sys_platform=='linux'",
-]
 
 [project.scripts]
 

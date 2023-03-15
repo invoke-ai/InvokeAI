@@ -531,7 +531,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         run_id: str = None,
         additional_guidance: List[Callable] = None,
     ):
-        self._adjust_memory_efficient_attention(latents)
+        # FIXME: do we still use any slicing now that PyTorch 2.0 has scaled dot-product attention on all platforms?
+        #   self._adjust_memory_efficient_attention(latents)
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
         if additional_guidance is None:
