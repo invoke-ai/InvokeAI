@@ -1,4 +1,6 @@
 import React, { PropsWithChildren } from 'react';
+import { IAIPopoverProps } from '../web/src/common/components/IAIPopover';
+import { IAIIconButtonProps } from '../web/src/common/components/IAIIconButton';
 
 export {};
 
@@ -50,9 +52,17 @@ declare module '@invoke-ai/invoke-ai-ui' {
   declare class InvokeAiLogoComponent extends React.Component<InvokeAILogoComponentProps> {
     public constructor(props: InvokeAILogoComponentProps);
   }
+
+  declare class IAIPopover extends React.Component<IAIPopoverProps> {
+    public constructor(props: IAIPopoverProps);
+  }
+
+  declare class IAIIconButton extends React.Component<IAIIconButtonProps> {
+    public constructor(props: IAIIconButtonProps);
+  }
 }
 
 declare function Invoke(props: PropsWithChildren): JSX.Element;
 
-export { ThemeChanger, InvokeAiLogoComponent };
+export { ThemeChanger, InvokeAiLogoComponent, IAIPopover, IAIIconButton };
 export = Invoke;
