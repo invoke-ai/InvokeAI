@@ -10,7 +10,6 @@ from .generator import (
     Img2Img,
     Inpaint
 )
-from .stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from .model_management import ModelManager
 from .safety_checker import SafetyChecker
 from .args import Args
