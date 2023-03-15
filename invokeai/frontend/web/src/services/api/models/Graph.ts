@@ -6,7 +6,7 @@ import type { BlurInvocation } from './BlurInvocation';
 import type { CollectInvocation } from './CollectInvocation';
 import type { CropImageInvocation } from './CropImageInvocation';
 import type { CvInpaintInvocation } from './CvInpaintInvocation';
-import type { EdgeConnection } from './EdgeConnection';
+import type { Edge } from './Edge';
 import type { GraphInvocation } from './GraphInvocation';
 import type { ImageToImageInvocation } from './ImageToImageInvocation';
 import type { InpaintInvocation } from './InpaintInvocation';
@@ -33,6 +33,6 @@ export type Graph = {
   /**
    * The connections between nodes and their fields in this graph
    */
-  edges?: Array<[EdgeConnection, EdgeConnection]>;
+  edges?: Array<Edge>;
 };
 
