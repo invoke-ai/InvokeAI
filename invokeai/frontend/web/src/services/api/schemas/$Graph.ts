@@ -51,11 +51,7 @@ export const $Graph = {
     edges: {
       type: 'array',
       contains: {
-        type: 'array',
-        contains: {
-          properties: {
-          },
-        },
+        type: 'Edge',
       },
     },
   },
