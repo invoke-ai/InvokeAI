@@ -60,9 +60,19 @@ declare module '@invoke-ai/invoke-ai-ui' {
   declare class IAIIconButton extends React.Component<IAIIconButtonProps> {
     public constructor(props: IAIIconButtonProps);
   }
+
+  declare class SettingsModal extends React.Component<SettingsModalProps> {
+    public constructor(props: SettingsModalProps);
+  }
 }
 
 declare function Invoke(props: PropsWithChildren): JSX.Element;
 
-export { ThemeChanger, InvokeAiLogoComponent, IAIPopover, IAIIconButton };
+export {
+  ThemeChanger,
+  InvokeAiLogoComponent,
+  IAIPopover,
+  IAIIconButton,
+  SettingsModal,
+};
 export = Invoke;
