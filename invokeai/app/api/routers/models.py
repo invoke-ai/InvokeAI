@@ -2,7 +2,11 @@
 
 from typing import Annotated, Any, List, Literal, Optional, Union
 
+<<<<<<< HEAD
 from fastapi.routing import APIRouter, HTTPException
+=======
+from fastapi.routing import APIRouter
+>>>>>>> 5f92f290 ([api] Add models router and list model API.)
 from pydantic import BaseModel, Field, parse_obj_as
 
 from ..dependencies import ApiDependencies
@@ -15,9 +19,17 @@ class VaeRepo(BaseModel):
     path: Optional[str] = Field(description="The path to the VAE")
     subfolder: Optional[str] = Field(description="The subfolder to use for this VAE")
 
+<<<<<<< HEAD
 class ModelInfo(BaseModel):
     description: Optional[str] = Field(description="A description of the model")
     
+=======
+
+class ModelInfo(BaseModel):
+    description: Optional[str] = Field(description="A description of the model")
+    
+
+>>>>>>> 5f92f290 ([api] Add models router and list model API.)
 class CkptModelInfo(ModelInfo):
     format: Literal['ckpt'] = 'ckpt'
 
@@ -27,6 +39,10 @@ class CkptModelInfo(ModelInfo):
     width: Optional[int] = Field(description="The width of the model")
     height: Optional[int] = Field(description="The height of the model")
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5f92f290 ([api] Add models router and list model API.)
 class DiffusersModelInfo(ModelInfo):
     format: Literal['diffusers'] = 'diffusers'
 
@@ -34,6 +50,7 @@ class DiffusersModelInfo(ModelInfo):
     repo_id: Optional[str] = Field(description="The repo ID to use for this model")
     path: Optional[str] = Field(description="The path to the model")
 
+<<<<<<< HEAD
 class CreateModelRequest (BaseModel):
     name: str = Field(description="The name of the model")
     info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
@@ -42,10 +59,17 @@ class CreateModelResponse (BaseModel):
     name: str = Field(description="The name of the new model")
     info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
     status: str = Field(description="The status of the API response")
+=======
+>>>>>>> 5f92f290 ([api] Add models router and list model API.)
 
 class ModelsList(BaseModel):
     models: dict[str, Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")]]
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 5f92f290 ([api] Add models router and list model API.)
 @models_router.get(
     "/",
     operation_id="list_models",
@@ -57,6 +81,7 @@ async def list_models() -> ModelsList:
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
 
+<<<<<<< HEAD
 #Update Model
 @models_router.post(
     "/",
@@ -112,6 +137,8 @@ async def delete_model(model_name: str) -> None:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+=======
+>>>>>>> 5f92f290 ([api] Add models router and list model API.)
         # @socketio.on("requestSystemConfig")
         # def handle_request_capabilities():
         #     print(">> System config requested")
