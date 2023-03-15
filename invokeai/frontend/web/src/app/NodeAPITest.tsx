@@ -45,10 +45,10 @@ const NodeAPITest = () => {
         },
       },
       edges: [
-        [
-          { node_id: 'a', field: 'image' },
-          { node_id: 'b', field: 'image' },
-        ],
+        {
+          source: { node_id: 'a', field: 'image' },
+          destination: { node_id: 'b', field: 'image' },
+        },
       ],
     });
 

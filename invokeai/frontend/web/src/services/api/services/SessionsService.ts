@@ -5,6 +5,7 @@ import type { BlurInvocation } from '../models/BlurInvocation';
 import type { CollectInvocation } from '../models/CollectInvocation';
 import type { CropImageInvocation } from '../models/CropImageInvocation';
 import type { CvInpaintInvocation } from '../models/CvInpaintInvocation';
+import type { Edge } from '../models/Edge';
 import type { Graph } from '../models/Graph';
 import type { GraphExecutionState } from '../models/GraphExecutionState';
 import type { GraphInvocation } from '../models/GraphInvocation';
@@ -197,7 +198,7 @@ export class SessionsService {
    */
   public static addEdge(
     sessionId: string,
-    requestBody: Array<any>,
+    requestBody: Edge,
   ): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'POST',
