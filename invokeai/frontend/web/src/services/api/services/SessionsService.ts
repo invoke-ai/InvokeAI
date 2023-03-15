@@ -32,17 +32,27 @@ export class SessionsService {
   /**
    * List Sessions
    * Gets a list of sessions, optionally searching
-   * @param page The page of results to get
-   * @param perPage The number of results per page
-   * @param query The query string to search for
    * @returns PaginatedResults_GraphExecutionState_ Successful Response
    * @throws ApiError
    */
-  public static listSessions(
+  public static listSessions({
+    page,
+    perPage = 10,
+    query = '',
+  }: {
+    /**
+     * The page of results to get
+     */
     page?: number,
-    perPage: number = 10,
-    query: string = '',
-  ): CancelablePromise<PaginatedResults_GraphExecutionState_> {
+    /**
+     * The number of results per page
+     */
+    perPage?: number,
+    /**
+     * The query string to search for
+     */
+    query?: string,
+  }): CancelablePromise<PaginatedResults_GraphExecutionState_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/sessions/',
@@ -60,13 +70,14 @@ export class SessionsService {
   /**
    * Create Session
    * Creates a new session, optionally initializing it with an invocation graph
-   * @param requestBody
    * @returns GraphExecutionState Successful Response
    * @throws ApiError
    */
-  public static createSession(
+  public static createSession({
+    requestBody,
+  }: {
     requestBody?: Graph,
-  ): CancelablePromise<GraphExecutionState> {
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/sessions/',
@@ -82,13 +93,17 @@ export class SessionsService {
   /**
    * Get Session
    * Gets a session
-   * @param sessionId The id of the session to get
    * @returns GraphExecutionState Successful Response
    * @throws ApiError
    */
-  public static getSession(
+  public static getSession({
+    sessionId,
+  }: {
+    /**
+     * The id of the session to get
+     */
     sessionId: string,
-  ): CancelablePromise<GraphExecutionState> {
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/sessions/{session_id}',
@@ -105,15 +120,19 @@ export class SessionsService {
   /**
    * Add Node
    * Adds a node to the graph
-   * @param sessionId The id of the session
-   * @param requestBody
    * @returns string Successful Response
    * @throws ApiError
    */
-  public static addNode(
+  public static addNode({
+    sessionId,
+    requestBody,
+  }: {
+    /**
+     * The id of the session
+     */
     sessionId: string,
     requestBody: (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | CvInpaintInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | ImageToImageInvocation | InpaintInvocation),
-  ): CancelablePromise<string> {
+  }): CancelablePromise<string> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/sessions/{session_id}/nodes',
@@ -133,17 +152,24 @@ export class SessionsService {
   /**
    * Update Node
    * Updates a node in the graph and removes all linked edges
-   * @param sessionId The id of the session
-   * @param nodePath The path to the node in the graph
-   * @param requestBody
    * @returns GraphExecutionState Successful Response
    * @throws ApiError
    */
-  public static updateNode(
+  public static updateNode({
+    sessionId,
+    nodePath,
+    requestBody,
+  }: {
+    /**
+     * The id of the session
+     */
     sessionId: string,
+    /**
+     * The path to the node in the graph
+     */
     nodePath: string,
     requestBody: (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | CvInpaintInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | ImageToImageInvocation | InpaintInvocation),
-  ): CancelablePromise<GraphExecutionState> {
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'PUT',
       url: '/api/v1/sessions/{session_id}/nodes/{node_path}',
@@ -164,15 +190,22 @@ export class SessionsService {
   /**
    * Delete Node
    * Deletes a node in the graph and removes all linked edges
-   * @param sessionId The id of the session
-   * @param nodePath The path to the node to delete
    * @returns GraphExecutionState Successful Response
    * @throws ApiError
    */
-  public static deleteNode(
+  public static deleteNode({
+    sessionId,
+    nodePath,
+  }: {
+    /**
+     * The id of the session
+     */
     sessionId: string,
+    /**
+     * The path to the node to delete
+     */
     nodePath: string,
-  ): CancelablePromise<GraphExecutionState> {
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/sessions/{session_id}/nodes/{node_path}',
@@ -191,15 +224,19 @@ export class SessionsService {
   /**
    * Add Edge
    * Adds an edge to the graph
-   * @param sessionId The id of the session
-   * @param requestBody
    * @returns GraphExecutionState Successful Response
    * @throws ApiError
    */
-  public static addEdge(
+  public static addEdge({
+    sessionId,
+    requestBody,
+  }: {
+    /**
+     * The id of the session
+     */
     sessionId: string,
     requestBody: Edge,
-  ): CancelablePromise<GraphExecutionState> {
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/sessions/{session_id}/edges',
@@ -219,21 +256,37 @@ export class SessionsService {
   /**
    * Delete Edge
    * Deletes an edge from the graph
-   * @param sessionId The id of the session
-   * @param fromNodeId The id of the node the edge is coming from
-   * @param fromField The field of the node the edge is coming from
-   * @param toNodeId The id of the node the edge is going to
-   * @param toField The field of the node the edge is going to
    * @returns GraphExecutionState Successful Response
    * @throws ApiError
    */
-  public static deleteEdge(
+  public static deleteEdge({
+    sessionId,
+    fromNodeId,
+    fromField,
+    toNodeId,
+    toField,
+  }: {
+    /**
+     * The id of the session
+     */
     sessionId: string,
+    /**
+     * The id of the node the edge is coming from
+     */
     fromNodeId: string,
+    /**
+     * The field of the node the edge is coming from
+     */
     fromField: string,
+    /**
+     * The id of the node the edge is going to
+     */
     toNodeId: string,
+    /**
+     * The field of the node the edge is going to
+     */
     toField: string,
-  ): CancelablePromise<GraphExecutionState> {
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/sessions/{session_id}/edges/{from_node_id}/{from_field}/{to_node_id}/{to_field}',
@@ -255,15 +308,22 @@ export class SessionsService {
   /**
    * Invoke Session
    * Invokes a session
-   * @param sessionId The id of the session to invoke
-   * @param all Whether or not to invoke all remaining invocations
    * @returns any Successful Response
    * @throws ApiError
    */
-  public static invokeSession(
+  public static invokeSession({
+    sessionId,
+    all = false,
+  }: {
+    /**
+     * The id of the session to invoke
+     */
     sessionId: string,
-    all: boolean = false,
-  ): CancelablePromise<any> {
+    /**
+     * Whether or not to invoke all remaining invocations
+     */
+    all?: boolean,
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'PUT',
       url: '/api/v1/sessions/{session_id}/invoke',

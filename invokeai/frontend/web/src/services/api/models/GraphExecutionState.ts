@@ -17,7 +17,7 @@ export type GraphExecutionState = {
   /**
    * The id of the execution state
    */
-  id?: string;
+  id: string;
   /**
    * The graph being executed
    */
@@ -25,30 +25,30 @@ export type GraphExecutionState = {
   /**
    * The expanded graph of activated and executed nodes
    */
-  execution_graph?: Graph;
+  execution_graph: Graph;
   /**
    * The set of node ids that have been executed
    */
-  executed?: Array<string>;
+  executed: Array<string>;
   /**
    * The list of node ids that have been executed, in order of execution
    */
-  executed_history?: Array<string>;
+  executed_history: Array<string>;
   /**
    * The results of node executions
    */
-  results?: Record<string, (ImageOutput | MaskOutput | PromptOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+  results: Record<string, (ImageOutput | MaskOutput | PromptOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
   /**
    * Errors raised when executing nodes
    */
-  errors?: Record<string, string>;
+  errors: Record<string, string>;
   /**
    * The map of prepared nodes to original graph nodes
    */
-  prepared_source_mapping?: Record<string, string>;
+  prepared_source_mapping: Record<string, string>;
   /**
    * The map of original graph nodes to prepared nodes
    */
-  source_prepared_mapping?: Record<string, Array<string>>;
+  source_prepared_mapping: Record<string, Array<string>>;
 };
 
