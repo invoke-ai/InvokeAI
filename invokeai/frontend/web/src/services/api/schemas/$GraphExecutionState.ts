@@ -7,6 +7,7 @@ export const $GraphExecutionState = {
     id: {
       type: 'string',
       description: `The id of the execution state`,
+      isRequired: true,
     },
     graph: {
       type: 'all-of',
@@ -22,18 +23,21 @@ export const $GraphExecutionState = {
       contains: [{
         type: 'Graph',
       }],
+      isRequired: true,
     },
     executed: {
       type: 'array',
       contains: {
         type: 'string',
       },
+      isRequired: true,
     },
     executed_history: {
       type: 'array',
       contains: {
         type: 'string',
       },
+      isRequired: true,
     },
     results: {
       type: 'dictionary',
@@ -53,18 +57,21 @@ export const $GraphExecutionState = {
           type: 'CollectInvocationOutput',
         }],
       },
+      isRequired: true,
     },
     errors: {
       type: 'dictionary',
       contains: {
         type: 'string',
       },
+      isRequired: true,
     },
     prepared_source_mapping: {
       type: 'dictionary',
       contains: {
         type: 'string',
       },
+      isRequired: true,
     },
     source_prepared_mapping: {
       type: 'dictionary',
@@ -74,6 +81,7 @@ export const $GraphExecutionState = {
           type: 'string',
         },
       },
+      isRequired: true,
     },
   },
 } as const;
