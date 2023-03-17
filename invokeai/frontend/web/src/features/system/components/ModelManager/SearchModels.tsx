@@ -91,7 +91,9 @@ function SearchModelEntry({
             onChange={foundModelsChangeHandler}
           ></IAICheckbox>
           {existingModels.includes(model.location) && (
-            <Badge colorScheme="accent">{t('modelManager.modelExists')}</Badge>
+            <Badge colorScheme="accent" paddingX={2} paddingY={1}>
+              {t('modelManager.modelExists')}
+            </Badge>
           )}
         </Flex>
         <Text fontStyle="italic" variant="subtext">
@@ -215,10 +217,10 @@ export default function SearchModels() {
     }
 
     return (
-      <>
+      <Flex flexDirection="column" rowGap={4}>
         {newFoundModels}
         {shouldShowExistingModelsInSearch && existingFoundModels}
-      </>
+      </Flex>
     );
   };
 
