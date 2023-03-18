@@ -341,4 +341,30 @@ export class SessionsService {
     });
   }
 
+  /**
+   * Cancel Session Invoke
+   * Invokes a session
+   * @returns any Successful Response
+   * @throws ApiError
+   */
+  public static cancelSessionInvoke({
+    sessionId,
+  }: {
+    /**
+     * The id of the session to cancel
+     */
+    sessionId: string,
+  }): CancelablePromise<any> {
+    return __request(OpenAPI, {
+      method: 'DELETE',
+      url: '/api/v1/sessions/{session_id}/invoke',
+      path: {
+        'session_id': sessionId,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
 }
