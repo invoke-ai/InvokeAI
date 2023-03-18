@@ -9,7 +9,11 @@ import {
 import { useEffect } from 'react';
 import { STATUS, ProgressImage } from 'services/apiSliceTypes';
 import { getImage } from 'services/thunks/image';
-import { createSession, invokeSession } from 'services/thunks/session';
+import {
+  cancelProcessing,
+  createSession,
+  invokeSession,
+} from 'services/thunks/session';
 import { io } from 'socket.io-client';
 import { useAppDispatch, useAppSelector } from './storeHooks';
 import { RootState } from './store';
@@ -42,17 +46,34 @@ const NodeAPITest = () => {
               id: 'a',
               type: 'txt2img',
               prompt: 'pizza',
-              steps: 10,
+              steps: 50,
+              seed: 123,
             },
             b: {
               id: 'b',
-              type: 'show_image',
+              type: 'img2img',
+              prompt: 'dog',
+              steps: 50,
+              seed: 123,
+              strength: 0.9,
+            },
+            c: {
+              id: 'c',
+              type: 'img2img',
+              prompt: 'cat',
+              steps: 50,
+              seed: 123,
+              strength: 0.9,
             },
           },
           edges: [
             {
               source: { node_id: 'a', field: 'image' },
               destination: { node_id: 'b', field: 'image' },
+            },
+            {
+              source: { node_id: 'b', field: 'image' },
+              destination: { node_id: 'c', field: 'image' },
             },
           ],
         },
@@ -62,6 +83,10 @@ const NodeAPITest = () => {
 
   const handleInvokeSession = () => {
     dispatch(invokeSession());
+  };
+
+  const handleCancelProcessing = () => {
+    dispatch(cancelProcessing());
   };
 
   useEffect(() => {
@@ -97,7 +122,7 @@ const NodeAPITest = () => {
       // in the future we will want to continue building the graph and executing etc
       console.log('invocation_complete', data);
       dispatch(setProgress(null));
-      dispatch(setSessionId(null));
+      // dispatch(setSessionId(null));
       dispatch(setStatus(STATUS.idle));
 
       // think this gets a blob...
@@ -107,12 +132,12 @@ const NodeAPITest = () => {
       //     imageName: data.result.image.image_name,
       //   })
       // );
-      socket.emit('unsubscribe', { session: sessionId });
-      console.log('unsubscribe', { session: sessionId });
     });
 
     // not sure when we get this?
     socket.on('session_complete', (data) => {
+      // socket.emit('unsubscribe', { session: sessionId });
+      // console.log('unsubscribe', { session: sessionId });
       // console.log('session_complete', data);
     });
 
@@ -136,16 +161,23 @@ const NodeAPITest = () => {
     >
       <Text>Session: {sessionId ? sessionId : '...'}</Text>
       <IAIButton
+        onClick={handleCancelProcessing}
+        // isDisabled={!sessionId}
+        colorScheme="error"
+      >
+        Cancel Processing
+      </IAIButton>
+      <IAIButton
         onClick={handleCreateSession}
-        isDisabled={status === STATUS.busy || Boolean(sessionId)}
+        // isDisabled={status === STATUS.busy || Boolean(sessionId)}
         colorScheme="accent"
       >
         Create Session
       </IAIButton>
       <IAIButton
         onClick={handleInvokeSession}
-        isDisabled={status === STATUS.busy}
-        isLoading={status === STATUS.busy}
+        // isDisabled={status === STATUS.busy}
+        // isLoading={status === STATUS.busy}
         loadingText={`Invoking ${
           progress === null ? '...' : `${Math.round(progress * 100)}%`
         }`}
