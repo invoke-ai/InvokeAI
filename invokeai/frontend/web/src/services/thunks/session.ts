@@ -14,26 +14,6 @@ export const createSession = createAppAsyncThunk(
   async (arg: CreateSessionArg, { getState, dispatch, ...moreThunkStuff }) => {
     const response = await SessionsService.createSession(arg);
     return response;
-  },
-  {
-    // if this returns false, the api call is skipped
-    // we can guard in many places, and maybe this isn't right for us,
-    // but just trying it here
-    condition: (arg, { getState }) => {
-      const {
-        api: { status, sessionId },
-      } = getState();
-
-      // don't create session if we are processing already
-      if (status === STATUS.busy) {
-        return false;
-      }
-
-      // don't create session if we have a sessionId
-      if (sessionId) {
-        return false;
-      }
-    },
   }
 );
 
@@ -61,22 +41,33 @@ export const invokeSession = createAppAsyncThunk(
     });
 
     return response;
-  },
-  {
-    condition: (arg, { getState }) => {
-      const {
-        api: { status, sessionId },
-      } = getState();
+  }
+);
+/**
+ * invokeSession
+ */
 
-      // don't invoke if we are processing already
-      if (status === STATUS.busy) {
-        return false;
-      }
+export const cancelProcessing = createAppAsyncThunk(
+  'api/cancelProcessing',
+  async (_arg, { getState }) => {
+    console.log('before canceling');
+    const {
+      api: { sessionId },
+    } = getState();
 
-      // don't invoke if we don't have a sessionId
-      if (!sessionId) {
-        return false;
-      }
-    },
+    // i'd really like for the typing on the condition callback below to tell this
+    // function here that sessionId will never be empty, but guess we do not get
+    // that luxury
+    if (!sessionId) {
+      return;
+    }
+
+    console.log('canceling');
+
+    const response = await SessionsService.cancelSessionInvoke({
+      sessionId,
+    });
+
+    return response;
   }
 );
