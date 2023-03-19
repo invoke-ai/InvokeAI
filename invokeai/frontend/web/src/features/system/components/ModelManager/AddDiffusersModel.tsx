@@ -17,29 +17,8 @@ import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
 import type { RootState } from 'app/store';
-import type { ReactElement } from 'react';
 import IAIForm from 'common/components/IAIForm';
-
-function FormItemWrapper({
-  children,
-}: {
-  children: ReactElement | ReactElement[];
-}) {
-  return (
-    <Flex
-      sx={{
-        flexDirection: 'column',
-        padding: 4,
-        rowGap: 4,
-        borderRadius: 'base',
-        width: 'full',
-        bg: 'base.900',
-      }}
-    >
-      {children}
-    </Flex>
-  );
-}
+import { IAIFormItemWrapper } from 'common/components/IAIForms/IAIFormItemWrapper';
 
 export default function AddDiffusersModel() {
   const dispatch = useAppDispatch();
@@ -95,7 +74,7 @@ export default function AddDiffusersModel() {
         {({ handleSubmit, errors, touched }) => (
           <IAIForm onSubmit={handleSubmit}>
             <VStack rowGap={2}>
-              <FormItemWrapper>
+              <IAIFormItemWrapper>
                 {/* Name */}
                 <FormControl
                   isInvalid={!!errors.name && touched.name}
@@ -123,9 +102,9 @@ export default function AddDiffusersModel() {
                     )}
                   </VStack>
                 </FormControl>
-              </FormItemWrapper>
+              </IAIFormItemWrapper>
 
-              <FormItemWrapper>
+              <IAIFormItemWrapper>
                 {/* Description */}
                 <FormControl
                   isInvalid={!!errors.description && touched.description}
@@ -152,9 +131,9 @@ export default function AddDiffusersModel() {
                     )}
                   </VStack>
                 </FormControl>
-              </FormItemWrapper>
+              </IAIFormItemWrapper>
 
-              <FormItemWrapper>
+              <IAIFormItemWrapper>
                 <Text fontWeight="bold" fontSize="sm">
                   {t('modelManager.formMessageDiffusersModelLocation')}
                 </Text>
@@ -213,9 +192,9 @@ export default function AddDiffusersModel() {
                     )}
                   </VStack>
                 </FormControl>
-              </FormItemWrapper>
+              </IAIFormItemWrapper>
 
-              <FormItemWrapper>
+              <IAIFormItemWrapper>
                 {/* VAE Path */}
                 <Text fontWeight="bold">
                   {t('modelManager.formMessageDiffusersVAELocation')}
@@ -277,7 +256,7 @@ export default function AddDiffusersModel() {
                     )}
                   </VStack>
                 </FormControl>
-              </FormItemWrapper>
+              </IAIFormItemWrapper>
 
               <IAIButton type="submit" isLoading={isProcessing}>
                 {t('modelManager.addModel')}

@@ -333,6 +333,7 @@
         "addNewModel": "Add New Model",
         "addCheckpointModel": "Add Checkpoint / Safetensor Model",
         "addDiffuserModel": "Add Diffusers",
+        "scanForModels": "Scan For Models",
         "addManually": "Add Manually",
         "manual": "Manual",
         "name": "Name",
