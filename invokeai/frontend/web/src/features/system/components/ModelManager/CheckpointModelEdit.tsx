@@ -28,6 +28,7 @@ import { isEqual, pickBy } from 'lodash';
 import ModelConvert from './ModelConvert';
 import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
 import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
+import IAIForm from 'common/components/IAIForm';
 
 const selector = createSelector(
   [systemSelector],
@@ -120,7 +121,7 @@ export default function CheckpointModelEdit() {
           onSubmit={editModelFormSubmitHandler}
         >
           {({ handleSubmit, errors, touched }) => (
-            <form onSubmit={handleSubmit}>
+            <IAIForm onSubmit={handleSubmit}>
               <VStack rowGap={2} alignItems="start">
                 {/* Description */}
                 <FormControl
@@ -317,7 +318,7 @@ export default function CheckpointModelEdit() {
                   {t('modelManager.updateModel')}
                 </IAIButton>
               </VStack>
-            </form>
+            </IAIForm>
           )}
         </Formik>
       </Flex>
