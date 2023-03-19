@@ -219,7 +219,6 @@ const IAICanvasToolChooserOptions = () => {
         onClick={handleSelectColorPickerTool}
       />
       <IAIPopover
-        trigger="hover"
         triggerComponent={
           <IAIIconButton
             aria-label={t('unifiedCanvas.brushOptions')}
