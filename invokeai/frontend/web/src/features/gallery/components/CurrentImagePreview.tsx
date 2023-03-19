@@ -7,6 +7,7 @@ import { isEqual } from 'lodash';
 import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
 import { gallerySelector } from '../store/gallerySelectors';
+import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 
@@ -48,6 +49,7 @@ export default function CurrentImagePreview() {
           src={imageToDisplay.url}
           width={imageToDisplay.width}
           height={imageToDisplay.height}
+          fallback={!isIntermediate ? <CurrentImageFallback /> : undefined}
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',
