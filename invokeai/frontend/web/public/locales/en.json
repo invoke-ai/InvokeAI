@@ -64,6 +64,8 @@
         "trainingDesc2": "InvokeAI already supports training custom embeddings using Textual Inversion using the main script.",
         "upload": "Upload",
         "close": "Close",
+        "cancel": "Cancel",
+        "accept": "Accept",
         "load": "Load",
         "back": "Back",
         "statusConnected": "Connected",
