@@ -25,10 +25,9 @@ import { useTranslation } from 'react-i18next';
 
 import type { InvokeModelConfigProps } from 'app/invokeai';
 import type { RootState } from 'app/store';
-import IAIIconButton from 'common/components/IAIIconButton';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import type { FieldInputProps, FormikProps } from 'formik';
-import { BiArrowBack } from 'react-icons/bi';
+import IAIForm from 'common/components/IAIForm';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
@@ -72,19 +71,6 @@ export default function AddCheckpointModel() {
 
   return (
     <VStack gap={2} alignItems="flex-start">
-      <IAIIconButton
-        aria-label={t('common.back')}
-        tooltip={t('common.back')}
-        onClick={() => dispatch(setAddNewModelUIOption(null))}
-        width="max-content"
-        position="absolute"
-        zIndex={1}
-        size="sm"
-        insetInlineEnd={12}
-        top={3}
-        icon={<BiArrowBack />}
-      />
-
       <SearchModels />
       <IAICheckbox
         label={t('modelManager.addManually')}
@@ -98,7 +84,7 @@ export default function AddCheckpointModel() {
           onSubmit={addModelFormSubmitHandler}
         >
           {({ handleSubmit, errors, touched }) => (
-            <form onSubmit={handleSubmit}>
+            <IAIForm onSubmit={handleSubmit} sx={{ w: 'full' }}>
               <VStack rowGap={2}>
                 <Text fontSize={20} fontWeight="bold" alignSelf="start">
                   {t('modelManager.manual')}
@@ -118,7 +104,7 @@ export default function AddCheckpointModel() {
                       name="name"
                       type="text"
                       validate={baseValidation}
-                      width="2xl"
+                      width="full"
                     />
                     {!!errors.name && touched.name ? (
                       <FormErrorMessage>{errors.name}</FormErrorMessage>
@@ -144,7 +130,7 @@ export default function AddCheckpointModel() {
                       id="description"
                       name="description"
                       type="text"
-                      width="2xl"
+                      width="full"
                     />
                     {!!errors.description && touched.description ? (
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
@@ -170,7 +156,7 @@ export default function AddCheckpointModel() {
                       id="config"
                       name="config"
                       type="text"
-                      width="2xl"
+                      width="full"
                     />
                     {!!errors.config && touched.config ? (
                       <FormErrorMessage>{errors.config}</FormErrorMessage>
@@ -196,7 +182,7 @@ export default function AddCheckpointModel() {
                       id="weights"
                       name="weights"
                       type="text"
-                      width="2xl"
+                      width="full"
                     />
                     {!!errors.weights && touched.weights ? (
                       <FormErrorMessage>{errors.weights}</FormErrorMessage>
@@ -219,7 +205,7 @@ export default function AddCheckpointModel() {
                       id="vae"
                       name="vae"
                       type="text"
-                      width="2xl"
+                      width="full"
                     />
                     {!!errors.vae && touched.vae ? (
                       <FormErrorMessage>{errors.vae}</FormErrorMessage>
@@ -231,7 +217,7 @@ export default function AddCheckpointModel() {
                   </VStack>
                 </FormControl>
 
-                <HStack width="100%">
+                <HStack width="100%" gap={8}>
                   {/* Width */}
                   <FormControl isInvalid={!!errors.width && touched.width}>
                     <FormLabel htmlFor="width" fontSize="sm">
@@ -252,7 +238,6 @@ export default function AddCheckpointModel() {
                             min={MIN_MODEL_SIZE}
                             max={MAX_MODEL_SIZE}
                             step={64}
-                            width="90%"
                             value={form.values.width}
                             onChange={(value) =>
                               form.setFieldValue(field.name, Number(value))
@@ -290,7 +275,6 @@ export default function AddCheckpointModel() {
                             name="height"
                             min={MIN_MODEL_SIZE}
                             max={MAX_MODEL_SIZE}
-                            width="90%"
                             step={64}
                             value={form.values.height}
                             onChange={(value) =>
@@ -319,7 +303,7 @@ export default function AddCheckpointModel() {
                   {t('modelManager.addModel')}
                 </IAIButton>
               </VStack>
-            </form>
+            </IAIForm>
           )}
         </Formik>
       )}

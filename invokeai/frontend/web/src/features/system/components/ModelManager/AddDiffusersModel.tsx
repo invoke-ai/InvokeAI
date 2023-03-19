@@ -11,15 +11,14 @@ import { InvokeDiffusersModelConfigProps } from 'app/invokeai';
 import { addNewModel } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAIIconButton from 'common/components/IAIIconButton';
 import IAIInput from 'common/components/IAIInput';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
-import { BiArrowBack } from 'react-icons/bi';
 
 import type { RootState } from 'app/store';
 import type { ReactElement } from 'react';
+import IAIForm from 'common/components/IAIForm';
 
 function FormItemWrapper({
   children,
@@ -89,24 +88,12 @@ export default function AddDiffusersModel() {
 
   return (
     <Flex>
-      <IAIIconButton
-        aria-label={t('common.back')}
-        tooltip={t('common.back')}
-        onClick={() => dispatch(setAddNewModelUIOption(null))}
-        width="max-content"
-        position="absolute"
-        zIndex={1}
-        size="sm"
-        insetInlineEnd={12}
-        top={3}
-        icon={<BiArrowBack />}
-      />
       <Formik
         initialValues={addModelFormValues}
         onSubmit={addModelFormSubmitHandler}
       >
         {({ handleSubmit, errors, touched }) => (
-          <form onSubmit={handleSubmit}>
+          <IAIForm onSubmit={handleSubmit}>
             <VStack rowGap={2}>
               <FormItemWrapper>
                 {/* Name */}
@@ -296,7 +283,7 @@ export default function AddDiffusersModel() {
                 {t('modelManager.addModel')}
               </IAIButton>
             </VStack>
-          </form>
+          </IAIForm>
         )}
       </Formik>
     </Flex>
