@@ -166,20 +166,8 @@ export default function InvokeTabs() {
     []
   );
 
-  /**
-   * isLazy means the tabs are mounted and unmounted when changing them. There is a tradeoff here,
-   * as mounting is expensive, but so is retaining all tabs in the DOM at all times.
-   *
-   * Removing isLazy messes with the outside click watcher, which is used by ResizableDrawer.
-   * Because you have multiple handlers listening for an outside click, any click anywhere triggers
-   * the watcher for the hidden drawers, closing the open drawer.
-   *
-   * TODO: Add logic to the `useOutsideClick` in ResizableDrawer to enable it only for the active
-   * tab's drawer.
-   */
   return (
     <Tabs
-      isLazy
       defaultIndex={activeTab}
       index={activeTab}
       onChange={(index: number) => {
