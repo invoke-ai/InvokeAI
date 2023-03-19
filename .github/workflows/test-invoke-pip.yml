@@ -7,13 +7,11 @@ on:
       - 'pyproject.toml'
       - 'invokeai/**'
       - '!invokeai/frontend/web/**'
-      - 'invokeai/frontend/web/dist/**'
   pull_request:
     paths:
       - 'pyproject.toml'
       - 'invokeai/**'
       - '!invokeai/frontend/web/**'
-      - 'invokeai/frontend/web/dist/**'
     types:
       - 'ready_for_review'
       - 'opened'
