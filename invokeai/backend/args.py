@@ -189,7 +189,7 @@ class Args(object):
                 print(f"{APP_NAME} {APP_VERSION}")
                 sys.exit(0)
 
-            print("* Initializing, be patient...")
+            # print("* Initializing, be patient...")
             Globals.root = Path(os.path.abspath(switches.root_dir or Globals.root))
             Globals.try_patchmatch = switches.patchmatch
 

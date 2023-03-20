@@ -69,7 +69,7 @@ def main():
     # run any post-install patches needed
     run_patches()
 
-    print(f">> Internet connectivity is {Globals.internet_available}")
+    # print(f">> Internet connectivity is {Globals.internet_available}")
 
     if not args.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
@@ -78,21 +78,21 @@ def main():
                 opt, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
-    print(f'>> InvokeAI runtime directory is "{Globals.root}"')
+    # print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
+    # print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
     import transformers  # type: ignore
 
-    transformers.logging.set_verbosity_error()
+    # transformers.logging.set_verbosity_error()
     import diffusers
 
-    diffusers.logging.set_verbosity_error()
+    # diffusers.logging.set_verbosity_error()
 
     # Loading Face Restoration and ESRGAN Modules
-    gfpgan, codeformer, esrgan = load_face_restoration(opt)
+    # gfpgan, codeformer, esrgan = load_face_restoration(opt)
 
     # normalize the config directory relative to root
     if not os.path.isabs(opt.conf):
@@ -109,7 +109,7 @@ def main():
         embedding_path = None
 
     # migrate legacy models
-    ModelManager.migrate_models()
+    # ModelManager.migrate_models()
 
     # load the infile as a list of lines
     if opt.infile:
@@ -133,13 +133,14 @@ def main():
             embedding_path=embedding_path,
             full_precision=opt.full_precision,
             precision=opt.precision,
-            gfpgan=gfpgan,
-            codeformer=codeformer,
-            esrgan=esrgan,
+            gfpgan=None,
+            codeformer=None,
+            esrgan=None,
             free_gpu_mem=opt.free_gpu_mem,
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
         )
+        pass
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(opt, e)
     except (IOError, KeyError) as e:
@@ -151,7 +152,8 @@ def main():
 
     # preload the model
     try:
-        gen.load_model()
+        # gen.load_model()   # this part of the code loads the weights. Hence commented.
+        pass
     except KeyError:
         pass
     except Exception as e:
@@ -170,7 +172,7 @@ def main():
 
     # web server loops forever
     if opt.web or opt.gui:
-        invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
+        invoke_ai_web_server_loop(gen,)
         sys.exit(0)
 
     if not infile:
@@ -1074,15 +1076,15 @@ def get_next_command(infile=None, model_name="no model") -> str:  # command stri
     return command
 
 
-def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
+# def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
+def invoke_ai_web_server_loop(gen: Generate,):
     print("\n* --web was specified, starting web server...")
     from invokeai.backend.web import InvokeAIWebServer
 
     # Change working directory to the stable-diffusion directory
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
     invoke_ai_web_server = InvokeAIWebServer(
-        generate=gen, gfpgan=gfpgan, codeformer=codeformer, esrgan=esrgan
+        generate=gen, gfpgan=None, codeformer=None, esrgan=None
     )
 
     try:
