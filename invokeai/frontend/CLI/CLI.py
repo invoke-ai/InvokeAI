@@ -69,8 +69,6 @@ def main():
     # run any post-install patches needed
     run_patches()
 
-    # print(f">> Internet connectivity is {Globals.internet_available}")
-
     if not args.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
         if not os.path.exists(config_file):
@@ -78,8 +76,7 @@ def main():
                 opt, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    # print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
-    # print(f'>> InvokeAI runtime directory is "{Globals.root}"')
+
 
     # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
@@ -91,7 +88,8 @@ def main():
 
     # diffusers.logging.set_verbosity_error()
 
-    # Loading Face Restoration and ESRGAN Modules
+    # Loading Face Restoration and ESRGAN Modules. This is another code block that is not required for now 
+    # but maybe important in future. Hence, keeping it commented
     # gfpgan, codeformer, esrgan = load_face_restoration(opt)
 
     # normalize the config directory relative to root
