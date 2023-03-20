@@ -93,12 +93,9 @@ const ResizableDrawer = ({
   useOutsideClick({
     ref: outsideClickRef,
     handler: () => {
-      if (isPinned) {
-        return;
-      }
-
       onClose();
     },
+    enabled: isOpen && !isPinned,
   });
 
   const handleEnables = useMemo(

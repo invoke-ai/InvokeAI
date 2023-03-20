@@ -405,7 +405,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     >
       <ButtonGroup isAttached={true}>
         <IAIPopover
-          trigger="hover"
           triggerComponent={
             <IAIIconButton
               aria-label={`${t('parameters.sendTo')}...`}
@@ -505,7 +504,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
       <ButtonGroup isAttached={true}>
         <IAIPopover
-          trigger="hover"
           triggerComponent={
             <IAIIconButton
               icon={<FaGrinStars />}
@@ -535,7 +533,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </IAIPopover>
 
         <IAIPopover
-          trigger="hover"
           triggerComponent={
             <IAIIconButton
               icon={<FaExpandArrowsAlt />}

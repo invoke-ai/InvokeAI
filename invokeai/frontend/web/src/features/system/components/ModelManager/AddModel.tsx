@@ -14,7 +14,7 @@ import {
 
 import IAIButton from 'common/components/IAIButton';
 
-import { FaPlus } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus } from 'react-icons/fa';
 
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,7 @@ import type { RootState } from 'app/store';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import AddCheckpointModel from './AddCheckpointModel';
 import AddDiffusersModel from './AddDiffusersModel';
+import IAIIconButton from 'common/components/IAIIconButton';
 
 function AddModelBox({
   text,
@@ -83,8 +84,22 @@ export default function AddModel() {
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
-        <ModalContent margin="auto" paddingInlineEnd={4}>
-          <ModalHeader>{t('modelManager.addNewModel')}</ModalHeader>
+        <ModalContent margin="auto">
+          <ModalHeader>{t('modelManager.addNewModel')} </ModalHeader>
+          {addNewModelUIOption !== null && (
+            <IAIIconButton
+              aria-label={t('common.back')}
+              tooltip={t('common.back')}
+              onClick={() => dispatch(setAddNewModelUIOption(null))}
+              position="absolute"
+              variant="ghost"
+              zIndex={1}
+              size="sm"
+              insetInlineEnd={12}
+              top={2}
+              icon={<FaArrowLeft />}
+            />
+          )}
           <ModalCloseButton />
           <ModalBody>
             {addNewModelUIOption == null && (
