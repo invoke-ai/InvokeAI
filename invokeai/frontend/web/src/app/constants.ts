@@ -31,18 +31,14 @@ export const DIFFUSERS_SAMPLERS: Array<string> = [
 ];
 
 // Valid image widths
-export const WIDTHS: Array<number> = [
-  64, 128, 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960,
-  1024, 1088, 1152, 1216, 1280, 1344, 1408, 1472, 1536, 1600, 1664, 1728, 1792,
-  1856, 1920, 1984, 2048,
-];
+export const WIDTHS: Array<number> = Array.from(Array(65)).map(
+  (_x, i) => i * 64
+);
 
 // Valid image heights
-export const HEIGHTS: Array<number> = [
-  64, 128, 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960,
-  1024, 1088, 1152, 1216, 1280, 1344, 1408, 1472, 1536, 1600, 1664, 1728, 1792,
-  1856, 1920, 1984, 2048,
-];
+export const HEIGHTS: Array<number> = Array.from(Array(65)).map(
+  (_x, i) => i * 64
+);
 
 // Valid upscaling levels
 export const UPSCALING_LEVELS: Array<{ key: string; value: number }> = [

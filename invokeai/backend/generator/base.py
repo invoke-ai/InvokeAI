@@ -497,7 +497,8 @@ class Generator:
         matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
         return matched_result
 
-    def sample_to_lowres_estimated_image(self, samples):
+    @staticmethod
+    def sample_to_lowres_estimated_image(samples):
         # origingally adapted from code by @erucipe and @keturn here:
         # https://discuss.huggingface.co/t/decoding-latents-to-rgb-without-upscaling/23204/7
 

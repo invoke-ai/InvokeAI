@@ -773,6 +773,24 @@ class GraphExecutionState(BaseModel):
         default_factory=dict,
     )
 
+    # Declare all fields as required; necessary for OpenAPI schema generation build.
+    # Technically only fields without a `default_factory` need to be listed here.
+    # See: https://github.com/pydantic/pydantic/discussions/4577
+    class Config:
+        schema_extra = {
+            'required': [
+                'id',
+                'graph',
+                'execution_graph',
+                'executed',
+                'executed_history',
+                'results',
+                'errors',
+                'prepared_source_mapping',
+                'source_prepared_mapping',
+            ]
+        }
+
     def next(self) -> BaseInvocation | None:
         """Gets the next node ready to execute."""
 

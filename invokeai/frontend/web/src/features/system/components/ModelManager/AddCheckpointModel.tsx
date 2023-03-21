@@ -1,4 +1,5 @@
 import {
+  Flex,
   FormControl,
   FormErrorMessage,
   FormHelperText,
@@ -25,10 +26,10 @@ import { useTranslation } from 'react-i18next';
 
 import type { InvokeModelConfigProps } from 'app/invokeai';
 import type { RootState } from 'app/store';
-import IAIIconButton from 'common/components/IAIIconButton';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import type { FieldInputProps, FormikProps } from 'formik';
-import { BiArrowBack } from 'react-icons/bi';
+import IAIForm from 'common/components/IAIForm';
+import { IAIFormItemWrapper } from 'common/components/IAIForms/IAIFormItemWrapper';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
@@ -72,243 +73,250 @@ export default function AddCheckpointModel() {
 
   return (
     <VStack gap={2} alignItems="flex-start">
-      <IAIIconButton
-        aria-label={t('common.back')}
-        tooltip={t('common.back')}
-        onClick={() => dispatch(setAddNewModelUIOption(null))}
-        width="max-content"
-        position="absolute"
-        zIndex={1}
-        size="sm"
-        insetInlineEnd={12}
-        top={3}
-        icon={<BiArrowBack />}
-      />
+      <Flex columnGap={4}>
+        <IAICheckbox
+          isChecked={!addManually}
+          label={t('modelManager.scanForModels')}
+          onChange={() => setAddmanually(!addManually)}
+        />
+        <IAICheckbox
+          label={t('modelManager.addManually')}
+          isChecked={addManually}
+          onChange={() => setAddmanually(!addManually)}
+        />
+      </Flex>
 
-      <SearchModels />
-      <IAICheckbox
-        label={t('modelManager.addManually')}
-        isChecked={addManually}
-        onChange={() => setAddmanually(!addManually)}
-      />
-
-      {addManually && (
+      {addManually ? (
         <Formik
           initialValues={addModelFormValues}
           onSubmit={addModelFormSubmitHandler}
         >
           {({ handleSubmit, errors, touched }) => (
-            <form onSubmit={handleSubmit}>
+            <IAIForm onSubmit={handleSubmit} sx={{ w: 'full' }}>
               <VStack rowGap={2}>
                 <Text fontSize={20} fontWeight="bold" alignSelf="start">
                   {t('modelManager.manual')}
                 </Text>
                 {/* Name */}
-                <FormControl
-                  isInvalid={!!errors.name && touched.name}
-                  isRequired
-                >
-                  <FormLabel htmlFor="name" fontSize="sm">
-                    {t('modelManager.name')}
-                  </FormLabel>
-                  <VStack alignItems="start">
-                    <Field
-                      as={IAIInput}
-                      id="name"
-                      name="name"
-                      type="text"
-                      validate={baseValidation}
-                      width="2xl"
-                    />
-                    {!!errors.name && touched.name ? (
-                      <FormErrorMessage>{errors.name}</FormErrorMessage>
-                    ) : (
-                      <FormHelperText margin={0}>
-                        {t('modelManager.nameValidationMsg')}
-                      </FormHelperText>
-                    )}
-                  </VStack>
-                </FormControl>
+                <IAIFormItemWrapper>
+                  <FormControl
+                    isInvalid={!!errors.name && touched.name}
+                    isRequired
+                  >
+                    <FormLabel htmlFor="name" fontSize="sm">
+                      {t('modelManager.name')}
+                    </FormLabel>
+                    <VStack alignItems="start">
+                      <Field
+                        as={IAIInput}
+                        id="name"
+                        name="name"
+                        type="text"
+                        validate={baseValidation}
+                        width="full"
+                      />
+                      {!!errors.name && touched.name ? (
+                        <FormErrorMessage>{errors.name}</FormErrorMessage>
+                      ) : (
+                        <FormHelperText margin={0}>
+                          {t('modelManager.nameValidationMsg')}
+                        </FormHelperText>
+                      )}
+                    </VStack>
+                  </FormControl>
+                </IAIFormItemWrapper>
 
                 {/* Description */}
-                <FormControl
-                  isInvalid={!!errors.description && touched.description}
-                  isRequired
-                >
-                  <FormLabel htmlFor="description" fontSize="sm">
-                    {t('modelManager.description')}
-                  </FormLabel>
-                  <VStack alignItems="start">
-                    <Field
-                      as={IAIInput}
-                      id="description"
-                      name="description"
-                      type="text"
-                      width="2xl"
-                    />
-                    {!!errors.description && touched.description ? (
-                      <FormErrorMessage>{errors.description}</FormErrorMessage>
-                    ) : (
-                      <FormHelperText margin={0}>
-                        {t('modelManager.descriptionValidationMsg')}
-                      </FormHelperText>
-                    )}
-                  </VStack>
-                </FormControl>
+                <IAIFormItemWrapper>
+                  <FormControl
+                    isInvalid={!!errors.description && touched.description}
+                    isRequired
+                  >
+                    <FormLabel htmlFor="description" fontSize="sm">
+                      {t('modelManager.description')}
+                    </FormLabel>
+                    <VStack alignItems="start">
+                      <Field
+                        as={IAIInput}
+                        id="description"
+                        name="description"
+                        type="text"
+                        width="full"
+                      />
+                      {!!errors.description && touched.description ? (
+                        <FormErrorMessage>
+                          {errors.description}
+                        </FormErrorMessage>
+                      ) : (
+                        <FormHelperText margin={0}>
+                          {t('modelManager.descriptionValidationMsg')}
+                        </FormHelperText>
+                      )}
+                    </VStack>
+                  </FormControl>
+                </IAIFormItemWrapper>
 
                 {/* Config */}
-                <FormControl
-                  isInvalid={!!errors.config && touched.config}
-                  isRequired
-                >
-                  <FormLabel htmlFor="config" fontSize="sm">
-                    {t('modelManager.config')}
-                  </FormLabel>
-                  <VStack alignItems="start">
-                    <Field
-                      as={IAIInput}
-                      id="config"
-                      name="config"
-                      type="text"
-                      width="2xl"
-                    />
-                    {!!errors.config && touched.config ? (
-                      <FormErrorMessage>{errors.config}</FormErrorMessage>
-                    ) : (
-                      <FormHelperText margin={0}>
-                        {t('modelManager.configValidationMsg')}
-                      </FormHelperText>
-                    )}
-                  </VStack>
-                </FormControl>
+                <IAIFormItemWrapper>
+                  <FormControl
+                    isInvalid={!!errors.config && touched.config}
+                    isRequired
+                  >
+                    <FormLabel htmlFor="config" fontSize="sm">
+                      {t('modelManager.config')}
+                    </FormLabel>
+                    <VStack alignItems="start">
+                      <Field
+                        as={IAIInput}
+                        id="config"
+                        name="config"
+                        type="text"
+                        width="full"
+                      />
+                      {!!errors.config && touched.config ? (
+                        <FormErrorMessage>{errors.config}</FormErrorMessage>
+                      ) : (
+                        <FormHelperText margin={0}>
+                          {t('modelManager.configValidationMsg')}
+                        </FormHelperText>
+                      )}
+                    </VStack>
+                  </FormControl>
+                </IAIFormItemWrapper>
 
                 {/* Weights */}
-                <FormControl
-                  isInvalid={!!errors.weights && touched.weights}
-                  isRequired
-                >
-                  <FormLabel htmlFor="config" fontSize="sm">
-                    {t('modelManager.modelLocation')}
-                  </FormLabel>
-                  <VStack alignItems="start">
-                    <Field
-                      as={IAIInput}
-                      id="weights"
-                      name="weights"
-                      type="text"
-                      width="2xl"
-                    />
-                    {!!errors.weights && touched.weights ? (
-                      <FormErrorMessage>{errors.weights}</FormErrorMessage>
-                    ) : (
-                      <FormHelperText margin={0}>
-                        {t('modelManager.modelLocationValidationMsg')}
-                      </FormHelperText>
-                    )}
-                  </VStack>
-                </FormControl>
+                <IAIFormItemWrapper>
+                  <FormControl
+                    isInvalid={!!errors.weights && touched.weights}
+                    isRequired
+                  >
+                    <FormLabel htmlFor="config" fontSize="sm">
+                      {t('modelManager.modelLocation')}
+                    </FormLabel>
+                    <VStack alignItems="start">
+                      <Field
+                        as={IAIInput}
+                        id="weights"
+                        name="weights"
+                        type="text"
+                        width="full"
+                      />
+                      {!!errors.weights && touched.weights ? (
+                        <FormErrorMessage>{errors.weights}</FormErrorMessage>
+                      ) : (
+                        <FormHelperText margin={0}>
+                          {t('modelManager.modelLocationValidationMsg')}
+                        </FormHelperText>
+                      )}
+                    </VStack>
+                  </FormControl>
+                </IAIFormItemWrapper>
 
                 {/* VAE */}
-                <FormControl isInvalid={!!errors.vae && touched.vae}>
-                  <FormLabel htmlFor="vae" fontSize="sm">
-                    {t('modelManager.vaeLocation')}
-                  </FormLabel>
-                  <VStack alignItems="start">
-                    <Field
-                      as={IAIInput}
-                      id="vae"
-                      name="vae"
-                      type="text"
-                      width="2xl"
-                    />
-                    {!!errors.vae && touched.vae ? (
-                      <FormErrorMessage>{errors.vae}</FormErrorMessage>
-                    ) : (
-                      <FormHelperText margin={0}>
-                        {t('modelManager.vaeLocationValidationMsg')}
-                      </FormHelperText>
-                    )}
-                  </VStack>
-                </FormControl>
+                <IAIFormItemWrapper>
+                  <FormControl isInvalid={!!errors.vae && touched.vae}>
+                    <FormLabel htmlFor="vae" fontSize="sm">
+                      {t('modelManager.vaeLocation')}
+                    </FormLabel>
+                    <VStack alignItems="start">
+                      <Field
+                        as={IAIInput}
+                        id="vae"
+                        name="vae"
+                        type="text"
+                        width="full"
+                      />
+                      {!!errors.vae && touched.vae ? (
+                        <FormErrorMessage>{errors.vae}</FormErrorMessage>
+                      ) : (
+                        <FormHelperText margin={0}>
+                          {t('modelManager.vaeLocationValidationMsg')}
+                        </FormHelperText>
+                      )}
+                    </VStack>
+                  </FormControl>
+                </IAIFormItemWrapper>
 
                 <HStack width="100%">
                   {/* Width */}
-                  <FormControl isInvalid={!!errors.width && touched.width}>
-                    <FormLabel htmlFor="width" fontSize="sm">
-                      {t('modelManager.width')}
-                    </FormLabel>
-                    <VStack alignItems="start">
-                      <Field id="width" name="width">
-                        {({
-                          field,
-                          form,
-                        }: {
-                          field: FieldInputProps<number>;
-                          form: FormikProps<InvokeModelConfigProps>;
-                        }) => (
-                          <IAINumberInput
-                            id="width"
-                            name="width"
-                            min={MIN_MODEL_SIZE}
-                            max={MAX_MODEL_SIZE}
-                            step={64}
-                            width="90%"
-                            value={form.values.width}
-                            onChange={(value) =>
-                              form.setFieldValue(field.name, Number(value))
-                            }
-                          />
-                        )}
-                      </Field>
+                  <IAIFormItemWrapper>
+                    <FormControl isInvalid={!!errors.width && touched.width}>
+                      <FormLabel htmlFor="width" fontSize="sm">
+                        {t('modelManager.width')}
+                      </FormLabel>
+                      <VStack alignItems="start">
+                        <Field id="width" name="width">
+                          {({
+                            field,
+                            form,
+                          }: {
+                            field: FieldInputProps<number>;
+                            form: FormikProps<InvokeModelConfigProps>;
+                          }) => (
+                            <IAINumberInput
+                              id="width"
+                              name="width"
+                              min={MIN_MODEL_SIZE}
+                              max={MAX_MODEL_SIZE}
+                              step={64}
+                              value={form.values.width}
+                              onChange={(value) =>
+                                form.setFieldValue(field.name, Number(value))
+                              }
+                            />
+                          )}
+                        </Field>
 
-                      {!!errors.width && touched.width ? (
-                        <FormErrorMessage>{errors.width}</FormErrorMessage>
-                      ) : (
-                        <FormHelperText margin={0}>
-                          {t('modelManager.widthValidationMsg')}
-                        </FormHelperText>
-                      )}
-                    </VStack>
-                  </FormControl>
+                        {!!errors.width && touched.width ? (
+                          <FormErrorMessage>{errors.width}</FormErrorMessage>
+                        ) : (
+                          <FormHelperText margin={0}>
+                            {t('modelManager.widthValidationMsg')}
+                          </FormHelperText>
+                        )}
+                      </VStack>
+                    </FormControl>
+                  </IAIFormItemWrapper>
 
                   {/* Height */}
-                  <FormControl isInvalid={!!errors.height && touched.height}>
-                    <FormLabel htmlFor="height" fontSize="sm">
-                      {t('modelManager.height')}
-                    </FormLabel>
-                    <VStack alignItems="start">
-                      <Field id="height" name="height">
-                        {({
-                          field,
-                          form,
-                        }: {
-                          field: FieldInputProps<number>;
-                          form: FormikProps<InvokeModelConfigProps>;
-                        }) => (
-                          <IAINumberInput
-                            id="height"
-                            name="height"
-                            min={MIN_MODEL_SIZE}
-                            max={MAX_MODEL_SIZE}
-                            width="90%"
-                            step={64}
-                            value={form.values.height}
-                            onChange={(value) =>
-                              form.setFieldValue(field.name, Number(value))
-                            }
-                          />
-                        )}
-                      </Field>
+                  <IAIFormItemWrapper>
+                    <FormControl isInvalid={!!errors.height && touched.height}>
+                      <FormLabel htmlFor="height" fontSize="sm">
+                        {t('modelManager.height')}
+                      </FormLabel>
+                      <VStack alignItems="start">
+                        <Field id="height" name="height">
+                          {({
+                            field,
+                            form,
+                          }: {
+                            field: FieldInputProps<number>;
+                            form: FormikProps<InvokeModelConfigProps>;
+                          }) => (
+                            <IAINumberInput
+                              id="height"
+                              name="height"
+                              min={MIN_MODEL_SIZE}
+                              max={MAX_MODEL_SIZE}
+                              step={64}
+                              value={form.values.height}
+                              onChange={(value) =>
+                                form.setFieldValue(field.name, Number(value))
+                              }
+                            />
+                          )}
+                        </Field>
 
-                      {!!errors.height && touched.height ? (
-                        <FormErrorMessage>{errors.height}</FormErrorMessage>
-                      ) : (
-                        <FormHelperText margin={0}>
-                          {t('modelManager.heightValidationMsg')}
-                        </FormHelperText>
-                      )}
-                    </VStack>
-                  </FormControl>
+                        {!!errors.height && touched.height ? (
+                          <FormErrorMessage>{errors.height}</FormErrorMessage>
+                        ) : (
+                          <FormHelperText margin={0}>
+                            {t('modelManager.heightValidationMsg')}
+                          </FormHelperText>
+                        )}
+                      </VStack>
+                    </FormControl>
+                  </IAIFormItemWrapper>
                 </HStack>
 
                 <IAIButton
@@ -319,9 +327,11 @@ export default function AddCheckpointModel() {
                   {t('modelManager.addModel')}
                 </IAIButton>
               </VStack>
-            </form>
+            </IAIForm>
           )}
         </Formik>
+      ) : (
+        <SearchModels />
       )}
     </VStack>
   );

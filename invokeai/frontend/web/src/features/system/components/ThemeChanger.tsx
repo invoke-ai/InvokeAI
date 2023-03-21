@@ -50,7 +50,6 @@ export default function ThemeChanger() {
 
   return (
     <IAIPopover
-      trigger="hover"
       triggerComponent={
         <IAIIconButton
           aria-label={t('common.themeLabel')}
