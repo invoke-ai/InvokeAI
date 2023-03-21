@@ -45,23 +45,23 @@ declare global {
 }
 
 declare module '@invoke-ai/invoke-ai-ui' {
-  declare class ThemeChanger extends React.Component<ThemeChangerProps> {
+  declare class ThemeChanger extends React.FunctionComponent<ThemeChangerProps> {
     public constructor(props: ThemeChangerProps);
   }
 
-  declare class InvokeAiLogoComponent extends React.Component<InvokeAILogoComponentProps> {
+  declare class InvokeAiLogoComponent extends React.FunctionComponent<InvokeAILogoComponentProps> {
     public constructor(props: InvokeAILogoComponentProps);
   }
 
-  declare class IAIPopover extends React.Component<IAIPopoverProps> {
+  declare class IAIPopover extends React.FunctionComponent<IAIPopoverProps> {
     public constructor(props: IAIPopoverProps);
   }
 
-  declare class IAIIconButton extends React.Component<IAIIconButtonProps> {
+  declare class IAIIconButton extends React.FunctionComponent<IAIIconButtonProps> {
     public constructor(props: IAIIconButtonProps);
   }
 
-  declare class SettingsModal extends React.Component<SettingsModalProps> {
+  declare class SettingsModal extends React.FunctionComponent<SettingsModalProps> {
     public constructor(props: SettingsModalProps);
   }
 }
