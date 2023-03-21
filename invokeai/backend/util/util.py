@@ -380,3 +380,18 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
         buffered.getvalue()
     ).decode("UTF-8")
     return image_base64
+
+def upload_on_blob(container,user_id, image, generation_mode, filename):
+    print("paths upload",container,user_id, image, generation_mode, filename)
+    tmp_path  = "/data/outputs/temp.png"
+    upload_api = "http://172.20.199.3:8000/product1/upload"
+    image.save(tmp_path)
+    params = {
+        "container": container,
+        "user_id": user_id,
+        "generation_mode": generation_mode,
+        "upload_path": filename,
+        }
+    with open(tmp_path, 'rb') as f:
+        files = {'image': f}
+        requests.post(url=upload_api, params=params, files=files)
