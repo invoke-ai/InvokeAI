@@ -1006,6 +1006,7 @@ class InvokeAIWebServer:
                     generation_parameters.pop("strength", None)
                     generation_parameters.pop("fit", None)
                     generation_parameters.pop("init_img", None)
+                    generation_parameters.pop("init_img_filename", None)
                     generation_parameters.pop("init_mask", None)
                     generation_parameters.pop("seam_size", None)
                     generation_parameters.pop("seam_blur", None)
@@ -1021,6 +1022,9 @@ class InvokeAIWebServer:
                 generation_parameters["init_img"] = Image.open(init_img_path).convert(
                     "RGB"
                 )
+                #add the filename, because it gets overriden
+                generation_parameters["init_img_filename"] = init_img_path.split("/")[-1]
+            generation_parameters["actual_generation_mode"] = actual_generation_mode
 
             def image_progress(sample, step):
                 if self.canceled.is_set():

@@ -380,3 +380,10 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
         buffered.getvalue()
     ).decode("UTF-8")
     return image_base64
+
+def image_to_base64(image: Image.Image, image_format: str = "PNG") -> str:
+    buffered = io.BytesIO()
+    image.save(buffered, format=image_format)
+    img_bytes = buffered.getvalue()
+    image_base64 = base64.b64encode(img_bytes).decode("utf-8")
+    return image_base64

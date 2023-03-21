@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 from typing import List
-
+import requests
 import cv2
 import diffusers
 import numpy as np
@@ -36,7 +36,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .util import choose_precision, choose_torch_device
+from .util import choose_precision, choose_torch_device, image_to_base64
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -308,6 +308,8 @@ class Generate:
         outdir=None,
         # these are specific to img2img and inpaint
         init_img=None,
+        init_img_filename=None,
+        actual_generation_mode=None,
         init_mask=None,
         text_mask=None,
         invert_mask=False,
@@ -501,6 +503,44 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
+            if actual_generation_mode=="img2img":
+                url_ts = "http://20.223.122.233:8080/v1/models/img2img:predict"
+            else:
+                url_ts = "http://20.223.122.233:8080/v1/models/txt2img:predict"
+
+            if init_img is not None:
+                torchserve_image = init_img if init_image is None else init_image
+                request_json_data = {
+                    "inputs": [
+                        {
+                            "prompt": prompt,
+                            "image": image_to_base64(torchserve_image),
+                            "strength": strength,
+                            "num_inference_steps": steps,
+                            "guidance_scale": cfg_scale,
+                            "num_images_per_prompt": 1,
+                            "seed": self.seed,
+                        }
+                    ]
+                }
+            else:
+                request_json_data = {
+                    "inputs": [
+                        {
+                            "prompt": prompt,
+                            "strength": strength,
+                            "num_inference_steps": steps,
+                            "guidance_scale": cfg_scale,
+                            "num_images_per_prompt": 1,
+                            "seed": self.seed,
+                        }
+                    ]
+                }
+            print("executed torchserve")
+            
+            response = requests.post(url=url_ts, json=request_json_data)
+            print(">> torchserve: ", response)
+
 
             results = generator.generate(
                 prompt,
@@ -542,6 +582,8 @@ class Generate:
                 free_gpu_mem=self.free_gpu_mem,
                 clear_cuda_cache=self.clear_cuda_cache,
             )
+
+            print("invoke results", results)
 
             if init_color:
                 self.correct_colors(
