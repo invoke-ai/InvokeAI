@@ -1,12 +1,7 @@
 -r requirements.txt
 
 # Get hardware-appropriate torch/torchvision 
-torch
-torchvision
-diffusers
-onnxruntime
-onnx
 ftfy
 spacy
 scipy
--e .
+optimum[openvino,nncf,onnxruntime]
