@@ -1,4 +1,4 @@
-import React, { PropsWithChildren } from 'react';
+import { PropsWithChildren } from 'react';
 import { IAIPopoverProps } from '../web/src/common/components/IAIPopover';
 import { IAIIconButtonProps } from '../web/src/common/components/IAIIconButton';
 
