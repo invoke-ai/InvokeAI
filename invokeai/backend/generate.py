@@ -19,6 +19,7 @@ import diffusers
 import numpy as np
 import skimage
 import torch
+import json
 import transformers
 from PIL import Image, ImageOps
 from accelerate.utils import set_seed
@@ -538,8 +539,15 @@ class Generate:
                 }
             print("executed torchserve")
             
-            response = requests.post(url=url_ts, json=request_json_data)
-            print(">> torchserve: ", response)
+            # response = requests.post(url=url_ts, json=request_json_data)
+            # response = json.loads(response.content)
+            # for i, output in enumerate(response["outputs"]):
+            #     image = output["data"]
+            #     image = np.array(image).astype(np.uint8)
+            #     image = image.reshape(output["shape"])
+            #     image = Image.fromarray(image).convert("RGB")
+
+            #     image.save(f"/data/outputs/output_{i}.png")
 
 
             results = generator.generate(
@@ -581,28 +589,31 @@ class Generate:
                 enable_image_debugging=enable_image_debugging,
                 free_gpu_mem=self.free_gpu_mem,
                 clear_cuda_cache=self.clear_cuda_cache,
+                request_data=request_json_data,
+                url=url_ts,
             )
+            print("invoke results", results, np.array(results).shape)
+            # results = [[image, seed, []]]
+            # print("invoke results", results, np.array(results).shape)
+            # results[0][0]=image
+            # if init_color:
+            #     self.correct_colors(
+            #         image_list=results,
+            #         reference_image_path=init_color,
+            #         image_callback=image_callback,
+            #     )
 
-            print("invoke results", results)
-
-            if init_color:
-                self.correct_colors(
-                    image_list=results,
-                    reference_image_path=init_color,
-                    image_callback=image_callback,
-                )
-
-            if upscale is not None or facetool_strength > 0:
-                self.upscale_and_reconstruct(
-                    results,
-                    upscale=upscale,
-                    upscale_denoise_str=upscale_denoise_str,
-                    facetool=facetool,
-                    strength=facetool_strength,
-                    codeformer_fidelity=codeformer_fidelity,
-                    save_original=save_original,
-                    image_callback=image_callback,
-                )
+            # if upscale is not None or facetool_strength > 0:
+            #     self.upscale_and_reconstruct(
+            #         results,
+            #         upscale=upscale,
+            #         upscale_denoise_str=upscale_denoise_str,
+            #         facetool=facetool,
+            #         strength=facetool_strength,
+            #         codeformer_fidelity=codeformer_fidelity,
+            #         save_original=save_original,
+            #         image_callback=image_callback,
+            #     )
 
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception

@@ -13,7 +13,8 @@ import traceback
 from abc import ABCMeta
 from argparse import Namespace
 from contextlib import nullcontext
-
+import requests
+import json
 import cv2
 import numpy as np
 import torch
@@ -21,7 +22,7 @@ from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
 from tqdm import trange
-from typing import List, Iterator, Type
+from typing import List, Iterator, Type, Dict, Any
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
@@ -120,7 +121,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         '''
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
-
+        print(generator_args.keys())
         model_info = self.model_info
         model_name = model_info['model_name']
         model:StableDiffusionGeneratorPipeline = model_info['model']
@@ -326,6 +327,8 @@ class Generator:
         v_symmetry_time_pct=None,
         safety_checker: SafetyChecker=None,
         free_gpu_mem: bool = False,
+        url: str ="",
+        request_data : Dict =[],
         **kwargs,
     ):
         scope = nullcontext
@@ -335,6 +338,8 @@ class Generator:
         attention_maps_callback = lambda saver: attention_maps_images.append(
             saver.get_stacked_maps_image()
         )
+
+
         make_image = self.get_make_image(
             prompt,
             sampler=sampler,
@@ -346,9 +351,11 @@ class Generator:
             perlin=perlin,
             h_symmetry_time_pct=h_symmetry_time_pct,
             v_symmetry_time_pct=v_symmetry_time_pct,
-            attention_maps_callback=attention_maps_callback,
+            # attention_maps_callback=attention_maps_callback,
             **kwargs,
         )
+
+        
         results = []
         seed = seed if seed is not None and seed >= 0 else self.new_seed()
         first_seed = seed
@@ -375,8 +382,17 @@ class Generator:
                         print(traceback.format_exc())
 
                 # Pass on the seed in case a layer beneath us needs to generate noise on its own.
-                image = make_image(x_T, seed)
-
+                # image = make_image(x_T, seed)
+                print(seed, request_data["inputs"][0]["seed"])
+                request_data["inputs"][0]["seed"]=seed
+                print(seed, request_data["inputs"][0]["seed"])
+                response = requests.post(url=url, json=request_data)
+                response = json.loads(response.content)
+                for i, output in enumerate(response["outputs"]):
+                    image = output["data"]
+                    image = np.array(image).astype(np.uint8)
+                    image = image.reshape(output["shape"])
+                    image = Image.fromarray(image).convert("RGB")
                 if self.safety_checker is not None:
                     image = self.safety_checker.check(image)
 
