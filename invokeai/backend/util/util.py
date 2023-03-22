@@ -17,7 +17,8 @@ import requests
 import torch
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
-
+import yaml
+from yaml.loader import SafeLoader
 from .devices import torch_dtype
 
 
@@ -381,17 +382,33 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
     ).decode("UTF-8")
     return image_base64
 
-def upload_on_blob(container,user_id, image, generation_mode, filename):
-    print("paths upload",container,user_id, image, generation_mode, filename)
-    tmp_path  = "/data/outputs/temp.png"
-    upload_api = "http://172.20.199.3:8000/product1/upload"
-    image.save(tmp_path)
+def api_configs():
+    return Path("/data") / "api_endpoints.yml"
+
+def upload_on_blob(container: str, user_id: str, image: Image.Image , generation_mode: str, filename: str):
+    """ Upload an image in the azure blob storage
+
+    Args:
+        container (str): Azure container
+        user_id (str): uuid or username
+        image (Image.Image): Pil Image to upload
+        generation_mode (str): type of generation used: img2img, txt2img, ..
+        filename (str): name of the file, used on the blob
+    """
+
+    with open(api_configs()) as f:
+        apis = yaml.load(f, Loader=SafeLoader)
+    buffered = io.BytesIO()
+    upload_api = apis["upload_endpoint"]
+    image.save(buffered, format="PNG")
     params = {
         "container": container,
         "user_id": user_id,
         "generation_mode": generation_mode,
         "upload_path": filename,
         }
-    with open(tmp_path, 'rb') as f:
-        files = {'image': f}
-        requests.post(url=upload_api, params=params, files=files)
+    buffered.seek(0)
+    files = {'image': buffered}
+    # with open(buffered.getvalue(), 'rb') as f:
+    #     files = {'image': f}
+    requests.post(url=upload_api, params=params, files=files)

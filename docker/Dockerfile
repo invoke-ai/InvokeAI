@@ -92,12 +92,14 @@ RUN useradd \
 
 # Create volume directory
 ARG VOLUME_DIR=/data
-RUN mkdir -p "${VOLUME_DIR}" \
-  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
+RUN mkdir -p "${VOLUME_DIR}"
+COPY ./invokeai/configs/api_endpoints.yml /data/api_endpoints.yml
+RUN chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
 
 # Setup runtime environment
 USER ${UNAME}:${UNAME}
 COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
