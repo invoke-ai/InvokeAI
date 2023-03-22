@@ -1,4 +1,3 @@
-import path from 'path';
 import react from '@vitejs/plugin-react-swc';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, PluginOption } from 'vite';
@@ -56,26 +55,6 @@ export default defineConfig(({ mode }) => {
       build: {
         ...common.build,
         // sourcemap: true, // this can be enabled if needed, it adds ovwer 15MB to the commit
-      },
-    };
-  } else if (mode === 'package') {
-    return {
-      ...common,
-      build: {
-        ...common.build,
-        lib: {
-          entry: path.resolve(__dirname, 'src/exports.tsx'),
-          name: 'InvokeAI UI',
-          fileName: (format) => `invoke-ai-ui.${format}.js`,
-        },
-        rollupOptions: {
-          external: ['react', 'react-dom'],
-          output: {
-            globals: {
-              react: 'React',
-            },
-          },
-        },
       },
     };
   } else {
