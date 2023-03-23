@@ -4,33 +4,31 @@ including img2img, txt2img, and inpaint
 """
 from __future__ import annotations
 
-import itertools
 import dataclasses
-import diffusers
+import itertools
+import json
 import os
 import random
-import traceback
 from abc import ABCMeta
 from argparse import Namespace
-from contextlib import nullcontext
-import requests
-import json
+from dataclasses import dataclass, field
+from typing import Dict, Iterator, List, Type
+
 import cv2
+import diffusers
 import numpy as np
+import requests
 import torch
-from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
-from tqdm import trange
-from typing import List, Iterator, Type, Dict, Any
-from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
+from PIL import Image, ImageChops, ImageFilter
 
 from ..image_util import configure_model_padding
-from ..util.util import rand_perlin_2d
-from ..safety_checker import SafetyChecker
 from ..prompting.conditioning import get_uc_and_c_and_ec
+from ..safety_checker import SafetyChecker
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ..util.util import rand_perlin_2d
 
 downsampling = 8
 
@@ -330,7 +328,6 @@ class Generator:
         request_data: Dict = {},
         **kwargs,
     ):
-        scope = nullcontext
         self.safety_checker = safety_checker
         self.free_gpu_mem = free_gpu_mem
         attention_maps_images = []
@@ -338,9 +335,6 @@ class Generator:
             saver.get_stacked_maps_image()
         )
 
-
-
-        
         results = []
         seed = seed if seed is not None and seed >= 0 else self.new_seed()
         first_seed = seed
@@ -358,7 +352,7 @@ class Generator:
             image = Image.fromarray(image).convert("RGB")
         if self.safety_checker is not None:
             image = self.safety_checker.check(image)
-            
+
         results.append([image, seed, attention_maps_images])
 
         if image_callback is not None:

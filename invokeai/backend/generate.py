@@ -12,35 +12,34 @@ import re
 import sys
 import time
 import traceback
+from pathlib import Path
 from typing import List
-import requests
+
 import cv2
 import diffusers
 import numpy as np
 import skimage
 import torch
-import json
 import transformers
 import yaml
-from yaml.loader import SafeLoader
-
-from PIL import Image, ImageOps
 from accelerate.utils import set_seed
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
-from pathlib import Path
+from PIL import Image, ImageOps
+from yaml.loader import SafeLoader
 
 from .args import metadata_from_png
 from .generator import infill_methods
-from .globals import Globals, global_cache_dir
+from .globals import Globals
 from .image_util import InitImageResizer, PngWriter, Txt2Mask, configure_model_padding
 from .model_management import ModelManager
-from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
+from .safety_checker import SafetyChecker
 from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device, image_to_base64
+
 with open("/data/resleeve_configs.yml") as f:
     resleeve_configs = yaml.load(f, Loader=SafeLoader)
 def fix_func(orig):
@@ -582,8 +581,8 @@ class Generate:
                 enable_image_debugging=enable_image_debugging,
                 free_gpu_mem=self.free_gpu_mem,
                 clear_cuda_cache=self.clear_cuda_cache,
-                request_data=request_json_data, #pass the JSON for the post request
-                url=url_ts, #pass torchserve url
+                request_data=request_json_data, # Pass the JSON for the post request
+                url=url_ts, # Pass torchserve url
             )
 
         except KeyboardInterrupt:
