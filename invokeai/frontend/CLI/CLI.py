@@ -7,18 +7,11 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Union
 import transformers
-
 import diffusers
 import click
 from compel import PromptParser
-
-if sys.platform == "darwin":
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-
 import pyparsing  # type: ignore
-
 import invokeai.version as invokeai
-
 from ...backend import Generate, ModelManager
 from ...backend.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
 from ...backend.globals import Globals, global_config_dir
@@ -32,9 +25,11 @@ from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import url_attachment_name, write_log
 from .readline import Completer, get_completer
 
+if sys.platform == "darwin":
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 # global used in multiple functions (fix)
 infile = None
-
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
@@ -130,7 +125,6 @@ def main():
 
     if opt.seamless:
         print(">> changed to seamless tiling mode")
-
 
     # try to autoconvert new models
     if path := opt.autoimport:
