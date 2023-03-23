@@ -1,0 +1,2 @@
+img2img_url: "http://20.223.122.233:8080/v1/models/img2img:predict"
+txt2img_url: "http://20.223.122.233:8080/v1/models/txt2img:predict"

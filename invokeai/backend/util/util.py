@@ -382,6 +382,15 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
     return image_base64
 
 def image_to_base64(image: Image.Image, image_format: str = "PNG") -> str:
+    """Convert a Pillow image to the base64-encoded string
+
+    Args:
+        image (Image.Image): Pil Image
+        image_format (str, optional): Specify the format of the image, Defaults to "PNG".
+
+    Returns:
+        str: base64 image
+    """
     buffered = io.BytesIO()
     image.save(buffered, format=image_format)
     img_bytes = buffered.getvalue()

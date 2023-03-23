@@ -340,20 +340,6 @@ class Generator:
         )
 
 
-        make_image = self.get_make_image(
-            prompt,
-            sampler=sampler,
-            init_image=init_image,
-            width=width,
-            height=height,
-            step_callback=step_callback,
-            threshold=threshold,
-            perlin=perlin,
-            h_symmetry_time_pct=h_symmetry_time_pct,
-            v_symmetry_time_pct=v_symmetry_time_pct,
-            # attention_maps_callback=attention_maps_callback,
-            **kwargs,
-        )
 
         
         results = []
@@ -361,64 +347,42 @@ class Generator:
         first_seed = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
 
-        # There used to be an additional self.model.ema_scope() here, but it breaks
-        # the inpaint-1.5 model. Not sure what it did.... ?
-        with scope(self.model.device.type):
-            for n in trange(iterations, desc="Generating"):
-                x_T = None
-                if self.variation_amount > 0:
-                    set_seed(seed)
-                    target_noise = self.get_noise(width, height)
-                    x_T = self.slerp(self.variation_amount, initial_noise, target_noise)
-                elif initial_noise is not None:
-                    # i.e. we specified particular variations
-                    x_T = initial_noise
-                else:
-                    set_seed(seed)
-                    try:
-                        x_T = self.get_noise(width, height)
-                    except:
-                        print("** An error occurred while getting initial noise **")
-                        print(traceback.format_exc())
 
-                # Pass on the seed in case a layer beneath us needs to generate noise on its own.
-                # image = make_image(x_T, seed)
-                print(seed, request_data["inputs"][0]["seed"])
-                request_data["inputs"][0]["seed"]=seed
-                print(seed, request_data["inputs"][0]["seed"])
-                response = requests.post(url=url, json=request_data)
-                response = json.loads(response.content)
-                for i, output in enumerate(response["outputs"]):
-                    image = output["data"]
-                    image = np.array(image).astype(np.uint8)
-                    image = image.reshape(output["shape"])
-                    image = Image.fromarray(image).convert("RGB")
-                if self.safety_checker is not None:
-                    image = self.safety_checker.check(image)
+        # Send request to torchserve model and set the new seed
+        request_data["inputs"][0]["seed"]=seed
+        response = requests.post(url=url, json=request_data)
+        response = json.loads(response.content)
+        for i, output in enumerate(response["outputs"]):
+            image = output["data"]
+            image = np.array(image).astype(np.uint8)
+            image = image.reshape(output["shape"])
+            image = Image.fromarray(image).convert("RGB")
+        if self.safety_checker is not None:
+            image = self.safety_checker.check(image)
+            
+        results.append([image, seed, attention_maps_images])
 
-                results.append([image, seed, attention_maps_images])
+        if image_callback is not None:
+            attention_maps_image = (
+                None
+                if len(attention_maps_images) == 0
+                else attention_maps_images[-1]
+            )
+            image_callback(
+                image,
+                seed,
+                first_seed=first_seed,
+                attention_maps_image=attention_maps_image,
+            )
 
-                if image_callback is not None:
-                    attention_maps_image = (
-                        None
-                        if len(attention_maps_images) == 0
-                        else attention_maps_images[-1]
-                    )
-                    image_callback(
-                        image,
-                        seed,
-                        first_seed=first_seed,
-                        attention_maps_image=attention_maps_image,
-                    )
+        seed = self.new_seed()
 
-                seed = self.new_seed()
-
-                # Free up memory from the last generation.
-                clear_cuda_cache = (
-                    kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
-                )
-                if clear_cuda_cache is not None:
-                    clear_cuda_cache()
+        # Free up memory from the last generation.
+        clear_cuda_cache = (
+            kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
+        )
+        if clear_cuda_cache is not None:
+            clear_cuda_cache()
 
         return results
 

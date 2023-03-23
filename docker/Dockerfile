@@ -92,8 +92,9 @@ RUN useradd \
 
 # Create volume directory
 ARG VOLUME_DIR=/data
-RUN mkdir -p "${VOLUME_DIR}" \
-  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
+RUN mkdir -p "${VOLUME_DIR}"
+COPY ./invokeai/configs/resleeve_configs.yml /data/resleeve_configs.yml
+RUN chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
 
 # Setup runtime environment
 USER ${UNAME}:${UNAME}

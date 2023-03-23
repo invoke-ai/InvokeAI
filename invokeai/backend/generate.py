@@ -21,6 +21,9 @@ import skimage
 import torch
 import json
 import transformers
+import yaml
+from yaml.loader import SafeLoader
+
 from PIL import Image, ImageOps
 from accelerate.utils import set_seed
 from diffusers.pipeline_utils import DiffusionPipeline
@@ -38,7 +41,8 @@ from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device, image_to_base64
-
+with open("/data/resleeve_configs.yml") as f:
+    resleeve_configs = yaml.load(f, Loader=SafeLoader)
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
 
@@ -504,18 +508,15 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
-            if actual_generation_mode=="img2img":
-                url_ts = "http://20.223.122.233:8080/v1/models/img2img:predict"
-            else:
-                url_ts = "http://20.223.122.233:8080/v1/models/txt2img:predict"
-
-            if init_img is not None:
-                torchserve_image = init_img if init_image is None else init_image
+            if actual_generation_mode == "img2img":
+                url_ts = resleeve_configs["img2img_url"]
+                # Check if init_image exists (processed image)
+                input_image = init_img if init_image is None else init_image
                 request_json_data = {
                     "inputs": [
                         {
                             "prompt": prompt,
-                            "image": image_to_base64(torchserve_image),
+                            "image": image_to_base64(input_image),
                             "strength": strength,
                             "num_inference_steps": steps,
                             "guidance_scale": cfg_scale,
@@ -524,7 +525,8 @@ class Generate:
                         }
                     ]
                 }
-            else:
+            elif actual_generation_mode == "txt2img":
+                url_ts = resleeve_configs["txt2img_url"]
                 request_json_data = {
                     "inputs": [
                         {
@@ -534,21 +536,14 @@ class Generate:
                             "guidance_scale": cfg_scale,
                             "num_images_per_prompt": 1,
                             "seed": self.seed,
+                            "height":height,
+                            "width":width,
+                            "negative_prompt":""
                         }
                     ]
                 }
-            print("executed torchserve")
-            
-            # response = requests.post(url=url_ts, json=request_json_data)
-            # response = json.loads(response.content)
-            # for i, output in enumerate(response["outputs"]):
-            #     image = output["data"]
-            #     image = np.array(image).astype(np.uint8)
-            #     image = image.reshape(output["shape"])
-            #     image = Image.fromarray(image).convert("RGB")
-
-            #     image.save(f"/data/outputs/output_{i}.png")
-
+            else:
+                raise Exception(f"{actual_generation_mode} is not yet supported")
 
             results = generator.generate(
                 prompt,
@@ -589,31 +584,9 @@ class Generate:
                 enable_image_debugging=enable_image_debugging,
                 free_gpu_mem=self.free_gpu_mem,
                 clear_cuda_cache=self.clear_cuda_cache,
-                request_data=request_json_data,
-                url=url_ts,
+                request_data=request_json_data, #pass the JSON for the post request
+                url=url_ts, #pass torchserve url
             )
-            print("invoke results", results, np.array(results).shape)
-            # results = [[image, seed, []]]
-            # print("invoke results", results, np.array(results).shape)
-            # results[0][0]=image
-            # if init_color:
-            #     self.correct_colors(
-            #         image_list=results,
-            #         reference_image_path=init_color,
-            #         image_callback=image_callback,
-            #     )
-
-            # if upscale is not None or facetool_strength > 0:
-            #     self.upscale_and_reconstruct(
-            #         results,
-            #         upscale=upscale,
-            #         upscale_denoise_str=upscale_denoise_str,
-            #         facetool=facetool,
-            #         strength=facetool_strength,
-            #         codeformer_fidelity=codeformer_fidelity,
-            #         save_original=save_original,
-            #         image_callback=image_callback,
-            #     )
 
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception
