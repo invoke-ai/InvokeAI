@@ -17,7 +17,7 @@ notebooks.
 
 You will need a GPU to perform training in a reasonable length of
 time, and at least 12 GB of VRAM. We recommend using the [`xformers`
-library](../installation/070_INSTALL_XFORMERS) to accelerate the
+library](../installation/070_INSTALL_XFORMERS.md) to accelerate the
 training process further. During training, about ~8 GB is temporarily
 needed in order to store intermediate models, checkpoints and logs.
 

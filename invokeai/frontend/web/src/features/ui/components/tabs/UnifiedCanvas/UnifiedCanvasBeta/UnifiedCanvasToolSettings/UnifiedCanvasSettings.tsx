@@ -56,7 +56,7 @@ const UnifiedCanvasSettings = () => {
 
   return (
     <IAIPopover
-      trigger="hover"
+      isLazy={false}
       triggerComponent={
         <IAIIconButton
           tooltip={t('unifiedCanvas.canvasSettings')}

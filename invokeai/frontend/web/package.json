@@ -6,7 +6,6 @@
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
-    "build:package": "vite build --mode=package",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",
