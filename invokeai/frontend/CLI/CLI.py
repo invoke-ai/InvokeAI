@@ -6,7 +6,9 @@ import traceback
 from argparse import Namespace
 from pathlib import Path
 from typing import Union
+import transformers
 
+import diffusers
 import click
 from compel import PromptParser
 
@@ -76,22 +78,6 @@ def main():
                 opt, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-
-
-    # loading here to avoid long delays on startup
-    # these two lines prevent a horrible warning message from appearing
-    # when the frozen CLIP tokenizer is imported
-    import transformers  # type: ignore
-
-    # transformers.logging.set_verbosity_error()
-    import diffusers
-
-    # diffusers.logging.set_verbosity_error()
-
-    # Loading Face Restoration and ESRGAN Modules. This is another code block that is not required for now 
-    # but maybe important in future. Hence, keeping it commented
-    # gfpgan, codeformer, esrgan = load_face_restoration(opt)
-
     # normalize the config directory relative to root
     if not os.path.isabs(opt.conf):
         opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
@@ -105,9 +91,6 @@ def main():
             embedding_path = opt.embedding_path
     else:
         embedding_path = None
-
-    # migrate legacy models
-    # ModelManager.migrate_models()
 
     # load the infile as a list of lines
     if opt.infile:
@@ -148,14 +131,6 @@ def main():
     if opt.seamless:
         print(">> changed to seamless tiling mode")
 
-    # preload the model
-    try:
-        # gen.load_model()   # this part of the code loads the weights. Hence commented.
-        pass
-    except KeyError:
-        pass
-    except Exception as e:
-        report_model_error(opt, e)
 
     # try to autoconvert new models
     if path := opt.autoimport:
@@ -1073,8 +1048,6 @@ def get_next_command(infile=None, model_name="no model") -> str:  # command stri
             print(f"#{command}")
     return command
 
-
-# def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
 def invoke_ai_web_server_loop(gen: Generate,):
     print("\n* --web was specified, starting web server...")
     from invokeai.backend.web import InvokeAIWebServer
