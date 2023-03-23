@@ -772,16 +772,10 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             original_config_file = Path(model_info["config"])
             model_name = model_name_or_path
             model_description = model_info["description"]
-            vae = model_info["vae"]
+            vae_path = model_info.get("vae")
         else:
             print(f"** {model_name_or_path} is not a legacy .ckpt weights file")
             return
-        if vae_repo := invokeai.backend.model_management.model_manager.VAE_TO_REPO_ID.get(
-            Path(vae).stem
-        ):
-            vae_repo = dict(repo_id=vae_repo)
-        else:
-            vae_repo = None
         model_name = manager.convert_and_import(
             ckpt_path,
             diffusers_path=Path(
@@ -790,7 +784,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             model_name=model_name,
             model_description=model_description,
             original_config_file=original_config_file,
-            vae=vae_repo,
+            vae_path=vae_path,
         )
     else:
         try:

@@ -1033,7 +1033,7 @@ def replace_checkpoint_vae(checkpoint, vae_path:str):
         vae_ckpt = torch.load(vae_path, map_location="cpu")
     for vae_key in vae_ckpt['state_dict']:
         new_key = f'first_stage_model.{vae_key}'
-    checkpoint[new_key] = vae_ckpt['state_dict'][vae_key]
+        checkpoint[new_key] = vae_ckpt['state_dict'][vae_key]
 
 def load_pipeline_from_original_stable_diffusion_ckpt(
     checkpoint_path: str,
