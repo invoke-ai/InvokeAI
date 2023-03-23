@@ -6,8 +6,6 @@ ARG PYTHON_VERSION=3.9
 ##################
 FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
 
-LABEL org.opencontainers.image.authors=
-
 # Prepare apt for buildkit cache
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
@@ -66,8 +64,7 @@ COPY --link pyproject.toml .
 COPY --link invokeai/version/invokeai_version.py invokeai/version/__init__.py invokeai/version/
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-# RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-#   "${APPNAME}"/bin/pip install .
+
 
 # Install pyproject.toml
 COPY --link . .
