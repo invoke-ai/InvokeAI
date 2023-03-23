@@ -1,7 +1,3 @@
--r requirements.txt
-
-# Get hardware-appropriate torch/torchvision 
-ftfy
-spacy
-scipy
-optimum[openvino,nncf,onnxruntime]
+# Get hardware-appropriate torch/torchvision
+onnxruntime-openvino==1.13.1
+openvino==2022.3.0

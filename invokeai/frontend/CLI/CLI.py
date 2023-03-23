@@ -29,6 +29,7 @@ from ...backend.image_util import (
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import url_attachment_name, write_log
 from .readline import Completer, get_completer
+from .invoke_optimized import Txt2Img_Optimized as optimize
 
 # global used in multiple functions (fix)
 infile = None
@@ -265,6 +266,18 @@ def main_loop(gen, opt):
             opt.width = gen.width
         if not opt.height:
             opt.height = gen.height
+
+        if opt.onnx:
+            print("Starting ONNX inference.")
+            txt2img_onnx = optimize(opt.width, opt.height)
+            txt2img_onnx.onnx_txt2img(opt.prompt, opt.model)
+            sys.exit(-1)
+
+        if opt.openvino:
+            print("Starting OpenVINO inference.")
+            txt2img_ov = optimize(opt.width, opt.height)
+            txt2img_ov.openvino_txt2img(opt.prompt, opt.model)
+            sys.exit(-1)
 
         # retrieve previous value of init image if requested
         if opt.init_img is not None and re.match("^-\\d+$", opt.init_img):
