@@ -438,10 +438,12 @@ class ModelManager(object):
             weight_bytes = f.read()
         model_hash = self._cached_sha256(weights, weight_bytes)
         sd = None
-        if weights.endswith(".safetensors"):
-            sd = safetensors.torch.load(weight_bytes)
-        else:
+        
+        if weights.endswith(".ckpt"):
             sd = torch.load(io.BytesIO(weight_bytes), map_location="cpu")
+        else:
+            sd = safetensors.torch.load(weight_bytes)
+            
         del weight_bytes
         # merged models from auto11 merge board are flat for some reason
         if "state_dict" in sd:
@@ -591,6 +593,7 @@ class ModelManager(object):
         if self._has_cuda():
             torch.cuda.empty_cache()
 
+    @classmethod
     def scan_model(self, model_name, checkpoint):
         """
         Apply picklescanner to the indicated checkpoint and issue a warning

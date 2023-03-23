@@ -843,7 +843,11 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
 
-        checkpoint = load_file(checkpoint_path) if Path(checkpoint_path).suffix == '.safetensors' else torch.load(checkpoint_path)
+        if Path(checkpoint_path).suffix == '.ckpt':
+            ModelManager.scan_model(checkpoint_path,checkpoint_path)
+            checkpoint = torch.load(checkpoint_path)
+        else:
+            checkpoint = load_file(checkpoint_path)
         cache_dir = global_cache_dir('hub')
         pipeline_class = StableDiffusionGeneratorPipeline if return_generator_pipeline else StableDiffusionPipeline
 
@@ -960,7 +964,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             vae = AutoencoderKL(**vae_config)
             vae.load_state_dict(converted_vae_checkpoint)
         else:
-            print('  | Using external VAE specified in config')
+            print('  | Using VAE specified in config')
 
         # Convert the text model.
         model_type = pipeline_type
