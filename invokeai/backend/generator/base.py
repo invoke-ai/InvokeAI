@@ -121,7 +121,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         '''
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
-        print(generator_args.keys())
         model_info = self.model_info
         model_name = model_info['model_name']
         model:StableDiffusionGeneratorPipeline = model_info['model']
@@ -327,8 +326,8 @@ class Generator:
         v_symmetry_time_pct=None,
         safety_checker: SafetyChecker=None,
         free_gpu_mem: bool = False,
-        url: str ="",
-        request_data : Dict =[],
+        url: str = "",
+        request_data: Dict = {},
         **kwargs,
     ):
         scope = nullcontext
