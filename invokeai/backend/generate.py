@@ -200,7 +200,6 @@ class Generate:
         # device to Generate(). However the device was then ignored, so
         # it wasn't actually doing anything. This logic could be reinstated.
         self.device = torch.device(choose_torch_device())
-        print(f">> Using device_type {self.device.type}")
         if full_precision:
             if self.precision != "auto":
                 raise ValueError("Remove --full_precision / -F if using --precision")
@@ -219,7 +218,7 @@ class Generate:
                     ">> xformers memory-efficient attention is available but disabled"
                 )
         else:
-            print(">> xformers not installed")
+            pass
 
         # model caching system for fast switching
         self.model_manager = ModelManager(
@@ -251,10 +250,9 @@ class Generate:
 
         # load safety checker if requested
         if safety_checker:
-            print(">> Initializing NSFW checker")
             self.safety_checker = SafetyChecker(self.device)
         else:
-            print(">> NSFW checker is disabled")
+            pass
 
     def prompt2png(self, prompt, outdir, **kwargs):
         """
