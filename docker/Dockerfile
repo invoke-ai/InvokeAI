@@ -6,8 +6,6 @@ ARG PYTHON_VERSION=3.9
 ##################
 FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
 
-LABEL org.opencontainers.image.authors="mauwii@outlook.de"
-
 # Prepare apt for buildkit cache
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
@@ -66,8 +64,7 @@ COPY --link pyproject.toml .
 COPY --link invokeai/version/invokeai_version.py invokeai/version/__init__.py invokeai/version/
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  "${APPNAME}"/bin/pip install .
+
 
 # Install pyproject.toml
 COPY --link . .
@@ -90,14 +87,30 @@ RUN useradd \
   -U \
   "${UNAME}"
 
-# Create volume directory
+# Create volume directory 
 ARG VOLUME_DIR=/data
+ARG VOLUME_CONFIG_DIR=/data/configs
+ARG VOLUME_DIFF_DIR=/data/configs/stable-diffusion
 RUN mkdir -p "${VOLUME_DIR}" \
   && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
+RUN mkdir -p "${VOLUME_CONFIG_DIR}" \
+  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_CONFIG_DIR}"
+RUN mkdir -p "${VOLUME_DIFF_DIR}" \
+  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIFF_DIR}"
+
 
 # Setup runtime environment
 USER ${UNAME}:${UNAME}
 COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+COPY ./models.yaml /data/configs
+COPY ./INITIAL_MODELS.yaml /data/configs
+COPY ./v1-finetune.yaml /data/configs/stable-diffusion
+COPY ./v1-finetune_style.yaml /data/configs/stable-diffusion
+COPY ./v1-inference.yaml /data/configs/stable-diffusion
+COPY ./v1-inpainting-inference.yaml /data/configs/stable-diffusion
+COPY ./v1-m1-finetune.yaml /data/configs/stable-diffusion
+COPY ./v2-inference.yaml /data/configs/stable-diffusion
+COPY ./v2-inference-v.yaml /data/configs/stable-diffusion
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
