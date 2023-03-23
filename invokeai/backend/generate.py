@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 from typing import List
-
+import requests
 import cv2
 import diffusers
 import numpy as np
@@ -36,7 +36,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .util import choose_precision, choose_torch_device
+from .util import choose_precision, choose_torch_device, upload_on_blob
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -306,6 +306,8 @@ class Generate:
         outdir=None,
         # these are specific to img2img and inpaint
         init_img=None,
+        init_img_filename=None,
+        actual_generation_mode=None,
         init_mask=None,
         text_mask=None,
         invert_mask=False,
@@ -499,6 +501,10 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
+            if init_img is not None:
+                upload_on_blob("rawuserinput", "user", init_img, actual_generation_mode, init_img_filename)
+                upload_on_blob("processeduserinput", "user", init_image, actual_generation_mode, init_img_filename)
+
 
             results = generator.generate(
                 prompt,

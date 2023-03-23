@@ -34,6 +34,7 @@ from ..prompting import (
 from ..stable_diffusion import PipelineIntermediateState
 from .modules.get_canvas_generation_mode import get_canvas_generation_mode
 from .modules.parameters import parameters_to_command
+from ..util import upload_on_blob
 
 # Loading Arguments
 opt = Args()
@@ -969,6 +970,8 @@ class InvokeAIWebServer:
                 actual_generation_mode = get_canvas_generation_mode(
                     initial_image, mask_image
                 )
+                # Store the generation mode, to use it in our implementation
+                generation_parameters["actual_generation_mode"] = actual_generation_mode
 
                 """
                 Apply the mask to the init image, creating a "mask" image with
@@ -1006,6 +1009,7 @@ class InvokeAIWebServer:
                     generation_parameters.pop("strength", None)
                     generation_parameters.pop("fit", None)
                     generation_parameters.pop("init_img", None)
+                    generation_parameters.pop("init_img_filename", None)
                     generation_parameters.pop("init_mask", None)
                     generation_parameters.pop("seam_size", None)
                     generation_parameters.pop("seam_blur", None)
@@ -1021,6 +1025,8 @@ class InvokeAIWebServer:
                 generation_parameters["init_img"] = Image.open(init_img_path).convert(
                     "RGB"
                 )
+                #add the filename, because it gets overriden
+                generation_parameters["init_img_filename"] = init_img_path.split("/")[-1]
 
             def image_progress(sample, step):
                 if self.canceled.is_set():
@@ -1256,6 +1262,12 @@ class InvokeAIWebServer:
                 )
 
                 print(f'\n\n>> Image generated: "{path}"\n')
+                #FIXME change user with id
+                upload_on_blob(container="generatedimage",
+                               user_id="user",
+                               image=image,
+                               generation_mode=generation_parameters["actual_generation_mode"],
+                               filename= path.split("/")[-1])
                 self.write_log_message(f'[Generated] "{path}": {command}')
 
                 if progress.total_iterations > progress.current_iteration:
