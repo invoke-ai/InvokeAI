@@ -730,9 +730,9 @@ v        Apply picklescanner to the indicated checkpoint and issue a warning
 
         # another round of heuristics to guess the correct config file.
         checkpoint = (
-            safetensors.torch.load_file(model_path)
-            if model_path.suffix == ".safetensors"
-            else torch.load(model_path)
+            torch.load(model_path)
+            if model_path.suffix == ".ckpt"
+            else safetensors.torch.load_file(model_path)
         )
 
         # additional probing needed if no config file provided

@@ -159,6 +159,7 @@ class Inpaint(Img2Img):
         seam_size: int,
         seam_blur: int,
         prompt,
+        seed,
         sampler,
         steps,
         cfg_scale,
@@ -192,7 +193,7 @@ class Inpaint(Img2Img):
 
         seam_noise = self.get_noise(im.width, im.height)
 
-        result = make_image(seam_noise)
+        result = make_image(seam_noise, seed)
 
         return result
 
@@ -342,6 +343,7 @@ class Inpaint(Img2Img):
                     seam_size,
                     seam_blur,
                     prompt,
+                    seed,
                     sampler,
                     seam_steps,
                     cfg_scale,

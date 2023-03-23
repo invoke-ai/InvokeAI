@@ -55,7 +55,6 @@ export default function LanguagePicker() {
 
   return (
     <IAIPopover
-      trigger="hover"
       triggerComponent={
         <IAIIconButton
           aria-label={t('common.languagePickerLabel')}
