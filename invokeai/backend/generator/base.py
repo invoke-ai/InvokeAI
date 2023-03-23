@@ -154,6 +154,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         for i in iteration_count:
             results = generator.generate(prompt,
                                          conditioning=(uc, c, extra_conditioning_info),
+                                         step_callback=step_callback,
                                          sampler=scheduler,
                                          **generator_args,
                                          )
