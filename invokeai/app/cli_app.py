@@ -12,6 +12,8 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
+from .services.latent_storage import DiskLatentStorage, ForwardCacheLatentStorage
+
 from ..backend import Args
 from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_graph_execution_history
 from .cli.completer import set_autocompleter
@@ -149,7 +151,8 @@ def invoke_cli():
     services = InvocationServices(
         model_manager=model_manager,
         events=events,
-        images=DiskImageStorage(output_folder),
+        latents = ForwardCacheLatentStorage(DiskLatentStorage(f'{output_folder}/latents')),
+        images=DiskImageStorage(f'{output_folder}/images'),
         queue=MemoryInvocationQueue(),
         graph_execution_manager=SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"

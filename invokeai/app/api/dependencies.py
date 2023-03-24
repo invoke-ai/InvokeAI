@@ -3,6 +3,8 @@
 import os
 from argparse import Namespace
 
+from ..services.latent_storage import DiskLatentStorage, ForwardCacheLatentStorage
+
 from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
@@ -54,7 +56,9 @@ class ApiDependencies:
             os.path.join(os.path.dirname(__file__), "../../../../outputs")
         )
 
-        images = DiskImageStorage(output_folder)
+        latents = ForwardCacheLatentStorage(DiskLatentStorage(f'{output_folder}/latents'))
+
+        images = DiskImageStorage(f'{output_folder}/images')
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
@@ -62,6 +66,7 @@ class ApiDependencies:
         services = InvocationServices(
             model_manager=get_model_manager(config),
             events=events,
+            latents=latents,
             images=images,
             queue=MemoryInvocationQueue(),
             graph_execution_manager=SqliteItemStorage[GraphExecutionState](
