@@ -362,6 +362,7 @@ class ModelManager(object):
             raise NotImplementedError(
                 f"Unknown model format {model_name}: {model_format}"
             )
+        self._add_embeddings_to_model(model)
         
         # usage statistics
         toc = time.time()
@@ -436,7 +437,6 @@ class ModelManager(object):
         height = width
 
         print(f"  | Default image dimensions = {width} x {height}")
-        self._add_embeddings_to_model(pipeline)
 
         return pipeline, width, height, model_hash
 
