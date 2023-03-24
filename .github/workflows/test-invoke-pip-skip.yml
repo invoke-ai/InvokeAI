@@ -6,7 +6,6 @@ on:
       - '!pyproject.toml'
       - '!invokeai/**'
       - 'invokeai/frontend/web/**'
-      - '!invokeai/frontend/web/dist/**'
   merge_group:
   workflow_dispatch:
 
