@@ -19,12 +19,6 @@ class Txt2Img_Optimized:
         subprocess.check_call(command)
 
     def onnx_txt2img(self, prompt, model):
-
-        command = ['pip', 'install', '-r'
-        , "requirements-win-cpu_onnx.txt"]
-        #ONNX Requirement packages installation
-        self.install_requirements(command)
-
         model = "CompVis/stable-diffusion-v1-4"
         device = "cpu_fp32"
         
@@ -43,18 +37,13 @@ class Txt2Img_Optimized:
     def openvino_txt2img(self,prompt,model):
         batch_size = 1
 
-        command = ['pip', 'install', '-r'
-        , "requirements_openvino.txt"]
-        #OpenVINO Requirement packages installation
-        self.install_requirements(command)
-
         model_type = "openvino"
         model_opevino = "echarlaix/stable-diffusion-v1-5-openvino"
         model_pytorch = "runwayml/stable-diffusion-v1-5"
         if model_type == "openvino":
             stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model_opevino)
         else:
-            stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model_pytorch, export=True)
+            stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model, export=True)
         stable_diffusion.compile()
 
         start = timeit.default_timer()
