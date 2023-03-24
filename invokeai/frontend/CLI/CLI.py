@@ -28,9 +28,9 @@ from ...backend.image_util import (
     write_metadata,
 )
 from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.stable_diffusion.invoke_optimized import Txt2Img_Optimized as optimize
 from ...backend.util import url_attachment_name, write_log
 from .readline import Completer, get_completer
-from .invoke_optimized import Txt2Img_Optimized as optimize
 
 # global used in multiple functions (fix)
 infile = None
@@ -263,13 +263,19 @@ def main_loop(gen, opt):
 
         if opt.onnx:
             print("Starting ONNX inference.")
+            command = ['pip', 'install', '-r', "requirements-win-cpu_onnx.txt"]
             txt2img_onnx = optimize(opt.width, opt.height)
+            #ONNX Requirement packages installation
+            txt2img_onnx.install_requirements(command)
             txt2img_onnx.onnx_txt2img(opt.prompt, opt.model)
             sys.exit(-1)
 
         if opt.openvino:
             print("Starting OpenVINO inference.")
+            command = ['pip', 'install', '-r', "requirements_openvino.txt"]
             txt2img_ov = optimize(opt.width, opt.height)
+            #OpenVINO Requirement packages installation
+            txt2img_ov.install_requirements(command)
             txt2img_ov.openvino_txt2img(opt.prompt, opt.model)
             sys.exit(-1)
 
