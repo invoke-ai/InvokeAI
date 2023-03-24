@@ -77,7 +77,6 @@ export default function UnifiedCanvasColorPicker() {
 
   return (
     <IAIPopover
-      trigger="hover"
       triggerComponent={
         <Box
           sx={{

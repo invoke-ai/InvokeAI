@@ -24,7 +24,7 @@ You need to have opencv installed so that pypatchmatch can be built:
 brew install opencv
 ```
 
-The next time you start `invoke`, after sucesfully installing opencv, pypatchmatch will be built.
+The next time you start `invoke`, after successfully installing opencv, pypatchmatch will be built.
 
 ## Linux
 
@@ -56,7 +56,7 @@ Prior to installing PyPatchMatch, you need to take the following steps:
 
 5. Confirm that pypatchmatch is installed. At the command-line prompt enter
    `python`, and then at the `>>>` line type
-   `from patchmatch import patch_match`: It should look like the follwing:
+   `from patchmatch import patch_match`: It should look like the following:
 
     ```py
     Python 3.9.5 (default, Nov 23 2021, 15:27:38)
@@ -108,4 +108,4 @@ Prior to installing PyPatchMatch, you need to take the following steps:
 
 [**Next, Follow Steps 4-6 from the Debian Section above**](#linux)
 
-If you see no errors, then you're ready to go!
+If you see no errors you're ready to go!

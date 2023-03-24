@@ -1,7 +1,10 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any, Dict
+from typing import Any, Dict, TypedDict
 
+ProgressImage = TypedDict(
+    "ProgressImage", {"dataURL": str, "width": int, "height": int}
+)
 
 class EventServiceBase:
     session_event: str = "session_event"
@@ -23,8 +26,9 @@ class EventServiceBase:
         self,
         graph_execution_state_id: str,
         invocation_id: str,
+        progress_image: ProgressImage | None,
         step: int,
-        percent: float,
+        total_steps: int,
     ) -> None:
         """Emitted when there is generation progress"""
         self.__emit_session_event(
@@ -32,8 +36,9 @@ class EventServiceBase:
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
                 invocation_id=invocation_id,
+                progress_image=progress_image,
                 step=step,
-                percent=percent,
+                total_steps=total_steps,
             ),
         )
 
