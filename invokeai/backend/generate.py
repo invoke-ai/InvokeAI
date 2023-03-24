@@ -22,6 +22,7 @@ import skimage
 import torch
 import transformers
 import yaml
+from loguru import logger
 from accelerate.utils import set_seed
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
@@ -311,7 +312,7 @@ class Generate:
         # these are specific to img2img and inpaint
         init_img=None,
         init_img_filename=None,
-        actual_generation_mode=None,
+        generation_mode=None,
         init_mask=None,
         text_mask=None,
         invert_mask=False,
@@ -505,14 +506,16 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
-            if actual_generation_mode == "img2img":
+            if generation_mode == "img2img":
                 # Upload initial image on blob
-                upload_on_blob("rawuserinput", "user", init_img, actual_generation_mode, init_img_filename)
+                response = upload_on_blob("rawuserinput", "0tryy", init_img, generation_mode, init_img_filename)
+                logger.debug(f"rawuserinput: {response.content}")
                 input_image = init_img
                 url_ts = resleeve_configs["img2img_url"]
                 if init_image is not None:
                     # Upload processed image on blob
-                    upload_on_blob("processeduserinput", "user", init_image, actual_generation_mode, init_img_filename)
+                    response =upload_on_blob("processeduserinput", "0tryy", init_image, generation_mode, init_img_filename)
+                    logger.debug(f"processeduserinput: {response.content}")
                     input_image = init_image
                     
                 request_json_data = {
@@ -528,7 +531,7 @@ class Generate:
                         }
                     ]
                 }
-            elif actual_generation_mode == "txt2img":
+            elif generation_mode == "txt2img":
                 url_ts = resleeve_configs["txt2img_url"]
                 request_json_data = {
                     "inputs": [
@@ -546,10 +549,8 @@ class Generate:
                     ]
                 }
             else:
-                raise Exception(f"{actual_generation_mode} is not yet supported")
+                raise Exception(f"{generation_mode} is not yet supported")
            
-
-
             results = generator.generate(
                 prompt,
                 iterations=iterations,

@@ -1,1 +1,2 @@
-upload_endpoint: "http://172.20.199.3:8000/product1/upload"
+# upload_endpoint: "http://172.20.199.3:8000/product1/upload"
+upload_endpoint: "http://20.105.64.83:8000/product1/upload"
