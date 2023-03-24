@@ -24,9 +24,9 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
-while true
-do
 if [ "$0" != "bash" ]; then
+  while true
+  do
     echo "Do you want to generate images using the"
     echo "1. command-line interface"
     echo "2. browser-based UI"
@@ -87,9 +87,9 @@ if [ "$0" != "bash" ]; then
             echo "Invalid selection"
             exit;;
     esac
+ done
 else # in developer console
     python --version
     echo "Press ^D to exit"
     export PS1="(InvokeAI) \u@\h \w> "
 fi
-done
