@@ -38,7 +38,7 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "compel==1.0.1",
+  "compel==1.0.4",
   "datasets",
   "diffusers[torch]~=0.14",
   "dnspython==2.2.1",
@@ -139,8 +139,24 @@ version = { attr = "invokeai.version.__version__" }
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
 
+#=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
+addopts = "--cov-report term --cov-report html --cov-report xml"
+[tool.coverage.run]
+branch = true
+source = ["invokeai"]
+omit = ["*tests*", "*migrations*", ".venv/*", "*.env"]
+[tool.coverage.report]
+show_missing = true
+fail_under = 85  # let's set something sensible on Day 1 ...
+[tool.coverage.json]
+output = "coverage/coverage.json"
+pretty_print = true
+[tool.coverage.html]
+directory = "coverage/html"
+[tool.coverage.xml]
+output = "coverage/index.xml"
+#=== End: PyTest and Coverage
 
 [flake8]
 max-line-length = 120
