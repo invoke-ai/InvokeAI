@@ -16,5 +16,6 @@ from .util import (
     download_with_resume,
     instantiate_from_config,
     url_attachment_name,
+    image_to_base64,
     upload_on_blob,
 )

@@ -382,6 +382,21 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
     ).decode("UTF-8")
     return image_base64
 
+def image_to_base64(image: Image.Image, image_format: str = "PNG") -> str:
+    """Convert a Pillow image to the base64-encoded string
+
+    Args:
+        image (Image.Image): Pil Image
+        image_format (str, optional): Specify the format of the image, Defaults to "PNG".
+
+    Returns:
+        str: base64 image
+    """
+    buffered = io.BytesIO()
+    image.save(buffered, format=image_format)
+    img_bytes = buffered.getvalue()
+    image_base64 = base64.b64encode(img_bytes).decode("utf-8")
+    return image_base64
 def api_configs():
     return Path("/data") / "api_endpoints.yml"
 
@@ -409,6 +424,4 @@ def upload_on_blob(container: str, user_id: str, image: Image.Image , generation
         }
     buffered.seek(0)
     files = {'image': buffered}
-    # with open(buffered.getvalue(), 'rb') as f:
-    #     files = {'image': f}
     requests.post(url=upload_api, params=params, files=files)

@@ -12,6 +12,7 @@ import re
 import sys
 import time
 import traceback
+from pathlib import Path
 from typing import List
 import requests
 import cv2
@@ -20,24 +21,27 @@ import numpy as np
 import skimage
 import torch
 import transformers
-from PIL import Image, ImageOps
+import yaml
 from accelerate.utils import set_seed
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
-from pathlib import Path
+from PIL import Image, ImageOps
+from yaml.loader import SafeLoader
 
 from .args import metadata_from_png
 from .generator import infill_methods
-from .globals import Globals, global_cache_dir
+from .globals import Globals
 from .image_util import InitImageResizer, PngWriter, Txt2Mask, configure_model_padding
 from .model_management import ModelManager
-from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
+from .safety_checker import SafetyChecker
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .util import choose_precision, choose_torch_device, upload_on_blob
+from .util import choose_precision, choose_torch_device, image_to_base64, upload_on_blob
 
+with open("/data/resleeve_configs.yml") as f:
+    resleeve_configs = yaml.load(f, Loader=SafeLoader)
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
 
@@ -501,9 +505,49 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
-            if init_img is not None:
+            if actual_generation_mode == "img2img":
+                # Upload initial image on blob
                 upload_on_blob("rawuserinput", "user", init_img, actual_generation_mode, init_img_filename)
-                upload_on_blob("processeduserinput", "user", init_image, actual_generation_mode, init_img_filename)
+                input_image = init_img
+                url_ts = resleeve_configs["img2img_url"]
+                if init_image is not None:
+                    # Upload processed image on blob
+                    upload_on_blob("processeduserinput", "user", init_image, actual_generation_mode, init_img_filename)
+                    input_image = init_image
+                    
+                request_json_data = {
+                    "inputs": [
+                        {
+                            "prompt": prompt,
+                            "image": image_to_base64(input_image),
+                            "strength": strength,
+                            "num_inference_steps": steps,
+                            "guidance_scale": cfg_scale,
+                            "num_images_per_prompt": 1,
+                            "seed": self.seed,
+                        }
+                    ]
+                }
+            elif actual_generation_mode == "txt2img":
+                url_ts = resleeve_configs["txt2img_url"]
+                request_json_data = {
+                    "inputs": [
+                        {
+                            "prompt": prompt,
+                            "strength": strength,
+                            "num_inference_steps": steps,
+                            "guidance_scale": cfg_scale,
+                            "num_images_per_prompt": 1,
+                            "seed": self.seed,
+                            "height":height,
+                            "width":width,
+                            "negative_prompt":""
+                        }
+                    ]
+                }
+            else:
+                raise Exception(f"{actual_generation_mode} is not yet supported")
+           
 
 
             results = generator.generate(
@@ -545,26 +589,9 @@ class Generate:
                 enable_image_debugging=enable_image_debugging,
                 free_gpu_mem=self.free_gpu_mem,
                 clear_cuda_cache=self.clear_cuda_cache,
+                request_data=request_json_data, # Pass the JSON for the post request
+                url=url_ts, # Pass torchserve url
             )
-
-            if init_color:
-                self.correct_colors(
-                    image_list=results,
-                    reference_image_path=init_color,
-                    image_callback=image_callback,
-                )
-
-            if upscale is not None or facetool_strength > 0:
-                self.upscale_and_reconstruct(
-                    results,
-                    upscale=upscale,
-                    upscale_denoise_str=upscale_denoise_str,
-                    facetool=facetool,
-                    strength=facetool_strength,
-                    codeformer_fidelity=codeformer_fidelity,
-                    save_original=save_original,
-                    image_callback=image_callback,
-                )
 
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception

@@ -4,32 +4,31 @@ including img2img, txt2img, and inpaint
 """
 from __future__ import annotations
 
-import itertools
 import dataclasses
-import diffusers
+import itertools
+import json
 import os
 import random
-import traceback
 from abc import ABCMeta
 from argparse import Namespace
-from contextlib import nullcontext
+from dataclasses import dataclass, field
+from typing import Dict, Iterator, List, Type
 
 import cv2
+import diffusers
 import numpy as np
+import requests
 import torch
-from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
-from tqdm import trange
-from typing import List, Iterator, Type
-from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
+from PIL import Image, ImageChops, ImageFilter
 
 from ..image_util import configure_model_padding
-from ..util.util import rand_perlin_2d
-from ..safety_checker import SafetyChecker
 from ..prompting.conditioning import get_uc_and_c_and_ec
+from ..safety_checker import SafetyChecker
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ..util.util import rand_perlin_2d
 
 downsampling = 8
 
@@ -120,7 +119,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         '''
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
-
         model_info = self.model_info
         model_name = model_info['model_name']
         model:StableDiffusionGeneratorPipeline = model_info['model']
@@ -326,83 +324,58 @@ class Generator:
         v_symmetry_time_pct=None,
         safety_checker: SafetyChecker=None,
         free_gpu_mem: bool = False,
+        url: str = "",
+        request_data: Dict = {},
         **kwargs,
     ):
-        scope = nullcontext
         self.safety_checker = safety_checker
         self.free_gpu_mem = free_gpu_mem
         attention_maps_images = []
         attention_maps_callback = lambda saver: attention_maps_images.append(
             saver.get_stacked_maps_image()
         )
-        make_image = self.get_make_image(
-            prompt,
-            sampler=sampler,
-            init_image=init_image,
-            width=width,
-            height=height,
-            step_callback=step_callback,
-            threshold=threshold,
-            perlin=perlin,
-            h_symmetry_time_pct=h_symmetry_time_pct,
-            v_symmetry_time_pct=v_symmetry_time_pct,
-            attention_maps_callback=attention_maps_callback,
-            **kwargs,
-        )
+
         results = []
         seed = seed if seed is not None and seed >= 0 else self.new_seed()
         first_seed = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
 
-        # There used to be an additional self.model.ema_scope() here, but it breaks
-        # the inpaint-1.5 model. Not sure what it did.... ?
-        with scope(self.model.device.type):
-            for n in trange(iterations, desc="Generating"):
-                x_T = None
-                if self.variation_amount > 0:
-                    set_seed(seed)
-                    target_noise = self.get_noise(width, height)
-                    x_T = self.slerp(self.variation_amount, initial_noise, target_noise)
-                elif initial_noise is not None:
-                    # i.e. we specified particular variations
-                    x_T = initial_noise
-                else:
-                    set_seed(seed)
-                    try:
-                        x_T = self.get_noise(width, height)
-                    except:
-                        print("** An error occurred while getting initial noise **")
-                        print(traceback.format_exc())
 
-                # Pass on the seed in case a layer beneath us needs to generate noise on its own.
-                image = make_image(x_T, seed)
+        # Send request to torchserve model and set the new seed
+        request_data["inputs"][0]["seed"]=seed
+        response = requests.post(url=url, json=request_data)
+        response = json.loads(response.content)
+        for i, output in enumerate(response["outputs"]):
+            image = output["data"]
+            image = np.array(image).astype(np.uint8)
+            image = image.reshape(output["shape"])
+            image = Image.fromarray(image).convert("RGB")
+        if self.safety_checker is not None:
+            image = self.safety_checker.check(image)
 
-                if self.safety_checker is not None:
-                    image = self.safety_checker.check(image)
+        results.append([image, seed, attention_maps_images])
 
-                results.append([image, seed, attention_maps_images])
+        if image_callback is not None:
+            attention_maps_image = (
+                None
+                if len(attention_maps_images) == 0
+                else attention_maps_images[-1]
+            )
+            image_callback(
+                image,
+                seed,
+                first_seed=first_seed,
+                attention_maps_image=attention_maps_image,
+            )
 
-                if image_callback is not None:
-                    attention_maps_image = (
-                        None
-                        if len(attention_maps_images) == 0
-                        else attention_maps_images[-1]
-                    )
-                    image_callback(
-                        image,
-                        seed,
-                        first_seed=first_seed,
-                        attention_maps_image=attention_maps_image,
-                    )
+        seed = self.new_seed()
 
-                seed = self.new_seed()
-
-                # Free up memory from the last generation.
-                clear_cuda_cache = (
-                    kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
-                )
-                if clear_cuda_cache is not None:
-                    clear_cuda_cache()
+        # Free up memory from the last generation.
+        clear_cuda_cache = (
+            kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
+        )
+        if clear_cuda_cache is not None:
+            clear_cuda_cache()
 
         return results
 

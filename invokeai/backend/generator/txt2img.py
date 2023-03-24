@@ -70,11 +70,6 @@ class Txt2Img(Generator):
                 callback=step_callback,
             )
 
-            if (
-                pipeline_output.attention_map_saver is not None
-                and attention_maps_callback is not None
-            ):
-                attention_maps_callback(pipeline_output.attention_map_saver)
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
 

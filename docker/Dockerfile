@@ -94,6 +94,7 @@ ARG VOLUME_DIFF_DIR=/data/configs/stable-diffusion
 RUN mkdir -p "${VOLUME_DIR}" \
   && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
 COPY ./invokeai/configs/api_endpoints.yml /data/api_endpoints.yml
+COPY ./invokeai/configs/resleeve_configs.yml /data/resleeve_configs.yml
 RUN mkdir -p "${VOLUME_CONFIG_DIR}" \
   && chown -hR "${UNAME}:${UNAME}" "${VOLUME_CONFIG_DIR}"
 RUN mkdir -p "${VOLUME_DIFF_DIR}" \
