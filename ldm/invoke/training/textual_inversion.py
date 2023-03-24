@@ -433,8 +433,6 @@ def do_front_end(args: Namespace):
 def main():
     args = parse_args()
     global_set_root(args.root_dir or Globals.root)
-    print(XFORMERS_AVAILABLE,file=sys.stderr)
-    sys.exit(0)
     try:
         if args.front_end:
             do_front_end(args)
