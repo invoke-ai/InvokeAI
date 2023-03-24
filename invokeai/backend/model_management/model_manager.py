@@ -362,6 +362,7 @@ class ModelManager(object):
             raise NotImplementedError(
                 f"Unknown model format {model_name}: {model_format}"
             )
+        self._add_embeddings_to_model(model)
         
         # usage statistics
         toc = time.time()
@@ -434,10 +435,9 @@ class ModelManager(object):
         # square images???
         width = pipeline.unet.config.sample_size * pipeline.vae_scale_factor
         height = width
-
         print(f"   | Default image dimensions = {width} x {height}")
+        
         self._add_embeddings_to_model(pipeline)
-
         return pipeline, width, height, model_hash
 
     def _load_ckpt_model(self, model_name, mconfig):
