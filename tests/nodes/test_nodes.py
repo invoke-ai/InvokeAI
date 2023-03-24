@@ -64,10 +64,12 @@ class PromptCollectionTestInvocation(BaseInvocation):
 
 
 from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.graph import EdgeConnection
+from invokeai.app.services.graph import Edge, EdgeConnection
 
-def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> tuple[EdgeConnection, EdgeConnection]:
-    return (EdgeConnection(node_id = from_id, field = from_field), EdgeConnection(node_id = to_id, field = to_field))
+def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:
+    return Edge(
+        source=EdgeConnection(node_id = from_id, field = from_field),
+        destination=EdgeConnection(node_id = to_id, field = to_field))
 
 
 class TestEvent:

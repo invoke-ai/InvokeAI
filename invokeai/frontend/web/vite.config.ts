@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
        * overrides any target specified here.
        */
       // target: 'esnext',
-      chunkSizeWarningLimit: 1500, // we don't really care about chunk size
+      chunkSizeWarningLimit: 1500, // we don't really care about chunk size,
     },
   };
   if (mode == 'development') {

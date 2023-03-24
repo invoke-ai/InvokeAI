@@ -61,7 +61,7 @@ class Txt2Img(Generator):
             ),
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
-        def make_image(x_T) -> PIL.Image.Image:
+        def make_image(x_T: torch.Tensor, _: int) -> PIL.Image.Image:
             pipeline_output = pipeline.image_from_embeddings(
                 latents=torch.zeros_like(x_T, dtype=self.torch_dtype()),
                 noise=x_T,

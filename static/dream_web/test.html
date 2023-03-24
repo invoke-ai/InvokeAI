@@ -105,17 +105,20 @@
 
             // Start building nodes
             var id = 1;
-            var initialNode = {"id": id.toString(), "type": "txt2img", "prompt": prompt, "sampler": sampler, "steps": steps, "seed": seed};
+            var initialNode = {"id": id.toString(), "type": "txt2img", "prompt": prompt, "model": "stable-diffusion-1-5", "sampler": sampler, "steps": steps, "seed": seed};
+            id++;
+            var i2iNode = {"id": id.toString(), "type": "img2img", "prompt": prompt, "model": "stable-diffusion-1-5", "sampler": sampler, "steps": steps, "seed": Math.floor(Math.random() * 10000)};
             id++;
             var upscaleNode = {"id": id.toString(), "type": "show_image" };
             id++
 
             nodes = {};
             nodes[initialNode.id] = initialNode;
+            nodes[i2iNode.id] = i2iNode;
             nodes[upscaleNode.id] = upscaleNode;
             links = [
-                [{ "node_id": initialNode.id, field: "image" },
-                 { "node_id": upscaleNode.id, field: "image" }]
+                { "source": { "node_id": initialNode.id, field: "image" }, "destination": { "node_id": i2iNode.id, field: "image" }},
+                { "source": { "node_id": i2iNode.id, field: "image" }, "destination": { "node_id": upscaleNode.id, field: "image" }}
             ];
             // expandSize = 128;
             // for (var i = 0; i < 6; ++i) {

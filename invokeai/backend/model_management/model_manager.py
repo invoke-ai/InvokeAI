@@ -97,7 +97,7 @@ class ModelManager(object):
         If on disk, will load from there.
         """
         if not model_name:
-            return self.current_model if self.current_model else self.get_model(self.default_model())
+            return self.get_model(self.current_model) if self.current_model else self.get_model(self.default_model())
         
         if not self.valid_model(model_name):
             print(
@@ -362,6 +362,7 @@ class ModelManager(object):
             raise NotImplementedError(
                 f"Unknown model format {model_name}: {model_format}"
             )
+        self._add_embeddings_to_model(model)
         
         # usage statistics
         toc = time.time()
@@ -436,7 +437,6 @@ class ModelManager(object):
         height = width
 
         print(f"  | Default image dimensions = {width} x {height}")
-        self._add_embeddings_to_model(pipeline)
 
         return pipeline, width, height, model_hash
 
@@ -732,9 +732,9 @@ class ModelManager(object):
 
         # another round of heuristics to guess the correct config file.
         checkpoint = (
-            safetensors.torch.load_file(model_path)
-            if model_path.suffix == ".safetensors"
-            else torch.load(model_path)
+            torch.load(model_path)
+            if model_path.suffix == ".ckpt"
+            else safetensors.torch.load_file(model_path)
         )
 
         # additional probing needed if no config file provided

@@ -12,14 +12,13 @@ import {
   RadioGroup,
   Spacer,
   Text,
-  VStack,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 
-import { FaPlus, FaSearch } from 'react-icons/fa';
+import { FaSearch, FaTrash } from 'react-icons/fa';
 
 import { addNewModel, searchForModels } from 'app/socketio/actions';
 import {
@@ -34,7 +33,7 @@ import IAIInput from 'common/components/IAIInput';
 import { Field, Formik } from 'formik';
 import { forEach, remove } from 'lodash';
 import type { ChangeEvent, ReactNode } from 'react';
-import { BiReset } from 'react-icons/bi';
+import IAIForm from 'common/components/IAIForm';
 
 const existingModelsSelector = createSelector([systemSelector], (system) => {
   const { model_list } = system;
@@ -71,34 +70,32 @@ function SearchModelEntry({
   };
 
   return (
-    <VStack>
-      <Flex
-        flexDirection="column"
-        gap={2}
-        backgroundColor={
-          modelsToAdd.includes(model.name) ? 'accent.650' : 'base.800'
-        }
-        paddingX={4}
-        paddingY={2}
-        borderRadius={4}
-      >
-        <Flex gap={4}>
-          <IAICheckbox
-            value={model.name}
-            label={<Text fontWeight={500}>{model.name}</Text>}
-            isChecked={modelsToAdd.includes(model.name)}
-            isDisabled={existingModels.includes(model.location)}
-            onChange={foundModelsChangeHandler}
-          ></IAICheckbox>
-          {existingModels.includes(model.location) && (
-            <Badge colorScheme="accent">{t('modelManager.modelExists')}</Badge>
-          )}
-        </Flex>
-        <Text fontStyle="italic" variant="subtext">
-          {model.location}
-        </Text>
+    <Flex
+      flexDirection="column"
+      gap={2}
+      backgroundColor={
+        modelsToAdd.includes(model.name) ? 'accent.650' : 'base.800'
+      }
+      paddingX={4}
+      paddingY={2}
+      borderRadius={4}
+    >
+      <Flex gap={4} alignItems="center" justifyContent="space-between">
+        <IAICheckbox
+          value={model.name}
+          label={<Text fontWeight={500}>{model.name}</Text>}
+          isChecked={modelsToAdd.includes(model.name)}
+          isDisabled={existingModels.includes(model.location)}
+          onChange={foundModelsChangeHandler}
+        ></IAICheckbox>
+        {existingModels.includes(model.location) && (
+          <Badge colorScheme="accent">{t('modelManager.modelExists')}</Badge>
+        )}
       </Flex>
-    </VStack>
+      <Text fontStyle="italic" variant="subtext">
+        {model.location}
+      </Text>
+    </Flex>
   );
 }
 
@@ -215,10 +212,10 @@ export default function SearchModels() {
     }
 
     return (
-      <>
+      <Flex flexDirection="column" rowGap={4}>
         {newFoundModels}
         {shouldShowExistingModelsInSearch && existingFoundModels}
-      </>
+      </Flex>
     );
   };
 
@@ -245,26 +242,26 @@ export default function SearchModels() {
             <Text
               sx={{
                 fontWeight: 500,
-                fontSize: 'sm',
               }}
               variant="subtext"
             >
               {t('modelManager.checkpointFolder')}
             </Text>
-            <Text sx={{ fontWeight: 500, fontSize: 'sm' }}>{searchFolder}</Text>
+            <Text sx={{ fontWeight: 500 }}>{searchFolder}</Text>
           </Flex>
           <Spacer />
           <IAIIconButton
             aria-label={t('modelManager.scanAgain')}
             tooltip={t('modelManager.scanAgain')}
-            icon={<BiReset />}
+            icon={<FaSearch />}
             fontSize={18}
             disabled={isProcessing}
             onClick={() => dispatch(searchForModels(searchFolder))}
           />
           <IAIIconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
-            icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
+            tooltip={t('modelManager.clearCheckpointFolder')}
+            icon={<FaTrash />}
             onClick={resetSearchModelHandler}
           />
         </Flex>
@@ -276,9 +273,9 @@ export default function SearchModels() {
           }}
         >
           {({ handleSubmit }) => (
-            <form onSubmit={handleSubmit}>
-              <HStack columnGap={2} alignItems="flex-end" width="100%">
-                <FormControl isRequired width="lg">
+            <IAIForm onSubmit={handleSubmit} width="100%">
+              <HStack columnGap={2} alignItems="flex-end">
+                <FormControl flexGrow={1}>
                   <Field
                     as={IAIInput}
                     id="checkpointFolder"
@@ -294,12 +291,12 @@ export default function SearchModels() {
                   tooltip={t('modelManager.findModels')}
                   type="submit"
                   disabled={isProcessing}
-                  paddingX={10}
+                  px={8}
                 >
                   {t('modelManager.findModels')}
                 </IAIButton>
               </HStack>
-            </form>
+            </IAIForm>
           )}
         </Formik>
       )}
@@ -410,7 +407,6 @@ export default function SearchModels() {
             maxHeight={72}
             overflowY="scroll"
             borderRadius="sm"
-            paddingInlineEnd={4}
             gap={2}
           >
             {foundModels.length > 0 ? (

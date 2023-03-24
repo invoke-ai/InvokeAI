@@ -1,4 +1,4 @@
-import React, { lazy } from 'react';
+import React, { lazy, PropsWithChildren } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store } from './app/store';
@@ -21,14 +21,14 @@ import './i18n';
 const App = lazy(() => import('./app/App'));
 const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
 
-export default function Component() {
+export default function Component(props: PropsWithChildren) {
   return (
     <React.StrictMode>
       <Provider store={store}>
         <PersistGate loading={<Loading />} persistor={persistor}>
           <React.Suspense fallback={<Loading showText />}>
             <ThemeLocaleProvider>
-              <App />
+              <App>{props.children}</App>
             </ThemeLocaleProvider>
           </React.Suspense>
         </PersistGate>
