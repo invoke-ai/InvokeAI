@@ -1,16 +1,16 @@
 # continuous integration
-/.github/workflows/ @mauwii @lstein
+/.github/workflows/ @mauwii @lstein @blessedcoolant
 
 # documentation
-/docs/ @lstein @mauwii @tildebyte
-/mkdocs.yml @lstein @mauwii
+/docs/ @lstein @mauwii @tildebyte @blessedcoolant
+/mkdocs.yml @lstein @mauwii @blessedcoolant
 
 # nodes
 /invokeai/app/ @Kyle0654 @blessedcoolant
 
 # installation and configuration
 /pyproject.toml @mauwii @lstein @blessedcoolant
-/docker/ @mauwii @lstein
+/docker/ @mauwii @lstein @blessedcoolant
 /scripts/ @ebr @lstein
 /installer/ @lstein @ebr
 /invokeai/assets @lstein @ebr
