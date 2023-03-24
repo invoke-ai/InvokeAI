@@ -63,6 +63,7 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
+.coveragerc
 .coverage
 .coverage.*
 .cache
@@ -73,6 +74,7 @@ cov.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.pytest.ini
 cover/
 junit/
 

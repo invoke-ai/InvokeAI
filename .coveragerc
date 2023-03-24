@@ -1,6 +1,0 @@
-[run]
-omit='.env/*'
-source='.'
-
-[report]
-show_missing = true
