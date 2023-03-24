@@ -157,7 +157,7 @@ def _run_invoke(
 ):
     pid = os.getpid()
     logdir.mkdir(parents=True, exist_ok=True)
-    logfile = Path(logdir, f'{time.strftime("%Y-%m-%d-%H:%M:%S")}-pid={pid}.txt')
+    logfile = Path(logdir, f'{time.strftime("%Y-%m-%d_%H-%M-%S")}-pid={pid}.txt')
     print(
         f">> Process {pid} running on GPU {gpu}; logging to {logfile}", file=sys.stderr
     )

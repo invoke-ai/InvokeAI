@@ -30,14 +30,17 @@ class PngWriter:
                 prefix = self._unused_prefix()
             else:
                 with open(next_prefix_file,'r') as file:
-                    prefix=int(file.readline() or int(self._unused_prefix())-1)
-                    prefix+=1
+                    prefix = 0
+                    try:
+                        prefix=int(file.readline())
+                    except (TypeError, ValueError):
+                        prefix=self._unused_prefix()
             with open(next_prefix_file,'w') as file:
-                file.write(str(prefix))
+                file.write(str(prefix+1))
         return f'{prefix:06}'
 
     # gives the next unique prefix in outdir
-    def _unused_prefix(self):
+    def _unused_prefix(self)->int:
         # sort reverse alphabetically until we find max+1
         dirlist = sorted(os.listdir(self.outdir), reverse=True)
         # find the first filename that matches our pattern or return 000000.0.png
@@ -45,8 +48,7 @@ class PngWriter:
             (f for f in dirlist if re.match('^(\d+)\..*\.png', f)),
             '0000000.0.png',
         )
-        basecount = int(existing_name.split('.', 1)[0]) + 1
-        return f'{basecount:06}'
+        return int(existing_name.split('.', 1)[0]) + 1
 
     # saves image named _image_ to outdir/name, writing metadata from prompt
     # returns full path of output
