@@ -10,6 +10,7 @@ from pydantic.fields import Field
 from ...invocations import *
 from ...invocations.baseinvocation import BaseInvocation
 from ...services.graph import (
+    Edge,
     EdgeConnection,
     Graph,
     GraphExecutionState,
@@ -92,7 +93,7 @@ async def get_session(
 async def add_node(
     session_id: str = Path(description="The id of the session"),
     node: Annotated[
-        Union[BaseInvocation.get_invocations()], Field(discriminator="type")
+        Union[BaseInvocation.get_invocations()], Field(discriminator="type") # type: ignore
     ] = Body(description="The node to add"),
 ) -> str:
     """Adds a node to the graph"""
@@ -125,7 +126,7 @@ async def update_node(
     session_id: str = Path(description="The id of the session"),
     node_path: str = Path(description="The path to the node in the graph"),
     node: Annotated[
-        Union[BaseInvocation.get_invocations()], Field(discriminator="type")
+        Union[BaseInvocation.get_invocations()], Field(discriminator="type") # type: ignore
     ] = Body(description="The new node"),
 ) -> GraphExecutionState:
     """Updates a node in the graph and removes all linked edges"""
@@ -186,7 +187,7 @@ async def delete_node(
 )
 async def add_edge(
     session_id: str = Path(description="The id of the session"),
-    edge: tuple[EdgeConnection, EdgeConnection] = Body(description="The edge to add"),
+    edge: Edge = Body(description="The edge to add"),
 ) -> GraphExecutionState:
     """Adds an edge to the graph"""
     session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
@@ -228,9 +229,9 @@ async def delete_edge(
         return Response(status_code=404)
 
     try:
-        edge = (
-            EdgeConnection(node_id=from_node_id, field=from_field),
-            EdgeConnection(node_id=to_node_id, field=to_field),
+        edge = Edge(
+            source=EdgeConnection(node_id=from_node_id, field=from_field),
+            destination=EdgeConnection(node_id=to_node_id, field=to_field)
         )
         session.delete_edge(edge)
         ApiDependencies.invoker.services.graph_execution_manager.set(

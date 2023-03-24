@@ -8,7 +8,8 @@ import {
   forwardRef,
   useDisclosure,
 } from '@chakra-ui/react';
-import { cloneElement, ReactElement, ReactNode, useRef } from 'react';
+import { cloneElement, memo, ReactElement, ReactNode, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import IAIButton from './IAIButton';
 
 type Props = {
@@ -22,10 +23,12 @@ type Props = {
 };
 
 const IAIAlertDialog = forwardRef((props: Props, ref) => {
+  const { t } = useTranslation();
+
   const {
-    acceptButtonText = 'Accept',
+    acceptButtonText = t('common.accept'),
     acceptCallback,
-    cancelButtonText = 'Cancel',
+    cancelButtonText = t('common.cancel'),
     cancelCallback,
     children,
     title,
@@ -56,6 +59,7 @@ const IAIAlertDialog = forwardRef((props: Props, ref) => {
         isOpen={isOpen}
         leastDestructiveRef={cancelRef}
         onClose={onClose}
+        isCentered
       >
         <AlertDialogOverlay>
           <AlertDialogContent>
@@ -79,4 +83,4 @@ const IAIAlertDialog = forwardRef((props: Props, ref) => {
     </>
   );
 });
-export default IAIAlertDialog;
+export default memo(IAIAlertDialog);

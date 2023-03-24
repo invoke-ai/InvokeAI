@@ -1075,9 +1075,10 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         dlogging.set_verbosity_error()
 
         checkpoint = (
-            load_file(checkpoint_path)
-            if Path(checkpoint_path).suffix == ".safetensors"
-            else torch.load(checkpoint_path)
+            torch.load(checkpoint_path)
+            if Path(checkpoint_path).suffix == ".ckpt"
+            else load_file(checkpoint_path)
+            
         )
         cache_dir = global_cache_dir("hub")
         pipeline_class = (
@@ -1274,7 +1275,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
                 tokenizer=tokenizer,
                 unet=unet.to(precision),
                 scheduler=scheduler,
-                safety_checker=safety_checker.to(precision),
+                safety_checker=None if return_generator_pipeline else safety_checker.to(precision),
                 feature_extractor=feature_extractor,
             )
         else:

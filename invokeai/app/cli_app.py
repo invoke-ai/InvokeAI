@@ -17,8 +17,9 @@ from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_gra
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
-from .services.generate_initializer import get_generate
-from .services.graph import EdgeConnection, GraphExecutionState
+from .services.model_manager_initializer import get_model_manager
+from .services.restoration_services import RestorationServices
+from .services.graph import Edge, EdgeConnection, GraphExecutionState
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
 from .services.invocation_services import InvocationServices
@@ -76,7 +77,7 @@ def get_command_parser() -> argparse.ArgumentParser:
 
 def generate_matching_edges(
     a: BaseInvocation, b: BaseInvocation
-) -> list[tuple[EdgeConnection, EdgeConnection]]:
+) -> list[Edge]:
     """Generates all possible edges between two invocations"""
     atype = type(a)
     btype = type(b)
@@ -93,24 +94,41 @@ def generate_matching_edges(
     matching_fields = matching_fields.difference(invalid_fields)
 
     edges = [
-        (
-            EdgeConnection(node_id=a.id, field=field),
-            EdgeConnection(node_id=b.id, field=field),
+        Edge(
+            source=EdgeConnection(node_id=a.id, field=field),
+            destination=EdgeConnection(node_id=b.id, field=field)
         )
         for field in matching_fields
     ]
     return edges
 
 
+class SessionError(Exception):
+    """Raised when a session error has occurred"""
+    pass
+
+
+def invoke_all(context: CliContext):
+    """Runs all invocations in the specified session"""
+    context.invoker.invoke(context.session, invoke_all=True)
+    while not context.get_session().is_complete():
+        # Wait some time
+        time.sleep(0.1)
+
+    # Print any errors
+    if context.session.has_error():
+        for n in context.session.errors:
+            print(
+                f"Error in node {n} (source node {context.session.prepared_source_mapping[n]}): {context.session.errors[n]}"
+            )
+        
+        raise SessionError()
+
+
 def invoke_cli():
-    args = Args()
-    config = args.parse_args()
-
-    generate = get_generate(args, config)
-
-    # NOTE: load model on first use, uncomment to load at startup
-    # TODO: Make this a config option?
-    # generate.load_model()
+    config = Args()
+    config.parse_args()
+    model_manager = get_model_manager(config)
 
     events = EventServiceBase()
 
@@ -122,7 +140,7 @@ def invoke_cli():
     db_location = os.path.join(output_folder, "invokeai.db")
 
     services = InvocationServices(
-        generate=generate,
+        model_manager=model_manager,
         events=events,
         images=DiskImageStorage(output_folder),
         queue=MemoryInvocationQueue(),
@@ -130,11 +148,11 @@ def invoke_cli():
             filename=db_location, table_name="graph_executions"
         ),
         processor=DefaultInvocationProcessor(),
+        restoration=RestorationServices(config),
     )
 
     invoker = Invoker(services)
     session: GraphExecutionState = invoker.create_execution_state()
-
     parser = get_command_parser()
 
     # Uncomment to print out previous sessions at startup
@@ -151,8 +169,7 @@ def invoke_cli():
 
         try:
             # Refresh the state of the session
-            session = invoker.services.graph_execution_manager.get(session.id)
-            history = list(get_graph_execution_history(session))
+            history = list(get_graph_execution_history(context.session))
 
             # Split the command for piping
             cmds = cmd_input.split("|")
@@ -164,7 +181,7 @@ def invoke_cli():
                     raise InvalidArgs("Empty command")
 
                 # Parse args to create invocation
-                args = vars(parser.parse_args(shlex.split(cmd.strip())))
+                args = vars(context.parser.parse_args(shlex.split(cmd.strip())))
 
                 # Override defaults
                 for field_name, field_default in context.defaults.items():
@@ -176,16 +193,16 @@ def invoke_cli():
                 command = CliCommand(command=args)
 
                 # Run any CLI commands immediately
-                # TODO: this won't behave as expected if piping and using e.g. history,
-                # since invocations are gathered and then run together at the end.
-                # This is more efficient if the CLI is running against a distributed
-                # backend, so it's preferable not to change that behavior.
                 if isinstance(command.command, BaseCommand):
+                    # Invoke all current nodes to preserve operation order
+                    invoke_all(context)
+
+                    # Run the command
                     command.command.run(context)
                     continue
 
                 # Pipe previous command output (if there was a previous command)
-                edges = []
+                edges: list[Edge] = list()
                 if len(history) > 0 or current_id != start_id:
                     from_id = (
                         history[0] if current_id == start_id else str(current_id - 1)
@@ -193,7 +210,7 @@ def invoke_cli():
                     from_node = (
                         next(filter(lambda n: n[0].id == from_id, new_invocations))[0]
                         if current_id != start_id
-                        else session.graph.get_node(from_id)
+                        else context.session.graph.get_node(from_id)
                     )
                     matching_edges = generate_matching_edges(
                         from_node, command.command
@@ -203,23 +220,23 @@ def invoke_cli():
                 # Parse provided links
                 if "link_node" in args and args["link_node"]:
                     for link in args["link_node"]:
-                        link_node = session.graph.get_node(link)
+                        link_node = context.session.graph.get_node(link)
                         matching_edges = generate_matching_edges(
                             link_node, command.command
                         )
-                        matching_destinations = [e[1] for e in matching_edges]
-                        edges = [e for e in edges if e[1] not in matching_destinations]
+                        matching_destinations = [e.destination for e in matching_edges]
+                        edges = [e for e in edges if e.destination not in matching_destinations]
                         edges.extend(matching_edges)
 
                 if "link" in args and args["link"]:
                     for link in args["link"]:
-                        edges = [e for e in edges if e[1].node_id != command.command.id and e[1].field != link[2]]
+                        edges = [e for e in edges if e.destination.node_id != command.command.id and e.destination.field != link[2]]
                         edges.append(
-                            (
-                                EdgeConnection(node_id=link[1], field=link[0]),
-                                EdgeConnection(
+                            Edge(
+                                source=EdgeConnection(node_id=link[1], field=link[0]),
+                                destination=EdgeConnection(
                                     node_id=command.command.id, field=link[2]
-                                ),
+                                )
                             )
                         )
 
@@ -227,36 +244,23 @@ def invoke_cli():
 
                 current_id = current_id + 1
 
-            # Command line was parsed successfully
-            # Add the invocations to the session
-            for invocation in new_invocations:
-                session.add_node(invocation[0])
-                for edge in invocation[1]:
+                # Add the node to the session
+                context.session.add_node(command.command)
+                for edge in edges:
                     print(edge)
-                    session.add_edge(edge)
+                    context.session.add_edge(edge)
 
-            # Execute all available invocations
-            invoker.invoke(session, invoke_all=True)
-            while not session.is_complete():
-                # Wait some time
-                session = context.get_session()
-                time.sleep(0.1)
-
-            # Print any errors
-            if session.has_error():
-                for n in session.errors:
-                    print(
-                        f"Error in node {n} (source node {session.prepared_source_mapping[n]}): {session.errors[n]}"
-                    )
-
-                # Start a new session
-                print("Creating a new session")
-                session = invoker.create_execution_state()
-                context.session = session
+            # Execute all remaining nodes
+            invoke_all(context)
 
         except InvalidArgs:
             print('Invalid command, use "help" to list commands')
             continue
+
+        except SessionError:
+            # Start a new session
+            print("Session error: creating a new session")
+            context.session = context.invoker.create_execution_state()
 
         except ExitCli:
             break

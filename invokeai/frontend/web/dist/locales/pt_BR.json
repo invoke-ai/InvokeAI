@@ -63,7 +63,10 @@
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
         "langRussian": "Russo",
-        "langSpanish": "Espanhol"
+        "langSpanish": "Espanhol",
+        "pinOptionsPanel": "Fixar painel de opções",
+        "loadingInvokeAI": "Carregando Invoke AI",
+        "loading": "Carregando"
     },
     "gallery": {
         "generations": "Gerações",
@@ -358,7 +361,6 @@
         "convertToDiffusersHelpText6": "Você deseja converter este modelo?",
         "convertToDiffusersSaveLocation": "Local para Salvar",
         "v1": "v1",
-        "v2": "v2",
         "inpainting": "v1 Inpainting",
         "customConfig": "Configuração personalizada",
         "pathToCustomConfig": "Caminho para configuração personalizada",
@@ -381,7 +383,19 @@
         "allModels": "Todos os Modelos",
         "repoIDValidationMsg": "Repositório Online do seu Modelo",
         "convert": "Converter",
-        "convertToDiffusersHelpText2": "Este processo irá substituir sua entrada de Gerenciador de Modelos por uma versão Diffusers do mesmo modelo."
+        "convertToDiffusersHelpText2": "Este processo irá substituir sua entrada de Gerenciador de Modelos por uma versão Diffusers do mesmo modelo.",
+        "mergedModelCustomSaveLocation": "Caminho Personalizado",
+        "mergedModelSaveLocation": "Local de Salvamento",
+        "interpolationType": "Tipo de Interpolação",
+        "ignoreMismatch": "Ignorar Divergências entre Modelos Selecionados",
+        "invokeAIFolder": "Pasta Invoke AI",
+        "weightedSum": "Soma Ponderada",
+        "sigmoid": "Sigmóide",
+        "inverseSigmoid": "Sigmóide Inversa",
+        "modelMergeHeaderHelp1": "Você pode mesclar até três modelos diferentes para criar uma mistura que atenda às suas necessidades.",
+        "modelMergeInterpAddDifferenceHelp": "Neste modo, o Modelo 3 é primeiro subtraído do Modelo 2. A versão resultante é mesclada com o Modelo 1 com a taxa alpha definida acima.",
+        "modelMergeAlphaHelp": "Alpha controla a força da mistura dos modelos. Valores de alpha mais baixos resultam em uma influência menor do segundo modelo.",
+        "modelMergeHeaderHelp2": "Apenas Diffusers estão disponíveis para mesclagem. Se você deseja mesclar um modelo de checkpoint, por favor, converta-o para Diffusers primeiro."
     },
     "parameters": {
         "images": "Imagems",
@@ -441,7 +455,22 @@
         "info": "Informações",
         "deleteImage": "Apagar Imagem",
         "initialImage": "Imagem inicial",
-        "showOptionsPanel": "Mostrar Painel de Opções"
+        "showOptionsPanel": "Mostrar Painel de Opções",
+        "vSymmetryStep": "V Passo de Simetria",
+        "hSymmetryStep": "H Passo de Simetria",
+        "symmetry": "Simetria",
+        "copyImage": "Copiar imagem",
+        "negativePrompts": "Indicações negativas",
+        "hiresStrength": "Força da Alta Resolução",
+        "denoisingStrength": "A força de remoção de ruído",
+        "imageToImage": "Imagem para Imagem",
+        "cancel": {
+            "setType": "Definir tipo de cancelamento",
+            "isScheduled": "Cancelando",
+            "schedule": "Cancelar após a iteração atual",
+            "immediate": "Cancelar imediatamente"
+        },
+        "general": "Geral"
     },
     "settings": {
         "models": "Modelos",
@@ -454,7 +483,8 @@
         "resetWebUI": "Reiniciar Interface",
         "resetWebUIDesc1": "Reiniciar a interface apenas reinicia o cache local do broswer para imagens e configurações lembradas. Não apaga nenhuma imagem do disco.",
         "resetWebUIDesc2": "Se as imagens não estão aparecendo na galeria ou algo mais não está funcionando, favor tentar reiniciar antes de postar um problema no GitHub.",
-        "resetComplete": "A interface foi reiniciada. Atualize a página para carregar."
+        "resetComplete": "A interface foi reiniciada. Atualize a página para carregar.",
+        "useSlidersForAll": "Usar deslizadores para todas as opções"
     },
     "toast": {
         "tempFoldersEmptied": "Pasta de Arquivos Temporários Esvaziada",
@@ -546,5 +576,20 @@
         "betaDarkenOutside": "Escurecer Externamente",
         "betaLimitToBox": "Limitar Para a Caixa",
         "betaPreserveMasked": "Preservar Máscarado"
+    },
+    "tooltip": {
+        "feature": {
+            "seed": "O valor da semente afeta o ruído inicial a partir do qual a imagem é formada. Você pode usar as sementes já existentes de imagens anteriores. 'Limiar de ruído' é usado para mitigar artefatos em valores CFG altos (experimente a faixa de 0-10), e o Perlin para adicionar ruído Perlin durante a geração: ambos servem para adicionar variação às suas saídas.",
+            "gallery": "A galeria exibe as gerações da pasta de saída conforme elas são criadas. As configurações são armazenadas em arquivos e acessadas pelo menu de contexto.",
+            "other": "Essas opções ativam modos alternativos de processamento para o Invoke. 'Seamless tiling' criará padrões repetidos na saída. 'High resolution' é uma geração em duas etapas com img2img: use essa configuração quando desejar uma imagem maior e mais coerente sem artefatos. Levará mais tempo do que o txt2img usual.",
+            "boundingBox": "A caixa delimitadora é a mesma que as configurações de largura e altura para Texto para Imagem ou Imagem para Imagem. Apenas a área na caixa será processada.",
+            "upscale": "Use o ESRGAN para ampliar a imagem imediatamente após a geração.",
+            "seamCorrection": "Controla o tratamento das emendas visíveis que ocorrem entre as imagens geradas no canvas.",
+            "faceCorrection": "Correção de rosto com GFPGAN ou Codeformer: o algoritmo detecta rostos na imagem e corrige quaisquer defeitos. Um valor alto mudará mais a imagem, resultando em rostos mais atraentes. Codeformer com uma fidelidade maior preserva a imagem original às custas de uma correção de rosto mais forte.",
+            "prompt": "Este é o campo de prompt. O prompt inclui objetos de geração e termos estilísticos. Você também pode adicionar peso (importância do token) no prompt, mas comandos e parâmetros de CLI não funcionarão.",
+            "infillAndScaling": "Gerencie os métodos de preenchimento (usados em áreas mascaradas ou apagadas do canvas) e a escala (útil para tamanhos de caixa delimitadora pequenos).",
+            "imageToImage": "Image to Image carrega qualquer imagem como inicial, que é então usada para gerar uma nova junto com o prompt. Quanto maior o valor, mais a imagem resultante mudará. Valores de 0.0 a 1.0 são possíveis, a faixa recomendada é de 0.25 a 0.75",
+            "variations": "Experimente uma variação com um valor entre 0,1 e 1,0 para mudar o resultado para uma determinada semente. Variações interessantes da semente estão entre 0,1 e 0,3."
+        }
     }
 }

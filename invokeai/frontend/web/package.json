@@ -8,7 +8,7 @@
     "build": "yarn run lint && vite build",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
-    "lint:eslint": "eslint --max-warnings=0",
+    "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
     "lint": "yarn run lint:eslint && yarn run lint:prettier && yarn run lint:tsc && yarn run lint:madge",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@chakra-ui/anatomy": "^2.1.1",
+    "@chakra-ui/cli": "^2.3.0",
     "@chakra-ui/icons": "^2.0.17",
     "@chakra-ui/react": "^2.5.1",
     "@chakra-ui/styled-system": "^2.6.1",
@@ -52,6 +53,7 @@
     "i18next-http-backend": "^2.1.1",
     "konva": "^8.4.2",
     "lodash": "^4.17.21",
+    "patch-package": "^6.5.1",
     "re-resizable": "^6.9.9",
     "react": "^18.2.0",
     "react-colorful": "^5.6.1",
@@ -72,7 +74,6 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "@chakra-ui/cli": "^2.3.0",
     "@fontsource/inter": "^4.5.15",
     "@types/dateformat": "^5.0.0",
     "@types/react": "^18.0.28",
@@ -92,7 +93,6 @@
     "husky": "^8.0.3",
     "lint-staged": "^13.1.2",
     "madge": "^6.0.0",
-    "patch-package": "^6.5.1",
     "postinstall-postinstall": "^2.1.0",
     "prettier": "^2.8.4",
     "rollup-plugin-visualizer": "^5.9.0",

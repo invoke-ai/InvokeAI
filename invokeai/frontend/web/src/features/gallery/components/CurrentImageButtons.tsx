@@ -7,10 +7,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import {
-  setDoesCanvasNeedScaling,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
@@ -52,6 +49,7 @@ import { gallerySelector } from '../store/gallerySelectors';
 import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -361,7 +359,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
     dispatch(setInitialCanvasImage(currentImage));
-    dispatch(setDoesCanvasNeedScaling(true));
+    dispatch(requestCanvasRescale());
 
     if (activeTabName !== 'unifiedCanvas') {
       dispatch(setActiveTab('unifiedCanvas'));
@@ -407,7 +405,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     >
       <ButtonGroup isAttached={true}>
         <IAIPopover
-          trigger="hover"
           triggerComponent={
             <IAIIconButton
               aria-label={`${t('parameters.sendTo')}...`}
@@ -419,7 +416,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             sx={{
               flexDirection: 'column',
               rowGap: 2,
-              w: 52,
             }}
           >
             <IAIButton
@@ -508,7 +504,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
       <ButtonGroup isAttached={true}>
         <IAIPopover
-          trigger="hover"
           triggerComponent={
             <IAIIconButton
               icon={<FaGrinStars />}
@@ -538,7 +533,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </IAIPopover>
 
         <IAIPopover
-          trigger="hover"
           triggerComponent={
             <IAIIconButton
               icon={<FaExpandArrowsAlt />}

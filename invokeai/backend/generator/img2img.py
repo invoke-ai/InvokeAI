@@ -1,8 +1,10 @@
 """
 invokeai.backend.generator.img2img descends from .generator
 """
+from typing import Optional
 
 import torch
+from accelerate.utils import set_seed
 from diffusers import logging
 
 from ..stable_diffusion import (
@@ -61,10 +63,11 @@ class Img2Img(Generator):
             ),
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
-        def make_image(x_T):
+        def make_image(x_T: torch.Tensor, seed: int):
             # FIXME: use x_T for initial seeded noise
             # We're not at the moment because the pipeline automatically resizes init_image if
             # necessary, which the x_T input might not match.
+            # In the meantime, reset the seed prior to generating pipeline output so we at least get the same result.
             logging.set_verbosity_error()  # quench safety check warnings
             pipeline_output = pipeline.img2img_from_embeddings(
                 init_image,
@@ -73,6 +76,7 @@ class Img2Img(Generator):
                 conditioning_data,
                 noise_func=self.get_noise_like,
                 callback=step_callback,
+                seed=seed,
             )
             if (
                 pipeline_output.attention_map_saver is not None

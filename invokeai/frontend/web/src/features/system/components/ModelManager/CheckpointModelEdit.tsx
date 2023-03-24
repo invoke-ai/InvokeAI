@@ -11,8 +11,6 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   Flex,
   FormControl,
-  FormErrorMessage,
-  FormHelperText,
   FormLabel,
   HStack,
   Text,
@@ -28,6 +26,9 @@ import type { RootState } from 'app/store';
 import type { FieldInputProps, FormikProps } from 'formik';
 import { isEqual, pickBy } from 'lodash';
 import ModelConvert from './ModelConvert';
+import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
+import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
+import IAIForm from 'common/components/IAIForm';
 
 const selector = createSelector(
   [systemSelector],
@@ -120,7 +121,7 @@ export default function CheckpointModelEdit() {
           onSubmit={editModelFormSubmitHandler}
         >
           {({ handleSubmit, errors, touched }) => (
-            <form onSubmit={handleSubmit}>
+            <IAIForm onSubmit={handleSubmit}>
               <VStack rowGap={2} alignItems="start">
                 {/* Description */}
                 <FormControl
@@ -139,11 +140,13 @@ export default function CheckpointModelEdit() {
                       width="full"
                     />
                     {!!errors.description && touched.description ? (
-                      <FormErrorMessage>{errors.description}</FormErrorMessage>
+                      <IAIFormErrorMessage>
+                        {errors.description}
+                      </IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.descriptionValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -165,11 +168,11 @@ export default function CheckpointModelEdit() {
                       width="full"
                     />
                     {!!errors.config && touched.config ? (
-                      <FormErrorMessage>{errors.config}</FormErrorMessage>
+                      <IAIFormErrorMessage>{errors.config}</IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.configValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -191,11 +194,13 @@ export default function CheckpointModelEdit() {
                       width="full"
                     />
                     {!!errors.weights && touched.weights ? (
-                      <FormErrorMessage>{errors.weights}</FormErrorMessage>
+                      <IAIFormErrorMessage>
+                        {errors.weights}
+                      </IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.modelLocationValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -214,11 +219,11 @@ export default function CheckpointModelEdit() {
                       width="full"
                     />
                     {!!errors.vae && touched.vae ? (
-                      <FormErrorMessage>{errors.vae}</FormErrorMessage>
+                      <IAIFormErrorMessage>{errors.vae}</IAIFormErrorMessage>
                     ) : (
-                      <FormHelperText margin={0}>
+                      <IAIFormHelperText>
                         {t('modelManager.vaeLocationValidationMsg')}
-                      </FormHelperText>
+                      </IAIFormHelperText>
                     )}
                   </VStack>
                 </FormControl>
@@ -253,11 +258,13 @@ export default function CheckpointModelEdit() {
                       </Field>
 
                       {!!errors.width && touched.width ? (
-                        <FormErrorMessage>{errors.width}</FormErrorMessage>
+                        <IAIFormErrorMessage>
+                          {errors.width}
+                        </IAIFormErrorMessage>
                       ) : (
-                        <FormHelperText margin={0}>
+                        <IAIFormHelperText>
                           {t('modelManager.widthValidationMsg')}
-                        </FormHelperText>
+                        </IAIFormHelperText>
                       )}
                     </VStack>
                   </FormControl>
@@ -291,11 +298,13 @@ export default function CheckpointModelEdit() {
                       </Field>
 
                       {!!errors.height && touched.height ? (
-                        <FormErrorMessage>{errors.height}</FormErrorMessage>
+                        <IAIFormErrorMessage>
+                          {errors.height}
+                        </IAIFormErrorMessage>
                       ) : (
-                        <FormHelperText margin={0}>
+                        <IAIFormHelperText>
                           {t('modelManager.heightValidationMsg')}
-                        </FormHelperText>
+                        </IAIFormHelperText>
                       )}
                     </VStack>
                   </FormControl>
@@ -309,7 +318,7 @@ export default function CheckpointModelEdit() {
                   {t('modelManager.updateModel')}
                 </IAIButton>
               </VStack>
-            </form>
+            </IAIForm>
           )}
         </Formik>
       </Flex>

@@ -25,17 +25,18 @@ from accelerate.utils import set_seed
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
+from pathlib import Path
 
 from .args import metadata_from_png
 from .generator import infill_methods
 from .globals import Globals, global_cache_dir
 from .image_util import InitImageResizer, PngWriter, Txt2Mask, configure_model_padding
 from .model_management import ModelManager
+from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device
-
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -222,6 +223,7 @@ class Generate:
             self.precision,
             max_loaded_models=max_loaded_models,
             sequential_offload=self.free_gpu_mem,
+            embedding_path=Path(self.embedding_path),
         )
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
@@ -244,31 +246,8 @@ class Generate:
 
         # load safety checker if requested
         if safety_checker:
-            try:
-                print(">> Initializing NSFW checker")
-                from diffusers.pipelines.stable_diffusion.safety_checker import (
-                    StableDiffusionSafetyChecker,
-                )
-                from transformers import AutoFeatureExtractor
-
-                safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                safety_model_path = global_cache_dir("hub")
-                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-                    safety_model_id,
-                    local_files_only=True,
-                    cache_dir=safety_model_path,
-                )
-                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(
-                    safety_model_id,
-                    local_files_only=True,
-                    cache_dir=safety_model_path,
-                )
-                self.safety_checker.to(self.device)
-            except Exception:
-                print(
-                    "** An error was encountered while installing the safety checker:"
-                )
-                print(traceback.format_exc())
+            print(">> Initializing NSFW checker")
+            self.safety_checker = SafetyChecker(self.device)
         else:
             print(">> NSFW checker is disabled")
 
@@ -495,18 +474,6 @@ class Generate:
             torch.cuda.reset_peak_memory_stats()
 
         results = list()
-        init_image = None
-        mask_image = None
-
-        try:
-            if (
-                self.free_gpu_mem
-                and self.model.cond_stage_model.device != self.model.device
-            ):
-                self.model.cond_stage_model.device = self.model.device
-                self.model.cond_stage_model.to(self.model.device)
-        except AttributeError:
-            pass
 
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
@@ -535,15 +502,6 @@ class Generate:
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
 
-            checker = (
-                {
-                    "checker": self.safety_checker,
-                    "extractor": self.safety_feature_extractor,
-                }
-                if self.safety_checker
-                else None
-            )
-
             results = generator.generate(
                 prompt,
                 iterations=iterations,
@@ -570,7 +528,7 @@ class Generate:
                 embiggen_strength=embiggen_strength,
                 inpaint_replace=inpaint_replace,
                 mask_blur_radius=mask_blur_radius,
-                safety_checker=checker,
+                safety_checker=self.safety_checker,
                 seam_size=seam_size,
                 seam_blur=seam_blur,
                 seam_strength=seam_strength,
@@ -952,18 +910,6 @@ class Generate:
         self.generators = {}
 
         set_seed(random.randrange(0, np.iinfo(np.uint32).max))
-        if self.embedding_path is not None:
-            print(f">> Loading embeddings from {self.embedding_path}")
-            for root, _, files in os.walk(self.embedding_path):
-                for name in files:
-                    ti_path = os.path.join(root, name)
-                    self.model.textual_inversion_manager.load_textual_inversion(
-                        ti_path, defer_injecting_tokens=True
-                    )
-            print(
-                f'>> Textual inversion triggers: {", ".join(sorted(self.model.textual_inversion_manager.get_all_trigger_strings()))}'
-            )
-
         self.model_name = model_name
         self._set_scheduler()  # requires self.model_name to be set first
         return self.model
@@ -1010,7 +956,7 @@ class Generate:
     ):
         results = []
         for r in image_list:
-            image, seed = r
+            image, seed, _ = r
             try:
                 if strength > 0:
                     if self.gfpgan is not None or self.codeformer is not None:

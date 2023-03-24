@@ -1,11 +1,13 @@
-import { Flex, Image } from '@chakra-ui/react';
+import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
+import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
 import { gallerySelector } from '../store/gallerySelectors';
+import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 
@@ -45,6 +47,9 @@ export default function CurrentImagePreview() {
       {imageToDisplay && (
         <Image
           src={imageToDisplay.url}
+          width={imageToDisplay.width}
+          height={imageToDisplay.height}
+          fallback={!isIntermediate ? <CurrentImageFallback /> : undefined}
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',
@@ -54,18 +59,23 @@ export default function CurrentImagePreview() {
             imageRendering: isIntermediate ? 'pixelated' : 'initial',
             borderRadius: 'base',
           }}
-          {...(isIntermediate && {
-            width: imageToDisplay.width,
-            height: imageToDisplay.height,
-          })}
         />
       )}
       {!shouldShowImageDetails && <NextPrevImageButtons />}
       {shouldShowImageDetails && imageToDisplay && (
-        <ImageMetadataViewer
-          image={imageToDisplay}
-          styleClass="current-image-metadata"
-        />
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '0',
+            width: '100%',
+            height: '100%',
+            borderRadius: 'base',
+            overflow: 'scroll',
+            maxHeight: APP_METADATA_HEIGHT,
+          }}
+        >
+          <ImageMetadataViewer image={imageToDisplay} />
+        </Box>
       )}
     </Flex>
   );

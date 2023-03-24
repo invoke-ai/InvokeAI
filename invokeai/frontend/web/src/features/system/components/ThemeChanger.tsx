@@ -34,9 +34,6 @@ export default function ThemeChanger() {
     Object.keys(THEMES).forEach((theme) => {
       themesToRender.push(
         <IAIButton
-          sx={{
-            width: 24,
-          }}
           isChecked={currentTheme === theme}
           leftIcon={currentTheme === theme ? <FaCheck /> : undefined}
           size="sm"
@@ -53,7 +50,6 @@ export default function ThemeChanger() {
 
   return (
     <IAIPopover
-      trigger="hover"
       triggerComponent={
         <IAIIconButton
           aria-label={t('common.themeLabel')}

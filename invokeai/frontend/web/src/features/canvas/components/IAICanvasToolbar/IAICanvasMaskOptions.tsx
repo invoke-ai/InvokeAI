@@ -104,7 +104,6 @@ const IAICanvasMaskOptions = () => {
 
   return (
     <IAIPopover
-      trigger="hover"
       triggerComponent={
         <ButtonGroup>
           <IAIIconButton

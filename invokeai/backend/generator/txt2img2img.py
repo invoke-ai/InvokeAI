@@ -64,7 +64,7 @@ class Txt2Img2Img(Generator):
             ),
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
-        def make_image(x_T):
+        def make_image(x_T: torch.Tensor, _: int):
             first_pass_latent_output, _ = pipeline.latents_from_embeddings(
                 latents=torch.zeros_like(x_T),
                 num_inference_steps=steps,

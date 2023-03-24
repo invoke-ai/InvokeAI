@@ -6,9 +6,9 @@ import {
   PopoverProps,
   PopoverTrigger,
 } from '@chakra-ui/react';
-import { ReactNode } from 'react';
+import { memo, ReactNode } from 'react';
 
-type IAIPopoverProps = PopoverProps & {
+export type IAIPopoverProps = PopoverProps & {
   triggerComponent: ReactNode;
   triggerContainerProps?: BoxProps;
   children: ReactNode;
@@ -35,4 +35,4 @@ const IAIPopover = (props: IAIPopoverProps) => {
   );
 };
 
-export default IAIPopover;
+export default memo(IAIPopover);
