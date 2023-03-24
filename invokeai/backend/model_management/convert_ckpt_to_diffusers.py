@@ -372,9 +372,9 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     unet_key = "model.diffusion_model."
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100:
-        print(f"  | Checkpoint {path} has both EMA and non-EMA weights.")
+        print(f"   | Checkpoint {path} has both EMA and non-EMA weights.")
         if extract_ema:
-            print("  | Extracting EMA weights (usually better for inference)")
+            print("   | Extracting EMA weights (usually better for inference)")
             for key in keys:
                 if key.startswith("model.diffusion_model"):
                     flat_ema_key = "model_ema." + "".join(key.split(".")[1:])
@@ -393,7 +393,7 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                         )
         else:
             print(
-                "  | Extracting only the non-EMA weights (usually better for fine-tuning)"
+                "   | Extracting only the non-EMA weights (usually better for fine-tuning)"
             )
 
     for key in keys:
@@ -1050,6 +1050,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     vae: AutoencoderKL = None,
     precision: torch.dtype = torch.float32,
     return_generator_pipeline: bool = False,
+    scan_needed:bool=True,
 ) -> Union[StableDiffusionPipeline, StableDiffusionGeneratorPipeline]:
     """
     Load a Stable Diffusion pipeline object from a CompVis-style `.ckpt`/`.safetensors` file and (ideally) a `.yaml`
@@ -1084,12 +1085,13 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
 
-        checkpoint = (
-            torch.load(checkpoint_path)
-            if Path(checkpoint_path).suffix == ".ckpt"
-            else load_file(checkpoint_path)
-            
-        )
+        if Path(checkpoint_path).suffix == '.ckpt':
+            if scan_needed:
+                ModelManager.scan_model(checkpoint_path,checkpoint_path)
+            checkpoint = torch.load(checkpoint_path)
+        else:
+            checkpoint = load_file(checkpoint_path)
+
         cache_dir = global_cache_dir("hub")
         pipeline_class = (
             StableDiffusionGeneratorPipeline
@@ -1101,7 +1103,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         if "global_step" in checkpoint:
             global_step = checkpoint["global_step"]
         else:
-            print("  | global_step key not found in model")
+            print("   | global_step key not found in model")
             global_step = None
 
         # sometimes there is a state_dict key and sometimes not
@@ -1214,7 +1216,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         # Convert the VAE model, or use the one passed
         if not vae:
-            print("  | Using checkpoint model's original VAE")
+            print("   | Using checkpoint model's original VAE")
             vae_config = create_vae_diffusers_config(
                 original_config, image_size=image_size
             )
@@ -1225,7 +1227,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             vae = AutoencoderKL(**vae_config)
             vae.load_state_dict(converted_vae_checkpoint)
         else:
-            print("  | Using external VAE specified in config")
+            print("   | Using external VAE specified in config")
 
         # Convert the text model.
         model_type = pipeline_type
