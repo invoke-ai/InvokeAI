@@ -93,6 +93,7 @@ ARG VOLUME_CONFIG_DIR=/data/configs
 ARG VOLUME_DIFF_DIR=/data/configs/stable-diffusion
 RUN mkdir -p "${VOLUME_DIR}" \
   && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
+COPY ./invokeai/configs/api_endpoints.yml /data/api_endpoints.yml
 COPY ./invokeai/configs/resleeve_configs.yml /data/resleeve_configs.yml
 RUN mkdir -p "${VOLUME_CONFIG_DIR}" \
   && chown -hR "${UNAME}:${UNAME}" "${VOLUME_CONFIG_DIR}"
@@ -102,6 +103,7 @@ RUN mkdir -p "${VOLUME_DIFF_DIR}" \
 # Setup runtime environment
 USER ${UNAME}:${UNAME}
 COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+
 COPY ./models.yaml /data/configs
 COPY ./INITIAL_MODELS.yaml /data/configs
 COPY ./v1-finetune.yaml /data/configs/stable-diffusion
@@ -111,6 +113,7 @@ COPY ./v1-inpainting-inference.yaml /data/configs/stable-diffusion
 COPY ./v1-m1-finetune.yaml /data/configs/stable-diffusion
 COPY ./v2-inference.yaml /data/configs/stable-diffusion
 COPY ./v2-inference-v.yaml /data/configs/stable-diffusion
+
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"

@@ -14,7 +14,7 @@ import time
 import traceback
 from pathlib import Path
 from typing import List
-
+import requests
 import cv2
 import diffusers
 import numpy as np
@@ -38,7 +38,7 @@ from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .safety_checker import SafetyChecker
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .util import choose_precision, choose_torch_device, image_to_base64
+from .util import choose_precision, choose_torch_device, image_to_base64, upload_on_blob
 
 with open("/data/resleeve_configs.yml") as f:
     resleeve_configs = yaml.load(f, Loader=SafeLoader)
@@ -506,9 +506,15 @@ class Generate:
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
             if actual_generation_mode == "img2img":
+                # Upload initial image on blob
+                upload_on_blob("rawuserinput", "user", init_img, actual_generation_mode, init_img_filename)
+                input_image = init_img
                 url_ts = resleeve_configs["img2img_url"]
-                # Check if init_image exists (processed image)
-                input_image = init_img if init_image is None else init_image
+                if init_image is not None:
+                    # Upload processed image on blob
+                    upload_on_blob("processeduserinput", "user", init_image, actual_generation_mode, init_img_filename)
+                    input_image = init_image
+                    
                 request_json_data = {
                     "inputs": [
                         {
@@ -541,6 +547,8 @@ class Generate:
                 }
             else:
                 raise Exception(f"{actual_generation_mode} is not yet supported")
+           
+
 
             results = generator.generate(
                 prompt,
