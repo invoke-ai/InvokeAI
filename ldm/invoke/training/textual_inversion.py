@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import npyscreen
+from diffusers.utils.import_utils import is_xformers_available
 from npyscreen import widget
 from omegaconf import OmegaConf
 
@@ -29,7 +30,7 @@ from ldm.invoke.training.textual_inversion_training import (
 TRAINING_DATA = "text-inversion-training-data"
 TRAINING_DIR = "text-inversion-output"
 CONF_FILE = "preferences.conf"
-
+XFORMERS_AVAILABLE = is_xformers_available()
 
 class textualInversionForm(npyscreen.FormMultiPageAction):
     resolutions = [512, 768, 1024]
@@ -178,7 +179,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             out_of=10000,
             step=500,
             lowest=1,
-            value=saved_args.get("max_train_steps", 3000),
+            value=saved_args.get("max_train_steps", 2500),
             scroll_exit=True,
         )
         self.train_batch_size = self.add_widget_intelligent(
@@ -187,7 +188,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             out_of=50,
             step=1,
             lowest=1,
-            value=saved_args.get("train_batch_size", 8),
+            value=saved_args.get("train_batch_size", 8 if XFORMERS_AVAILABLE else 3),
             scroll_exit=True,
         )
         self.gradient_accumulation_steps = self.add_widget_intelligent(
@@ -225,7 +226,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         self.enable_xformers_memory_efficient_attention = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Use xformers acceleration",
-            value=saved_args.get("enable_xformers_memory_efficient_attention", False),
+            value=saved_args.get("enable_xformers_memory_efficient_attention", XFORMERS_AVAILABLE),
             scroll_exit=True,
         )
         self.lr_scheduler = self.add_widget_intelligent(
@@ -428,8 +429,7 @@ def do_front_end(args: Namespace):
             print(str(e))
             print("** DETAILS:")
             print(traceback.format_exc())
-
-
+            
 def main():
     args = parse_args()
     global_set_root(args.root_dir or Globals.root)
