@@ -424,4 +424,4 @@ def upload_on_blob(container: str, user_id: str, image: Image.Image , generation
         }
     buffered.seek(0)
     files = {'image': buffered}
-    requests.post(url=upload_api, params=params, files=files)
+    return requests.post(url=upload_api, params=params, files=files)

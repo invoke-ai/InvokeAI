@@ -20,7 +20,7 @@ from PIL.Image import Image as ImageType
 from werkzeug.utils import secure_filename
 
 import invokeai.frontend.web.dist as frontend
-
+from loguru import logger
 from .. import Generate
 from ..args import APP_ID, APP_VERSION, Args, calculate_init_img_hash
 from ..generator import infill_methods
@@ -970,8 +970,6 @@ class InvokeAIWebServer:
                 actual_generation_mode = get_canvas_generation_mode(
                     initial_image, mask_image
                 )
-                # Store the generation mode, to use it in our implementation
-                generation_parameters["actual_generation_mode"] = actual_generation_mode
 
                 """
                 Apply the mask to the init image, creating a "mask" image with
@@ -1027,7 +1025,7 @@ class InvokeAIWebServer:
                 )
                 #add the filename, because it gets overriden
                 generation_parameters["init_img_filename"] = init_img_path.split("/")[-1]
-
+            logger.debug(f">> generation parameters: {generation_parameters}")
             def image_progress(sample, step):
                 if self.canceled.is_set():
                     raise CanceledException
@@ -1263,11 +1261,12 @@ class InvokeAIWebServer:
 
                 print(f'\n\n>> Image generated: "{path}"\n')
                 #FIXME change user with id
-                upload_on_blob(container="generatedimage",
-                               user_id="user",
+                response = upload_on_blob(container="generatedimage",
+                               user_id="final",
                                image=image,
-                               generation_mode=generation_parameters["actual_generation_mode"],
+                               generation_mode=generation_parameters["generation_mode"],
                                filename= path.split("/")[-1])
+                logger.debug(f"generatedimage{response.content}")
                 self.write_log_message(f'[Generated] "{path}": {command}')
 
                 if progress.total_iterations > progress.current_iteration:

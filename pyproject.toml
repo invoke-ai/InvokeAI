@@ -77,6 +77,7 @@ dependencies = [
   "transformers~=4.26",
   "uvicorn[standard]==0.20.0",
   "windows-curses; sys_platform=='win32'",
+  "loguru",
 ]
 
 [project.optional-dependencies]
