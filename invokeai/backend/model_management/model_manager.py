@@ -45,9 +45,6 @@ class SDLegacyType(Enum):
     UNKNOWN = 99
 
 DEFAULT_MAX_MODELS = 2
-VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
-    "vae-ft-mse-840000-ema-pruned": "stabilityai/sd-vae-ft-mse",
-}
 
 class ModelManager(object):
     '''
@@ -437,7 +434,6 @@ class ModelManager(object):
         height = width
         print(f"   | Default image dimensions = {width} x {height}")
         
-        self._add_embeddings_to_model(pipeline)
         return pipeline, width, height, model_hash
 
     def _load_ckpt_model(self, model_name, mconfig):
@@ -457,15 +453,21 @@ class ModelManager(object):
 
         from . import load_pipeline_from_original_stable_diffusion_ckpt
 
-        self.offload_model(self.current_model)
-        if vae_config := self._choose_diffusers_vae(model_name):
-            vae = self._load_vae(vae_config)
+        try:
+            if self.list_models()[self.current_model]['status'] == 'active':
+                self.offload_model(self.current_model)
+        except Exception as e:
+            pass
+        
+        vae_path = None
+        if vae:
+            vae_path = vae if os.path.isabs(vae) else os.path.normpath(os.path.join(Globals.root, vae))
         if self._has_cuda():
             torch.cuda.empty_cache()
         pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
             checkpoint_path=weights,
             original_config_file=config,
-            vae=vae,
+            vae_path=vae_path,
             return_generator_pipeline=True,
             precision=torch.float16 if self.precision == "float16" else torch.float32,
         )
@@ -473,7 +475,6 @@ class ModelManager(object):
             pipeline.enable_offload_submodels(self.device)
         else:
             pipeline.to(self.device)
-
         return (
             pipeline,
             width,
@@ -512,6 +513,7 @@ class ModelManager(object):
         print(f">> Offloading {model_name} to CPU")
         model = self.models[model_name]["model"]
         model.offload_all()
+        self.current_model = None
 
         gc.collect()
         if self._has_cuda():
@@ -795,15 +797,16 @@ class ModelManager(object):
         return model_name
 
     def convert_and_import(
-        self,
-        ckpt_path: Path,
-        diffusers_path: Path,
-        model_name=None,
-        model_description=None,
-        vae=None,
-        original_config_file: Path = None,
-        commit_to_conf: Path = None,
-        scan_needed: bool=True,
+            self,
+            ckpt_path: Path,
+            diffusers_path: Path,
+            model_name=None,
+            model_description=None,
+            vae:dict=None,
+            vae_path:Path=None,
+            original_config_file: Path = None,
+            commit_to_conf: Path = None,
+            scan_needed: bool=True,
     ) -> str:
         """
         Convert a legacy ckpt weights file to diffuser model and import
@@ -831,13 +834,17 @@ class ModelManager(object):
         try:
             # By passing the specified VAE to the conversion function, the autoencoder
             # will be built into the model rather than tacked on afterward via the config file
-            vae_model = self._load_vae(vae) if vae else None
+            vae_model=None
+            if vae:
+                vae_model=self._load_vae(vae)
+                vae_path=None
             convert_ckpt_to_diffusers(
                 ckpt_path,
                 diffusers_path,
                 extract_ema=True,
                 original_config_file=original_config_file,
                 vae=vae_model,
+                vae_path=vae_path,
                 scan_needed=scan_needed,
             )
             print(
@@ -883,36 +890,6 @@ class ModelManager(object):
                 found_models.append({"name": file.stem, "location": location})
 
         return search_folder, found_models
-
-    def _choose_diffusers_vae(
-        self, model_name: str, vae: str = None
-    ) -> Union[dict, str]:
-        # In the event that the original entry is using a custom ckpt VAE, we try to
-        # map that VAE onto a diffuser VAE using a hard-coded dictionary.
-        # I would prefer to do this differently: We load the ckpt model into memory, swap the
-        # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
-        # VAE is built into the model. However, when I tried this I got obscure key errors.
-        if vae:
-            return vae
-        if model_name in self.config and (
-            vae_ckpt_path := self.model_info(model_name).get("vae", None)
-        ):
-            vae_basename = Path(vae_ckpt_path).stem
-            diffusers_vae = None
-            if diffusers_vae := VAE_TO_REPO_ID.get(vae_basename, None):
-                print(
-                    f">> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version"
-                )
-                vae = {"repo_id": diffusers_vae}
-            else:
-                print(
-                    f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown'
-                )
-                print(
-                    '** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config'
-                )
-                vae = {"repo_id": "stabilityai/sd-vae-ft-mse"}
-        return vae
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
