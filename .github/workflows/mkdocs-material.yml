@@ -5,6 +5,9 @@ on:
       - 'main'
       - 'development'
 
+permissions:
+    contents: write
+
 jobs:
   mkdocs-material:
     if: github.event.pull_request.draft == false
@@ -34,8 +37,6 @@ jobs:
 
       - name: deploy to gh-pages
         if: ${{ github.ref == 'refs/heads/main' }}
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python -m \
             mkdocs gh-deploy \
