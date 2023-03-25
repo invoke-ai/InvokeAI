@@ -58,7 +58,7 @@ class InvokeAIGeneratorOutput:
     '''
     InvokeAIGeneratorOutput is a dataclass that contains the outputs of a generation
     operation, including the image, its seed, the model name used to generate the image
-    and the model hash, as well as all the generate() parameters that went into 
+    and the model hash, as well as all the generate() parameters that went into
     generating the image (in .params, also available as attributes)
     '''
     image: Image
@@ -116,7 +116,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
            outputs = txt2img.generate(prompt='banana sushi', iterations=None)
            for o in outputs:
                print(o.image, o.seed)
-        
+
         '''
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
@@ -154,6 +154,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         for i in iteration_count:
             results = generator.generate(prompt,
                                          conditioning=(uc, c, extra_conditioning_info),
+                                         step_callback=step_callback,
                                          sampler=scheduler,
                                          **generator_args,
                                          )
@@ -167,7 +168,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             if callback:
                 callback(output)
             yield output
-            
+
     @classmethod
     def schedulers(self)->List[str]:
         '''
@@ -177,7 +178,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
     def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
         return generator_class(model, self.params.precision)
-               
+
     def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
         scheduler_class = self.scheduler_map.get(scheduler_name,'ddim')
         scheduler = scheduler_class.from_config(model.scheduler.config)
@@ -267,12 +268,12 @@ class Embiggen(Txt2Img):
                                 embiggen_tiles=embiggen_tiles,
                                 strength=strength,
                                 **kwargs)
-    
+
     @classmethod
     def _generator_class(cls):
         from .embiggen import Embiggen
         return Embiggen
-    
+
 
 class Generator:
     downsampling_factor: int
@@ -347,7 +348,6 @@ class Generator:
             h_symmetry_time_pct=h_symmetry_time_pct,
             v_symmetry_time_pct=v_symmetry_time_pct,
             attention_maps_callback=attention_maps_callback,
-            seed=seed,
             **kwargs,
         )
         results = []
@@ -375,7 +375,8 @@ class Generator:
                         print("** An error occurred while getting initial noise **")
                         print(traceback.format_exc())
 
-                image = make_image(x_T)
+                # Pass on the seed in case a layer beneath us needs to generate noise on its own.
+                image = make_image(x_T, seed)
 
                 if self.safety_checker is not None:
                     image = self.safety_checker.check(image)
@@ -497,7 +498,8 @@ class Generator:
         matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
         return matched_result
 
-    def sample_to_lowres_estimated_image(self, samples):
+    @staticmethod
+    def sample_to_lowres_estimated_image(samples):
         # origingally adapted from code by @erucipe and @keturn here:
         # https://discuss.huggingface.co/t/decoding-latents-to-rgb-without-upscaling/23204/7
 

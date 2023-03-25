@@ -490,7 +490,7 @@ class Args(object):
             "-z",
             type=int,
             default=6,
-            choices=range(0, 9),
+            choices=range(0, 10),
             dest="png_compression",
             help="level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.",
         )
@@ -943,7 +943,6 @@ class Args(object):
             "--png_compression",
             "-z",
             type=int,
-            default=6,
             choices=range(0, 10),
             dest="png_compression",
             help="level of PNG compression, from 0 (none) to 9 (maximum). [6]",

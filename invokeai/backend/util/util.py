@@ -3,6 +3,9 @@ import math
 import multiprocessing as mp
 import os
 import re
+import io
+import base64
+
 from collections import abc
 from inspect import isfunction
 from pathlib import Path
@@ -364,3 +367,16 @@ def url_attachment_name(url: str) -> dict:
 def download_with_progress_bar(url: str, dest: Path) -> bool:
     result = download_with_resume(url, dest, access_token=None)
     return result is not None
+
+
+def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
+    """
+    Converts an image into a base64 image dataURL.
+    """
+    buffered = io.BytesIO()
+    image.save(buffered, format=image_format)
+    mime_type = Image.MIME.get(image_format.upper(), "image/" + image_format.lower())
+    image_base64 = f"data:{mime_type};base64," + base64.b64encode(
+        buffered.getvalue()
+    ).decode("UTF-8")
+    return image_base64

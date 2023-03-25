@@ -1,20 +1,18 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from datetime import datetime, timezone
 from functools import partial
-from typing import Any, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 import numpy as np
-from PIL import Image
+
 from pydantic import Field
-from skimage.exposure.histogram_matching import match_histograms
 
 from ..services.image_storage import ImageType
-from ..services.invocation_services import InvocationServices
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
-from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
+from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator, Generator
 from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.util.util import image_to_dataURL
 
 SAMPLER_NAME_VALUES = Literal[
     tuple(InvokeAIGenerator.schedulers())
@@ -46,20 +44,33 @@ class TextToImageInvocation(BaseInvocation):
         self, context: InvocationContext, intermediate_state: PipelineIntermediateState
     ) -> None:
         step = intermediate_state.step
-        # if intermediate_state.predicted_original is not None:
-        #     # Some schedulers report not only the noisy latents at the current timestep,
-        #     # but also their estimate so far of what the de-noised latents will be.
-        #     sample = intermediate_state.predicted_original
-        # else:
-        #     sample = intermediate_state.latents
+        if intermediate_state.predicted_original is not None:
+            # Some schedulers report not only the noisy latents at the current timestep,
+            # but also their estimate so far of what the de-noised latents will be.
+        
+            sample = intermediate_state.predicted_original
+        else:
+             sample = intermediate_state.latents
+             
+        image = Generator(context.services.model_manager.get_model()).sample_to_image(sample)
+        (width, height) = image.size
+        dataURL = image_to_dataURL(image, image_format="JPEG")
         context.services.events.emit_generator_progress(
             context.graph_execution_state_id,
             self.id,
+            {
+                "width" : width,
+                "height": height,
+                "dataURL": dataURL,
+            },
             step,
-            float(step) / float(self.steps),
+            self.steps,
         )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        def step_callback(state: PipelineIntermediateState):
+            self.dispatch_progress(context, state.latents, state.step)
+
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
@@ -121,7 +132,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         generator_output = next(
             Img2Img(model).generate(
                 prompt=self.prompt,
-                init_img=image,
+                init_image=image,
                 init_mask=mask,
             step_callback=partial(self.dispatch_progress, context),
                 **self.dict(
@@ -175,13 +186,13 @@ class InpaintInvocation(ImageToImageInvocation):
         # Handle invalid model parameter
         # TODO: figure out if this can be done via a validator that uses the model_cache
         # TODO: How to get the default model name now?
-        manager = context.services.model_manager.get_model()
+        model = context.services.model_manager.get_model()
         generator_output = next(
             Inpaint(model).generate(
                 prompt=self.prompt,
                 init_img=image,
                 init_mask=mask,
-            step_callback=partial(self.dispatch_progress, context),
+                step_callback=partial(self.dispatch_progress, context),
                 **self.dict(
                     exclude={"prompt", "image", "mask"}
                 ),  # Shorthand for passing all of the parameters above manually

@@ -1,3 +1,7 @@
+import React, { PropsWithChildren } from 'react';
+import { IAIPopoverProps } from '../web/src/common/components/IAIPopover';
+import { IAIIconButtonProps } from '../web/src/common/components/IAIIconButton';
+
 export {};
 
 declare module 'redux-socket.io-middleware';
@@ -39,3 +43,36 @@ declare global {
   }
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
+
+declare module '@invoke-ai/invoke-ai-ui' {
+  declare class ThemeChanger extends React.Component<ThemeChangerProps> {
+    public constructor(props: ThemeChangerProps);
+  }
+
+  declare class InvokeAiLogoComponent extends React.Component<InvokeAILogoComponentProps> {
+    public constructor(props: InvokeAILogoComponentProps);
+  }
+
+  declare class IAIPopover extends React.Component<IAIPopoverProps> {
+    public constructor(props: IAIPopoverProps);
+  }
+
+  declare class IAIIconButton extends React.Component<IAIIconButtonProps> {
+    public constructor(props: IAIIconButtonProps);
+  }
+
+  declare class SettingsModal extends React.Component<SettingsModalProps> {
+    public constructor(props: SettingsModalProps);
+  }
+}
+
+declare function Invoke(props: PropsWithChildren): JSX.Element;
+
+export {
+  ThemeChanger,
+  InvokeAiLogoComponent,
+  IAIPopover,
+  IAIIconButton,
+  SettingsModal,
+};
+export = Invoke;

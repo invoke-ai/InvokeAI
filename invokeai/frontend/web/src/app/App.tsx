@@ -14,11 +14,11 @@ import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppSelector } from './storeHooks';
-import { useEffect } from 'react';
+import { PropsWithChildren, useEffect } from 'react';
 
 keepGUIAlive();
 
-const App = () => {
+const App = (props: PropsWithChildren) => {
   useToastWatcher();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
@@ -40,7 +40,7 @@ const App = () => {
           w={APP_WIDTH}
           h={APP_HEIGHT}
         >
-          <SiteHeader />
+          {props.children || <SiteHeader />}
           <Flex gap={4} w="full" h="full">
             <InvokeTabs />
             <ImageGalleryPanel />
