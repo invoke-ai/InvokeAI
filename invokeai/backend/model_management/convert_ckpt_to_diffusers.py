@@ -1229,15 +1229,15 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         # If a replacement VAE path was specified, we'll incorporate that into
         # the checkpoint model and then convert it
         if vae_path:
-            print(f"  | Converting VAE {vae_path}")
+            print(f"   | Converting VAE {vae_path}")
             replace_checkpoint_vae(checkpoint,vae_path)
         # otherwise we use the original VAE, provided that
         # an externally loaded diffusers VAE was not passed
         elif not vae:
-            print("  | Using checkpoint model's original VAE")
+            print("   | Using checkpoint model's original VAE")
 
         if vae:
-            print("  | Using replacement diffusers VAE")
+            print("   | Using replacement diffusers VAE")
         else:  # convert the original or replacement VAE
             vae_config = create_vae_diffusers_config(
                 original_config, image_size=image_size

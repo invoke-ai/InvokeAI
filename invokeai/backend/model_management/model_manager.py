@@ -434,7 +434,6 @@ class ModelManager(object):
         height = width
         print(f"   | Default image dimensions = {width} x {height}")
         
-        self._add_embeddings_to_model(pipeline)
         return pipeline, width, height, model_hash
 
     def _load_ckpt_model(self, model_name, mconfig):
@@ -476,7 +475,6 @@ class ModelManager(object):
             pipeline.enable_offload_submodels(self.device)
         else:
             pipeline.to(self.device)
-
         return (
             pipeline,
             width,
