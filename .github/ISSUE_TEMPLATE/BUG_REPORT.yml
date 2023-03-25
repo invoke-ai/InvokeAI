@@ -65,6 +65,16 @@ body:
       placeholder: 8GB
     validations:
       required: false
+      
+  - type: input
+    id: version-number
+    attributes:
+      label: What version did you experience this issue on?
+      description: |
+        Please share the version of Invoke AI that you experienced the issue on. If this is not the latest version, please update first to confirm the issue still exists. If you are testing main, please include the commit hash instead.
+      placeholder: X.X.X
+    validations:
+      required: true
 
   - type: textarea
     id: what-happened

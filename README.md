@@ -139,7 +139,7 @@ not supported.
     _For Windows/Linux with an NVIDIA GPU:_
 
     ```terminal
-    pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
     ```
 
     _For Linux with an AMD GPU:_
