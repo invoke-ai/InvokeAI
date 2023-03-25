@@ -1036,6 +1036,15 @@ def convert_open_clip_checkpoint(checkpoint):
 
     return text_model
 
+def replace_checkpoint_vae(checkpoint, vae_path:str):
+    if vae_path.endswith(".safetensors"):
+        vae_ckpt = load_file(vae_path)
+    else:
+        vae_ckpt = torch.load(vae_path, map_location="cpu")
+    state_dict = vae_ckpt['state_dict'] if "state_dict" in vae_ckpt else vae_ckpt
+    for vae_key in state_dict:
+        new_key = f'first_stage_model.{vae_key}'
+        checkpoint[new_key] = state_dict[vae_key]
 
 def load_pipeline_from_original_stable_diffusion_ckpt(
     checkpoint_path: str,
@@ -1048,6 +1057,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     extract_ema: bool = True,
     upcast_attn: bool = False,
     vae: AutoencoderKL = None,
+    vae_path: str = None,
     precision: torch.dtype = torch.float32,
     return_generator_pipeline: bool = False,
     scan_needed:bool=True,
@@ -1078,6 +1088,8 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param precision: precision to use - torch.float16, torch.float32 or torch.autocast
     :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
     running stable diffusion 2.1.
+    :param vae: A diffusers VAE to load into the pipeline.
+    :param vae_path: Path to a checkpoint VAE that will be converted into diffusers and loaded into the pipeline.
     """
 
     with warnings.catch_warnings():
@@ -1214,9 +1226,19 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         unet.load_state_dict(converted_unet_checkpoint)
 
-        # Convert the VAE model, or use the one passed
-        if not vae:
+        # If a replacement VAE path was specified, we'll incorporate that into
+        # the checkpoint model and then convert it
+        if vae_path:
+            print(f"   | Converting VAE {vae_path}")
+            replace_checkpoint_vae(checkpoint,vae_path)
+        # otherwise we use the original VAE, provided that
+        # an externally loaded diffusers VAE was not passed
+        elif not vae:
             print("   | Using checkpoint model's original VAE")
+
+        if vae:
+            print("   | Using replacement diffusers VAE")
+        else:  # convert the original or replacement VAE
             vae_config = create_vae_diffusers_config(
                 original_config, image_size=image_size
             )
@@ -1226,8 +1248,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
             vae = AutoencoderKL(**vae_config)
             vae.load_state_dict(converted_vae_checkpoint)
-        else:
-            print("   | Using external VAE specified in config")
 
         # Convert the text model.
         model_type = pipeline_type
