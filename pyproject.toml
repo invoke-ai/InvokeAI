@@ -45,7 +45,7 @@ dependencies = [
   "einops",
   "eventlet",
   "facexlib",
-  "fastapi==0.94.1",
+  "fastapi==0.88.0",
   "fastapi-events==0.8.0",
   "fastapi-socketio==0.0.10",
   "flask==2.1.3",
@@ -160,4 +160,3 @@ output = "coverage/index.xml"
 
 [flake8]
 max-line-length = 120
-
