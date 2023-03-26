@@ -28,12 +28,28 @@ class ImageOutput(BaseInvocationOutput):
     image:      ImageField = Field(default=None, description="The output image")
     #fmt: on
 
+    class Config:
+        schema_extra = {
+            'required': [
+                'type',
+                'image',
+            ]
+        }
+
 class MaskOutput(BaseInvocationOutput):
     """Base class for invocations that output a mask"""
     #fmt: off
     type: Literal["mask"] = "mask"
     mask:      ImageField = Field(default=None, description="The output mask")
-    #fomt: on
+    #fmt: on
+
+    class Config:
+        schema_extra = {
+            'required': [
+                'type',
+                'mask',
+            ]
+        }
 
 # TODO: this isn't really necessary anymore
 class LoadImageInvocation(BaseInvocation):
