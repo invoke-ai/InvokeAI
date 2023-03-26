@@ -6,10 +6,10 @@
  * Base class for invocations that output a prompt
  */
 export type PromptOutput = {
-  type?: 'prompt';
+  type: 'prompt';
   /**
    * The output prompt
    */
-  prompt?: string;
+  prompt: string;
 };
 

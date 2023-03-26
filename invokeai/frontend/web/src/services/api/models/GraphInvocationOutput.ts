@@ -6,6 +6,6 @@
  * Base class for all invocation outputs
  */
 export type GraphInvocationOutput = {
-  type?: 'graph_output';
+  type: 'graph_output';
 };
 

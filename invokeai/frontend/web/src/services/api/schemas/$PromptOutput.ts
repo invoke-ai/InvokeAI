@@ -6,10 +6,12 @@ export const $PromptOutput = {
   properties: {
     type: {
       type: 'Enum',
+      isRequired: true,
     },
     prompt: {
       type: 'string',
       description: `The output prompt`,
+      isRequired: true,
     },
   },
 } as const;
