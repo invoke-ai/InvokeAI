@@ -1,39 +1,57 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
-import { Graph, SessionsService } from 'services/api';
-import { STATUS } from 'services/apiSliceTypes';
+import { SessionsService } from 'services/api';
 
 /**
- * createSession
+ * createSession thunk
  */
 
-type CreateSessionArg = { requestBody?: Graph };
+/**
+ * Extract the type of the requestBody from the generated API client.
+ *
+ * Would really like for this to be generated but it's easy enough to extract it.
+ */
 
-// createAppAsyncThunk provides typing for getState and dispatch
+type CreateSessionRequestBody = Parameters<
+  (typeof SessionsService)['createSession']
+>[0]['requestBody'];
+
 export const createSession = createAppAsyncThunk(
   'api/createSession',
-  async (arg: CreateSessionArg, { getState, dispatch, ...moreThunkStuff }) => {
-    const response = await SessionsService.createSession(arg);
+  async (arg: CreateSessionRequestBody, _thunkApi) => {
+    const response = await SessionsService.createSession({ requestBody: arg });
+
     return response;
   }
 );
 
 /**
- * invokeSession
+ * addNode thunk
+ */
+
+type AddNodeRequestBody = Parameters<
+  (typeof SessionsService)['addNode']
+>[0]['requestBody'];
+
+export const addNode = createAppAsyncThunk(
+  'api/addNode',
+  async (arg: { node: AddNodeRequestBody; sessionId: string }, _thunkApi) => {
+    const response = await SessionsService.addNode({
+      requestBody: arg.node,
+      sessionId: arg.sessionId,
+    });
+
+    return response;
+  }
+);
+
+/**
+ * invokeSession thunk
  */
 
 export const invokeSession = createAppAsyncThunk(
   'api/invokeSession',
-  async (_arg, { getState }) => {
-    const {
-      api: { sessionId },
-    } = getState();
-
-    // i'd really like for the typing on the condition callback below to tell this
-    // function here that sessionId will never be empty, but guess we do not get
-    // that luxury
-    if (!sessionId) {
-      return;
-    }
+  async (arg: { sessionId: string }, _thunkApi) => {
+    const { sessionId } = arg;
 
     const response = await SessionsService.invokeSession({
       sessionId,
@@ -43,26 +61,15 @@ export const invokeSession = createAppAsyncThunk(
     return response;
   }
 );
+
 /**
- * invokeSession
+ * invokeSession thunk
  */
 
 export const cancelProcessing = createAppAsyncThunk(
   'api/cancelProcessing',
-  async (_arg, { getState }) => {
-    console.log('before canceling');
-    const {
-      api: { sessionId },
-    } = getState();
-
-    // i'd really like for the typing on the condition callback below to tell this
-    // function here that sessionId will never be empty, but guess we do not get
-    // that luxury
-    if (!sessionId) {
-      return;
-    }
-
-    console.log('canceling');
+  async (arg: { sessionId: string }, _thunkApi) => {
+    const { sessionId } = arg;
 
     const response = await SessionsService.cancelSessionInvoke({
       sessionId,

@@ -3,12 +3,16 @@ import IAIButton from 'common/components/IAIButton';
 import {
   setProgress,
   setProgressImage,
-  setSessionId,
   setStatus,
+  STATUS,
 } from 'services/apiSlice';
-import { useEffect } from 'react';
-import { STATUS, ProgressImage } from 'services/apiSliceTypes';
-import { getImage } from 'services/thunks/image';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  GeneratorProgressEvent,
+  GraphExecutionStateCompleteEvent,
+  InvocationCompleteEvent,
+  InvocationStartedEvent,
+} from 'services/events/types';
 import {
   cancelProcessing,
   createSession,
@@ -18,14 +22,6 @@ import { io } from 'socket.io-client';
 import { useAppDispatch, useAppSelector } from './storeHooks';
 import { RootState } from './store';
 
-type GeneratorProgress = {
-  session_id: string;
-  invocation_id: string;
-  progress_image: ProgressImage;
-  step: number;
-  total_steps: number;
-};
-
 const socket_url = `ws://${window.location.host}`;
 const socket = io(socket_url, {
   path: '/ws/socket.io',
@@ -33,60 +29,84 @@ const socket = io(socket_url, {
 
 const NodeAPITest = () => {
   const dispatch = useAppDispatch();
-  const { sessionId, status, progress, progressImage } = useAppSelector(
+  const { sessionId, progress, progressImage } = useAppSelector(
     (state: RootState) => state.api
+  );
+
+  const [resultImages, setResultImages] = useState<string[]>([]);
+
+  const appendResultImage = useCallback(
+    (url: string) => {
+      setResultImages([...resultImages, url]);
+    },
+    [resultImages]
   );
 
   const handleCreateSession = () => {
     dispatch(
       createSession({
-        requestBody: {
-          nodes: {
-            a: {
-              id: 'a',
-              type: 'txt2img',
-              prompt: 'pizza',
-              steps: 50,
-              seed: 123,
-            },
-            b: {
-              id: 'b',
-              type: 'img2img',
-              prompt: 'dog',
-              steps: 50,
-              seed: 123,
-              strength: 0.9,
-            },
-            c: {
-              id: 'c',
-              type: 'img2img',
-              prompt: 'cat',
-              steps: 50,
-              seed: 123,
-              strength: 0.9,
-            },
+        nodes: {
+          a: {
+            id: 'a',
+            type: 'txt2img',
+            prompt: 'pizza',
+            steps: 30,
           },
-          edges: [
-            {
-              source: { node_id: 'a', field: 'image' },
-              destination: { node_id: 'b', field: 'image' },
-            },
-            {
-              source: { node_id: 'b', field: 'image' },
-              destination: { node_id: 'c', field: 'image' },
-            },
-          ],
+          b: {
+            id: 'b',
+            type: 'img2img',
+            prompt: 'dog',
+            steps: 30,
+            strength: 0.75,
+          },
+          c: {
+            id: 'c',
+            type: 'img2img',
+            prompt: 'cat',
+            steps: 30,
+            strength: 0.75,
+          },
+          d: {
+            id: 'd',
+            type: 'img2img',
+            prompt: 'jalapeno',
+            steps: 30,
+            strength: 0.75,
+          },
         },
+        edges: [
+          {
+            source: { node_id: 'a', field: 'image' },
+            destination: { node_id: 'b', field: 'image' },
+          },
+          {
+            source: { node_id: 'b', field: 'image' },
+            destination: { node_id: 'c', field: 'image' },
+          },
+          {
+            source: { node_id: 'c', field: 'image' },
+            destination: { node_id: 'd', field: 'image' },
+          },
+        ],
       })
     );
   };
 
   const handleInvokeSession = () => {
-    dispatch(invokeSession());
+    if (!sessionId) {
+      return;
+    }
+
+    dispatch(invokeSession({ sessionId }));
+    setResultImages([]);
   };
 
   const handleCancelProcessing = () => {
-    dispatch(cancelProcessing());
+    if (!sessionId) {
+      return;
+    }
+
+    dispatch(cancelProcessing({ sessionId }));
   };
 
   useEffect(() => {
@@ -96,50 +116,11 @@ const NodeAPITest = () => {
 
     // set up socket.io listeners
 
-    // TODO: suppose this should be handled in the socket.io middleware
-    // TODO: write types for the socket.io payloads, haven't found a generator for them yet...
+    // TODO: suppose this should be handled in the socket.io middleware?
 
     // subscribe to the current session
     socket.emit('subscribe', { session: sessionId });
     console.log('subscribe', { session: sessionId });
-
-    // received on each generation step
-    socket.on('generator_progress', (data: GeneratorProgress) => {
-      console.log('generator_progress', data);
-      dispatch(setProgress(data.step / data.total_steps));
-      dispatch(setProgressImage(data.progress_image));
-    });
-
-    // received after invokeSession called
-    socket.on('invocation_started', (data) => {
-      console.log('invocation_started', data);
-      dispatch(setStatus(STATUS.busy));
-    });
-
-    // received when generation complete
-    socket.on('invocation_complete', (data) => {
-      // for now, just unsubscribe from the session when we finish a generation
-      // in the future we will want to continue building the graph and executing etc
-      console.log('invocation_complete', data);
-      dispatch(setProgress(null));
-      // dispatch(setSessionId(null));
-      dispatch(setStatus(STATUS.idle));
-
-      // think this gets a blob...
-      // dispatch(
-      //   getImage({
-      //     imageType: data.result.image.image_type,
-      //     imageName: data.result.image.image_name,
-      //   })
-      // );
-    });
-
-    // not sure when we get this?
-    socket.on('session_complete', (data) => {
-      // socket.emit('unsubscribe', { session: sessionId });
-      // console.log('unsubscribe', { session: sessionId });
-      // console.log('session_complete', data);
-    });
 
     () => {
       // cleanup
@@ -148,6 +129,52 @@ const NodeAPITest = () => {
       socket.disconnect();
     };
   }, [dispatch, sessionId]);
+
+  useEffect(() => {
+    /**
+     * `invocation_started`
+     */
+    socket.on('invocation_started', (data: InvocationStartedEvent) => {
+      console.log('invocation_started', data);
+      dispatch(setStatus(STATUS.busy));
+    });
+
+    /**
+     * `generator_progress`
+     */
+    socket.on('generator_progress', (data: GeneratorProgressEvent) => {
+      console.log('generator_progress', data);
+      dispatch(setProgress(data.step / data.total_steps));
+      if (data.progress_image) {
+        dispatch(setProgressImage(data.progress_image));
+      }
+    });
+
+    /**
+     * `invocation_complete`
+     */
+    socket.on('invocation_complete', (data: InvocationCompleteEvent) => {
+      if (data.result.type === 'image') {
+        const url = `api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}`;
+        appendResultImage(url);
+      }
+
+      console.log('invocation_complete', data);
+      dispatch(setProgress(null));
+      dispatch(setStatus(STATUS.idle));
+      console.log(data);
+    });
+
+    /**
+     * `graph_execution_state_complete`
+     */
+    socket.on(
+      'graph_execution_state_complete',
+      (data: GraphExecutionStateCompleteEvent) => {
+        console.log(data);
+      }
+    );
+  }, [dispatch, appendResultImage]);
 
   return (
     <Flex
@@ -160,24 +187,14 @@ const NodeAPITest = () => {
       }}
     >
       <Text>Session: {sessionId ? sessionId : '...'}</Text>
-      <IAIButton
-        onClick={handleCancelProcessing}
-        // isDisabled={!sessionId}
-        colorScheme="error"
-      >
+      <IAIButton onClick={handleCancelProcessing} colorScheme="error">
         Cancel Processing
       </IAIButton>
-      <IAIButton
-        onClick={handleCreateSession}
-        // isDisabled={status === STATUS.busy || Boolean(sessionId)}
-        colorScheme="accent"
-      >
+      <IAIButton onClick={handleCreateSession} colorScheme="accent">
         Create Session
       </IAIButton>
       <IAIButton
         onClick={handleInvokeSession}
-        // isDisabled={status === STATUS.busy}
-        // isLoading={status === STATUS.busy}
         loadingText={`Invoking ${
           progress === null ? '...' : `${Math.round(progress * 100)}%`
         }`}
@@ -185,14 +202,19 @@ const NodeAPITest = () => {
       >
         Invoke
       </IAIButton>
-      <Image
-        src={progressImage?.dataURL}
-        width={progressImage?.width}
-        height={progressImage?.height}
-        sx={{
-          imageRendering: 'pixelated',
-        }}
-      />
+      <Flex wrap="wrap" gap={4} overflow="scroll">
+        <Image
+          src={progressImage?.dataURL}
+          width={progressImage?.width}
+          height={progressImage?.height}
+          sx={{
+            imageRendering: 'pixelated',
+          }}
+        />
+        {resultImages.map((url) => (
+          <Image key={url} src={url} />
+        ))}
+      </Flex>
     </Flex>
   );
 };
