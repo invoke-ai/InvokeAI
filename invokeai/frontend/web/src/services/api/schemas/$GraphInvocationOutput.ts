@@ -6,6 +6,7 @@ export const $GraphInvocationOutput = {
   properties: {
     type: {
       type: 'Enum',
+      isRequired: true,
     },
   },
 } as const;

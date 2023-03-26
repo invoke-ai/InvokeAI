@@ -6,6 +6,7 @@ export const $ImageOutput = {
   properties: {
     type: {
       type: 'Enum',
+      isRequired: true,
     },
     image: {
       type: 'all-of',
@@ -13,6 +14,7 @@ export const $ImageOutput = {
       contains: [{
         type: 'ImageField',
       }],
+      isRequired: true,
     },
   },
 } as const;
