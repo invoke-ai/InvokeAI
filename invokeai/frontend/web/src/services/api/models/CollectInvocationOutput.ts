@@ -6,7 +6,7 @@
  * Base class for all invocation outputs
  */
 export type CollectInvocationOutput = {
-  type?: 'collect_output';
+  type: 'collect_output';
   /**
    * The collection of input items
    */
