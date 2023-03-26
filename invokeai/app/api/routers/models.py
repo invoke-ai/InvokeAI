@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, List, Literal, Optional, Union
 
-from fastapi.routing import APIRouter, HTTPException
+from fastapi.routing import APIRouter, HTTPException, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 
 from ..dependencies import ApiDependencies
@@ -16,6 +16,7 @@ class VaeRepo(BaseModel):
     subfolder: Optional[str] = Field(description="The subfolder to use for this VAE")
 
 class ModelInfo(BaseModel):
+    model_name: str = Field(..., description="The name of the model")
     description: Optional[str] = Field(description="A description of the model")
     
 class CkptModelInfo(ModelInfo):
@@ -56,61 +57,6 @@ async def list_models() -> ModelsList:
     models_raw = ApiDependencies.invoker.services.model_manager.list_models()
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
-
-#Update Model
-@models_router.post(
-    "/",
-    operation_id="update_model",
-    responses={
-        201: {
-        "model_response": Union[CkptModelInfo, DiffusersModelInfo], 
-        },
-        202: {
-        "description": "Model submission is processing. Check back later."
-        }, 
-    },
-)
-async def update_model(
-    model_request: CreateModelRequest
-) -> CreateModelResponse:
-    """Adds a new model to the active model configuration file."""
-    try:
-        ApiDependencies.invoker.services.model_manager.add_model(
-            model_name=model_request.name,
-            model_attributes=model_request.info,
-            clobber=True,
-        )
-        model_response = CreateModelResponse(name=model_request.name, info=model_request.info, status="success")
-
-    except Exception as e:
-        # Handle any exceptions thrown during the execution of the method
-        # or raise the exception to be handled by the global exception handler
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    
-    return model_response
-
-""" Delete Model """
-@models_router.delete(
-    "/{model_name}",
-    operation_id="del_model",
-    responses={204: {"description": "Model deleted"}, 404: {"description": "Model not found"}},
-)
-async def delete_model(model_name: str) -> None:
-    """Deletes a model based on the model name."""
-    try:
-        # check if model exists
-        if model_name not in ApiDependencies.invoker.services.model_manager.models:
-            raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
-        
-        # delete model
-        print(f">> Deleting Model: {model_name}")
-        ApiDependencies.invoker.services.model_manager.del_model(model_name, delete_files=True)
-        print(f">> Model Deleted: {model_name}")
-    except Exception as e:
-        # Handle any exceptions thrown during the execution of the method
-        raise HTTPException(status_code=500, detail=str(e))
-
 
         # @socketio.on("requestSystemConfig")
         # def handle_request_capabilities():
