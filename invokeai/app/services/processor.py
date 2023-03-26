@@ -4,7 +4,7 @@ from threading import Event, Thread
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
-
+from ..util.util import CanceledException
 
 class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker_thread: Thread
@@ -58,6 +58,12 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         )
                     )
 
+                    # Check queue to see if this is canceled, and skip if so
+                    if self.__invoker.services.queue.is_canceled(
+                        graph_execution_state.id
+                    ):
+                        continue
+
                     # Save outputs and history
                     graph_execution_state.complete(invocation.id, outputs)
 
@@ -74,6 +80,9 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     )
 
                 except KeyboardInterrupt:
+                    pass
+
+                except CanceledException:
                     pass
 
                 except Exception as e:
@@ -95,6 +104,12 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     )
 
                     pass
+                
+                # Check queue to see if this is canceled, and skip if so
+                if self.__invoker.services.queue.is_canceled(
+                    graph_execution_state.id
+                ):
+                    continue
 
                 # Queue any further commands if invoking all
                 is_complete = graph_execution_state.is_complete()
