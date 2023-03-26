@@ -211,6 +211,26 @@ description for the model, whether to make this the default model that
 is loaded at InvokeAI startup time, and whether to replace its
 VAE. Generally the answer to the latter question is "no".
 
+### Specifying a configuration file for legacy checkpoints
+
+Some checkpoint files come with instructions to use a specific .yaml
+configuration file. For InvokeAI load this file correctly, please put
+the config file in the same directory as the corresponding `.ckpt` or
+`.safetensors` file and make sure the file has the same basename as
+the weights file. Here is an example:
+
+```bash
+wonderful-model-v2.ckpt
+wonderful-model-v2.yaml
+```
+
+Similarly, to use a custom VAE, name the VAE like this:
+
+```bash
+wonderful-model-v2.vae.pt
+```
+
+
 ### Converting legacy models into `diffusers`
 
 The CLI `!convert_model` will convert a `.safetensors` or `.ckpt`
