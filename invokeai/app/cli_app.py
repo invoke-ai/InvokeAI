@@ -14,6 +14,7 @@ from pydantic.fields import Field
 
 from ..backend import Args
 from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_graph_execution_history
+from .cli.completer import get_completer
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
@@ -129,6 +130,7 @@ def invoke_cli():
     config = Args()
     config.parse_args()
     model_manager = get_model_manager(config)
+    completer = get_completer(model_manager)
 
     events = EventServiceBase()
 
@@ -162,8 +164,8 @@ def invoke_cli():
 
     while True:
         try:
-            cmd_input = input("> ")
-        except KeyboardInterrupt:
+            cmd_input = input(f"{model_manager.current_model or '(no model)'}> ")
+        except (KeyboardInterrupt, EOFError):
             # Ctrl-c exits
             break
 
