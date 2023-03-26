@@ -1,28 +1,13 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
-import { ImagesService, ImageType } from 'services/api';
+import { ImagesService } from 'services/api';
 
-type GetImageArg = {
-  /**
-   * The type of image to get
-   */
-  imageType: ImageType;
-  /**
-   * The name of the image to get
-   */
-  imageName: string;
-};
+type GetImageArg = Parameters<(typeof ImagesService)['getImage']>[0];
 
 // createAppAsyncThunk provides typing for getState and dispatch
 export const getImage = createAppAsyncThunk(
   'api/getImage',
-  async (arg: GetImageArg, { getState, dispatch, ...moreThunkStuff }) => {
+  async (arg: GetImageArg, _thunkApi) => {
     const response = await ImagesService.getImage(arg);
     return response;
-  },
-  {
-    condition: (arg, { getState }) => {
-      // we can get an image at any time
-      return true;
-    },
   }
 );

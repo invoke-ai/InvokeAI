@@ -1,8 +1,27 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { APIState, STATUS } from './apiSliceTypes';
+import { ProgressImage } from './events/types';
 import { createSession, invokeSession } from 'services/thunks/session';
 import { getImage } from './thunks/image';
+
+/**
+ * Just temp until we work out better statuses
+ */
+export enum STATUS {
+  idle = 'IDLE',
+  busy = 'BUSY',
+  error = 'ERROR',
+}
+
+/**
+ * Type for the temp (?) API slice.
+ */
+export interface APIState {
+  sessionId: string | null;
+  progressImage: ProgressImage | null;
+  progress: number | null;
+  status: STATUS;
+}
 
 const initialSystemState: APIState = {
   sessionId: null,
@@ -32,7 +51,10 @@ export const apiSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(createSession.fulfilled, (state, { payload: { id } }) => {
+    builder.addCase(createSession.fulfilled, (state, action) => {
+      const {
+        payload: { id },
+      } = action;
       // HTTP 200
       // state.networkStatus = 'idle'
       state.sessionId = id;
@@ -47,6 +69,7 @@ export const apiSlice = createSlice({
       // state.networkStatus = 'idle'
     });
     builder.addCase(invokeSession.fulfilled, (state, action) => {
+      console.log('invokeSession.fulfilled: ', action.payload);
       // HTTP 200
       // state.networkStatus = 'idle'
     });
