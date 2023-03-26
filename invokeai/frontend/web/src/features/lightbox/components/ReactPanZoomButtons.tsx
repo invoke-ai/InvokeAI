@@ -34,7 +34,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<BiZoomIn />}
         aria-label={t('accessibility.zoomIn')}
-        tooltip="Zoom In"
+        tooltip={t('accessibility.zoomIn')}
         onClick={() => zoomIn()}
         fontSize={20}
       />
@@ -42,7 +42,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<BiZoomOut />}
         aria-label={t('accessibility.zoomOut')}
-        tooltip="Zoom Out"
+        tooltip={t('accessibility.zoomOut')}
         onClick={() => zoomOut()}
         fontSize={20}
       />
@@ -50,7 +50,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<BiRotateLeft />}
         aria-label={t('accessibility.rotateCounterClockwise')}
-        tooltip="Rotate Counter-Clockwise"
+        tooltip={t('accessibility.rotateCounterClockwise')}
         onClick={rotateCounterClockwise}
         fontSize={20}
       />
@@ -58,7 +58,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<BiRotateRight />}
         aria-label={t('accessibility.rotateClockwise')}
-        tooltip="Rotate Clockwise"
+        tooltip={t('accessibility.rotateClockwise')}
         onClick={rotateClockwise}
         fontSize={20}
       />
@@ -66,7 +66,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<MdFlip />}
         aria-label={t('accessibility.flipHorizontally')}
-        tooltip="Flip Horizontally"
+        tooltip={t('accessibility.flipHorizontally')}
         onClick={flipHorizontally}
         fontSize={20}
       />
@@ -74,7 +74,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<MdFlip style={{ transform: 'rotate(90deg)' }} />}
         aria-label={t('accessibility.flipVertically')}
-        tooltip="Flip Vertically"
+        tooltip={t('accessibility.flipVertically')}
         onClick={flipVertically}
         fontSize={20}
       />
@@ -82,7 +82,7 @@ const ReactPanZoomButtons = ({
       <IAIIconButton
         icon={<BiReset />}
         aria-label={t('accessibility.reset')}
-        tooltip="Reset"
+        tooltip={t('accessibility.reset')}
         onClick={() => {
           resetTransform();
           reset();
