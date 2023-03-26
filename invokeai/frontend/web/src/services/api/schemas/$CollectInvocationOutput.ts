@@ -6,6 +6,7 @@ export const $CollectInvocationOutput = {
   properties: {
     type: {
       type: 'Enum',
+      isRequired: true,
     },
     collection: {
       type: 'array',

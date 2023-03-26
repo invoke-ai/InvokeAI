@@ -6,11 +6,13 @@ export const $IterateInvocationOutput = {
   properties: {
     type: {
       type: 'Enum',
+      isRequired: true,
     },
     item: {
       description: `The item being iterated over`,
       properties: {
       },
+      isRequired: true,
     },
   },
 } as const;
