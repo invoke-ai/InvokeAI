@@ -8,10 +8,10 @@ import type { ImageField } from './ImageField';
  * Base class for invocations that output an image
  */
 export type ImageOutput = {
-  type?: 'image';
+  type: 'image';
   /**
    * The output image
    */
-  image?: ImageField;
+  image: ImageField;
 };
 

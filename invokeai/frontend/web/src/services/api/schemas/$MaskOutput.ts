@@ -6,6 +6,7 @@ export const $MaskOutput = {
   properties: {
     type: {
       type: 'Enum',
+      isRequired: true,
     },
     mask: {
       type: 'all-of',
@@ -13,6 +14,7 @@ export const $MaskOutput = {
       contains: [{
         type: 'ImageField',
       }],
+      isRequired: true,
     },
   },
 } as const;
