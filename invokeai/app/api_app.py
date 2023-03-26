@@ -99,6 +99,13 @@ def custom_openapi():
 
     output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
     for schema_key, output_schema in output_schemas["definitions"].items():
+        # Schema generation makes output properties optional by default
+        # Manually fix this by marking them all required
+        required_properties = []
+        for prop in output_schema["properties"]:
+            required_properties.append(prop)
+        output_schema["required"] = required_properties
+
         openapi_schema["components"]["schemas"][schema_key] = output_schema
 
         # TODO: note that we assume the schema_key here is the TYPE.__name__
@@ -114,6 +121,12 @@ def custom_openapi():
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
 
         invoker_schema["output"] = outputs_ref
+
+    # Same as we did for outputs above, mark GraphExecutionState properties all required
+    required_properties = []
+    for prop in openapi_schema["components"]["schemas"]["GraphExecutionState"]["properties"]:
+        required_properties.append(prop)
+    openapi_schema["components"]["schemas"]["GraphExecutionState"]["required"] = required_properties
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

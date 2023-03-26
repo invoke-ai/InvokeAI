@@ -127,14 +127,6 @@ class NodeAlreadyExecutedError(Exception):
 class GraphInvocationOutput(BaseInvocationOutput):
     type: Literal["graph_output"] = "graph_output"
 
-    class Config:
-        schema_extra = {
-            'required': [
-                'type',
-                'image',
-            ]
-        }
-
 # TODO: Fill this out and move to invocations
 class GraphInvocation(BaseInvocation):
     type: Literal["graph"] = "graph"
@@ -153,14 +145,6 @@ class IterateInvocationOutput(BaseInvocationOutput):
     type: Literal["iterate_output"] = "iterate_output"
 
     item: Any = Field(description="The item being iterated over")
-
-    class Config:
-        schema_extra = {
-            'required': [
-                'type',
-                'item',
-            ]
-        }
 
 # TODO: Fill this out and move to invocations
 class IterateInvocation(BaseInvocation):
@@ -182,14 +166,6 @@ class CollectInvocationOutput(BaseInvocationOutput):
     type: Literal["collect_output"] = "collect_output"
 
     collection: list[Any] = Field(description="The collection of input items")
-
-    class Config:
-        schema_extra = {
-            'required': [
-                'type',
-                'collection',
-            ]
-        }
 
 class CollectInvocation(BaseInvocation):
     """Collects values into a collection"""
@@ -793,24 +769,6 @@ class GraphExecutionState(BaseModel):
         description="The map of original graph nodes to prepared nodes",
         default_factory=dict,
     )
-
-    # Declare all fields as required; necessary for OpenAPI schema generation build.
-    # Technically only fields without a `default_factory` need to be listed here.
-    # See: https://github.com/pydantic/pydantic/discussions/4577
-    class Config:
-        schema_extra = {
-            'required': [
-                'id',
-                'graph',
-                'execution_graph',
-                'executed',
-                'executed_history',
-                'results',
-                'errors',
-                'prepared_source_mapping',
-                'source_prepared_mapping',
-            ]
-        }
 
     def next(self) -> BaseInvocation | None:
         """Gets the next node ready to execute."""
