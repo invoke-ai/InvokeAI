@@ -127,6 +127,13 @@ class NodeAlreadyExecutedError(Exception):
 class GraphInvocationOutput(BaseInvocationOutput):
     type: Literal["graph_output"] = "graph_output"
 
+    class Config:
+        schema_extra = {
+            'required': [
+                'type',
+                'image',
+            ]
+        }
 
 # TODO: Fill this out and move to invocations
 class GraphInvocation(BaseInvocation):
@@ -147,6 +154,13 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
     item: Any = Field(description="The item being iterated over")
 
+    class Config:
+        schema_extra = {
+            'required': [
+                'type',
+                'item',
+            ]
+        }
 
 # TODO: Fill this out and move to invocations
 class IterateInvocation(BaseInvocation):
@@ -169,6 +183,13 @@ class CollectInvocationOutput(BaseInvocationOutput):
 
     collection: list[Any] = Field(description="The collection of input items")
 
+    class Config:
+        schema_extra = {
+            'required': [
+                'type',
+                'collection',
+            ]
+        }
 
 class CollectInvocation(BaseInvocation):
     """Collects values into a collection"""
