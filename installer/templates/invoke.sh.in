@@ -106,7 +106,7 @@ do_dialog() {
 	
         choice=$(dialog --clear \
                         --backtitle "InvokeAI" \
-                        --title "What you like to run?" \
+                        --title "What would you like to run?" \
                         --menu "Select an option:" \
                         0 0 0 \
                         "${options[@]}" \
