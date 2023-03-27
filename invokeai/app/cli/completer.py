@@ -6,7 +6,6 @@ completer object.
 import atexit
 import readline
 import shlex
-import sys
 
 from pathlib import Path
 from typing import List, Dict, Literal, get_args, get_type_hints, get_origin
@@ -131,7 +130,7 @@ class Completer(object):
             readline.redisplay()
             self.linebuffer = None
     
-def get_completer(model_manager: ModelManager) -> Completer:
+def set_autocompleter(model_manager: ModelManager) -> Completer:
     global completer
     
     if completer:
