@@ -1,0 +1,166 @@
+prompt_options:
+  nationality:
+    - Asian
+    - Black
+    - Russian
+    - Swedish
+    - Latin
+    - American
+    - Arab
+    - Indian
+    - Chinese
+  garment_type:
+    - Dress
+    - Pants
+    - Shirt
+    - Skirt
+    - Blouse
+    - Jacket
+    - Jumpsuit
+    - Sweater
+    - Coat
+    - Blazer
+    - Romper
+    - Tunic
+    - Kimono
+    - Bodysuit
+    - Halter top
+    - Crop top
+    - Shorts
+    - Overalls
+    - Tights
+  material:
+    - Linen
+    - Denim
+    - Rayon
+    - Velvet
+    - Chiffon
+  color:
+    - Black
+    - White
+    - Red
+    - Blue
+    - Green
+    - Yellow
+    - Orange
+    - Purple
+    - Brown
+    - Pink
+    - Gray
+    - Silver
+    - Gold
+  style:
+    - A-line
+    - Sheath
+    - Shift
+    - Empire waist
+    - Maxi
+  size:
+    - Petite
+    - Plus size
+    - Tall
+    - Regular
+    - Custom
+  closure:
+    - Tie waist closure
+    - Hook and eye closure
+    - Snap closure
+    - Corset lacing closure
+    - Wrap style closure
+  embellishments:
+    - Fringe embellishments
+    - Studs embellishments
+    - Ruffles embellishments
+    - Lace-up details embellishments
+    - Rhinestones embellishments
+  lining:
+    - Satin lining
+    - Mesh lining
+    - Flannel lining
+    - Silk lining
+    - Fleece lining
+  collar:
+    - Mandarin collar
+    - Peter Pan collar
+    - Stand-up collar
+    - Bow collar
+    - Shawl collar
+  sleeve_style:
+    - Bell sleeves
+    - Cap sleeves
+    - Puff sleeves
+    - Bishop sleeves
+    - Cold shoulder sleeves
+    - long sleeves
+    - short sleeves
+    - sleeveless sleeves
+    - long sleeves
+    - short sleeves
+    - sleeveless sleeves
+    - 3/4 sleeves
+  hemline:
+    - short hemline
+    - medium hemline
+    - long hemline
+    - straight hemline
+    - curved hemline
+    - asymmetrical hemline
+  neckline:
+    - V-neck neckline
+    - Square neck neckline
+    - Boat neck neckline
+    - Crew neck neckline
+    - Off-the-shoulder neckline
+  waistline:
+    - high-waisted waistline
+    - low-waisted waistline
+    - mid-waisted waistline
+  fit:
+    - slim fit
+    - loose fit
+    - straight fit
+    - skinny fit
+    - relaxed fit
+    - fitted fit
+    - tailored fit
+  texture:
+    - rough texture
+    - soft texture
+    - stiff texture
+    - smooth texture
+  breathability:
+    - Breathable
+    - Non-breathable
+  pattern:
+    - Floral pattern
+    - Plaid pattern
+    - Striped pattern
+    - Polka dot pattern
+    - Solid pattern
+    - Banded pattern
+    - Animal print pattern
+    - Geometric pattern
+    - Bird print pattern
+    - Abstract pattern
+    - graphic pattern
+    - aztec pattern
+    - paisley pattern
+    - chevron pattern
+    - tribal pattern
+    - camo pattern
+    - indian pattern
+  brand:
+    - Gucci
+    - Chanel
+    - Louis Vuitton
+    - Prada
+    - Dior
+    - Balenciaga
+    - Fendi
+    - Givenchy
+    - Versace
+    - Saint Laurent
+    - Valentino
+    - Miu Miu
+    - Bottega Veneta
+    - Dolce & Gabbana

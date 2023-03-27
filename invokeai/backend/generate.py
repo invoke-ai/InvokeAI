@@ -40,6 +40,8 @@ from .prompting.conditioning import log_tokenization
 from .safety_checker import SafetyChecker
 from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device, image_to_base64, upload_on_blob
+from .prompting.prompt_template import standard_fashion_prompt
+
 
 with open("/data/resleeve_configs.yml") as f:
     resleeve_configs = yaml.load(f, Loader=SafeLoader)
@@ -473,7 +475,11 @@ class Generate:
             lambda concepts: self.load_huggingface_concepts(concepts),
             self.model.textual_inversion_manager.get_all_trigger_strings(),
         )
-
+        
+        # Get backend prompt
+        hidden_prompt, negative_prompt = standard_fashion_prompt()
+        # Create final prompt
+        prompt += " " + hidden_prompt
         tic = time.time()
         if self._has_cuda():
             torch.cuda.reset_peak_memory_stats()
@@ -506,8 +512,9 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
+
             if generation_mode == "img2img":
-                # Upload initial image on blob
+                # Upload initial image on blob 
                 response = upload_on_blob("rawuserinput", "0tryy", init_img, generation_mode, init_img_filename)
                 logger.debug(f"rawuserinput: {response.content}")
                 input_image = init_img
@@ -544,7 +551,7 @@ class Generate:
                             "seed": self.seed,
                             "height":height,
                             "width":width,
-                            "negative_prompt":""
+                            "negative_prompt": negative_prompt
                         }
                     ]
                 }
