@@ -16,6 +16,9 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   docker:
     if: github.event.pull_request.draft == false

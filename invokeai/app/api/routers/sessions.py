@@ -270,3 +270,18 @@ async def invoke_session(
 
     ApiDependencies.invoker.invoke(session, invoke_all=all)
     return Response(status_code=202)
+
+
+@session_router.delete(
+    "/{session_id}/invoke",
+    operation_id="cancel_session_invoke",
+    responses={
+        202: {"description": "The invocation is canceled"}
+    },
+)
+async def cancel_session_invoke(
+    session_id: str = Path(description="The id of the session to cancel"),
+) -> None:
+    """Invokes a session"""
+    ApiDependencies.invoker.cancel(session_id)
+    return Response(status_code=202)

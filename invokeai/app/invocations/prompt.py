@@ -12,3 +12,11 @@ class PromptOutput(BaseInvocationOutput):
 
     prompt: str = Field(default=None, description="The output prompt")
     #fmt: on
+
+    class Config:
+        schema_extra = {
+            'required': [
+                'type',
+                'prompt',
+            ]
+        }
