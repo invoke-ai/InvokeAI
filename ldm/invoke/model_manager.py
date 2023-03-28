@@ -1364,7 +1364,7 @@ class ModelManager(object):
         using_fp16 = self.precision == "float16"
 
         vae_args.update(
-            cache_dir=global_cache_dir("hug"),
+            cache_dir=global_cache_dir("hub"),
             local_files_only=not Globals.internet_available,
         )
 
