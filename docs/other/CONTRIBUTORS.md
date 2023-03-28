@@ -23,14 +23,16 @@ We thank them for all of their time and hard work.
 * @damian0815 - Attention Systems and Gameplay Engineer
 * @mauwii (Matthias Wild) - Continuous integration and product maintenance engineer
 * @Netsvetaev (Artur Netsvetaev) - UI/UX Developer
-* @tildebyte - General gadfly and resident (self-appointed) know-it-all
 * @keturn - Lead for Diffusers port
 * @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
 * @jpphoto (Jonathan Pollack) - Inference and rendering engine optimization
 * @genomancer (Gregg Helt) - Model training and merging
+* @gogurtenjoyer - User support and testing
+* @whosawwhatsis - User support and testing
 
 ## **Contributions by**
 
+- [tildebyte](https://github.com/tildebyte)
 - [Sean McLellan](https://github.com/Oceanswave)
 - [Kevin Gibbons](https://github.com/bakkot)
 - [Tesseract Cat](https://github.com/TesseractCat)
@@ -78,6 +80,7 @@ We thank them for all of their time and hard work.
 - [psychedelicious](https://github.com/psychedelicious)
 - [damian0815](https://github.com/damian0815)
 - [Eugene Brodsky](https://github.com/ebr)
+- [Statcomm](https://github.com/statcomm)
 
 ## **Original CompVis Authors**
 

@@ -142,6 +142,10 @@ This method is recommended for those familiar with running Docker containers
 -   [WebUI overview](features/WEB.md)
 -   [WebUI hotkey reference guide](features/WEBUIHOTKEYS.md)
 -   [WebUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
+-   [Visual Manual for InvokeAI v2.3.1](https://docs.google.com/presentation/d/e/2PACX-1vSE90aC7bVVg0d9KXVMhy-Wve-wModgPFp7AGVTOCgf4xE03SnV24mjdwldolfCr59D_35oheHe4Cow/pub?start=false&loop=true&delayms=60000) (contributed by Statcomm)
+
+<!-- separator -->
+
 <!-- separator -->
 
 ### The InvokeAI Command Line Interface
@@ -176,6 +180,154 @@ This method is recommended for those familiar with running Docker containers
 -   [Generating Variations](features/VARIATIONS.md)
 
 ## :octicons-log-16: Latest Changes
+
+### v2.3.3 <small>(29 March 2023)</small>
+
+#### Bug Fixes
+1. When using legacy checkpoints with an external VAE, the VAE file is now scanned for malware prior to loading. Previously only the main model weights file was scanned.
+2. Textual inversion will select an appropriate batchsize based on whether `xformers` is active, and will default to `xformers` enabled if the library is detected.
+3. The batch script log file names have been fixed to be compatible with Windows.
+4. Occasional corruption of the `.next_prefix` file (which stores the next output file name in sequence) on Windows systems is now detected and corrected.
+5. An infinite loop when opening the developer's console from within the `invoke.sh` script has been corrected.
+
+#### Enhancements
+1. It is now possible to load and run several community-contributed SD-2.0 based models, including the infamous "Illuminati" model.
+2. The "NegativePrompts" embedding file, and others like it, can now be loaded by placing it in the InvokeAI `embeddings` directory.
+3. If no `--model` is specified at launch time, InvokeAI will remember the last model used and restore it the next time it is launched.
+4. On Linux systems, the `invoke.sh` launcher now uses a prettier console-based interface. To take advantage of it, install the `dialog` package using your package manager (e.g. `sudo apt install dialog`).
+5. When loading legacy models (safetensors/ckpt) you can specify a custom config file and/or a VAE by placing like-named files in the same directory as the model following this example:
+```
+my-favorite-model.ckpt
+my-favorite-model.yaml
+my-favorite-model.vae.pt      # or my-favorite-model.vae.safetensors
+```
+
+### v2.3.2 <small>(13 March 2023)</small>
+
+#### Bugfixes
+
+Since version 2.3.1 the following bugs have been fixed:
+
+1. Black images appearing for potential NSFW images when generating with legacy checkpoint models and both `--no-nsfw_checker` and `--ckpt_convert` turned on.
+2. Black images appearing when generating from models fine-tuned on Stable-Diffusion-2-1-base. When importing V2-derived models, you may be asked to select whether the model was derived from a "base" model (512 pixels) or the 768-pixel SD-2.1 model.
+3. The "Use All" button was not restoring the Hi-Res Fix setting on the WebUI
+4. When using the model installer console app, models failed to import correctly when importing from directories with spaces in their names. A similar issue with the output directory was also fixed.
+5. Crashes that occurred during model merging.
+6. Restore previous naming of Stable Diffusion base and 768 models.
+7. Upgraded to latest versions of `diffusers`, `transformers`, `safetensors` and `accelerate` libraries upstream. We hope that this will fix the `assertion NDArray > 2**32` issue that MacOS users have had when generating images larger than 768x768 pixels. Please report back.
+
+As part of the upgrade to `diffusers`, the location of the diffusers-based models has changed from `models/diffusers` to `models/hub`. When you launch InvokeAI for the first time, it will prompt you to OK a one-time move. This should be quick and harmless, but if you have modified your `models/diffusers` directory in some way, for example using symlinks, you may wish to cancel the migration and make appropriate adjustments.
+
+#### New "Invokeai-batch" script
+
+2.3.2 introduces a new command-line only script called
+`invokeai-batch` that can be used to generate hundreds of images from
+prompts and settings that vary systematically. This can be used to try
+the same prompt across multiple combinations of models, steps, CFG
+settings and so forth. It also allows you to template prompts and
+generate a combinatorial list like: ``` a shack in the mountains,
+photograph a shack in the mountains, watercolor a shack in the
+mountains, oil painting a chalet in the mountains, photograph a chalet
+in the mountains, watercolor a chalet in the mountains, oil painting a
+shack in the desert, photograph ...  ```
+
+If you have a system with multiple GPUs, or a single GPU with lots of
+VRAM, you can parallelize generation across the combinatorial set,
+reducing wait times and using your system's resources efficiently
+(make sure you have good GPU cooling).
+
+To try `invokeai-batch` out. Launch the "developer's console" using
+the `invoke` launcher script, or activate the invokeai virtual
+environment manually. From the console, give the command
+`invokeai-batch --help` in order to learn how the script works and
+create your first template file for dynamic prompt generation.
+
+### v2.3.1 <small>(26 February 2023)</small>
+
+This is primarily a bugfix release, but it does provide several new features that will improve the user experience. 
+
+#### Enhanced support for model management
+
+InvokeAI now makes it convenient to add, remove and modify models. You can individually import models that are stored on your local system, scan an entire folder and its subfolders for models and import them automatically, and even directly import models from the internet by providing their download URLs. You also have the option of designating a local folder to scan for new models each time InvokeAI is restarted.
+
+There are three ways of accessing the model management features:
+
+1. ***From the WebUI***, click on the cube to the right of the model selection menu. This will bring up a form that allows you to import models individually from your local disk or scan a directory for models to import.
+
+![image](https://user-images.githubusercontent.com/111189/220638091-918492cc-0719-4194-b033-3741e8289b30.png)
+
+2. **Using the Model Installer App**
+
+Choose option (5) _download and install models_ from the `invoke` launcher script to start a new console-based application for model management. You can use this to select from a curated set of starter models, or import checkpoint, safetensors, and diffusers models from a local disk or the internet. The example below shows importing two checkpoint URLs from popular SD sites and a HuggingFace diffusers model using its Repository ID. It also shows how to designate a folder to be scanned at startup time for new models to import.
+
+Command-line users can start this app using the command `invokeai-model-install`.
+
+![image](https://user-images.githubusercontent.com/111189/220660363-22ff3a2e-8082-410e-a818-d2b3a0529bac.png)
+
+3. **Using the Command Line Client (CLI)**
+
+The `!install_model` and `!convert_model` commands have been enhanced to allow entering of URLs and local directories to scan and import. The first command installs .ckpt and .safetensors files as-is. The second one converts them into the faster diffusers format before installation.
+
+Internally InvokeAI is able to probe the contents of a .ckpt or .safetensors file to distinguish among v1.x, v2.x and inpainting models. This means that you do **not** need to include "inpaint" in your model names to use an inpainting model. Note that Stable Diffusion v2.x models will be autoconverted into a diffusers model the first time you use it.
+
+Please see [INSTALLING MODELS](https://invoke-ai.github.io/InvokeAI/installation/050_INSTALLING_MODELS/) for more information on model management.
+
+#### An Improved Installer Experience
+
+The installer now launches a console-based UI for setting and changing commonly-used startup options:
+
+![image](https://user-images.githubusercontent.com/111189/220644777-3d3a90ca-f9e2-4e6d-93da-cbdd66bf12f3.png)
+
+After selecting the desired options, the installer installs several support models needed by InvokeAI's face reconstruction and upscaling features and then launches the interface for selecting and installing models shown earlier. At any time,  you can edit the startup options by launching `invoke.sh`/`invoke.bat` and entering option (6) _change InvokeAI startup options_
+
+Command-line users can launch the new configure app using `invokeai-configure`.
+
+This release also comes with a renewed updater. To do an update without going through a whole reinstallation, launch `invoke.sh` or `invoke.bat` and choose option (9) _update InvokeAI_ . This will bring you to a screen that prompts you to update to the latest released version, to the most current development version, or any released or unreleased version you choose by selecting the tag or branch of the desired version.
+
+![image](https://user-images.githubusercontent.com/111189/220650124-30a77137-d9cd-406e-a87d-d8283f99a4b3.png)
+
+Command-line users can run this interface by typing `invokeai-configure`
+
+#### Image Symmetry Options
+
+There are now features to generate horizontal and vertical symmetry during generation. The way these work is to wait until a selected step in the generation process and then to turn on a mirror image effect. In addition to generating some cool images, you can also use this to make side-by-side comparisons of how an image will look with more or fewer steps. Access this option from the WebUI by selecting _Symmetry_ from the image generation settings, or within the CLI by using the options `--h_symmetry_time_pct` and `--v_symmetry_time_pct` (these can be abbreviated to `--h_sym` and `--v_sym` like all other options).
+
+![image](https://user-images.githubusercontent.com/111189/220658687-47fd0f2c-7069-4d95-aec9-7196fceb360d.png)
+
+#### A New Unified Canvas Look
+
+This release introduces a beta version of the WebUI Unified Canvas. To try it out, open up the settings dialogue in the WebUI (gear icon) and select _Use Canvas Beta Layout_:
+
+![image](https://user-images.githubusercontent.com/111189/220646958-b7eca95e-dc39-4cd2-b277-63eac98ed446.png)
+
+Refresh the screen and go to to Unified Canvas (left side of screen, third icon from the top). The new layout is designed to provide more space to work in and to keep the image controls close to the image itself:
+
+![image](https://user-images.githubusercontent.com/111189/220647560-4a9265a1-6926-44f9-9d08-e1ef2ce61ff8.png)
+
+#### Model conversion and merging within the WebUI
+
+The WebUI now has an intuitive interface for model merging, as well as for permanent conversion of models from legacy .ckpt/.safetensors formats into diffusers format. These options are also available directly from the `invoke.sh`/`invoke.bat` scripts.
+
+#### An easier way to contribute translations to the WebUI
+
+We have migrated our translation efforts to [Weblate](https://hosted.weblate.org/engage/invokeai/), a FOSS translation product. Maintaining the growing project's translations is now far simpler for the maintainers and community. Please review our brief [translation guide](https://github.com/invoke-ai/InvokeAI/blob/v2.3.1/docs/other/TRANSLATION.md) for more information on how to contribute.
+
+#### Numerous internal bugfixes and performance issues
+
+This releases quashes multiple bugs that were reported in 2.3.0. Major internal changes include upgrading to `diffusers 0.13.0`, and using the `compel` library for prompt parsing. See [Detailed Change Log](#full-change-log) for a detailed list of bugs caught and squished.
+
+#### Summary of InvokeAI command line scripts (all accessible via the launcher menu)
+
+| Command                  | Description                                                         |
+|--------------------------|---------------------------------------------------------------------|
+| `invokeai`               | Command line interface                                              |
+| `invokeai --web`         | Web interface                                                       |
+| `invokeai-model-install` | Model installer with console forms-based front end                  |
+| `invokeai-ti --gui`      | Textual inversion, with a console forms-based front end             |
+| `invokeai-merge --gui`   | Model merging, with a console forms-based front end                 |
+| `invokeai-configure`     | Startup configuration; can also be used to reinstall support models |
+| `invokeai-update`        | InvokeAI software updater                                           |
+
 
 ### v2.3.0 <small>(9 February 2023)</small>
 
