@@ -43,6 +43,11 @@ class CreateModelResponse (BaseModel):
     info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
     status: str = Field(description="The status of the API response")
 
+class CreateModelResponse (BaseModel):
+    name: str = Field(description="The name of the new model")
+    info: Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")] = Field(description="The model info")
+
+
 class ModelsList(BaseModel):
     models: dict[str, Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")]]
 
@@ -63,13 +68,20 @@ async def list_models() -> ModelsList:
 """ Add Model """
 @models_router.post(
     "/",
-    operation_id="add_model",
-    responses={201: {"model": Union[CkptModelInfo, DiffusersModelInfo], "new_model_list": ModelsList}},
+    operation_id="update_model",
+    responses={
+        201: {
+        "model_response": Union[CkptModelInfo, DiffusersModelInfo], 
+        },
+        202: {
+        "description": "Model submission is processing. Check back later."
+        }, 
+    },
 )
-async def add_model(
-    model_info: Union[CkptModelInfo, DiffusersModelInfo],
-) -> Union[CkptModelInfo, DiffusersModelInfo]:
-    """Adds a new model"""
+async def update_model(
+    model_request: CreateModelRequest
+) -> CreateModelRequest:
+    #Adds a new model
     try:
         model_name = model_info["model_name"]
         del model_info["model_name"]
@@ -79,18 +91,18 @@ async def add_model(
             del model_attributes["vae"]
 
         ApiDependencies.invoker.services.model_manager.add_model(
-            model_name=model_name,
-            model_attributes=model_attributes,
+            model_name=model_request["name"],
+            model_attributes=model_request["info"],
             clobber=True,
         )
-        # How does Ckpt support deprecation change the above?
+        model_response = CreateModelResponse(status="success")
 
     except Exception as e:
         # Handle any exceptions thrown during the execution of the method
         # or raise the exception to be handled by the global exception handler
         raise HTTPException(status_code=500, detail=str(e))
     
-    return model_info
+    return model_request
 
 """ Delete Model """
 @models_router.delete(
@@ -99,6 +111,7 @@ async def add_model(
     responses={204: {"description": "Model deleted"}, 404: {"description": "Model not found"}},
 )
 async def delete_model(model_name: str) -> None:
+    """Deletes a model based on the model name."""
     try:
         # check if model exists
         if model_name not in ApiDependencies.invoker.services.model_manager.models:
