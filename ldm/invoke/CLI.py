@@ -126,7 +126,7 @@ def main():
             print(f"{e}. Aborting.")
             sys.exit(-1)
 
-    model = retrieve_last_used_model() or opt.model
+    model = opt.model or retrieve_last_used_model()
 
     # creating a Generate object:
     try:
