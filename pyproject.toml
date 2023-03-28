@@ -58,6 +58,7 @@ dependencies = [
   "pillow",
   "prompt-toolkit",
   "pudb",
+  "packaging",
   "pypatchmatch",
   "pyreadline3",
   "pytorch-lightning==1.7.7",

@@ -329,7 +329,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         resp = requests.get(url, headers=header, stream=True) # new request with range
 
     if exist_size > content_length:
-        print('* corrupt existing file found. re-downloading')
+        print(f'* corrupt existing file found (existing_size={exist_size}, content_length={content_length}). re-downloading')
         os.remove(dest)
         exist_size = 0
 
@@ -341,7 +341,8 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     elif resp.status_code == 206 or exist_size > 0:
         print(f"* {dest}: partial file found. Resuming...")
     elif resp.status_code != 200:
-        print(f"** An error occurred during downloading {dest}: {resp.reason}")
+        print(f"** An error occurred while downloading {url}: {resp.reason}")
+        return None
     else:
         print(f"* {dest}: Downloading...")
 
