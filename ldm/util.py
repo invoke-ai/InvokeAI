@@ -346,10 +346,6 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         print(f"* {dest}: Downloading...")
 
     try:
-        if content_length < 2000:
-            print(f"*** ERROR DOWNLOADING {url}: {resp.text}")
-            return None
-
         with open(dest, open_mode) as file, tqdm(
                 desc=str(dest),
                 initial=exist_size,

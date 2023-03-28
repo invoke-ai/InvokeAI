@@ -1288,8 +1288,14 @@ def check_internet() -> bool:
 
 # This routine performs any patch-ups needed after installation
 def run_patches():
-    # install ckpt configuration files that may have been added to the
-    # distro after original root directory configuration
+    install_missing_config_files()
+    update_launchers()
+
+def install_missing_config_files():
+    """
+    install ckpt configuration files that may have been added to the
+    distro after original root directory configuration
+    """
     import invokeai.configs as conf
     from shutil import copyfile
     
@@ -1300,6 +1306,20 @@ def run_patches():
         if not dest.exists():
             copyfile(src,dest)
     
+def update_launchers():
+    """
+    Make any updates to the launcher .sh and .bat scripts that may be needed
+    from release to release. This is not an elegant solution. Instead, the 
+    launcher should be moved into the source tree and installed by pip.
+    """
+    if sys.platform == "linux" \
+       and not Path(Globals.root,'.dialogrc').exists():
+        print('>> Downloading new version of launcher script and its config file')
+        from ldm.util import download_with_progress_bar
+        url_base = 'https://raw.githubusercontent.com/invoke-ai/InvokeAI/v2.3.3-rc1/installer/templates/'
+        download_with_progress_bar(url_base+'invoke.sh.in',Path(Globals.root,'invoke.sh'))
+        download_with_progress_bar(url_base+'dialogrc',Path(Globals.root,'.dialogrc'))
+
 if __name__ == '__main__':
     main()
     
