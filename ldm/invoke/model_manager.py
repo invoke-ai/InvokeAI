@@ -172,9 +172,9 @@ class ModelManager(object):
         """
         # if we are converting legacy files automatically, then
         # there are no legacy ckpts!
-        if Globals.ckpt_convert:
-            return False
         info = self.model_info(model_name)
+        if Globals.ckpt_convert or info.format=='diffusers' or self.is_v2_config(info.config):
+            return False
         if "weights" in info and info["weights"].endswith((".ckpt", ".safetensors")):
             return True
         return False
@@ -544,6 +544,8 @@ class ModelManager(object):
         return pipeline, width, height, model_hash
 
     def is_v2_config(self, config: Path) -> bool:
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root, config)
         try:
             mconfig = OmegaConf.load(config)
             return (

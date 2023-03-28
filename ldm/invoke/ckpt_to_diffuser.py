@@ -1264,10 +1264,10 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
                 cache_dir=cache_dir,
             )
             pipe = pipeline_class(
-                vae=vae,
-                text_encoder=text_model,
+                vae=vae.to(precision),
+                text_encoder=text_model.to(precision),
                 tokenizer=tokenizer,
-                unet=unet,
+                unet=unet.to(precision),
                 scheduler=scheduler,
                 safety_checker=None,
                 feature_extractor=None,
