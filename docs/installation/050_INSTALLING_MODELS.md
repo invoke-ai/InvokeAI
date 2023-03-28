@@ -11,7 +11,7 @@ The model checkpoint files ('\*.ckpt') are the Stable Diffusion
 captioned images gathered from multiple sources.
 
 Originally there was only a single Stable Diffusion weights file,
-which many people named `model.ckpt`. Now there are dozens or more
+which many people named `model.ckpt`. Now there are hundreds
 that have been fine tuned to provide particulary styles, genres, or
 other features. In addition, there are several new formats that
 improve on the original checkpoint format: a `.safetensors` format
@@ -29,9 +29,10 @@ and performance are being made at a rapid pace. Among other features
 is the ability to download and install a `diffusers` model just by
 providing its HuggingFace repository ID.
 
-While InvokeAI will continue to support `.ckpt` and `.safetensors`
+While InvokeAI will continue to support legacy `.ckpt` and `.safetensors`
 models for the near future, these are deprecated and support will
-likely be withdrawn at some point in the not-too-distant future.
+be withdrawn in version 3.0, after which all legacy models will be
+converted into diffusers at the time they are loaded.
 
 This manual will guide you through installing and configuring model
 weight files and converting legacy `.ckpt` and `.safetensors` files
@@ -89,15 +90,18 @@ aware that CIVITAI hosts many models that generate NSFW content.
 !!! note
 
     InvokeAI 2.3.x does not support directly importing and
-    running Stable Diffusion version 2 checkpoint models. You may instead
-    convert them into `diffusers` models using the conversion methods
-    described below.
+    running Stable Diffusion version 2 checkpoint models. If you
+    try to import them, they will be automatically
+    converted into `diffusers` models on the fly. This adds about 20s
+    to loading time. To avoid this overhead, you are encouraged to
+    use one of the conversion methods described below to convert them
+    permanently.
 
 ## Installation
 
 There are multiple ways to install and manage models:
 
-1. The `invokeai-configure` script which will download and install them for you.
+1. The `invokeai-model-install` script which will download and install them for you.
 
 2. The command-line tool (CLI) has commands that allows you to import, configure and modify
    models files.
@@ -105,14 +109,41 @@ There are multiple ways to install and manage models:
 3. The web interface (WebUI) has a GUI for importing and managing
    models.
 
-### Installation via `invokeai-configure`
+### Installation via `invokeai-model-install`
 
-From the `invoke` launcher, choose option (6) "re-run the configure
-script to download new models." This will launch the same script that
-prompted you to select models at install time. You can use this to add
-models that you skipped the first time around. It is all right to
-specify a model that was previously downloaded; the script will just
-confirm that the files are complete.
+From the `invoke` launcher, choose option (5) "Download and install
+models."  This will launch the same script that prompted you to select
+models at install time. You can use this to add models that you
+skipped the first time around. It is all right to specify a model that
+was previously downloaded; the script will just confirm that the files
+are complete.
+
+This script allows you to load 3d party models. Look for a large text
+entry box labeled "IMPORT LOCAL AND REMOTE MODELS." In this box, you
+can cut and paste one or more of any of the following:
+
+1. A URL that points to a downloadable .ckpt or .safetensors file.
+2. A file path pointing to a .ckpt or .safetensors  file.
+3. A diffusers model repo_id (from HuggingFace) in the format
+   "owner/repo_name".
+4. A directory path pointing to a diffusers model directory.
+5. A directory path pointing to a directory containing a bunch of
+   .ckpt and .safetensors files. All will be imported.
+
+You can enter multiple items into the textbox, each one on a separate
+line. You can paste into the textbox using ctrl-shift-V or by dragging
+and dropping a file/directory from the desktop into the box.
+
+The script also lets you designate a directory that will be scanned
+for new model files each time InvokeAI starts up. These models will be
+added automatically.
+
+Lastly, the script gives you a checkbox option to convert legacy models
+into diffusers, or to run the legacy model directly. If you choose to
+convert, the original .ckpt/.safetensors file will **not** be deleted,
+but a new diffusers directory will be created, using twice your disk
+space. However, the diffusers version will load faster, and will be
+compatible with InvokeAI 3.0.
 
 ### Installation via the CLI
 
@@ -144,19 +175,15 @@ invoke> !import_model https://example.org/sd_models/martians.safetensors
 For this to work, the URL must not be password-protected. Otherwise
 you will receive a 404 error.
 
-When you import a legacy model, the CLI will first ask you what type
-of model this is. You can indicate whether it is a model based on
-Stable Diffusion 1.x (1.4 or 1.5), one based on Stable Diffusion 2.x,
-or a 1.x inpainting model. Be careful to indicate the correct model
-type, or it will not load correctly. You can correct the model type
-after the fact using the `!edit_model` command.
-
-The system will then ask you a few other questions about the model,
-including what size image it was trained on (usually 512x512), what
-name and description you wish to use for it, and whether you would
-like to install a custom VAE (variable autoencoder) file for the
-model. For recent models, the answer to the VAE question is usually
-"no," but it won't hurt to answer "yes".
+When you import a legacy model, the CLI will try to figure out what
+type of model it is and select the correct load configuration file.
+However, one thing it can't do is to distinguish between Stable
+Diffusion 2.x models trained on 512x512 vs 768x768 images. In this
+case, the CLI will pop up a menu of choices, asking you to select
+which type of model it is. Please consult the model documentation to
+identify the correct answer, as loading with the wrong configuration
+will lead to black images. You can correct the model type after the
+fact using the `!edit_model` command.
 
 After importing, the model will load. If this is successful, you will
 be asked if you want to keep the model loaded in memory to start
@@ -210,129 +237,6 @@ Before installing, the CLI will ask you for a short name and
 description for the model, whether to make this the default model that
 is loaded at InvokeAI startup time, and whether to replace its
 VAE. Generally the answer to the latter question is "no".
-
-### Specifying a configuration file for legacy checkpoints
-
-Some checkpoint files come with instructions to use a specific .yaml
-configuration file. For InvokeAI load this file correctly, please put
-the config file in the same directory as the corresponding `.ckpt` or
-`.safetensors` file and make sure the file has the same basename as
-the weights file. Here is an example:
-
-```bash
-wonderful-model-v2.ckpt
-wonderful-model-v2.yaml
-```
-
-Similarly, to use a custom VAE, name the VAE like this:
-
-```bash
-wonderful-model-v2.vae.pt
-```
-
-
-### Converting legacy models into `diffusers`
-
-The CLI `!convert_model` will convert a `.safetensors` or `.ckpt`
-models file into `diffusers` and install it.This will enable the model
-to load and run faster without loss of image quality.
-
-The usage is identical to `!import_model`. You may point the command
-to either a downloaded model file on disk, or to a (non-password
-protected) URL:
-
-```bash
-invoke> !convert_model C:/Users/fred/Downloads/martians.safetensors
-```
-
-After a successful conversion, the CLI will offer you the option of
-deleting the original `.ckpt` or `.safetensors` file.
-
-### Optimizing a previously-installed model
-
-Lastly, if you have previously installed a `.ckpt` or `.safetensors`
-file and wish to convert it into a `diffusers` model, you can do this
-without re-downloading and converting the original file using the
-`!optimize_model` command. Simply pass the short name of an existing
-installed model:
-
-```bash
-invoke> !optimize_model martians-v1.0
-```
-
-The model will be converted into `diffusers` format and replace the
-previously installed version. You will again be offered the
-opportunity to delete the original `.ckpt` or `.safetensors` file.
-
-### Related CLI Commands
-
-There are a whole series of additional model management commands in
-the CLI that you can read about in [Command-Line
-Interface](../features/CLI.md). These include:
-
-* `!models` - List all installed models
-* `!switch <model name>` - Switch to the indicated model
-* `!edit_model <model name>` - Edit the indicated model to change its name, description or other properties
-* `!del_model <model name>` - Delete the indicated model
-
-### Manually editing `configs/models.yaml`
-
-
-If you are comfortable with a text editor then you may simply edit `models.yaml`
-directly.
-
-You will need to download the desired `.ckpt/.safetensors` file and
-place it somewhere on your machine's filesystem. Alternatively, for a
-`diffusers` model, record the repo_id or download the whole model
-directory. Then using a **text** editor (e.g. the Windows Notepad
-application), open the file `configs/models.yaml`, and add a new
-stanza that follows this model:
-
-#### A legacy model
-
-A legacy `.ckpt` or `.safetensors` entry will look like this:
-
-```yaml
-arabian-nights-1.0:
-  description: A great fine-tune in Arabian Nights style
-  weights: ./path/to/arabian-nights-1.0.ckpt
-  config: ./configs/stable-diffusion/v1-inference.yaml
-  format: ckpt
-  width: 512
-  height: 512
-  default: false
-```
-
-Note that `format` is `ckpt` for both `.ckpt` and `.safetensors` files.
-
-#### A diffusers model
-
-A stanza for a `diffusers` model will look like this for a HuggingFace
-model with a repository ID:
-
-```yaml
-arabian-nights-1.1:
-  description: An even better fine-tune of the Arabian Nights
-  repo_id: captahab/arabian-nights-1.1
-  format: diffusers
-  default: true
-```
-
-And for a downloaded directory:
-
-```yaml
-arabian-nights-1.1:
-  description: An even better fine-tune of the Arabian Nights
-  path: /path/to/captahab-arabian-nights-1.1
-  format: diffusers
-  default: true
-```
-
-There is additional syntax for indicating an external VAE to use with
-this model. See `INITIAL_MODELS.yaml` and `models.yaml` for examples.
-
-After you save the modified `models.yaml` file relaunch
-`invokeai`. The new model will now be available for your use.
 
 ### Installation via the WebUI
 
@@ -413,3 +317,143 @@ And here is what the same argument looks like in `invokeai.init`:
 --no-nsfw_checker
 --autoconvert /home/fred/stable-diffusion-checkpoints
 ```
+
+### Specifying a configuration file for legacy checkpoints
+
+Some checkpoint files come with instructions to use a specific .yaml
+configuration file. For InvokeAI load this file correctly, please put
+the config file in the same directory as the corresponding `.ckpt` or
+`.safetensors` file and make sure the file has the same basename as
+the model file. Here is an example:
+
+```bash
+wonderful-model-v2.ckpt
+wonderful-model-v2.yaml
+```
+
+This is not needed for `diffusers` models, which come with their own
+pre-packaged configuration.
+
+### Specifying a custom VAE file for legacy checkpoints
+
+To associate a custom VAE with a legacy file, place the VAE file in
+the same directory as the corresponding `.ckpt` or
+`.safetensors` file and make sure the file has the same basename as
+the model file. Use the suffix `.vae.pt` for VAE checkpoint files, and
+`.vae.safetensors` for VAE safetensors files. There is no requirement
+that both the model and the VAE follow the same format.
+
+Example:
+
+```bash
+wonderful-model-v2.pt
+wonderful-model-v2.vae.safetensors
+```
+
+### Converting legacy models into `diffusers`
+
+The CLI `!convert_model` will convert a `.safetensors` or `.ckpt`
+models file into `diffusers` and install it.This will enable the model
+to load and run faster without loss of image quality.
+
+The usage is identical to `!import_model`. You may point the command
+to either a downloaded model file on disk, or to a (non-password
+protected) URL:
+
+```bash
+invoke> !convert_model C:/Users/fred/Downloads/martians.safetensors
+```
+
+After a successful conversion, the CLI will offer you the option of
+deleting the original `.ckpt` or `.safetensors` file.
+
+### Optimizing a previously-installed model
+
+Lastly, if you have previously installed a `.ckpt` or `.safetensors`
+file and wish to convert it into a `diffusers` model, you can do this
+without re-downloading and converting the original file using the
+`!optimize_model` command. Simply pass the short name of an existing
+installed model:
+
+```bash
+invoke> !optimize_model martians-v1.0
+```
+
+The model will be converted into `diffusers` format and replace the
+previously installed version. You will again be offered the
+opportunity to delete the original `.ckpt` or `.safetensors` file.
+
+Alternatively you can use the WebUI's model manager to handle diffusers
+optimization. Select the legacy model you wish to convert, and then
+look for a button labeled "Convert to Diffusers" in the upper right of
+the window.
+
+### Related CLI Commands
+
+There are a whole series of additional model management commands in
+the CLI that you can read about in [Command-Line
+Interface](../features/CLI.md). These include:
+
+* `!models` - List all installed models
+* `!switch <model name>` - Switch to the indicated model
+* `!edit_model <model name>` - Edit the indicated model to change its name, description or other properties
+* `!del_model <model name>` - Delete the indicated model
+
+### Manually editing `configs/models.yaml`
+
+If you are comfortable with a text editor then you may simply edit `models.yaml`
+directly.
+
+You will need to download the desired `.ckpt/.safetensors` file and
+place it somewhere on your machine's filesystem. Alternatively, for a
+`diffusers` model, record the repo_id or download the whole model
+directory. Then using a **text** editor (e.g. the Windows Notepad
+application), open the file `configs/models.yaml`, and add a new
+stanza that follows this model:
+
+#### A legacy model
+
+A legacy `.ckpt` or `.safetensors` entry will look like this:
+
+```yaml
+arabian-nights-1.0:
+  description: A great fine-tune in Arabian Nights style
+  weights: ./path/to/arabian-nights-1.0.ckpt
+  config: ./configs/stable-diffusion/v1-inference.yaml
+  format: ckpt
+  width: 512
+  height: 512
+  default: false
+```
+
+Note that `format` is `ckpt` for both `.ckpt` and `.safetensors` files.
+
+#### A diffusers model
+
+A stanza for a `diffusers` model will look like this for a HuggingFace
+model with a repository ID:
+
+```yaml
+arabian-nights-1.1:
+  description: An even better fine-tune of the Arabian Nights
+  repo_id: captahab/arabian-nights-1.1
+  format: diffusers
+  default: true
+```
+
+And for a downloaded directory:
+
+```yaml
+arabian-nights-1.1:
+  description: An even better fine-tune of the Arabian Nights
+  path: /path/to/captahab-arabian-nights-1.1
+  format: diffusers
+  default: true
+```
+
+There is additional syntax for indicating an external VAE to use with
+this model. See `INITIAL_MODELS.yaml` and `models.yaml` for examples.
+
+After you save the modified `models.yaml` file relaunch
+`invokeai`. The new model will now be available for your use.
+
