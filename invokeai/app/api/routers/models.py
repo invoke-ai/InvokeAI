@@ -34,19 +34,17 @@ class DiffusersModelInfo(ModelInfo):
     repo_id: Optional[str] = Field(description="The repo ID to use for this model")
     path: Optional[str] = Field(description="The path to the model")
 
+class modelInfo(ModelInfo):
+    info: Annotated[Union[CkptModelInfo,DiffusersModelInfo], Field(discriminator="format")] 
+
 class CreateModelRequest (BaseModel):
     name: str = Field(description="The name of the model")
-    info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
-
-class CreateModelResponse (BaseModel):
-    name: str = Field(description="The name of the new model")
-    info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
-    status: str = Field(description="The status of the API response")
-
-class CreateModelResponse (BaseModel):
-    name: str = Field(description="The name of the new model")
     info: Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")] = Field(description="The model info")
 
+class CreateModelResponse (BaseModel):
+    name: str = Field(description="The name of the new model")
+    info: modelInfo = Field(description="The model details and configuration")
+    status: str = Field(description="The status of the API response")
 
 class ModelsList(BaseModel):
     models: dict[str, Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")]]
@@ -95,7 +93,7 @@ async def update_model(
             model_attributes=model_request["info"],
             clobber=True,
         )
-        model_response = CreateModelResponse(status="success")
+        model_response = CreateModelResponse(name=model_request.name, info=model_request.info, status="success")
 
     except Exception as e:
         # Handle any exceptions thrown during the execution of the method
