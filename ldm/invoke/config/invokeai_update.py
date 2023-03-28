@@ -16,6 +16,8 @@ from rich.text import Text
 from ldm.invoke import __version__
 
 INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive"
+INVOKE_AI_TAG="https://github.com/invoke-ai/InvokeAI/archive/refs/tags"
+INVOKE_AI_BRANCH="https://github.com/invoke-ai/InvokeAI/archive/refs/heads"
 INVOKE_AI_REL="https://api.github.com/repos/invoke-ai/InvokeAI/releases"
 
 OS = platform.uname().system
@@ -41,7 +43,8 @@ def welcome(versions: dict):
         yield '[bold yellow]Options:'
         yield f'''[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
 [2] Update to the bleeding-edge development version ([italic]main[/italic])
-[3] Manually enter the tag or branch name you wish to update'''
+[3] Manually enter the [bold]tag name[/bold] for the version you wish to update to
+[4] Manually enter the [bold]branch name[/bold] for the version you wish to update to'''        
 
     console.rule()
     print(
@@ -62,17 +65,26 @@ def main():
     welcome(versions)
 
     tag = None
-    choice = Prompt.ask('Choice:',choices=['1','2','3'],default='1')
+    branch = None
+    release = None
+    choice = Prompt.ask('Choice:',choices=['1','2','3','4'],default='1')
     
     if choice=='1':
-        tag = versions[0]['tag_name']
+        release = versions[0]['tag_name']
     elif choice=='2':
-        tag = 'main'
+        release = 'main'
     elif choice=='3':
-        tag = Prompt.ask('Enter an InvokeAI tag or branch name')
+        tag = Prompt.ask('Enter an InvokeAI tag name')
+    elif choice=='4':
+        branch = Prompt.ask('Enter an InvokeAI branch name')
 
     print(f':crossed_fingers: Upgrading to [yellow]{tag}[/yellow]')
-    cmd = f'pip install {INVOKE_AI_SRC}/{tag}.zip --use-pep517 --upgrade'
+    if release:
+        cmd = f'pip install {INVOKE_AI_SRC}/{release}.zip --use-pep517 --upgrade'
+    elif tag:
+        cmd = f'pip install {INVOKE_AI_TAG}/{tag}.zip --use-pep517 --upgrade'
+    else:
+        cmd = f'pip install {INVOKE_AI_BRANCH}/{branch}.zip --use-pep517 --upgrade'
     print('')
     print('')
     if os.system(cmd)==0:

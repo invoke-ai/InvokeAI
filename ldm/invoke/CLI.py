@@ -1353,7 +1353,7 @@ def do_version_update(root_version: version.Version, app_version: Union[str, ver
         if sys.platform == "linux":
             print('>> Downloading new version of launcher script and its config file')
             from ldm.util import download_with_progress_bar
-            url_base = f'https://raw.githubusercontent.com/invoke-ai/InvokeAI/release/v{str(app_version)}/installer/templates/'
+            url_base = f'https://raw.githubusercontent.com/invoke-ai/InvokeAI/v{str(app_version)}/installer/templates/'
 
             dest = Path(Globals.root,'invoke.sh.in')
             assert download_with_progress_bar(url_base+'invoke.sh.in',dest)

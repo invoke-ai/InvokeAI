@@ -908,11 +908,11 @@ class ModelManager(object):
                     )
                 elif model_type == SDLegacyType.V2:
                     print(
-                        f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                        f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide the configuration file type or path."
                     )
                 else:
                     print(
-                        f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                        f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide the configuration file type or path."
                     )
 
             if not model_config_file and config_file_callback:
