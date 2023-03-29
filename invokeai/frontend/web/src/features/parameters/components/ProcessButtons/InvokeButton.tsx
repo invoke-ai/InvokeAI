@@ -11,6 +11,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
+import { createSession } from 'services/thunks/session';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -24,7 +25,8 @@ export default function InvokeButton(props: InvokeButton) {
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleClickGenerate = () => {
-    dispatch(generateImage(activeTabName));
+    // dispatch(generateImage(activeTabName));
+    dispatch(createSession());
   };
 
   const { t } = useTranslation();
