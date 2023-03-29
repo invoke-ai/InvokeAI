@@ -7,7 +7,6 @@ import {
   UpscaleInvocation,
 } from 'services/api';
 
-// fe todo export sampler types
 // fe todo fix model type (frontend uses null, backend uses undefined)
 // fe todo update front end to store to have whole image field (vs just name)
 // be todo add symmetry fields
