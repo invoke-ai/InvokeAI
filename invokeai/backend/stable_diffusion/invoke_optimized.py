@@ -14,7 +14,7 @@ class Txt2Img_Optimized:
         self.width = width
         self.num_images_per_prompt = 1
 
-    def install_requirements(self, command):
+    def execute_command(self, command):
         # execute command
         subprocess.check_call(command)
 
@@ -37,10 +37,12 @@ class Txt2Img_Optimized:
     def openvino_txt2img(self,prompt,model):
         batch_size = 1
 
-        model_type = "openvino"
+        model_type = "IR"
         model_opevino = "echarlaix/stable-diffusion-v1-5-openvino"
         model_pytorch = "runwayml/stable-diffusion-v1-5"
-        if model_type == "openvino":
+        if model_type == "IR":
+            command = "mo --input_model " + model_opevino + "\\unet\\model.onnx --progress --input_shape [2,4,64,64],[-1],[2,77,768] --use_legacy_frontend --input sample,timestep,encoder_hidden_states" 
+            self.execute_command(command)
             stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model_opevino)
         else:
             stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model, export=True)
