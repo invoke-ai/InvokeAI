@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store';
 import {
   ImageToImageInvocation,
@@ -12,10 +11,12 @@ import {
 // be todo add symmetry fields
 // be todo variations....
 
-export function buildTxt2ImgNode(state: RootState): TextToImageInvocation {
+export function buildTxt2ImgNode(
+  state: RootState
+): Omit<TextToImageInvocation, 'id'> {
   const { generation, system } = state;
 
-  const { shouldDisplayInProgressType, openModel } = system;
+  const { shouldDisplayInProgressType, model } = system;
 
   const {
     prompt,
@@ -30,7 +31,6 @@ export function buildTxt2ImgNode(state: RootState): TextToImageInvocation {
 
   // missing fields in TextToImageInvocation: strength, hires_fix
   return {
-    id: uuidv4(),
     type: 'txt2img',
     prompt,
     seed,
@@ -40,12 +40,14 @@ export function buildTxt2ImgNode(state: RootState): TextToImageInvocation {
     cfg_scale,
     sampler_name: sampler as TextToImageInvocation['sampler_name'],
     seamless,
-    model: openModel as string | undefined,
+    model,
     progress_images: shouldDisplayInProgressType === 'full-res',
   };
 }
 
-export function buildImg2ImgNode(state: RootState): ImageToImageInvocation {
+export function buildImg2ImgNode(
+  state: RootState
+): Omit<ImageToImageInvocation, 'id'> {
   const { generation, system } = state;
 
   const { shouldDisplayInProgressType, openModel: model } = system;
@@ -65,7 +67,6 @@ export function buildImg2ImgNode(state: RootState): ImageToImageInvocation {
   } = generation;
 
   return {
-    id: 'a',
     type: 'img2img',
     prompt,
     seed,
@@ -86,7 +87,9 @@ export function buildImg2ImgNode(state: RootState): ImageToImageInvocation {
   };
 }
 
-export function buildFacetoolNode(state: RootState): RestoreFaceInvocation {
+export function buildFacetoolNode(
+  state: RootState
+): Omit<RestoreFaceInvocation, 'id'> {
   const { generation, postprocessing } = state;
 
   const { initialImage } = generation;
@@ -95,7 +98,6 @@ export function buildFacetoolNode(state: RootState): RestoreFaceInvocation {
 
   // missing fields in RestoreFaceInvocation: type, codeformer_fidelity
   return {
-    id: uuidv4(),
     type: 'restore_face',
     image: {
       image_name:
@@ -106,7 +108,9 @@ export function buildFacetoolNode(state: RootState): RestoreFaceInvocation {
 }
 
 // is this ESRGAN??
-export function buildUpscaleNode(state: RootState): UpscaleInvocation {
+export function buildUpscaleNode(
+  state: RootState
+): Omit<UpscaleInvocation, 'id'> {
   const { generation, postprocessing } = state;
 
   const { initialImage } = generation;
@@ -115,7 +119,6 @@ export function buildUpscaleNode(state: RootState): UpscaleInvocation {
 
   // missing fields in UpscaleInvocation: denoise_str
   return {
-    id: uuidv4(),
     type: 'upscale',
     image: {
       image_name:

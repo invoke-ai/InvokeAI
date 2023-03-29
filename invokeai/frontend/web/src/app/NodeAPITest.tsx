@@ -114,6 +114,8 @@ const NodeAPITest = () => {
       return;
     }
 
+    setResultImages([]);
+
     // set up socket.io listeners
 
     // TODO: suppose this should be handled in the socket.io middleware?
@@ -190,10 +192,16 @@ const NodeAPITest = () => {
       <IAIButton onClick={handleCancelProcessing} colorScheme="error">
         Cancel Processing
       </IAIButton>
-      <IAIButton onClick={handleCreateSession} colorScheme="accent">
-        Create Session
-      </IAIButton>
       <IAIButton
+        onClick={handleCreateSession}
+        colorScheme="accent"
+        loadingText={`Invoking ${
+          progress === null ? '...' : `${Math.round(progress * 100)}%`
+        }`}
+      >
+        Create Session & Invoke
+      </IAIButton>
+      {/* <IAIButton
         onClick={handleInvokeSession}
         loadingText={`Invoking ${
           progress === null ? '...' : `${Math.round(progress * 100)}%`
@@ -201,7 +209,7 @@ const NodeAPITest = () => {
         colorScheme="accent"
       >
         Invoke
-      </IAIButton>
+      </IAIButton> */}
       <Flex wrap="wrap" gap={4} overflow="scroll">
         <Image
           src={progressImage?.dataURL}
