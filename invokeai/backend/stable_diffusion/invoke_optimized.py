@@ -41,11 +41,14 @@ class Txt2Img_Optimized:
         model_opevino = "echarlaix/stable-diffusion-v1-5-openvino"
         model_pytorch = "runwayml/stable-diffusion-v1-5"
         if model_type == "IR":
-            command = "mo --input_model " + model_opevino + "\\unet\\model.onnx --progress --input_shape [2,4,64,64],[-1],[2,77,768] --use_legacy_frontend --input sample,timestep,encoder_hidden_states" 
-            self.execute_command(command)
             stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model_opevino)
-        else:
+        elif model_type == "Pytorch":
             stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model, export=True)
+        else:
+            command = "python convert_stable_diffusion_checkpoint_to_onnx.py --model_path=model_opevino --output_path=models\\stable_diffusion_onnx"
+            self.execute_command(command)
+            command = "mo --input_model " + model_opevino + "\\unet\\model.onnx --progress --input_shape [2,4,64,64],[-1],[2,77,768] --use_legacy_frontend --input sample,timestep,encoder_hidden_states"
+            self.execute_command(command)
         stable_diffusion.compile()
 
         start = timeit.default_timer()
