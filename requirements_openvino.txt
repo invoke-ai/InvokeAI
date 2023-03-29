@@ -2,4 +2,4 @@ optimum[openvino,nncf]
 opencv-python==4.5.5.64
 tqdm==4.64.0
 streamlit==1.12.0
-pip install openvino-dev[onnx]
+openvino-dev[onnx]
