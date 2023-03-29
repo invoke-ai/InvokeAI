@@ -490,6 +490,13 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
+        # To try and load LoRA not trained through diffusers
+        # To be removed once support for diffusers LoRA weights is high enough
+        if self.model.lora_manager:
+            prompt = self.model.lora_manager.configure_prompt_legacy(prompt)
+            # lora MUST process prompt before conditioning
+            self.model.lora_manager.load_lora_legacy()
+
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
             prompt,
@@ -527,6 +534,9 @@ class Generate:
                 skip_normalize_legacy_blend=skip_normalize,
                 log_tokens=self.log_tokenization,
             )
+
+            if self.model.peft_manager:
+                self.model = self.model.peft_manager.load(self.model, self.model.unet.dtype)
 
             init_image, mask_image = self._make_images(
                 init_img,
@@ -990,6 +1000,7 @@ class Generate:
 
         self.model_name = model_name
         self._set_sampler()  # requires self.model_name to be set first
+
         return self.model
 
     def load_huggingface_concepts(self, concepts: list[str]):
@@ -1032,6 +1043,8 @@ class Generate:
         image_callback=None,
         prefix=None,
     ):
+
+        results = []
         for r in image_list:
             image, seed = r
             try:
@@ -1084,6 +1097,10 @@ class Generate:
                 image_callback(image, seed, upscaled=True, use_prefix=prefix)
             else:
                 r[0] = image
+
+            results.append([image, seed])
+
+        return results
 
     def apply_textmask(
         self, image_path: str, prompt: str, callback, threshold: float = 0.5

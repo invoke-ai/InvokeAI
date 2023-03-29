@@ -13,6 +13,7 @@ from ldm.models.diffusion.cross_attention_control import Arguments, \
     restore_default_cross_attention, override_cross_attention, Context, get_cross_attention_modules, \
     CrossAttentionType, SwapCrossAttnContext
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
+from ldm.modules.lora_manager import LoraCondition
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -45,10 +46,15 @@ class InvokeAIDiffuserComponent:
 
         tokens_count_including_eos_bos: int
         cross_attention_control_args: Optional[Arguments] = None
+        lora_conditions: Optional[list[LoraCondition]] = None
 
         @property
         def wants_cross_attention_control(self):
             return self.cross_attention_control_args is not None
+
+        @property
+        def has_lora_conditions(self):
+            return self.lora_conditions is not None
 
 
     def __init__(self, model, model_forward_callback: ModelForwardCallback,
@@ -69,11 +75,11 @@ class InvokeAIDiffuserComponent:
     def custom_attention_context(self,
                                  extra_conditioning_info: Optional[ExtraConditioningInfo],
                                  step_count: int):
-        do_swap = extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
         old_attn_processor = None
-        if do_swap:
-            old_attn_processor = self.override_cross_attention(extra_conditioning_info,
-                                                               step_count=step_count)
+        if extra_conditioning_info.wants_cross_attention_control | extra_conditioning_info.has_lora_conditions:
+            old_attn_processor = self.override_attention_processors(extra_conditioning_info,
+                                                                    step_count=step_count)
+
         try:
             yield None
         finally:
@@ -82,26 +88,35 @@ class InvokeAIDiffuserComponent:
             # TODO resuscitate attention map saving
             #self.remove_attention_map_saving()
 
-    def override_cross_attention(self, conditioning: ExtraConditioningInfo, step_count: int) -> Dict[str, AttnProcessor]:
+
+    def override_attention_processors(self, conditioning: ExtraConditioningInfo, step_count: int) -> Dict[str, AttnProcessor]:
         """
         setup cross attention .swap control. for diffusers this replaces the attention processor, so
         the previous attention processor is returned so that the caller can restore it later.
         """
-        self.conditioning = conditioning
-        self.cross_attention_control_context = Context(
-            arguments=self.conditioning.cross_attention_control_args,
-            step_count=step_count
-        )
-        return override_cross_attention(self.model,
-                                        self.cross_attention_control_context,
-                                        is_running_diffusers=self.is_running_diffusers)
+        old_attn_processors = self.model.attn_processors
 
-    def restore_default_cross_attention(self, restore_attention_processor: Optional['AttnProcessor']=None):
-        self.conditioning = None
+        # Load lora conditions into the model
+        if conditioning.has_lora_conditions:
+            for condition in conditioning.lora_conditions:
+                condition(self.model)
+
+        if conditioning.wants_cross_attention_control:
+            self.cross_attention_control_context = Context(
+                arguments=conditioning.cross_attention_control_args,
+                step_count=step_count
+            )
+            override_cross_attention(self.model,
+                                     self.cross_attention_control_context,
+                                     is_running_diffusers=self.is_running_diffusers)
+        return old_attn_processors
+
+
+    def restore_default_cross_attention(self, processors_to_restore: Optional[dict[str, 'AttnProcessor']]=None):
         self.cross_attention_control_context = None
         restore_default_cross_attention(self.model,
                                         is_running_diffusers=self.is_running_diffusers,
-                                        restore_attention_processor=restore_attention_processor)
+                                        processors_to_restore=processors_to_restore)
 
     def setup_attention_map_saving(self, saver: AttentionMapSaver):
         def callback(slice, dim, offset, slice_size, key):
@@ -303,7 +318,7 @@ class InvokeAIDiffuserComponent:
             #print("applying saved attention maps for", cross_attention_control_types_to_do)
             for ca_type in cross_attention_control_types_to_do:
                 context.request_apply_saved_attention_maps(ca_type)
-            edited_conditioning = self.conditioning.cross_attention_control_args.edited_conditioning
+            edited_conditioning = context.arguments.edited_conditioning
             conditioned_next_x = self.model_forward_callback(x, sigma, edited_conditioning)
             context.clear_requests(cleanup=True)
 
