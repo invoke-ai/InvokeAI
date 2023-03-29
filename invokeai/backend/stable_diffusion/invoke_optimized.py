@@ -1,13 +1,15 @@
-from diffusers import OnnxStableDiffusionPipeline
-from optimum.intel.openvino import OVStableDiffusionPipeline
-
-import openvino.utils as utils
-utils.add_openvino_libs_to_path()
+"""
+Implements optimized version of Stablediffusion txt2img inference
+"""
 
 import timeit
 import subprocess
+import importlib
 
-class Txt2Img_Optimized:
+from diffusers import OnnxStableDiffusionPipeline
+
+#Implementation of class for optimized modules.
+class txt2img_Optimized:
 
     def __init__(self, height, width):
         self.height = height
@@ -34,16 +36,22 @@ class Txt2Img_Optimized:
         print(f"Elapsed time for inference: {elapsed_time}")
         image.save("ONNX_inference.png")
 
+    """
+    Implementation of openvino based optimization
+    """
     def openvino_txt2img(self,prompt,model):
-        batch_size = 1
+
+        #from optimum.intel.openvino import OVStableDiffusionPipeline
+        ovsd = importlib.import_module('optimum.intel.openvino')
+        utils = importlib.import_module('openvino.utils')
+        utils.add_openvino_libs_to_path()
 
         model_type = "IR"
         model_opevino = "echarlaix/stable-diffusion-v1-5-openvino"
-        model_pytorch = "runwayml/stable-diffusion-v1-5"
         if model_type == "IR":
-            stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model_opevino)
+            stable_diffusion = ovsd.OVStableDiffusionPipeline.from_pretrained(model_opevino)
         elif model_type == "Pytorch":
-            stable_diffusion = OVStableDiffusionPipeline.from_pretrained(model, export=True)
+            stable_diffusion = ovsd.OVStableDiffusionPipeline.from_pretrained(model, export=True)
         else:
             command = "python convert_stable_diffusion_checkpoint_to_onnx.py --model_path=model_opevino --output_path=models\\stable_diffusion_onnx"
             self.execute_command(command)
@@ -56,7 +64,7 @@ class Txt2Img_Optimized:
         image = stable_diffusion(prompt).images[0]
         end = timeit.default_timer()
         inference_time = end - start
-        image.save(f"OpenVINO_new_OUTPUT.png")
+        image.save(f"OpenVINO_inference_{end}.png")
         print(f"Inference time for input: {inference_time}")
 
             
