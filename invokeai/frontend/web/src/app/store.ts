@@ -15,6 +15,7 @@ import uiReducer from 'features/ui/store/uiSlice';
 import apiReducer from 'services/apiSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
+import { invokeMiddleware } from 'services/invokeMiddleware';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -103,7 +104,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       immutableCheck: false,
       serializableCheck: false,
-    }).concat(socketioMiddleware()),
+    }).concat(socketioMiddleware(), invokeMiddleware),
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [

@@ -1,5 +1,6 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
 import { SessionsService } from 'services/api';
+import { buildGraph } from 'common/util/buildGraph';
 
 /**
  * createSession thunk
@@ -18,7 +19,16 @@ type CreateSessionRequestBody = Parameters<
 export const createSession = createAppAsyncThunk(
   'api/createSession',
   async (arg: CreateSessionRequestBody, _thunkApi) => {
-    const response = await SessionsService.createSession({ requestBody: arg });
+    let graph = arg;
+    if (!arg) {
+      const { getState } = _thunkApi;
+      const state = getState();
+      graph = buildGraph(state);
+    }
+
+    const response = await SessionsService.createSession({
+      requestBody: graph,
+    });
 
     return response;
   }
