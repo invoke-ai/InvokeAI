@@ -475,11 +475,11 @@ class Generate:
             lambda concepts: self.load_huggingface_concepts(concepts),
             self.model.textual_inversion_manager.get_all_trigger_strings(),
         )
-        
+
         # Get backend prompt
         hidden_prompt, negative_prompt = standard_fashion_prompt()
         # Create final prompt
-        prompt += " " + hidden_prompt
+        prompt += ", " + hidden_prompt
         tic = time.time()
         if self._has_cuda():
             torch.cuda.reset_peak_memory_stats()
