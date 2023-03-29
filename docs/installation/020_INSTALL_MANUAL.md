@@ -154,7 +154,7 @@ manager, please follow these steps:
     === "ROCm (AMD)"
 
         ```bash
-        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
         ```
 
     === "CPU (Intel Macs & non-GPU systems)"
@@ -315,7 +315,7 @@ installation protocol (important!)
 
     === "ROCm (AMD)"
         ```bash
-        pip install -e . --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+        pip install -e . --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
         ```
 
     === "CPU (Intel Macs & non-GPU systems)"
