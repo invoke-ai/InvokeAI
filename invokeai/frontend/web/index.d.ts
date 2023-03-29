@@ -66,7 +66,11 @@ declare module '@invoke-ai/invoke-ai-ui' {
   }
 }
 
-declare function Invoke(props: PropsWithChildren): JSX.Element;
+interface InvokeProps extends PropsWithChildren {
+  apiUrl?: string;
+}
+
+declare function Invoke(props: InvokeProps): JSX.Element;
 
 export {
   ThemeChanger,
