@@ -34,16 +34,13 @@ class DiffusersModelInfo(ModelInfo):
     repo_id: Optional[str] = Field(description="The repo ID to use for this model")
     path: Optional[str] = Field(description="The path to the model")
 
-class modelInfo(ModelInfo):
-    info: Annotated[Union[CkptModelInfo,DiffusersModelInfo], Field(discriminator="format")] 
-
 class CreateModelRequest (BaseModel):
     name: str = Field(description="The name of the model")
-    info: Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")] = Field(description="The model info")
+    info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
 
 class CreateModelResponse (BaseModel):
     name: str = Field(description="The name of the new model")
-    info: modelInfo = Field(description="The model details and configuration")
+    info: Union[CkptModelInfo, DiffusersModelInfo] = Field(..., discriminator="format", description="The model details and configuration")
     status: str = Field(description="The status of the API response")
 
 class ModelsList(BaseModel):
