@@ -39,18 +39,7 @@ export function buildTxt2ImgNode(state: RootState): TextToImageInvocation {
     width,
     height,
     cfg_scale,
-    sampler_name: sampler as
-      | 'ddim'
-      | 'dpmpp_2'
-      | 'k_dpm_2'
-      | 'k_dpm_2_a'
-      | 'k_dpmpp_2'
-      | 'k_euler'
-      | 'k_euler_a'
-      | 'k_heun'
-      | 'k_lms'
-      | 'plms'
-      | undefined,
+    sampler_name: sampler as TextToImageInvocation['sampler_name'],
     seamless,
     model: openModel as string | undefined,
     progress_images: shouldDisplayInProgressType === 'full-res',
@@ -85,18 +74,7 @@ export function buildImg2ImgNode(state: RootState): ImageToImageInvocation {
     width,
     height,
     cfg_scale: cfgScale,
-    sampler_name: sampler as
-      | 'ddim'
-      | 'dpmpp_2'
-      | 'k_dpm_2'
-      | 'k_dpm_2_a'
-      | 'k_dpmpp_2'
-      | 'k_euler'
-      | 'k_euler_a'
-      | 'k_heun'
-      | 'k_lms'
-      | 'plms'
-      | undefined,
+    sampler_name: sampler as ImageToImageInvocation['sampler_name'],
     seamless,
     model: model as string | undefined,
     progress_images: shouldDisplayInProgressType === 'full-res',
