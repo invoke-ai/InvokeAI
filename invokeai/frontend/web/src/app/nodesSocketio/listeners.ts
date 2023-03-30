@@ -95,6 +95,7 @@ const makeSocketIOListeners = (
                 width: 512,
                 height: 512,
                 category: 'result',
+                name: data.result.image.image_name,
                 mtime: new Date().getTime(),
               },
             })
