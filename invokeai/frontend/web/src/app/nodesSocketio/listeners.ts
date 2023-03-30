@@ -15,6 +15,7 @@ import {
 import {
   addImage,
   clearIntermediateImage,
+  setIntermediateImage,
 } from 'features/gallery/store/gallerySlice';
 
 import type { RootState } from 'app/store';
@@ -85,6 +86,8 @@ const makeSocketIOListeners = (
         const sessionId = data.graph_execution_state_id;
         if (data.result.type === 'image') {
           const url = `api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}`;
+
+          // need to update the type for this or figure out how to get these values
           dispatch(
             addImage({
               category: 'result',
@@ -124,7 +127,17 @@ const makeSocketIOListeners = (
         console.log('generator_progress', data);
         dispatch(setProgress(data.step / data.total_steps));
         if (data.progress_image) {
-          dispatch(setProgressImage(data.progress_image));
+          dispatch(
+            setIntermediateImage({
+              // need to update the type for this or figure out how to get these values
+              category: 'result',
+              uuid: uuidv4(),
+              mtime: new Date().getTime(),
+              url: data.progress_image.dataURL,
+              thumbnail: '',
+              ...data.progress_image,
+            })
+          );
         }
       } catch (e) {
         console.error(e);
