@@ -15,6 +15,7 @@ import uiReducer from 'features/ui/store/uiSlice';
 import apiReducer from 'services/apiSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
+import { socketioMiddleware as nodesSocketioMiddleware } from './nodesSocketio/middleware';
 import { invokeMiddleware } from 'services/invokeMiddleware';
 
 /**
@@ -97,6 +98,14 @@ const rootPersistConfig = getPersistConfig({
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
+function buildMiddleware() {
+  if (import.meta.env.MODE === 'nodes') {
+    return [nodesSocketioMiddleware(), invokeMiddleware];
+  } else {
+    return [socketioMiddleware()];
+  }
+}
+
 // Continue with store setup
 export const store = configureStore({
   reducer: persistedReducer,
@@ -104,7 +113,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       immutableCheck: false,
       serializableCheck: false,
-    }).concat(socketioMiddleware(), invokeMiddleware),
+    }).concat(buildMiddleware()),
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [

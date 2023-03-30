@@ -1,0 +1,158 @@
+import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
+import dateFormat from 'dateformat';
+import i18n from 'i18n';
+import { v4 as uuidv4 } from 'uuid';
+
+import {
+  addLogEntry,
+  errorOccurred,
+  setCurrentStatus,
+  setIsCancelable,
+  setIsConnected,
+  setIsProcessing,
+} from 'features/system/store/systemSlice';
+
+import {
+  addImage,
+  clearIntermediateImage,
+} from 'features/gallery/store/gallerySlice';
+
+import type { RootState } from 'app/store';
+import {
+  GeneratorProgressEvent,
+  InvocationCompleteEvent,
+  InvocationErrorEvent,
+  InvocationStartedEvent,
+} from 'services/events/types';
+import {
+  setProgress,
+  setProgressImage,
+  setSessionId,
+  setStatus,
+  STATUS,
+} from 'services/apiSlice';
+import { emitUnsubscribe } from './actions';
+
+/**
+ * Returns an object containing listener callbacks
+ */
+const makeSocketIOListeners = (
+  store: MiddlewareAPI<Dispatch<AnyAction>, RootState>
+) => {
+  const { dispatch, getState } = store;
+
+  return {
+    /**
+     * Callback to run when we receive a 'connect' event.
+     */
+    onConnect: () => {
+      try {
+        dispatch(setIsConnected(true));
+        dispatch(setCurrentStatus(i18n.t('common.statusConnected')));
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    /**
+     * Callback to run when we receive a 'disconnect' event.
+     */
+    onDisconnect: () => {
+      try {
+        dispatch(setIsConnected(false));
+        dispatch(setCurrentStatus(i18n.t('common.statusDisconnected')));
+
+        dispatch(
+          addLogEntry({
+            timestamp: dateFormat(new Date(), 'isoDateTime'),
+            message: `Disconnected from server`,
+            level: 'warning',
+          })
+        );
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    onInvocationStarted: (data: InvocationStartedEvent) => {
+      console.log('invocation_started', data);
+      dispatch(setStatus(STATUS.busy));
+    },
+    /**
+     * Callback to run when we receive a 'generationResult' event.
+     */
+    onInvocationComplete: (data: InvocationCompleteEvent) => {
+      console.log('invocation_complete', data);
+      try {
+        const sessionId = data.graph_execution_state_id;
+        if (data.result.type === 'image') {
+          const url = `api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}`;
+          dispatch(
+            addImage({
+              category: 'result',
+              image: {
+                uuid: uuidv4(),
+                url,
+                thumbnail: '',
+                width: 512,
+                height: 512,
+                category: 'result',
+                mtime: new Date().getTime(),
+              },
+            })
+          );
+          dispatch(
+            addLogEntry({
+              timestamp: dateFormat(new Date(), 'isoDateTime'),
+              message: `Generated: ${data.result.image.image_name}`,
+            })
+          );
+          dispatch(setIsProcessing(false));
+          dispatch(setIsCancelable(false));
+          dispatch(emitUnsubscribe(sessionId));
+          dispatch(setSessionId(null));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    /**
+     * Callback to run when we receive a 'progressUpdate' event.
+     * TODO: Add additional progress phases
+     */
+    onGeneratorProgress: (data: GeneratorProgressEvent) => {
+      try {
+        console.log('generator_progress', data);
+        dispatch(setProgress(data.step / data.total_steps));
+        if (data.progress_image) {
+          dispatch(setProgressImage(data.progress_image));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    /**
+     * Callback to run when we receive a 'progressUpdate' event.
+     */
+    onInvocationError: (data: InvocationErrorEvent) => {
+      const { error } = data;
+
+      try {
+        dispatch(
+          addLogEntry({
+            timestamp: dateFormat(new Date(), 'isoDateTime'),
+            message: `Server error: ${error}`,
+            level: 'error',
+          })
+        );
+        dispatch(errorOccurred());
+        dispatch(clearIntermediateImage());
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    /**
+     * Callback to run when we receive a 'galleryImages' event.
+     */
+  };
+};
+
+export default makeSocketIOListeners;
