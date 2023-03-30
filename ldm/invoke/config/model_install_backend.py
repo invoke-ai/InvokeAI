@@ -29,7 +29,13 @@ Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
-Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
+Dataset_path = None
+for path in configs.__path__:
+    file =Path(path, "INITIAL_MODELS.yaml")
+    if file.exists():
+        Dataset_path = file
+        break
+assert Dataset_path,f"Could not find the file INITIAL_MODELS.yaml in {configs.__path__}"
 
 # initial models omegaconf
 Datasets = None
