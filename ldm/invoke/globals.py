@@ -77,7 +77,7 @@ def global_models_dir()->Path:
     return Path(Globals.root, Globals.models_dir)
 
 def global_lora_models_dir()->Path:
-    return Path(global_models_dir(), Globals.lora_models_dir)
+    return Path(Globals.root, Globals.lora_models_dir)
 
 def global_autoscan_dir()->Path:
     return Path(Globals.root, Globals.autoscan_dir)

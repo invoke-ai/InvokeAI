@@ -57,6 +57,7 @@ dependencies = [
   "numpy<1.24",
   "omegaconf",
   "opencv-python",
+  "peft",
   "picklescan",
   "pillow",
   "prompt-toolkit",

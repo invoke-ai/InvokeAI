@@ -13,6 +13,7 @@ class LoraCondition:
 
     def __call__(self, model):
         path = Path(global_lora_models_dir(), self.name)
+        print(f'DEBUG: path = {path}')
 
         # TODO: make model able to load from huggingface, rather then just local files
         if path.is_dir():

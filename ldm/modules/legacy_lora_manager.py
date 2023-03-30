@@ -324,14 +324,16 @@ class LegacyLoraManager:
         return re.sub(lora_match, "", prompt)
 
     def apply_lora_model(self, name, mult: float = 1.0):
-        path_file = Path(self.lora_path, f'{name}.ckpt')
-        if Path(self.lora_path, f'{name}.safetensors').exists():
-            path_file = Path(self.lora_path, f'{name}.safetensors')
-
+        for suffix in ['ckpt','safetensors']:
+            path_file = Path(self.lora_path, f'{name}.{suffix}')
+            print(f'DEBUG: looking for existence of {path_file}')
+            if path_file.exists():
+                break
         if not path_file.exists():
             print(f">> Unable to find lora: {name}")
             return
 
+        print(f'DEBUG: path_file = {path_file}')
         lora = self.wrapper.loaded_loras.get(name, None)
         if lora is None:
             lora = self.load_lora_module(name, path_file, mult)
