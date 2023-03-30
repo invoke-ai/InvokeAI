@@ -1037,10 +1037,10 @@ def convert_open_clip_checkpoint(checkpoint):
     return text_model
 
 def replace_checkpoint_vae(checkpoint, vae_path:str):
-    if vae_path.endswith(".safetensors"):
-        vae_ckpt = load_file(vae_path)
-    else:
+    if Path(vae_path).suffix in ['.pt','.ckpt']:
         vae_ckpt = torch.load(vae_path, map_location="cpu")
+    else:
+        vae_ckpt = load_file(vae_path)
     state_dict = vae_ckpt['state_dict'] if "state_dict" in vae_ckpt else vae_ckpt
     for vae_key in state_dict:
         new_key = f'first_stage_model.{vae_key}'
