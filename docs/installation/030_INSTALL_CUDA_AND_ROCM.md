@@ -97,7 +97,13 @@ to work well.
 
 After installation, please run `rocm-smi` a second time to confirm
 that the driver is present and the GPU is recognized. You may need to
-do a reboot in order to load the driver.
+do a reboot in order to load the driver. If you continue to have
+errors you may need to add your username to the system `render`
+group. This can be done with the following command:
+
+```
+sudo usermod -a -G render my-user-name
+```
 
 ### Linux Install with a ROCm-docker Container
 
