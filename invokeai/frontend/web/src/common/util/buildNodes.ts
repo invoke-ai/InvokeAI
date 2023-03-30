@@ -6,6 +6,8 @@ import {
   UpscaleInvocation,
 } from 'services/api';
 
+import { Image } from 'app/invokeai';
+
 // fe todo fix model type (frontend uses null, backend uses undefined)
 // fe todo update front end to store to have whole image field (vs just name)
 // be todo add symmetry fields
@@ -50,7 +52,7 @@ export function buildImg2ImgNode(
 ): Omit<ImageToImageInvocation, 'id'> {
   const { generation, system } = state;
 
-  const { shouldDisplayInProgressType, openModel: model } = system;
+  const { shouldDisplayInProgressType, model } = system;
 
   const {
     prompt,
@@ -76,11 +78,10 @@ export function buildImg2ImgNode(
     cfg_scale: cfgScale,
     sampler_name: sampler as ImageToImageInvocation['sampler_name'],
     seamless,
-    model: model as string | undefined,
+    model,
     progress_images: shouldDisplayInProgressType === 'full-res',
     image: {
-      image_name:
-        typeof initialImage === 'string' ? initialImage : initialImage?.url,
+      image_name: (initialImage as Image).name,
     },
     strength,
     fit,

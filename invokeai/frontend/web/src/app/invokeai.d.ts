@@ -124,6 +124,7 @@ export declare type Image = {
   category: GalleryCategory;
   isBase64?: boolean;
   dreamPrompt?: 'string';
+  name?: string;
 };
 
 // GalleryImages is an array of Image.
