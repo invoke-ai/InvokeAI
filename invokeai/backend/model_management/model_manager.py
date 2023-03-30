@@ -18,7 +18,7 @@ import warnings
 from enum import Enum
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Callable
 
 import safetensors
 import safetensors.torch
@@ -630,14 +630,13 @@ class ModelManager(object):
     def heuristic_import(
             self,
             path_url_or_repo: str,
-            convert: bool = True,
             model_name: str = None,
             description: str = None,
             model_config_file: Path = None,
             commit_to_conf: Path = None,
+            config_file_callback: Callable[[Path], Path] = None,
     ) -> str:
-        """
-        Accept a string which could be:
+        """Accept a string which could be:
            - a HF diffusers repo_id
            - a URL pointing to a legacy .ckpt or .safetensors file
            - a local path pointing to a legacy .ckpt or .safetensors file
@@ -651,16 +650,20 @@ class ModelManager(object):
         The model_name and/or description can be provided. If not, they will
         be generated automatically.
 
-        If convert is true, legacy models will be converted to diffusers
-        before importing.
-
         If commit_to_conf is provided, the newly loaded model will be written
         to the `models.yaml` file at the indicated path. Otherwise, the changes
         will only remain in memory.
 
-        The (potentially derived) name of the model is returned on success, or None
-        on failure. When multiple models are added from a directory, only the last
-        imported one is returned.
+        The routine will do its best to figure out the config file
+        needed to convert legacy checkpoint file, but if it can't it
+        will call the config_file_callback routine, if provided. The
+        callback accepts a single argument, the Path to the checkpoint
+        file, and returns a Path to the config file to use.
+
+        The (potentially derived) name of the model is returned on
+        success, or None on failure. When multiple models are added
+        from a directory, only the last imported one is returned.
+
         """
         model_path: Path = None
         thing = path_url_or_repo  # to save typing
@@ -707,7 +710,7 @@ class ModelManager(object):
                     Path(thing).rglob("*.safetensors")
                 ):
                     if model_name := self.heuristic_import(
-                        str(m), convert, commit_to_conf=commit_to_conf
+                        str(m), commit_to_conf=commit_to_conf
                     ):
                         print(f" >> {model_name} successfully imported")
                 return model_name
@@ -735,7 +738,7 @@ class ModelManager(object):
 
         # another round of heuristics to guess the correct config file.
         checkpoint = None
-        if model_path.suffix.endswith((".ckpt",".pt")):
+        if model_path.suffix in [".ckpt",".pt"]:
             self.scan_model(model_path,model_path)
             checkpoint = torch.load(model_path)
         else:
@@ -743,43 +746,62 @@ class ModelManager(object):
 
         # additional probing needed if no config file provided
         if model_config_file is None:
-            model_type = self.probe_model_type(checkpoint)
-            if model_type == SDLegacyType.V1:
-                print("   | SD-v1 model detected")
-                model_config_file = Path(
-                    Globals.root, "configs/stable-diffusion/v1-inference.yaml"
-                )
-            elif model_type == SDLegacyType.V1_INPAINT:
-                print("   | SD-v1 inpainting model detected")
-                model_config_file = Path(
-                    Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
-                )
-            elif model_type == SDLegacyType.V2_v:
-                print(
-                    "   | SD-v2-v model detected; model will be converted to diffusers format"
-                )
-                model_config_file = Path(
-                    Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
-                )
-                convert = True
-            elif model_type == SDLegacyType.V2_e:
-                print(
-                    "   | SD-v2-e model detected; model will be converted to diffusers format"
-                )
-                model_config_file = Path(
-                    Globals.root, "configs/stable-diffusion/v2-inference.yaml"
-                )
-                convert = True
-            elif model_type == SDLegacyType.V2:
-                print(
-                    f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
-                )
-                return
+            # look for a like-named .yaml file in same directory
+            if model_path.with_suffix(".yaml").exists():
+                model_config_file = model_path.with_suffix(".yaml")
+                print(f"   | Using config file {model_config_file.name}")
+
             else:
-                print(
-                    f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
-                )
-                return
+                model_type = self.probe_model_type(checkpoint)
+                if model_type == SDLegacyType.V1:
+                    print("   | SD-v1 model detected")
+                    model_config_file = Path(
+                        Globals.root, "configs/stable-diffusion/v1-inference.yaml"
+                    )
+                elif model_type == SDLegacyType.V1_INPAINT:
+                    print("   | SD-v1 inpainting model detected")
+                    model_config_file = Path(
+                        Globals.root, "configs/stable-diffusion/v1-inpainting-inference.yaml"
+                    )
+                elif model_type == SDLegacyType.V2_v:
+                    print(
+                        "   | SD-v2-v model detected"
+                    )
+                    model_config_file = Path(
+                        Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
+                    )
+                elif model_type == SDLegacyType.V2_e:
+                    print(
+                        "   | SD-v2-e model detected"
+                    )
+                    model_config_file = Path(
+                        Globals.root, "configs/stable-diffusion/v2-inference.yaml"
+                    )
+                elif model_type == SDLegacyType.V2:
+                    print(
+                        f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                    )
+                    return
+                else:
+                    print(
+                        f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                    )
+                    return
+
+        if not model_config_file and config_file_callback:
+            model_config_file = config_file_callback(model_path)
+
+        # despite our best efforts, we could not find a model config file, so give up
+        if not model_config_file:
+            return
+
+        # look for a custom vae, a like-named file ending with .vae in the same directory
+        vae_path = None
+        for suffix in ["pt", "ckpt", "safetensors"]:
+            if (model_path.with_suffix(f".vae.{suffix}")).exists():
+                vae_path = model_path.with_suffix(f".vae.{suffix}")
+                print(f"   | Using VAE file {vae_path.name}")
+        vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
 
         diffuser_path = Path(
             Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
@@ -787,7 +809,8 @@ class ModelManager(object):
         model_name = self.convert_and_import(
             model_path,
             diffusers_path=diffuser_path,
-            vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
+            vae=vae,
+            vae_path=str(vae_path),
             model_name=model_name,
             model_description=description,
             original_config_file=model_config_file,
@@ -829,8 +852,8 @@ class ModelManager(object):
             return
 
         model_name = model_name or diffusers_path.name
-        model_description = model_description or f"Optimized version of {model_name}"
-        print(f">> Optimizing {model_name} (30-60s)")
+        model_description = model_description or f"Converted version of {model_name}"
+        print(f"   | Converting {model_name} to diffusers (30-60s)")
         try:
             # By passing the specified VAE to the conversion function, the autoencoder
             # will be built into the model rather than tacked on afterward via the config file
@@ -848,7 +871,7 @@ class ModelManager(object):
                 scan_needed=scan_needed,
             )
             print(
-                f"   | Success. Optimized model is now located at {str(diffusers_path)}"
+                f"   | Success. Converted model is now located at {str(diffusers_path)}"
             )
             print(f"   | Writing new config file entry for {model_name}")
             new_config = dict(
