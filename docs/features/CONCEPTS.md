@@ -1,5 +1,5 @@
 ---
-title: Concepts Library
+title: Styles and Subjects
 ---
 
 # :material-library-shelves: The Hugging Face Concepts Library and Importing Textual Inversion files
