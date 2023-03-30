@@ -62,6 +62,7 @@ dependencies = [
   "pillow",
   "prompt-toolkit",
   "pudb",
+  "packaging",
   "pypatchmatch",
   "pyreadline3",
   "python-multipart==0.0.5",

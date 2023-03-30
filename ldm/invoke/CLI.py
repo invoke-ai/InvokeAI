@@ -4,6 +4,7 @@ import shlex
 import sys
 import traceback
 from argparse import Namespace
+from packaging import version
 from pathlib import Path
 from typing import Union
 
@@ -771,11 +772,11 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             original_config_file = Path(model_info["config"])
             model_name = model_name_or_path
             model_description = model_info["description"]
-            vae = model_info["vae"]
+            vae = model_info.get("vae")
         else:
             print(f"** {model_name_or_path} is not a legacy .ckpt weights file")
             return
-        if vae_repo := ldm.invoke.model_manager.VAE_TO_REPO_ID.get(Path(vae).stem):
+        if vae and (vae_repo := ldm.invoke.model_manager.VAE_TO_REPO_ID.get(Path(vae).stem)):
             vae_repo = dict(repo_id=vae_repo)
         else:
             vae_repo = None
@@ -1288,8 +1289,27 @@ def check_internet() -> bool:
 
 # This routine performs any patch-ups needed after installation
 def run_patches():
-    # install ckpt configuration files that may have been added to the
-    # distro after original root directory configuration
+    install_missing_config_files()
+    version_file = Path(Globals.root,'.version')
+    if version_file.exists():
+        with open(version_file,'r') as f:
+            root_version = version.parse(f.readline() or 'v2.3.2')
+    else:
+        root_version = version.parse('v2.3.2')
+    app_version = version.parse(ldm.invoke.__version__)
+    if root_version < app_version:
+        try:
+            do_version_update(root_version, ldm.invoke.__version__)
+            with open(version_file,'w') as f:
+                f.write(ldm.invoke.__version__)
+        except:
+            print("** Update failed. Will try again on next launch")
+
+def install_missing_config_files():
+    """
+    install ckpt configuration files that may have been added to the
+    distro after original root directory configuration
+    """
     import invokeai.configs as conf
     from shutil import copyfile
     
@@ -1300,6 +1320,27 @@ def run_patches():
         if not dest.exists():
             copyfile(src,dest)
     
+def do_version_update(root_version: version.Version, app_version: Union[str, version.Version]):
+    """
+    Make any updates to the launcher .sh and .bat scripts that may be needed
+    from release to release. This is not an elegant solution. Instead, the 
+    launcher should be moved into the source tree and installed using pip.
+    """
+    if root_version < version.Version('v2.3.3'):
+        if sys.platform == "linux":
+            print('>> Downloading new version of launcher script and its config file')
+            from ldm.util import download_with_progress_bar
+            url_base = f'https://raw.githubusercontent.com/invoke-ai/InvokeAI/release/v{str(app_version)}/installer/templates/'
+
+            dest = Path(Globals.root,'invoke.sh.in')
+            assert download_with_progress_bar(url_base+'invoke.sh.in',dest)
+            dest.replace(Path(Globals.root,'invoke.sh'))
+            os.chmod(Path(Globals.root,'invoke.sh'), 0o0755)
+
+            dest = Path(Globals.root,'dialogrc')
+            assert download_with_progress_bar(url_base+'dialogrc',dest)
+            dest.replace(Path(Globals.root,'.dialogrc'))
+
 if __name__ == '__main__':
     main()
     
