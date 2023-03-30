@@ -838,6 +838,7 @@ def edit_model(model_name: str, gen, opt, completer):
     print(f"\n>> Editing model {model_name} from configuration file {opt.conf}")
     new_name = _get_model_name(manager.list_models(), completer, model_name)
 
+    completer.complete_extensions(('.yaml','.ckpt','.safetensors','.pt'))
     for attribute in info.keys():
         if type(info[attribute]) != str:
             continue
@@ -845,6 +846,7 @@ def edit_model(model_name: str, gen, opt, completer):
             continue
         completer.set_line(info[attribute])
         info[attribute] = input(f"{attribute}: ") or info[attribute]
+    completer.complete_extensions(None)
 
     if info["format"] == "diffusers":
         vae = info.get("vae", dict(repo_id=None, path=None, subfolder=None))
