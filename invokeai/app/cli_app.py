@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import shlex
 import time
 from typing import (
@@ -22,7 +23,7 @@ from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
 from .services.model_manager_initializer import get_model_manager
 from .services.restoration_services import RestorationServices
-from .services.graph import Edge, EdgeConnection, GraphExecutionState
+from .services.graph import Edge, EdgeConnection, GraphExecutionState, are_connection_types_compatible
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
 from .services.invocation_services import InvocationServices
@@ -46,7 +47,7 @@ def add_invocation_args(command_parser):
         "-l",
         action="append",
         nargs=3,
-        help="A link in the format 'dest_field source_node source_field'. source_node can be relative to history (e.g. -1)",
+        help="A link in the format 'source_node source_field dest_field'. source_node can be relative to history (e.g. -1)",
     )
 
     command_parser.add_argument(
@@ -95,6 +96,9 @@ def generate_matching_edges(
     # Remove invalid fields
     invalid_fields = set(["type", "id"])
     matching_fields = matching_fields.difference(invalid_fields)
+
+    # Validate types
+    matching_fields = [f for f in matching_fields if are_connection_types_compatible(afields[f], bfields[f])]
 
     edges = [
         Edge(
@@ -165,6 +169,8 @@ def invoke_cli():
     session: GraphExecutionState = invoker.create_execution_state()
     parser = get_command_parser()
 
+    re_negid = re.compile('^-[0-9]+$')
+
     # Uncomment to print out previous sessions at startup
     # print(services.session_manager.list())
 
@@ -230,7 +236,11 @@ def invoke_cli():
                 # Parse provided links
                 if "link_node" in args and args["link_node"]:
                     for link in args["link_node"]:
-                        link_node = context.session.graph.get_node(link)
+                        node_id = link
+                        if re_negid.match(node_id):
+                            node_id = str(current_id + int(node_id))
+
+                        link_node = context.session.graph.get_node(node_id)
                         matching_edges = generate_matching_edges(
                             link_node, command.command
                         )
@@ -241,9 +251,14 @@ def invoke_cli():
                 if "link" in args and args["link"]:
                     for link in args["link"]:
                         edges = [e for e in edges if e.destination.node_id != command.command.id and e.destination.field != link[2]]
+
+                        node_id = link[0]
+                        if re_negid.match(node_id):
+                            node_id = str(current_id + int(node_id))
+
                         edges.append(
                             Edge(
-                                source=EdgeConnection(node_id=link[1], field=link[0]),
+                                source=EdgeConnection(node_id=node_id, field=link[1]),
                                 destination=EdgeConnection(
                                     node_id=command.command.id, field=link[2]
                                 )

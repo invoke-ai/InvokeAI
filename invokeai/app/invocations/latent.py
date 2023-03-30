@@ -4,28 +4,18 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from torch import Tensor
 import torch
-
+from ...backend.util.devices import CUDA_DEVICE
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
-
 from ...backend.image_util.seamless import configure_model_padding
-
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
-
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
-
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
-
-
 import numpy as np
-
-from PIL import Image
-from skimage.exposure.histogram_matching import match_histograms
-
+from accelerate.utils import set_seed
 from ..services.image_storage import ImageType
-from ..services.invocation_services import InvocationServices
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
-from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator, Generator
+from ...backend.generator import Generator
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util.util import image_to_dataURL
 from diffusers.schedulers import SchedulerMixin as Scheduler
@@ -40,10 +30,17 @@ class LatentField(BaseModel):
 
 
 class LatentOutput(BaseInvocationOutput):
-    """Base class for invocations that output an image"""
+    """Base class for invocations that output a latent"""
     #fmt: off
-    type: Literal["latent"] = "latent"
-    latent:      LatentField = Field(default=None, description="The output latent")
+    type: Literal["latent_output"] = "latent_output"
+    latent: LatentField            = Field(default=None, description="The output latent")
+    #fmt: on
+
+class NoiseOutput(BaseInvocationOutput):
+    """Invocation noise output"""
+    #fmt: off
+    type: Literal["noise_output"] = "noise_output"
+    noise: LatentField            = Field(default=None, description="The output noise")
     #fmt: on
 
 
@@ -81,31 +78,22 @@ def torch_dtype(precision:str = "float16") -> torch.dtype:
     return torch.float16 if precision == "float16" else torch.float32
 
 
-def get_noise(width:int, height:int, device:torch.device, latent_channels:int=4, use_mps_noise:bool=False, downsampling_factor:int = 8):
+def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_channels:int=4, use_mps_noise:bool=False, downsampling_factor:int = 8):
     # limit noise to only the diffusion image channels, not the mask channels
     input_channels = min(latent_channels, 4)
-    if use_mps_noise or device.type == "mps":
-        x = torch.randn(
-            [
-                1,
-                input_channels,
-                height // downsampling_factor,
-                width //  downsampling_factor,
-            ],
-            dtype=torch_dtype(),
-            device="cpu",
-        ).to(device)
-    else:
-        x = torch.randn(
-            [
-                1,
-                input_channels,
-                height // downsampling_factor,
-                width // downsampling_factor,
-            ],
-            dtype=torch_dtype(),
-            device=device,
-        )
+    use_device = "cpu" if (use_mps_noise or device.type == "mps") else device
+    generator = torch.Generator(device=use_device).manual_seed(seed)
+    x = torch.randn(
+        [
+            1,
+            input_channels,
+            height // downsampling_factor,
+            width //  downsampling_factor,
+        ],
+        dtype=torch_dtype(),
+        device=use_device,
+        generator=generator,
+    ).to(device)
     # if self.perlin > 0.0:
     #     perlin_noise = self.get_perlin_noise(
     #         width // self.downsampling_factor, height // self.downsampling_factor
@@ -113,6 +101,26 @@ def get_noise(width:int, height:int, device:torch.device, latent_channels:int=4,
     #     x = (1 - self.perlin) * x + self.perlin * perlin_noise
     return x
 
+
+class NoiseInvocation(BaseInvocation):
+    """Generates latent noise."""
+
+    type: Literal["noise"] = "noise"
+
+    # Inputs
+    seed:        int = Field(default=0, ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", )
+    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting noise", )
+    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
+
+    def invoke(self, context: InvocationContext) -> NoiseOutput:
+        device = torch.device(CUDA_DEVICE)
+        noise = get_noise(self.width, self.height, device, self.seed)
+
+        name = f'{context.graph_execution_state_id}__{self.id}'
+        context.services.latents.set(name, noise)
+        return NoiseOutput(
+            noise=LatentField(latent_name=name)
+        )
 
 
 # Text to image
@@ -126,6 +134,7 @@ class TextToLatentInvocation(BaseInvocation):
     # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
+    noise: Optional[LatentField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
@@ -163,6 +172,8 @@ class TextToLatentInvocation(BaseInvocation):
         )
 
     def invoke(self, context: InvocationContext) -> LatentOutput:
+        noise = context.services.latents.get(self.noise.latent_name)
+
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, state.latents, state.step)
 
@@ -201,7 +212,7 @@ class TextToLatentInvocation(BaseInvocation):
             ),
         ).add_scheduler_args_if_applicable(model.scheduler, eta=None)#ddim_eta)
 
-        noise = get_noise(self.width, self.height, model.device)
+        # TODO: Verify the noise is the right size
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=torch.zeros_like(noise, dtype=torch_dtype()),
