@@ -14,6 +14,7 @@ from pydantic.fields import Field
 
 from ..backend import Args
 from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_graph_execution_history
+from .cli.completer import set_autocompleter
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
@@ -130,6 +131,12 @@ def invoke_cli():
     config.parse_args()
     model_manager = get_model_manager(config)
 
+    # This initializes the autocompleter and returns it.
+    # Currently nothing is done with the returned Completer
+    # object, but the object can be used to change autocompletion
+    # behavior on the fly, if desired.
+    completer = set_autocompleter(model_manager)
+
     events = EventServiceBase()
 
     output_folder = os.path.abspath(
@@ -162,8 +169,8 @@ def invoke_cli():
 
     while True:
         try:
-            cmd_input = input("> ")
-        except KeyboardInterrupt:
+            cmd_input = input("invoke> ")
+        except (KeyboardInterrupt, EOFError):
             # Ctrl-c exits
             break
 
