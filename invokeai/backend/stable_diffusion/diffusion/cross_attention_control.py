@@ -550,7 +550,12 @@ def get_mem_free_total(device):
 
 
 class InvokeAIDiffusersCrossAttention(
-    diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin
+    # in diffusers v0.15, diffusers.models.attention.CrossAttention has been renamed to Attention
+    #      or alternatively can use diffusers.models.cross_attention.CrossAttention,
+    #      but that is deprecated and just a wrapper aroundr Attention
+    # diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin
+    diffusers.models.attention.Attention, InvokeAICrossAttentionMixin
+    # diffusers.models.cross_attention.CrossAttention, InvokeAICrossAttentionMixin
 ):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
