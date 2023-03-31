@@ -277,7 +277,7 @@ class LoRA:
             return
 
 
-class LegacyLoraManager:
+class KohyaLoraManager:
     def __init__(self, pipe, lora_path):
         self.unet = pipe.unet
         self.lora_path = lora_path
@@ -291,7 +291,7 @@ class LegacyLoraManager:
         # can be used instead to load through diffusers, once enough support is added
         # lora = load_lora_attn(name, path_file, self.wrapper, multiplier)
 
-        print(f">> Loading lora {name} from {path_file}")
+        print(f"   | Found lora {name} at {path_file}")
         if path_file.suffix == '.safetensors':
             checkpoint = load_file(path_file.absolute().as_posix(), device='cpu')
         else:
@@ -306,18 +306,12 @@ class LegacyLoraManager:
     def configure_prompt(self, prompt: str) -> str:
         self.clear_loras()
 
-        # lora_match = re.compile(r"<lora:([^>]+)>")
-        lora_match = re.compile(r"withLoraLegacy\(([a-zA-Z\,\d]+)\)")
+        lora_match = re.compile(r"withLora\(([a-zA-Z_-]+),?\s*([\d.]+)?\)")
 
-        for match in re.findall(lora_match, prompt):
-            # match = match.split(':')
-            match = match.split(',')
-            name = match[0].strip()
-
-            mult = 1.0
-            if len(match) == 2:
-                mult = float(match[1].strip())
-
+        for match in lora_match.findall(prompt):
+            name, mult = match
+            name = name.strip()
+            mult = float(mult or '1.0')
             self.set_lora(name, mult)
 
         # remove lora and return prompt to avoid the lora prompt causing issues in inference
@@ -326,14 +320,13 @@ class LegacyLoraManager:
     def apply_lora_model(self, name, mult: float = 1.0):
         for suffix in ['ckpt','safetensors']:
             path_file = Path(self.lora_path, f'{name}.{suffix}')
-            print(f'DEBUG: looking for existence of {path_file}')
             if path_file.exists():
+                print(f"   | Loading lora {path_file.name} with weight {mult}")
                 break
         if not path_file.exists():
-            print(f">> Unable to find lora: {name}")
+            print(f"   ** Unable to find lora: {name}")
             return
 
-        print(f'DEBUG: path_file = {path_file}')
         lora = self.wrapper.loaded_loras.get(name, None)
         if lora is None:
             lora = self.load_lora_module(name, path_file, mult)

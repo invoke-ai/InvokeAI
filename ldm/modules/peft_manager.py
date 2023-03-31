@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from ldm.invoke.globals import global_lora_models_dir
 
-
 class LoraPeftModule:
     def __init__(self, lora_dir, multiplier: float = 1.0):
         self.lora_dir = lora_dir

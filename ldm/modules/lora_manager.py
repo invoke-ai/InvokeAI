@@ -1,7 +1,6 @@
 from pathlib import Path
 from ldm.invoke.globals import global_lora_models_dir
-from .legacy_lora_manager import LegacyLoraManager
-
+from .kohya_lora_manager import KohyaLoraManager
 
 class LoraCondition:
     name: str
@@ -13,7 +12,6 @@ class LoraCondition:
 
     def __call__(self, model):
         path = Path(global_lora_models_dir(), self.name)
-        print(f'DEBUG: path = {path}')
 
         # TODO: make model able to load from huggingface, rather then just local files
         if path.is_dir():
@@ -32,8 +30,8 @@ class LoraCondition:
 
 class LoraManager:
     def __init__(self, pipe):
-        # Legacy class handles lora not generated through diffusers
-        self.legacy = LegacyLoraManager(pipe, global_lora_models_dir())
+        # Kohya class handles lora not generated through diffusers
+        self.kohya = KohyaLoraManager(pipe, global_lora_models_dir())
 
     @staticmethod
     def set_loras_conditions(lora_weights: list):
@@ -47,10 +45,10 @@ class LoraManager:
 
         return None
 
-    # Legacy functions, to pipe to LoraLegacyManager
+    # Kohya functions, to pipe to LoraKohyaManager
     # To be removed once support for diffusers LoRA weights is high enough
-    def configure_prompt_legacy(self, prompt: str) -> str:
-        return self.legacy.configure_prompt(prompt)
+    def configure_prompt_kohya(self, prompt: str) -> str:
+        return self.kohya.configure_prompt(prompt)
 
-    def load_lora_legacy(self):
-        self.legacy.load_lora()
+    def load_lora_kohya(self):
+        self.kohya.load_lora()

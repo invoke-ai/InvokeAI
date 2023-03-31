@@ -493,9 +493,9 @@ class Generate:
         # To try and load LoRA not trained through diffusers
         # To be removed once support for diffusers LoRA weights is high enough
         if self.model.lora_manager:
-            prompt = self.model.lora_manager.configure_prompt_legacy(prompt)
+            prompt = self.model.lora_manager.configure_prompt_kohya(prompt)
             # lora MUST process prompt before conditioning
-            self.model.lora_manager.load_lora_legacy()
+            self.model.lora_manager.load_lora_kohya()
 
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(

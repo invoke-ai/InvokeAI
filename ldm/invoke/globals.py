@@ -23,7 +23,7 @@ Globals = Namespace()
 Globals.initfile = 'invokeai.init'
 Globals.models_file = 'models.yaml'
 Globals.models_dir = 'models'
-Globals.lora_models_dir = 'lora'
+Globals.lora_models_dir = 'loras'
 Globals.config_dir = 'configs'
 Globals.autoscan_dir = 'weights'
 Globals.converted_ckpts_dir = 'converted_ckpts'
@@ -77,7 +77,9 @@ def global_models_dir()->Path:
     return Path(Globals.root, Globals.models_dir)
 
 def global_lora_models_dir()->Path:
-    return Path(Globals.root, Globals.lora_models_dir)
+    return Path(Globals.lora_models_dir) \
+        if Path(Globals.lora_models_dir).is_absolute() \
+           else Path(Globals.root, Globals.lora_models_dir)
 
 def global_autoscan_dir()->Path:
     return Path(Globals.root, Globals.autoscan_dir)

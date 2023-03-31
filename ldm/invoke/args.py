@@ -655,6 +655,13 @@ class Args(object):
             help='Path to a directory containing .bin and/or .pt files, or a single .bin/.pt file. You may use subdirectories. (default is ROOTDIR/embeddings)'
         )
         render_group.add_argument(
+            '--lora_directory',
+            dest='lora_path',
+            default='loras',
+            type=str,
+            help='Path to a directory containing LoRA files; subdirectories are not supported. (default is ROOTDIR/loras)'
+        )
+        render_group.add_argument(
             '--embeddings',
             action=argparse.BooleanOptionalAction,
             default=True,

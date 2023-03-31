@@ -110,6 +110,9 @@ def main():
     else:
         embedding_path = None
 
+    if opt.lora_path:
+        Globals.lora_models_dir = opt.lora_path
+
     # migrate legacy models
     ModelManager.migrate_models()
 

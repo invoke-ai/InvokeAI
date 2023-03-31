@@ -655,6 +655,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
         "models",
         "configs",
         "embeddings",
+        "loras",
         "text-inversion-output",
         "text-inversion-training-data",
     ):
