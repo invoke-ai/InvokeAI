@@ -127,6 +127,7 @@ requires-python = ">=3.9, <3.11"
 "invokeai-ti" = "ldm.invoke.training.textual_inversion:main"
 "invokeai-update" = "ldm.invoke.config.invokeai_update:main"
 "invokeai-batch" = "ldm.invoke.dynamic_prompts:main"
+"invokeai-metadata" = "ldm.invoke.invokeai_metadata:main"
 
 [project.urls]
 "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"

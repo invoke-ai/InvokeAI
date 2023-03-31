@@ -384,7 +384,7 @@ class InvokeAiInstance:
             os.chmod(dest, 0o0755)
 
         if OS == "Linux":
-            shutil.copy(Path(__file__).parent / '..' / "templates" / "dialogrc", self.runtime / '.dialogrc')
+            shutil.copy(Path(__file__).parents[1] / "templates" / "dialogrc", self.runtime / '.dialogrc')
 
     def update(self):
         pass

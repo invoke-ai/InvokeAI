@@ -19,7 +19,7 @@ from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities.distributed import rank_zero_only
-from omegaconf import ListConfig
+from omegaconf import ListConfig, OmegaConf
 import urllib
 
 from ldm.modules.textual_inversion_manager import TextualInversionManager
@@ -609,15 +609,35 @@ class DDPM(pl.LightningModule):
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
 
+    
 
 class LatentDiffusion(DDPM):
     """main class"""
+
+    @staticmethod
+    def _fallback_personalization_config()->dict:
+        """
+        This protects us against custom legacy config files that
+        don't contain the personalization_config section.
+        """
+        return OmegaConf.create(
+            dict(
+                target='ldm.modules.embedding_manager.EmbeddingManager',
+                params=dict(
+                    placeholder_strings=list('*'),
+                    initializer_words=list('sculpture'),
+                    per_image_tokens=False,
+                    num_vectors_per_token=1,
+                    progressive_words=False,
+                )
+            )
+        )
 
     def __init__(
         self,
         first_stage_config,
         cond_stage_config,
-        personalization_config,
+        personalization_config=_fallback_personalization_config(),
         num_timesteps_cond=None,
         cond_stage_key='image',
         cond_stage_trainable=False,
