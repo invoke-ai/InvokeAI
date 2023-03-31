@@ -328,6 +328,7 @@
         "updateModel": "Update Model",
         "availableModels": "Available Models",
         "addLora": "Add Lora",
+        "noLoraModels": "No Loras Found",
         "search": "Search",
         "load": "Load",
         "active": "active",

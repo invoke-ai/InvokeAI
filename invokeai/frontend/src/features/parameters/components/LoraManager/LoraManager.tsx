@@ -83,7 +83,7 @@ export default function LoraManager() {
       borderRadius={4}
       fontWeight="bold"
     >
-      No Loras Found
+      {t('modelManager.noLoraModels')}
     </Box>
   );
 }
