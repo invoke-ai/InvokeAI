@@ -50,7 +50,9 @@ class InvokeAIDiffuserComponent:
     """
 
     debug_thresholding = False
-    sequential_guidance = False
+    # FIXME
+    # sequential_guidance = False
+    sequential_guidance = True
 
     @dataclass
     class ExtraConditioningInfo:
@@ -354,6 +356,7 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do,
         **kwargs,
     ):
+        print("using _apply_cross_attention_controlled_conditioning__diffusers")
         context: Context = self.cross_attention_control_context
 
         cross_attn_processor_context = SwapCrossAttnContext(
@@ -393,6 +396,7 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do,
         **kwargs,
     ):
+        print("using _apply_cross_attention_controlled_conditioning__compvis")
         # print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)
         # slower non-batched path (20% slower on mac MPS)
         # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of

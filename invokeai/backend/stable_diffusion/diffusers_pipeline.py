@@ -473,6 +473,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         :param callback:
         :param run_id:
         """
+
+        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
+        control_image = kwargs.get("control_image", None)
+        control_scale = kwargs.get("control_scale", None)
+
+        # print("in SDGPipeline.image_from_embeddings, control_prompt_embeds: ", control_prompt_embeds.shape)
+        # print("in SDGPipeline.image_from_embeddings, control_image: ", control_image.shape)
+        # print("in SDGPipeline.image_from_embeddings, control_scale: ", control_scale)
+
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
             latents,
             num_inference_steps,
@@ -618,15 +627,65 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         **kwargs,
     ):
+
+        control_image = kwargs.get("control_image", None)   # should be a processed tensor
+        control_scale = kwargs.get("control_scale", None)
+        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
+
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
+        # print("")
+        # print("in StableDiffusionGeneratorPipeline.step(), step index: " + str(step_index) +
+        #      ", total step count: " + str(total_step_count))
+        # print("t: ", str(t), " shape: ", t.shape, " type: ", type(t))
+        # print(", timestep: ", str(timestep), " shape: ", timestep.shape, " type: ", type(timestep))
+
+        #if control_image is not None:
+        #   print("control_image:   shape=", control_image.shape, "  type=", type(control_image)),
+        # print("control_scale: ", control_scale)
+        # print("control_prompt_embeds:   shape", control_prompt_embeds.shape, "  type=", type(control_prompt_embeds))
+        # print("control conditioning shape: ", control_prompt_embeds.shape if control_prompt_embeds is not None else "None")
+
 
         if additional_guidance is None:
             additional_guidance = []
 
+        # FIXME: add conditional to handle NOT classifier free guidance
+        # expand the latents if we are doing classifier free guidance
+        # print("doing classifier free guidance: ", self.do_classifier_free_guidance)
+        # latent_model_input = latents
+        # latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
+
+        latent_control_input = latents
+
+        latent_model_input = torch.cat([latents] * 2)
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
+        latent_model_input = self.scheduler.scale_model_input(latent_model_input, timestep)
+        latent_control_input = self.scheduler.scale_model_input(latent_control_input, timestep)
+
+        ehs = torch.cat([conditioning_data.unconditioned_embeddings, conditioning_data.text_embeddings])
+
+
+        if (self.control_model is not None) and (control_image is not None) and (control_scale is not None):
+            # controlnet inference
+            # print("attempting controlnet inference")
+            # print(type(control_prompt_embeds))
+            # print(control_prompt_embeds.shape)
+            down_block_res_samples, mid_block_res_sample = self.control_model(
+                latent_model_input,
+                # latent_control_input,
+                # torch.cat([latent_model_input]*2),
+                # t,
+                timestep,
+                encoder_hidden_states = ehs,
+                controlnet_cond=control_image,
+                conditioning_scale=control_scale,
+                return_dict=False,
+            )
+            # print("finished ControlNetModel calls")
+        else:
+            down_block_res_samples, mid_block_res_sample = None, None
 
         if (self.control_model is not None) and (kwargs.get("control_image") is not None):
             control_image = kwargs.get("control_image") # should be a processed tensor derived from the control image
@@ -655,6 +714,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
             latent_model_input,
             t,
+            # timestep,
             conditioning_data.unconditioned_embeddings,
             conditioning_data.text_embeddings,
             conditioning_data.guidance_scale,
@@ -664,6 +724,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             mid_block_additional_residual=mid_block_res_sample,
         )
 
+        # print("running scheduler.step()")
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(
             noise_pred, timestep, latents, **conditioning_data.scheduler_args
