@@ -4,6 +4,8 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from torch import Tensor
 import torch
+
+from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import CUDA_DEVICE
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
@@ -170,14 +172,9 @@ class TextToLatentInvocation(BaseInvocation):
             step,
             self.steps,
         )
-
-    def invoke(self, context: InvocationContext) -> LatentOutput:
-        noise = context.services.latents.get(self.noise.latent_name)
-
-        def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state.latents, state.step)
-
-        model_info = context.services.model_manager.get_model(self.model)
+    
+    def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
+        model_info = model_manager.get_model(self.model)
         model_name = model_info['model_name']
         model_hash = model_info['hash']
         model: StableDiffusionGeneratorPipeline = model_info['model']
@@ -185,8 +182,7 @@ class TextToLatentInvocation(BaseInvocation):
             model=model,
             scheduler_name=self.sampler_name
         )
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
-
+        
         if isinstance(model, DiffusionPipeline):
             for component in [model.unet, model.vae]:
                 configure_model_padding(component,
@@ -199,6 +195,11 @@ class TextToLatentInvocation(BaseInvocation):
                                     self.seamless_axes
                                     )
 
+        return model
+
+
+    def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
+        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
         conditioning_data = ConditioningData(
             uc,
             c,
@@ -211,11 +212,72 @@ class TextToLatentInvocation(BaseInvocation):
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
         ).add_scheduler_args_if_applicable(model.scheduler, eta=None)#ddim_eta)
+        return conditioning_data
+
+
+    def invoke(self, context: InvocationContext) -> LatentOutput:
+        noise = context.services.latents.get(self.noise.latent_name)
+
+        def step_callback(state: PipelineIntermediateState):
+            self.dispatch_progress(context, state.latents, state.step)
+
+        model = self.get_model(context.services.model_manager)
+        conditioning_data = self.get_conditioning_data(model)
 
         # TODO: Verify the noise is the right size
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=torch.zeros_like(noise, dtype=torch_dtype()),
+            noise=noise,
+            num_inference_steps=self.steps,
+            conditioning_data=conditioning_data,
+            callback=step_callback
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f'{context.graph_execution_state_id}__{self.id}'
+        context.services.latents.set(name, result_latents)
+        return LatentOutput(
+            latent=LatentField(latent_name=name)
+        )
+
+
+class LatentToLatentInvocation(TextToLatentInvocation):
+    """Generates a latent using a latent as base image."""
+
+    type: Literal["l2l"] = "l2l"
+
+    # Inputs
+    latent: Optional[LatentField] = Field(description="The latent to use as a base image")
+    strength: float = Field(default=0.5, description="The strength of the latent to use")
+
+    def invoke(self, context: InvocationContext) -> LatentOutput:
+        noise = context.services.latents.get(self.noise.latent_name)
+        latent = context.services.latents.get(self.latent.latent_name)
+
+        def step_callback(state: PipelineIntermediateState):
+            self.dispatch_progress(context, state.latents, state.step)
+
+        model = self.get_model(context.services.model_manager)
+        conditioning_data = self.get_conditioning_data(model)
+
+        # TODO: Verify the noise is the right size
+
+        initial_latent = latent if self.strength < 1.0 else torch.zeros_like(
+            latent, device=model.device, dtype=latent.dtype
+        )
+        
+        timesteps, _ = model.get_img2img_timesteps(
+            self.steps,
+            self.strength,
+            device=model.device,
+        )
+
+        result_latents, result_attention_map_saver = model.latents_from_embeddings(
+            latents=initial_latent,
+            timesteps=timesteps,
             noise=noise,
             num_inference_steps=self.steps,
             conditioning_data=conditioning_data,
@@ -249,14 +311,15 @@ class LatentToImageInvocation(BaseInvocation):
         model_info = context.services.model_manager.get_model(self.model)
         model: StableDiffusionGeneratorPipeline = model_info['model']
 
-        np_image = model.decode_latents(latent)
-        image = model.numpy_to_pil(np_image)[0]
+        with torch.inference_mode():
+            np_image = model.decode_latents(latent)
+            image = model.numpy_to_pil(np_image)[0]
 
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
-        )
-        context.services.images.save(image_type, image_name, image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
-        )
+            image_type = ImageType.RESULT
+            image_name = context.services.images.create_name(
+                context.graph_execution_state_id, self.id
+            )
+            context.services.images.save(image_type, image_name, image)
+            return ImageOutput(
+                image=ImageField(image_type=image_type, image_name=image_name)
+            )

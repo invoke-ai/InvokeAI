@@ -250,7 +250,7 @@ def invoke_cli():
 
                 if "link" in args and args["link"]:
                     for link in args["link"]:
-                        edges = [e for e in edges if e.destination.node_id != command.command.id and e.destination.field != link[2]]
+                        edges = [e for e in edges if e.destination.node_id != command.command.id or e.destination.field != link[2]]
 
                         node_id = link[0]
                         if re_negid.match(node_id):
