@@ -31,6 +31,8 @@ from ..safety_checker import SafetyChecker
 from ..prompting.conditioning import get_uc_and_c_and_ec
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
+# from compel import Compel
+
 downsampling = 8
 
 @dataclass
@@ -86,9 +88,14 @@ class InvokeAIGenerator(metaclass=ABCMeta):
     def __init__(self,
                  model_info: dict,
                  params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
+                 **kwargs,
                  ):
         self.model_info=model_info
         self.params=params
+        self.kwargs = kwargs
+
+        # print("in InvokeAIGenerator.__init__(), kwargs: ", len(kwargs))
+        # for k,v in kwargs.items(): print("     ", k, "==>", type(v))
 
     def generate(self,
                  prompt: str='',
@@ -97,6 +104,10 @@ class InvokeAIGenerator(metaclass=ABCMeta):
                  iterations: int=1,
                  **keyword_args,
                  )->Iterator[InvokeAIGeneratorOutput]:
+        # print("")
+        # print("in InvokeAIGenerator.generate(), keyword_args:", len(keyword_args))
+        # for k,v in keyword_args.items(): print("     ", k, "==>", type(v))
+
         '''
         Return an iterator across the indicated number of generations.
         Each time the iterator is called it will return an InvokeAIGeneratorOutput
@@ -129,9 +140,24 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             model=model,
             scheduler_name=generator_args.get('scheduler')
         )
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt,model=model)
+        # print("   scheduler class: ", scheduler.__class__)
+
+        # FIXME: doing double the work here to get conditioning info from Compel in two different ways
+        # Generators want (uc, c, extra_conditioning_info) form from get_uc_and_c_and_ec which uses Compel
+        # ControlNetModel wants output of compel(prompt)
+        # really should be able to package this up as one thing and avoid both
+        # extra arg passing and double compel calls
+        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt, model=model)
+        # compel = Compel(tokenizer=model.tokenizer, text_encoder=model.text_encoder)
+        # prompt_embeds = compel([prompt])
+
+
+        # print("   prompt_embeds: ", type(prompt_embeds))
+        # print("   prompt_embeds shape: ", prompt_embeds.shape)
+
         gen_class = self._generator_class()
-        generator = gen_class(model, self.params.precision)
+        generator = gen_class(model, self.params.precision, **self.kwargs)
+        # print("generator class: ", type(generator))
         if self.params.variation_amount > 0:
             generator.set_variation(generator_args.get('seed'),
                                     generator_args.get('variation_amount'),
@@ -151,6 +177,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
                                     )
 
         iteration_count = range(iterations) if iterations else itertools.count(start=0, step=1)
+        # print("generator_args: ", generator_args)
         for i in iteration_count:
             results = generator.generate(prompt,
                                          conditioning=(uc, c, extra_conditioning_info),
@@ -281,7 +308,9 @@ class Generator:
     precision: str
     model: DiffusionPipeline
 
-    def __init__(self, model: DiffusionPipeline, precision: str):
+    def __init__(self, model: DiffusionPipeline, precision: str, **kwargs):
+        # print("Generator.__init__(), kwargs:")
+        # for k,v in kwargs.items(): print("     ", k, "==>", type(v))
         self.model = model
         self.precision = precision
         self.seed = None
@@ -329,6 +358,9 @@ class Generator:
         free_gpu_mem: bool = False,
         **kwargs,
     ):
+        # print("Generator seed: ", seed)
+        # print("Generator.generate(), kwargs:")
+        # for k,v in kwargs.items(): print("     ", k, "==>", type(v))
         scope = nullcontext
         self.safety_checker = safety_checker
         self.free_gpu_mem = free_gpu_mem
@@ -354,7 +386,6 @@ class Generator:
         seed = seed if seed is not None and seed >= 0 else self.new_seed()
         first_seed = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
-
         # There used to be an additional self.model.ema_scope() here, but it breaks
         # the inpaint-1.5 model. Not sure what it did.... ?
         with scope(self.model.device.type):

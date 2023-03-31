@@ -4,6 +4,7 @@ invokeai.backend.generator.txt2img inherits from invokeai.backend.generator
 import PIL.Image
 import torch
 
+from diffusers.models.controlnet import ControlNetModel
 from ..stable_diffusion import (
     ConditioningData,
     PostprocessingSettings,
@@ -12,9 +13,19 @@ from ..stable_diffusion import (
 from .base import Generator
 
 
+
 class Txt2Img(Generator):
-    def __init__(self, model, precision):
-        super().__init__(model, precision)
+    def __init__(self, model, precision,
+                 control_model: ControlNetModel = None,
+                 **kwargs):
+        # print("")
+        # print("in txt2img.Txt2Img.__init__(), model:", type(model))
+        # print("in txt2img.Txt2Img.__init__(), control_model:", type(control_model))
+        # print("in txt2img.Txt2Img.__init__(), kwargs:", len(kwargs))
+        # for k,v in kwargs.items():
+        #     print("     ", k, "==>", type(v))
+        self.control_model = control_model
+        super().__init__(model, precision, **kwargs)
 
     @torch.no_grad()
     def get_make_image(
@@ -42,9 +53,12 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
+        control_image = kwargs.get("control_image", None)
+
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
+        pipeline.control_model = self.control_model
         pipeline.scheduler = sampler
 
         uc, c, extra_conditioning_info = conditioning
@@ -61,6 +75,11 @@ class Txt2Img(Generator):
             ),
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
+        if control_image is not None:
+            #     print("prepping control image (converting to tensor and additional processing)")
+            control_image = pipeline.prepare_image(image=control_image)
+            kwargs["control_image"] = control_image
+
         def make_image(x_T: torch.Tensor, _: int) -> PIL.Image.Image:
             pipeline_output = pipeline.image_from_embeddings(
                 latents=torch.zeros_like(x_T, dtype=self.torch_dtype()),
@@ -68,6 +87,7 @@ class Txt2Img(Generator):
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
                 callback=step_callback,
+                **kwargs,
             )
 
             if (
