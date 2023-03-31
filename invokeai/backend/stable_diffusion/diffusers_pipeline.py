@@ -478,10 +478,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_image = kwargs.get("control_image", None)
         control_scale = kwargs.get("control_scale", None)
 
-        # print("in SDGPipeline.image_from_embeddings, control_prompt_embeds: ", control_prompt_embeds.shape)
-        # print("in SDGPipeline.image_from_embeddings, control_image: ", control_image.shape)
-        # print("in SDGPipeline.image_from_embeddings, control_scale: ", control_scale)
-
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
             latents,
             num_inference_steps,
@@ -634,18 +630,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
-        # print("")
-        # print("in StableDiffusionGeneratorPipeline.step(), step index: " + str(step_index) +
-        #      ", total step count: " + str(total_step_count))
-        # print("t: ", str(t), " shape: ", t.shape, " type: ", type(t))
-        # print(", timestep: ", str(timestep), " shape: ", timestep.shape, " type: ", type(timestep))
-
-        #if control_image is not None:
-        #   print("control_image:   shape=", control_image.shape, "  type=", type(control_image)),
-        # print("control_scale: ", control_scale)
-        # print("control_prompt_embeds:   shape", control_prompt_embeds.shape, "  type=", type(control_prompt_embeds))
-        # print("control conditioning shape: ", control_prompt_embeds.shape if control_prompt_embeds is not None else "None")
-
 
         if additional_guidance is None:
             additional_guidance = []
@@ -653,37 +637,25 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # FIXME: add conditional to handle NOT classifier free guidance
         # expand the latents if we are doing classifier free guidance
         # print("doing classifier free guidance: ", self.do_classifier_free_guidance)
-        # latent_model_input = latents
         # latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
-
         latent_control_input = latents
-
         latent_model_input = torch.cat([latents] * 2)
+
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latent_model_input, timestep)
-        latent_control_input = self.scheduler.scale_model_input(latent_control_input, timestep)
-
         ehs = torch.cat([conditioning_data.unconditioned_embeddings, conditioning_data.text_embeddings])
-
 
         if (self.control_model is not None) and (control_image is not None) and (control_scale is not None):
             # controlnet inference
-            # print("attempting controlnet inference")
-            # print(type(control_prompt_embeds))
-            # print(control_prompt_embeds.shape)
             down_block_res_samples, mid_block_res_sample = self.control_model(
                 latent_model_input,
-                # latent_control_input,
-                # torch.cat([latent_model_input]*2),
-                # t,
                 timestep,
                 encoder_hidden_states = ehs,
                 controlnet_cond=control_image,
                 conditioning_scale=control_scale,
                 return_dict=False,
             )
-            # print("finished ControlNetModel calls")
         else:
             down_block_res_samples, mid_block_res_sample = None, None
 
@@ -691,7 +663,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
             latent_model_input,
             t,
-            # timestep,
             conditioning_data.unconditioned_embeddings,
             conditioning_data.text_embeddings,
             conditioning_data.guidance_scale,
@@ -701,7 +672,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             mid_block_additional_residual=mid_block_res_sample,
         )
 
-        # print("running scheduler.step()")
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(
             noise_pred, timestep, latents, **conditioning_data.scheduler_args
@@ -1007,7 +977,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     # copied from diffusers pipeline_stable_diffusion_controlnet.py
     # Returns torch.Tensor of shape (batch_size, 3, height, width)
-    def prepare_image(
+    def prepare_control_image(
         self,
         image,
         width=512,
@@ -1018,11 +988,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         dtype=torch.float16,
         do_classifier_free_guidance=True,
     ):
-        # print("in StableDiffusionGeneratorPipeline.prepare_image")
-        # print("do_classifier_free_guidance: ", do_classifier_free_guidance)
-        # print("input image type: ", type(image))
-        # print("desired width: ", width)
-        # print("desired height: ", height)
         if not isinstance(image, torch.Tensor):
             if isinstance(image, PIL.Image.Image):
                 image = [image]
@@ -1047,10 +1012,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 image = torch.cat(image, dim=0)
 
         image_batch_size = image.shape[0]
-        # print("image batch size: ", image_batch_size)
-        # print("image type:", type(image))
-        # print("image size:", image.size())
-        #
         if image_batch_size == 1:
             repeat_by = batch_size
         else:
@@ -1058,19 +1019,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             repeat_by = num_images_per_prompt
 
         image = image.repeat_interleave(repeat_by, dim=0)
-        # print("image type:", type(image))
-        # print("image size:", image.size())
-
         image = image.to(device=device, dtype=dtype)
-        # print("image type:", type(image))
-        # print("image size:", image.size())
-
         if do_classifier_free_guidance:
             image = torch.cat([image] * 2)
-
-        # print("image type:", type(image))
-        # print("image size:", image.shape)
-        # print("sum values: ", torch.sum(image, [0,1,2], keepdim=False))
-        # print(image)
-
         return image

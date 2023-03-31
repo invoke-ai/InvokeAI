@@ -181,9 +181,6 @@ class InvokeAIDiffuserComponent:
         :param step_index: counts upwards from 0 to (step_count-1) (as passed to setup_cross_attention_control, if using). May be called multiple times for a single step, therefore do not assume that its value will monotically increase. If None, will be estimated by comparing sigma against self.model.sigmas .
         :return: the new latents after applying the model to x using unscaled unconditioning and CFG-scaled conditioning.
         """
-        # print("in InvokAIDiffuserComponent.do_diffusion_step(), step index: " + str(step_index))
-        # print("current latent shape:", x.shape)
-        # for key in kwargs: print(key, type(kwargs[key]))
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
@@ -200,7 +197,7 @@ class InvokeAIDiffuserComponent:
 
         if wants_hybrid_conditioning:
             unconditioned_next_x, conditioned_next_x = self._apply_hybrid_conditioning(
-                x, sigma, unconditioning, conditioning
+                x, sigma, unconditioning, conditioning, **kwargs,
             )
         elif wants_cross_attention_control:
             (
@@ -212,20 +209,21 @@ class InvokeAIDiffuserComponent:
                 unconditioning,
                 conditioning,
                 cross_attention_control_types_to_do,
+                **kwargs,
             )
         elif self.sequential_guidance:
             (
                 unconditioned_next_x,
                 conditioned_next_x,
             ) = self._apply_standard_conditioning_sequentially(
-                x, sigma, unconditioning, conditioning
+                x, sigma, unconditioning, conditioning, **kwargs,
             )
         else:
             (
                 unconditioned_next_x,
                 conditioned_next_x,
             ) = self._apply_standard_conditioning(
-                x, sigma, unconditioning, conditioning, **kwargs
+                x, sigma, unconditioning, conditioning, **kwargs,
             )
 
         combined_next_x = self._combine(
@@ -273,10 +271,6 @@ class InvokeAIDiffuserComponent:
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
     def _apply_standard_conditioning(self, x, sigma, unconditioning, conditioning, **kwargs):
-        # print("using _apply_standard_conditioning")
-        # print("unconditioning shape:", unconditioning.shape)
-        #print("conditioining shape:", conditioning.shape)
-        # for key in kwargs: print("     ", key, type(kwargs[key]))
         # fast batched path
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
@@ -303,11 +297,7 @@ class InvokeAIDiffuserComponent:
         conditioning: torch.Tensor,
         **kwargs,
     ):
-        # print("using _apply_standard_conditioning_sequentially")
-        # print("unconditioning: ", unconditioning.shape)
-        # print("conditioning: ", conditioning.shape)
         # low-memory sequential path
-
         unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning, **kwargs)
         conditioned_next_x = self.model_forward_callback(x, sigma, conditioning, **kwargs)
         if conditioned_next_x.device.type == "mps":
@@ -316,7 +306,6 @@ class InvokeAIDiffuserComponent:
         return unconditioned_next_x, conditioned_next_x
 
     def _apply_hybrid_conditioning(self, x, sigma, unconditioning, conditioning, **kwargs):
-        print("using _apply_hybrid_conditioning")
         assert isinstance(conditioning, dict)
         assert isinstance(unconditioning, dict)
         x_twice = torch.cat([x] * 2)
@@ -342,6 +331,7 @@ class InvokeAIDiffuserComponent:
         unconditioning,
         conditioning,
         cross_attention_control_types_to_do,
+        **kwargs,
     ):
         if self.is_running_diffusers:
             return self._apply_cross_attention_controlled_conditioning__diffusers(
@@ -371,7 +361,6 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do,
         **kwargs,
     ):
-        print("using _apply_cross_attention_controlled_conditioning__diffusers")
         context: Context = self.cross_attention_control_context
 
         cross_attn_processor_context = SwapCrossAttnContext(
@@ -411,7 +400,6 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do,
         **kwargs,
     ):
-        print("using _apply_cross_attention_controlled_conditioning__compvis")
         # print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)
         # slower non-batched path (20% slower on mac MPS)
         # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of

@@ -329,7 +329,6 @@ class InvokeAICrossAttentionMixin:
 
     def get_invokeai_attention_mem_efficient(self, q, k, v):
         if q.device.type == "cuda":
-            # print("in get_attention_mem_efficient with q shape", q.shape, ", k shape", k.shape, ", free memory is", get_mem_free_total(q.device))
             return self.einsum_op_cuda(q, k, v)
 
         if q.device.type == "mps" or q.device.type == "cpu":
