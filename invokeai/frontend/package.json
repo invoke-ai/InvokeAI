@@ -15,8 +15,8 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@chakra-ui/icons": "^2.0.17",
-    "@chakra-ui/react": "^2.5.1",
+    "@chakra-ui/icons": "^2.0.18",
+    "@chakra-ui/react": "^2.5.5",
     "@emotion/cache": "^11.10.5",
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
@@ -52,6 +52,7 @@
     "redux-persist": "^6.0.0",
     "socket.io": "^4.6.0",
     "socket.io-client": "^4.6.0",
+    "typescript": "^5.0.3",
     "use-image": "^1.1.0",
     "uuid": "^9.0.0",
     "yarn": "^1.22.19"
@@ -61,8 +62,8 @@
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@types/react-transition-group": "^4.4.5",
-    "@typescript-eslint/eslint-plugin": "^5.52.0",
-    "@typescript-eslint/parser": "^5.52.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
     "babel-plugin-transform-imports": "^2.0.0",
     "eslint": "^8.34.0",
     "eslint-config-prettier": "^8.6.0",
