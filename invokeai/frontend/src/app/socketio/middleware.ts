@@ -51,6 +51,7 @@ export const socketioMiddleware = () => {
       onModelConverted,
       onModelsMerged,
       onModelChangeFailed,
+      onFoundLoras,
       onTempFolderEmptied,
     } = makeSocketIOListeners(store);
 
@@ -69,6 +70,7 @@ export const socketioMiddleware = () => {
       emitConvertToDiffusers,
       emitMergeDiffusersModels,
       emitRequestModelChange,
+      emitGetLoraModels,
       emitSaveStagingAreaImageToGallery,
       emitRequestEmptyTempFolder,
     } = makeSocketIOEmitters(store, socketio);
@@ -143,6 +145,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('modelChangeFailed', (data: InvokeAI.ModelChangeResponse) => {
         onModelChangeFailed(data);
+      });
+
+      socketio.on('foundLoras', (data: InvokeAI.FoundLorasRsponse) => {
+        onFoundLoras(data);
       });
 
       socketio.on('tempFolderEmptied', () => {
@@ -223,6 +229,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestModelChange': {
         emitRequestModelChange(action.payload);
+        break;
+      }
+
+      case 'socketio/getLoraModels': {
+        emitGetLoraModels();
         break;
       }
 

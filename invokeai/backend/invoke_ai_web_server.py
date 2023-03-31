@@ -29,10 +29,9 @@ from ldm.invoke.conditioning import get_tokens_for_prompt_object, get_prompt_str
     get_tokenizer
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
-from ldm.invoke.globals import Globals, global_converted_ckpts_dir
+from ldm.invoke.globals import Globals, global_converted_ckpts_dir, global_models_dir, global_lora_models_dir
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from compel.prompt_parser import Blend
-from ldm.invoke.globals import global_models_dir
 from ldm.invoke.merge_diffusers import merge_diffusion_models
 
 # Loading Arguments
@@ -483,6 +482,27 @@ class InvokeAIWebServer:
                 print(f">> Models Merged: {models_to_merge}")
                 print(
                     f">> New Model Added: {model_merge_info['merged_model_name']}")
+            except Exception as e:
+                self.handle_exceptions(e)
+
+        @socketio.on('getLoraModels')
+        def get_lora_models():
+            try:
+                lora_path = global_lora_models_dir()
+                lora_folder_ckpt = Path(lora_path).glob("**/*.ckpt")
+                lora_folder_safetensors = Path(lora_path).glob("**/*.safetensors")
+
+                ckpt_loras = [x for x in lora_folder_ckpt if x.is_file()]
+                safetensors_loras = [x for x in lora_folder_safetensors if x.is_file()]
+
+                loras = ckpt_loras + safetensors_loras
+
+                found_loras = []
+                for lora in loras:
+                    location = str(lora.resolve()).replace("\\", "/")
+                    found_loras.append({"name": lora.stem, "location": location})
+
+                socketio.emit('foundLoras', found_loras)
             except Exception as e:
                 self.handle_exceptions(e)
 

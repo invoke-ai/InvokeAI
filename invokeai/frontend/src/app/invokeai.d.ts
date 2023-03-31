@@ -271,6 +271,13 @@ export declare type FoundModelResponse = {
   found_models: FoundModel[];
 };
 
+export declare type FoundLora = {
+  name: string;
+  location: string;
+};
+
+export declare type FoundLorasRsponse = FoundLora[];
+
 export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;

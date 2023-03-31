@@ -196,6 +196,9 @@ const makeSocketIOEmitters = (
       dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);
     },
+    emitGetLoraModels: () => {
+      socketio.emit('getLoraModels');
+    },
     emitSaveStagingAreaImageToGallery: (url: string) => {
       socketio.emit('requestSaveStagingAreaImageToGallery', url);
     },

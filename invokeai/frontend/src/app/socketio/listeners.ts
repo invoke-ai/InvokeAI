@@ -11,6 +11,7 @@ import {
   errorOccurred,
   processingCanceled,
   setCurrentStatus,
+  setFoundLoras,
   setFoundModels,
   setIsCancelable,
   setIsConnected,
@@ -481,6 +482,9 @@ const makeSocketIOListeners = (
           level: 'error',
         })
       );
+    },
+    onFoundLoras: (data: InvokeAI.FoundLorasRsponse) => {
+      dispatch(setFoundLoras(data));
     },
     onTempFolderEmptied: () => {
       dispatch(

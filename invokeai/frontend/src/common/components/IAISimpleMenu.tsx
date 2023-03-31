@@ -7,13 +7,14 @@ import {
   MenuButtonProps,
   MenuListProps,
   MenuItemProps,
+  Text,
 } from '@chakra-ui/react';
 import { MouseEventHandler, ReactNode } from 'react';
 import { MdArrowDropDown, MdArrowDropUp } from 'react-icons/md';
 import IAIButton from './IAIButton';
 import IAIIconButton from './IAIIconButton';
 
-interface IAIMenuItem {
+export interface IAIMenuItem {
   item: ReactNode | string;
   onClick: MouseEventHandler<HTMLButtonElement> | undefined;
 }
@@ -82,7 +83,9 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
             fontSize="1.5rem"
             {...menuButtonProps}
           >
-            {menuType === 'regular' && buttonText}
+            {menuType === 'regular' && (
+              <Text fontSize="0.9rem">{buttonText}</Text>
+            )}
           </MenuButton>
           <MenuList
             zIndex={15}

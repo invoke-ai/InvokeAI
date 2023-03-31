@@ -327,6 +327,7 @@
         "addModel": "Add Model",
         "updateModel": "Update Model",
         "availableModels": "Available Models",
+        "addLora": "Add Lora",
         "search": "Search",
         "load": "Load",
         "active": "active",

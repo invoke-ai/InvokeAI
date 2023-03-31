@@ -51,6 +51,7 @@ export interface SystemState
   toastQueue: UseToastOptions[];
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
+  foundLoras: InvokeAI.FoundLora[] | null;
   openModel: string | null;
   cancelOptions: {
     cancelType: CancelType;
@@ -93,6 +94,7 @@ const initialSystemState: SystemState = {
   toastQueue: [],
   searchFolder: null,
   foundModels: null,
+  foundLoras: null,
   openModel: null,
   cancelOptions: {
     cancelType: 'immediate',
@@ -262,6 +264,12 @@ export const systemSlice = createSlice({
     ) => {
       state.foundModels = action.payload;
     },
+    setFoundLoras: (
+      state,
+      action: PayloadAction<InvokeAI.FoundLora[] | null>
+    ) => {
+      state.foundLoras = action.payload;
+    },
     setOpenModel: (state, action: PayloadAction<string | null>) => {
       state.openModel = action.payload;
     },
@@ -303,6 +311,7 @@ export const {
   setProcessingIndeterminateTask,
   setSearchFolder,
   setFoundModels,
+  setFoundLoras,
   setOpenModel,
   setCancelType,
   setCancelAfter,

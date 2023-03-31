@@ -52,6 +52,8 @@ export const requestModelChange = createAction<string>(
   'socketio/requestModelChange'
 );
 
+export const getLoraModels = createAction<undefined>('socketio/getLoraModels');
+
 export const saveStagingAreaImageToGallery = createAction<string>(
   'socketio/saveStagingAreaImageToGallery'
 );
