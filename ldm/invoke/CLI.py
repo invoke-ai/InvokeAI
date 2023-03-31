@@ -65,6 +65,7 @@ def main():
     Globals.disable_xformers = not args.xformers
     Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = args.ckpt_convert
+    print(f'DEBUG: ckpt_convert = {args.ckpt_convert}')
 
     # run any post-install patches needed
     run_patches()

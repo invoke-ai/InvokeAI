@@ -522,7 +522,7 @@ class Args(object):
             '--ckpt_convert',
             action=argparse.BooleanOptionalAction,
             dest='ckpt_convert',
-            default=False,
+            default=True,
             help='Load legacy ckpt files as diffusers. Pass --no-ckpt-convert to inhibit this behavior',
         )
         model_group.add_argument(
