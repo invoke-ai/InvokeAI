@@ -10,6 +10,7 @@ import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Ou
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
+import LoraManager from 'features/parameters/components/LoraManager/LoraManager';
 import MainSettings from 'features/parameters/components/MainParameters/MainParameters';
 import ParametersAccordion from 'features/parameters/components/ParametersAccordion';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
@@ -73,6 +74,7 @@ export default function UnifiedCanvasPanel() {
       <Flex flexDir="column" rowGap="0.5rem">
         <PromptInput />
         <NegativePromptInput />
+        <LoraManager />
       </Flex>
       <ProcessButtons />
       <MainSettings />
