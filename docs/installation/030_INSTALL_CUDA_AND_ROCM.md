@@ -77,7 +77,7 @@ machine. To test, open up a terminal window and issue the following
 command:
 
 ```
-rocm-smi
+rocminfo
 ```
 
 If you get a table labeled "ROCm System Management Interface" the
@@ -95,9 +95,17 @@ recent version of Ubuntu, 22.04. However, this [community-contributed
 recipe](https://novaspirit.github.io/amdgpu-rocm-ubu22/) is reported
 to work well.
 
-After installation, please run `rocm-smi` a second time to confirm
+After installation, please run `rocminfo` a second time to confirm
 that the driver is present and the GPU is recognized. You may need to
-do a reboot in order to load the driver.
+do a reboot in order to load the driver. In addition, if you see
+errors relating to your username not being a member of the `render`
+group, you may fix this by adding yourself to this group with the command:
+
+```
+sudo usermod -a -G render myUserName
+```
+
+(Thanks to @EgoringKosmos for the usermod recipe.)
 
 ### Linux Install with a ROCm-docker Container
 
