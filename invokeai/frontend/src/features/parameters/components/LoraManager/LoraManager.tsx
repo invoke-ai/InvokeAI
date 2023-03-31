@@ -69,14 +69,21 @@ export default function LoraManager() {
     }
   }, [foundLoras, loraItems, dispatch, prompt, handleLora, renderLoraOption]);
 
-  return (
-    foundLoras &&
-    foundLoras?.length > 0 && (
-      <IAISimpleMenu
-        menuItems={loraItems}
-        menuType="regular"
-        buttonText={t('modelManager.addLora')}
-      />
-    )
+  return foundLoras && foundLoras?.length > 0 ? (
+    <IAISimpleMenu
+      menuItems={loraItems}
+      menuType="regular"
+      buttonText={t('modelManager.addLora')}
+    />
+  ) : (
+    <Box
+      background="var(--btn-base-color)"
+      padding={2}
+      textAlign="center"
+      borderRadius={4}
+      fontWeight="bold"
+    >
+      No Loras Found
+    </Box>
   );
 }
