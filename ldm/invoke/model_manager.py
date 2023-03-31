@@ -19,7 +19,7 @@ import warnings
 from enum import Enum
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, List
 
 import safetensors
 import safetensors.torch
@@ -368,11 +368,19 @@ class ModelManager(object):
         # check whether this is a v2 file and force conversion
         convert = Globals.ckpt_convert or self.is_v2_config(config)
 
+        if matching_config := self._scan_for_matching_file(Path(weights),suffixes=['.yaml']):
+            print(f'   | Using external config file {matching_config}')
+            config = matching_config
+
         # get the path to the custom vae, if any
         vae_path = None
+        # first we use whatever is in the config file
         if vae:
             path = Path(vae if os.path.isabs(vae) else os.path.normpath(os.path.join(Globals.root, vae)))
-            vae_path = path if path.exists() else None
+            if path.exists():
+                vae_path = path
+        # then we look for a file with the same basename
+        vae_path = vae_path or self._scan_for_matching_file(Path(weights))
             
         # if converting automatically to diffusers, then we do the conversion and return
         # a diffusers pipeline
@@ -449,7 +457,7 @@ class ModelManager(object):
 
         # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
         if vae_path:
-            print(f"   | Loading VAE weights from: {vae}")
+            print(f"   | Loading VAE weights from: {vae_path}")
             if vae_path.suffix in [".ckpt", ".pt"]:
                 self.scan_model(vae_path.name, vae_path)
                 vae_ckpt = torch.load(vae_path, map_location="cpu")
@@ -458,7 +466,7 @@ class ModelManager(object):
             vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
             model.first_stage_model.load_state_dict(vae_dict, strict=False)
         else:
-            print(f"   | VAE file {vae} not found. Skipping.")
+            print("   | Using VAE built into model.")
 
         model.to(self.device)
         # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
@@ -915,12 +923,9 @@ class ModelManager(object):
             convert = True
             print("   | This SD-v2 model will be converted to diffusers format for use")
 
-        # look for a custom vae
-        vae_path = None
-        for suffix in ["pt", "ckpt", "safetensors"]:
-            if (model_path.with_suffix(f".vae.{suffix}")).exists():
-                vae_path = model_path.with_suffix(f".vae.{suffix}")
-                print(f"   | Using VAE file {vae_path.name}")
+        if (vae_path := self._scan_for_matching_file(model_path)):
+            print(f"   | Using VAE file {vae_path.name}")
+        
         if convert:
             diffuser_path = Path(
                 Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
@@ -1316,6 +1321,22 @@ class ModelManager(object):
             f.write(hash)
         return hash
 
+    @classmethod
+    def _scan_for_matching_file(
+            self,model_path: Path,
+            suffixes: List[str]=['.vae.pt','.vae.ckpt','.vae.safetensors']
+    )->Path:
+        """
+        Find a file with same basename as the indicated model, but with one
+        of the suffixes passed.
+        """
+        # look for a custom vae
+        vae_path = None
+        for suffix in suffixes:
+            if model_path.with_suffix(suffix).exists():
+                vae_path = model_path.with_suffix(suffix)
+        return vae_path
+                               
     def _load_vae(self, vae_config) -> AutoencoderKL:
         vae_args = {}
         try:
