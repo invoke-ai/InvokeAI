@@ -99,7 +99,7 @@ const rootPersistConfig = getPersistConfig({
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 function buildMiddleware() {
-  if (import.meta.env.MODE === 'nodes') {
+  if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
     return [nodesSocketioMiddleware(), invokeMiddleware];
   } else {
     return [socketioMiddleware()];
