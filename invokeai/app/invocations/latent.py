@@ -313,6 +313,56 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         )
 
 
+class LatentToLatentInvocation(TextToLatentInvocation):
+    """Generates a latent using a latent as base image."""
+
+    type: Literal["l2l"] = "l2l"
+
+    # Inputs
+    latent: Optional[LatentField] = Field(description="The latent to use as a base image")
+    strength: float = Field(default=0.5, description="The strength of the latent to use")
+
+    def invoke(self, context: InvocationContext) -> LatentOutput:
+        noise = context.services.latents.get(self.noise.latent_name)
+        latent = context.services.latents.get(self.latent.latent_name)
+
+        def step_callback(state: PipelineIntermediateState):
+            self.dispatch_progress(context, state.latents, state.step)
+
+        model = self.get_model(context.services.model_manager)
+        conditioning_data = self.get_conditioning_data(model)
+
+        # TODO: Verify the noise is the right size
+
+        initial_latent = latent if self.strength < 1.0 else torch.zeros_like(
+            latent, device=model.device, dtype=latent.dtype
+        )
+        
+        timesteps, _ = model.get_img2img_timesteps(
+            self.steps,
+            self.strength,
+            device=model.device,
+        )
+
+        result_latents, result_attention_map_saver = model.latents_from_embeddings(
+            latents=initial_latent,
+            timesteps=timesteps,
+            noise=noise,
+            num_inference_steps=self.steps,
+            conditioning_data=conditioning_data,
+            callback=step_callback
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f'{context.graph_execution_state_id}__{self.id}'
+        context.services.latents.set(name, result_latents)
+        return LatentOutput(
+            latent=LatentField(latent_name=name)
+        )
+
+
 # Latent to image
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
