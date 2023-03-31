@@ -103,11 +103,7 @@ class ModelManager(object):
             requested_model = self.models[model_name]["model"]
             print(f">> Retrieving model {model_name} from system RAM cache")
             self.models[model_name]["model"] = self._model_from_cpu(requested_model)
-            width = self.models[model_name]["width"]
-            height = self.models[model_name]["height"]
-            hash = self.models[model_name]["hash"]
-
-        else:  # we're about to load a new model, so potentially offload the least recently used one
+        else:
             requested_model, width, height, hash = self._load_model(model_name)
             self.models[model_name] = {
                 "model": requested_model,
@@ -118,13 +114,8 @@ class ModelManager(object):
 
         self.current_model = model_name
         self._push_newest_model(model_name)
-        return {
-            "model": requested_model,
-            "width": width,
-            "height": height,
-            "hash": hash,
-        }
-
+        return self.models[model_name]
+    
     def default_model(self) -> str | None:
         """
         Returns the name of the default model, or None
