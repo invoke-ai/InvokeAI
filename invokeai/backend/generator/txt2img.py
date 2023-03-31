@@ -18,12 +18,6 @@ class Txt2Img(Generator):
     def __init__(self, model, precision,
                  control_model: ControlNetModel = None,
                  **kwargs):
-        # print("")
-        # print("in txt2img.Txt2Img.__init__(), model:", type(model))
-        # print("in txt2img.Txt2Img.__init__(), control_model:", type(control_model))
-        # print("in txt2img.Txt2Img.__init__(), kwargs:", len(kwargs))
-        # for k,v in kwargs.items():
-        #     print("     ", k, "==>", type(v))
         self.control_model = control_model
         super().__init__(model, precision, **kwargs)
 
@@ -76,8 +70,7 @@ class Txt2Img(Generator):
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
         if control_image is not None:
-            #     print("prepping control image (converting to tensor and additional processing)")
-            control_image = pipeline.prepare_image(image=control_image)
+            control_image = pipeline.prepare_control_image(image=control_image)
             kwargs["control_image"] = control_image
 
         def make_image(x_T: torch.Tensor, _: int) -> PIL.Image.Image:
