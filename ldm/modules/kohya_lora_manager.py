@@ -300,9 +300,6 @@ class KohyaLoraManager:
         self.loras_to_load = {}
 
     def load_lora_module(self, name, path_file, multiplier: float = 1.0):
-        # can be used instead to load through diffusers, once enough support is added
-        # lora = load_lora_attn(name, path_file, self.wrapper, multiplier)
-
         print(f"   | Found lora {name} at {path_file}")
         if path_file.suffix == ".safetensors":
             checkpoint = load_file(path_file.absolute().as_posix(), device="cpu")
@@ -316,7 +313,7 @@ class KohyaLoraManager:
         return lora
 
     def apply_lora_model(self, name, mult: float = 1.0):
-        for suffix in ["ckpt", "safetensors"]:
+        for suffix in ["ckpt", "safetensors", "pt"]:
             path_file = Path(self.lora_path, f"{name}.{suffix}")
             if path_file.exists():
                 print(f"   | Loading lora {path_file.name} with weight {mult}")
