@@ -62,7 +62,7 @@ Globals.sequential_guidance = False
 Globals.full_precision = False
 
 # whether we should convert ckpt files into diffusers models on the fly
-Globals.ckpt_convert = False
+Globals.ckpt_convert = True
 
 # logging tokenization everywhere
 Globals.log_tokenization = False

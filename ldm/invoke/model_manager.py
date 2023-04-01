@@ -152,19 +152,6 @@ class ModelManager(object):
         """
         return list(self.config.keys())
 
-    def is_legacy(self, model_name: str) -> bool:
-        """
-        Return true if this is a legacy (.ckpt) model
-        """
-        # if we are converting legacy files automatically, then
-        # there are no legacy ckpts!
-        info = self.model_info(model_name)
-        if Globals.ckpt_convert or info.format=='diffusers' or self.is_v2_config(info.config):
-            return False
-        if "weights" in info and info["weights"].endswith((".ckpt", ".safetensors")):
-            return True
-        return False
-
     def list_models(self) -> dict:
         """
         Return a dict of models in the format:
@@ -365,9 +352,6 @@ class ModelManager(object):
         if not os.path.isabs(weights):
             weights = os.path.normpath(os.path.join(Globals.root, weights))
 
-        # check whether this is a v2 file and force conversion
-        convert = Globals.ckpt_convert or self.is_v2_config(config)
-
         if matching_config := self._scan_for_matching_file(Path(weights),suffixes=['.yaml']):
             print(f'   | Using external config file {matching_config}')
             config = matching_config
@@ -382,102 +366,41 @@ class ModelManager(object):
         # then we look for a file with the same basename
         vae_path = vae_path or self._scan_for_matching_file(Path(weights))
             
-        # if converting automatically to diffusers, then we do the conversion and return
-        # a diffusers pipeline
-        if convert:
-            print(
-                f">> Converting legacy checkpoint {model_name} into a diffusers model..."
-            )
-            from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
+        # Do the conversion and return a diffusers pipeline
+        print(
+            f">> Converting legacy checkpoint {model_name} into a diffusers model..."
+        )
+        from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
 
-            try:
-                if self.list_models()[self.current_model]['status'] == 'active':
-                    self.offload_model(self.current_model)
-            except Exception:
-                pass
-            
-            if self._has_cuda():
-                torch.cuda.empty_cache()
-            pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
-                checkpoint_path=weights,
-                original_config_file=config,
-                vae_path=vae_path,
-                return_generator_pipeline=True,
-                precision=torch.float16
-                if self.precision == "float16"
-                else torch.float32,
-            )
-            if self.sequential_offload:
-                pipeline.enable_offload_submodels(self.device)
-            else:
-                pipeline.to(self.device)
+#        try:
+#            if self.list_models()[self.current_model]['status'] == 'active':
+#                self.offload_model(self.current_model)
+#        except Exception:
+#            pass
 
-            return (
-                pipeline,
-                width,
-                height,
-                "NOHASH",
-            )
-
-        # for usage statistics
         if self._has_cuda():
-            torch.cuda.reset_peak_memory_stats()
             torch.cuda.empty_cache()
-
-        # this does the work
-        if not os.path.isabs(config):
-            config = os.path.join(Globals.root, config)
-        omega_config = OmegaConf.load(config)
-        with open(weights, "rb") as f:
-            weight_bytes = f.read()
-        model_hash = self._cached_sha256(weights, weight_bytes)
-        sd = None
-
-        if weights.endswith(".ckpt"):
-            self.scan_model(model_name, weights)
-            sd = torch.load(io.BytesIO(weight_bytes), map_location="cpu")
+        pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
+            checkpoint_path=weights,
+            original_config_file=config,
+            vae_path=vae_path,
+            return_generator_pipeline=True,
+            precision=torch.float16
+            if self.precision == "float16"
+            else torch.float32,
+        )
+        if self.sequential_offload:
+            pipeline.enable_offload_submodels(self.device)
         else:
-            sd = safetensors.torch.load(weight_bytes)
+            pipeline.to(self.device)
 
-        del weight_bytes
-        # merged models from auto11 merge board are flat for some reason
-        if "state_dict" in sd:
-            sd = sd["state_dict"]
+        return (
+            pipeline,
+            width,
+            height,
+            "NOHASH",
+        )
 
-        print("   | Forcing garbage collection prior to loading new model")
-        gc.collect()
-        model = instantiate_from_config(omega_config.model)
-        model.load_state_dict(sd, strict=False)
-
-        if self.precision == "float16":
-            print("   | Using faster float16 precision")
-            model = model.to(torch.float16)
-        else:
-            print("   | Using more accurate float32 precision")
-
-        # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
-        if vae_path:
-            print(f"   | Loading VAE weights from: {vae_path}")
-            if vae_path.suffix in [".ckpt", ".pt"]:
-                self.scan_model(vae_path.name, vae_path)
-                vae_ckpt = torch.load(vae_path, map_location="cpu")
-            else:
-                vae_ckpt = safetensors.torch.load_file(vae_path)
-            vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
-            model.first_stage_model.load_state_dict(vae_dict, strict=False)
-        else:
-            print("   | Using VAE built into model.")
-
-        model.to(self.device)
-        # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
-        model.cond_stage_model.device = self.device
-
-        model.eval()
-
-        for module in model.modules():
-            if isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
-                module._orig_padding_mode = module.padding_mode
-        return model, width, height, model_hash
 
     def _load_diffusers_model(self, mconfig):
         name_or_path = self.model_name_or_path(mconfig)
@@ -760,7 +683,6 @@ class ModelManager(object):
     def heuristic_import(
         self,
         path_url_or_repo: str,
-        convert: bool = False,
         model_name: str = None,
         description: str = None,
         model_config_file: Path = None,
@@ -781,9 +703,6 @@ class ModelManager(object):
 
         The model_name and/or description can be provided. If not, they will
         be generated automatically.
-
-        If convert is true, legacy models will be converted to diffusers
-        before importing.
 
         If commit_to_conf is provided, the newly loaded model will be written
         to the `models.yaml` file at the indicated path. Otherwise, the changes
@@ -840,7 +759,6 @@ class ModelManager(object):
                 ):
                     if model_name := self.heuristic_import(
                         str(m),
-                        convert,
                         commit_to_conf=commit_to_conf,
                         config_file_callback=config_file_callback,
                     ):
@@ -919,48 +837,28 @@ class ModelManager(object):
             if not model_config_file:
                 return
 
-        if self.is_v2_config(model_config_file):
-            convert = True
-            print("   | This SD-v2 model will be converted to diffusers format for use")
-
         if (vae_path := self._scan_for_matching_file(model_path)):
             print(f"   | Using VAE file {vae_path.name}")
         
-        if convert:
-            diffuser_path = Path(
-                Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
-            )
-            vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
-            model_name = self.convert_and_import(
-                model_path,
-                diffusers_path=diffuser_path,
-                vae=vae,
-                vae_path=vae_path,
-                model_name=model_name,
-                model_description=description,
-                original_config_file=model_config_file,
-                commit_to_conf=commit_to_conf,
-                scan_needed=False,
-            )
-            # in the event that this file was downloaded automatically prior to conversion
-            # we do not keep the original .ckpt/.safetensors around
-            if is_temporary:
-                model_path.unlink(missing_ok=True)
-        else:
-            model_name = self.import_ckpt_model(
-                model_path,
-                config=model_config_file,
-                model_name=model_name,
-                model_description=description,
-                vae=str(
-                    vae_path
-                    or Path(
-                        Globals.root,
-                        "models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt",
-                    )
-                ),
-                commit_to_conf=commit_to_conf,
-            )
+        diffuser_path = Path(
+            Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
+        )
+        vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
+        model_name = self.convert_and_import(
+            model_path,
+            diffusers_path=diffuser_path,
+            vae=vae,
+            vae_path=vae_path,
+            model_name=model_name,
+            model_description=description,
+            original_config_file=model_config_file,
+            commit_to_conf=commit_to_conf,
+            scan_needed=False,
+        )
+        # in the event that this file was downloaded automatically prior to conversion
+        # we do not keep the original .ckpt/.safetensors around
+        if is_temporary:
+            model_path.unlink(missing_ok=True)
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name

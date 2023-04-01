@@ -919,12 +919,8 @@ class Generate:
         return self._load_generator(".omnibus", "Omnibus")
 
     def _load_generator(self, module, class_name):
-        if self.is_legacy_model(self.model_name):
-            mn = f"ldm.invoke.ckpt_generator{module}"
-            cn = f"Ckpt{class_name}"
-        else:
-            mn = f"ldm.invoke.generator{module}"
-            cn = class_name
+        mn = f"ldm.invoke.generator{module}"
+        cn = class_name
         module = importlib.import_module(mn)
         constructor = getattr(module, cn)
         return constructor(self.model, self.precision)
@@ -1130,9 +1126,6 @@ class Generate:
 
     def sample_to_lowres_estimated_image(self, samples):
         return self._make_base().sample_to_lowres_estimated_image(samples)
-
-    def is_legacy_model(self, model_name) -> bool:
-        return self.model_manager.is_legacy(model_name)
 
     def _set_sampler(self):
         if isinstance(self.model, DiffusionPipeline):

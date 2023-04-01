@@ -523,7 +523,7 @@ class Args(object):
             action=argparse.BooleanOptionalAction,
             dest='ckpt_convert',
             default=True,
-            help='Load legacy ckpt files as diffusers. Pass --no-ckpt-convert to inhibit this behavior',
+            help='Deprecated option. Legacy ckpt files are now always converted to diffusers when loaded.'
         )
         model_group.add_argument(
             '--internet',
@@ -798,12 +798,12 @@ class Args(object):
             *Model manipulation*
             !models                                   -- list models in configs/models.yaml
             !switch <model_name>                      -- switch to model named <model_name>
-            !import_model /path/to/weights/file.ckpt  -- adds a .ckpt model to your config
+            !import_model /path/to/weights/file       -- imports a model from a ckpt or safetensors file
             !import_model /path/to/weights/           -- interactively import models from a directory
-            !import_model http://path_to_model.ckpt   -- downloads and adds a .ckpt model to your config
-            !import_model hakurei/waifu-diffusion     -- downloads and adds a diffusers model to your config
-            !optimize_model <model_name>              -- converts a .ckpt model to a diffusers model
-            !convert_model /path/to/weights/file.ckpt -- converts a .ckpt file path to a diffusers model
+            !import_model http://path_to_model        -- downloads and adds a ckpt or safetensors model to your config
+            !import_model hakurei/waifu-diffusion     -- downloads and adds a diffusers model to your config using its repo_id
+            !optimize_model <model_name>              -- converts a .ckpt/.safetensors model to a diffusers model
+            !convert_model /path/to/weights/file      -- converts a .ckpt file path to a diffusers model and adds to your config
             !edit_model <model_name>                  -- edit a model's description
             !del_model <model_name>                   -- delete a model
             """
