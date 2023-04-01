@@ -3,6 +3,7 @@
 # Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
 # Copyright (c) 2022 Robin Rombach and Patrick Esser and contributors
 
+import contextlib
 import gc
 import importlib
 import os
@@ -490,13 +491,6 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
-        # To try and load LoRA not trained through diffusers
-        # To be removed once support for diffusers LoRA weights is high enough
-        if self.model.lora_manager:
-            prompt = self.model.lora_manager.configure_prompt_kohya(prompt)
-            # lora MUST process prompt before conditioning
-            self.model.lora_manager.load_lora_kohya()
-
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
             prompt,
@@ -535,77 +529,83 @@ class Generate:
                 log_tokens=self.log_tokenization,
             )
 
-            if self.model.peft_manager:
-                self.model = self.model.peft_manager.load(self.model, self.model.unet.dtype)
 
-            init_image, mask_image = self._make_images(
-                init_img,
-                init_mask,
-                width,
-                height,
-                fit=fit,
-                text_mask=text_mask,
-                invert_mask=invert_mask,
-                force_outpaint=force_outpaint,
-            )
+            # untested code, so commented out for now
+            # if self.model.peft_manager:
+            #     self.model = self.model.peft_manager.load(self.model, self.model.unet.dtype)
 
-            # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            generator = self.select_generator(
-                init_image, mask_image, embiggen, hires_fix, force_outpaint
-            )
+            # This should be generalized
+            context = self.model.lora_manager.kohya_context() if self.model.lora_manager else contextlib.nullcontext()
 
-            generator.set_variation(self.seed, variation_amount, with_variations)
-            generator.use_mps_noise = use_mps_noise
+            with context:
+                init_image, mask_image = self._make_images(
+                    init_img,
+                    init_mask,
+                    width,
+                    height,
+                    fit=fit,
+                    text_mask=text_mask,
+                    invert_mask=invert_mask,
+                    force_outpaint=force_outpaint,
+                )
 
-            checker = (
-                {
-                    "checker": self.safety_checker,
-                    "extractor": self.safety_feature_extractor,
-                }
-                if self.safety_checker
-                else None
-            )
+                # TODO: Hacky selection of operation to perform. Needs to be refactored.
+                generator = self.select_generator(
+                    init_image, mask_image, embiggen, hires_fix, force_outpaint
+                )
 
-            results = generator.generate(
-                prompt,
-                iterations=iterations,
-                seed=self.seed,
-                sampler=self.sampler,
-                steps=steps,
-                cfg_scale=cfg_scale,
-                conditioning=(uc, c, extra_conditioning_info),
-                ddim_eta=ddim_eta,
-                image_callback=image_callback,  # called after the final image is generated
-                step_callback=step_callback,  # called after each intermediate image is generated
-                width=width,
-                height=height,
-                init_img=init_img,  # embiggen needs to manipulate from the unmodified init_img
-                init_image=init_image,  # notice that init_image is different from init_img
-                mask_image=mask_image,
-                strength=strength,
-                threshold=threshold,
-                perlin=perlin,
-                h_symmetry_time_pct=h_symmetry_time_pct,
-                v_symmetry_time_pct=v_symmetry_time_pct,
-                embiggen=embiggen,
-                embiggen_tiles=embiggen_tiles,
-                embiggen_strength=embiggen_strength,
-                inpaint_replace=inpaint_replace,
-                mask_blur_radius=mask_blur_radius,
-                safety_checker=checker,
-                seam_size=seam_size,
-                seam_blur=seam_blur,
-                seam_strength=seam_strength,
-                seam_steps=seam_steps,
-                tile_size=tile_size,
-                infill_method=infill_method,
-                force_outpaint=force_outpaint,
-                inpaint_height=inpaint_height,
-                inpaint_width=inpaint_width,
-                enable_image_debugging=enable_image_debugging,
-                free_gpu_mem=self.free_gpu_mem,
-                clear_cuda_cache=self.clear_cuda_cache,
-            )
+                generator.set_variation(self.seed, variation_amount, with_variations)
+                generator.use_mps_noise = use_mps_noise
+
+                checker = (
+                    {
+                        "checker": self.safety_checker,
+                        "extractor": self.safety_feature_extractor,
+                    }
+                    if self.safety_checker
+                    else None
+                )
+
+                results = generator.generate(
+                    prompt,
+                    iterations=iterations,
+                    seed=self.seed,
+                    sampler=self.sampler,
+                    steps=steps,
+                    cfg_scale=cfg_scale,
+                    conditioning=(uc, c, extra_conditioning_info),
+                    ddim_eta=ddim_eta,
+                    image_callback=image_callback,  # called after the final image is generated
+                    step_callback=step_callback,  # called after each intermediate image is generated
+                    width=width,
+                    height=height,
+                    init_img=init_img,  # embiggen needs to manipulate from the unmodified init_img
+                    init_image=init_image,  # notice that init_image is different from init_img
+                    mask_image=mask_image,
+                    strength=strength,
+                    threshold=threshold,
+                    perlin=perlin,
+                    h_symmetry_time_pct=h_symmetry_time_pct,
+                    v_symmetry_time_pct=v_symmetry_time_pct,
+                    embiggen=embiggen,
+                    embiggen_tiles=embiggen_tiles,
+                    embiggen_strength=embiggen_strength,
+                    inpaint_replace=inpaint_replace,
+                    mask_blur_radius=mask_blur_radius,
+                    safety_checker=checker,
+                    seam_size=seam_size,
+                    seam_blur=seam_blur,
+                    seam_strength=seam_strength,
+                    seam_steps=seam_steps,
+                    tile_size=tile_size,
+                    infill_method=infill_method,
+                    force_outpaint=force_outpaint,
+                    inpaint_height=inpaint_height,
+                    inpaint_width=inpaint_width,
+                    enable_image_debugging=enable_image_debugging,
+                    free_gpu_mem=self.free_gpu_mem,
+                    clear_cuda_cache=self.clear_cuda_cache,
+                )
 
             if init_color:
                 self.correct_colors(

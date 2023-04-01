@@ -1,16 +1,19 @@
 import re
 from pathlib import Path
-from ldm.invoke.devices import choose_torch_device
-from safetensors.torch import load_file
+
 import torch
-from torch.utils.hooks import RemovableHandle
+from compel import Compel
 from diffusers.models import UNet2DConditionModel
+from safetensors.torch import load_file
+from torch.utils.hooks import RemovableHandle
 from transformers import CLIPTextModel
 
-'''
+from ldm.invoke.devices import choose_torch_device
+
+"""
 This module supports loading LoRA weights trained with https://github.com/kohya-ss/sd-scripts
 To be removed once support for diffusers LoRA weights is well supported
-'''
+"""
 
 
 class LoRALayer:
@@ -43,8 +46,8 @@ class LoRAModuleWrapper:
 
         self.UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
         self.TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
-        self.LORA_PREFIX_UNET = 'lora_unet'
-        self.LORA_PREFIX_TEXT_ENCODER = 'lora_te'
+        self.LORA_PREFIX_UNET = "lora_unet"
+        self.LORA_PREFIX_TEXT_ENCODER = "lora_te"
 
         self.re_digits = re.compile(r"\d+")
         self.re_unet_transformer_attn_blocks = re.compile(
@@ -66,15 +69,20 @@ class LoRAModuleWrapper:
         self.re_processor_weight = re.compile(r"(.+)_(\d+)_(.+)")
         self.re_processor_alpha = re.compile(r"(.+)_(\d+)")
 
-        def find_modules(prefix, root_module: torch.nn.Module, target_replace_modules) -> dict[str, torch.nn.Module]:
+        def find_modules(
+            prefix, root_module: torch.nn.Module, target_replace_modules
+        ) -> dict[str, torch.nn.Module]:
             mapping = {}
             for name, module in root_module.named_modules():
                 if module.__class__.__name__ in target_replace_modules:
                     for child_name, child_module in module.named_modules():
                         layer_type = child_module.__class__.__name__
-                        if layer_type == "Linear" or (layer_type == "Conv2d" and child_module.kernel_size == (1, 1)):
-                            lora_name = prefix + '.' + name + '.' + child_name
-                            lora_name = lora_name.replace('.', '_')
+                        if layer_type == "Linear" or (
+                            layer_type == "Conv2d"
+                            and child_module.kernel_size == (1, 1)
+                        ):
+                            lora_name = prefix + "." + name + "." + child_name
+                            lora_name = lora_name.replace(".", "_")
                             mapping[lora_name] = child_module
                             self.apply_module_forward(child_module, lora_name)
             return mapping
@@ -83,14 +91,12 @@ class LoRAModuleWrapper:
             self.text_modules = find_modules(
                 self.LORA_PREFIX_TEXT_ENCODER,
                 text_encoder,
-                self.TEXT_ENCODER_TARGET_REPLACE_MODULE
+                self.TEXT_ENCODER_TARGET_REPLACE_MODULE,
             )
 
         if self.unet_modules is None:
             self.unet_modules = find_modules(
-                self.LORA_PREFIX_UNET,
-                unet,
-                self.UNET_TARGET_REPLACE_MODULE
+                self.LORA_PREFIX_UNET, unet, self.UNET_TARGET_REPLACE_MODULE
             )
 
     def convert_key_to_diffusers(self, key):
@@ -100,7 +106,9 @@ class LoRAModuleWrapper:
                 return False
 
             match_list.clear()
-            match_list.extend([int(x) if re.match(self.re_digits, x) else x for x in r.groups()])
+            match_list.extend(
+                [int(x) if re.match(self.re_digits, x) else x for x in r.groups()]
+            )
             return True
 
         m = []
@@ -121,7 +129,7 @@ class LoRAModuleWrapper:
             if third == "weight":
                 bm = []
                 if match(bm, self.re_processor_weight, second):
-                    s_bm = bm[2].split('.')
+                    s_bm = bm[2].split(".")
                     s_front = f"{bm[0]}_{s_bm[0]}"
                     s_back = f"{s_bm[1]}"
                     if int(bm[1]) == 0:
@@ -169,7 +177,10 @@ class LoRAModuleWrapper:
                 layer = lora.layers.get(name, None)
                 if layer is None:
                     continue
-                output = output + layer.up(layer.down(*input_h)) * lora.multiplier * layer.scale
+                output = (
+                    output
+                    + layer.up(layer.down(*input_h)) * lora.multiplier * layer.scale
+                )
             return output
 
         return lora_forward
@@ -189,15 +200,6 @@ class LoRAModuleWrapper:
 
     def clear_loaded_loras(self):
         self.loaded_loras.clear()
-
-    def __del__(self):
-        self.clear_hooks()
-        self.clear_applied_loras()
-        self.clear_loaded_loras()
-        del self.text_modules
-        del self.unet_modules
-        del self.hooks
-
 
 class LoRA:
     name: str
@@ -232,7 +234,11 @@ class LoRA:
                     print(f">> Missing layer: {stem}")
                     continue
 
-                if self.rank is None and leaf == 'lora_down.weight' and len(value.size()) == 2:
+                if (
+                    self.rank is None
+                    and leaf == "lora_down.weight"
+                    and len(value.size()) == 2
+                ):
                     self.rank = value.shape[0]
                 self.load_lora_layer(stem, leaf, value, wrapped)
                 continue
@@ -242,7 +248,11 @@ class LoRA:
                     print(f">> Missing layer: {stem}")
                     continue
 
-                if self.rank is None and leaf == 'lora_down.weight' and len(value.size()) == 2:
+                if (
+                    self.rank is None
+                    and leaf == "lora_down.weight"
+                    and len(value.size()) == 2
+                ):
                     self.rank = value.shape[0]
                 self.load_lora_layer(stem, leaf, value, wrapped)
                 continue
@@ -260,7 +270,9 @@ class LoRA:
         elif type(wrapped) == torch.nn.Conv2d:
             module = torch.nn.Conv2d(value.shape[1], value.shape[0], (1, 1), bias=False)
         else:
-            print(f">> Encountered unknown lora layer module in {self.name}: {type(value).__name__}")
+            print(
+                f">> Encountered unknown lora layer module in {self.name}: {type(value).__name__}"
+            )
             return
 
         with torch.no_grad():
@@ -292,10 +304,10 @@ class KohyaLoraManager:
         # lora = load_lora_attn(name, path_file, self.wrapper, multiplier)
 
         print(f"   | Found lora {name} at {path_file}")
-        if path_file.suffix == '.safetensors':
-            checkpoint = load_file(path_file.absolute().as_posix(), device='cpu')
+        if path_file.suffix == ".safetensors":
+            checkpoint = load_file(path_file.absolute().as_posix(), device="cpu")
         else:
-            checkpoint = torch.load(path_file, map_location='cpu')
+            checkpoint = torch.load(path_file, map_location="cpu")
 
         lora = LoRA(name, self.device, self.dtype, self.wrapper, multiplier)
         lora.load_from_dict(checkpoint)
@@ -303,23 +315,9 @@ class KohyaLoraManager:
 
         return lora
 
-    def configure_prompt(self, prompt: str) -> str:
-        self.clear_loras()
-
-        lora_match = re.compile(r"withLora\(([a-zA-Z_-]+),?\s*([\d.]+)?\)")
-
-        for match in lora_match.findall(prompt):
-            name, mult = match
-            name = name.strip()
-            mult = float(mult or '1.0')
-            self.set_lora(name, mult)
-
-        # remove lora and return prompt to avoid the lora prompt causing issues in inference
-        return re.sub(lora_match, "", prompt)
-
     def apply_lora_model(self, name, mult: float = 1.0):
-        for suffix in ['ckpt','safetensors']:
-            path_file = Path(self.lora_path, f'{name}.{suffix}')
+        for suffix in ["ckpt", "safetensors"]:
+            path_file = Path(self.lora_path, f"{name}.{suffix}")
             if path_file.exists():
                 print(f"   | Loading lora {path_file.name} with weight {mult}")
                 break
@@ -333,10 +331,6 @@ class KohyaLoraManager:
 
         lora.multiplier = mult
         self.wrapper.applied_loras[name] = lora
-
-    def load_lora(self):
-        for name, multiplier in self.loras_to_load.items():
-            self.apply_lora_model(name, multiplier)
 
     def unload_applied_loras(self, loras_to_load):
         # unload any lora's not defined by loras_to_load
@@ -352,16 +346,6 @@ class KohyaLoraManager:
         if lora_name in self.wrapper.loaded_loras:
             del self.wrapper.loaded_loras[lora_name]
 
-    def set_lora(self, name, multiplier: float = 1.0):
-        self.loras_to_load[name] = multiplier
-
-        # update the multiplier if the lora was already loaded
-        if name in self.wrapper.loaded_loras:
-            self.wrapper.loaded_loras[name].multiplier = multiplier
-
     def clear_loras(self):
         self.loras_to_load = {}
         self.wrapper.clear_applied_loras()
-
-    def __del__(self):
-        del self.loras_to_load
