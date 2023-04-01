@@ -464,7 +464,6 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         return self(text, **kwargs)
 
     def set_textual_inversion_manager(self, manager): #TextualInversionManager):
-        # TODO all of the weighting and expanding stuff needs be moved out of this class
         self.textual_inversion_manager = manager
 
     @property
