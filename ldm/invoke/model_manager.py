@@ -19,7 +19,7 @@ import warnings
 from enum import Enum
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, List
 
 import safetensors
 import safetensors.torch
@@ -46,12 +46,7 @@ class SDLegacyType(Enum):
     V2_v = 5
     UNKNOWN = 99
 
-
 DEFAULT_MAX_MODELS = 2
-VAE_TO_REPO_ID = {  # hack, see note in convert_and_import()
-    "vae-ft-mse-840000-ema-pruned": "stabilityai/sd-vae-ft-mse",
-}
-
 
 class ModelManager(object):
     def __init__(
@@ -108,11 +103,7 @@ class ModelManager(object):
             requested_model = self.models[model_name]["model"]
             print(f">> Retrieving model {model_name} from system RAM cache")
             self.models[model_name]["model"] = self._model_from_cpu(requested_model)
-            width = self.models[model_name]["width"]
-            height = self.models[model_name]["height"]
-            hash = self.models[model_name]["hash"]
-
-        else:  # we're about to load a new model, so potentially offload the least recently used one
+        else:
             requested_model, width, height, hash = self._load_model(model_name)
             self.models[model_name] = {
                 "model": requested_model,
@@ -123,13 +114,8 @@ class ModelManager(object):
 
         self.current_model = model_name
         self._push_newest_model(model_name)
-        return {
-            "model": requested_model,
-            "width": width,
-            "height": height,
-            "hash": hash,
-        }
-
+        return self.models[model_name]
+    
     def default_model(self) -> str | None:
         """
         Returns the name of the default model, or None
@@ -172,9 +158,9 @@ class ModelManager(object):
         """
         # if we are converting legacy files automatically, then
         # there are no legacy ckpts!
-        if Globals.ckpt_convert:
-            return False
         info = self.model_info(model_name)
+        if Globals.ckpt_convert or info.format=='diffusers' or self.is_v2_config(info.config):
+            return False
         if "weights" in info and info["weights"].endswith((".ckpt", ".safetensors")):
             return True
         return False
@@ -382,6 +368,20 @@ class ModelManager(object):
         # check whether this is a v2 file and force conversion
         convert = Globals.ckpt_convert or self.is_v2_config(config)
 
+        if matching_config := self._scan_for_matching_file(Path(weights),suffixes=['.yaml']):
+            print(f'   | Using external config file {matching_config}')
+            config = matching_config
+
+        # get the path to the custom vae, if any
+        vae_path = None
+        # first we use whatever is in the config file
+        if vae:
+            path = Path(vae if os.path.isabs(vae) else os.path.normpath(os.path.join(Globals.root, vae)))
+            if path.exists():
+                vae_path = path
+        # then we look for a file with the same basename
+        vae_path = vae_path or self._scan_for_matching_file(Path(weights))
+            
         # if converting automatically to diffusers, then we do the conversion and return
         # a diffusers pipeline
         if convert:
@@ -390,15 +390,18 @@ class ModelManager(object):
             )
             from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
 
-            self.offload_model(self.current_model)
-            if vae_config := self._choose_diffusers_vae(model_name):
-                vae = self._load_vae(vae_config)
+            try:
+                if self.list_models()[self.current_model]['status'] == 'active':
+                    self.offload_model(self.current_model)
+            except Exception:
+                pass
+            
             if self._has_cuda():
                 torch.cuda.empty_cache()
             pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
                 checkpoint_path=weights,
                 original_config_file=config,
-                vae=vae,
+                vae_path=vae_path,
                 return_generator_pipeline=True,
                 precision=torch.float16
                 if self.precision == "float16"
@@ -453,20 +456,17 @@ class ModelManager(object):
             print("   | Using more accurate float32 precision")
 
         # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
-        if vae:
-            if not os.path.isabs(vae):
-                vae = os.path.normpath(os.path.join(Globals.root, vae))
-            if os.path.exists(vae):
-                print(f"   | Loading VAE weights from: {vae}")
-                if vae.endswith((".ckpt", ".pt")):
-                    self.scan_model(vae, vae)
-                    vae_ckpt = torch.load(vae, map_location="cpu")
-                else:
-                    vae_ckpt = safetensors.torch.load_file(vae)
-                vae_dict = {k: v for k, v in vae_ckpt.items() if k[0:4] != "loss"}
-                model.first_stage_model.load_state_dict(vae_dict, strict=False)
+        if vae_path:
+            print(f"   | Loading VAE weights from: {vae_path}")
+            if vae_path.suffix in [".ckpt", ".pt"]:
+                self.scan_model(vae_path.name, vae_path)
+                vae_ckpt = torch.load(vae_path, map_location="cpu")
             else:
-                print(f"   | VAE file {vae} not found. Skipping.")
+                vae_ckpt = safetensors.torch.load_file(vae_path)
+            vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
+            model.first_stage_model.load_state_dict(vae_dict, strict=False)
+        else:
+            print("   | Using VAE built into model.")
 
         model.to(self.device)
         # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
@@ -544,6 +544,8 @@ class ModelManager(object):
         return pipeline, width, height, model_hash
 
     def is_v2_config(self, config: Path) -> bool:
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root, config)
         try:
             mconfig = OmegaConf.load(config)
             return (
@@ -818,7 +820,6 @@ class ModelManager(object):
             print(f"  | {thing} appears to be a diffusers file on disk")
             model_name = self.import_diffuser_model(
                 thing,
-                vae=dict(repo_id="stabilityai/sd-vae-ft-mse"),
                 model_name=model_name,
                 description=description,
                 commit_to_conf=commit_to_conf,
@@ -906,11 +907,11 @@ class ModelManager(object):
                     )
                 elif model_type == SDLegacyType.V2:
                     print(
-                        f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                        f"** {thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide the configuration file type or path."
                     )
                 else:
                     print(
-                        f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                        f"** {thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide the configuration file type or path."
                     )
 
             if not model_config_file and config_file_callback:
@@ -922,18 +923,14 @@ class ModelManager(object):
             convert = True
             print("   | This SD-v2 model will be converted to diffusers format for use")
 
-        # look for a custom vae
-        vae_path = None
-        for suffix in ["pt", "ckpt", "safetensors"]:
-            if (model_path.with_suffix(f".vae.{suffix}")).exists():
-                vae_path = model_path.with_suffix(f".vae.{suffix}")
-                print(f"   | Using VAE file {vae_path.name}")
-        vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
-
+        if (vae_path := self._scan_for_matching_file(model_path)):
+            print(f"   | Using VAE file {vae_path.name}")
+        
         if convert:
             diffuser_path = Path(
                 Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
             )
+            vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
             model_name = self.convert_and_import(
                 model_path,
                 diffusers_path=diffuser_path,
@@ -1006,14 +1003,17 @@ class ModelManager(object):
         try:
             # By passing the specified VAE to the conversion function, the autoencoder
             # will be built into the model rather than tacked on afterward via the config file
-            vae_model = self._load_vae(vae) if vae else None
+            vae_model=None
+            if vae:
+                vae_model=self._load_vae(vae)
+                vae_path=None
             convert_ckpt_to_diffusers(
                 ckpt_path,
                 diffusers_path,
                 extract_ema=True,
                 original_config_file=original_config_file,
                 vae=vae_model,
-                vae_path=str(vae_path) if vae_path else None,
+                vae_path=vae_path,
                 scan_needed=scan_needed,
             )
             print(
@@ -1059,36 +1059,6 @@ class ModelManager(object):
                 found_models.append({"name": file.stem, "location": location})
 
         return search_folder, found_models
-
-    def _choose_diffusers_vae(
-        self, model_name: str, vae: str = None
-    ) -> Union[dict, str]:
-        # In the event that the original entry is using a custom ckpt VAE, we try to
-        # map that VAE onto a diffuser VAE using a hard-coded dictionary.
-        # I would prefer to do this differently: We load the ckpt model into memory, swap the
-        # VAE in memory, and then pass that to convert_ckpt_to_diffusers() so that the swapped
-        # VAE is built into the model. However, when I tried this I got obscure key errors.
-        if vae:
-            return vae
-        if model_name in self.config and (
-            vae_ckpt_path := self.model_info(model_name).get("vae", None)
-        ):
-            vae_basename = Path(vae_ckpt_path).stem
-            diffusers_vae = None
-            if diffusers_vae := VAE_TO_REPO_ID.get(vae_basename, None):
-                print(
-                    f">> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version"
-                )
-                vae = {"repo_id": diffusers_vae}
-            else:
-                print(
-                    f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown'
-                )
-                print(
-                    '** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config'
-                )
-                vae = {"repo_id": "stabilityai/sd-vae-ft-mse"}
-        return vae
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
@@ -1351,6 +1321,22 @@ class ModelManager(object):
             f.write(hash)
         return hash
 
+    @classmethod
+    def _scan_for_matching_file(
+            self,model_path: Path,
+            suffixes: List[str]=['.vae.pt','.vae.ckpt','.vae.safetensors']
+    )->Path:
+        """
+        Find a file with same basename as the indicated model, but with one
+        of the suffixes passed.
+        """
+        # look for a custom vae
+        vae_path = None
+        for suffix in suffixes:
+            if model_path.with_suffix(suffix).exists():
+                vae_path = model_path.with_suffix(suffix)
+        return vae_path
+                               
     def _load_vae(self, vae_config) -> AutoencoderKL:
         vae_args = {}
         try:
@@ -1362,7 +1348,7 @@ class ModelManager(object):
         using_fp16 = self.precision == "float16"
 
         vae_args.update(
-            cache_dir=global_cache_dir("hug"),
+            cache_dir=global_cache_dir("hub"),
             local_files_only=not Globals.internet_available,
         )
 

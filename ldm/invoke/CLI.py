@@ -4,6 +4,7 @@ import shlex
 import sys
 import traceback
 from argparse import Namespace
+from packaging import version
 from pathlib import Path
 from typing import Union
 
@@ -125,11 +126,13 @@ def main():
             print(f"{e}. Aborting.")
             sys.exit(-1)
 
+    model = opt.model or retrieve_last_used_model()
+
     # creating a Generate object:
     try:
         gen = Generate(
             conf=opt.conf,
-            model=opt.model,
+            model=model,
             sampler_name=opt.sampler_name,
             embedding_path=embedding_path,
             full_precision=opt.full_precision,
@@ -178,6 +181,7 @@ def main():
     # web server loops forever
     if opt.web or opt.gui:
         invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
+        save_last_used_model(gen.model_name)
         sys.exit(0)
 
     if not infile:
@@ -498,6 +502,7 @@ def main_loop(gen, opt, completer):
     print(
         f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
     )
+    save_last_used_model(gen.model_name)
 
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
@@ -771,14 +776,10 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             original_config_file = Path(model_info["config"])
             model_name = model_name_or_path
             model_description = model_info["description"]
-            vae = model_info["vae"]
+            vae_path = model_info.get("vae")
         else:
             print(f"** {model_name_or_path} is not a legacy .ckpt weights file")
             return
-        if vae_repo := ldm.invoke.model_manager.VAE_TO_REPO_ID.get(Path(vae).stem):
-            vae_repo = dict(repo_id=vae_repo)
-        else:
-            vae_repo = None
         model_name = manager.convert_and_import(
             ckpt_path,
             diffusers_path=Path(
@@ -787,7 +788,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             model_name=model_name,
             model_description=model_description,
             original_config_file=original_config_file,
-            vae=vae_repo,
+            vae_path=vae_path,
         )
     else:
         try:
@@ -833,6 +834,7 @@ def edit_model(model_name: str, gen, opt, completer):
     print(f"\n>> Editing model {model_name} from configuration file {opt.conf}")
     new_name = _get_model_name(manager.list_models(), completer, model_name)
 
+    completer.complete_extensions(('.yaml','.ckpt','.safetensors','.pt'))
     for attribute in info.keys():
         if type(info[attribute]) != str:
             continue
@@ -840,6 +842,7 @@ def edit_model(model_name: str, gen, opt, completer):
             continue
         completer.set_line(info[attribute])
         info[attribute] = input(f"{attribute}: ") or info[attribute]
+    completer.complete_extensions(None)
 
     if info["format"] == "diffusers":
         vae = info.get("vae", dict(repo_id=None, path=None, subfolder=None))
@@ -1286,10 +1289,48 @@ def check_internet() -> bool:
     except:
         return False
 
+
+def retrieve_last_used_model()->str:
+    """
+    Return name of the last model used.
+    """
+    model_file_path = Path(Globals.root,'.last_model')
+    if not model_file_path.exists():
+        return None
+    with open(model_file_path,'r') as f:
+        return f.readline()
+
+def save_last_used_model(model_name:str):
+    """
+    Save name of the last model used.
+    """
+    model_file_path = Path(Globals.root,'.last_model')
+    with open(model_file_path,'w') as f:
+        f.write(model_name)
+
 # This routine performs any patch-ups needed after installation
 def run_patches():
-    # install ckpt configuration files that may have been added to the
-    # distro after original root directory configuration
+    install_missing_config_files()
+    version_file = Path(Globals.root,'.version')
+    if version_file.exists():
+        with open(version_file,'r') as f:
+            root_version = version.parse(f.readline() or 'v2.3.2')
+    else:
+        root_version = version.parse('v2.3.2')
+    app_version = version.parse(ldm.invoke.__version__)
+    if root_version < app_version:
+        try:
+            do_version_update(root_version, ldm.invoke.__version__)
+            with open(version_file,'w') as f:
+                f.write(ldm.invoke.__version__)
+        except:
+            print("** Update failed. Will try again on next launch")
+
+def install_missing_config_files():
+    """
+    install ckpt configuration files that may have been added to the
+    distro after original root directory configuration
+    """
     import invokeai.configs as conf
     from shutil import copyfile
     
@@ -1300,6 +1341,27 @@ def run_patches():
         if not dest.exists():
             copyfile(src,dest)
     
+def do_version_update(root_version: version.Version, app_version: Union[str, version.Version]):
+    """
+    Make any updates to the launcher .sh and .bat scripts that may be needed
+    from release to release. This is not an elegant solution. Instead, the 
+    launcher should be moved into the source tree and installed using pip.
+    """
+    if root_version < version.Version('v2.3.3'):
+        if sys.platform == "linux":
+            print('>> Downloading new version of launcher script and its config file')
+            from ldm.util import download_with_progress_bar
+            url_base = f'https://raw.githubusercontent.com/invoke-ai/InvokeAI/v{str(app_version)}/installer/templates/'
+
+            dest = Path(Globals.root,'invoke.sh.in')
+            assert download_with_progress_bar(url_base+'invoke.sh.in',dest)
+            dest.replace(Path(Globals.root,'invoke.sh'))
+            os.chmod(Path(Globals.root,'invoke.sh'), 0o0755)
+
+            dest = Path(Globals.root,'dialogrc')
+            assert download_with_progress_bar(url_base+'dialogrc',dest)
+            dest.replace(Path(Globals.root,'.dialogrc'))
+
 if __name__ == '__main__':
     main()
     

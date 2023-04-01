@@ -145,7 +145,7 @@ not supported.
     _For Linux with an AMD GPU:_
 
     ```sh
-    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
     ```
 
     _For Macintoshes, either Intel or M1/M2:_

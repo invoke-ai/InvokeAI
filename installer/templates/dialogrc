@@ -1,0 +1,27 @@
+# Screen 
+use_shadow = OFF
+use_colors = ON
+screen_color = (BLACK, BLACK, ON)
+
+# Box 
+dialog_color = (YELLOW, BLACK , ON) 
+title_color = (YELLOW, BLACK, ON) 
+border_color = (YELLOW, BLACK, OFF) 
+border2_color = (YELLOW, BLACK, OFF) 
+
+# Button 
+button_active_color = (RED, BLACK, OFF) 
+button_inactive_color = (YELLOW, BLACK, OFF) 
+button_label_active_color = (YELLOW,BLACK,ON) 
+button_label_inactive_color = (YELLOW,BLACK,ON)
+ 
+# Menu box 
+menubox_color = (BLACK, BLACK, ON) 
+menubox_border_color = (YELLOW, BLACK, OFF) 
+menubox_border2_color = (YELLOW, BLACK, OFF) 
+
+# Menu window 
+item_color = (YELLOW, BLACK, OFF) 
+item_selected_color = (BLACK, YELLOW, OFF) 
+tag_key_color = (YELLOW, BLACK, OFF) 
+tag_key_selected_color = (BLACK, YELLOW, OFF)

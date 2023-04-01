@@ -463,6 +463,9 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def encode(self, text, **kwargs):
         return self(text, **kwargs)
 
+    def set_textual_inversion_manager(self, manager): #TextualInversionManager):
+        self.textual_inversion_manager = manager
+
     @property
     def device(self):
         return self.transformer.device
@@ -475,10 +478,6 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
     fragment_weights_key = "fragment_weights"
     return_tokens_key = "return_tokens"
-
-    def set_textual_inversion_manager(self, manager): #TextualInversionManager):
-        # TODO all of the weighting and expanding stuff needs be moved out of this class
-        self.textual_inversion_manager = manager
 
     def forward(self, text: list, **kwargs):
         # TODO all of the weighting and expanding stuff needs be moved out of this class

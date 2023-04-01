@@ -20,6 +20,8 @@ title: Overview
 
         Scriptable access to InvokeAI's features.
 
+    -   [Visual Manual for InvokeAI](https://docs.google.com/presentation/d/e/2PACX-1vSE90aC7bVVg0d9KXVMhy-Wve-wModgPFp7AGVTOCgf4xE03SnV24mjdwldolfCr59D_35oheHe4Cow/pub?start=false&loop=true&delayms=60000) (contributed by Statcomm)
+
 -   Image Generation
 
     -   [Prompt Engineering](PROMPTS.md)

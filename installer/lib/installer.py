@@ -241,14 +241,18 @@ class InvokeAiInstance:
 
         from plumbum import FG, local
 
+        # Note that we're installing pinned versions of torch and
+        # torchvision here, which *should* correspond to what is
+        # in pyproject.toml. This is to prevent torch 2.0 from
+        # being installed and immediately uninstalled and replaced with 1.13
         pip = local[self.pip]
 
         (
             pip[
                 "install",
                 "--require-virtualenv",
-                "torch",
-                "torchvision",
+                "torch~=1.13.1",
+                "torchvision~=0.14.1",
                 "--force-reinstall",
                 "--find-links" if find_links is not None else None,
                 find_links,
@@ -378,6 +382,9 @@ class InvokeAiInstance:
             dest = self.runtime / f"{script}.{ext}"
             shutil.copy(src, dest)
             os.chmod(dest, 0o0755)
+
+        if OS == "Linux":
+            shutil.copy(Path(__file__).parents[1] / "templates" / "dialogrc", self.runtime / '.dialogrc')
 
     def update(self):
         pass
