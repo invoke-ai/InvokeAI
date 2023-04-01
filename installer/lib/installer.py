@@ -252,7 +252,7 @@ class InvokeAiInstance:
                 "install",
                 "--require-virtualenv",
                 "torch~=1.13.1",
-                "torchvision>=0.14.1",
+                "torchvision~=0.14.1",
                 "--force-reinstall",
                 "--find-links" if find_links is not None else None,
                 find_links,
