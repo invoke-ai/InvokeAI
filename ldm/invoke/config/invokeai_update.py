@@ -78,7 +78,7 @@ def main():
     elif choice=='4':
         branch = Prompt.ask('Enter an InvokeAI branch name')
 
-    print(f':crossed_fingers: Upgrading to [yellow]{tag}[/yellow]')
+    print(f':crossed_fingers: Upgrading to [yellow]{tag if tag else release}[/yellow]')
     if release:
         cmd = f'pip install {INVOKE_AI_SRC}/{release}.zip --use-pep517 --upgrade'
     elif tag:
