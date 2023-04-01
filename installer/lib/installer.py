@@ -242,8 +242,8 @@ class InvokeAiInstance:
         from plumbum import FG, local
 
         # Note that we're installing pinned versions of torch and
-        # torchvision here, which may not correspond to what is
-        # in pyproject.toml. This is a hack to prevent torch 2.0 from
+        # torchvision here, which *should* correspond to what is
+        # in pyproject.toml. This is to prevent torch 2.0 from
         # being installed and immediately uninstalled and replaced with 1.13
         pip = local[self.pip]
 
