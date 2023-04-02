@@ -33,7 +33,7 @@ import {
   STATUS,
 } from 'services/apiSlice';
 import { emitUnsubscribe } from './actions';
-import { listSessions } from 'services/thunks/session';
+import { getGalleryImages } from 'services/thunks/extra';
 
 /**
  * Returns an object containing listener callbacks
@@ -51,6 +51,7 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus(i18n.t('common.statusConnected')));
+        dispatch(getGalleryImages({ count: 20 }));
       } catch (e) {
         console.error(e);
       }
