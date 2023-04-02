@@ -85,7 +85,7 @@ class InvokeAIDiffuserComponent:
         finally:
             if old_attn_processor is not None:
                 self.restore_default_cross_attention(old_attn_processor)
-            if extra_conditioning_info.has_lora_conditions:
+            if extra_conditioning_info and extra_conditioning_info.has_lora_conditions:
                 for lora_condition in extra_conditioning_info.lora_conditions:
                     lora_condition.unload()
             # TODO resuscitate attention map saving
