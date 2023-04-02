@@ -29,13 +29,14 @@ export function buildTxt2ImgNode(
     cfgScale: cfg_scale,
     sampler,
     seamless,
+    shouldRandomizeSeed,
   } = generation;
 
   // missing fields in TextToImageInvocation: strength, hires_fix
   return {
     type: 'txt2img',
     prompt,
-    seed,
+    seed: shouldRandomizeSeed ? -1 : seed,
     steps,
     width,
     height,
@@ -66,12 +67,13 @@ export function buildImg2ImgNode(
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
     initialImage,
+    shouldRandomizeSeed,
   } = generation;
 
   return {
     type: 'img2img',
     prompt,
-    seed,
+    seed: shouldRandomizeSeed ? -1 : seed,
     steps,
     width,
     height,
