@@ -19,7 +19,7 @@ class LoraCondition:
     name: str
     weight: float
 
-    def __init__(self, name, weight: float = 1.0, kohya_manager: KohyaLoraManager=None):
+    def __init__(self, name, weight: float = 1.0, kohya_manager: Optional[KohyaLoraManager]=None):
         self.name = name
         self.weight = weight
         self.kohya_manager = kohya_manager
