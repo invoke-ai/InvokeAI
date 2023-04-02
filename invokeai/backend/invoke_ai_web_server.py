@@ -537,8 +537,15 @@ class InvokeAIWebServer:
                 for lora in loras:
                     location = str(lora.resolve()).replace("\\", "/")
                     found_loras.append({"name": lora.stem, "location": location})
-
                 socketio.emit("foundLoras", found_loras)
+            except Exception as e:
+                self.handle_exceptions(e)
+
+        @socketio.on("getTextualInversionTriggers")
+        def get_ti_triggers():
+            try:
+                triggers = [{'name': x} for x in self.generate.model.textual_inversion_manager.get_all_trigger_strings()]
+                socketio.emit("foundTextualInversionTriggers", triggers)
             except Exception as e:
                 self.handle_exceptions(e)
 

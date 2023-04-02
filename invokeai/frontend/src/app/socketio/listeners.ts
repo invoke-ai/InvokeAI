@@ -12,6 +12,7 @@ import {
   processingCanceled,
   setCurrentStatus,
   setFoundLoras,
+  setFoundTextualInversionTriggers,
   setFoundModels,
   setIsCancelable,
   setIsConnected,
@@ -485,6 +486,11 @@ const makeSocketIOListeners = (
     },
     onFoundLoras: (data: InvokeAI.FoundLorasRsponse) => {
       dispatch(setFoundLoras(data));
+    },
+    onFoundTextualInversionTriggers: (
+      data: InvokeAI.FoundTextualInversionTriggersResponse
+    ) => {
+      dispatch(setFoundTextualInversionTriggers(data));
     },
     onTempFolderEmptied: () => {
       dispatch(

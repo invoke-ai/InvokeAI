@@ -329,6 +329,8 @@
         "availableModels": "Available Models",
         "addLora": "Add Lora",
         "noLoraModels": "No Loras Found",
+        "addTextualInversionTrigger": "Add Textual Inversion Trigger",
+        "noTextualInversionTriggers": "No TI Triggers Found",
         "search": "Search",
         "load": "Load",
         "active": "active",

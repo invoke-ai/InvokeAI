@@ -52,6 +52,7 @@ export const socketioMiddleware = () => {
       onModelsMerged,
       onModelChangeFailed,
       onFoundLoras,
+      onFoundTextualInversionTriggers,
       onTempFolderEmptied,
     } = makeSocketIOListeners(store);
 
@@ -71,6 +72,7 @@ export const socketioMiddleware = () => {
       emitMergeDiffusersModels,
       emitRequestModelChange,
       emitGetLoraModels,
+      emitGetTextualInversionTriggers,
       emitSaveStagingAreaImageToGallery,
       emitRequestEmptyTempFolder,
     } = makeSocketIOEmitters(store, socketio);
@@ -150,6 +152,13 @@ export const socketioMiddleware = () => {
       socketio.on('foundLoras', (data: InvokeAI.FoundLorasRsponse) => {
         onFoundLoras(data);
       });
+
+      socketio.on(
+        'foundTextualInversionTriggers',
+        (data: InvokeAI.FoundTextualInversionTriggersResponse) => {
+          onFoundTextualInversionTriggers(data);
+        }
+      );
 
       socketio.on('tempFolderEmptied', () => {
         onTempFolderEmptied();
@@ -234,6 +243,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/getLoraModels': {
         emitGetLoraModels();
+        break;
+      }
+
+      case 'socketio/getTextualInversionTriggers': {
+        emitGetTextualInversionTriggers();
         break;
       }
 

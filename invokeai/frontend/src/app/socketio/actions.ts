@@ -54,6 +54,10 @@ export const requestModelChange = createAction<string>(
 
 export const getLoraModels = createAction<undefined>('socketio/getLoraModels');
 
+export const getTextualInversionTriggers = createAction<undefined>(
+  'socketio/getTextualInversionTriggers'
+);
+
 export const saveStagingAreaImageToGallery = createAction<string>(
   'socketio/saveStagingAreaImageToGallery'
 );

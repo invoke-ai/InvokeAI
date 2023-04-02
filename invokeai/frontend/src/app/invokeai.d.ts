@@ -276,7 +276,15 @@ export declare type FoundLora = {
   location: string;
 };
 
+export declare type FoundTextualInversionTriggers = {
+  name: string;
+  location: string;
+};
+
 export declare type FoundLorasRsponse = FoundLora[];
+
+export declare type FoundTextualInversionTriggersResponse =
+  FoundTextualInversionTriggers[];
 
 export declare type SystemStatusResponse = SystemStatus;
 

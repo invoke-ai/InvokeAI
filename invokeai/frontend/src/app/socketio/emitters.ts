@@ -199,6 +199,9 @@ const makeSocketIOEmitters = (
     emitGetLoraModels: () => {
       socketio.emit('getLoraModels');
     },
+    emitGetTextualInversionTriggers: () => {
+      socketio.emit('getTextualInversionTriggers');
+    },
     emitSaveStagingAreaImageToGallery: (url: string) => {
       socketio.emit('requestSaveStagingAreaImageToGallery', url);
     },

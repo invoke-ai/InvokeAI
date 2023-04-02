@@ -52,6 +52,9 @@ export interface SystemState
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
   foundLoras: InvokeAI.FoundLora[] | null;
+  foundTextualInversionTriggers:
+    | InvokeAI.FoundTextualInversionTriggers[]
+    | null;
   openModel: string | null;
   cancelOptions: {
     cancelType: CancelType;
@@ -95,6 +98,7 @@ const initialSystemState: SystemState = {
   searchFolder: null,
   foundModels: null,
   foundLoras: null,
+  foundTextualInversionTriggers: null,
   openModel: null,
   cancelOptions: {
     cancelType: 'immediate',
@@ -270,6 +274,12 @@ export const systemSlice = createSlice({
     ) => {
       state.foundLoras = action.payload;
     },
+    setFoundTextualInversionTriggers: (
+      state,
+      action: PayloadAction<InvokeAI.FoundTextualInversionTriggers[] | null>
+    ) => {
+      state.foundTextualInversionTriggers = action.payload;
+    },
     setOpenModel: (state, action: PayloadAction<string | null>) => {
       state.openModel = action.payload;
     },
@@ -312,6 +322,7 @@ export const {
   setSearchFolder,
   setFoundModels,
   setFoundLoras,
+  setFoundTextualInversionTriggers,
   setOpenModel,
   setCancelType,
   setCancelAfter,
