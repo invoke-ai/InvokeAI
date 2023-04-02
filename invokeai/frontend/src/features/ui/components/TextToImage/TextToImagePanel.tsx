@@ -64,9 +64,9 @@ export default function TextToImagePanel() {
       <Flex flexDir="column" rowGap="0.5rem">
         <PromptInput />
         <NegativePromptInput />
+        <LoraManager />
+        <TextualInversionManager />
       </Flex>
-      <LoraManager />
-      <TextualInversionManager />
       <ProcessButtons />
       <MainSettings />
       <ParametersAccordion accordionInfo={textToImageAccordions} />

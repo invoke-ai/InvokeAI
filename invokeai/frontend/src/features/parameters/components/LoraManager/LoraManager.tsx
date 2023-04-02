@@ -55,6 +55,7 @@ export default function LoraManager() {
 
   useEffect(() => {
     if (foundLoras) {
+      console.log('renderloraoption: here i am');
       const lorasFound: IAIMenuItem[] = [];
       foundLoras.forEach((lora) => {
         if (lora.name !== ' ') {

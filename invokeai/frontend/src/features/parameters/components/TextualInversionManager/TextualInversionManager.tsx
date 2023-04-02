@@ -64,6 +64,7 @@ export default function TextualInversionManager() {
 
   useEffect(() => {
     if (foundTextualInversionTriggers) {
+      console.log('rendertextualinversionoption: here i am');
       const textualInversionsFound: IAIMenuItem[] = [];
       foundTextualInversionTriggers.forEach((textualInversion) => {
         if (textualInversion.name !== ' ') {
