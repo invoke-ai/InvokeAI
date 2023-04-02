@@ -12,13 +12,13 @@ import { buildGraph } from 'common/util/buildGraph';
  * Would really like for this to be generated but it's easy enough to extract it.
  */
 
-type CreateSessionRequestBody = Parameters<
+type CreateSessionArg = Parameters<
   (typeof SessionsService)['createSession']
->[0]['requestBody'];
+>[0];
 
 export const createSession = createAppAsyncThunk(
   'api/createSession',
-  async (arg: CreateSessionRequestBody, _thunkApi) => {
+  async (arg: CreateSessionArg['requestBody'], _thunkApi) => {
     let graph = arg;
     if (!arg) {
       const { getState } = _thunkApi;
@@ -38,13 +38,14 @@ export const createSession = createAppAsyncThunk(
  * addNode thunk
  */
 
-type AddNodeRequestBody = Parameters<
-  (typeof SessionsService)['addNode']
->[0]['requestBody'];
+type AddNodeArg = Parameters<(typeof SessionsService)['addNode']>[0];
 
 export const addNode = createAppAsyncThunk(
   'api/addNode',
-  async (arg: { node: AddNodeRequestBody; sessionId: string }, _thunkApi) => {
+  async (
+    arg: { node: AddNodeArg['requestBody']; sessionId: string },
+    _thunkApi
+  ) => {
     const response = await SessionsService.addNode({
       requestBody: arg.node,
       sessionId: arg.sessionId,
@@ -73,12 +74,16 @@ export const invokeSession = createAppAsyncThunk(
 );
 
 /**
- * invokeSession thunk
+ * cancelSession thunk
  */
+
+type CancelSessionArg = Parameters<
+  (typeof SessionsService)['cancelSessionInvoke']
+>[0];
 
 export const cancelProcessing = createAppAsyncThunk(
   'api/cancelProcessing',
-  async (arg: { sessionId: string }, _thunkApi) => {
+  async (arg: CancelSessionArg, _thunkApi) => {
     const { sessionId } = arg;
 
     const response = await SessionsService.cancelSessionInvoke({
