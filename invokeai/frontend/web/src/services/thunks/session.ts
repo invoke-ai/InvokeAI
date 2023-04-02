@@ -93,3 +93,18 @@ export const cancelProcessing = createAppAsyncThunk(
     return response;
   }
 );
+
+/**
+ * listSessions thunk
+ */
+
+type ListSessionsArg = Parameters<(typeof SessionsService)['listSessions']>[0];
+
+export const listSessions = createAppAsyncThunk(
+  'api/listSessions',
+  async (arg: ListSessionsArg, _thunkApi) => {
+    const response = await SessionsService.listSessions(arg);
+
+    return response;
+  }
+);
