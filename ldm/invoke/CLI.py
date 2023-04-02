@@ -181,7 +181,6 @@ def main():
     # web server loops forever
     if opt.web or opt.gui:
         invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
-        save_last_used_model(gen.model_name)
         sys.exit(0)
 
     if not infile:
@@ -502,7 +501,6 @@ def main_loop(gen, opt, completer):
     print(
         f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
     )
-    save_last_used_model(gen.model_name)
 
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
@@ -1299,14 +1297,6 @@ def retrieve_last_used_model()->str:
         return None
     with open(model_file_path,'r') as f:
         return f.readline()
-
-def save_last_used_model(model_name:str):
-    """
-    Save name of the last model used.
-    """
-    model_file_path = Path(Globals.root,'.last_model')
-    with open(model_file_path,'w') as f:
-        f.write(model_name)
 
 # This routine performs any patch-ups needed after installation
 def run_patches():
