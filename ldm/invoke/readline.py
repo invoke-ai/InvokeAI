@@ -11,9 +11,11 @@ seeds:
 import os
 import re
 import atexit
+from typing import List
 from ldm.invoke.args import Args
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.globals import Globals
+from ldm.modules.lora_manager import LoraManager
 
 # ---------------readline utilities---------------------
 try:
@@ -135,6 +137,9 @@ class Completer(object):
             # looking for an embedding concept
             elif re.search('<[\w-]*$',buffer):
                 self.matches= self._concept_completions(text,state)
+
+            elif re.search('withLora\(?[a-zA-Z0-9._-]*$',buffer):
+                self.matches= self._lora_completions(text,state)
 
             # looking for a model
             elif re.match('^'+'|'.join(MODEL_COMMANDS),buffer):
@@ -297,6 +302,15 @@ class Completer(object):
                 matches.append(f'<{concept}>')
         matches.sort()
         return matches
+
+    def _lora_completions(self, text, state)->List[str]:
+        loras: dict = LoraManager.list_loras()
+        lora_names = [f'withLora({x},1)' for x in loras.keys()]
+        matches = list()
+        for lora in lora_names:
+            if lora.startswith(text):
+                matches.append(lora)
+        return sorted(matches)
 
     def _model_completions(self, text, state, ckpt_only=False):
         m = re.search('(!switch\s+)(\w*)',text)

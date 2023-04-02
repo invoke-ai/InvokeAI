@@ -1,10 +1,8 @@
-import traceback
-
+import os
 from pathlib import Path
-from typing import Optional
 from ldm.invoke.globals import global_lora_models_dir
 from .kohya_lora_manager import KohyaLoraManager
-from typing import Optional
+from typing import Optional, Dict
 
 class LoraCondition:
     name: str
@@ -27,11 +25,11 @@ class LoraCondition:
                 else:
                     print(f"   ** Unable to find valid LoRA at: {path}")
             else:
-                print(f"   ** Invalid Model to load LoRA")
+                print("   ** Invalid Model to load LoRA")
         elif self.kohya_manager:
             self.kohya_manager.apply_lora_model(self.name,self.weight)
         else:
-            print(f"   ** Unable to load LoRA")
+            print("   ** Unable to load LoRA")
 
     def unload(self):
         if self.kohya_manager:
@@ -53,3 +51,16 @@ class LoraManager:
             return conditions
 
         return None
+
+    @classmethod
+    def list_loras(self)->Dict[str, Path]:
+        path = Path(global_lora_models_dir())
+        models_found = dict()
+        for root,_,files in os.walk(path):
+            for x in files:
+                name = Path(x).stem
+                suffix = Path(x).suffix
+                if suffix in [".ckpt", ".pt", ".safetensors"]:
+                    models_found[name]=Path(root,x)
+        return models_found
+            
