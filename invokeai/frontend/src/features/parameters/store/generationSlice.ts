@@ -17,6 +17,7 @@ export interface GenerationState {
   perlin: number;
   prompt: string;
   negativePrompt: string;
+  lorasInUse: string[];
   sampler: string;
   seamBlur: number;
   seamless: boolean;
@@ -48,6 +49,7 @@ const initialGenerationState: GenerationState = {
   perlin: 0,
   prompt: '',
   negativePrompt: '',
+  lorasInUse: [],
   sampler: 'k_lms',
   seamBlur: 16,
   seamless: false,
@@ -71,12 +73,38 @@ const initialGenerationState: GenerationState = {
 
 const initialState: GenerationState = initialGenerationState;
 
+const loraExists = (state: GenerationState, lora: string) => {
+  const lora_regex = new RegExp(`withLora\\(${lora},?\\s*([^\\)]+)?\\)`);
+  if (state.prompt.match(lora_regex)) return true;
+  return false;
+};
+
 export const generationSlice = createSlice({
   name: 'generation',
   initialState,
   reducers: {
     setPrompt: (state, action: PayloadAction<string | InvokeAI.Prompt>) => {
       const newPrompt = action.payload;
+
+      // Tackle User Typed Lora Syntax
+      let lorasInUse = [...state.lorasInUse]; // Get Loras In Prompt
+      const lora_regex = /withLora\(([^\\)]+)\)/g; // Scan For Lora Syntax
+      if (typeof newPrompt === 'string') {
+        const lora_matches = [...newPrompt.matchAll(lora_regex)]; // Match All Lora Syntaxes
+        if (lora_matches.length > 0) {
+          lorasInUse = []; // Reset Loras In Use
+          lora_matches.forEach((lora_match) => {
+            const lora_name = lora_match[1].split(',')[0];
+            const lora_weight = lora_match[1].split(',')[1];
+            if (!lorasInUse.includes(lora_name)) lorasInUse.push(lora_name); // Add Loras In Prompt
+          });
+        } else {
+          lorasInUse = []; // If No Matches, Remove Loras In Use
+        }
+      }
+
+      state.lorasInUse = lorasInUse;
+
       if (typeof newPrompt === 'string') {
         state.prompt = newPrompt;
       } else {
@@ -93,6 +121,28 @@ export const generationSlice = createSlice({
       } else {
         state.negativePrompt = promptToString(newPrompt);
       }
+    },
+    setLorasInUse: (state, action: PayloadAction<string>) => {
+      const newLora = action.payload;
+      const loras = [...state.lorasInUse];
+
+      if (loraExists(state, newLora)) {
+        const lora_regex = new RegExp(
+          `withLora\\(${newLora},?\\s*([^\\)]+)?\\)`,
+          'g'
+        );
+        const newPrompt = state.prompt.replaceAll(lora_regex, '');
+        state.prompt = newPrompt;
+
+        if (loras.includes(newLora)) {
+          const newLoraIndex = loras.indexOf(newLora);
+          if (newLoraIndex > -1) loras.splice(newLoraIndex, 1);
+        }
+      } else {
+        state.prompt = `${state.prompt} withLora(${newLora},1)`;
+        if (!loras.includes(newLora)) loras.push(newLora);
+      }
+      state.lorasInUse = loras;
     },
     setIterations: (state, action: PayloadAction<number>) => {
       state.iterations = action.payload;
@@ -374,6 +424,7 @@ export const {
   setPerlin,
   setPrompt,
   setNegativePrompt,
+  setLorasInUse,
   setSampler,
   setSeamBlur,
   setSeamless,

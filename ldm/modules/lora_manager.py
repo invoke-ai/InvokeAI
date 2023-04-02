@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 from ldm.invoke.globals import global_lora_models_dir
 from .kohya_lora_manager import KohyaLoraManager
+from typing import Optional
 
 class LoraCondition:
     name: str
