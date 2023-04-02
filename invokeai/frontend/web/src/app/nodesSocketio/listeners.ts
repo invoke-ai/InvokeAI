@@ -1,4 +1,4 @@
-import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
+import { MiddlewareAPI } from '@reduxjs/toolkit';
 import dateFormat from 'dateformat';
 import i18n from 'i18n';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,7 +18,7 @@ import {
   setIntermediateImage,
 } from 'features/gallery/store/gallerySlice';
 
-import type { RootState } from 'app/store';
+import type { AppDispatch, RootState } from 'app/store';
 import {
   GeneratorProgressEvent,
   InvocationCompleteEvent,
@@ -33,12 +33,13 @@ import {
   STATUS,
 } from 'services/apiSlice';
 import { emitUnsubscribe } from './actions';
+import { listSessions } from 'services/thunks/session';
 
 /**
  * Returns an object containing listener callbacks
  */
 const makeSocketIOListeners = (
-  store: MiddlewareAPI<Dispatch<AnyAction>, RootState>
+  store: MiddlewareAPI<AppDispatch, RootState>
 ) => {
   const { dispatch, getState } = store;
 
