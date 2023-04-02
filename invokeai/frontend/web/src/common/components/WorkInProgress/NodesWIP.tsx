@@ -16,7 +16,7 @@ export default function NodesWIP() {
           textAlign: 'center',
         }}
       >
-        <NodeAPITest />
+        {/* <NodeAPITest /> */}
       </Flex>
     </WorkInProgress>
   );
