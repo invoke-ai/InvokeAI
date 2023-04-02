@@ -8,7 +8,7 @@ from typing import Dict
 
 import torch
 
-class LatentStorageBase(ABC):
+class LatentsStorageBase(ABC):
     """Responsible for storing and retrieving latents."""
 
     @abstractmethod
@@ -24,15 +24,15 @@ class LatentStorageBase(ABC):
         pass
 
 
-class ForwardCacheLatentStorage(LatentStorageBase):
+class ForwardCacheLatentsStorage(LatentsStorageBase):
     """Caches the latest N latents in memory, writing-thorugh to and reading from underlying storage"""
     
     __cache: Dict[str, torch.Tensor]
     __cache_ids: Queue
     __max_cache_size: int
-    __underlying_storage: LatentStorageBase
+    __underlying_storage: LatentsStorageBase
 
-    def __init__(self, underlying_storage: LatentStorageBase, max_cache_size: int = 20):
+    def __init__(self, underlying_storage: LatentsStorageBase, max_cache_size: int = 20):
         self.__underlying_storage = underlying_storage
         self.__cache = dict()
         self.__cache_ids = Queue()
@@ -67,7 +67,7 @@ class ForwardCacheLatentStorage(LatentStorageBase):
                 self.__cache.pop(self.__cache_ids.get())
 
 
-class DiskLatentStorage(LatentStorageBase):
+class DiskLatentsStorage(LatentsStorageBase):
     """Stores latents in a folder on disk without caching"""
 
     __output_folder: str

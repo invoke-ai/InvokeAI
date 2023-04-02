@@ -3,7 +3,7 @@
 import os
 from argparse import Namespace
 
-from ..services.latent_storage import DiskLatentStorage, ForwardCacheLatentStorage
+from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
 from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
@@ -56,7 +56,7 @@ class ApiDependencies:
             os.path.join(os.path.dirname(__file__), "../../../../outputs")
         )
 
-        latents = ForwardCacheLatentStorage(DiskLatentStorage(f'{output_folder}/latents'))
+        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
 
         images = DiskImageStorage(f'{output_folder}/images')
 

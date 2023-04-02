@@ -25,24 +25,24 @@ import diffusers
 from diffusers import DiffusionPipeline
 
 
-class LatentField(BaseModel):
-    """A latent field used for passing latent objects between invocations"""
+class LatentsField(BaseModel):
+    """A latents field used for passing latents between invocations"""
 
-    latent_name: Optional[str] = Field(default=None, description="The name of the latent")
+    latents_name: Optional[str] = Field(default=None, description="The name of the latents")
 
 
-class LatentOutput(BaseInvocationOutput):
-    """Base class for invocations that output a latent"""
+class LatentsOutput(BaseInvocationOutput):
+    """Base class for invocations that output latents"""
     #fmt: off
     type: Literal["latent_output"] = "latent_output"
-    latent: LatentField            = Field(default=None, description="The output latent")
+    latents: LatentsField            = Field(default=None, description="The output latents")
     #fmt: on
 
 class NoiseOutput(BaseInvocationOutput):
     """Invocation noise output"""
     #fmt: off
     type: Literal["noise_output"] = "noise_output"
-    noise: LatentField            = Field(default=None, description="The output noise")
+    noise: LatentsField            = Field(default=None, description="The output noise")
     #fmt: on
 
 
@@ -121,13 +121,13 @@ class NoiseInvocation(BaseInvocation):
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, noise)
         return NoiseOutput(
-            noise=LatentField(latent_name=name)
+            noise=LatentsField(latents_name=name)
         )
 
 
 # Text to image
-class TextToLatentInvocation(BaseInvocation):
-    """Generates a latent."""
+class TextToLatentsInvocation(BaseInvocation):
+    """Generates latents from a prompt."""
 
     type: Literal["t2l"] = "t2l"
 
@@ -136,7 +136,7 @@ class TextToLatentInvocation(BaseInvocation):
     # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
-    noise: Optional[LatentField] = Field(description="The noise to use")
+    noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
@@ -215,8 +215,8 @@ class TextToLatentInvocation(BaseInvocation):
         return conditioning_data
 
 
-    def invoke(self, context: InvocationContext) -> LatentOutput:
-        noise = context.services.latents.get(self.noise.latent_name)
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        noise = context.services.latents.get(self.noise.latents_name)
 
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, state.latents, state.step)
@@ -239,23 +239,23 @@ class TextToLatentInvocation(BaseInvocation):
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, result_latents)
-        return LatentOutput(
-            latent=LatentField(latent_name=name)
+        return LatentsOutput(
+            latents=LatentsField(latents_name=name)
         )
 
 
-class LatentToLatentInvocation(TextToLatentInvocation):
-    """Generates a latent using a latent as base image."""
+class LatentsToLatentsInvocation(TextToLatentsInvocation):
+    """Generates latents using latents as base image."""
 
     type: Literal["l2l"] = "l2l"
 
     # Inputs
-    latent: Optional[LatentField] = Field(description="The latent to use as a base image")
-    strength: float = Field(default=0.5, description="The strength of the latent to use")
+    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
+    strength: float = Field(default=0.5, description="The strength of the latents to use")
 
-    def invoke(self, context: InvocationContext) -> LatentOutput:
-        noise = context.services.latents.get(self.noise.latent_name)
-        latent = context.services.latents.get(self.latent.latent_name)
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        noise = context.services.latents.get(self.noise.latents_name)
+        latent = context.services.latents.get(self.latents.latents_name)
 
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, state.latents, state.step)
@@ -265,7 +265,7 @@ class LatentToLatentInvocation(TextToLatentInvocation):
 
         # TODO: Verify the noise is the right size
 
-        initial_latent = latent if self.strength < 1.0 else torch.zeros_like(
+        initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
             latent, device=model.device, dtype=latent.dtype
         )
         
@@ -276,7 +276,7 @@ class LatentToLatentInvocation(TextToLatentInvocation):
         )
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
-            latents=initial_latent,
+            latents=initial_latents,
             timesteps=timesteps,
             noise=noise,
             num_inference_steps=self.steps,
@@ -289,30 +289,31 @@ class LatentToLatentInvocation(TextToLatentInvocation):
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, result_latents)
-        return LatentOutput(
-            latent=LatentField(latent_name=name)
+        return LatentsOutput(
+            latents=LatentsField(latents_name=name)
         )
 
 
 # Latent to image
-class LatentToImageInvocation(BaseInvocation):
-    """Generates an image from a latent."""
+class LatentsToImageInvocation(BaseInvocation):
+    """Generates an image from latents."""
 
     type: Literal["l2i"] = "l2i"
 
     # Inputs
-    latent: Optional[LatentField] = Field(description="The latent to generate an image from")
+    latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     model: str = Field(default="", description="The model to use")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        latent = context.services.latents.get(self.latent.latent_name)
+        latents = context.services.latents.get(self.latents.latents_name)
 
+        # TODO: this only really needs the vae
         model_info = context.services.model_manager.get_model(self.model)
         model: StableDiffusionGeneratorPipeline = model_info['model']
 
         with torch.inference_mode():
-            np_image = model.decode_latents(latent)
+            np_image = model.decode_latents(latents)
             image = model.numpy_to_pil(np_image)[0]
 
             image_type = ImageType.RESULT
