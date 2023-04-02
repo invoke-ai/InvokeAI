@@ -6,7 +6,7 @@ from torch import Tensor
 import torch
 
 from ...backend.model_management.model_manager import ModelManager
-from ...backend.util.devices import CUDA_DEVICE
+from ...backend.util.devices import CUDA_DEVICE, torch_dtype
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
@@ -75,11 +75,6 @@ def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->
     return scheduler
 
 
-# TODO: is this a system setting?
-def torch_dtype(precision:str = "float16") -> torch.dtype:
-    return torch.float16 if precision == "float16" else torch.float32
-
-
 def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_channels:int=4, use_mps_noise:bool=False, downsampling_factor:int = 8):
     # limit noise to only the diffusion image channels, not the mask channels
     input_channels = min(latent_channels, 4)
@@ -92,7 +87,7 @@ def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_c
             height // downsampling_factor,
             width //  downsampling_factor,
         ],
-        dtype=torch_dtype(),
+        dtype=torch_dtype(device),
         device=use_device,
         generator=generator,
     ).to(device)
@@ -227,7 +222,7 @@ class TextToLatentsInvocation(BaseInvocation):
         # TODO: Verify the noise is the right size
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
-            latents=torch.zeros_like(noise, dtype=torch_dtype()),
+            latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
             noise=noise,
             num_inference_steps=self.steps,
             conditioning_data=conditioning_data,
