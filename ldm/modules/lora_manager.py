@@ -34,7 +34,7 @@ class LoraCondition:
 
     def unload(self):
         if self.kohya_manager:
-            print(f'DEBUG unloading {self.name}')
+            print(f'>> unloading LoRA {self.name}')
             self.kohya_manager.unload_applied_lora(self.name)
 
 class LoraManager:
