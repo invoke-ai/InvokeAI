@@ -43,6 +43,7 @@ export default function LoraManager() {
 
   const renderLoraOption = useCallback(
     (lora: string) => {
+      console.log('renderLoraOption');
       const thisloraExists = loraExists(lora);
       const loraExistsStyle = {
         fontWeight: 'bold',

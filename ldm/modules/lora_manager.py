@@ -1,25 +1,15 @@
 import traceback
 
 from pathlib import Path
+from typing import Optional
 from ldm.invoke.globals import global_lora_models_dir
 from .kohya_lora_manager import KohyaLoraManager
-
-
-class KohyaLoraContext:
-    def __init__(self, kohya_manager: KohyaLoraManager):
-        self.kohya=kohya_manager
-
-    def __enter__(self):
-        self.kohya.clear_loras()
-
-    def __exit__(self,*exc):
-        self.kohya.clear_loras()
 
 class LoraCondition:
     name: str
     weight: float
 
-    def __init__(self, name, weight: float = 1.0, kohya_manager: KohyaLoraManager=None):
+    def __init__(self, name, weight: float = 1.0, kohya_manager: Optional[KohyaLoraManager]=None):
         self.name = name
         self.weight = weight
         self.kohya_manager = kohya_manager
@@ -42,6 +32,11 @@ class LoraCondition:
         else:
             print(f"   ** Unable to load LoRA")
 
+    def unload(self):
+        if self.kohya_manager:
+            print(f'>> unloading LoRA {self.name}')
+            self.kohya_manager.unload_applied_lora(self.name)
+
 class LoraManager:
     def __init__(self, pipe):
         # Kohya class handles lora not generated through diffusers
@@ -57,6 +52,3 @@ class LoraManager:
             return conditions
 
         return None
-
-    def kohya_context(self)->KohyaLoraContext:
-        return KohyaLoraContext(self.kohya)

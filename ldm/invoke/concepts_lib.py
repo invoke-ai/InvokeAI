@@ -27,10 +27,12 @@ class HuggingFaceConceptsLibrary(object):
         self.match_trigger = re.compile('(<[\w\- >]+>)') # trigger is slightly less restrictive than HF concept name
         self.match_concept = re.compile('<([\w\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
-    def list_concepts(self)->list:
+    def list_concepts(self, minimum_likes: int=0)->list:
         '''
         Return a list of all the concepts by name, without the 'sd-concepts-library' part.
         Also adds local concepts in invokeai/embeddings folder.
+        If minimum_likes is provided, then only concepts that have received at least that
+        many "likes" will be returned.
         '''
         local_concepts_now = self.get_local_concepts(os.path.join(self.root, 'embeddings'))
         local_concepts_to_add = set(local_concepts_now).difference(set(self.local_concepts))
@@ -44,7 +46,7 @@ class HuggingFaceConceptsLibrary(object):
         else:
             try:
                 models = self.hf_api.list_models(filter=ModelFilter(model_name='sd-concepts-library/'))
-                self.concept_list = [a.id.split('/')[1] for a in models]
+                self.concept_list = [a.id.split('/')[1] for a in models if a.likes>=minimum_likes]
                 # when init, add all in dir. when not init, add only concepts added between init and now
                 self.concept_list.extend(list(local_concepts_to_add))
             except Exception as e:
@@ -181,7 +183,7 @@ class HuggingFaceConceptsLibrary(object):
 
         print(f'>> Downloading {repo_id}...',end='')
         try:
-            for file in ('README.md','learned_embeds.bin','token_identifier.txt','type_of_concept.txt'):
+            for file in ('learned_embeds.bin','token_identifier.txt'):
                 url = hf_hub_url(repo_id, file)
                 request.urlretrieve(url, os.path.join(dest,file),reporthook=tally_download_size)
         except ul_error.HTTPError as e:
