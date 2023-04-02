@@ -49,25 +49,6 @@ class LoRAModuleWrapper:
         self.LORA_PREFIX_UNET = "lora_unet"
         self.LORA_PREFIX_TEXT_ENCODER = "lora_te"
 
-        self.re_digits = re.compile(r"\d+")
-        self.re_unet_transformer_attn_blocks = re.compile(
-            r"lora_unet_(.+)_blocks_(\d+)_attentions_(\d+)_transformer_blocks_(\d+)_attn(\d+)_(.+).(weight|alpha)"
-        )
-        self.re_unet_mid_blocks = re.compile(
-            r"lora_unet_mid_block_attentions_(\d+)_(.+).(weight|alpha)"
-        )
-        self.re_unet_transformer_blocks = re.compile(
-            r"lora_unet_(.+)_blocks_(\d+)_attentions_(\d+)_transformer_blocks_(\d+)_(.+).(weight|alpha)"
-        )
-        self.re_unet_mid_transformer_blocks = re.compile(
-            r"lora_unet_mid_block_attentions_(\d+)_transformer_blocks_(\d+)_(.+).(weight|alpha)"
-        )
-        self.re_unet_norm_blocks = re.compile(
-            r"lora_unet_(.+)_blocks_(\d+)_attentions_(\d+)_(.+).(weight|alpha)"
-        )
-        self.re_out = re.compile(r"to_out_(\d+)")
-        self.re_processor_weight = re.compile(r"(.+)_(\d+)_(.+)")
-        self.re_processor_alpha = re.compile(r"(.+)_(\d+)")
 
         def find_modules(
             prefix, root_module: torch.nn.Module, target_replace_modules
