@@ -43,6 +43,38 @@ export class ImagesService {
   }
 
   /**
+   * Get Thumbnail
+   * Gets a thumbnail
+   * @returns any Successful Response
+   * @throws ApiError
+   */
+  public static getThumbnail({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of image to get
+     */
+    imageType: ImageType,
+    /**
+     * The name of the image to get
+     */
+    imageName: string,
+  }): CancelablePromise<any> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/images/{image_type}/thumbnails/{image_name}',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
    * Upload Image
    * @returns any Successful Response
    * @throws ApiError
