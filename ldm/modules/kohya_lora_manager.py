@@ -26,7 +26,7 @@ class LoRALayer:
     def __init__(self, lora_name: str, name: str, rank=4, alpha=1.0):
         self.lora_name = lora_name
         self.name = name
-        self.scale = alpha / rank if alpha else 1.0
+        self.scale = alpha / rank if (alpha and rank) else 1.0
 
 
 class LoRAModuleWrapper:

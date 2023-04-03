@@ -535,7 +535,7 @@ class InvokeAIWebServer:
                     loras = loras + models
 
                 found_loras = []
-                for lora in loras:
+                for lora in sorted(loras):
                     location = str(lora.resolve()).replace("\\", "/")
                     found_loras.append({"name": lora.stem, "location": location})
                 socketio.emit("foundLoras", found_loras)
