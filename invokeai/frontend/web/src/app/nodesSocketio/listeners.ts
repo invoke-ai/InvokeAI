@@ -34,6 +34,9 @@ import {
 } from 'services/apiSlice';
 import { emitUnsubscribe } from './actions';
 import { getGalleryImages } from 'services/thunks/extra';
+import { resultAdded } from 'features/gallery/store/resultsSlice';
+import { buildImageUrls } from 'services/util/buildImageUrls';
+import { extractTimestampFromResultImageName } from 'services/util/extractTimestampFromResultImageName';
 
 /**
  * Returns an object containing listener callbacks
@@ -87,28 +90,46 @@ const makeSocketIOListeners = (
       try {
         const sessionId = data.graph_execution_state_id;
         if (data.result.type === 'image') {
-          const url = `api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}`;
+          const { image_name: imageName } = data.result.image;
 
-          // need to update the type for this or figure out how to get these values
+          const { imageUrl, thumbnailUrl } = buildImageUrls(
+            'results',
+            imageName
+          );
+
+          const timestamp = extractTimestampFromResultImageName(imageName);
+
+          // // need to update the type for this or figure out how to get these values
+          // dispatch(
+          //   addImage({
+          //     category: 'result',
+          //     image: {
+          //       uuid: uuidv4(),
+          //       url: imageUrl,
+          //       thumbnail: '',
+          //       width: 512,
+          //       height: 512,
+          //       category: 'result',
+          //       name: imageName,
+          //       mtime: new Date().getTime(),
+          //     },
+          //   })
+          // );
+
           dispatch(
-            addImage({
-              category: 'result',
-              image: {
-                uuid: uuidv4(),
-                url,
-                thumbnail: '',
-                width: 512,
-                height: 512,
-                category: 'result',
-                name: data.result.image.image_name,
-                mtime: new Date().getTime(),
-              },
+            resultAdded({
+              name: imageName,
+              url: imageUrl,
+              thumbnail: thumbnailUrl,
+              width: 512,
+              height: 512,
+              timestamp,
             })
           );
           dispatch(
             addLogEntry({
               timestamp: dateFormat(new Date(), 'isoDateTime'),
-              message: `Generated: ${data.result.image.image_name}`,
+              message: `Generated: ${imageName}`,
             })
           );
           dispatch(setIsProcessing(false));
