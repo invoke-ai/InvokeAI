@@ -31,6 +31,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
+  setShouldShowHuggingFaceConcepts,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
@@ -52,7 +53,11 @@ const selector = createSelector(
       enableImageDebugging,
     } = system;
 
-    const { shouldUseCanvasBetaLayout, shouldUseSliders } = ui;
+    const {
+      shouldUseCanvasBetaLayout,
+      shouldUseSliders,
+      shouldShowHuggingFaceConcepts,
+    } = ui;
 
     return {
       shouldDisplayInProgressType,
@@ -63,6 +68,7 @@ const selector = createSelector(
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
+      shouldShowHuggingFaceConcepts,
     };
   },
   {
@@ -107,6 +113,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
+    shouldShowHuggingFaceConcepts,
   } = useAppSelector(selector);
 
   /**
@@ -204,6 +211,14 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 isChecked={shouldUseSliders}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldUseSliders(e.target.checked))
+                }
+              />
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={t('settings.showHuggingFaceConcepts')}
+                isChecked={shouldShowHuggingFaceConcepts}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setShouldShowHuggingFaceConcepts(e.target.checked))
                 }
               />
             </div>
