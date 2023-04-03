@@ -25,7 +25,8 @@ import HoverableImage from './HoverableImage';
 
 import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { selectResultsAll } from '../store/resultsSlice';
+import { selectResultsAll, selectResultsTotal } from '../store/resultsSlice';
+import { getNextResultsPage } from 'services/thunks/extra';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 
@@ -49,9 +50,15 @@ const ImageGalleryContent = () => {
   } = useAppSelector(imageGallerySelector);
 
   const allResultImages = useAppSelector(selectResultsAll);
+  const currentResultsPage = useAppSelector((state) => state.results.page);
+  const totalResultsPages = useAppSelector((state) => state.results.pages);
+  const isLoadingResults = useAppSelector((state) => state.results.isLoading);
 
+  // const handleClickLoadMore = () => {
+  //   dispatch(requestImages(currentCategory));
+  // };
   const handleClickLoadMore = () => {
-    dispatch(requestImages(currentCategory));
+    dispatch(getNextResultsPage());
   };
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -222,10 +229,11 @@ const ImageGalleryContent = () => {
               </Grid>
               <IAIButton
                 onClick={handleClickLoadMore}
-                isDisabled={!areMoreImagesAvailable}
+                isDisabled={currentResultsPage === totalResultsPages - 1}
+                isLoading={isLoadingResults}
                 flexShrink={0}
               >
-                {areMoreImagesAvailable
+                {currentResultsPage !== totalResultsPages - 1
                   ? t('gallery.loadMore')
                   : t('gallery.allImagesLoaded')}
               </IAIButton>
