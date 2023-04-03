@@ -8,26 +8,30 @@ import importlib
 
 from diffusers import OnnxStableDiffusionPipeline
 
+utils = importlib.import_module('openvino.utils')
+utils.add_openvino_libs_to_path()
+
 #Implementation of class for optimized modules.
 class txt2img_Optimized:
 
-    def __init__(self, height, width):
+    def __init__(self, height, width, steps, num_images):
         self.height = height
         self.width = width
-        self.num_images_per_prompt = 1
+        self.num_images_per_prompt = num_images
+        self.num_inference_steps = steps
 
     def execute_command(self, command):
         # execute command
         subprocess.check_call(command)
 
     def onnx_txt2img(self, prompt, model):
-        model = "CompVis/stable-diffusion-v1-4"
+        model = "runwayml/stable-diffusion-v1-5" #"CompVis/stable-diffusion-v1-4"
         device = "cpu_fp32"
         
         if device == "cpu":
-            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="CPUExecutionProvider")
+            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, num_images_per_prompt=self.num_images_per_prompt, num_inference_steps=self.num_inference_steps, revision="onnx", provider="CPUExecutionProvider")
         else:
-            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="OpenVINOExecutionProvider")
+            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, num_images_per_prompt=self.num_images_per_prompt, num_inference_steps=self.num_inference_steps, revision="onnx", provider="OpenVINOExecutionProvider")
 
         t_0 = timeit.default_timer()
         image = onnx_pipe(prompt, self.height, self.height).images[0]
@@ -43,15 +47,14 @@ class txt2img_Optimized:
 
         #from optimum.intel.openvino import OVStableDiffusionPipeline
         ovsd = importlib.import_module('optimum.intel.openvino')
-        utils = importlib.import_module('openvino.utils')
-        utils.add_openvino_libs_to_path()
 
-        model_type = "IR"
+        model_type = "Pytorch"
+        model_pytorch = "stabilityai/stable-diffusion-2-1"#runwayml/stable-diffusion-v1-5 #CompVis/stable-diffusion-v1-4
         model_opevino = "echarlaix/stable-diffusion-v1-5-openvino"
         if model_type == "IR":
             stable_diffusion = ovsd.OVStableDiffusionPipeline.from_pretrained(model_opevino)
         elif model_type == "Pytorch":
-            stable_diffusion = ovsd.OVStableDiffusionPipeline.from_pretrained(model, export=True)
+            stable_diffusion = ovsd.OVStableDiffusionPipeline.from_pretrained(model_pytorch, export=True)
         else:
             command = "python convert_stable_diffusion_checkpoint_to_onnx.py --model_path=model_opevino --output_path=models\\stable_diffusion_onnx"
             self.execute_command(command)

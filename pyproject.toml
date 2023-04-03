@@ -77,6 +77,8 @@ dependencies = [
   "transformers~=4.26",
   "uvicorn[standard]==0.20.0",
   "windows-curses; sys_platform=='win32'",
+  "onnxruntime-openvino"
+  "openvino==2022.3.0",
 ]
 
 [project.optional-dependencies]
