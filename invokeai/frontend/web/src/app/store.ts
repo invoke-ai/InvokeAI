@@ -94,6 +94,8 @@ const rootPersistConfig = getPersistConfig({
     ...galleryBlacklist,
     ...lightboxBlacklist,
     ...apiBlacklist,
+    // for now, never persist the results slice
+    'results',
   ],
   debounce: 300,
 });
