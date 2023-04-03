@@ -1,5 +1,15 @@
 # InvokeAI Web UI
 
+- [InvokeAI Web UI](#invokeai-web-ui)
+  - [Details](#details)
+  - [Contributing](#contributing)
+    - [Dev Environment](#dev-environment)
+      - [`postinstall` script](#postinstall-script)
+        - [`@chakra-ui/cli` patch](#chakra-uicli-patch)
+        - [`redux-persist` patch](#redux-persist-patch)
+        - [`redux-deep-persist` patch](#redux-deep-persist-patch)
+    - [Production builds](#production-builds)
+
 The UI is a fairly straightforward Typescript React app. The only really fancy stuff is the Unified Canvas.
 
 Code in `invokeai/frontend/web/` if you want to have a look.
@@ -32,7 +42,27 @@ Start everything in dev mode:
 
 1. Start the dev server: `yarn dev`
 2. Start the InvokeAI UI per usual: `invokeai --web`
-3. Point your browser to the dev server address e.g. `http://localhost:5173/`
+3. Point your browser to the dev server address e.g. <http://localhost:5173/>
+
+#### `postinstall` script
+
+The `postinstall` script patches a few packages and runs the Chakra-UI CLI to generate types for the theme.
+
+##### `@chakra-ui/cli` patch
+
+See: <https://github.com/chakra-ui/chakra-ui/issues/7394>
+
+##### `redux-persist` patch
+
+We want to persist the canvas state to `localStorage` but many canvas operations change data very quickly, so we need to debounce the writes to `localStorage`.
+
+`redux-persist` is unfortunately unmaintained. The repo's current code is nonfunctional, but the last release's code depends on a package that was removed from `npm` for being malware, so we cannot just fork it.
+
+So, we have to patch it directly. Perhaps a better way would be to write a debounced storage adapter, but I couldn't figure out how to do that.
+
+##### `redux-deep-persist` patch
+
+This package makes blacklisting and whitelisting persist configs very simple, but we have to patch it to match `redux-persist` for the types to work.
 
 ### Production builds
 
