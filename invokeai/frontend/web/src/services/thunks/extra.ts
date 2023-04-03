@@ -1,9 +1,10 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
-import { addImage } from 'features/gallery/store/gallerySlice';
-import { forEach } from 'lodash';
+import { map } from 'lodash';
 import { SessionsService } from 'services/api';
 import { isImageOutput } from 'services/types/guards';
-import { v4 as uuidv4 } from 'uuid';
+import { buildImageUrls } from 'services/util/buildImageUrls';
+import { extractTimestampFromResultImageName } from 'services/util/extractTimestampFromResultImageName';
+import { resultsReceived } from 'features/gallery/store/resultsSlice';
 
 type GetGalleryImagesArg = {
   count: number;
@@ -30,28 +31,61 @@ export const getGalleryImages = createAppAsyncThunk(
       perPage: 20,
     });
 
-    response.items.forEach((session) => {
-      forEach(session.results, (result) => {
-        if (isImageOutput(result)) {
-          const url = `api/v1/images/${result.image.image_type}/${result.image.image_name}`;
+    // build flattened array of results ojects, use lodash `map()` to make results object an array
+    const allResults = response.items.flatMap((session) =>
+      map(session.results)
+    );
 
-          dispatch(
-            addImage({
-              category: 'result',
-              image: {
-                uuid: uuidv4(),
-                url,
-                thumbnail: '',
-                width: 512,
-                height: 512,
-                category: 'result',
-                name: result.image.image_name,
-                mtime: new Date().getTime(),
-              },
-            })
-          );
-        }
-      });
+    // filter out non-image-outputs (eg latents, prompts, etc)
+    const imageOutputResults = allResults.filter(isImageOutput);
+
+    // build ResultImage objects
+    const resultImages = imageOutputResults.map((result) => {
+      const name = result.image.image_name;
+
+      const { imageUrl, thumbnailUrl } = buildImageUrls('results', name);
+      const timestamp = extractTimestampFromResultImageName(name);
+
+      return {
+        name,
+        url: imageUrl,
+        thumbnail: thumbnailUrl,
+        timestamp,
+        height: 512,
+        width: 512,
+      };
     });
+
+    // update the results slice
+    dispatch(resultsReceived(resultImages));
+
+    // response.items.forEach((session) => {
+    //   forEach(session.results, (result) => {
+    //     if (isImageOutput(result)) {
+    //       const { imageUrl, thumbnailUrl } = buildImageUrls(
+    //         result.image.image_type!, // fix the generated types to avoid non-null assertion
+    //         result.image.image_name! // fix the generated types to avoid non-null assertion
+    //       );
+
+    //       dispatch
+
+    //       dispatch(
+    //         addImage({
+    //           category: 'result',
+    //           image: {
+    //             uuid: uuidv4(),
+    //             url: imageUrl,
+    //             thumbnail: ,
+    //             width: 512,
+    //             height: 512,
+    //             category: 'result',
+    //             name: result.image.image_name,
+    //             mtime: new Date().getTime(),
+    //           },
+    //         })
+    //       );
+    //     }
+    //   });
+    // });
   }
 );

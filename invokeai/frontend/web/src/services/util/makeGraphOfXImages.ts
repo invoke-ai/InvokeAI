@@ -1,4 +1,4 @@
-import { Graph, TextToImageInvocation } from './api';
+import { Graph, TextToImageInvocation } from '../api';
 
 /**
  * Make a graph of however many images
