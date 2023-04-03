@@ -577,6 +577,12 @@ class Args(object):
             default=True,
             help="Load the patchmatch extension for outpainting. Use --no-patchmatch to disable.",
         )
+        model_group.add_argument(
+            "--onnx",
+            dest="onnx",
+            action="store_true",
+            help="Forces to use ONNX backend for inference",
+        )
         file_group.add_argument(
             "--from_file",
             dest="infile",

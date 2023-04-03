@@ -45,6 +45,28 @@ def main():
     if not args:
         sys.exit(-1)
 
+    # load the infile as a list of lines
+    if opt.infile:
+        try:
+            if os.path.isfile(opt.infile):
+                infile = open(opt.infile, "r", encoding="utf-8")
+            elif opt.infile == "-":  # stdin
+                infile = sys.stdin
+            else:
+                raise FileNotFoundError(f"{opt.infile} not found.")
+        except (FileNotFoundError, IOError) as e:
+            print(f"{e}. Aborting.")
+            sys.exit(-1)
+
+    print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
+    print(f'>> InvokeAI runtime directory is "{Globals.root}"')
+
+    if opt.onnx:
+        #Invocation of onnx pipeline
+        gen = Generate()
+        #main_loop(gen, opt)
+        sys.exit(1)
+
     if args.laion400m:
         print(
             "--laion400m flag has been deprecated. Please use --model laion400m instead."
@@ -80,9 +102,6 @@ def main():
                 opt, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    logger.info(f"{invokeai.__app_name__}, version {invokeai.__version__}")
-    logger.info(f'InvokeAI runtime directory is "{Globals.root}"')
-
     # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -112,20 +131,6 @@ def main():
 
     # migrate legacy models
     ModelManager.migrate_models()
-
-    # load the infile as a list of lines
-    if opt.infile:
-        try:
-            if os.path.isfile(opt.infile):
-                infile = open(opt.infile, "r", encoding="utf-8")
-            elif opt.infile == "-":  # stdin
-                infile = sys.stdin
-            else:
-                raise FileNotFoundError(f"{opt.infile} not found.")
-        except (FileNotFoundError, IOError) as e:
-            logger.critical('Aborted',exc_info=True)
-            sys.exit(-1)
-
     # creating a Generate object:
     try:
         gen = Generate(
