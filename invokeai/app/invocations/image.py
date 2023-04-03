@@ -20,7 +20,14 @@ class ImageField(BaseModel):
     )
     image_name: Optional[str] = Field(default=None, description="The name of the image")
 
-
+    class Config:
+        schema_extra = {
+            'required': [
+                'image_type',
+                'image_name',
+            ]
+        }
+        
 class ImageOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
     #fmt: off
