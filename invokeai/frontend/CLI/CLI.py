@@ -264,17 +264,9 @@ def main_loop(gen, opt):
         if opt.onnx:
             print("Starting ONNX inference.")
             #ONNX Requirement packages installation
-            os.system("pip install -r requirements-win-cpu_onnx.txt")
-            txt2img_onnx = optimize(opt.width, opt.height)
+            #os.system("pip install -r requirements-win-cpu_onnx.txt")
+            txt2img_onnx = optimize(opt.width, opt.height, opt.steps, opt.iterations)
             txt2img_onnx.onnx_txt2img(opt.prompt, opt.model)
-            sys.exit(-1)
-
-        if opt.openvino:
-            print("Starting OpenVINO inference.")
-            #OpenVINO Requirement packages installation
-            os.system("pip install -r requirements_openvino.txt")
-            txt2img_ov = optimize(opt.width, opt.height)
-            txt2img_ov.openvino_txt2img(opt.prompt, opt.model)
             sys.exit(-1)
 
         # retrieve previous value of init image if requested
