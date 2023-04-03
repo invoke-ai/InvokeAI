@@ -17,7 +17,7 @@ from typing import (
 )
 
 import networkx as nx
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, root_validator, validator
 from pydantic.fields import Field
 
 from ..invocations import *
@@ -1142,6 +1142,54 @@ class GraphExecutionState(BaseModel):
                 f"Destination node {edge.destination.node_id} has already been prepared or executed and cannot have a source edge deleted"
             )
         self.graph.delete_edge(edge)
+
+
+class ExposedNodeInput(BaseModel):
+    node_path: str = Field(description="The node path to the node with the input")
+    field: str = Field(description="The field name of the input")
+    alias: str = Field(description="The alias of the input")
+
+
+class ExposedNodeOutput(BaseModel):
+    node_path: str = Field(description="The node path to the node with the output")
+    field: str = Field(description="The field name of the output")
+    alias: str = Field(description="The alias of the output")
+
+class LibraryGraph(BaseModel):
+    id: str = Field(description="The unique identifier for this library graph", default_factory=uuid.uuid4)
+    graph: Graph = Field(description="The graph")
+    name: str = Field(description="The name of the graph")
+    description: str = Field(description="The description of the graph")
+    exposed_inputs: list[ExposedNodeInput] = Field(description="The inputs exposed by this graph", default_factory=list)
+    exposed_outputs: list[ExposedNodeOutput] = Field(description="The outputs exposed by this graph", default_factory=list)
+
+    @validator('exposed_inputs', 'exposed_outputs')
+    def validate_exposed_aliases(cls, v):
+        if len(v) != len(set(i.alias for i in v)):
+            raise ValueError("Duplicate exposed alias")
+        return v
+    
+    @root_validator
+    def validate_exposed_nodes(cls, values):
+        graph = values['graph']
+
+        # Validate exposed inputs
+        for exposed_input in values['exposed_inputs']:
+            if not graph.has_node(exposed_input.node_path):
+                raise ValueError(f"Exposed input node {exposed_input.node_path} does not exist")
+            node = graph.get_node(exposed_input.node_path)
+            if get_input_field(node, exposed_input.field) is None:
+                raise ValueError(f"Exposed input field {exposed_input.field} does not exist on node {exposed_input.node_path}")
+
+        # Validate exposed outputs
+        for exposed_output in values['exposed_outputs']:
+            if not graph.has_node(exposed_output.node_path):
+                raise ValueError(f"Exposed output node {exposed_output.node_path} does not exist")
+            node = graph.get_node(exposed_output.node_path)
+            if get_output_field(node, exposed_output.field) is None:
+                raise ValueError(f"Exposed output field {exposed_output.field} does not exist on node {exposed_output.node_path}")
+
+        return values
 
 
 GraphInvocation.update_forward_refs()

@@ -6,10 +6,36 @@ from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_t
 from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
-
-from ..models.image import ImageField
-from ..services.graph import GraphExecutionState
+from ..invocations.image import ImageField
+from ..services.graph import GraphExecutionState, LibraryGraph, get_input_field
 from ..services.invoker import Invoker
+
+
+def add_field_argument(command_parser, name: str, field):
+    if get_origin(field.type_) == Literal:
+        allowed_values = get_args(field.type_)
+        allowed_types = set()
+        for val in allowed_values:
+            allowed_types.add(type(val))
+        allowed_types_list = list(allowed_types)
+        field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
+
+        command_parser.add_argument(
+            f"--{name}",
+            dest=name,
+            type=field_type,
+            default=field.default if field.default_factory is None else field.default_factory(),
+            choices=allowed_values,
+            help=field.field_info.description,
+        )
+    else:
+        command_parser.add_argument(
+            f"--{name}",
+            dest=name,
+            type=field.type_,
+            default=field.default if field.default_factory is None else field.default_factory(),
+            help=field.field_info.description,
+        )
 
 
 def add_parsers(
@@ -36,30 +62,32 @@ def add_parsers(
             if name in exclude_fields:
                 continue
 
-            if get_origin(field.type_) == Literal:
-                allowed_values = get_args(field.type_)
-                allowed_types = set()
-                for val in allowed_values:
-                    allowed_types.add(type(val))
-                allowed_types_list = list(allowed_types)
-                field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
+            add_field_argument(command_parser, name, field)
 
-                command_parser.add_argument(
-                    f"--{name}",
-                    dest=name,
-                    type=field_type,
-                    default=field.default if field.default_factory is None else field.default_factory(),
-                    choices=allowed_values,
-                    help=field.field_info.description,
-                )
-            else:
-                command_parser.add_argument(
-                    f"--{name}",
-                    dest=name,
-                    type=field.type_,
-                    default=field.default if field.default_factory is None else field.default_factory(),
-                    help=field.field_info.description,
-                )
+
+def add_graph_parsers(
+    subparsers,
+    graphs: list[LibraryGraph],
+    add_arguments: Callable[[argparse.ArgumentParser], None]|None = None
+):
+    for graph in graphs:
+        command_parser = subparsers.add_parser(graph.name, help=graph.description)
+        
+        if add_arguments is not None:
+            add_arguments(command_parser)
+
+        # Add arguments for inputs
+        for exposed_input in graph.exposed_inputs:
+            node = graph.graph.get_node(exposed_input.node_path)
+            field = get_input_field(node, exposed_input.field)
+            add_field_argument(command_parser, exposed_input.alias, field)
+            command_parser.add_argument(
+                f"--{exposed_input.alias}",
+                dest=exposed_input.alias,
+                type=field.type_,
+                default=field.default if field.default_factory is None else field.default_factory(),
+                help=field.field_info.description,
+            )
 
 
 class CliContext:

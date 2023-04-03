@@ -7,7 +7,7 @@ from invokeai.app.services.processor import DefaultInvocationProcessor
 from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from invokeai.app.services.invocation_queue import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
+from invokeai.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, LibraryGraph, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
 import pytest
 
 
@@ -28,6 +28,9 @@ def mock_services():
         images = None, # type: ignore
         latents = None, # type: ignore
         queue = MemoryInvocationQueue(),
+        graph_library=SqliteItemStorage[LibraryGraph](
+            filename=sqlite_memory, table_name="graphs"
+        ),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
         processor = DefaultInvocationProcessor(),
         restoration = None, # type: ignore

@@ -13,17 +13,20 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
+from .services.default_graphs import create_system_graphs
+
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
 from ..backend import Args
-from .cli.commands import BaseCommand, CliContext, ExitCli, add_parsers, get_graph_execution_history
+from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers, get_graph_execution_history
 from .cli.completer import set_autocompleter
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
 from .services.model_manager_initializer import get_model_manager
 from .services.restoration_services import RestorationServices
-from .services.graph import Edge, EdgeConnection, GraphExecutionState, are_connection_types_compatible
+from .services.graph import Edge, EdgeConnection, ExposedNodeInput, GraphExecutionState, GraphInvocation, LibraryGraph, are_connection_types_compatible
+from .services.default_graphs import default_text_to_image_graph_id
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
 from .services.invocation_services import InvocationServices
@@ -58,7 +61,7 @@ def add_invocation_args(command_parser):
     )
 
 
-def get_command_parser() -> argparse.ArgumentParser:
+def get_command_parser(services: InvocationServices) -> argparse.ArgumentParser:
     # Create invocation parser
     parser = argparse.ArgumentParser()
 
@@ -76,11 +79,16 @@ def get_command_parser() -> argparse.ArgumentParser:
     commands = BaseCommand.get_all_subclasses()
     add_parsers(subparsers, commands, exclude_fields=["type"])
 
+    # Create subparsers for exposed CLI graphs
+    # TODO: add a way to identify these graphs
+    text_to_image = services.graph_library.get(default_text_to_image_graph_id)
+    add_graph_parsers(subparsers, [text_to_image], add_arguments=add_invocation_args)
+
     return parser
 
 
 def generate_matching_edges(
-    a: BaseInvocation, b: BaseInvocation
+    a: BaseInvocation, b: BaseInvocation, exposed_inputs: list[ExposedNodeInput]|None = None
 ) -> list[Edge]:
     """Generates all possible edges between two invocations"""
     atype = type(a)
@@ -158,6 +166,9 @@ def invoke_cli():
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
         images=DiskImageStorage(f'{output_folder}/images'),
         queue=MemoryInvocationQueue(),
+        graph_library=SqliteItemStorage[LibraryGraph](
+            filename=db_location, table_name="graphs"
+        ),
         graph_execution_manager=SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
         ),
@@ -165,9 +176,12 @@ def invoke_cli():
         restoration=RestorationServices(config),
     )
 
+    system_graphs = create_system_graphs(services.graph_library)
+    system_graph_names = set([g.name for g in system_graphs])
+
     invoker = Invoker(services)
     session: GraphExecutionState = invoker.create_execution_state()
-    parser = get_command_parser()
+    parser = get_command_parser(services)
 
     re_negid = re.compile('^-[0-9]+$')
 
@@ -205,8 +219,23 @@ def invoke_cli():
                         args[field_name] = field_default
 
                 # Parse invocation
-                args["id"] = current_id
-                command = CliCommand(command=args)
+                command: CliCommand = None # type:ignore
+                system_graph: LibraryGraph|None = None
+                if args['type'] in system_graph_names:
+                    system_graph = next(filter(lambda g: g.name == args['type'], system_graphs))
+                    invocation = GraphInvocation(graph=system_graph.graph, id=str(current_id))
+                    for exposed_input in system_graph.exposed_inputs:
+                        if exposed_input.alias in args:
+                            node = invocation.graph.get_node(exposed_input.node_path)
+                            field = exposed_input.field
+                            setattr(node, field, args[exposed_input.alias])
+                    command = CliCommand(command = invocation)
+                else:
+                    args["id"] = current_id
+                    command = CliCommand(command=args)
+
+                if command is None:
+                    continue
 
                 # Run any CLI commands immediately
                 if isinstance(command.command, BaseCommand):
@@ -217,6 +246,7 @@ def invoke_cli():
                     command.command.run(context)
                     continue
 
+                # TODO: handle linking with library graphs
                 # Pipe previous command output (if there was a previous command)
                 edges: list[Edge] = list()
                 if len(history) > 0 or current_id != start_id:

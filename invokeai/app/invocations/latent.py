@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
+import random
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 import torch
@@ -99,13 +100,17 @@ def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_c
     return x
 
 
+def random_seed():
+    return random.randint(0, np.iinfo(np.uint32).max)
+
+
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
     type: Literal["noise"] = "noise"
 
     # Inputs
-    seed:        int = Field(default=0, ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", )
+    seed:        int = Field(ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", default_factory=random_seed)
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting noise", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
 
