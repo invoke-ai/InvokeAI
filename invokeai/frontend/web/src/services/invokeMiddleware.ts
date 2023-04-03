@@ -35,6 +35,7 @@ export const invokeMiddleware: Middleware =
       const uploadLocation = action.payload;
       console.log('uploadImage.fulfilled');
 
+      // TODO: actually get correct attributes here
       const newImage: InvokeAI.Image = {
         uuid: uuidv4(),
         category: 'user',
@@ -49,6 +50,7 @@ export const invokeMiddleware: Middleware =
 
       const { activeTab } = getState().ui;
       const activeTabName = tabMap[activeTab];
+
       if (activeTabName === 'unifiedCanvas') {
         dispatch(setInitialCanvasImage(newImage));
       } else if (activeTabName === 'img2img') {
