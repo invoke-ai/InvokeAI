@@ -26,7 +26,7 @@ import HoverableImage from './HoverableImage';
 import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { selectResultsAll, selectResultsTotal } from '../store/resultsSlice';
-import { getNextResultsPage } from 'services/thunks/extra';
+import { getNextResultsPage } from 'services/thunks/gallery';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 
