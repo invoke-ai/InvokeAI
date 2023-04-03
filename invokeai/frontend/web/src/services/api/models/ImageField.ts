@@ -9,10 +9,10 @@ export type ImageField = {
   /**
    * The type of the image
    */
-  image_type?: string;
+  image_type: string;
   /**
    * The name of the image
    */
-  image_name?: string;
+  image_name: string;
 };
 
