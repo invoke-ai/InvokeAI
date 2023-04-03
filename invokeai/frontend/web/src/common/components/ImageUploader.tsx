@@ -2,7 +2,6 @@ import { Box, useToast } from '@chakra-ui/react';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
-import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { ResourceKey } from 'i18next';
 import {
@@ -15,6 +14,7 @@ import {
 } from 'react';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
+import { uploadImage } from 'services/thunks/image';
 import ImageUploadOverlay from './ImageUploadOverlay';
 
 type ImageUploaderProps = {
@@ -49,7 +49,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   const fileAcceptedCallback = useCallback(
     async (file: File) => {
-      dispatch(uploadImage({ imageFile: file }));
+      dispatch(uploadImage({ formData: { file } }));
     },
     [dispatch]
   );
@@ -124,7 +124,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         return;
       }
 
-      dispatch(uploadImage({ imageFile: file }));
+      dispatch(uploadImage({ formData: { file } }));
     };
     document.addEventListener('paste', pasteImageListener);
     return () => {

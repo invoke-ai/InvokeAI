@@ -1,5 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
+import io
 from datetime import datetime, timezone
 import uuid
 
@@ -50,7 +50,7 @@ async def upload_image(file: UploadFile, request: Request):
 
     contents = await file.read()
     try:
-        im = Image.open(contents)
+        im = Image.open(io.BytesIO(contents))
     except:
         # Error opening the image
         return Response(status_code=415)

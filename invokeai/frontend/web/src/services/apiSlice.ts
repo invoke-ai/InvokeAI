@@ -1,8 +1,11 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { v4 as uuidv4 } from 'uuid';
 import { ProgressImage } from './events/types';
 import { createSession, invokeSession } from 'services/thunks/session';
-import { getImage } from './thunks/image';
+import { getImage, uploadImage } from './thunks/image';
+import * as InvokeAI from 'app/invokeai';
+import { addImage } from 'features/gallery/store/gallerySlice';
 
 /**
  * Just temp until we work out better statuses
@@ -90,6 +93,19 @@ export const apiSlice = createSlice({
       // state.networkStatus = 'busy'
     });
     builder.addCase(getImage.rejected, (state, action) => {
+      // !HTTP 200
+      // state.networkStatus = 'idle'
+    });
+    builder.addCase(uploadImage.fulfilled, (state, action) => {
+      // !HTTP 200
+      console.log(action.payload);
+      // state.networkStatus = 'idle'
+    });
+    builder.addCase(uploadImage.pending, (state, action) => {
+      // HTTP request pending
+      // state.networkStatus = 'busy'
+    });
+    builder.addCase(uploadImage.rejected, (state, action) => {
       // !HTTP 200
       // state.networkStatus = 'idle'
     });
