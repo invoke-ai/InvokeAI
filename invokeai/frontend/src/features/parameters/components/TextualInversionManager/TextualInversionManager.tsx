@@ -79,9 +79,6 @@ export default function TextualInversionManager() {
     }
   }, [
     foundTextualInversionTriggers,
-    textualInversionItems,
-    dispatch,
-    prompt,
     handleTextualInversion,
     renderTextualInversionOption,
   ]);
