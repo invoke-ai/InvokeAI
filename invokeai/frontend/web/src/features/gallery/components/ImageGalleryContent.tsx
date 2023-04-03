@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex, Grid, Icon, Text } from '@chakra-ui/react';
+import { ButtonGroup, Flex, Grid, Icon, Image, Text } from '@chakra-ui/react';
 import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -25,6 +25,7 @@ import HoverableImage from './HoverableImage';
 
 import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { selectResultsAll } from '../store/resultsSlice';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 
@@ -46,6 +47,8 @@ const ImageGalleryContent = () => {
     areMoreImagesAvailable,
     shouldUseSingleGalleryColumn,
   } = useAppSelector(imageGallerySelector);
+
+  const allResultImages = useAppSelector(selectResultsAll);
 
   const handleClickLoadMore = () => {
     dispatch(requestImages(currentCategory));
@@ -202,7 +205,7 @@ const ImageGalleryContent = () => {
                 gap={2}
                 style={{ gridTemplateColumns: galleryGridTemplateColumns }}
               >
-                {images.map((image) => {
+                {/* {images.map((image) => {
                   const { uuid } = image;
                   const isSelected = currentImageUuid === uuid;
                   return (
@@ -212,7 +215,10 @@ const ImageGalleryContent = () => {
                       isSelected={isSelected}
                     />
                   );
-                })}
+                })} */}
+                {allResultImages.map((image) => (
+                  <Image key={image.name} src={image.thumbnail} />
+                ))}
               </Grid>
               <IAIButton
                 onClick={handleClickLoadMore}
