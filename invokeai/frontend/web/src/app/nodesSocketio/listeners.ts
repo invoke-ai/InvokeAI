@@ -33,10 +33,9 @@ import {
   STATUS,
 } from 'services/apiSlice';
 import { emitUnsubscribe } from './actions';
-import { getGalleryImages } from 'services/thunks/extra';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
-import { buildImageUrls } from 'services/util/buildImageUrls';
-import { extractTimestampFromResultImageName } from 'services/util/extractTimestampFromResultImageName';
+import { getNextResultsPage } from 'services/thunks/extra';
+import { prepareResultImage } from 'services/util/prepareResultImage';
 
 /**
  * Returns an object containing listener callbacks
@@ -54,7 +53,12 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus(i18n.t('common.statusConnected')));
-        dispatch(getGalleryImages({ count: 20 }));
+
+        // fetch more results, but only if we don't already have results
+        // maybe we should have a different thunk for `onConnect` vs when you click 'Load More'?
+        if (!getState().results.ids.length) {
+          dispatch(getNextResultsPage());
+        }
       } catch (e) {
         console.error(e);
       }
@@ -90,15 +94,9 @@ const makeSocketIOListeners = (
       try {
         const sessionId = data.graph_execution_state_id;
         if (data.result.type === 'image') {
-          const { image_name: imageName } = data.result.image;
+          const resultImage = prepareResultImage(data.result.image);
 
-          const { imageUrl, thumbnailUrl } = buildImageUrls(
-            'results',
-            imageName
-          );
-
-          const timestamp = extractTimestampFromResultImageName(imageName);
-
+          dispatch(resultAdded(resultImage));
           // // need to update the type for this or figure out how to get these values
           // dispatch(
           //   addImage({
@@ -117,19 +115,9 @@ const makeSocketIOListeners = (
           // );
 
           dispatch(
-            resultAdded({
-              name: imageName,
-              url: imageUrl,
-              thumbnail: thumbnailUrl,
-              width: 512,
-              height: 512,
-              timestamp,
-            })
-          );
-          dispatch(
             addLogEntry({
               timestamp: dateFormat(new Date(), 'isoDateTime'),
-              message: `Generated: ${imageName}`,
+              message: `Generated: ${data.result.image.image_name}`,
             })
           );
           dispatch(setIsProcessing(false));
