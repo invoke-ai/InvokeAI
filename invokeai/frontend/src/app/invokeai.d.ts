@@ -283,8 +283,10 @@ export declare type FoundTextualInversionTriggers = {
 
 export declare type FoundLorasRsponse = FoundLora[];
 
-export declare type FoundTextualInversionTriggersResponse =
-  FoundTextualInversionTriggers[];
+export declare type FoundTextualInversionTriggersResponse = {
+  local_triggers: FoundTextualInversionTriggers[];
+  huggingface_concepts: FoundTextualInversionTriggers[];
+};
 
 export declare type SystemStatusResponse = SystemStatus;
 

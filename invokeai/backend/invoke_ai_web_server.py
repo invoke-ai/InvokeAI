@@ -546,10 +546,10 @@ class InvokeAIWebServer:
         def get_ti_triggers():
             try:
                 local_triggers = self.generate.model.textual_inversion_manager.get_all_trigger_strings()
-                triggers = [{'name': x} for x in sorted(local_triggers)]
+                local_triggers = [{'name': x} for x in sorted(local_triggers)]
                 concepts = HuggingFaceConceptsLibrary().list_concepts(minimum_likes=6)
-                triggers = triggers + [{'name': f'<{x}>'} for x in sorted(concepts) if f'<{x}>' not in local_triggers]
-                socketio.emit("foundTextualInversionTriggers", triggers)
+                concepts = [{'name': f'<{x}>'} for x in sorted(concepts) if f'<{x}>' not in local_triggers]
+                socketio.emit("foundTextualInversionTriggers", {'local_triggers': local_triggers, 'huggingface_concepts': concepts})
             except Exception as e:
                 self.handle_exceptions(e)
 

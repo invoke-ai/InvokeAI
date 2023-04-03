@@ -1,72 +1,80 @@
 import { Box } from '@chakra-ui/react';
 import { getTextualInversionTriggers } from 'app/socketio/actions';
+import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISimpleMenu, { IAIMenuItem } from 'common/components/IAISimpleMenu';
-import { setPrompt } from 'features/parameters/store/generationSlice';
-import { useEffect, useState, useCallback } from 'react';
+import { setTextualInversionsInUse } from 'features/parameters/store/generationSlice';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function TextualInversionManager() {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.generation.prompt);
-  const foundTextualInversionTriggers = useAppSelector(
-    (state) => state.system.foundTextualInversionTriggers
+  const textualInversionsInUse = useAppSelector(
+    (state: RootState) => state.generation.textualInversionsInUse
   );
-  const [textualInversionItems, setTextualInversionItems] = useState<
-    IAIMenuItem[]
-  >([{ item: '', onClick: undefined }]);
+  const foundLocalTextualInversionTriggers = useAppSelector(
+    (state) => state.system.foundLocalTextualInversionTriggers
+  );
+  const foundHuggingFaceTextualInversionTriggers = useAppSelector(
+    (state) => state.system.foundHuggingFaceTextualInversionTriggers
+  );
+
+  const localTextualInversionTriggers = useAppSelector(
+    (state) => state.generation.localTextualInversionTriggers
+  );
+
+  const huggingFaceTextualInversionConcepts = useAppSelector(
+    (state) => state.generation.huggingFaceTextualInversionConcepts
+  );
+
+  const shouldShowHuggingFaceConcepts = useAppSelector(
+    (state) => state.ui.shouldShowHuggingFaceConcepts
+  );
+
   const { t } = useTranslation();
-
-  const textualInversionExists = useCallback(
-    (textualInversion: string) => {
-      const textualInversion_regex = new RegExp(`${textualInversion}`);
-      if (prompt.match(textualInversion_regex)) return true;
-      return false;
-    },
-    [prompt]
-  );
-
-  const handleTextualInversion = useCallback(
-    (textualInversion: string) => {
-      if (textualInversionExists(textualInversion)) {
-        const textualInversion_regex = new RegExp(`${textualInversion}`);
-        const newPrompt = prompt.replace(textualInversion_regex, '');
-        dispatch(setPrompt(newPrompt));
-      } else {
-        dispatch(setPrompt(`${prompt} ${textualInversion}`));
-      }
-    },
-    [dispatch, textualInversionExists, prompt]
-  );
 
   useEffect(() => {
     dispatch(getTextualInversionTriggers());
   }, [dispatch]);
 
-  const renderTextualInversionOption = useCallback(
-    (textualInversion: string) => {
-      const thisTextualInversionExists =
-        textualInversionExists(textualInversion);
-      const textualInversionExistsStyle = {
-        fontWeight: 'bold',
-        color: 'var(--context-menu-active-item)',
-      };
-      return (
-        <Box
-          style={thisTextualInversionExists ? textualInversionExistsStyle : {}}
-        >
-          {textualInversion}
-        </Box>
-      );
-    },
-    [textualInversionExists]
-  );
+  const handleTextualInversion = (textual_inversion: string) => {
+    dispatch(setTextualInversionsInUse(textual_inversion));
+  };
 
-  useEffect(() => {
-    if (foundTextualInversionTriggers) {
-      console.log('rendertextualinversionoption: here i am');
-      const textualInversionsFound: IAIMenuItem[] = [];
-      foundTextualInversionTriggers.forEach((textualInversion) => {
+  const renderTextualInversionOption = (textual_inversion: string) => {
+    const thisTIExists = textualInversionsInUse.includes(textual_inversion);
+    const tiExistsStyle = {
+      fontWeight: 'bold',
+      color: 'var(--context-menu-active-item)',
+    };
+    return (
+      <Box style={thisTIExists ? tiExistsStyle : {}}>{textual_inversion}</Box>
+    );
+  };
+
+  const numOfActiveTextualInversions = () => {
+    const allTextualInversions = localTextualInversionTriggers.concat(
+      huggingFaceTextualInversionConcepts
+    );
+    return allTextualInversions.filter((ti) =>
+      textualInversionsInUse.includes(ti)
+    ).length;
+  };
+
+  const makeTextualInversionItems = () => {
+    const textualInversionsFound: IAIMenuItem[] = [];
+    foundLocalTextualInversionTriggers?.forEach((textualInversion) => {
+      if (textualInversion.name !== ' ') {
+        const newTextualInversionItem: IAIMenuItem = {
+          item: renderTextualInversionOption(textualInversion.name),
+          onClick: () => handleTextualInversion(textualInversion.name),
+        };
+        textualInversionsFound.push(newTextualInversionItem);
+      }
+    });
+
+    if (shouldShowHuggingFaceConcepts) {
+      foundHuggingFaceTextualInversionTriggers?.forEach((textualInversion) => {
         if (textualInversion.name !== ' ') {
           const newTextualInversionItem: IAIMenuItem = {
             item: renderTextualInversionOption(textualInversion.name),
@@ -75,20 +83,22 @@ export default function TextualInversionManager() {
           textualInversionsFound.push(newTextualInversionItem);
         }
       });
-      setTextualInversionItems(textualInversionsFound);
     }
-  }, [
-    foundTextualInversionTriggers,
-    handleTextualInversion,
-    renderTextualInversionOption,
-  ]);
 
-  return foundTextualInversionTriggers &&
-    foundTextualInversionTriggers?.length > 0 ? (
+    return textualInversionsFound;
+  };
+
+  return foundLocalTextualInversionTriggers &&
+    (foundLocalTextualInversionTriggers?.length > 0 ||
+      (foundHuggingFaceTextualInversionTriggers &&
+        foundHuggingFaceTextualInversionTriggers?.length > 0 &&
+        shouldShowHuggingFaceConcepts)) ? (
     <IAISimpleMenu
-      menuItems={textualInversionItems}
+      menuItems={makeTextualInversionItems()}
       menuType="regular"
-      buttonText={t('modelManager.addTextualInversionTrigger')}
+      buttonText={`${t(
+        'modelManager.addTextualInversionTrigger'
+      )} (${numOfActiveTextualInversions()})`}
     />
   ) : (
     <Box

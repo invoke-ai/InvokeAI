@@ -52,7 +52,10 @@ export interface SystemState
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
   foundLoras: InvokeAI.FoundLora[] | null;
-  foundTextualInversionTriggers:
+  foundLocalTextualInversionTriggers:
+    | InvokeAI.FoundTextualInversionTriggers[]
+    | null;
+  foundHuggingFaceTextualInversionTriggers:
     | InvokeAI.FoundTextualInversionTriggers[]
     | null;
   openModel: string | null;
@@ -98,7 +101,8 @@ const initialSystemState: SystemState = {
   searchFolder: null,
   foundModels: null,
   foundLoras: null,
-  foundTextualInversionTriggers: null,
+  foundLocalTextualInversionTriggers: null,
+  foundHuggingFaceTextualInversionTriggers: null,
   openModel: null,
   cancelOptions: {
     cancelType: 'immediate',
@@ -274,11 +278,17 @@ export const systemSlice = createSlice({
     ) => {
       state.foundLoras = action.payload;
     },
-    setFoundTextualInversionTriggers: (
+    setFoundLocalTextualInversionTriggers: (
       state,
       action: PayloadAction<InvokeAI.FoundTextualInversionTriggers[] | null>
     ) => {
-      state.foundTextualInversionTriggers = action.payload;
+      state.foundLocalTextualInversionTriggers = action.payload;
+    },
+    setFoundHuggingFaceTextualInversionTriggers: (
+      state,
+      action: PayloadAction<InvokeAI.FoundTextualInversionTriggers[] | null>
+    ) => {
+      state.foundHuggingFaceTextualInversionTriggers = action.payload;
     },
     setOpenModel: (state, action: PayloadAction<string | null>) => {
       state.openModel = action.payload;
@@ -322,7 +332,8 @@ export const {
   setSearchFolder,
   setFoundModels,
   setFoundLoras,
-  setFoundTextualInversionTriggers,
+  setFoundLocalTextualInversionTriggers,
+  setFoundHuggingFaceTextualInversionTriggers,
   setOpenModel,
   setCancelType,
   setCancelAfter,
