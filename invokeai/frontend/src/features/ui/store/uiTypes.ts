@@ -12,5 +12,6 @@ export interface UIState {
   shouldUseCanvasBetaLayout: boolean;
   shouldShowExistingModelsInSearch: boolean;
   shouldUseSliders: boolean;
+  shouldShowHuggingFaceConcepts: boolean;
   addNewModelUIOption: AddNewModelType;
 }

@@ -44,6 +44,7 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
 
   const renderMenuItems = () => {
     const menuItemsToRender: ReactNode[] = [];
+
     menuItems.forEach((menuItem, index) => {
       menuItemsToRender.push(
         <MenuItem
@@ -92,7 +93,7 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
             padding={0}
             borderRadius="0.5rem"
             overflowY="scroll"
-            maxHeight="500px"
+            maxHeight={300}
             backgroundColor="var(--background-color-secondary)"
             color="var(--text-color-secondary)"
             borderColor="var(--border-color)"

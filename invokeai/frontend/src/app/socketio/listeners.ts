@@ -12,7 +12,6 @@ import {
   processingCanceled,
   setCurrentStatus,
   setFoundLoras,
-  setFoundTextualInversionTriggers,
   setFoundModels,
   setIsCancelable,
   setIsConnected,
@@ -21,6 +20,8 @@ import {
   setSearchFolder,
   setSystemConfig,
   setSystemStatus,
+  setFoundLocalTextualInversionTriggers,
+  setFoundHuggingFaceTextualInversionTriggers,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -36,8 +37,10 @@ import type { RootState } from 'app/store';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   clearInitialImage,
+  setHuggingFaceTextualInversionConcepts,
   setInfillMethod,
   setInitialImage,
+  setLocalTextualInversionTriggers,
   setMaskPath,
 } from 'features/parameters/store/generationSlice';
 import { tabMap } from 'features/ui/store/tabMap';
@@ -490,8 +493,31 @@ const makeSocketIOListeners = (
     onFoundTextualInversionTriggers: (
       data: InvokeAI.FoundTextualInversionTriggersResponse
     ) => {
-      dispatch(setFoundTextualInversionTriggers(data));
+      const localTriggers = data.local_triggers;
+      const huggingFaceConcepts = data.huggingface_concepts;
+
+      dispatch(setFoundLocalTextualInversionTriggers(localTriggers));
+      dispatch(
+        setFoundHuggingFaceTextualInversionTriggers(huggingFaceConcepts)
+      );
+
+      // Assign Local TI's
+      const foundLocalTINames: string[] = [];
+      localTriggers.forEach((textualInversion) => {
+        foundLocalTINames.push(textualInversion.name);
+      });
+      dispatch(setLocalTextualInversionTriggers(foundLocalTINames));
+
+      // Assign HuggingFace Concepts
+      const foundHuggingFaceConceptNames: string[] = [];
+      huggingFaceConcepts.forEach((concept) => {
+        foundHuggingFaceConceptNames.push(concept.name);
+      });
+      dispatch(
+        setHuggingFaceTextualInversionConcepts(foundHuggingFaceConceptNames)
+      );
     },
+
     onTempFolderEmptied: () => {
       dispatch(
         addToast({
