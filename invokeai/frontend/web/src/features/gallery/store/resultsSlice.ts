@@ -3,7 +3,7 @@ import { ResultImage } from 'app/invokeai';
 
 import { RootState } from 'app/store';
 import { map } from 'lodash';
-import { getNextResultsPage } from 'services/thunks/extra';
+import { getNextResultsPage } from 'services/thunks/gallery';
 import { isImageOutput } from 'services/types/guards';
 import { prepareResultImage } from 'services/util/prepareResultImage';
 

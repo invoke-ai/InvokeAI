@@ -29,3 +29,15 @@ export const getNextResultsPage = createAppAsyncThunk(
     return response;
   }
 );
+
+export const getInitialResultsPage = createAppAsyncThunk(
+  'results/getMoreResultsImages',
+  async (_arg) => {
+    const response = await SessionsService.listSessions({
+      page: 0,
+      perPage: 10,
+    });
+
+    return response;
+  }
+);
