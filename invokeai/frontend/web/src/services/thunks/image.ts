@@ -11,3 +11,13 @@ export const getImage = createAppAsyncThunk(
     return response;
   }
 );
+
+type UploadImageArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
+
+export const uploadImage = createAppAsyncThunk(
+  'api/uploadImage',
+  async (arg: UploadImageArg, _thunkApi) => {
+    const response = await ImagesService.uploadImage(arg);
+    return response;
+  }
+);
