@@ -127,6 +127,19 @@ export declare type Image = {
   name?: string;
 };
 
+/**
+ * ResultImage
+ */
+export declare type ResultImage = {
+  name: string;
+  url: string;
+  thumbnail: string;
+  width: number;
+  height: number;
+  timestamp: number;
+  metadata?: Metadata;
+};
+
 // GalleryImages is an array of Image.
 export declare type GalleryImages = {
   images: Array<Image>;

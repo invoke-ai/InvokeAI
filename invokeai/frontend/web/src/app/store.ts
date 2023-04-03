@@ -7,6 +7,7 @@ import { getPersistConfig } from 'redux-deep-persist';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
+import resultsReducer from 'features/gallery/store/resultsSlice';
 import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
@@ -80,6 +81,7 @@ const rootReducer = combineReducers({
   ui: uiReducer,
   lightbox: lightboxReducer,
   api: apiReducer,
+  results: resultsReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
