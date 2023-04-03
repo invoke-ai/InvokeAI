@@ -34,7 +34,7 @@ import {
 } from 'services/apiSlice';
 import { emitUnsubscribe } from './actions';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
-import { getNextResultsPage } from 'services/thunks/extra';
+import { getInitialResultsPage } from 'services/thunks/gallery';
 import { prepareResultImage } from 'services/util/prepareResultImage';
 
 /**
@@ -57,7 +57,7 @@ const makeSocketIOListeners = (
         // fetch more results, but only if we don't already have results
         // maybe we should have a different thunk for `onConnect` vs when you click 'Load More'?
         if (!getState().results.ids.length) {
-          dispatch(getNextResultsPage());
+          dispatch(getInitialResultsPage());
         }
       } catch (e) {
         console.error(e);
@@ -98,21 +98,21 @@ const makeSocketIOListeners = (
 
           dispatch(resultAdded(resultImage));
           // // need to update the type for this or figure out how to get these values
-          // dispatch(
-          //   addImage({
-          //     category: 'result',
-          //     image: {
-          //       uuid: uuidv4(),
-          //       url: imageUrl,
-          //       thumbnail: '',
-          //       width: 512,
-          //       height: 512,
-          //       category: 'result',
-          //       name: imageName,
-          //       mtime: new Date().getTime(),
-          //     },
-          //   })
-          // );
+          dispatch(
+            addImage({
+              category: 'result',
+              image: {
+                uuid: uuidv4(),
+                url: resultImage.url,
+                thumbnail: '',
+                width: 512,
+                height: 512,
+                category: 'result',
+                name: resultImage.name,
+                mtime: new Date().getTime(),
+              },
+            })
+          );
 
           dispatch(
             addLogEntry({
