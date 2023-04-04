@@ -19,16 +19,7 @@ const initialtabsState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
-  enabledParameterPanels: {
-    general: true,
-    seed: true,
-    variations: true,
-    faceRestore: true,
-    upscale: true,
-    symmetry: true,
-    other: true,
-    imageToImage: true,
-  },
+  disabledParameterPanels: [],
 };
 
 const initialState: UIState = initialtabsState;
