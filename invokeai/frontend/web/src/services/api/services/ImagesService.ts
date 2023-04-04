@@ -89,7 +89,6 @@ export class ImagesService {
       url: '/api/v1/images/uploads/',
       formData: formData,
       mediaType: 'multipart/form-data',
-      responseHeader: "location",
       errors: {
         404: `Session not found`,
         422: `Validation Error`,

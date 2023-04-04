@@ -1,5 +1,6 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
 import { ImagesService } from 'services/api';
+import { getHeaders } from 'services/util/getHeaders';
 
 type GetImageArg = Parameters<(typeof ImagesService)['getImage']>[0];
 
@@ -18,6 +19,7 @@ export const uploadImage = createAppAsyncThunk(
   'api/uploadImage',
   async (arg: UploadImageArg, _thunkApi) => {
     const response = await ImagesService.uploadImage(arg);
-    return response;
+    const { location } = getHeaders(response);
+    return location;
   }
 );
