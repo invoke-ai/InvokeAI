@@ -5,7 +5,8 @@ import argparse
 from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_type_hints
 from pydantic import BaseModel, Field
 
-from ..invocations.image import ImageField
+from invokeai.app.datatypes.image import ImageField
+
 from ..services.graph import GraphExecutionState
 from ..services.invoker import Invoker
 

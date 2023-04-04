@@ -7,27 +7,10 @@ import numpy
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..services.image_storage import ImageType
+from invokeai.app.datatypes.image import ImageField, ImageType
 from ..services.invocation_services import InvocationServices
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 
-
-class ImageField(BaseModel):
-    """An image field used for passing image objects between invocations"""
-
-    image_type: str = Field(
-        default=ImageType.RESULT, description="The type of the image"
-    )
-    image_name: Optional[str] = Field(default=None, description="The name of the image")
-
-    class Config:
-        schema_extra = {
-            'required': [
-                'image_type',
-                'image_name',
-            ]
-        }
-        
 class ImageOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
     #fmt: off

@@ -10,18 +10,11 @@ from queue import Queue
 from typing import Callable, Dict
 
 from PIL.Image import Image
-from invokeai.app.invocations.image import ImageField
+from invokeai.app.datatypes.image import ImageField, ImageType
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.save_thumbnail import save_thumbnail
 
 from invokeai.backend.image_util import PngWriter
-
-
-class ImageType(str, Enum):
-    RESULT = "results"
-    INTERMEDIATE = "intermediates"
-    UPLOAD = "uploads"
-
 
 class ImageStorageBase(ABC):
     """Responsible for storing and retrieving images."""

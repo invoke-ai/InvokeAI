@@ -8,12 +8,13 @@ from torch import Tensor
 
 from pydantic import Field
 
-from ..services.image_storage import ImageType
+from invokeai.app.datatypes.image import ImageField, ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from .image import ImageOutput
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
 from ...backend.stable_diffusion import PipelineIntermediateState
-from ..util.util import diffusers_step_callback_adapter, CanceledException
+from ..datatypes.exceptions import CanceledException
+from ..util.step_callback import diffusers_step_callback_adapter
 
 SAMPLER_NAME_VALUES = Literal[
     tuple(InvokeAIGenerator.schedulers())

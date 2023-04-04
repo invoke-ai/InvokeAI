@@ -4,7 +4,7 @@ from threading import Event, Thread
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
-from ..util.util import CanceledException
+from ..datatypes.exceptions import CanceledException
 
 class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker_thread: Thread

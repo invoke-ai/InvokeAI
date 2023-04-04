@@ -7,9 +7,9 @@ import numpy
 from PIL import Image, ImageOps
 from pydantic import Field
 
-from ..services.image_storage import ImageType
+from invokeai.app.datatypes.image import ImageField, ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from .image import ImageOutput
 
 
 class CvInpaintInvocation(BaseInvocation):

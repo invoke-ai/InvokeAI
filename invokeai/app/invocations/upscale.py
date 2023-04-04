@@ -5,10 +5,10 @@ from typing import Literal, Union
 
 from pydantic import Field
 
-from ..services.image_storage import ImageType
+from invokeai.app.datatypes.image import ImageField, ImageType
 from ..services.invocation_services import InvocationServices
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from .image import ImageOutput
 
 
 class UpscaleInvocation(BaseInvocation):
