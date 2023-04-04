@@ -1,6 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 import io
 from datetime import datetime, timezone
+import uuid
 
 from fastapi import Path, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
@@ -55,14 +56,14 @@ async def upload_image(file: UploadFile, request: Request):
         # Error opening the image
         return Response(status_code=415)
 
-    filename = f"{str(int(datetime.now(timezone.utc).timestamp()))}.png"
-    ApiDependencies.invoker.services.images.save("uploads", filename, im)
+    filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
+    ApiDependencies.invoker.services.images.save(ImageType.UPLOAD, filename, im)
 
     return Response(
         status_code=201,
         headers={
             "Location": request.url_for(
-                "get_image", image_type="uploads", image_name=filename
+                "get_image", image_type=ImageType.UPLOAD.value, image_name=filename
             )
         },
     )
