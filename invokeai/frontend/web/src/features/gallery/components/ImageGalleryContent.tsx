@@ -31,8 +31,8 @@ import {
   selectResultsTotal,
 } from '../store/resultsSlice';
 import {
-  getNextResultsPage,
-  getNextUploadsPage,
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
 } from 'services/thunks/gallery';
 import { selectUploadsAll, uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
@@ -90,11 +90,11 @@ const ImageGalleryContent = () => {
   // };
   const handleClickLoadMore = () => {
     if (currentCategory === 'result') {
-      dispatch(getNextResultsPage());
+      dispatch(receivedResultImagesPage());
     }
 
     if (currentCategory === 'user') {
-      dispatch(getNextUploadsPage());
+      dispatch(receivedUploadImagesPage());
     }
   };
 
@@ -249,20 +249,17 @@ const ImageGalleryContent = () => {
                 gap={2}
                 style={{ gridTemplateColumns: galleryGridTemplateColumns }}
               >
-                {/* {images.map((image) => {
-                  const { uuid } = image;
-                  const isSelected = currentImageUuid === uuid;
+                {images.map((image) => {
+                  const { name } = image;
+                  const isSelected = currentImageUuid === name;
                   return (
                     <HoverableImage
-                      key={uuid}
+                      key={name}
                       image={image}
                       isSelected={isSelected}
                     />
                   );
-                })} */}
-                {images.map((image) => (
-                  <Image key={image.name} src={image.thumbnail} />
-                ))}
+                })}
               </Grid>
               <IAIButton
                 onClick={handleClickLoadMore}

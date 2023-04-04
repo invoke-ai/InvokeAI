@@ -6,20 +6,23 @@ import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
-import { gallerySelector } from '../store/gallerySelectors';
+import {
+  gallerySelector,
+  selectedImageSelector,
+} from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
 
 export const imagesSelector = createSelector(
-  [gallerySelector, uiSelector],
-  (gallery: GalleryState, ui) => {
+  [gallerySelector, uiSelector, selectedImageSelector],
+  (gallery: GalleryState, ui, selectedImage) => {
     const { currentImage, intermediateImage } = gallery;
     const { shouldShowImageDetails, shouldHidePreview } = ui;
 
     return {
-      imageToDisplay: intermediateImage ? intermediateImage : currentImage,
+      imageToDisplay: intermediateImage ? intermediateImage : selectedImage,
       isIntermediate: Boolean(intermediateImage),
       shouldShowImageDetails,
       shouldHidePreview,
@@ -86,7 +89,7 @@ export default function CurrentImagePreview() {
             maxHeight: APP_METADATA_HEIGHT,
           }}
         >
-          <ImageMetadataViewer image={imageToDisplay} />
+          {/* <ImageMetadataViewer image={imageToDisplay} /> */}
         </Box>
       )}
     </Flex>

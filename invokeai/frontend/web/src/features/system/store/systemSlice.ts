@@ -2,7 +2,12 @@ import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
+import { invocationComplete } from 'app/nodesSocketio/actions';
+import { resultAdded } from 'features/gallery/store/resultsSlice';
+import dateFormat from 'dateformat';
+
 import i18n from 'i18n';
+import { isImageOutput } from 'services/types/guards';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -271,6 +276,29 @@ export const systemSlice = createSlice({
     setCancelAfter: (state, action: PayloadAction<number | null>) => {
       state.cancelOptions.cancelAfter = action.payload;
     },
+    socketioConnected: (state) => {
+      state.isConnected = true;
+      state.currentStatus = i18n.t('common.statusConnected');
+    },
+    socketioDisconnected: (state) => {
+      state.isConnected = false;
+      state.currentStatus = i18n.t('common.statusDisconnected');
+    },
+  },
+  extraReducers(builder) {
+    builder.addCase(invocationComplete, (state, action) => {
+      const { data, timestamp } = action.payload;
+      state.isProcessing = false;
+      state.isCancelable = false;
+
+      if (isImageOutput(data.result)) {
+        state.log.push({
+          timestamp: dateFormat(timestamp, 'isoDateTime'),
+          message: `Generated: ${data.result.image.image_name}`,
+          level: 'info',
+        });
+      }
+    });
   },
 });
 
@@ -306,6 +334,8 @@ export const {
   setOpenModel,
   setCancelType,
   setCancelAfter,
+  socketioConnected,
+  socketioDisconnected,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
