@@ -9,7 +9,10 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setCurrentImage } from 'features/gallery/store/gallerySlice';
+import {
+  imageSelected,
+  setCurrentImage,
+} from 'features/gallery/store/gallerySlice';
 import {
   setAllImageToImageParameters,
   setAllParameters,
@@ -33,14 +36,14 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
 
 interface HoverableImageProps {
-  image: InvokeAI._Image;
+  image: InvokeAI.Image;
   isSelected: boolean;
 }
 
 const memoEqualityCheck = (
   prev: HoverableImageProps,
   next: HoverableImageProps
-) => prev.image.uuid === next.image.uuid && prev.isSelected === next.isSelected;
+) => prev.image.name === next.image.name && prev.isSelected === next.isSelected;
 
 /**
  * Gallery image component with delete/use all/use seed buttons on hover.
@@ -55,7 +58,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     shouldUseSingleGalleryColumn,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
-  const { url, thumbnail, uuid, metadata } = image;
+  const { url, thumbnail, name, metadata } = image;
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -92,7 +95,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
-    dispatch(setInitialImage(image));
+    // dispatch(setInitialImage(image));
     if (activeTabName !== 'img2img') {
       dispatch(setActiveTab('img2img'));
     }
@@ -105,7 +108,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToCanvas = () => {
-    dispatch(setInitialCanvasImage(image));
+    // dispatch(setInitialCanvasImage(image));
 
     dispatch(resizeAndScaleCanvas());
 
@@ -155,16 +158,19 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     });
   };
 
-  const handleSelectImage = () => dispatch(setCurrentImage(image));
+  const handleSelectImage = () => {
+    dispatch(imageSelected(image.name));
+    // dispatch(setCurrentImage(image));
+  };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData('invokeai/imageUuid', uuid);
-    e.dataTransfer.effectAllowed = 'move';
+    // e.dataTransfer.setData('invokeai/imageUuid', uuid);
+    // e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleLightBox = () => {
-    dispatch(setCurrentImage(image));
-    dispatch(setIsLightboxOpen(true));
+    // dispatch(setCurrentImage(image));
+    // dispatch(setIsLightboxOpen(true));
   };
 
   return (
@@ -209,9 +215,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             {t('parameters.sendToUnifiedCanvas')}
           </MenuItem>
           <MenuItem data-warning>
-            <DeleteImageModal image={image}>
+            {/* <DeleteImageModal image={image}>
               <p>{t('parameters.deleteImage')}</p>
-            </DeleteImageModal>
+            </DeleteImageModal> */}
           </MenuItem>
         </MenuList>
       )}
@@ -219,7 +225,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       {(ref) => (
         <Box
           position="relative"
-          key={uuid}
+          key={name}
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
           userSelect="none"
@@ -290,7 +296,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 insetInlineEnd: 1,
               }}
             >
-              <DeleteImageModal image={image}>
+              {/* <DeleteImageModal image={image}>
                 <IAIIconButton
                   aria-label={t('parameters.deleteImage')}
                   icon={<FaTrashAlt />}
@@ -298,7 +304,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                   fontSize={14}
                   isDisabled={!mayDeleteImage}
                 />
-              </DeleteImageModal>
+              </DeleteImageModal> */}
             </Box>
           )}
         </Box>

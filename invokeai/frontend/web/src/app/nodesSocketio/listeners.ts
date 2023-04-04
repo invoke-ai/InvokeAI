@@ -10,6 +10,8 @@ import {
   setIsCancelable,
   setIsConnected,
   setIsProcessing,
+  socketioConnected,
+  socketioDisconnected,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -32,13 +34,13 @@ import {
   setStatus,
   STATUS,
 } from 'services/apiSlice';
-import { emitUnsubscribe } from './actions';
+import { emitUnsubscribe, invocationComplete } from './actions';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
 import {
-  getNextResultsPage,
-  getNextUploadsPage,
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
 } from 'services/thunks/gallery';
-import { processImageField } from 'services/util/processImageField';
+import { deserializeImageField } from 'services/util/deserializeImageField';
 
 /**
  * Returns an object containing listener callbacks
@@ -54,15 +56,15 @@ const makeSocketIOListeners = (
      */
     onConnect: () => {
       try {
-        dispatch(setIsConnected(true));
-        dispatch(setCurrentStatus(i18n.t('common.statusConnected')));
+        dispatch(socketioConnected());
 
         // fetch more images, but only if we don't already have images
         if (!getState().results.ids.length) {
-          dispatch(getNextResultsPage());
+          dispatch(receivedResultImagesPage());
         }
+
         if (!getState().uploads.ids.length) {
-          dispatch(getNextUploadsPage());
+          dispatch(receivedUploadImagesPage());
         }
       } catch (e) {
         console.error(e);
@@ -73,8 +75,8 @@ const makeSocketIOListeners = (
      */
     onDisconnect: () => {
       try {
-        dispatch(setIsConnected(false));
-        dispatch(setCurrentStatus(i18n.t('common.statusDisconnected')));
+        dispatch(socketioDisconnected());
+        dispatch(emitUnsubscribe(getState().api.sessionId));
 
         dispatch(
           addLogEntry({
@@ -97,38 +99,40 @@ const makeSocketIOListeners = (
     onInvocationComplete: (data: InvocationCompleteEvent) => {
       console.log('invocation_complete', data);
       try {
+        dispatch(invocationComplete({ data, timestamp: new Date() }));
+
         const sessionId = data.graph_execution_state_id;
         if (data.result.type === 'image') {
-          const resultImage = processImageField(data.result.image);
+          // const resultImage = deserializeImageField(data.result.image);
 
-          dispatch(resultAdded(resultImage));
+          // dispatch(resultAdded(resultImage));
           // // need to update the type for this or figure out how to get these values
-          dispatch(
-            addImage({
-              category: 'result',
-              image: {
-                uuid: uuidv4(),
-                url: resultImage.url,
-                thumbnail: '',
-                width: 512,
-                height: 512,
-                category: 'result',
-                name: resultImage.name,
-                mtime: new Date().getTime(),
-              },
-            })
-          );
+          // dispatch(
+          //   addImage({
+          //     category: 'result',
+          //     image: {
+          //       uuid: uuidv4(),
+          //       url: resultImage.url,
+          //       thumbnail: '',
+          //       width: 512,
+          //       height: 512,
+          //       category: 'result',
+          //       name: resultImage.name,
+          //       mtime: new Date().getTime(),
+          //     },
+          //   })
+          // );
+          // dispatch(setIsProcessing(false));
+          // dispatch(setIsCancelable(false));
 
-          dispatch(
-            addLogEntry({
-              timestamp: dateFormat(new Date(), 'isoDateTime'),
-              message: `Generated: ${data.result.image.image_name}`,
-            })
-          );
-          dispatch(setIsProcessing(false));
-          dispatch(setIsCancelable(false));
+          // dispatch(
+          //   addLogEntry({
+          //     timestamp: dateFormat(new Date(), 'isoDateTime'),
+          //     message: `Generated: ${data.result.image.image_name}`,
+          //   })
+          // );
           dispatch(emitUnsubscribe(sessionId));
-          dispatch(setSessionId(null));
+          // dispatch(setSessionId(''));
         }
       } catch (e) {
         console.error(e);

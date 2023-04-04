@@ -1,9 +1,16 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
+import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { Image } from 'app/invokeai';
+import { invocationComplete } from 'app/nodesSocketio/actions';
 
 import { RootState } from 'app/store';
-import { getNextResultsPage, IMAGES_PER_PAGE } from 'services/thunks/gallery';
-import { processImageField } from 'services/util/processImageField';
+import { socketioConnected } from 'features/system/store/systemSlice';
+import {
+  receivedResultImagesPage,
+  IMAGES_PER_PAGE,
+} from 'services/thunks/gallery';
+import { isImageOutput } from 'services/types/guards';
+import { deserializeImageField } from 'services/util/deserializeImageField';
+import { setCurrentCategory } from './gallerySlice';
 
 // use `createEntityAdapter` to create a slice for results images
 // https://redux-toolkit.js.org/api/createEntityAdapter#overview
@@ -47,13 +54,14 @@ const resultsSlice = createSlice({
   extraReducers: (builder) => {
     // here we can respond to a fulfilled call of the `getNextResultsPage` thunk
     // because we pass in the fulfilled thunk action creator, everything is typed
-    builder.addCase(getNextResultsPage.pending, (state) => {
+    builder.addCase(receivedResultImagesPage.pending, (state) => {
       state.isLoading = true;
     });
-    builder.addCase(getNextResultsPage.fulfilled, (state, action) => {
+
+    builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
-      const resultImages = items.map((image) => processImageField(image));
+      const resultImages = items.map((image) => deserializeImageField(image));
 
       // use the adapter reducer to append all the results to state
       resultsAdapter.addMany(state, resultImages);
@@ -62,6 +70,15 @@ const resultsSlice = createSlice({
       state.pages = pages;
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
+    });
+
+    builder.addCase(invocationComplete, (state, action) => {
+      const { data } = action.payload;
+
+      if (isImageOutput(data.result)) {
+        const resultImage = deserializeImageField(data.result.image);
+        resultsAdapter.addOne(state, resultImage);
+      }
     });
   },
 });
