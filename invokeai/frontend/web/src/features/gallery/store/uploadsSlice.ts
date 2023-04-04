@@ -2,8 +2,11 @@ import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
 import { Image } from 'app/invokeai';
 
 import { RootState } from 'app/store';
-import { getNextUploadsPage, IMAGES_PER_PAGE } from 'services/thunks/gallery';
-import { processImageField } from 'services/util/processImageField';
+import {
+  receivedUploadImagesPage,
+  IMAGES_PER_PAGE,
+} from 'services/thunks/gallery';
+import { deserializeImageField } from 'services/util/deserializeImageField';
 
 export const uploadsAdapter = createEntityAdapter<Image>({
   selectId: (image) => image.name,
@@ -29,13 +32,13 @@ const uploadsSlice = createSlice({
     uploadAdded: uploadsAdapter.addOne,
   },
   extraReducers: (builder) => {
-    builder.addCase(getNextUploadsPage.pending, (state) => {
+    builder.addCase(receivedUploadImagesPage.pending, (state) => {
       state.isLoading = true;
     });
-    builder.addCase(getNextUploadsPage.fulfilled, (state, action) => {
+    builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
-      const images = items.map((image) => processImageField(image));
+      const images = items.map((image) => deserializeImageField(image));
 
       uploadsAdapter.addMany(state, images);
 

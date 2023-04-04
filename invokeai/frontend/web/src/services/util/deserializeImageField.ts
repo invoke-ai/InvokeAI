@@ -27,7 +27,7 @@ export const extractTimestampFromImageName = (imageName: string) => {
   return Number(timestamp);
 };
 
-export const processImageField = (image: ImageField): Image => {
+export const deserializeImageField = (image: ImageField): Image => {
   const name = image.image_name;
   const type = image.image_type;
 

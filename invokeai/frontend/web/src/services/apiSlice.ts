@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { ProgressImage } from './events/types';
 import { createSession, invokeSession } from 'services/thunks/session';
 import { getImage, uploadImage } from './thunks/image';
+import { invocationComplete } from 'app/nodesSocketio/actions';
 
 /**
  * Just temp until we work out better statuses
@@ -17,14 +18,14 @@ export enum STATUS {
  * Type for the temp (?) API slice.
  */
 export interface APIState {
-  sessionId: string | null;
+  sessionId: string;
   progressImage: ProgressImage | null;
   progress: number | null;
   status: STATUS;
 }
 
 const initialSystemState: APIState = {
-  sessionId: null,
+  sessionId: '',
   status: STATUS.idle,
   progress: null,
   progressImage: null,
@@ -105,6 +106,9 @@ export const apiSlice = createSlice({
     builder.addCase(uploadImage.rejected, (state, action) => {
       // !HTTP 200
       // state.networkStatus = 'idle'
+    });
+    builder.addCase(invocationComplete, (state) => {
+      state.sessionId = '';
     });
   },
 });

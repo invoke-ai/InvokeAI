@@ -7,6 +7,8 @@ import {
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
+import { selectResultsAll, selectResultsEntities } from './resultsSlice';
+import { selectUploadsAll, selectUploadsEntities } from './uploadsSlice';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
@@ -73,5 +75,20 @@ export const hoverableImageSelector = createSelector(
     memoizeOptions: {
       resultEqualityCheck: isEqual,
     },
+  }
+);
+
+export const selectedImageSelector = createSelector(
+  [gallerySelector, selectResultsEntities, selectUploadsEntities],
+  (gallery, allResults, allUploads) => {
+    const selectedImageName = gallery.selectedImageName;
+
+    if (selectedImageName in allResults) {
+      return allResults[selectedImageName];
+    }
+
+    if (selectedImageName in allUploads) {
+      return allUploads[selectedImageName];
+    }
   }
 );

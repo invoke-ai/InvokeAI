@@ -10,6 +10,7 @@ import {
   InvocationErrorEvent,
   InvocationStartedEvent,
 } from 'services/events/types';
+import { invocationComplete } from './actions';
 
 const socket_url = `ws://${window.location.host}`;
 
@@ -40,6 +41,12 @@ export const socketioMiddleware = () => {
 
     areListenersSet = true;
 
+    // use the action's match() function for type narrowing and safety
+    if (invocationComplete.match(action)) {
+      emitUnsubscribe(action.payload.data.graph_execution_state_id);
+      socketio.removeAllListeners();
+    }
+
     /**
      * Handle redux actions caught by middleware.
      */
@@ -63,12 +70,12 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/unsubscribe': {
-        emitUnsubscribe(action.payload);
+      // case 'socketio/unsubscribe': {
+      //   emitUnsubscribe(action.payload);
 
-        socketio.removeAllListeners();
-        break;
-      }
+      //   socketio.removeAllListeners();
+      //   break;
+      // }
     }
 
     next(action);
