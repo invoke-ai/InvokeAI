@@ -113,7 +113,7 @@ const MetadataItem = ({
 };
 
 type ImageMetadataViewerProps = {
-  image: InvokeAI.Image;
+  image: InvokeAI._Image;
 };
 
 // TODO: I don't know if this is needed.

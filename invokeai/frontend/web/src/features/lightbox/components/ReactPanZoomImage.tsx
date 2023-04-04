@@ -3,7 +3,7 @@ import { TransformComponent, useTransformContext } from 'react-zoom-pan-pinch';
 import * as InvokeAI from 'app/invokeai';
 
 type ReactPanZoomProps = {
-  image: InvokeAI.Image;
+  image: InvokeAI._Image;
   styleClass?: string;
   alt?: string;
   ref?: React.Ref<HTMLImageElement>;

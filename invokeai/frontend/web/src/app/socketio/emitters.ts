@@ -91,7 +91,7 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
+    emitRunESRGAN: (imageToProcess: InvokeAI._Image) => {
       dispatch(setIsProcessing(true));
 
       const {
@@ -119,7 +119,7 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
+    emitRunFacetool: (imageToProcess: InvokeAI._Image) => {
       dispatch(setIsProcessing(true));
 
       const {
@@ -150,7 +150,7 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
+    emitDeleteImage: (imageToDelete: InvokeAI._Image) => {
       const { url, uuid, category, thumbnail } = imageToDelete;
       dispatch(removeImage(imageToDelete));
       socketio.emit('deleteImage', url, thumbnail, uuid, category);
