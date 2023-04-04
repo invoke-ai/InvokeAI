@@ -5,28 +5,16 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 import { getPersistConfig } from 'redux-deep-persist';
 
-import canvasReducer, { canvasSlice } from 'features/canvas/store/canvasSlice';
-import galleryReducer, {
-  gallerySlice,
-} from 'features/gallery/store/gallerySlice';
-import resultsReducer, {
-  resultsSlice,
-} from 'features/gallery/store/resultsSlice';
-import uploadsReducer, {
-  uploadsSlice,
-} from 'features/gallery/store/uploadsSlice';
-import lightboxReducer, {
-  lightboxSlice,
-} from 'features/lightbox/store/lightboxSlice';
-import generationReducer, {
-  generationSlice,
-} from 'features/parameters/store/generationSlice';
-import postprocessingReducer, {
-  postprocessingSlice,
-} from 'features/parameters/store/postprocessingSlice';
-import systemReducer, { systemSlice } from 'features/system/store/systemSlice';
+import canvasReducer from 'features/canvas/store/canvasSlice';
+import galleryReducer from 'features/gallery/store/gallerySlice';
+import resultsReducer from 'features/gallery/store/resultsSlice';
+import uploadsReducer from 'features/gallery/store/uploadsSlice';
+import lightboxReducer from 'features/lightbox/store/lightboxSlice';
+import generationReducer from 'features/parameters/store/generationSlice';
+import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
+import systemReducer from 'features/system/store/systemSlice';
 import uiReducer, { uiSlice } from 'features/ui/store/uiSlice';
-import apiReducer, { apiSlice } from 'services/apiSlice';
+import apiReducer from 'services/apiSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketioMiddleware as nodesSocketioMiddleware } from './nodesSocketio/middleware';
@@ -129,21 +117,6 @@ interface InitializeStore {
   disabledPanels?: string[];
 }
 
-const disablePanels = ({
-  disabledPanels,
-  enabledParameterPanels,
-}: {
-  disabledPanels: string[];
-  enabledParameterPanels: { [key: string]: boolean };
-}) => {
-  const updatedParameterPanels: { [key: string]: boolean } = {};
-  Object.keys(enabledParameterPanels).forEach(function (key, index) {
-    updatedParameterPanels[key] =
-      disabledPanels.indexOf(key) >= 0 ? false : true;
-  });
-  return updatedParameterPanels;
-};
-
 // Continue with store setup
 export const initializeStore = ({ disabledPanels = [] }: InitializeStore) =>
   configureStore({
@@ -156,11 +129,7 @@ export const initializeStore = ({ disabledPanels = [] }: InitializeStore) =>
     preloadedState: {
       ui: {
         ...uiSlice.getInitialState(),
-        enabledParameterPanels: disablePanels({
-          disabledPanels,
-          enabledParameterPanels:
-            uiSlice.getInitialState().enabledParameterPanels,
-        }),
+        disabledParameterPanels: disabledPanels,
       },
     },
     devTools: {

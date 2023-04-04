@@ -13,5 +13,5 @@ export interface UIState {
   addNewModelUIOption: AddNewModelType;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
-  enabledParameterPanels: { [key: string]: boolean };
+  disabledParameterPanels: string[];
 }

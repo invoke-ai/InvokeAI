@@ -24,7 +24,7 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
   const { system, ui } = useAppSelector((state: RootState) => state);
 
   const { openAccordions } = system;
-  const { enabledParameterPanels } = ui;
+  const { disabledParameterPanels } = ui;
 
   const dispatch = useAppDispatch();
 
@@ -42,7 +42,7 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
           accordionInfo[key];
 
         // do not render if panel is disabled in global state
-        if (enabledParameterPanels[key] !== false) {
+        if (disabledParameterPanels.indexOf(key) > -1) {
           accordionsToRender.push(
             <InvokeAccordionItem
               key={key}
