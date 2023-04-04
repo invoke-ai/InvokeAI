@@ -44,7 +44,7 @@ const ImageToImageParameters = () => {
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
     },
-    faceRestore: {
+    face_restore: {
       header: `${t('parameters.faceRestoration')}`,
       feature: Feature.FACE_CORRECTION,
       content: <FaceRestoreSettings />,
