@@ -2,13 +2,16 @@
 
 import datetime
 import os
+from glob import glob
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 from queue import Queue
-from typing import Dict
+from typing import Callable, Dict
 
 from PIL.Image import Image
+from invokeai.app.invocations.image import ImageField
+from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.save_thumbnail import save_thumbnail
 
 from invokeai.backend.image_util import PngWriter
@@ -25,6 +28,10 @@ class ImageStorageBase(ABC):
 
     @abstractmethod
     def get(self, image_type: ImageType, image_name: str) -> Image:
+        pass
+
+    @abstractmethod
+    def list(self, image_type: ImageType, page: int = 0, per_page: int = 10) -> PaginatedResults[ImageField]:
         pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
@@ -70,6 +77,19 @@ class DiskImageStorage(ImageStorageBase):
             Path(os.path.join(output_folder, image_type, "thumbnails")).mkdir(
                 parents=True, exist_ok=True
             )
+
+    def list(self, image_type: ImageType, page: int = 0, per_page: int = 10) -> PaginatedResults[ImageField]:
+        dir_path = os.path.join(self.__output_folder, image_type)
+        image_paths = glob(f"{dir_path}/*.png")
+        image_list = list(map(lambda i: ImageField(image_type=image_type, image_name=i), image_paths))
+
+        count = len(image_list)
+        image_page = image_list[page * per_page : (page + 1) * per_page]
+        page_count = int(count / per_page) + 1
+
+        return PaginatedResults[ImageField](
+            items=image_page, page=page, pages=page_count, per_page=per_page, total=count
+        )
 
     def get(self, image_type: ImageType, image_name: str) -> Image:
         image_path = self.get_path(image_type, image_name)

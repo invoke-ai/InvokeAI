@@ -2,10 +2,12 @@
 import io
 from datetime import datetime, timezone
 
-from fastapi import Path, Request, UploadFile
+from fastapi import Path, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRouter
 from PIL import Image
+from invokeai.app.invocations.image import ImageField
+from invokeai.app.services.item_storage import PaginatedResults
 
 from ...services.image_storage import ImageType
 from ..dependencies import ApiDependencies
@@ -64,3 +66,18 @@ async def upload_image(file: UploadFile, request: Request):
             )
         },
     )
+
+@images_router.get(
+    "/uploads/",
+    operation_id="list_uploads",
+    responses={200: {"model": PaginatedResults[ImageField]}},
+)
+async def list_uploads(
+    page: int = Query(default=0, description="The page of uploads to get"),
+    per_page: int = Query(default=10, description="The number of uploads per page"),
+) -> PaginatedResults[ImageField]:
+    """Gets a list of uploads"""
+    result = ApiDependencies.invoker.services.images.list(
+        ImageType.UPLOAD, page, per_page
+    )
+    return result
