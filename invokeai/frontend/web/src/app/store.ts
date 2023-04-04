@@ -8,6 +8,7 @@ import { getPersistConfig } from 'redux-deep-persist';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
 import resultsReducer from 'features/gallery/store/resultsSlice';
+import uploadsReducer from 'features/gallery/store/uploadsSlice';
 import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
@@ -82,6 +83,7 @@ const rootReducer = combineReducers({
   lightbox: lightboxReducer,
   api: apiReducer,
   results: resultsReducer,
+  uploads: uploadsReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -94,8 +96,9 @@ const rootPersistConfig = getPersistConfig({
     ...galleryBlacklist,
     ...lightboxBlacklist,
     ...apiBlacklist,
-    // for now, never persist the results slice
+    // for now, never persist the results/uploads slices
     'results',
+    'uploads',
   ],
   debounce: 300,
 });

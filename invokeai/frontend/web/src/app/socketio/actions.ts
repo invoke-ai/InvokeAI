@@ -13,9 +13,13 @@ import { InvokeTabName } from 'features/ui/store/tabMap';
 export const generateImage = createAction<InvokeTabName>(
   'socketio/generateImage'
 );
-export const runESRGAN = createAction<InvokeAI.Image>('socketio/runESRGAN');
-export const runFacetool = createAction<InvokeAI.Image>('socketio/runFacetool');
-export const deleteImage = createAction<InvokeAI.Image>('socketio/deleteImage');
+export const runESRGAN = createAction<InvokeAI._Image>('socketio/runESRGAN');
+export const runFacetool = createAction<InvokeAI._Image>(
+  'socketio/runFacetool'
+);
+export const deleteImage = createAction<InvokeAI._Image>(
+  'socketio/deleteImage'
+);
 export const requestImages = createAction<GalleryCategory>(
   'socketio/requestImages'
 );
