@@ -13,7 +13,7 @@ import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
-import uiReducer, { uiSlice } from 'features/ui/store/uiSlice';
+import uiReducer from 'features/ui/store/uiSlice';
 import apiReducer from 'services/apiSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
@@ -113,41 +113,28 @@ function buildMiddleware() {
   }
 }
 
-interface InitializeStore {
-  disabledPanels?: string[];
-}
-
 // Continue with store setup
-export const initializeStore = ({ disabledPanels = [] }: InitializeStore) =>
-  configureStore({
-    reducer: persistedReducer,
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({
-        immutableCheck: false,
-        serializableCheck: false,
-      }).concat(buildMiddleware()),
-    preloadedState: {
-      ui: {
-        ...uiSlice.getInitialState(),
-        disabledParameterPanels: disabledPanels,
-      },
-    },
-    devTools: {
-      // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
-      actionsDenylist: [
-        'canvas/setCursorPosition',
-        'canvas/setStageCoordinates',
-        'canvas/setStageScale',
-        'canvas/setIsDrawing',
-        'canvas/setBoundingBoxCoordinates',
-        'canvas/setBoundingBoxDimensions',
-        'canvas/setIsDrawing',
-        'canvas/addPointToCurrentLine',
-      ],
-    },
-  });
-
-const store = initializeStore({});
+export const store = configureStore({
+  reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      immutableCheck: false,
+      serializableCheck: false,
+    }).concat(buildMiddleware()),
+  devTools: {
+    // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
+    actionsDenylist: [
+      'canvas/setCursorPosition',
+      'canvas/setStageCoordinates',
+      'canvas/setStageScale',
+      'canvas/setIsDrawing',
+      'canvas/setBoundingBoxCoordinates',
+      'canvas/setBoundingBoxDimensions',
+      'canvas/setIsDrawing',
+      'canvas/addPointToCurrentLine',
+    ],
+  },
+});
 
 export type AppGetState = typeof store.getState;
 export type RootState = ReturnType<typeof store.getState>;
