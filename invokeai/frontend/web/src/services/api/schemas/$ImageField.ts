@@ -5,8 +5,11 @@ export const $ImageField = {
   description: `An image field used for passing image objects between invocations`,
   properties: {
     image_type: {
-      type: 'string',
+      type: 'all-of',
       description: `The type of the image`,
+      contains: [{
+        type: 'ImageType',
+      }],
       isRequired: true,
     },
     image_name: {
