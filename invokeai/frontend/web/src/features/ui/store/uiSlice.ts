@@ -93,6 +93,9 @@ export const uiSlice = createSlice({
         state.shouldShowParametersPanel = true;
       }
     },
+    setDisabledPanels: (state, action: PayloadAction<string[]>) => {
+      state.disabledParameterPanels = action.payload;
+    },
   },
 });
 
@@ -114,6 +117,7 @@ export const {
   togglePinParametersPanel,
   toggleParametersPanel,
   toggleGalleryPanel,
+  setDisabledPanels,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
