@@ -1,9 +1,11 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
+import { invocationComplete } from 'app/nodesSocketio/actions';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash';
+import { isImageOutput } from 'services/types/guards';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -23,6 +25,7 @@ export type Gallery = {
 };
 
 export interface GalleryState {
+  selectedImageName: string;
   currentImage?: InvokeAI._Image;
   currentImageUuid: string;
   intermediateImage?: InvokeAI._Image & {
@@ -42,6 +45,7 @@ export interface GalleryState {
 }
 
 const initialState: GalleryState = {
+  selectedImageName: '',
   currentImageUuid: '',
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
@@ -69,6 +73,9 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState,
   reducers: {
+    imageSelected: (state, action: PayloadAction<string>) => {
+      state.selectedImageName = action.payload;
+    },
     setCurrentImage: (state, action: PayloadAction<InvokeAI._Image>) => {
       state.currentImage = action.payload;
       state.currentImageUuid = action.payload.uuid;
@@ -255,9 +262,19 @@ export const gallerySlice = createSlice({
       state.shouldUseSingleGalleryColumn = action.payload;
     },
   },
+  extraReducers(builder) {
+    builder.addCase(invocationComplete, (state, action) => {
+      const { data } = action.payload;
+      if (isImageOutput(data.result)) {
+        state.selectedImageName = data.result.image.image_name;
+        state.intermediateImage = undefined;
+      }
+    });
+  },
 });
 
 export const {
+  imageSelected,
   addImage,
   clearIntermediateImage,
   removeImage,

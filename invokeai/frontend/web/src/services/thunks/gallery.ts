@@ -3,8 +3,8 @@ import { ImagesService } from 'services/api';
 
 export const IMAGES_PER_PAGE = 20;
 
-export const getNextResultsPage = createAppAsyncThunk(
-  'results/getInitialResultsPage',
+export const receivedResultImagesPage = createAppAsyncThunk(
+  'results/receivedResultImagesPage',
   async (_arg, { getState }) => {
     const response = await ImagesService.listImages({
       imageType: 'results',
@@ -16,8 +16,8 @@ export const getNextResultsPage = createAppAsyncThunk(
   }
 );
 
-export const getNextUploadsPage = createAppAsyncThunk(
-  'uploads/getNextUploadsPage',
+export const receivedUploadImagesPage = createAppAsyncThunk(
+  'uploads/receivedUploadImagesPage',
   async (_arg, { getState }) => {
     const response = await ImagesService.listImages({
       imageType: 'uploads',
