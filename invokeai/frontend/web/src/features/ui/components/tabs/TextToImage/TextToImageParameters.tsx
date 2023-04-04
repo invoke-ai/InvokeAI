@@ -38,7 +38,7 @@ const TextToImageParameters = () => {
       content: <VariationsSettings />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
     },
-    face_restore: {
+    faceRestore: {
       header: `${t('parameters.faceRestoration')}`,
       feature: Feature.FACE_CORRECTION,
       content: <FaceRestoreSettings />,

@@ -14,4 +14,5 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
+  enabledParameterPanels: { [key: string]: boolean };
 }

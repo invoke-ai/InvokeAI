@@ -21,9 +21,10 @@ type ParametersAccordionsType = {
 const ParametersAccordion = (props: ParametersAccordionsType) => {
   const { accordionInfo } = props;
 
-  const openAccordions = useAppSelector(
-    (state: RootState) => state.system.openAccordions
-  );
+  const { system, ui } = useAppSelector((state: RootState) => state);
+
+  const { openAccordions } = system;
+  const { enabledParameterPanels } = ui;
 
   const dispatch = useAppDispatch();
 
@@ -39,15 +40,19 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
       Object.keys(accordionInfo).forEach((key) => {
         const { header, feature, content, additionalHeaderComponents } =
           accordionInfo[key];
-        accordionsToRender.push(
-          <InvokeAccordionItem
-            key={key}
-            header={header}
-            feature={feature}
-            content={content}
-            additionalHeaderComponents={additionalHeaderComponents}
-          />
-        );
+
+        // do not render if panel is disabled in global state
+        if (enabledParameterPanels[key] !== false) {
+          accordionsToRender.push(
+            <InvokeAccordionItem
+              key={key}
+              header={header}
+              feature={feature}
+              content={content}
+              additionalHeaderComponents={additionalHeaderComponents}
+            />
+          );
+        }
       });
     }
     return accordionsToRender;

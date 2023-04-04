@@ -68,6 +68,7 @@ declare module '@invoke-ai/invoke-ai-ui' {
 
 interface InvokeProps extends PropsWithChildren {
   apiUrl?: string;
+  disabledPanels?: string[];
 }
 
 declare function Invoke(props: InvokeProps): JSX.Element;
