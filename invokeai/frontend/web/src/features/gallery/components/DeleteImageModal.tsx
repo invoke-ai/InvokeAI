@@ -52,7 +52,7 @@ interface DeleteImageModalProps {
   /**
    * The image to delete.
    */
-  image?: InvokeAI.Image;
+  image?: InvokeAI._Image;
 }
 
 /**

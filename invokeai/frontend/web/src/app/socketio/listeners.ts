@@ -262,7 +262,7 @@ const makeSocketIOListeners = (
        */
 
       // Generate a UUID for each image
-      const preparedImages = images.map((image): InvokeAI.Image => {
+      const preparedImages = images.map((image): InvokeAI._Image => {
         return {
           uuid: uuidv4(),
           ...image,
@@ -334,7 +334,7 @@ const makeSocketIOListeners = (
 
       if (
         initialImage === url ||
-        (initialImage as InvokeAI.Image)?.url === url
+        (initialImage as InvokeAI._Image)?.url === url
       ) {
         dispatch(clearInitialImage());
       }

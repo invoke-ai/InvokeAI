@@ -36,7 +36,7 @@ export const invokeMiddleware: Middleware =
       console.log('uploadImage.fulfilled');
 
       // TODO: actually get correct attributes here
-      const newImage: InvokeAI.Image = {
+      const newImage: InvokeAI._Image = {
         uuid: uuidv4(),
         category: 'user',
         url: uploadLocation,

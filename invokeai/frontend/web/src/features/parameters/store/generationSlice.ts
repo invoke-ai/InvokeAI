@@ -11,7 +11,7 @@ export interface GenerationState {
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI.Image | string; // can be an Image or url
+  initialImage?: InvokeAI._Image | string; // can be an Image or url
   iterations: number;
   maskPath: string;
   perlin: number;
@@ -319,7 +319,7 @@ export const generationSlice = createSlice({
     },
     setInitialImage: (
       state,
-      action: PayloadAction<InvokeAI.Image | string>
+      action: PayloadAction<InvokeAI._Image | string>
     ) => {
       state.initialImage = action.payload;
     },

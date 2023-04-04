@@ -8,7 +8,7 @@ import { clamp } from 'lodash';
 export type GalleryCategory = 'user' | 'result';
 
 export type AddImagesPayload = {
-  images: Array<InvokeAI.Image>;
+  images: Array<InvokeAI._Image>;
   areMoreImagesAvailable: boolean;
   category: GalleryCategory;
 };
@@ -16,16 +16,16 @@ export type AddImagesPayload = {
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export type Gallery = {
-  images: InvokeAI.Image[];
+  images: InvokeAI._Image[];
   latest_mtime?: number;
   earliest_mtime?: number;
   areMoreImagesAvailable: boolean;
 };
 
 export interface GalleryState {
-  currentImage?: InvokeAI.Image;
+  currentImage?: InvokeAI._Image;
   currentImageUuid: string;
-  intermediateImage?: InvokeAI.Image & {
+  intermediateImage?: InvokeAI._Image & {
     boundingBox?: IRect;
     generationMode?: InvokeTabName;
   };
@@ -69,7 +69,7 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState,
   reducers: {
-    setCurrentImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+    setCurrentImage: (state, action: PayloadAction<InvokeAI._Image>) => {
       state.currentImage = action.payload;
       state.currentImageUuid = action.payload.uuid;
     },
@@ -124,7 +124,7 @@ export const gallerySlice = createSlice({
     addImage: (
       state,
       action: PayloadAction<{
-        image: InvokeAI.Image;
+        image: InvokeAI._Image;
         category: GalleryCategory;
       }>
     ) => {
@@ -150,7 +150,10 @@ export const gallerySlice = createSlice({
     setIntermediateImage: (
       state,
       action: PayloadAction<
-        InvokeAI.Image & { boundingBox?: IRect; generationMode?: InvokeTabName }
+        InvokeAI._Image & {
+          boundingBox?: IRect;
+          generationMode?: InvokeTabName;
+        }
       >
     ) => {
       state.intermediateImage = action.payload;
