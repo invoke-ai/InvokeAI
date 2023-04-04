@@ -13,16 +13,28 @@ import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
-import { useAppSelector } from './storeHooks';
+import { useAppDispatch, useAppSelector } from './storeHooks';
 import { PropsWithChildren, useEffect } from 'react';
+import { setDisabledPanels } from 'features/ui/store/uiSlice';
 
 keepGUIAlive();
 
-const App = (props: PropsWithChildren) => {
+interface Props extends PropsWithChildren {
+  options: {
+    disabledPanels: string[];
+  };
+}
+
+const App = (props: Props) => {
   useToastWatcher();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
   const { setColorMode } = useColorMode();
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(setDisabledPanels(props.options.disabledPanels));
+  }, [dispatch, props.options.disabledPanels]);
 
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');

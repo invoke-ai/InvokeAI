@@ -42,7 +42,7 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
           accordionInfo[key];
 
         // do not render if panel is disabled in global state
-        if (disabledParameterPanels.indexOf(key) > -1) {
+        if (disabledParameterPanels.indexOf(key) === -1) {
           accordionsToRender.push(
             <InvokeAccordionItem
               key={key}
