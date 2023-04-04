@@ -95,7 +95,10 @@ class DiskImageStorage(ImageStorageBase):
 
         count = len(all_images)
         page_of_images = all_images[page * per_page : (page + 1) * per_page]
-        page_count = int(count / per_page) + 1
+
+        page_count_trunc = int(count / per_page) 
+        page_count_mod = count % per_page
+        page_count = page_count_trunc if page_count_mod == 0 else page_count_trunc + 1
 
         return PaginatedResults[ImageField](
             items=page_of_images,

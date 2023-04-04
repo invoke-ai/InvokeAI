@@ -106,10 +106,12 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         finally:
             self._lock.release()
 
-        pageCount = int(count / per_page) + 1
+        page_count_trunc = int(count / per_page) 
+        page_count_mod = count % per_page
+        page_count = page_count_trunc if page_count_mod == 0 else page_count_trunc + 1
 
         return PaginatedResults[T](
-            items=items, page=page, pages=pageCount, per_page=per_page, total=count
+            items=items, page=page, pages=page_count, per_page=per_page, total=count
         )
 
     def search(
