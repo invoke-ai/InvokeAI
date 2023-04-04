@@ -15,7 +15,6 @@ from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
-
 @images_router.get("/{image_type}/{image_name}", operation_id="get_image")
 async def get_image(
     image_type: ImageType = Path(description="The type of image to get"),
@@ -69,16 +68,17 @@ async def upload_image(file: UploadFile, request: Request):
     )
 
 @images_router.get(
-    "/uploads/",
-    operation_id="list_uploads",
+    "/",
+    operation_id="list_images",
     responses={200: {"model": PaginatedResults[ImageField]}},
 )
-async def list_uploads(
-    page: int = Query(default=0, description="The page of uploads to get"),
-    per_page: int = Query(default=10, description="The number of uploads per page"),
+async def list_images(
+    image_type: ImageType = Query(default=ImageType.RESULT, description="The type of images to get"),
+    page: int = Query(default=0, description="The page of images to get"),
+    per_page: int = Query(default=10, description="The number of images per page"),
 ) -> PaginatedResults[ImageField]:
-    """Gets a list of uploads"""
+    """Gets a list of images"""
     result = ApiDependencies.invoker.services.images.list(
-        ImageType.UPLOAD, page, per_page
+        image_type, page, per_page
     )
     return result

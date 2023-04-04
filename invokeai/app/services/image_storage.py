@@ -77,18 +77,19 @@ class DiskImageStorage(ImageStorageBase):
         self, image_type: ImageType, page: int = 0, per_page: int = 10
     ) -> PaginatedResults[ImageField]:
         dir_path = os.path.join(self.__output_folder, image_type)
+        image_paths = glob(f"{dir_path}/*.png")
+
+        # just want the filenames
+        image_filenames = list(map(lambda i: os.path.basename(i), image_paths))
 
         # we want to sort the images by timestamp, but we don't trust the filesystem
         # we do have a timestamp in the filename: `{uuid}_{timestamp}.png`
-        
-        image_paths = glob(f"{dir_path}/*.png")
         sorted_paths = sorted(
             # extract the timestamp as int and multiply -1 to reverse sorting
-            image_paths, key=lambda i: int(os.path.splitext(i)[0].split("_")[1]) * -1
+            image_filenames, key=lambda i: int(os.path.splitext(i)[0].split("_")[-1]) * -1
         )
         
         all_images = list(
-            # build ImageFields for every image path
             map(lambda i: ImageField(image_type=image_type, image_name=i), sorted_paths)
         )
 
