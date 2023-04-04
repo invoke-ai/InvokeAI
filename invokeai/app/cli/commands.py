@@ -6,7 +6,8 @@ from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_t
 from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
-from ..invocations.image import ImageField
+
+from ..models.image import ImageField
 from ..services.graph import GraphExecutionState
 from ..services.invoker import Invoker
 
