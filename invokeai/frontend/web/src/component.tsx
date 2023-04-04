@@ -1,7 +1,7 @@
 import React, { lazy, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { store } from './app/store';
+import { initializeStore } from './app/store';
 import { persistor } from './persistor';
 import { OpenAPI } from 'services/api';
 import '@fontsource/inter/100.css';
@@ -24,16 +24,17 @@ const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
+  disabledPanels?: string[];
 }
 
-export default function Component({ apiUrl, children }: Props) {
+export default function Component({ apiUrl, disabledPanels, children }: Props) {
   useEffect(() => {
     if (apiUrl) OpenAPI.BASE = apiUrl;
   }, [apiUrl]);
 
   return (
     <React.StrictMode>
-      <Provider store={store}>
+      <Provider store={initializeStore({ disabledPanels })}>
         <PersistGate loading={<Loading />} persistor={persistor}>
           <React.Suspense fallback={<Loading showText />}>
             <ThemeLocaleProvider>

@@ -1,4 +1,4 @@
-import { store } from 'app/store';
+import { initializeStore } from 'app/store';
 import { persistStore } from 'redux-persist';
 
-export const persistor = persistStore(store);
+export const persistor = persistStore(initializeStore({}));
