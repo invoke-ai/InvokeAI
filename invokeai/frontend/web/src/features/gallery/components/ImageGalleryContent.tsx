@@ -25,10 +25,43 @@ import HoverableImage from './HoverableImage';
 
 import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { selectResultsAll, selectResultsTotal } from '../store/resultsSlice';
-import { getNextResultsPage } from 'services/thunks/gallery';
+import {
+  resultsAdapter,
+  selectResultsAll,
+  selectResultsTotal,
+} from '../store/resultsSlice';
+import {
+  getNextResultsPage,
+  getNextUploadsPage,
+} from 'services/thunks/gallery';
+import { selectUploadsAll, uploadsAdapter } from '../store/uploadsSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
+
+const gallerySelector = createSelector(
+  [
+    (state: RootState) => state.uploads,
+    (state: RootState) => state.results,
+    (state: RootState) => state.gallery,
+  ],
+  (uploads, results, gallery) => {
+    const { currentCategory } = gallery;
+
+    return currentCategory === 'result'
+      ? {
+          images: resultsAdapter.getSelectors().selectAll(results),
+          isLoading: results.isLoading,
+          areMoreImagesAvailable: results.page < results.pages - 1,
+        }
+      : {
+          images: uploadsAdapter.getSelectors().selectAll(uploads),
+          isLoading: uploads.isLoading,
+          areMoreImagesAvailable: uploads.page < uploads.pages - 1,
+        };
+  }
+);
 
 const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
@@ -37,7 +70,7 @@ const ImageGalleryContent = () => {
   const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
 
   const {
-    images,
+    // images,
     currentCategory,
     currentImageUuid,
     shouldPinGallery,
@@ -45,20 +78,24 @@ const ImageGalleryContent = () => {
     galleryGridTemplateColumns,
     galleryImageObjectFit,
     shouldAutoSwitchToNewImages,
-    areMoreImagesAvailable,
+    // areMoreImagesAvailable,
     shouldUseSingleGalleryColumn,
   } = useAppSelector(imageGallerySelector);
 
-  const allResultImages = useAppSelector(selectResultsAll);
-  const currentResultsPage = useAppSelector((state) => state.results.page);
-  const totalResultsPages = useAppSelector((state) => state.results.pages);
-  const isLoadingResults = useAppSelector((state) => state.results.isLoading);
+  const { images, areMoreImagesAvailable, isLoading } =
+    useAppSelector(gallerySelector);
 
   // const handleClickLoadMore = () => {
   //   dispatch(requestImages(currentCategory));
   // };
   const handleClickLoadMore = () => {
-    dispatch(getNextResultsPage());
+    if (currentCategory === 'result') {
+      dispatch(getNextResultsPage());
+    }
+
+    if (currentCategory === 'user') {
+      dispatch(getNextUploadsPage());
+    }
   };
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -223,17 +260,17 @@ const ImageGalleryContent = () => {
                     />
                   );
                 })} */}
-                {allResultImages.map((image) => (
+                {images.map((image) => (
                   <Image key={image.name} src={image.thumbnail} />
                 ))}
               </Grid>
               <IAIButton
                 onClick={handleClickLoadMore}
-                isDisabled={currentResultsPage === totalResultsPages - 1}
-                isLoading={isLoadingResults}
+                isDisabled={!areMoreImagesAvailable}
+                isLoading={isLoading}
                 flexShrink={0}
               >
-                {currentResultsPage !== totalResultsPages - 1
+                {areMoreImagesAvailable
                   ? t('gallery.loadMore')
                   : t('gallery.allImagesLoaded')}
               </IAIButton>

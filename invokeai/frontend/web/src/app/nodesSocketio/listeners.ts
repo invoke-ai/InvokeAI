@@ -34,8 +34,11 @@ import {
 } from 'services/apiSlice';
 import { emitUnsubscribe } from './actions';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
-import { getInitialResultsPage } from 'services/thunks/gallery';
-import { prepareResultImage } from 'services/util/prepareResultImage';
+import {
+  getNextResultsPage,
+  getNextUploadsPage,
+} from 'services/thunks/gallery';
+import { processImageField } from 'services/util/processImageField';
 
 /**
  * Returns an object containing listener callbacks
@@ -54,10 +57,12 @@ const makeSocketIOListeners = (
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus(i18n.t('common.statusConnected')));
 
-        // fetch more results, but only if we don't already have results
-        // maybe we should have a different thunk for `onConnect` vs when you click 'Load More'?
+        // fetch more images, but only if we don't already have images
         if (!getState().results.ids.length) {
-          dispatch(getInitialResultsPage());
+          dispatch(getNextResultsPage());
+        }
+        if (!getState().uploads.ids.length) {
+          dispatch(getNextUploadsPage());
         }
       } catch (e) {
         console.error(e);
@@ -94,7 +99,7 @@ const makeSocketIOListeners = (
       try {
         const sessionId = data.graph_execution_state_id;
         if (data.result.type === 'image') {
-          const resultImage = prepareResultImage(data.result.image);
+          const resultImage = processImageField(data.result.image);
 
           dispatch(resultAdded(resultImage));
           // // need to update the type for this or figure out how to get these values

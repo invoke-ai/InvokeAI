@@ -6,7 +6,7 @@ import {
   UpscaleInvocation,
 } from 'services/api';
 
-import { Image } from 'app/invokeai';
+import { _Image } from 'app/invokeai';
 
 // fe todo fix model type (frontend uses null, backend uses undefined)
 // fe todo update front end to store to have whole image field (vs just name)
@@ -83,7 +83,8 @@ export function buildImg2ImgNode(
     model,
     progress_images: shouldDisplayInProgressType === 'full-res',
     image: {
-      image_name: (initialImage as Image).name,
+      image_name: (initialImage as _Image).name!,
+      image_type: 'result',
     },
     strength,
     fit,
@@ -104,7 +105,9 @@ export function buildFacetoolNode(
     type: 'restore_face',
     image: {
       image_name:
-        typeof initialImage === 'string' ? initialImage : initialImage?.url,
+        (typeof initialImage === 'string' ? initialImage : initialImage?.url) ||
+        '',
+      image_type: 'result',
     },
     strength,
   };
@@ -125,7 +128,9 @@ export function buildUpscaleNode(
     type: 'upscale',
     image: {
       image_name:
-        typeof initialImage === 'string' ? initialImage : initialImage?.url,
+        (typeof initialImage === 'string' ? initialImage : initialImage?.url) ||
+        '',
+      image_type: 'result',
     },
     strength,
     level,

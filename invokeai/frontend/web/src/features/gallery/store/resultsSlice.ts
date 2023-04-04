@@ -1,17 +1,15 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { ResultImage } from 'app/invokeai';
+import { Image } from 'app/invokeai';
 
 import { RootState } from 'app/store';
-import { map } from 'lodash';
-import { getNextResultsPage } from 'services/thunks/gallery';
-import { isImageOutput } from 'services/types/guards';
-import { prepareResultImage } from 'services/util/prepareResultImage';
+import { getNextResultsPage, IMAGES_PER_PAGE } from 'services/thunks/gallery';
+import { processImageField } from 'services/util/processImageField';
 
 // use `createEntityAdapter` to create a slice for results images
 // https://redux-toolkit.js.org/api/createEntityAdapter#overview
 
 // the "Entity" is InvokeAI.ResultImage, while the "entities" are instances of that type
-const resultsAdapter = createEntityAdapter<ResultImage>({
+export const resultsAdapter = createEntityAdapter<Image>({
   // Provide a callback to get a stable, unique identifier for each entity. This defaults to
   // `(item) => item.id`, but for our result images, the `name` is the unique identifier.
   selectId: (image) => image.name,
@@ -26,6 +24,7 @@ type AdditionalResultsState = {
   page: number; // current page we are on
   pages: number; // the total number of pages available
   isLoading: boolean; // whether we are loading more images or not, mostly a placeholder
+  nextPage: number; // the next page to request
 };
 
 const resultsSlice = createSlice({
@@ -35,6 +34,7 @@ const resultsSlice = createSlice({
     page: 0,
     pages: 0,
     isLoading: false,
+    nextPage: 0,
   }),
   reducers: {
     // the adapter provides some helper reducers; see the docs for all of them
@@ -47,28 +47,20 @@ const resultsSlice = createSlice({
   extraReducers: (builder) => {
     // here we can respond to a fulfilled call of the `getNextResultsPage` thunk
     // because we pass in the fulfilled thunk action creator, everything is typed
-    builder.addCase(getNextResultsPage.pending, (state, action) => {
+    builder.addCase(getNextResultsPage.pending, (state) => {
       state.isLoading = true;
     });
     builder.addCase(getNextResultsPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
-      // build flattened array of results ojects, use lodash `map()` to make results object an array
-      const allResults = items.flatMap((session) => map(session.results));
+      const resultImages = items.map((image) => processImageField(image));
 
-      // filter out non-image-outputs (eg latents, prompts, etc)
-      const imageOutputResults = allResults.filter(isImageOutput);
-
-      // map results to ResultImage objects
-      const resultImages = imageOutputResults.map((result) =>
-        prepareResultImage(result.image)
-      );
-
-      // use the adapter reducer to add all the results to resultsSlice state
+      // use the adapter reducer to append all the results to state
       resultsAdapter.addMany(state, resultImages);
 
       state.page = page;
       state.pages = pages;
+      state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
     });
   },

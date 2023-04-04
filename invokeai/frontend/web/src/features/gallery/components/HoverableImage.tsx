@@ -33,7 +33,7 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
 
 interface HoverableImageProps {
-  image: InvokeAI.Image;
+  image: InvokeAI._Image;
   isSelected: boolean;
 }
 
