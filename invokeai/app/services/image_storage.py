@@ -24,7 +24,9 @@ class ImageStorageBase(ABC):
         pass
 
     @abstractmethod
-    def list(self, image_type: ImageType, page: int = 0, per_page: int = 10) -> PaginatedResults[ImageField]:
+    def list(
+        self, image_type: ImageType, page: int = 0, per_page: int = 10
+    ) -> PaginatedResults[ImageField]:
         pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
@@ -71,17 +73,35 @@ class DiskImageStorage(ImageStorageBase):
                 parents=True, exist_ok=True
             )
 
-    def list(self, image_type: ImageType, page: int = 0, per_page: int = 10) -> PaginatedResults[ImageField]:
+    def list(
+        self, image_type: ImageType, page: int = 0, per_page: int = 10
+    ) -> PaginatedResults[ImageField]:
         dir_path = os.path.join(self.__output_folder, image_type)
-        image_paths = glob(f"{dir_path}/*.png")
-        image_list = list(map(lambda i: ImageField(image_type=image_type, image_name=i), image_paths))
 
-        count = len(image_list)
-        image_page = image_list[page * per_page : (page + 1) * per_page]
+        # we want to sort the images by timestamp, but we don't trust the filesystem
+        # we do have a timestamp in the filename: `{uuid}_{timestamp}.png`
+        
+        image_paths = glob(f"{dir_path}/*.png")
+        sorted_paths = sorted(
+            # extract the timestamp as int and multiply -1 to reverse sorting
+            image_paths, key=lambda i: int(os.path.splitext(i)[0].split("_")[1]) * -1
+        )
+        
+        all_images = list(
+            # build ImageFields for every image path
+            map(lambda i: ImageField(image_type=image_type, image_name=i), sorted_paths)
+        )
+
+        count = len(all_images)
+        page_of_images = all_images[page * per_page : (page + 1) * per_page]
         page_count = int(count / per_page) + 1
 
         return PaginatedResults[ImageField](
-            items=image_page, page=page, pages=page_count, per_page=per_page, total=count
+            items=page_of_images,
+            page=page,
+            pages=page_count,
+            per_page=per_page,
+            total=count,
         )
 
     def get(self, image_type: ImageType, image_name: str) -> Image:
