@@ -52,7 +52,7 @@ const PromptInput = () => {
     clearTimeout(promptTimer);
     const newPromptTimer = window.setTimeout(() => {
       dispatch(handlePromptCheckers(e.target.value));
-    }, 500);
+    }, 1000);
     setPromptTimer(newPromptTimer);
   };
 
