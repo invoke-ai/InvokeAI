@@ -59,6 +59,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
                 f"""INSERT OR REPLACE INTO {self._table_name} (item) VALUES (?);""",
                 (item.json(),),
             )
+            self._conn.commit()
         finally:
             self._lock.release()
         self._on_changed(item)
@@ -84,6 +85,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             self._cursor.execute(
                 f"""DELETE FROM {self._table_name} WHERE id = ?;""", (str(id),)
             )
+            self._conn.commit()
         finally:
             self._lock.release()
         self._on_deleted(id)
