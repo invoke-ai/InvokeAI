@@ -1,8 +1,5 @@
-import { Middleware } from '@reduxjs/toolkit';
+import { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
 import { io } from 'socket.io-client';
-
-import makeSocketIOEmitters from './emitters';
-import makeSocketIOListeners from './listeners';
 
 import {
   GeneratorProgressEvent,
@@ -10,7 +7,20 @@ import {
   InvocationErrorEvent,
   InvocationStartedEvent,
 } from 'services/events/types';
-import { invocationComplete } from './actions';
+import {
+  generatorProgress,
+  invocationComplete,
+  invocationError,
+  invocationStarted,
+  socketioConnected,
+  socketioDisconnected,
+  socketioSubscribed,
+} from './actions';
+import {
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
+} from 'services/thunks/gallery';
+import { AppDispatch, RootState } from 'app/store';
 
 const socket_url = `ws://${window.location.host}`;
 
@@ -22,64 +32,62 @@ const socketio = io(socket_url, {
 export const socketioMiddleware = () => {
   let areListenersSet = false;
 
-  const middleware: Middleware = (store) => (next) => (action) => {
-    const { emitSubscribe, emitUnsubscribe } = makeSocketIOEmitters(socketio);
+  const middleware: Middleware =
+    (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
+      const { dispatch, getState } = store;
+      const timestamp = new Date();
 
-    const {
-      onConnect,
-      onDisconnect,
-      onInvocationStarted,
-      onGeneratorProgress,
-      onInvocationError,
-      onInvocationComplete,
-    } = makeSocketIOListeners(store);
+      if (!areListenersSet) {
+        socketio.on('connect', () => {
+          dispatch(socketioConnected({ timestamp }));
 
-    if (!areListenersSet) {
-      socketio.on('connect', () => onConnect());
-      socketio.on('disconnect', () => onDisconnect());
-    }
+          if (!getState().results.ids.length) {
+            dispatch(receivedResultImagesPage());
+          }
 
-    areListenersSet = true;
+          if (!getState().uploads.ids.length) {
+            dispatch(receivedUploadImagesPage());
+          }
+        });
 
-    // use the action's match() function for type narrowing and safety
-    if (invocationComplete.match(action)) {
-      emitUnsubscribe(action.payload.data.graph_execution_state_id);
-      socketio.removeAllListeners();
-    }
-
-    /**
-     * Handle redux actions caught by middleware.
-     */
-    switch (action.type) {
-      case 'socketio/subscribe': {
-        emitSubscribe(action.payload);
-
-        socketio.on('invocation_started', (data: InvocationStartedEvent) =>
-          onInvocationStarted(data)
-        );
-        socketio.on('generator_progress', (data: GeneratorProgressEvent) =>
-          onGeneratorProgress(data)
-        );
-        socketio.on('invocation_error', (data: InvocationErrorEvent) =>
-          onInvocationError(data)
-        );
-        socketio.on('invocation_complete', (data: InvocationCompleteEvent) =>
-          onInvocationComplete(data)
-        );
-
-        break;
+        socketio.on('disconnect', () => {
+          dispatch(socketioDisconnected({ timestamp }));
+          socketio.removeAllListeners();
+        });
       }
 
-      // case 'socketio/unsubscribe': {
-      //   emitUnsubscribe(action.payload);
+      areListenersSet = true;
 
-      //   socketio.removeAllListeners();
-      //   break;
-      // }
-    }
+      if (invocationComplete.match(action)) {
+        socketio.emit('unsubscribe', {
+          session: action.payload.data.graph_execution_state_id,
+        });
 
-    next(action);
-  };
+        socketio.removeAllListeners();
+      }
+
+      if (socketioSubscribed.match(action)) {
+        socketio.emit('subscribe', { session: action.payload.sessionId });
+
+        socketio.on('invocation_started', (data: InvocationStartedEvent) => {
+          dispatch(invocationStarted({ data, timestamp }));
+        });
+
+        socketio.on('generator_progress', (data: GeneratorProgressEvent) => {
+          dispatch(generatorProgress({ data, timestamp }));
+        });
+
+        socketio.on('invocation_error', (data: InvocationErrorEvent) => {
+          dispatch(invocationError({ data, timestamp }));
+        });
+
+        socketio.on('invocation_complete', (data: InvocationCompleteEvent) => {
+          dispatch(invocationComplete({ data, timestamp }));
+        });
+      }
+
+      next(action);
+    };
 
   return middleware;
 };

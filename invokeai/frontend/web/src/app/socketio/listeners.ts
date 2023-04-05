@@ -34,8 +34,9 @@ import type { RootState } from 'app/store';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   clearInitialImage,
+  initialImageSelected,
   setInfillMethod,
-  setInitialImage,
+  // setInitialImage,
   setMaskPath,
 } from 'features/parameters/store/generationSlice';
 import { tabMap } from 'features/ui/store/tabMap';
@@ -146,7 +147,8 @@ const makeSocketIOListeners = (
           const activeTabName = tabMap[activeTab];
           switch (activeTabName) {
             case 'img2img': {
-              dispatch(setInitialImage(newImage));
+              dispatch(initialImageSelected(newImage.uuid));
+              // dispatch(setInitialImage(newImage));
               break;
             }
           }

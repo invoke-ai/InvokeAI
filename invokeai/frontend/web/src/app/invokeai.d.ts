@@ -14,6 +14,7 @@
 
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
+import { ImageMetadata, ImageType } from 'services/api';
 
 /**
  * TODO:
@@ -132,12 +133,10 @@ export declare type _Image = {
  */
 export declare type Image = {
   name: string;
+  type: ImageType;
   url: string;
   thumbnail: string;
-  width: number;
-  height: number;
-  timestamp: number;
-  metadata?: Metadata;
+  metadata: ImageMetadata;
 };
 
 // GalleryImages is an array of Image.

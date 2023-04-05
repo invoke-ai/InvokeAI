@@ -7,6 +7,7 @@ import {
 } from 'services/api';
 
 import { _Image } from 'app/invokeai';
+import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 
 // fe todo fix model type (frontend uses null, backend uses undefined)
 // fe todo update front end to store to have whole image field (vs just name)
@@ -66,9 +67,15 @@ export function buildImg2ImgNode(
     seamless,
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
-    initialImage,
     shouldRandomizeSeed,
   } = generation;
+
+  const initialImage = initialImageSelector(state);
+
+  if (!initialImage) {
+    // TODO: handle this
+    throw 'no initial image';
+  }
 
   return {
     type: 'img2img',
@@ -83,8 +90,8 @@ export function buildImg2ImgNode(
     model,
     progress_images: shouldDisplayInProgressType === 'full-res',
     image: {
-      image_name: (initialImage as _Image).name!,
-      image_type: 'result',
+      image_name: initialImage.name,
+      image_type: 'results',
     },
     strength,
     fit,
@@ -107,7 +114,7 @@ export function buildFacetoolNode(
       image_name:
         (typeof initialImage === 'string' ? initialImage : initialImage?.url) ||
         '',
-      image_type: 'result',
+      image_type: 'results',
     },
     strength,
   };
@@ -130,7 +137,7 @@ export function buildUpscaleNode(
       image_name:
         (typeof initialImage === 'string' ? initialImage : initialImage?.url) ||
         '',
-      image_type: 'result',
+      image_type: 'results',
     },
     strength,
     level,

@@ -1,31 +1,46 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
-import {
-  gallerySelector,
-  selectedImageSelector,
-} from '../store/gallerySelectors';
+import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
 
 export const imagesSelector = createSelector(
-  [gallerySelector, uiSelector, selectedImageSelector],
-  (gallery: GalleryState, ui, selectedImage) => {
-    const { currentImage, intermediateImage } = gallery;
+  [uiSelector, selectedImageSelector, systemSelector],
+  (ui, selectedImage, system) => {
     const { shouldShowImageDetails, shouldHidePreview } = ui;
+    const { progressImage } = system;
+
+    // TODO: Clean this up, this is really gross
+    const imageToDisplay = progressImage
+      ? {
+          url: progressImage.dataURL,
+          width: progressImage.width,
+          height: progressImage.height,
+          isProgressImage: true,
+          image: progressImage,
+        }
+      : selectedImage
+      ? {
+          url: selectedImage.url,
+          width: selectedImage.metadata.width,
+          height: selectedImage.metadata.height,
+          isProgressImage: false,
+          image: selectedImage,
+        }
+      : null;
 
     return {
-      imageToDisplay: intermediateImage ? intermediateImage : selectedImage,
-      isIntermediate: Boolean(intermediateImage),
       shouldShowImageDetails,
       shouldHidePreview,
+      imageToDisplay,
     };
   },
   {
@@ -36,12 +51,8 @@ export const imagesSelector = createSelector(
 );
 
 export default function CurrentImagePreview() {
-  const {
-    shouldShowImageDetails,
-    imageToDisplay,
-    isIntermediate,
-    shouldHidePreview,
-  } = useAppSelector(imagesSelector);
+  const { shouldShowImageDetails, imageToDisplay, shouldHidePreview } =
+    useAppSelector(imagesSelector);
 
   return (
     <Flex
@@ -61,7 +72,7 @@ export default function CurrentImagePreview() {
           fallback={
             shouldHidePreview ? (
               <CurrentImageHidden />
-            ) : !isIntermediate ? (
+            ) : !imageToDisplay.isProgressImage ? (
               <CurrentImageFallback />
             ) : undefined
           }
@@ -71,27 +82,31 @@ export default function CurrentImagePreview() {
             maxHeight: '100%',
             height: 'auto',
             position: 'absolute',
-            imageRendering: isIntermediate ? 'pixelated' : 'initial',
+            imageRendering: imageToDisplay.isProgressImage
+              ? 'pixelated'
+              : 'initial',
             borderRadius: 'base',
           }}
         />
       )}
       {!shouldShowImageDetails && <NextPrevImageButtons />}
-      {shouldShowImageDetails && imageToDisplay && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '0',
-            width: '100%',
-            height: '100%',
-            borderRadius: 'base',
-            overflow: 'scroll',
-            maxHeight: APP_METADATA_HEIGHT,
-          }}
-        >
-          {/* <ImageMetadataViewer image={imageToDisplay} /> */}
-        </Box>
-      )}
+      {shouldShowImageDetails &&
+        imageToDisplay &&
+        'metadata' in imageToDisplay.image && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '0',
+              width: '100%',
+              height: '100%',
+              borderRadius: 'base',
+              overflow: 'scroll',
+              maxHeight: APP_METADATA_HEIGHT,
+            }}
+          >
+            <ImageMetadataViewer image={imageToDisplay.image} />
+          </Box>
+        )}
     </Flex>
   );
 }

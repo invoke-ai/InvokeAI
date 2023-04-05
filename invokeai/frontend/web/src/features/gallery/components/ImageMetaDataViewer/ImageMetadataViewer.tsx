@@ -18,7 +18,7 @@ import {
   setCfgScale,
   setHeight,
   setImg2imgStrength,
-  setInitialImage,
+  // setInitialImage,
   setMaskPath,
   setPerlin,
   setSampler,
@@ -113,14 +113,14 @@ const MetadataItem = ({
 };
 
 type ImageMetadataViewerProps = {
-  image: InvokeAI._Image;
+  image: InvokeAI.Image;
 };
 
 // TODO: I don't know if this is needed.
 const memoEqualityCheck = (
   prev: ImageMetadataViewerProps,
   next: ImageMetadataViewerProps
-) => prev.image.uuid === next.image.uuid;
+) => prev.image.name === next.image.name;
 
 // TODO: Show more interesting information in this component.
 
@@ -137,8 +137,8 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     dispatch(setShouldShowImageDetails(false));
   });
 
-  const metadata = image?.metadata?.image || {};
-  const dreamPrompt = image?.dreamPrompt;
+  const metadata = image?.metadata.sd_metadata || {};
+  const dreamPrompt = image?.metadata.sd_metadata?.dreamPrompt;
 
   const {
     cfg_scale,
@@ -160,6 +160,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     type,
     variations,
     width,
+    model_weights,
   } = metadata;
 
   const { t } = useTranslation();
@@ -193,8 +194,8 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
       {Object.keys(metadata).length > 0 ? (
         <>
           {type && <MetadataItem label="Generation type" value={type} />}
-          {image.metadata?.model_weights && (
-            <MetadataItem label="Model" value={image.metadata.model_weights} />
+          {model_weights && (
+            <MetadataItem label="Model" value={model_weights} />
           )}
           {['esrgan', 'gfpgan'].includes(type) && (
             <MetadataItem label="Original image" value={orig_path} />
@@ -288,14 +289,14 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               onClick={() => dispatch(setHeight(height))}
             />
           )}
-          {init_image_path && (
+          {/* {init_image_path && (
             <MetadataItem
               label="Initial image"
               value={init_image_path}
               isLink
               onClick={() => dispatch(setInitialImage(init_image_path))}
             />
-          )}
+          )} */}
           {mask_image_path && (
             <MetadataItem
               label="Mask image"
