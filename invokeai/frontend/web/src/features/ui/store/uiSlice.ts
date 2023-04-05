@@ -19,6 +19,7 @@ const initialtabsState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   disabledParameterPanels: [],
+  disabledTabs: [],
 };
 
 const initialState: UIState = initialtabsState;
@@ -94,6 +95,9 @@ export const uiSlice = createSlice({
     setDisabledPanels: (state, action: PayloadAction<string[]>) => {
       state.disabledParameterPanels = action.payload;
     },
+    setDisabledTabs: (state, action: PayloadAction<InvokeTabName[]>) => {
+      state.disabledTabs = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageSelected, (state) => {
@@ -123,6 +127,7 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   setDisabledPanels,
+  setDisabledTabs,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
