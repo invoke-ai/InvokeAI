@@ -5,32 +5,39 @@ import {
   InvocationErrorEvent,
   InvocationStartedEvent,
 } from 'services/events/types';
-/**
- * We can't use redux-toolkit's createSlice() to make these actions,
- * because they have no associated reducer. They only exist to dispatch
- * requests to the server via socketio. These actions will be handled
- * by the middleware.
- */
 
-export const emitSubscribe = createAction<string>('socketio/subscribe');
-export const emitUnsubscribe = createAction<string>('socketio/unsubscribe');
-
-type Timestamp = {
+type SocketioPayload = {
   timestamp: Date;
 };
 
+export const socketioConnected = createAction<SocketioPayload>(
+  'socketio/socketioConnected'
+);
+
+export const socketioDisconnected = createAction<SocketioPayload>(
+  'socketio/socketioDisconnected'
+);
+
+export const socketioSubscribed = createAction<
+  SocketioPayload & { sessionId: string }
+>('socketio/socketioSubscribed');
+
+export const socketioUnsubscribed = createAction<
+  SocketioPayload & { sessionId: string }
+>('socketio/socketioUnsubscribed');
+
 export const invocationStarted = createAction<
-  { data: InvocationStartedEvent } & Timestamp
+  SocketioPayload & { data: InvocationStartedEvent }
 >('socketio/invocationStarted');
 
 export const invocationComplete = createAction<
-  { data: InvocationCompleteEvent } & Timestamp
+  SocketioPayload & { data: InvocationCompleteEvent }
 >('socketio/invocationComplete');
 
 export const invocationError = createAction<
-  { data: InvocationErrorEvent } & Timestamp
+  SocketioPayload & { data: InvocationErrorEvent }
 >('socketio/invocationError');
 
 export const generatorProgress = createAction<
-  { data: GeneratorProgressEvent } & Timestamp
+  SocketioPayload & { data: GeneratorProgressEvent }
 >('socketio/generatorProgress');
