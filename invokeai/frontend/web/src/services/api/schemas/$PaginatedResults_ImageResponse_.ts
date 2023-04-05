@@ -1,13 +1,13 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export const $PaginatedResults_ImageField_ = {
+export const $PaginatedResults_ImageResponse_ = {
   description: `Paginated results`,
   properties: {
     items: {
       type: 'array',
       contains: {
-        type: 'ImageField',
+        type: 'ImageResponse',
       },
       isRequired: true,
     },

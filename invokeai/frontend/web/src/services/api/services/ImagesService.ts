@@ -3,7 +3,7 @@
 /* eslint-disable */
 import type { Body_upload_image } from '../models/Body_upload_image';
 import type { ImageType } from '../models/ImageType';
-import type { PaginatedResults_ImageField_ } from '../models/PaginatedResults_ImageField_';
+import type { PaginatedResults_ImageResponse_ } from '../models/PaginatedResults_ImageResponse_';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -100,7 +100,7 @@ export class ImagesService {
   /**
    * List Images
    * Gets a list of images
-   * @returns PaginatedResults_ImageField_ Successful Response
+   * @returns PaginatedResults_ImageResponse_ Successful Response
    * @throws ApiError
    */
   public static listImages({
@@ -120,7 +120,7 @@ export class ImagesService {
      * The number of images per page
      */
     perPage?: number,
-  }): CancelablePromise<PaginatedResults_ImageField_> {
+  }): CancelablePromise<PaginatedResults_ImageResponse_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/images/',
