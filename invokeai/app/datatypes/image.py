@@ -2,6 +2,8 @@ from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from invokeai.app.datatypes.metadata import ImageMetadata
+
 
 class ImageType(str, Enum):
     RESULT = "results"
@@ -24,3 +26,13 @@ class ImageField(BaseModel):
                 "image_name",
             ]
         }
+
+
+class ImageResponse(BaseModel):
+    """The response type for images"""
+
+    image_type: ImageType = Field(description="The type of the image")
+    image_name: str = Field(description="The name of the image")
+    image_url: str = Field(description="The url of the image")
+    thumbnail_url: str = Field(description="The url of the image's thumbnail")
+    metadata: ImageMetadata = Field(description="The image's metadata")
