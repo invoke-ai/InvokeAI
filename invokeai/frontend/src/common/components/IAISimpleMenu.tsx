@@ -93,7 +93,7 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
             padding={0}
             borderRadius="0.5rem"
             overflowY="scroll"
-            maxHeight={300}
+            maxHeight={500}
             backgroundColor="var(--background-color-secondary)"
             color="var(--text-color-secondary)"
             borderColor="var(--border-color)"
