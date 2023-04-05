@@ -30,7 +30,7 @@ import {
 import { OpenAPI } from 'services/api';
 
 export const socketMiddleware = () => {
-  let socket_url = `ws://${window.location.host}`;
+  let socket_url = `ws://localhost:9090`;
 
   console.log('socket middleware file loaded');
   console.log('OPENAPI.BASE: ', OpenAPI.BASE);
