@@ -1,6 +1,7 @@
 import React, { PropsWithChildren } from 'react';
 import { IAIPopoverProps } from '../web/src/common/components/IAIPopover';
 import { IAIIconButtonProps } from '../web/src/common/components/IAIIconButton';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 
 export {};
 
@@ -69,6 +70,7 @@ declare module '@invoke-ai/invoke-ai-ui' {
 interface InvokeProps extends PropsWithChildren {
   apiUrl?: string;
   disabledPanels?: string[];
+  disabledTabs?: InvokeTabName[];
 }
 
 declare function Invoke(props: InvokeProps): JSX.Element;

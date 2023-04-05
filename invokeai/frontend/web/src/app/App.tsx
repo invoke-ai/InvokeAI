@@ -15,13 +15,15 @@ import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from './storeHooks';
 import { PropsWithChildren, useEffect } from 'react';
-import { setDisabledPanels } from 'features/ui/store/uiSlice';
+import { setDisabledPanels, setDisabledTabs } from 'features/ui/store/uiSlice';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 
 keepGUIAlive();
 
 interface Props extends PropsWithChildren {
   options: {
     disabledPanels: string[];
+    disabledTabs: InvokeTabName[];
   };
 }
 
@@ -35,6 +37,10 @@ const App = (props: Props) => {
   useEffect(() => {
     dispatch(setDisabledPanels(props.options.disabledPanels));
   }, [dispatch, props.options.disabledPanels]);
+
+  useEffect(() => {
+    dispatch(setDisabledTabs(props.options.disabledTabs));
+  }, [dispatch, props.options.disabledTabs]);
 
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
