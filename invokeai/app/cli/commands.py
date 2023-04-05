@@ -79,15 +79,8 @@ def add_graph_parsers(
         # Add arguments for inputs
         for exposed_input in graph.exposed_inputs:
             node = graph.graph.get_node(exposed_input.node_path)
-            field = get_input_field(node, exposed_input.field)
+            field = node.__fields__[exposed_input.field]
             add_field_argument(command_parser, exposed_input.alias, field)
-            command_parser.add_argument(
-                f"--{exposed_input.alias}",
-                dest=exposed_input.alias,
-                type=field.type_,
-                default=field.default if field.default_factory is None else field.default_factory(),
-                help=field.field_info.description,
-            )
 
 
 class CliContext:
@@ -95,16 +88,23 @@ class CliContext:
     session: GraphExecutionState
     parser: argparse.ArgumentParser
     defaults: dict[str, Any]
+    graph_nodes: dict[str, str]
 
     def __init__(self, invoker: Invoker, session: GraphExecutionState, parser: argparse.ArgumentParser):
         self.invoker = invoker
         self.session = session
         self.parser = parser
         self.defaults = dict()
+        self.graph_nodes = dict()
 
     def get_session(self):
         self.session = self.invoker.services.graph_execution_manager.get(self.session.id)
         return self.session
+
+    def reset(self):
+        self.session = self.invoker.create_execution_state()
+        self.graph_nodes = dict()
+        # Leave defaults unchanged
 
 
 class ExitCli(Exception):

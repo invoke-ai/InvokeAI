@@ -733,7 +733,7 @@ class Graph(BaseModel):
         for sgn in (
             gn for gn in self.nodes.values() if isinstance(gn, GraphInvocation)
         ):
-            sgn.graph.nx_graph_flat(g, self._get_node_path(sgn.id, prefix))
+            g = sgn.graph.nx_graph_flat(g, self._get_node_path(sgn.id, prefix))
 
         # TODO: figure out if iteration nodes need to be expanded
 

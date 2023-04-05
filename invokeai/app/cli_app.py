@@ -87,17 +87,64 @@ def get_command_parser(services: InvocationServices) -> argparse.ArgumentParser:
     return parser
 
 
+class NodeField():
+    alias: str
+    node_path: str
+    field: str
+    field_type: type
+
+    def __init__(self, alias: str, node_path: str, field: str, field_type: type):
+        self.alias = alias
+        self.node_path = node_path
+        self.field = field
+        self.field_type = field_type
+
+
+def fields_from_type_hints(hints: dict[str, type], node_path: str) -> dict[str,NodeField]:
+    return {k:NodeField(alias=k, node_path=node_path, field=k, field_type=v) for k, v in hints.items()}
+
+
+def get_node_input_field(graph: LibraryGraph, field_alias: str, node_id: str) -> NodeField:
+    """Gets the node field for the specified field alias"""
+    exposed_input = next(e for e in graph.exposed_inputs if e.alias == field_alias)
+    node_type = type(graph.graph.get_node(exposed_input.node_path))
+    return NodeField(alias=exposed_input.alias, node_path=f'{node_id}.{exposed_input.node_path}', field=exposed_input.field, field_type=get_type_hints(node_type)[exposed_input.field])
+
+
+def get_node_output_field(graph: LibraryGraph, field_alias: str, node_id: str) -> NodeField:
+    """Gets the node field for the specified field alias"""
+    exposed_output = next(e for e in graph.exposed_outputs if e.alias == field_alias)
+    node_type = type(graph.graph.get_node(exposed_output.node_path))
+    node_output_type = node_type.get_output_type()
+    return NodeField(alias=exposed_output.alias, node_path=f'{node_id}.{exposed_output.node_path}', field=exposed_output.field, field_type=get_type_hints(node_output_type)[exposed_output.field])
+
+
+def get_node_inputs(invocation: BaseInvocation, context: CliContext) -> dict[str, NodeField]:
+    """Gets the inputs for the specified invocation from the context"""
+    node_type = type(invocation)
+    if node_type is not GraphInvocation:
+        return fields_from_type_hints(get_type_hints(node_type), invocation.id)
+    else:
+        graph: LibraryGraph = context.invoker.services.graph_library.get(context.graph_nodes[invocation.id])
+        return {e.alias: get_node_input_field(graph, e.alias, invocation.id) for e in graph.exposed_inputs}
+
+
+def get_node_outputs(invocation: BaseInvocation, context: CliContext) -> dict[str, NodeField]:
+    """Gets the outputs for the specified invocation from the context"""
+    node_type = type(invocation)
+    if node_type is not GraphInvocation:
+        return fields_from_type_hints(get_type_hints(node_type.get_output_type()), invocation.id)
+    else:
+        graph: LibraryGraph = context.invoker.services.graph_library.get(context.graph_nodes[invocation.id])
+        return {e.alias: get_node_output_field(graph, e.alias, invocation.id) for e in graph.exposed_outputs}
+
+
 def generate_matching_edges(
-    a: BaseInvocation, b: BaseInvocation, exposed_inputs: list[ExposedNodeInput]|None = None
+    a: BaseInvocation, b: BaseInvocation, context: CliContext
 ) -> list[Edge]:
     """Generates all possible edges between two invocations"""
-    atype = type(a)
-    btype = type(b)
-
-    aoutputtype = atype.get_output_type()
-
-    afields = get_type_hints(aoutputtype)
-    bfields = get_type_hints(btype)
+    afields = get_node_outputs(a, context)
+    bfields = get_node_inputs(b, context)
 
     matching_fields = set(afields.keys()).intersection(bfields.keys())
 
@@ -106,14 +153,14 @@ def generate_matching_edges(
     matching_fields = matching_fields.difference(invalid_fields)
 
     # Validate types
-    matching_fields = [f for f in matching_fields if are_connection_types_compatible(afields[f], bfields[f])]
+    matching_fields = [f for f in matching_fields if are_connection_types_compatible(afields[f].field_type, bfields[f].field_type)]
 
     edges = [
         Edge(
-            source=EdgeConnection(node_id=a.id, field=field),
-            destination=EdgeConnection(node_id=b.id, field=field)
+            source=EdgeConnection(node_id=afields[alias].node_path, field=afields[alias].field),
+            destination=EdgeConnection(node_id=bfields[alias].node_path, field=bfields[alias].field)
         )
-        for field in matching_fields
+        for alias in matching_fields
     ]
     return edges
 
@@ -259,7 +306,7 @@ def invoke_cli():
                         else context.session.graph.get_node(from_id)
                     )
                     matching_edges = generate_matching_edges(
-                        from_node, command.command
+                        from_node, command.command, context
                     )
                     edges.extend(matching_edges)
 
@@ -272,7 +319,7 @@ def invoke_cli():
 
                         link_node = context.session.graph.get_node(node_id)
                         matching_edges = generate_matching_edges(
-                            link_node, command.command
+                            link_node, command.command, context
                         )
                         matching_destinations = [e.destination for e in matching_edges]
                         edges = [e for e in edges if e.destination not in matching_destinations]
@@ -286,12 +333,14 @@ def invoke_cli():
                         if re_negid.match(node_id):
                             node_id = str(current_id + int(node_id))
 
+                        # TODO: handle missing input/output
+                        node_output = get_node_outputs(context.session.graph.get_node(node_id), context)[link[1]]
+                        node_input = get_node_inputs(command.command, context)[link[2]]
+
                         edges.append(
                             Edge(
-                                source=EdgeConnection(node_id=node_id, field=link[1]),
-                                destination=EdgeConnection(
-                                    node_id=command.command.id, field=link[2]
-                                )
+                                source=EdgeConnection(node_id=node_output.node_path, field=node_output.field),
+                                destination=EdgeConnection(node_id=node_input.node_path, field=node_input.field)
                             )
                         )
 
@@ -315,7 +364,7 @@ def invoke_cli():
         except SessionError:
             # Start a new session
             print("Session error: creating a new session")
-            context.session = context.invoker.create_execution_state()
+            context.reset()
 
         except ExitCli:
             break
