@@ -17,11 +17,8 @@ def save_thumbnail(
     if os.path.exists(thumbnail_path):
         return thumbnail_path
 
-    thumbnail_width = size
-    thumbnail_height = round(size * (image.height / image.width))
-
     image_copy = image.copy()
-    image_copy.thumbnail(size=(thumbnail_width, thumbnail_height))
+    image_copy.thumbnail(size=(size, size))
 
     image_copy.save(thumbnail_path, "WEBP")
 
