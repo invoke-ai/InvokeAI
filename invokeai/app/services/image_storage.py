@@ -134,7 +134,7 @@ class DiskImageStorage(ImageStorageBase):
         if cache_item:
             return cache_item
 
-        image = Image.open(image_path)
+        image = PILImage.open(image_path)
         self.__set_cache(image_path, image)
         return image
 
