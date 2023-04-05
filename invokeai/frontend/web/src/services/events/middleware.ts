@@ -31,8 +31,10 @@ import { OpenAPI } from 'services/api';
 
 let socket_url = `ws://${window.location.host}`;
 
+console.log('socket middleware file loaded');
 // if building in package mode, replace socket url with open api base url minus the http protocol
 if (import.meta.env.MODE === 'package' && OpenAPI.BASE) {
+  console.log('inside statement to set URL');
   //eslint-disable-next-line
   socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
 }
