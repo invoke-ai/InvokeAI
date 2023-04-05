@@ -1,6 +1,6 @@
-import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
 import { Image } from 'app/invokeai';
-import { invocationComplete } from 'app/nodesSocketio/actions';
+import { invocationComplete } from 'services/events/actions';
 
 import { RootState } from 'app/store';
 import {
@@ -11,7 +11,6 @@ import { isImageOutput } from 'services/types/guards';
 import { deserializeImageField } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 // import { deserializeImageField } from 'services/util/deserializeImageField';
-import { setCurrentCategory } from './gallerySlice';
 
 // use `createEntityAdapter` to create a slice for results images
 // https://redux-toolkit.js.org/api/createEntityAdapter#overview
@@ -55,10 +54,17 @@ const resultsSlice = createSlice({
   extraReducers: (builder) => {
     // here we can respond to a fulfilled call of the `getNextResultsPage` thunk
     // because we pass in the fulfilled thunk action creator, everything is typed
+
+    /**
+     * Received Result Images Page - PENDING
+     */
     builder.addCase(receivedResultImagesPage.pending, (state) => {
       state.isLoading = true;
     });
 
+    /**
+     * Received Result Images Page - FULFILLED
+     */
     builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
@@ -75,6 +81,9 @@ const resultsSlice = createSlice({
       state.isLoading = false;
     });
 
+    /**
+     * Invocation Complete
+     */
     builder.addCase(invocationComplete, (state, action) => {
       const { data } = action.payload;
 

@@ -8,6 +8,8 @@
  * Patches the request logic in such a way that we can extract headers from requests.
  *
  * Copied from https://github.com/ferdikoomen/openapi-typescript-codegen/issues/829#issuecomment-1228224477
+ * 
+ * This file should be excluded in `tsconfig.json` and ignored by prettier/eslint!
  */
 
 import axios from 'axios';

@@ -1,4 +1,4 @@
-import { ExpandedIndex, StatHelpText, UseToastOptions } from '@chakra-ui/react';
+import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
@@ -7,16 +7,15 @@ import {
   invocationComplete,
   invocationError,
   invocationStarted,
-  socketioConnected,
-  socketioDisconnected,
-} from 'app/nodesSocketio/actions';
-import { resultAdded } from 'features/gallery/store/resultsSlice';
-import dateFormat from 'dateformat';
+  socketConnected,
+  socketDisconnected,
+} from 'services/events/actions';
 
 import i18n from 'i18n';
 import { isImageOutput } from 'services/types/guards';
 import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
+import { makeToast } from '../hooks/useToastWatcher';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -70,6 +69,9 @@ export interface SystemState
     cancelType: CancelType;
     cancelAfter: number | null;
   };
+  /**
+   * The current progress image
+   */
   progressImage: ProgressImage | null;
 }
 
@@ -287,45 +289,55 @@ export const systemSlice = createSlice({
     setCancelAfter: (state, action: PayloadAction<number | null>) => {
       state.cancelOptions.cancelAfter = action.payload;
     },
-    // socketioConnected: (state) => {
-    //   state.isConnected = true;
-    //   state.currentStatus = i18n.t('common.statusConnected');
-    // },
-    // socketioDisconnected: (state) => {
-    //   state.isConnected = false;
-    //   state.currentStatus = i18n.t('common.statusDisconnected');
-    // },
   },
   extraReducers(builder) {
-    builder.addCase(socketioConnected, (state, action) => {
+    /**
+     * Socket Connected
+     */
+    builder.addCase(socketConnected, (state, action) => {
       const { timestamp } = action.payload;
 
       state.isConnected = true;
       state.currentStatus = i18n.t('common.statusConnected');
       state.log.push({
-        timestamp: dateFormat(timestamp, 'isoDateTime'),
+        timestamp,
         message: `Connected to server`,
         level: 'info',
       });
+      state.toastQueue.push(
+        makeToast({ title: i18n.t('toast.connected'), status: 'success' })
+      );
     });
 
-    builder.addCase(socketioDisconnected, (state, action) => {
+    /**
+     * Socket Disconnected
+     */
+    builder.addCase(socketDisconnected, (state, action) => {
       const { timestamp } = action.payload;
 
       state.isConnected = false;
       state.currentStatus = i18n.t('common.statusDisconnected');
       state.log.push({
-        timestamp: dateFormat(timestamp, 'isoDateTime'),
+        timestamp,
         message: `Disconnected from server`,
-        level: 'warning',
+        level: 'error',
       });
+      state.toastQueue.push(
+        makeToast({ title: i18n.t('toast.disconnected'), status: 'error' })
+      );
     });
 
-    builder.addCase(invocationStarted, (state, action) => {
+    /**
+     * Invocation Started
+     */
+    builder.addCase(invocationStarted, (state) => {
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
     });
 
+    /**
+     * Generator Progress
+     */
     builder.addCase(generatorProgress, (state, action) => {
       const { step, total_steps, progress_image } = action.payload.data;
 
@@ -335,6 +347,9 @@ export const systemSlice = createSlice({
       state.progressImage = progress_image ?? null;
     });
 
+    /**
+     * Invocation Complete
+     */
     builder.addCase(invocationComplete, (state, action) => {
       const { data, timestamp } = action.payload;
 
@@ -346,18 +361,21 @@ export const systemSlice = createSlice({
       // TODO: handle logging for other invocation types
       if (isImageOutput(data.result)) {
         state.log.push({
-          timestamp: dateFormat(timestamp, 'isoDateTime'),
+          timestamp,
           message: `Generated: ${data.result.image.image_name}`,
           level: 'info',
         });
       }
     });
 
+    /**
+     * Invocation Error
+     */
     builder.addCase(invocationError, (state, action) => {
       const { data, timestamp } = action.payload;
 
       state.log.push({
-        timestamp: dateFormat(timestamp, 'isoDateTime'),
+        timestamp,
         message: `Server error: ${data.error}`,
         level: 'error',
       });
@@ -365,15 +383,16 @@ export const systemSlice = createSlice({
       state.wasErrorSeen = true;
       state.progressImage = null;
       state.isProcessing = false;
+      state.toastQueue.push(
+        makeToast({ title: i18n.t('toast.serverError'), status: 'error' })
+      );
     });
 
+    /**
+     * Initial Image Selected
+     */
     builder.addCase(initialImageSelected, (state) => {
-      state.toastQueue.push({
-        title: i18n.t('toast.sentToImageToImage'),
-        status: 'success',
-        duration: 2500,
-        isClosable: true,
-      });
+      state.toastQueue.push(makeToast(i18n.t('toast.sentToImageToImage')));
     });
   },
 });
@@ -410,8 +429,6 @@ export const {
   setOpenModel,
   setCancelType,
   setCancelAfter,
-  // socketioConnected,
-  // socketioDisconnected,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

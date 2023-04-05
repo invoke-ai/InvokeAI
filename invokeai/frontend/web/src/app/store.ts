@@ -14,11 +14,9 @@ import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
-import apiReducer from 'services/apiSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
-import { socketioMiddleware as nodesSocketioMiddleware } from './nodesSocketio/middleware';
-import { invokeMiddleware } from 'services/invokeMiddleware';
+import { socketMiddleware } from 'services/events/middleware';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -81,7 +79,6 @@ const rootReducer = combineReducers({
   canvas: canvasReducer,
   ui: uiReducer,
   lightbox: lightboxReducer,
-  api: apiReducer,
   results: resultsReducer,
   uploads: uploadsReducer,
 });
@@ -107,7 +104,7 @@ const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 function buildMiddleware() {
   if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
-    return [nodesSocketioMiddleware(), invokeMiddleware];
+    return [socketMiddleware()];
   } else {
     return [socketioMiddleware()];
   }
