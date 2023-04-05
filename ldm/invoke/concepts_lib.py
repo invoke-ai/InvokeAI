@@ -24,8 +24,8 @@ class HuggingFaceConceptsLibrary(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
-        self.match_trigger = re.compile('(<[\w\- >]+>)') # trigger is slightly less restrictive than HF concept name
-        self.match_concept = re.compile('<([\w\-]+)>') # HF concept name can only contain A-Za-z0-9_-
+        self.match_trigger = re.compile('(<[a-zA-Z0-9_\- >]+>)') # trigger is slightly less restrictive than HF concept name
+        self.match_concept = re.compile('<([a-zA-Z0-9_\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self, minimum_likes: int=0)->list:
         '''
