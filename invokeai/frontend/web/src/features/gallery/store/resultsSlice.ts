@@ -3,13 +3,14 @@ import { Image } from 'app/invokeai';
 import { invocationComplete } from 'app/nodesSocketio/actions';
 
 import { RootState } from 'app/store';
-import { socketioConnected } from 'features/system/store/systemSlice';
 import {
   receivedResultImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
 import { isImageOutput } from 'services/types/guards';
 import { deserializeImageField } from 'services/util/deserializeImageField';
+import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
+// import { deserializeImageField } from 'services/util/deserializeImageField';
 import { setCurrentCategory } from './gallerySlice';
 
 // use `createEntityAdapter` to create a slice for results images
@@ -21,7 +22,7 @@ export const resultsAdapter = createEntityAdapter<Image>({
   // `(item) => item.id`, but for our result images, the `name` is the unique identifier.
   selectId: (image) => image.name,
   // Order all images by their time (in descending order)
-  sortComparer: (a, b) => b.timestamp - a.timestamp,
+  sortComparer: (a, b) => b.metadata.timestamp - a.metadata.timestamp,
 });
 
 // This type is intersected with the Entity type to create the shape of the state
@@ -61,7 +62,9 @@ const resultsSlice = createSlice({
     builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
-      const resultImages = items.map((image) => deserializeImageField(image));
+      const resultImages = items.map((image) =>
+        deserializeImageResponse(image)
+      );
 
       // use the adapter reducer to append all the results to state
       resultsAdapter.addMany(state, resultImages);

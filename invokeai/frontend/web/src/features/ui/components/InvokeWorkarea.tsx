@@ -1,7 +1,7 @@
 import { Box, BoxProps, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setInitialImage } from 'features/parameters/store/generationSlice';
+import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import {
   activeTabNameSelector,
   uiSelector,
@@ -47,7 +47,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
     const image = getImageByUuid(uuid);
     if (!image) return;
     if (activeTabName === 'img2img') {
-      dispatch(setInitialImage(image));
+      dispatch(initialImageSelected(image.uuid));
     } else if (activeTabName === 'unifiedCanvas') {
       dispatch(setInitialCanvasImage(image));
     }

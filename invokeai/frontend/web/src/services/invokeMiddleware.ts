@@ -1,7 +1,7 @@
 import { isFulfilled, Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 
-import { emitSubscribe } from 'app/nodesSocketio/actions';
+import { socketioSubscribed } from 'app/nodesSocketio/actions';
 import { AppDispatch, RootState } from 'app/store';
 import { setSessionId } from './apiSlice';
 import { uploadImage } from './thunks/image';
@@ -10,7 +10,7 @@ import * as InvokeAI from 'app/invokeai';
 import { addImage } from 'features/gallery/store/gallerySlice';
 import { tabMap } from 'features/ui/store/tabMap';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { setInitialImage } from 'features/parameters/store/generationSlice';
+import { initialImageSelected as initialImageSet } from 'features/parameters/store/generationSlice';
 
 /**
  * `redux-toolkit` provides nice matching utilities, which can be used as type guards
@@ -24,12 +24,14 @@ export const invokeMiddleware: Middleware =
   (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
     const { dispatch, getState } = store;
 
+    const timestamp = new Date();
+
     if (isFulfilledCreateSession(action)) {
       const sessionId = action.payload.id;
       console.log('createSession.fulfilled');
 
       dispatch(setSessionId(sessionId));
-      dispatch(emitSubscribe(sessionId));
+      dispatch(socketioSubscribed({ sessionId, timestamp }));
       dispatch(invokeSession({ sessionId }));
     } else if (isFulfilledUploadImage(action)) {
       const uploadLocation = action.payload;
@@ -54,7 +56,8 @@ export const invokeMiddleware: Middleware =
       if (activeTabName === 'unifiedCanvas') {
         dispatch(setInitialCanvasImage(newImage));
       } else if (activeTabName === 'img2img') {
-        dispatch(setInitialImage(newImage));
+        // dispatch(setInitialImage(newImage));
+        dispatch(initialImageSet(newImage.uuid));
       }
     } else {
       next(action);

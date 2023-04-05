@@ -317,12 +317,12 @@ export const generationSlice = createSlice({
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
-    setInitialImage: (
-      state,
-      action: PayloadAction<InvokeAI._Image | string>
-    ) => {
-      state.initialImage = action.payload;
-    },
+    // setInitialImage: (
+    //   state,
+    //   action: PayloadAction<InvokeAI._Image | string>
+    // ) => {
+    //   state.initialImage = action.payload;
+    // },
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
@@ -353,6 +353,9 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
+    initialImageSelected: (state, action: PayloadAction<string>) => {
+      state.initialImage = action.payload;
+    },
   },
 });
 
@@ -368,7 +371,7 @@ export const {
   setHeight,
   setImg2imgStrength,
   setInfillMethod,
-  setInitialImage,
+  // setInitialImage,
   setIterations,
   setMaskPath,
   setParameter,
@@ -394,6 +397,7 @@ export const {
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
+  initialImageSelected,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

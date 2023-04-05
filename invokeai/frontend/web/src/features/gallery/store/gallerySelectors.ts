@@ -7,8 +7,16 @@ import {
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
-import { selectResultsAll, selectResultsEntities } from './resultsSlice';
-import { selectUploadsAll, selectUploadsEntities } from './uploadsSlice';
+import {
+  selectResultsAll,
+  selectResultsById,
+  selectResultsEntities,
+} from './resultsSlice';
+import {
+  selectUploadsAll,
+  selectUploadsById,
+  selectUploadsEntities,
+} from './uploadsSlice';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
