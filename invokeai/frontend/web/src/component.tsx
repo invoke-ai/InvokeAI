@@ -4,6 +4,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { store } from './app/store';
 import { persistor } from './persistor';
 import { OpenAPI } from 'services/api';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import '@fontsource/inter/100.css';
 import '@fontsource/inter/200.css';
 import '@fontsource/inter/300.css';
@@ -25,11 +26,13 @@ const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
 interface Props extends PropsWithChildren {
   apiUrl?: string;
   disabledPanels?: string[];
+  disabledTabs?: InvokeTabName[];
 }
 
 export default function Component({
   apiUrl,
   disabledPanels = [],
+  disabledTabs = [],
   children,
 }: Props) {
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function Component({
         <PersistGate loading={<Loading />} persistor={persistor}>
           <React.Suspense fallback={<Loading showText />}>
             <ThemeLocaleProvider>
-              <App options={{ disabledPanels }}>{children}</App>
+              <App options={{ disabledPanels, disabledTabs }}>{children}</App>
             </ThemeLocaleProvider>
           </React.Suspense>
         </PersistGate>

@@ -1,3 +1,5 @@
+import { InvokeTabName } from './tabMap';
+
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
 export interface UIState {
@@ -14,4 +16,5 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   disabledParameterPanels: string[];
+  disabledTabs: InvokeTabName[];
 }

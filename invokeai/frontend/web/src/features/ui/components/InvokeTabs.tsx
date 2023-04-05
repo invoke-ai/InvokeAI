@@ -45,38 +45,41 @@ const tabIconStyles: ChakraProps['sx'] = {
   boxSize: 6,
 };
 
-const tabInfo: InvokeTabInfo[] = [
-  {
-    id: 'txt2img',
-    icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
-    workarea: <TextToImageWorkarea />,
-  },
-  {
-    id: 'img2img',
-    icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
-    workarea: <ImageToImageWorkarea />,
-  },
-  {
-    id: 'unifiedCanvas',
-    icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
-    workarea: <UnifiedCanvasWorkarea />,
-  },
-  {
-    id: 'nodes',
-    icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
-    workarea: <NodesWIP />,
-  },
-  {
-    id: 'postprocessing',
-    icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
-    workarea: <PostProcessingWIP />,
-  },
-  {
-    id: 'training',
-    icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
-    workarea: <TrainingWIP />,
-  },
-];
+const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
+  const tabs: InvokeTabInfo[] = [
+    {
+      id: 'txt2img',
+      icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
+      workarea: <TextToImageWorkarea />,
+    },
+    {
+      id: 'img2img',
+      icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
+      workarea: <ImageToImageWorkarea />,
+    },
+    {
+      id: 'unifiedCanvas',
+      icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
+      workarea: <UnifiedCanvasWorkarea />,
+    },
+    {
+      id: 'nodes',
+      icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
+      workarea: <NodesWIP />,
+    },
+    {
+      id: 'postprocessing',
+      icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
+      workarea: <PostProcessingWIP />,
+    },
+    {
+      id: 'training',
+      icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
+      workarea: <TrainingWIP />,
+    },
+  ];
+  return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+};
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -85,13 +88,10 @@ export default function InvokeTabs() {
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const shouldPinGallery = useAppSelector(
-    (state: RootState) => state.ui.shouldPinGallery
-  );
+  const { shouldPinGallery, disabledTabs, shouldPinParametersPanel } =
+    useAppSelector((state: RootState) => state.ui);
 
-  const shouldPinParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldPinParametersPanel
-  );
+  const activeTabs = buildTabs(disabledTabs);
 
   const { t } = useTranslation();
 
@@ -142,7 +142,7 @@ export default function InvokeTabs() {
 
   const tabs = useMemo(
     () =>
-      tabInfo.map((tab) => (
+      activeTabs.map((tab) => (
         <Tooltip
           key={tab.id}
           hasArrow
@@ -157,13 +157,13 @@ export default function InvokeTabs() {
           </Tab>
         </Tooltip>
       )),
-    [t]
+    [t, activeTabs]
   );
 
   const tabPanels = useMemo(
     () =>
-      tabInfo.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
-    []
+      activeTabs.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
+    [activeTabs]
   );
 
   return (
