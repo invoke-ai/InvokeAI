@@ -2,16 +2,16 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageField } from './ImageField';
+import type { ImageResponse } from './ImageResponse';
 
 /**
  * Paginated results
  */
-export type PaginatedResults_ImageField_ = {
+export type PaginatedResults_ImageResponse_ = {
   /**
    * Items
    */
-  items: Array<ImageField>;
+  items: Array<ImageResponse>;
   /**
    * Current Page
    */
