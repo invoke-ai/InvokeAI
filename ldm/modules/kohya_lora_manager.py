@@ -64,19 +64,6 @@ class LoHALayer:
 
     def forward(self, lora, input_h, output):
 
-        # implementation according to lycoris
-        # i'm not so sure what happens here, but to properly work
-        # i moved scaling from weight calculation to output calculation
-        # https://github.com/KohakuBlueleaf/LyCORIS/blob/main/lycoris/loha.py#L175
-        if self.t1 is None:
-            diff_weight = ((self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b))
-            weight = self.org_module.weight.data.reshape(diff_weight.shape) + diff_weight
-
-        else:
-            rebuild1 = torch.einsum('i j k l, j r, i p -> p r k l', self.t1, self.w1_b, self.w1_a)
-            rebuild2 = torch.einsum('i j k l, j r, i p -> p r k l', self.t2, self.w2_b, self.w2_a)
-            weight = self.org_module.weight.data + rebuild1 * rebuild2
-
         if type(self.org_module) == torch.nn.Conv2d:
             op = torch.nn.functional.conv2d
             extra_args = dict(
@@ -89,6 +76,19 @@ class LoHALayer:
         else:
             op = torch.nn.functional.linear
             extra_args = {}
+
+        # implementation according to lycoris
+        # i'm not so sure what happens here, but to properly work
+        # i moved scaling from weight calculation to output calculation
+        # https://github.com/KohakuBlueleaf/LyCORIS/blob/main/lycoris/loha.py#L175
+        if self.t1 is None:
+            diff_weight = ((self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b))
+            weight = self.org_module.weight.data.reshape(diff_weight.shape) + diff_weight
+
+        else:
+            rebuild1 = torch.einsum('i j k l, j r, i p -> p r k l', self.t1, self.w1_b, self.w1_a)
+            rebuild2 = torch.einsum('i j k l, j r, i p -> p r k l', self.t2, self.w2_b, self.w2_a)
+            weight = self.org_module.weight.data + rebuild1 * rebuild2
         
         bias = None if self.org_module.bias is None else self.org_module.bias.data
         return output + op(
@@ -228,7 +228,6 @@ class LoRA:
 
     def load_from_dict(self, state_dict):
         state_dict_groupped = dict()
-        is_loha = False
 
         for key, value in state_dict.items():
             stem, leaf = key.split(".", 1)
@@ -252,9 +251,6 @@ class LoRA:
                 ):
                     self.rank = value.shape[0]
 
-            if "hada_t1" in leaf:
-                is_loha = True
-
 
         for stem, values in state_dict_groupped.items():
             if stem.startswith(self.wrapper.LORA_PREFIX_TEXT_ENCODER):
@@ -267,9 +263,6 @@ class LoRA:
             if wrapped is None:
                 print(f">> Missing layer: {stem}")
                 continue
-
-            print(f"{stem}")
-            print(f"{list(values.keys())}")
 
             # lora and locon
             if "lora_down.weight" in values:
