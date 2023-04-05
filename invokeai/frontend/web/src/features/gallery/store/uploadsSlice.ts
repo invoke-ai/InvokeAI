@@ -7,10 +7,11 @@ import {
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
 import { deserializeImageField } from 'services/util/deserializeImageField';
+import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
 export const uploadsAdapter = createEntityAdapter<Image>({
   selectId: (image) => image.name,
-  sortComparer: (a, b) => b.timestamp - a.timestamp,
+  sortComparer: (a, b) => b.metadata.timestamp - a.metadata.timestamp,
 });
 
 type AdditionalUploadsState = {
@@ -38,7 +39,7 @@ const uploadsSlice = createSlice({
     builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
-      const images = items.map((image) => deserializeImageField(image));
+      const images = items.map((image) => deserializeImageResponse(image));
 
       uploadsAdapter.addMany(state, images);
 

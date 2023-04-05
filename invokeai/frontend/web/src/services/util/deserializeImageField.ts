@@ -27,6 +27,10 @@ export const extractTimestampFromImageName = (imageName: string) => {
   return Number(timestamp);
 };
 
+/**
+ * Process ImageField objects. These come from `invocation_complete` events and do not contain all the data we need.
+ * This is a WIP on the server side.
+ */
 export const deserializeImageField = (image: ImageField): Image => {
   const name = image.image_name;
   const type = image.image_type;
@@ -37,10 +41,13 @@ export const deserializeImageField = (image: ImageField): Image => {
 
   return {
     name,
+    type,
     url,
     thumbnail,
-    timestamp,
-    height: 512,
-    width: 512,
+    metadata: {
+      timestamp,
+      height: 512, // TODO: need the server to give this to us
+      width: 512,
+    },
   };
 };

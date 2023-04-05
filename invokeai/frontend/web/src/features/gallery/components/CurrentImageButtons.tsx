@@ -14,8 +14,9 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
 import {
+  initialImageSelected,
   setAllParameters,
-  setInitialImage,
+  // setInitialImage,
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
@@ -129,8 +130,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
-    dispatch(setInitialImage(currentImage));
-    dispatch(setActiveTab('img2img'));
+    dispatch(initialImageSelected(currentImage.uuid));
+    // dispatch(setInitialImage(currentImage));
+
+    // dispatch(setActiveTab('img2img'));
   };
 
   const handleCopyImage = async () => {
