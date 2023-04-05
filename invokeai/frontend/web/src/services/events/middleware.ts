@@ -27,8 +27,15 @@ import {
   invokeSession,
   isFulfilledCreateSession,
 } from 'services/thunks/session';
+import { OpenAPI } from 'services/api';
 
-const socket_url = `ws://${window.location.host}`;
+let socket_url = `ws://${window.location.host}`;
+
+// if building in package mode, replace socket url with open api base url minus the http protocol
+if (import.meta.env.MODE === 'package' && OpenAPI.BASE) {
+  //eslint-disable-next-line
+  socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+}
 
 const socket = io(socket_url, {
   timeout: 60000,
