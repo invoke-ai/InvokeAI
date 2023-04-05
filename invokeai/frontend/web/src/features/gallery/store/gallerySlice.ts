@@ -1,11 +1,12 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
-import { invocationComplete } from 'app/nodesSocketio/actions';
+import { invocationComplete } from 'services/events/actions';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash';
 import { isImageOutput } from 'services/types/guards';
+import { uploadImage } from 'services/thunks/image';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -25,9 +26,25 @@ export type Gallery = {
 };
 
 export interface GalleryState {
+  /**
+   * The selected image's unique name
+   * Use `selectedImageSelector` to access the image
+   */
   selectedImageName: string;
+  /**
+   * The currently selected image
+   * @deprecated See `state.gallery.selectedImageName`
+   */
   currentImage?: InvokeAI._Image;
+  /**
+   * The currently selected image's uuid.
+   * @deprecated See `state.gallery.selectedImageName`, use `selectedImageSelector` to access the image
+   */
   currentImageUuid: string;
+  /**
+   * The current progress image
+   * @deprecated See `state.system.progressImage`
+   */
   intermediateImage?: InvokeAI._Image & {
     boundingBox?: IRect;
     generationMode?: InvokeTabName;
@@ -263,12 +280,24 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers(builder) {
+    /**
+     * Invocation Complete
+     */
     builder.addCase(invocationComplete, (state, action) => {
       const { data } = action.payload;
       if (isImageOutput(data.result)) {
         state.selectedImageName = data.result.image.image_name;
         state.intermediateImage = undefined;
       }
+    });
+
+    /**
+     * Upload Image - FULFILLED
+     */
+    builder.addCase(uploadImage.fulfilled, (state, action) => {
+      const location = action.payload;
+      const imageName = location.split('/').pop() || '';
+      state.selectedImageName = imageName;
     });
   },
 });

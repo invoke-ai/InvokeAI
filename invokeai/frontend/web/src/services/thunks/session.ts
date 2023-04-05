@@ -1,21 +1,15 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
 import { SessionsService } from 'services/api';
 import { buildGraph } from 'common/util/buildGraph';
-
-/**
- * createSession thunk
- */
-
-/**
- * Extract the type of the requestBody from the generated API client.
- *
- * Would really like for this to be generated but it's easy enough to extract it.
- */
+import { isFulfilled } from '@reduxjs/toolkit';
 
 type CreateSessionArg = Parameters<
   (typeof SessionsService)['createSession']
 >[0];
 
+/**
+ * `SessionsService.createSession()` thunk
+ */
 export const createSession = createAppAsyncThunk(
   'api/createSession',
   async (arg: CreateSessionArg['requestBody'], _thunkApi) => {
@@ -35,11 +29,15 @@ export const createSession = createAppAsyncThunk(
 );
 
 /**
- * addNode thunk
+ * Function to check if an action is a fulfilled `SessionsService.createSession()` thunk
  */
+export const isFulfilledCreateSession = isFulfilled(createSession);
 
 type AddNodeArg = Parameters<(typeof SessionsService)['addNode']>[0];
 
+/**
+ * `SessionsService.addNode()` thunk
+ */
 export const addNode = createAppAsyncThunk(
   'api/addNode',
   async (
@@ -56,9 +54,8 @@ export const addNode = createAppAsyncThunk(
 );
 
 /**
- * invokeSession thunk
+ * `SessionsService.invokeSession()` thunk
  */
-
 export const invokeSession = createAppAsyncThunk(
   'api/invokeSession',
   async (arg: { sessionId: string }, _thunkApi) => {
@@ -73,14 +70,13 @@ export const invokeSession = createAppAsyncThunk(
   }
 );
 
-/**
- * cancelSession thunk
- */
-
 type CancelSessionArg = Parameters<
   (typeof SessionsService)['cancelSessionInvoke']
 >[0];
 
+/**
+ * `SessionsService.cancelSession()` thunk
+ */
 export const cancelProcessing = createAppAsyncThunk(
   'api/cancelProcessing',
   async (arg: CancelSessionArg, _thunkApi) => {
@@ -94,12 +90,11 @@ export const cancelProcessing = createAppAsyncThunk(
   }
 );
 
-/**
- * listSessions thunk
- */
-
 type ListSessionsArg = Parameters<(typeof SessionsService)['listSessions']>[0];
 
+/**
+ * `SessionsService.listSessions()` thunk
+ */
 export const listSessions = createAppAsyncThunk(
   'api/listSessions',
   async (arg: ListSessionsArg, _thunkApi) => {
