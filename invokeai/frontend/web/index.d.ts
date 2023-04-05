@@ -65,6 +65,14 @@ declare module '@invoke-ai/invoke-ai-ui' {
   declare class SettingsModal extends React.Component<SettingsModalProps> {
     public constructor(props: SettingsModalProps);
   }
+
+  declare class StatusIndicator extends React.Component<StatusIndicatorProps> {
+    public constructor(props: StatusIndicatorProps);
+  }
+
+  declare class ModelSelect extends React.Component<ModelSelectProps> {
+    public constructor(props: ModelSelectProps);
+  }
 }
 
 interface InvokeProps extends PropsWithChildren {
@@ -82,5 +90,7 @@ export {
   IAIPopover,
   IAIIconButton,
   SettingsModal,
+  StatusIndicator,
+  ModelSelect,
 };
 export = Invoke;
