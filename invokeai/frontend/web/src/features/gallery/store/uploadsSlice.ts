@@ -6,6 +6,7 @@ import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
+import { uploadImage } from 'services/thunks/image';
 import { deserializeImageField } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
@@ -33,9 +34,16 @@ const uploadsSlice = createSlice({
     uploadAdded: uploadsAdapter.addOne,
   },
   extraReducers: (builder) => {
+    /**
+     * Received Upload Images Page - PENDING
+     */
     builder.addCase(receivedUploadImagesPage.pending, (state) => {
       state.isLoading = true;
     });
+
+    /**
+     * Received Upload Images Page - FULFILLED
+     */
     builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
       const { items, page, pages } = action.payload;
 
@@ -47,6 +55,20 @@ const uploadsSlice = createSlice({
       state.pages = pages;
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
+    });
+
+    /**
+     * Upload Image - FULFILLED
+     */
+    builder.addCase(uploadImage.fulfilled, (state, action) => {
+      const location = action.payload;
+
+      const uploadedImage = deserializeImageField({
+        image_name: location.split('/').pop() || '',
+        image_type: 'uploads',
+      });
+
+      uploadsAdapter.addOne(state, uploadedImage);
     });
   },
 });
