@@ -27,17 +27,23 @@ interface Props extends PropsWithChildren {
   apiUrl?: string;
   disabledPanels?: string[];
   disabledTabs?: InvokeTabName[];
+  token?: string;
 }
 
 export default function Component({
   apiUrl,
   disabledPanels = [],
   disabledTabs = [],
+  token,
   children,
 }: Props) {
   useEffect(() => {
     if (apiUrl) OpenAPI.BASE = apiUrl;
   }, [apiUrl]);
+
+  useEffect(() => {
+    if (token) OpenAPI.TOKEN = token;
+  }, [token]);
 
   return (
     <React.StrictMode>
