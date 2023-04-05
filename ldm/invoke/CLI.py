@@ -1348,6 +1348,9 @@ def do_version_update(root_version: version.Version, app_version: Union[str, ver
     from release to release. This is not an elegant solution. Instead, the 
     launcher should be moved into the source tree and installed using pip.
     """
+    if root_version < version.Version('v2.3.4'):
+        dest = Path(Globals.root,'loras')
+        dest.mkdir(exist_ok=True)
     if root_version < version.Version('v2.3.3'):
         if sys.platform == "linux":
             print('>> Downloading new version of launcher script and its config file')
