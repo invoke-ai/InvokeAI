@@ -465,6 +465,13 @@ class Args(object):
             "--version", "-V", action="store_true", help="Print InvokeAI version number"
         )
         model_group.add_argument(
+            "--onnx",
+            dest="ONNX",
+            action="store_true",
+            help="Forces to use ONNX backend for inference",
+            default=False,
+        )
+        model_group.add_argument(
             "--root_dir",
             default=None,
             help='Path to directory containing "models", "outputs" and "configs". If not present will read from environment variable INVOKEAI_ROOT. Defaults to ~/invokeai.',
@@ -576,12 +583,6 @@ class Args(object):
             action=argparse.BooleanOptionalAction,
             default=True,
             help="Load the patchmatch extension for outpainting. Use --no-patchmatch to disable.",
-        )
-        model_group.add_argument(
-            "--onnx",
-            dest="onnx",
-            action="store_true",
-            help="Forces to use ONNX backend for inference",
         )
         file_group.add_argument(
             "--from_file",

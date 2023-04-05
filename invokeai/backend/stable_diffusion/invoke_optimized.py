@@ -27,14 +27,13 @@ class txt2img_Optimized:
     def onnx_txt2img(self, prompt, model):
         model = "runwayml/stable-diffusion-v1-5" #"CompVis/stable-diffusion-v1-4"
         device = "cpu_fp32"
-
         if device == "cpu":
-            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, num_images_per_prompt=self.num_images_per_prompt, num_inference_steps=self.num_inference_steps, revision="onnx", provider="CPUExecutionProvider")
+            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="CPUExecutionProvider")
         else:
-            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, num_images_per_prompt=self.num_images_per_prompt, num_inference_steps=self.num_inference_steps, revision="onnx", provider="OpenVINOExecutionProvider")
+            onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="OpenVINOExecutionProvider")
 
         t_0 = timeit.default_timer()
-        image = onnx_pipe(prompt, self.height, self.height).images[0]
+        image = onnx_pipe(prompt, self.height, self.height, num_images_per_prompt=self.num_images_per_prompt, num_inference_steps=self.num_inference_steps).images[0]
         t_1 = timeit.default_timer()
         elapsed_time = round((t_1 - t_0), 3)
         print(f"Elapsed time for inference: {elapsed_time}")

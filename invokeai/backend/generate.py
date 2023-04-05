@@ -36,6 +36,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
+from .stable_diffusion.invoke_optimized import txt2img_Optimized as optimize
 from .util import choose_precision, choose_torch_device
 
 def fix_func(orig):
@@ -148,6 +149,7 @@ class Generate:
         gfpgan=None,
         codeformer=None,
         esrgan=None,
+        optimize=True,
         free_gpu_mem: bool = False,
         safety_checker: bool = False,
         max_loaded_models: int = 2,
@@ -191,65 +193,72 @@ class Generate:
         self.karras_max = None
         self.infill_method = None
 
-        # Note that in previous versions, there was an option to pass the
-        # device to Generate(). However the device was then ignored, so
-        # it wasn't actually doing anything. This logic could be reinstated.
-        self.device = torch.device(choose_torch_device())
-        print(f">> Using device_type {self.device.type}")
-        if full_precision:
-            if self.precision != "auto":
-                raise ValueError("Remove --full_precision / -F if using --precision")
-            print("Please remove deprecated --full_precision / -F")
-            print("If auto config does not work you can use --precision=float32")
-            self.precision = "float32"
-        if self.precision == "auto":
-            self.precision = choose_precision(self.device)
-        Globals.full_precision = self.precision == "float32"
+        #Initiates Pytorch inference
+        if not optimize:
+            # Note that in previous versions, there was an option to pass the
+            # device to Generate(). However the device was then ignored, so
+            # it wasn't actually doing anything. This logic could be reinstated.
+            self.device = torch.device(choose_torch_device())
+            print(f">> Using device_type {self.device.type}")
+            if full_precision:
+                if self.precision != "auto":
+                    raise ValueError("Remove --full_precision / -F if using --precision")
+                print("Please remove deprecated --full_precision / -F")
+                print("If auto config does not work you can use --precision=float32")
+                self.precision = "float32"
+            if self.precision == "auto":
+                self.precision = choose_precision(self.device)
+            Globals.full_precision = self.precision == "float32"
 
-        if is_xformers_available():
-            if torch.cuda.is_available() and not Globals.disable_xformers:
-                print(">> xformers memory-efficient attention is available and enabled")
+            if is_xformers_available():
+                if torch.cuda.is_available() and not Globals.disable_xformers:
+                    print(">> xformers memory-efficient attention is available and enabled")
+                else:
+                    print(
+                        ">> xformers memory-efficient attention is available but disabled"
+                    )
             else:
-                print(
-                    ">> xformers memory-efficient attention is available but disabled"
-                )
-        else:
-            print(">> xformers not installed")
+                print(">> xformers not installed")
 
-        # model caching system for fast switching
-        self.model_manager = ModelManager(
-            mconfig,
-            self.device,
-            self.precision,
-            max_loaded_models=max_loaded_models,
-            sequential_offload=self.free_gpu_mem,
-            embedding_path=Path(self.embedding_path),
-        )
-        # don't accept invalid models
-        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
-        model = model or fallback
-        if not self.model_manager.valid_model(model):
-            print(
-                f'** "{model}" is not a known model name; falling back to {fallback}.'
+            # model caching system for fast switching
+            self.model_manager = ModelManager(
+                mconfig,
+                self.device,
+                self.precision,
+                max_loaded_models=max_loaded_models,
+                sequential_offload=self.free_gpu_mem,
+                embedding_path=Path(self.embedding_path),
             )
-            model = None
-        self.model_name = model or fallback
+            # don't accept invalid models
+            fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
+            model = model or fallback
+            if not self.model_manager.valid_model(model):
+                print(
+                    f'** "{model}" is not a known model name; falling back to {fallback}.'
+                )
+                model = None
+            self.model_name = model or fallback
 
-        # for VRAM usage statistics
-        self.session_peakmem = (
-            torch.cuda.max_memory_allocated(self.device) if self._has_cuda else None
-        )
-        transformers.logging.set_verbosity_error()
+            # for VRAM usage statistics
+            self.session_peakmem = (
+                torch.cuda.max_memory_allocated(self.device) if self._has_cuda else None
+            )
+            transformers.logging.set_verbosity_error()
 
-        # gets rid of annoying messages about random seed
-        logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
+            # gets rid of annoying messages about random seed
+            logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
 
-        # load safety checker if requested
-        if safety_checker:
-            print(">> Initializing NSFW checker")
-            self.safety_checker = SafetyChecker(self.device)
+            # load safety checker if requested
+            if safety_checker:
+                print(">> Initializing NSFW checker")
+                self.safety_checker = SafetyChecker(self.device)
+            else:
+                print(">> NSFW checker is disabled")
         else:
-            print(">> NSFW checker is disabled")
+            #Set precision for ONNX inference
+            self.precision = "float32"
+            fallback = "runwayml/stable-diffusion-v1-5"
+            self.model_name = model or fallback
 
     def prompt2png(self, prompt, outdir, **kwargs):
         """
@@ -279,6 +288,32 @@ class Generate:
             "init_img" in kwargs
         ), "call to img2img() must include the init_img argument"
         return self.prompt2png(prompt, outdir, **kwargs)
+
+    def prompt2image_onnx(
+        self,
+        prompt,
+        iterations=None,
+        steps=None,
+        width=None,
+        height=None,
+        model=None,
+    ):
+        tic = time.time()
+        print("Inside prompt2image_onnx")
+        print("width, height, steps, iterations:", width, height, steps, iterations)
+        txt2img_onnx = optimize(width, height, steps, iterations)
+        txt2img_onnx.onnx_txt2img(prompt, model)
+        # generator = self.select_generator()
+        # results = generator.generate(
+        #     prompt,
+        #     iterations=iterations,
+        #     seed=self.seed,
+        #     sampler=self.sampler,
+        #     steps=steps,
+        # )
+        toc = time.time()
+        print("\n>> Usage stats:")
+        print(f">> image(s) generated in", "%4.2fs" % (toc - tic))
 
     def prompt2image(
         self,
