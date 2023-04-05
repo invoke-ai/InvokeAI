@@ -1,7 +1,7 @@
 import { HEADERS } from '../api/core/request';
 
 /**
- * Returns the headers of a given response object
+ * Returns the response headers of the response received by the generated API client.
  */
 export const getHeaders = (response: any): Record<string, string> => {
   if (!(HEADERS in response)) {
