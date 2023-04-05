@@ -61,10 +61,21 @@ def main():
     print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
-    if opt.onnx:
+    if not args.conf:
+        config_file = os.path.join(Globals.root, "configs", "models.yaml")
+        if not os.path.exists(config_file):
+            report_model_error(
+                opt, FileNotFoundError(f"The file {config_file} could not be found.")
+            )
+
+    # normalize the config directory relative to root
+    if not os.path.isabs(opt.conf):
+        opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
+
+    if opt.ONNX:
         #Invocation of onnx pipeline
-        gen = Generate()
-        #main_loop(gen, opt)
+        gen = Generate(conf=opt.conf,optimize=opt.ONNX)
+        main_loop(gen, opt)
         sys.exit(1)
 
     if args.laion400m:
@@ -94,13 +105,6 @@ def main():
     run_patches()
 
     logger.info(f"Internet connectivity is {Globals.internet_available}")
-
-    if not args.conf:
-        config_file = os.path.join(Globals.root, "configs", "models.yaml")
-        if not os.path.exists(config_file):
-            report_model_error(
-                opt, FileNotFoundError(f"The file {config_file} could not be found.")
-            )
 
     # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
@@ -156,24 +160,26 @@ def main():
     if opt.seamless:
         logger.info("Changed to seamless tiling mode")
 
-    # preload the model
-    try:
-        gen.load_model()
-    except KeyError:
-        pass
-    except Exception as e:
-        report_model_error(opt, e)
+    if not opt.ONNX:
+        # preload the model
+        try:
+            gen.load_model()
+        except KeyError:
+            pass
+        except Exception as e:
+            report_model_error(opt, e)
 
-    # try to autoconvert new models
-    if path := opt.autoconvert:
-        gen.model_manager.heuristic_import(
-            str(path), commit_to_conf=opt.conf
-        )
+        # try to autoconvert new models
+        if path := opt.autoconvert:
+            gen.model_manager.heuristic_import(
+                str(path), convert=True, commit_to_conf=opt.conf
+            )
 
-    # web server loops forever
-    if opt.web or opt.gui:
-        invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
-        sys.exit(0)
+        # web server loops forever
+        print("web and gui options: ", opt.gui, opt.web)
+        if opt.web or opt.gui:
+            invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
+            sys.exit(0)
 
     if not infile:
         print(
@@ -201,25 +207,26 @@ def main_loop(gen, opt):
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    completer = get_completer(opt, models=gen.model_manager.list_models())
-    set_default_output_dir(opt, completer)
-    if gen.model:
-        add_embedding_terms(gen, completer)
-    output_cntr = completer.get_current_history_length() + 1
+    if not opt.ONNX:
+        completer = get_completer(opt, models=gen.model_manager.list_models())
+        set_default_output_dir(opt, completer)
+        if gen.model:
+            add_embedding_terms(gen, completer)
+        output_cntr = completer.get_current_history_length() + 1
 
-    # os.pathconf is not available on Windows
-    if hasattr(os, "pathconf"):
-        path_max = os.pathconf(opt.outdir, "PC_PATH_MAX")
-        name_max = os.pathconf(opt.outdir, "PC_NAME_MAX")
-    else:
-        path_max = 260
-        name_max = 255
+        # os.pathconf is not available on Windows
+        if hasattr(os, "pathconf"):
+            path_max = os.pathconf(opt.outdir, "PC_PATH_MAX")
+            name_max = os.pathconf(opt.outdir, "PC_NAME_MAX")
+        else:
+            path_max = 260
+            name_max = 255
 
     while not done:
         operation = "generate"
 
         try:
-            command = get_next_command(infile, gen.model_name)
+            command = get_next_command(infile, gen.model)
         except EOFError:
             done = infile is None or doneAfterInFile
             infile = None
@@ -236,10 +243,10 @@ def main_loop(gen, opt):
             done = True
             break
 
-        if not command.startswith("!history"):
+        if not opt.ONNX and not command.startswith("!history"):
             completer.add_history(command)
 
-        if command.startswith("!"):
+        if not opt.ONNX and command.startswith("!"):
             command, operation = do_command(command, gen, opt, completer)
 
         if operation is None:
@@ -268,10 +275,18 @@ def main_loop(gen, opt):
 
         if opt.onnx:
             print("Starting ONNX inference.")
-            #ONNX Requirement packages installation
-            #os.system("pip install -r requirements-win-cpu_onnx.txt")
-            txt2img_onnx = optimize(opt.width, opt.height, opt.steps, opt.iterations)
-            txt2img_onnx.onnx_txt2img(opt.prompt, opt.model)
+            try:
+                gen.prompt2image_onnx(
+                    opt.prompt,
+                    opt.iterations,
+                    opt.steps,
+                    opt.width,
+                    opt.height,
+                    gen.model
+                )
+            except (PromptParser.ParsingException, pyparsing.ParseException) as e:
+                print("** An error occurred while processing your prompt **")
+                print(f"** {str(e)} **")
             sys.exit(-1)
 
         # retrieve previous value of init image if requested
