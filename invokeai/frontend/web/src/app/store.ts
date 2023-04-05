@@ -102,13 +102,13 @@ const rootPersistConfig = getPersistConfig({
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
-function buildMiddleware() {
-  if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
-    return [socketMiddleware()];
-  } else {
-    return [socketioMiddleware()];
-  }
-}
+// function buildMiddleware() {
+//   if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
+//     return [socketMiddleware()];
+//   } else {
+//     return [socketioMiddleware()];
+//   }
+// }
 
 // Continue with store setup
 export const store = configureStore({
@@ -117,7 +117,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       immutableCheck: false,
       serializableCheck: false,
-    }).concat(buildMiddleware()),
+    }).concat(socketMiddleware()),
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [
