@@ -1,4 +1,4 @@
-import React, { lazy, PropsWithChildren, useEffect } from 'react';
+import React, { lazy, PropsWithChildren, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store } from './app/store';
@@ -37,9 +37,12 @@ export default function Component({
   token,
   children,
 }: Props) {
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
     console.log('setting OPENAPI.BASE to', apiUrl);
     if (apiUrl) OpenAPI.BASE = apiUrl;
+    setReady(true);
   }, [apiUrl]);
 
   useEffect(() => {
@@ -48,15 +51,17 @@ export default function Component({
 
   return (
     <React.StrictMode>
-      <Provider store={store}>
-        <PersistGate loading={<Loading />} persistor={persistor}>
-          <React.Suspense fallback={<Loading showText />}>
-            <ThemeLocaleProvider>
-              <App options={{ disabledPanels, disabledTabs }}>{children}</App>
-            </ThemeLocaleProvider>
-          </React.Suspense>
-        </PersistGate>
-      </Provider>
+      {ready && (
+        <Provider store={store}>
+          <PersistGate loading={<Loading />} persistor={persistor}>
+            <React.Suspense fallback={<Loading showText />}>
+              <ThemeLocaleProvider>
+                <App options={{ disabledPanels, disabledTabs }}>{children}</App>
+              </ThemeLocaleProvider>
+            </React.Suspense>
+          </PersistGate>
+        </Provider>
+      )}
     </React.StrictMode>
   );
 }
