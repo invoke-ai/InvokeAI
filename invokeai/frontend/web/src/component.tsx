@@ -38,6 +38,7 @@ export default function Component({
   children,
 }: Props) {
   useEffect(() => {
+    console.log('setting OPENAPI.BASE to', apiUrl);
     if (apiUrl) OpenAPI.BASE = apiUrl;
   }, [apiUrl]);
 

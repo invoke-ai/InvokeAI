@@ -29,23 +29,23 @@ import {
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 
-let socket_url = `ws://${window.location.host}`;
-
-console.log('socket middleware file loaded');
-console.log('OPENAPI.BASE: ', OpenAPI.BASE);
-// if building in package mode, replace socket url with open api base url minus the http protocol
-if (OpenAPI.BASE) {
-  console.log('inside statement to set URL');
-  //eslint-disable-next-line
-  socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
-}
-
-const socket = io(socket_url, {
-  timeout: 60000,
-  path: '/ws/socket.io',
-});
-
 export const socketMiddleware = () => {
+  let socket_url = `ws://${window.location.host}`;
+
+  console.log('socket middleware file loaded');
+  console.log('OPENAPI.BASE: ', OpenAPI.BASE);
+  // if building in package mode, replace socket url with open api base url minus the http protocol
+  if (OpenAPI.BASE) {
+    console.log('inside statement to set URL');
+    //eslint-disable-next-line
+    socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+  }
+
+  const socket = io(socket_url, {
+    timeout: 60000,
+    path: '/ws/socket.io',
+  });
+
   let areListenersSet = false;
 
   const middleware: Middleware =
