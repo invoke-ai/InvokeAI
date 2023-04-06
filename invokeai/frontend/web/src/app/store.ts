@@ -14,6 +14,7 @@ import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
+import modelsReducer from 'features/system/store/modelSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
@@ -83,6 +84,7 @@ const rootReducer = combineReducers({
   lightbox: lightboxReducer,
   results: resultsReducer,
   uploads: uploadsReducer,
+  models: modelsReducer,
 });
 
 const rootPersistConfig = getPersistConfig({

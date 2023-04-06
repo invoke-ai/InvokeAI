@@ -4,13 +4,14 @@ import { ImageToImageInvocation } from 'services/api';
 import { _Image } from 'app/invokeai';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 
-export function buildImg2ImgNode(
+export const buildImg2ImgNode = (
   state: RootState
-): Record<string, ImageToImageInvocation> {
+): Record<string, ImageToImageInvocation> => {
   const nodeId = uuidv4();
-  const { generation, system } = state;
+  const { generation, system, models } = state;
 
-  const { shouldDisplayInProgressType, model } = system;
+  const { shouldDisplayInProgressType } = system;
+  const { currentModel: model } = models;
 
   const {
     prompt,
@@ -55,4 +56,4 @@ export function buildImg2ImgNode(
       fit,
     },
   };
-}
+};

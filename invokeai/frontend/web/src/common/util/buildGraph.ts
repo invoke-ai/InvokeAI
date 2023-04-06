@@ -5,9 +5,9 @@ import {
   ImageToImageInvocation,
   TextToImageInvocation,
 } from 'services/api';
-import { buildTxt2ImgNode } from './nodes/textToimage';
-import { buildImg2ImgNode } from './nodes/imageToImage';
+import { buildImg2ImgNode } from './nodes/image2Image';
 import { buildIteration } from './nodes/iteration';
+import { buildTxt2ImgNode } from './nodes/text2Image';
 
 function mapTabToFunction(activeTabName: InvokeTabName) {
   switch (activeTabName) {

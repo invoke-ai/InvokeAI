@@ -1,15 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store';
 import { TextToImageInvocation } from 'services/api';
-import { _Image } from 'app/invokeai';
 
-export function buildTxt2ImgNode(
+export const buildTxt2ImgNode = (
   state: RootState
-): Record<string, TextToImageInvocation> {
+): Record<string, TextToImageInvocation> => {
   const nodeId = uuidv4();
-  const { generation, system } = state;
+  const { generation, system, models } = state;
 
-  const { shouldDisplayInProgressType, model } = system;
+  const { shouldDisplayInProgressType } = system;
+  const { currentModel: model } = models;
 
   const {
     prompt,
@@ -40,4 +40,4 @@ export function buildTxt2ImgNode(
       progress_images: shouldDisplayInProgressType === 'full-res',
     },
   };
-}
+};
