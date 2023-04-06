@@ -3,16 +3,16 @@ import { SessionsService } from 'services/api';
 import { buildGraph } from 'common/util/buildGraph';
 import { isFulfilled } from '@reduxjs/toolkit';
 
-type CreateSessionArg = Parameters<
+type SessionCreatedArg = Parameters<
   (typeof SessionsService)['createSession']
 >[0];
 
 /**
  * `SessionsService.createSession()` thunk
  */
-export const createSession = createAppAsyncThunk(
-  'api/createSession',
-  async (arg: CreateSessionArg['requestBody'], _thunkApi) => {
+export const sessionCreated = createAppAsyncThunk(
+  'api/sessionCreated',
+  async (arg: SessionCreatedArg['requestBody'], _thunkApi) => {
     let graph = arg;
     if (!arg) {
       const { getState } = _thunkApi;
@@ -31,17 +31,17 @@ export const createSession = createAppAsyncThunk(
 /**
  * Function to check if an action is a fulfilled `SessionsService.createSession()` thunk
  */
-export const isFulfilledCreateSession = isFulfilled(createSession);
+export const isFulfilledSessionCreatedAction = isFulfilled(sessionCreated);
 
-type AddNodeArg = Parameters<(typeof SessionsService)['addNode']>[0];
+type NodeAddedArg = Parameters<(typeof SessionsService)['addNode']>[0];
 
 /**
  * `SessionsService.addNode()` thunk
  */
-export const addNode = createAppAsyncThunk(
-  'api/addNode',
+export const nodeAdded = createAppAsyncThunk(
+  'api/nodeAdded',
   async (
-    arg: { node: AddNodeArg['requestBody']; sessionId: string },
+    arg: { node: NodeAddedArg['requestBody']; sessionId: string },
     _thunkApi
   ) => {
     const response = await SessionsService.addNode({
@@ -56,8 +56,8 @@ export const addNode = createAppAsyncThunk(
 /**
  * `SessionsService.invokeSession()` thunk
  */
-export const invokeSession = createAppAsyncThunk(
-  'api/invokeSession',
+export const sessionInvoked = createAppAsyncThunk(
+  'api/sessionInvoked',
   async (arg: { sessionId: string }, _thunkApi) => {
     const { sessionId } = arg;
 
@@ -70,16 +70,16 @@ export const invokeSession = createAppAsyncThunk(
   }
 );
 
-type CancelSessionArg = Parameters<
+type SessionCanceledArg = Parameters<
   (typeof SessionsService)['cancelSessionInvoke']
 >[0];
 
 /**
  * `SessionsService.cancelSession()` thunk
  */
-export const cancelProcessing = createAppAsyncThunk(
-  'api/cancelProcessing',
-  async (arg: CancelSessionArg, _thunkApi) => {
+export const sessionCanceled = createAppAsyncThunk(
+  'api/sessionCanceled',
+  async (arg: SessionCanceledArg, _thunkApi) => {
     const { sessionId } = arg;
 
     const response = await SessionsService.cancelSessionInvoke({
@@ -90,14 +90,16 @@ export const cancelProcessing = createAppAsyncThunk(
   }
 );
 
-type ListSessionsArg = Parameters<(typeof SessionsService)['listSessions']>[0];
+type SessionsListedArg = Parameters<
+  (typeof SessionsService)['listSessions']
+>[0];
 
 /**
  * `SessionsService.listSessions()` thunk
  */
-export const listSessions = createAppAsyncThunk(
+export const listedSessions = createAppAsyncThunk(
   'api/listSessions',
-  async (arg: ListSessionsArg, _thunkApi) => {
+  async (arg: SessionsListedArg, _thunkApi) => {
     const response = await SessionsService.listSessions(arg);
 
     return response;

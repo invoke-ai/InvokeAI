@@ -51,7 +51,7 @@ export const imagesSelector = createSelector(
 export default function CurrentImagePreview() {
   const { shouldShowImageDetails, imageToDisplay } =
     useAppSelector(imagesSelector);
-  console.log(imageToDisplay);
+
   return (
     <Flex
       sx={{
