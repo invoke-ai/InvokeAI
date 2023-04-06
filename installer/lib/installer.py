@@ -144,8 +144,8 @@ class Installer:
 
             from plumbum import FG, local
 
-            pip = local[get_pip_from_venv(venv_dir)]
-            pip[ "install", "--upgrade", "pip"] & FG
+            pip = local[get_python_from_venv(venv_dir)]
+            pip[ "-m", "pip", "install", "--upgrade", "pip"] & FG
 
         return venv_dir
 
@@ -410,6 +410,22 @@ def get_pip_from_venv(venv_path: Path) -> str:
 
     pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
     return str(venv_path.expanduser().resolve() / pip)
+
+
+def get_python_from_venv(venv_path: Path) -> str:
+    """
+    Given a path to a virtual environment, get the absolute path to the `python` executable
+    in a cross-platform fashion. Does not validate that the python executable
+    actually exists in the virtualenv.
+
+    :param venv_path: Path to the virtual environment
+    :type venv_path: Path
+    :return: Absolute path to the python executable
+    :rtype: str
+    """
+
+    python = "Scripts\python.exe" if OS == "Windows" else "bin/python"
+    return str(venv_path.expanduser().resolve() / python)
 
 
 def set_sys_path(venv_path: Path) -> None:
