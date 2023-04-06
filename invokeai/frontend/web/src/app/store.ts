@@ -53,6 +53,7 @@ const systemBlacklist = [
   'openModel',
   'cancelOptions.cancelAfter',
   'isCancelScheduled',
+  'sessionId',
 ].map((blacklistItem) => `system.${blacklistItem}`);
 
 const galleryBlacklist = [
