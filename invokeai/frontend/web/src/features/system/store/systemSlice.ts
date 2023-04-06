@@ -18,7 +18,7 @@ import { isImageOutput } from 'services/types/guards';
 import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
-import { sessionCanceled } from 'services/thunks/session';
+import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -384,6 +384,7 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.isCancelable = true;
       state.currentStatusHasSteps = false;
+      state.currentStatus = i18n.t('common.statusGenerating');
     });
 
     /**
@@ -408,6 +409,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.progressImage = null;
+      state.currentStatus = i18n.t('common.statusProcessingComplete');
 
       // TODO: handle logging for other invocation types
       if (isImageOutput(data.result)) {
@@ -444,6 +446,14 @@ export const systemSlice = createSlice({
         message: `Server error: ${data.error}`,
         level: 'error',
       });
+    });
+
+    /**
+     * Session Invoked - PENDING
+     */
+
+    builder.addCase(sessionInvoked.pending, (state) => {
+      state.currentStatus = i18n.t('common.statusPreparing');
     });
 
     /**

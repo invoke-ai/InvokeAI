@@ -106,6 +106,30 @@ export const socketMiddleware = () => {
 
       // Everything else only happens once we have created a session
       if (isFulfilledSessionCreatedAction(action)) {
+        const oldSessionId = getState().system.sessionId;
+
+        if (oldSessionId) {
+          // Unsubscribe when invocations complete
+          socket.emit('unsubscribe', {
+            session: oldSessionId,
+          });
+
+          dispatch(
+            socketUnsubscribed({
+              sessionId: oldSessionId,
+              timestamp: getTimestamp(),
+            })
+          );
+
+          // Remove listeners for these events; we need to set them up fresh whenever we subscribe
+          [
+            'invocation_started',
+            'generator_progress',
+            'invocation_error',
+            'invocation_complete',
+          ].forEach((event) => socket.removeAllListeners(event));
+        }
+
         const sessionId = action.payload.id;
 
         // After a session is created, we immediately subscribe to events and then invoke the session
@@ -137,26 +161,10 @@ export const socketMiddleware = () => {
 
           const { cancelType, isCancelScheduled } = getState().system;
 
+          // Handle scheduled cancelation
           if (cancelType === 'scheduled' && isCancelScheduled) {
             dispatch(sessionCanceled({ sessionId }));
           }
-
-          // Unsubscribe when invocations complete
-          socket.emit('unsubscribe', {
-            session: sessionId,
-          });
-
-          dispatch(
-            socketUnsubscribed({ sessionId, timestamp: getTimestamp() })
-          );
-
-          // Remove listeners for these events; we need to set them up fresh whenever we subscribe
-          [
-            'invocation_started',
-            'generator_progress',
-            'invocation_error',
-            'invocation_complete',
-          ].forEach((event) => socket.removeAllListeners(event));
 
           dispatch(invocationComplete({ data, timestamp: getTimestamp() }));
         });
