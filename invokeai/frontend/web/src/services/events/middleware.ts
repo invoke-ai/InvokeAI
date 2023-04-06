@@ -14,6 +14,7 @@ import {
   invocationStarted,
   socketConnected,
   socketDisconnected,
+  socketReset,
   socketSubscribed,
   socketUnsubscribed,
 } from './actions';
@@ -35,9 +36,15 @@ export const socketMiddleware = () => {
   let socket_url = `ws://${window.location.host}`;
 
   // if building in package mode, replace socket url with open api base url minus the http protocol
-  if (import.meta.env.MODE === 'package' && OpenAPI.BASE) {
-    //eslint-disable-next-line
-    socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+  if (import.meta.env.MODE === 'package') {
+    if (OpenAPI.BASE) {
+      //eslint-disable-next-line
+      socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+    }
+
+    if (OpenAPI.TOKEN) {
+      // TODO: handle providing jwt to socket.io
+    }
   }
 
   const socket = io(socket_url, {
@@ -51,6 +58,26 @@ export const socketMiddleware = () => {
       const { dispatch, getState } = store;
       // Set listeners for `connect` and `disconnect` events once
       // Must happen in middleware to get access to `dispatch`
+
+      if (socketReset.match(action)) {
+        // fully reset all
+        const { sessionId } = getState().system;
+
+        if (sessionId) {
+          socket.emit('unsubscribe', { sessionId });
+          dispatch(
+            socketUnsubscribed({ sessionId, timestamp: getTimestamp() })
+          );
+        }
+
+        if (socket.connected) {
+          socket.disconnect();
+          dispatch(socketDisconnected({ timestamp: getTimestamp() }));
+        }
+
+        socket.removeAllListeners();
+        areListenersSet = false;
+      }
 
       if (!areListenersSet) {
         socket.on('connect', () => {
