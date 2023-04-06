@@ -71,9 +71,12 @@ def main():
     if not os.path.isabs(opt.conf):
         opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
 
-    if opt.ONNX:
+    if opt.optimize:
         #Invocation of onnx pipeline
-        gen = Generate(conf=opt.conf,optimize=opt.ONNX)
+        gen = Generate(
+            conf=opt.conf,
+            model=opt.model,
+            optimize=opt.optimize)
         main_loop(gen, opt)
         sys.exit(1)
 
@@ -209,11 +212,12 @@ def main_loop(gen, opt):
     doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
+    completer = get_completer(opt, models=[])
 
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    if not opt.ONNX:
+    if not opt.optimize:
         completer = get_completer(opt, models=gen.model_manager.list_models())
         set_default_output_dir(opt, completer)
         if gen.model:
@@ -249,10 +253,10 @@ def main_loop(gen, opt):
             done = True
             break
 
-        if not opt.ONNX and not command.startswith("!history"):
+        if not opt.optimize and not command.startswith("!history"):
             completer.add_history(command)
 
-        if not opt.ONNX and command.startswith("!"):
+        if not opt.optimize and command.startswith("!"):
             command, operation = do_command(command, gen, opt, completer)
 
         if operation is None:
@@ -282,7 +286,7 @@ def main_loop(gen, opt):
         if opt.onnx:
             print("Starting ONNX inference.")
             try:
-                gen.prompt2image_onnx(
+                gen.prompt2image_optimize(
                     opt.prompt,
                     opt.iterations,
                     opt.steps,

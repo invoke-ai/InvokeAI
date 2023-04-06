@@ -465,8 +465,8 @@ class Args(object):
             "--version", "-V", action="store_true", help="Print InvokeAI version number"
         )
         model_group.add_argument(
-            "--onnx",
-            dest="ONNX",
+            "--optimize",
+            dest="optimize",
             action="store_true",
             help="Forces to use ONNX backend for inference",
             default=False,
