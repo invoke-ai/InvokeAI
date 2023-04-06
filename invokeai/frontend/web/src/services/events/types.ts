@@ -1,11 +1,4 @@
-import {
-  CollectInvocationOutput,
-  GraphInvocationOutput,
-  ImageOutput,
-  IterateInvocationOutput,
-  MaskOutput,
-  PromptOutput,
-} from '../api';
+import { GraphExecutionState } from '../api';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -39,13 +32,7 @@ export type GeneratorProgressEvent = {
 export type InvocationCompleteEvent = {
   graph_execution_state_id: string;
   invocation_id: string;
-  result:
-    | CollectInvocationOutput
-    | GraphInvocationOutput
-    | ImageOutput
-    | IterateInvocationOutput
-    | MaskOutput
-    | PromptOutput;
+  result: GraphExecutionState['results'][string];
 };
 
 /**
