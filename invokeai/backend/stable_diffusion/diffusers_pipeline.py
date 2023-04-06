@@ -623,40 +623,16 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         **kwargs,
     ):
 
-        control_image = kwargs.get("control_image", None)   # should be a processed tensor
-        control_scale = kwargs.get("control_scale", None)
-        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
-
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
 
         if additional_guidance is None:
             additional_guidance = []
 
-        # FIXME: add conditional to handle NOT classifier free guidance
-        # expand the latents if we are doing classifier free guidance
-        # print("doing classifier free guidance: ", self.do_classifier_free_guidance)
-        # latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
-        latent_control_input = latents
-        latent_model_input = torch.cat([latents] * 2)
-
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        latent_model_input = self.scheduler.scale_model_input(latent_model_input, timestep)
-        ehs = torch.cat([conditioning_data.unconditioned_embeddings, conditioning_data.text_embeddings])
+        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
-        if (self.control_model is not None) and (control_image is not None) and (control_scale is not None):
-            # controlnet inference
-            down_block_res_samples, mid_block_res_sample = self.control_model(
-                latent_model_input,
-                timestep,
-                encoder_hidden_states = ehs,
-                controlnet_cond=control_image,
-                conditioning_scale=control_scale,
-                return_dict=False,
-            )
-        else:
-            down_block_res_samples, mid_block_res_sample = None, None
 
         if (self.control_model is not None) and (kwargs.get("control_image") is not None):
             control_image = kwargs.get("control_image") # should be a processed tensor derived from the control image(s)
