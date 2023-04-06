@@ -144,8 +144,8 @@ class Installer:
 
             from plumbum import FG, local
 
-            pip = local[get_python_from_venv(venv_dir)]
-            pip[ "-m", "pip", "install", "--upgrade", "pip"] & FG
+            python = local[get_python_from_venv(venv_dir)]
+            python[ "-m", "pip", "install", "--upgrade", "pip"] & FG
 
         return venv_dir
 
