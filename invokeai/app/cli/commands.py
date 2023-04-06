@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 import argparse
 from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_type_hints
 from pydantic import BaseModel, Field
-
+import networkx as nx
+import matplotlib.pyplot as plt
 from ..invocations.image import ImageField
 from ..services.graph import GraphExecutionState
 from ..services.invoker import Invoker
@@ -46,7 +47,7 @@ def add_parsers(
                     f"--{name}",
                     dest=name,
                     type=field_type,
-                    default=field.default,
+                    default=field.default if field.default_factory is None else field.default_factory(),
                     choices=allowed_values,
                     help=field.field_info.description,
                 )
@@ -55,7 +56,7 @@ def add_parsers(
                     f"--{name}",
                     dest=name,
                     type=field.type_,
-                    default=field.default,
+                    default=field.default if field.default_factory is None else field.default_factory(),
                     help=field.field_info.description,
                 )
 
@@ -200,3 +201,39 @@ class SetDefaultCommand(BaseCommand):
                 del context.defaults[self.field]
         else:
             context.defaults[self.field] = self.value
+
+
+class DrawGraphCommand(BaseCommand):
+    """Debugs a graph"""
+    type: Literal['draw_graph'] = 'draw_graph'
+
+    def run(self, context: CliContext) -> None:
+        session: GraphExecutionState = context.invoker.services.graph_execution_manager.get(context.session.id)
+        nxgraph = session.graph.nx_graph_flat()
+
+        # Draw the networkx graph
+        plt.figure(figsize=(20, 20))
+        pos = nx.spectral_layout(nxgraph)
+        nx.draw_networkx_nodes(nxgraph, pos, node_size=1000)
+        nx.draw_networkx_edges(nxgraph, pos, width=2)
+        nx.draw_networkx_labels(nxgraph, pos, font_size=20, font_family="sans-serif")
+        plt.axis("off")
+        plt.show()
+
+
+class DrawExecutionGraphCommand(BaseCommand):
+    """Debugs an execution graph"""
+    type: Literal['draw_xgraph'] = 'draw_xgraph'
+
+    def run(self, context: CliContext) -> None:
+        session: GraphExecutionState = context.invoker.services.graph_execution_manager.get(context.session.id)
+        nxgraph = session.execution_graph.nx_graph_flat()
+
+        # Draw the networkx graph
+        plt.figure(figsize=(20, 20))
+        pos = nx.spectral_layout(nxgraph)
+        nx.draw_networkx_nodes(nxgraph, pos, node_size=1000)
+        nx.draw_networkx_edges(nxgraph, pos, width=2)
+        nx.draw_networkx_labels(nxgraph, pos, font_size=20, font_family="sans-serif")
+        plt.axis("off")
+        plt.show()

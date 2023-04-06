@@ -1,6 +1,8 @@
 from .test_invoker import create_edge
 from .test_nodes import ImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from invokeai.app.invocations.collections import RangeInvocation
+from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
 from invokeai.app.services.processor import DefaultInvocationProcessor
 from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from invokeai.app.services.invocation_queue import MemoryInvocationQueue
@@ -21,13 +23,14 @@ def simple_graph():
 def mock_services():
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        model_manager = None,
-        events = None,
-        images = None,
+        model_manager = None, # type: ignore
+        events = None, # type: ignore
+        images = None, # type: ignore
+        latents = None, # type: ignore
         queue = MemoryInvocationQueue(),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
         processor = DefaultInvocationProcessor(),
-        restoration = None,
+        restoration = None, # type: ignore
     )
 
 def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[BaseInvocation, BaseInvocationOutput]:
@@ -73,31 +76,23 @@ def test_graph_is_not_complete(simple_graph, mock_services):
 
 def test_graph_state_expands_iterator(mock_services):
     graph = Graph()
-    test_prompts = ["Banana sushi", "Cat sushi"]
-    graph.add_node(PromptCollectionTestInvocation(id = "1", collection = list(test_prompts)))
-    graph.add_node(IterateInvocation(id = "2"))
-    graph.add_node(ImageTestInvocation(id = "3"))
-    graph.add_edge(create_edge("1", "collection", "2", "collection"))
-    graph.add_edge(create_edge("2", "item", "3", "prompt"))
+    graph.add_node(RangeInvocation(id = "0", start = 0, stop = 3, step = 1))
+    graph.add_node(IterateInvocation(id = "1"))
+    graph.add_node(MultiplyInvocation(id = "2", b = 10))
+    graph.add_node(AddInvocation(id = "3", b = 1))
+    graph.add_edge(create_edge("0", "collection", "1", "collection"))
+    graph.add_edge(create_edge("1", "item", "2", "a"))
+    graph.add_edge(create_edge("2", "a", "3", "a"))
     
     g = GraphExecutionState(graph = graph)
-    n1 = invoke_next(g, mock_services)
-    n2 = invoke_next(g, mock_services)
-    n3 = invoke_next(g, mock_services)
-    n4 = invoke_next(g, mock_services)
-    n5 = invoke_next(g, mock_services)
+    while not g.is_complete():
+        invoke_next(g, mock_services)
+    
+    prepared_add_nodes = g.source_prepared_mapping['3']
+    results = set([g.results[n].a for n in prepared_add_nodes])
+    expected = set([1, 11, 21])
+    assert results == expected
 
-    assert g.prepared_source_mapping[n1[0].id] == "1"
-    assert g.prepared_source_mapping[n2[0].id] == "2"
-    assert g.prepared_source_mapping[n3[0].id] == "2"
-    assert g.prepared_source_mapping[n4[0].id] == "3"
-    assert g.prepared_source_mapping[n5[0].id] == "3"
-
-    assert isinstance(n4[0], ImageTestInvocation)
-    assert isinstance(n5[0], ImageTestInvocation)
-
-    prompts = [n4[0].prompt, n5[0].prompt]
-    assert sorted(prompts) == sorted(test_prompts)
 
 def test_graph_state_collects(mock_services):
     graph = Graph()
