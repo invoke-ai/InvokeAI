@@ -1,4 +1,4 @@
-import React, { lazy, PropsWithChildren, useEffect } from 'react';
+import React, { lazy, PropsWithChildren, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { buildMiddleware, store } from './app/store';
@@ -39,18 +39,22 @@ export default function Component({
   children,
 }: Props) {
   useEffect(() => {
-    if (apiUrl) {
-      OpenAPI.BASE = apiUrl;
-    }
-    resetMiddlewares();
-    addMiddleware(buildMiddleware());
-  }, [apiUrl]);
-
-  useEffect(() => {
+    // configure API client token
     if (token) {
       OpenAPI.TOKEN = token;
     }
-  }, [token]);
+
+    // configure API client base url
+    if (apiUrl) {
+      OpenAPI.BASE = apiUrl;
+    }
+
+    // reset dynamically added middlewares
+    resetMiddlewares();
+
+    // rebuild socket middleware with token and apiUrl
+    addMiddleware(buildMiddleware());
+  }, [apiUrl, token]);
 
   return (
     <React.StrictMode>

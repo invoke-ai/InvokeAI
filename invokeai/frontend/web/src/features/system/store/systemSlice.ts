@@ -9,6 +9,8 @@ import {
   invocationStarted,
   socketConnected,
   socketDisconnected,
+  socketSubscribed,
+  socketUnsubscribed,
 } from 'services/events/actions';
 
 import i18n from 'i18n';
@@ -73,6 +75,10 @@ export interface SystemState
    * The current progress image
    */
   progressImage: ProgressImage | null;
+  /**
+   * The current socket session id
+   */
+  sessionId: string | null;
 }
 
 const initialSystemState: SystemState = {
@@ -116,6 +122,7 @@ const initialSystemState: SystemState = {
     cancelAfter: null,
   },
   progressImage: null,
+  sessionId: null,
 };
 
 export const systemSlice = createSlice({
@@ -291,6 +298,20 @@ export const systemSlice = createSlice({
     },
   },
   extraReducers(builder) {
+    /**
+     * Socket Subscribed
+     */
+    builder.addCase(socketSubscribed, (state, action) => {
+      state.sessionId = action.payload.sessionId;
+    });
+
+    /**
+     * Socket Unsubscribed
+     */
+    builder.addCase(socketUnsubscribed, (state) => {
+      state.sessionId = null;
+    });
+
     /**
      * Socket Connected
      */
