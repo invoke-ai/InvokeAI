@@ -30,6 +30,7 @@ import {
   sessionCanceled,
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
+import { receivedModels } from 'services/thunks/model';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -91,6 +92,10 @@ export const socketMiddleware = () => {
 
           if (!getState().uploads.ids.length) {
             dispatch(receivedUploadImagesPage());
+          }
+
+          if (!getState().models.modelList.length) {
+            dispatch(receivedModels());
           }
         });
 
