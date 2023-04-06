@@ -25,8 +25,9 @@ import {
 import { AppDispatch, RootState } from 'app/store';
 import { getTimestamp } from 'common/util/getTimestamp';
 import {
-  invokeSession,
-  isFulfilledCreateSession,
+  sessionInvoked,
+  isFulfilledSessionCreatedAction,
+  sessionCanceled,
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 
@@ -56,11 +57,9 @@ export const socketMiddleware = () => {
   const middleware: Middleware =
     (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
       const { dispatch, getState } = store;
-      // Set listeners for `connect` and `disconnect` events once
-      // Must happen in middleware to get access to `dispatch`
 
+      // Nothing dispatches `socketReset` actions yet, so this is a noop, but including anyways
       if (socketReset.match(action)) {
-        // fully reset all
         const { sessionId } = getState().system;
 
         if (sessionId) {
@@ -79,6 +78,8 @@ export const socketMiddleware = () => {
         areListenersSet = false;
       }
 
+      // Set listeners for `connect` and `disconnect` events once
+      // Must happen in middleware to get access to `dispatch`
       if (!areListenersSet) {
         socket.on('connect', () => {
           dispatch(socketConnected({ timestamp: getTimestamp() }));
@@ -104,7 +105,7 @@ export const socketMiddleware = () => {
       }
 
       // Everything else only happens once we have created a session
-      if (isFulfilledCreateSession(action)) {
+      if (isFulfilledSessionCreatedAction(action)) {
         const sessionId = action.payload.id;
 
         // After a session is created, we immediately subscribe to events and then invoke the session
@@ -134,6 +135,12 @@ export const socketMiddleware = () => {
         socket.on('invocation_complete', (data: InvocationCompleteEvent) => {
           const sessionId = data.graph_execution_state_id;
 
+          const { cancelType, isCancelScheduled } = getState().system;
+
+          if (cancelType === 'scheduled' && isCancelScheduled) {
+            dispatch(sessionCanceled({ sessionId }));
+          }
+
           // Unsubscribe when invocations complete
           socket.emit('unsubscribe', {
             session: sessionId,
@@ -155,7 +162,7 @@ export const socketMiddleware = () => {
         });
 
         // Finally we actually invoke the session, starting processing
-        dispatch(invokeSession({ sessionId }));
+        dispatch(sessionInvoked({ sessionId }));
       }
 
       // Always pass the action on so other middleware and reducers can handle it

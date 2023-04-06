@@ -52,6 +52,11 @@ export default function Component({
     // reset dynamically added middlewares
     resetMiddlewares();
 
+    // TODO: at this point, after resetting the middleware, we really ought to clean up the socket
+    // stuff by calling `dispatch(socketReset())`. but we cannot dispatch from here as we are
+    // outside the provider. it's not needed until there is the possibility that we will change
+    // the `apiUrl`/`token` dynamically.
+
     // rebuild socket middleware with token and apiUrl
     addMiddleware(buildMiddleware());
   }, [apiUrl, token]);

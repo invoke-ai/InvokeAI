@@ -52,6 +52,7 @@ const systemBlacklist = [
   'totalSteps',
   'openModel',
   'cancelOptions.cancelAfter',
+  'isCancelScheduled',
 ].map((blacklistItem) => `system.${blacklistItem}`);
 
 const galleryBlacklist = [

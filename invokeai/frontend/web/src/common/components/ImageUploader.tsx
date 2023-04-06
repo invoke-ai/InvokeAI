@@ -14,7 +14,7 @@ import {
 } from 'react';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { uploadImage } from 'services/thunks/image';
+import { imageUploaded } from 'services/thunks/image';
 import ImageUploadOverlay from './ImageUploadOverlay';
 
 type ImageUploaderProps = {
@@ -49,7 +49,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   const fileAcceptedCallback = useCallback(
     async (file: File) => {
-      dispatch(uploadImage({ formData: { file } }));
+      dispatch(imageUploaded({ formData: { file } }));
     },
     [dispatch]
   );
@@ -124,7 +124,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         return;
       }
 
-      dispatch(uploadImage({ formData: { file } }));
+      dispatch(imageUploaded({ formData: { file } }));
     };
     document.addEventListener('paste', pasteImageListener);
     return () => {

@@ -18,6 +18,7 @@ import { isImageOutput } from 'services/types/guards';
 import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
+import { sessionCanceled } from 'services/thunks/session';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -79,6 +80,14 @@ export interface SystemState
    * The current socket session id
    */
   sessionId: string | null;
+  /**
+   * Cancel strategy
+   */
+  cancelType: CancelType;
+  /**
+   * Whether or not a scheduled cancelation is pending
+   */
+  isCancelScheduled: boolean;
 }
 
 const initialSystemState: SystemState = {
@@ -123,6 +132,8 @@ const initialSystemState: SystemState = {
   },
   progressImage: null,
   sessionId: null,
+  cancelType: 'immediate',
+  isCancelScheduled: false,
 };
 
 export const systemSlice = createSlice({
@@ -296,6 +307,24 @@ export const systemSlice = createSlice({
     setCancelAfter: (state, action: PayloadAction<number | null>) => {
       state.cancelOptions.cancelAfter = action.payload;
     },
+    /**
+     * A cancel was scheduled
+     */
+    cancelScheduled: (state) => {
+      state.isCancelScheduled = true;
+    },
+    /**
+     * The scheduled cancel was aborted
+     */
+    scheduledCancelAborted: (state) => {
+      state.isCancelScheduled = false;
+    },
+    /**
+     * The cancel type was changed
+     */
+    cancelTypeChanged: (state, action: PayloadAction<CancelType>) => {
+      state.cancelType = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -353,6 +382,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(invocationStarted, (state) => {
       state.isProcessing = true;
+      state.isCancelable = true;
       state.currentStatusHasSteps = false;
     });
 
@@ -404,9 +434,40 @@ export const systemSlice = createSlice({
       state.wasErrorSeen = true;
       state.progressImage = null;
       state.isProcessing = false;
+
       state.toastQueue.push(
         makeToast({ title: i18n.t('toast.serverError'), status: 'error' })
       );
+
+      state.log.push({
+        timestamp,
+        message: `Server error: ${data.error}`,
+        level: 'error',
+      });
+    });
+
+    /**
+     * Session Canceled
+     */
+    builder.addCase(sessionCanceled.fulfilled, (state, action) => {
+      const { timestamp } = action.payload;
+
+      state.isProcessing = false;
+      state.isCancelable = false;
+      state.isCancelScheduled = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.progressImage = null;
+
+      state.toastQueue.push(
+        makeToast({ title: i18n.t('toast.canceled'), status: 'warning' })
+      );
+
+      state.log.push({
+        timestamp,
+        message: `Processing canceled`,
+        level: 'warning',
+      });
     });
 
     /**
@@ -450,6 +511,9 @@ export const {
   setOpenModel,
   setCancelType,
   setCancelAfter,
+  cancelScheduled,
+  scheduledCancelAborted,
+  cancelTypeChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

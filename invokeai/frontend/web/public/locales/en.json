@@ -525,6 +525,7 @@
         "serverError": "Server Error",
         "disconnected": "Disconnected from Server",
         "connected": "Connected to Server",
+        "canceled": "Processing Canceled",
         "tempFoldersEmptied": "Temp Folder Emptied",
         "uploadFailed": "Upload failed",
         "uploadFailedMultipleImagesDesc": "Multiple images pasted, may only upload one image at a time",
