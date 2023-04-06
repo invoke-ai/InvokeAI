@@ -169,7 +169,7 @@ def main():
     if opt.seamless:
         logger.info("Changed to seamless tiling mode")
 
-    if not opt.ONNX:
+    if not opt.optimize:
         # preload the model
         try:
             gen.load_model()
@@ -253,10 +253,10 @@ def main_loop(gen, opt):
             done = True
             break
 
-        if not opt.optimize and not command.startswith("!history"):
+        if not command.startswith("!history"):
             completer.add_history(command)
 
-        if not opt.optimize and command.startswith("!"):
+        if command.startswith("!"):
             command, operation = do_command(command, gen, opt, completer)
 
         if operation is None:
@@ -292,7 +292,8 @@ def main_loop(gen, opt):
                     opt.steps,
                     opt.width,
                     opt.height,
-                    gen.model
+                    gen.model,
+                    gen.precision
                 )
             except (PromptParser.ParsingException, pyparsing.ParseException) as e:
                 print("** An error occurred while processing your prompt **")

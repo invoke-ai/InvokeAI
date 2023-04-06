@@ -3,7 +3,7 @@ Implements optimized version of Stablediffusion txt2img inference
 """
 
 import timeit
-import subprocess
+import time
 import importlib
 
 from diffusers import OnnxStableDiffusionPipeline
@@ -20,14 +20,9 @@ class txt2img_Optimized:
         self.num_images_per_prompt = num_images
         self.num_inference_steps = steps
 
-    def execute_command(self, command):
-        # execute command
-        subprocess.check_call(command)
-
-    def onnx_txt2img(self, prompt, model):
-        model = "runwayml/stable-diffusion-v1-5" #"CompVis/stable-diffusion-v1-4"
-        device = "cpu_fp32"
-        if device == "cpu":
+    def onnx_txt2img(self, prompt, model, precision):
+        #model can be "runwayml/stable-diffusion-v1-5" or "CompVis/stable-diffusion-v1-4"
+        if precision == "cpu":
             onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="CPUExecutionProvider")
         else:
             onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="OpenVINOExecutionProvider")
@@ -37,4 +32,5 @@ class txt2img_Optimized:
         t_1 = timeit.default_timer()
         elapsed_time = round((t_1 - t_0), 3)
         print(f"Elapsed time for inference: {elapsed_time}")
-        image.save("ONNX_inference.png")
+        timestamp = int(time.time())
+        image.save(f"Inference_{timestamp}.png")

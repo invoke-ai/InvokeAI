@@ -300,20 +300,11 @@ class Generate:
         width=None,
         height=None,
         model=None,
+        precision=None
     ):
         tic = time.time()
-        print("Inside prompt2image_onnx")
-        print("width, height, steps, iterations:", width, height, steps, iterations)
         txt2img_onnx = optimize(width, height, steps, iterations)
-        txt2img_onnx.onnx_txt2img(prompt, model)
-        # generator = self.select_generator()
-        # results = generator.generate(
-        #     prompt,
-        #     iterations=iterations,
-        #     seed=self.seed,
-        #     sampler=self.sampler,
-        #     steps=steps,
-        # )
+        txt2img_onnx.onnx_txt2img(prompt, model, precision)
         toc = time.time()
         print("\n>> Usage stats:")
         print(f">> image(s) generated in", "%4.2fs" % (toc - tic))
