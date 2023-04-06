@@ -6,8 +6,12 @@ import type { CollectInvocationOutput } from './CollectInvocationOutput';
 import type { Graph } from './Graph';
 import type { GraphInvocationOutput } from './GraphInvocationOutput';
 import type { ImageOutput } from './ImageOutput';
+import type { IntCollectionOutput } from './IntCollectionOutput';
+import type { IntOutput } from './IntOutput';
 import type { IterateInvocationOutput } from './IterateInvocationOutput';
+import type { LatentsOutput } from './LatentsOutput';
 import type { MaskOutput } from './MaskOutput';
+import type { NoiseOutput } from './NoiseOutput';
 import type { PromptOutput } from './PromptOutput';
 
 /**
@@ -37,7 +41,7 @@ export type GraphExecutionState = {
   /**
    * The results of node executions
    */
-  results: Record<string, (ImageOutput | MaskOutput | PromptOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+  results: Record<string, (ImageOutput | MaskOutput | PromptOutput | LatentsOutput | NoiseOutput | IntOutput | IntCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
   /**
    * Errors raised when executing nodes
    */
