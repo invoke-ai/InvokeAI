@@ -1,7 +1,7 @@
 import React, { lazy, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { store } from './app/store';
+import { buildMiddleware, store } from './app/store';
 import { persistor } from './persistor';
 import { OpenAPI } from 'services/api';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -19,6 +19,7 @@ import Loading from './Loading';
 
 // Localization
 import './i18n';
+import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 
 const App = lazy(() => import('./app/App'));
 const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
@@ -38,11 +39,17 @@ export default function Component({
   children,
 }: Props) {
   useEffect(() => {
-    if (apiUrl) OpenAPI.BASE = apiUrl;
+    if (apiUrl) {
+      OpenAPI.BASE = apiUrl;
+    }
+    resetMiddlewares();
+    addMiddleware(buildMiddleware());
   }, [apiUrl]);
 
   useEffect(() => {
-    if (token) OpenAPI.TOKEN = token;
+    if (token) {
+      OpenAPI.TOKEN = token;
+    }
   }, [token]);
 
   return (
