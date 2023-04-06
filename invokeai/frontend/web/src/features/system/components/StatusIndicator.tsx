@@ -80,7 +80,7 @@ const StatusIndicator = () => {
         cursor={statusIndicatorCursor}
         onClick={handleClickStatusIndicator}
         sx={{
-          fontSize: 'xs',
+          fontSize: 'sm',
           fontWeight: '600',
           color: `${statusIdentifier}.400`,
         }}
