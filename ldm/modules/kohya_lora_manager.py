@@ -324,7 +324,6 @@ class KohyaLoraManager:
         self.text_encoder = pipe.text_encoder
         self.device = torch.device(choose_torch_device())
         self.dtype = pipe.unet.dtype
-        self.loras_to_load = {}
 
     def load_lora_module(self, name, path_file, multiplier: float = 1.0):
         print(f"   | Found lora {name} at {path_file}")
@@ -356,12 +355,6 @@ class KohyaLoraManager:
         lora.multiplier = mult
         self.wrapper.applied_loras[name] = lora
 
-    def unload_applied_loras(self, loras_to_load):
-        # unload any lora's not defined by loras_to_load
-        for name in list(self.wrapper.applied_loras.keys()):
-            if name not in loras_to_load:
-                self.unload_applied_lora(name)
-
     def unload_applied_lora(self, lora_name: str):
         if lora_name in self.wrapper.applied_loras:
             del self.wrapper.applied_loras[lora_name]
@@ -371,5 +364,4 @@ class KohyaLoraManager:
             del self.wrapper.loaded_loras[lora_name]
 
     def clear_loras(self):
-        self.loras_to_load = {}
         self.wrapper.clear_applied_loras()

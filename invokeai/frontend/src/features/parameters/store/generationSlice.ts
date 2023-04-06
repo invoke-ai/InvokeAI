@@ -135,7 +135,7 @@ export const generationSlice = createSlice({
           if (newLoraIndex > -1) loras.splice(newLoraIndex, 1);
         }
       } else {
-        state.prompt = `${state.prompt} withLora(${newLora},1)`;
+        state.prompt = `${state.prompt} withLora(${newLora},0.75)`;
         if (!loras.includes(newLora)) loras.push(newLora);
       }
       state.lorasInUse = loras;
