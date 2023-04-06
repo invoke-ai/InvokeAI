@@ -6,7 +6,7 @@ import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash';
 import { isImageOutput } from 'services/types/guards';
-import { uploadImage } from 'services/thunks/image';
+import { imageUploaded } from 'services/thunks/image';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -294,7 +294,7 @@ export const gallerySlice = createSlice({
     /**
      * Upload Image - FULFILLED
      */
-    builder.addCase(uploadImage.fulfilled, (state, action) => {
+    builder.addCase(imageUploaded.fulfilled, (state, action) => {
       const location = action.payload;
       const imageName = location.split('/').pop() || '';
       state.selectedImageName = imageName;

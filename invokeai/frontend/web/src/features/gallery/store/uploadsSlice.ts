@@ -6,7 +6,7 @@ import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { uploadImage } from 'services/thunks/image';
+import { imageUploaded } from 'services/thunks/image';
 import { deserializeImageField } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
@@ -60,7 +60,7 @@ const uploadsSlice = createSlice({
     /**
      * Upload Image - FULFILLED
      */
-    builder.addCase(uploadImage.fulfilled, (state, action) => {
+    builder.addCase(imageUploaded.fulfilled, (state, action) => {
       const location = action.payload;
 
       const uploadedImage = deserializeImageField({
