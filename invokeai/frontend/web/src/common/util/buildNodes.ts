@@ -91,7 +91,7 @@ export function buildImg2ImgNode(
     progress_images: shouldDisplayInProgressType === 'full-res',
     image: {
       image_name: initialImage.name,
-      image_type: 'results',
+      image_type: initialImage.type,
     },
     strength,
     fit,
