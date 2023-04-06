@@ -2,6 +2,7 @@
 from invokeai.backend import ModelManager
 
 from .events import EventServiceBase
+from .latent_storage import LatentsStorageBase
 from .image_storage import ImageStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
@@ -11,6 +12,7 @@ class InvocationServices:
     """Services that can be used by invocations"""
 
     events: EventServiceBase
+    latents: LatentsStorageBase
     images: ImageStorageBase
     queue: InvocationQueueABC
     model_manager: ModelManager
@@ -24,6 +26,7 @@ class InvocationServices:
             self,
             model_manager: ModelManager,
             events: EventServiceBase,
+            latents: LatentsStorageBase,
             images: ImageStorageBase,
             queue: InvocationQueueABC,
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
@@ -32,6 +35,7 @@ class InvocationServices:
     ):
         self.model_manager = model_manager
         self.events = events
+        self.latents = latents
         self.images = images
         self.queue = queue
         self.graph_execution_manager = graph_execution_manager

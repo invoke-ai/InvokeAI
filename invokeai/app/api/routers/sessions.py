@@ -51,7 +51,7 @@ async def list_sessions(
     query: str = Query(default="", description="The query string to search for"),
 ) -> PaginatedResults[GraphExecutionState]:
     """Gets a list of sessions, optionally searching"""
-    if filter == "":
+    if query == "":
         result = ApiDependencies.invoker.services.graph_execution_manager.list(
             page, per_page
         )
