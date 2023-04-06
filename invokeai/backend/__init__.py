@@ -10,7 +10,7 @@ from .generator import (
     Img2Img,
     Inpaint
 )
-from .model_management import ModelManager, SDModelComponent
+from .model_management import ModelManager
 from .safety_checker import SafetyChecker
 from .args import Args
 from .globals import Globals
