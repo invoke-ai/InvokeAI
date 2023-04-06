@@ -50,6 +50,14 @@ export const $GraphExecutionState = {
         }, {
           type: 'PromptOutput',
         }, {
+          type: 'LatentsOutput',
+        }, {
+          type: 'NoiseOutput',
+        }, {
+          type: 'IntOutput',
+        }, {
+          type: 'IntCollectionOutput',
+        }, {
           type: 'GraphInvocationOutput',
         }, {
           type: 'IterateInvocationOutput',
