@@ -7,9 +7,10 @@ import {
   RangeInvocation,
   TextToImageInvocation,
 } from 'services/api';
+import { buildImg2ImgNode } from './image2Image';
 
 type BuildIteration = {
-  baseNode: Record<string, TextToImageInvocation | ImageToImageInvocation>;
+  graph: Graph;
   iterations: number;
 };
 
@@ -41,11 +42,12 @@ const buildIterateNode = (): Record<string, IterateInvocation> => {
 };
 
 export const buildIteration = ({
-  baseNode,
+  graph,
   iterations,
 }: BuildIteration): Graph => {
   const rangeNode = buildRangeNode(iterations);
   const iterateNode = buildIterateNode();
+  const baseNode: Graph['nodes'] = graph.nodes;
   const edges: Edge[] = [
     {
       source: {
@@ -64,7 +66,7 @@ export const buildIteration = ({
       },
       destination: {
         field: 'seed',
-        node_id: Object.keys(baseNode)[0],
+        node_id: Object.keys(baseNode!)[0],
       },
     },
   ];
@@ -72,7 +74,7 @@ export const buildIteration = ({
     nodes: {
       ...rangeNode,
       ...iterateNode,
-      ...baseNode,
+      ...graph.nodes,
     },
     edges,
   };
