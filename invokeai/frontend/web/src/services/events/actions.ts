@@ -45,3 +45,6 @@ export const invocationError = createAction<
 export const generatorProgress = createAction<
   BaseSocketPayload & { data: GeneratorProgressEvent }
 >('socket/generatorProgress');
+
+// dispatch this when we need to fully reset the socket connection
+export const socketReset = createAction('socket/socketReset');
