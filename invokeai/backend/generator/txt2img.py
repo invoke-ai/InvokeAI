@@ -4,7 +4,10 @@ invokeai.backend.generator.txt2img inherits from invokeai.backend.generator
 import PIL.Image
 import torch
 
-from diffusers.models.controlnet import ControlNetModel
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+
 from ..stable_diffusion import (
     ConditioningData,
     PostprocessingSettings,
@@ -16,9 +19,11 @@ from .base import Generator
 
 class Txt2Img(Generator):
     def __init__(self, model, precision,
-                 control_model: ControlNetModel = None,
+                 control_model: Optional[Union[ControlNetModel, List[ControlNetModel]]] = None,
                  **kwargs):
         self.control_model = control_model
+        if isinstance(self.control_model, list):
+            self.control_model = MultiControlNetModel(self.control_model)
         super().__init__(model, precision, **kwargs)
 
     @torch.no_grad()
@@ -70,7 +75,23 @@ class Txt2Img(Generator):
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
         if control_image is not None:
-            control_image = pipeline.prepare_control_image(image=control_image, do_classifier_free_guidance=do_classifier_free_guidance)
+            if isinstance(self.control_model, ControlNetModel):
+                control_image = pipeline.prepare_control_image(image=control_image, do_classifier_free_guidance=do_classifier_free_guidance)
+            elif isinstance(self.control_model, MultiControlNetModel):
+                images = []
+                for image_ in control_image:
+                    image_ = self.model.prepare_control_image(
+                        image=image_,
+                        # width=width,
+                        # height=height,
+                        # batch_size=batch_size * num_images_per_prompt,
+                        # num_images_per_prompt=num_images_per_prompt,
+                        # device=device,
+                        # dtype=self.controlnet.dtype,
+                        do_classifier_free_guidance=do_classifier_free_guidance,
+                    )
+                    images.append(image_)
+                control_image = images
             kwargs["control_image"] = control_image
 
         def make_image(x_T: torch.Tensor, _: int) -> PIL.Image.Image:
