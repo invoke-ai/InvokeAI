@@ -2,7 +2,7 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit';
 
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
-
+import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { getPersistConfig } from 'redux-deep-persist';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
@@ -102,22 +102,22 @@ const rootPersistConfig = getPersistConfig({
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
-function buildMiddleware() {
+// TODO: rip the old middleware out when nodes is complete
+export function buildMiddleware() {
   if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
-    return [socketMiddleware()];
+    return socketMiddleware();
   } else {
-    return [socketioMiddleware()];
+    return socketioMiddleware();
   }
 }
 
-// Continue with store setup
 export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       immutableCheck: false,
       serializableCheck: false,
-    }).concat(buildMiddleware()),
+    }).concat(dynamicMiddlewares),
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [

@@ -29,28 +29,29 @@ import {
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 
-let socket_url = `ws://${window.location.host}`;
-
-// if building in package mode, replace socket url with open api base url minus the http protocol
-if (import.meta.env.MODE === 'package' && OpenAPI.BASE) {
-  //eslint-disable-next-line
-  socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
-}
-
-const socket = io(socket_url, {
-  timeout: 60000,
-  path: '/ws/socket.io',
-});
-
 export const socketMiddleware = () => {
   let areListenersSet = false;
+
+  let socket_url = `ws://${window.location.host}`;
+
+  // if building in package mode, replace socket url with open api base url minus the http protocol
+  if (import.meta.env.MODE === 'package' && OpenAPI.BASE) {
+    //eslint-disable-next-line
+    socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+  }
+
+  const socket = io(socket_url, {
+    timeout: 60000,
+    path: '/ws/socket.io',
+    autoConnect: false, // achtung! removing this breaks the dynamic middleware
+  });
 
   const middleware: Middleware =
     (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
       const { dispatch, getState } = store;
-
       // Set listeners for `connect` and `disconnect` events once
       // Must happen in middleware to get access to `dispatch`
+
       if (!areListenersSet) {
         socket.on('connect', () => {
           dispatch(socketConnected({ timestamp: getTimestamp() }));
@@ -70,6 +71,9 @@ export const socketMiddleware = () => {
         });
 
         areListenersSet = true;
+
+        // must manually connect
+        socket.connect();
       }
 
       // Everything else only happens once we have created a session
