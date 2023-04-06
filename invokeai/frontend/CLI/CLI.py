@@ -160,12 +160,12 @@ def main():
     # try to autoconvert new models
     if path := opt.autoimport:
         gen.model_manager.heuristic_import(
-            str(path), convert=False, commit_to_conf=opt.conf
+            str(path), commit_to_conf=opt.conf
         )
 
     if path := opt.autoconvert:
         gen.model_manager.heuristic_import(
-            str(path), convert=True, commit_to_conf=opt.conf
+            str(path), commit_to_conf=opt.conf
         )
 
     # web server loops forever
