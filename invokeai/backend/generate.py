@@ -150,7 +150,7 @@ class Generate:
         gfpgan=None,
         codeformer=None,
         esrgan=None,
-        optimize=True,
+        optimize=False,
         free_gpu_mem: bool = False,
         safety_checker: bool = False,
         max_loaded_models: int = 2,
@@ -193,6 +193,7 @@ class Generate:
         self.safety_checker = None
         self.karras_max = None
         self.infill_method = None
+        self.optimize = optimize
 
         #Initiates Pytorch inference
         if not optimize:
@@ -290,7 +291,7 @@ class Generate:
         ), "call to img2img() must include the init_img argument"
         return self.prompt2png(prompt, outdir, **kwargs)
 
-    def prompt2image_onnx(
+    def prompt2image_optimize(
         self,
         prompt,
         iterations=None,
