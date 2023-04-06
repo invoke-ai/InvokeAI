@@ -73,12 +73,18 @@ def main():
 
     if opt.optimize:
         #Invocation of onnx pipeline
-        gen = Generate(
-            conf=opt.conf,
-            model=opt.model,
-            optimize=opt.optimize)
-        main_loop(gen, opt)
-        sys.exit(1)
+        try:
+            gen = Generate(
+                conf=opt.conf,
+                model=opt.model,
+                optimize=opt.optimize)
+            main_loop(gen, opt)
+            sys.exit(1)
+        except (FileNotFoundError, TypeError, AssertionError) as e:
+            report_model_error(opt, e)
+        except (IOError, KeyError) as e:
+            print(f"{e}. Aborting.")
+            sys.exit(-1)
 
     if args.laion400m:
         print(

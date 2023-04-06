@@ -259,6 +259,7 @@ class Generate:
             #Set precision for ONNX inference
             self.precision = "float32"
             fallback = "runwayml/stable-diffusion-v1-5"
+            self.model = model or fallback
             self.model_name = model or fallback
 
     def prompt2png(self, prompt, outdir, **kwargs):
