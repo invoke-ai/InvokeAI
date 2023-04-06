@@ -48,7 +48,7 @@ class Txt2Img(Generator):
         """
         self.perlin = perlin
         control_image = kwargs.get("control_image", None)
-
+        do_classifier_free_guidance = cfg_scale > 1.0
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
@@ -70,7 +70,7 @@ class Txt2Img(Generator):
         ).add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta)
 
         if control_image is not None:
-            control_image = pipeline.prepare_control_image(image=control_image)
+            control_image = pipeline.prepare_control_image(image=control_image, do_classifier_free_guidance=do_classifier_free_guidance)
             kwargs["control_image"] = control_image
 
         def make_image(x_T: torch.Tensor, _: int) -> PIL.Image.Image:

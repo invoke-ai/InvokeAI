@@ -135,11 +135,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             scheduler_name=generator_args.get('scheduler')
         )
 
-        # FIXME: doing double the work here to get conditioning info from Compel in two different ways
-        # Generators want (uc, c, extra_conditioning_info) form from get_uc_and_c_and_ec which uses Compel
-        # ControlNetModel wants output of compel(prompt)
-        # really should be able to package this up as one thing and avoid both
-        # extra arg passing and double compel calls
+        # get conditioning from prompt via Compel package
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt, model=model)
 
         gen_class = self._generator_class()

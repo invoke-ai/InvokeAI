@@ -50,9 +50,7 @@ class InvokeAIDiffuserComponent:
     """
 
     debug_thresholding = False
-    # FIXME
-    # sequential_guidance = False
-    sequential_guidance = True
+    sequential_guidance = False
 
     @dataclass
     class ExtraConditioningInfo:
@@ -276,12 +274,7 @@ class InvokeAIDiffuserComponent:
         sigma_twice = torch.cat([sigma] * 2)
         both_conditionings = torch.cat([unconditioning, conditioning])
         both_results = self.model_forward_callback(
-            # x_twice,
-            x,
-            # sigma_twice,
-            sigma,
-            both_conditionings,
-            **kwargs,
+            x_twice, sigma_twice, both_conditionings, **kwargs,
         )
         unconditioned_next_x, conditioned_next_x = both_results.chunk(2)
         if conditioned_next_x.device.type == "mps":

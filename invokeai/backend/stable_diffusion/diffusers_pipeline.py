@@ -473,11 +473,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         :param callback:
         :param run_id:
         """
-
-        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
-        control_image = kwargs.get("control_image", None)
-        control_scale = kwargs.get("control_scale", None)
-
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
             latents,
             num_inference_steps,
@@ -623,35 +618,32 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         **kwargs,
     ):
-
-        control_image = kwargs.get("control_image", None)   # should be a processed tensor
-        control_scale = kwargs.get("control_scale", None)
-        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
-
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
 
         if additional_guidance is None:
             additional_guidance = []
 
-        # FIXME: add conditional to handle NOT classifier free guidance
-        # expand the latents if we are doing classifier free guidance
-        # print("doing classifier free guidance: ", self.do_classifier_free_guidance)
-        # latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
-        latent_control_input = latents
-        latent_model_input = torch.cat([latents] * 2)
-
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        latent_model_input = self.scheduler.scale_model_input(latent_model_input, timestep)
-        ehs = torch.cat([conditioning_data.unconditioned_embeddings, conditioning_data.text_embeddings])
+        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
-        if (self.control_model is not None) and (control_image is not None) and (control_scale is not None):
+        if (self.control_model is not None) and (kwargs.get("control_image") is not None):
+            control_image = kwargs.get("control_image") # should be a processed tensor derived from the control image
+            control_scale = kwargs.get("control_scale", 1.0)  # control_scale default is 1.0
+            if conditioning_data.guidance_scale > 1.0:
+                # expand the latents input to control model if doing classifier free guidance
+                #    (which I think for now is always true, there is conditional elsewhere that stops execution if
+                #     classifier_free_guidance is <= 1.0 ?)
+                latent_control_input = torch.cat([latent_model_input] * 2)
+            else:
+                latent_control_input = latent_model_input
             # controlnet inference
             down_block_res_samples, mid_block_res_sample = self.control_model(
-                latent_model_input,
+                latent_control_input,
                 timestep,
-                encoder_hidden_states = ehs,
+                encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
+                                                 conditioning_data.text_embeddings]),
                 controlnet_cond=control_image,
                 conditioning_scale=control_scale,
                 return_dict=False,
