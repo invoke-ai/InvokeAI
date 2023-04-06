@@ -5,7 +5,7 @@ import {
   ImageToImageInvocation,
   TextToImageInvocation,
 } from 'services/api';
-import { buildImg2ImgNode } from './nodes/image2Image';
+import { buildHiResNode, buildImg2ImgNode } from './nodes/image2Image';
 import { buildIteration } from './nodes/iteration';
 import { buildTxt2ImgNode } from './nodes/text2Image';
 
@@ -32,12 +32,31 @@ const buildBaseNode = (
 };
 
 export const buildGraph = (state: RootState): Graph => {
-  const { iterations } = state.generation;
+  const { generation, postprocessing } = state;
+  const { iterations } = generation;
+  const { hiresFix, hiresStrength } = postprocessing;
+
   const baseNode = buildBaseNode(state);
 
+  let graph: Graph = { nodes: baseNode };
+
   if (iterations > 1) {
-    return buildIteration({ baseNode, iterations });
+    graph = buildIteration({ graph, iterations });
   }
 
-  return { nodes: baseNode };
+  if (hiresFix) {
+    const { node, edge } = buildHiResNode(
+      baseNode as Record<string, TextToImageInvocation>,
+      hiresStrength
+    );
+    graph = {
+      nodes: {
+        ...graph.nodes,
+        ...node,
+      },
+      edges: [...(graph.edges || []), edge],
+    };
+  }
+
+  return graph;
 };
