@@ -47,6 +47,7 @@ class InvokeAIDiffuserComponent:
     At the moment it includes the following features:
     * Cross attention control ("prompt2prompt")
     * Hybrid conditioning (used for inpainting)
+    * "LoRA" and "PEFT" augmentions to the unet's attention weights
     """
 
     debug_thresholding = False
