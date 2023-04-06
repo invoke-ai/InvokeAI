@@ -22,6 +22,7 @@ import transformers
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
+from pathlib import Path
 from PIL import Image, ImageOps
 from pytorch_lightning import logging, seed_everything
 
@@ -992,9 +993,17 @@ class Generate:
 
         self.model_name = model_name
         self._set_sampler()  # requires self.model_name to be set first
-
+        self._save_last_used_model(model_name)
         return self.model
 
+    def _save_last_used_model(self,model_name:str):
+        """
+        Save name of the last model used.
+        """
+        model_file_path = Path(Globals.root,'.last_model')
+        with open(model_file_path,'w') as f:
+            f.write(model_name)
+        
     def load_huggingface_concepts(self, concepts: list[str]):
         self.model.textual_inversion_manager.load_huggingface_concepts(concepts)
 
