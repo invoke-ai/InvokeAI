@@ -48,6 +48,7 @@ class Txt2Img(Generator):
         """
         self.perlin = perlin
         control_image = kwargs.get("control_image", None)
+
         do_classifier_free_guidance = cfg_scale > 1.0
 
         # noinspection PyTypeChecker

@@ -473,6 +473,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         :param callback:
         :param run_id:
         """
+
+        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
+        control_image = kwargs.get("control_image", None)
+        control_scale = kwargs.get("control_scale", None)
+
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
             latents,
             num_inference_steps,
@@ -618,6 +623,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         **kwargs,
     ):
+
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
 

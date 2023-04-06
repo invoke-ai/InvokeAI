@@ -50,7 +50,9 @@ class InvokeAIDiffuserComponent:
     """
 
     debug_thresholding = False
-    sequential_guidance = False
+    # FIXME
+    # sequential_guidance = False
+    sequential_guidance = True
 
     @dataclass
     class ExtraConditioningInfo:
