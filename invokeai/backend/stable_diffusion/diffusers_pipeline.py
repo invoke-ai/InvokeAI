@@ -15,11 +15,14 @@ import psutil
 import torch
 import torchvision.transforms as T
 from compel import EmbeddingsProvider
-from diffusers.models import AutoencoderKL, UNet2DConditionModel, ControlNetModel
+from diffusers.models import AutoencoderKL, UNet2DConditionModel
+from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
 )
@@ -474,10 +477,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         :param run_id:
         """
 
-        # control_prompt_embeds = kwargs.get("control_prompt_embeds", None)
-        control_image = kwargs.get("control_image", None)
-        control_scale = kwargs.get("control_scale", None)
-
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
             latents,
             num_inference_steps,
@@ -635,8 +634,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
         if (self.control_model is not None) and (kwargs.get("control_image") is not None):
-            control_image = kwargs.get("control_image") # should be a processed tensor derived from the control image
+            control_image = kwargs.get("control_image") # should be a processed tensor derived from the control image(s)
             control_scale = kwargs.get("control_scale", 1.0)  # control_scale default is 1.0
+            # handling case where using multiple control models but only specifying single control_scale
+            #     so reshape control_scale to match number of control models
+            if isinstance(self.control_model, MultiControlNetModel) and isinstance(control_scale, float):
+                control_scale = [control_scale] * len(self.control_model.nets)
             if conditioning_data.guidance_scale > 1.0:
                 # expand the latents input to control model if doing classifier free guidance
                 #    (which I think for now is always true, there is conditional elsewhere that stops execution if
