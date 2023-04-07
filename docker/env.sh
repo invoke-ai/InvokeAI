@@ -28,12 +28,16 @@ if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
 
   # Set PIP_EXTRA_INDEX_URL based on container flavor
   if [[ "$CONTAINER_FLAVOR" == "rocm" ]]; then
-    PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/rocm"
+    PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/rocm5.4.2"
   elif [[ "$CONTAINER_FLAVOR" == "cpu" ]]; then
     PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
   # elif [[ -z "$CONTAINER_FLAVOR" || "$CONTAINER_FLAVOR" == "cuda" ]]; then
   #   PIP_PACKAGE=${PIP_PACKAGE-".[xformers]"}
   fi
+fi
+
+if [[ "$CONTAINER_FLAVOR" == "rocm" ]]; then
+  DEVICE_BINDS="--device=/dev/kfd --device=/dev/dri"
 fi
 
 # Variables shared by build.sh and run.sh

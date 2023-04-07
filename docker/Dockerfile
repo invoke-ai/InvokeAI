@@ -21,7 +21,8 @@ RUN \
     --no-install-recommends \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
-    libopencv-dev=4.5.*
+    libopencv-dev=4.5.* \
+    libstdc++-10-dev=10.2.*
 
 # Set working directory and env
 ARG APPDIR=/usr/src
@@ -94,6 +95,10 @@ RUN useradd \
 ARG VOLUME_DIR=/data
 RUN mkdir -p "${VOLUME_DIR}" \
   && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
+
+# Link amdgpu.ids for ROCm builds
+RUN mkdir -p "/opt/amdgpu/share/libdrm" \
+  && ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids"
 
 # Setup runtime environment
 USER ${UNAME}:${UNAME}

@@ -29,6 +29,7 @@ docker run \
   ${HUGGING_FACE_HUB_TOKEN:+--env="HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}"} \
   --publish=9090:9090 \
   --cap-add=sys_nice \
+  ${DEVICE_BINDS} \
   ${GPU_FLAGS:+--gpus="${GPU_FLAGS}"} \
   "${CONTAINER_IMAGE}" ${@:+$@}
 
