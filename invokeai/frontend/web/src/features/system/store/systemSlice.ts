@@ -88,6 +88,10 @@ export interface SystemState
    * Whether or not a scheduled cancelation is pending
    */
   isCancelScheduled: boolean;
+  /**
+   * Array of node IDs that we want to handle when events received
+   */
+  subscribedNodeIds: string[];
 }
 
 const initialSystemState: SystemState = {
@@ -134,6 +138,7 @@ const initialSystemState: SystemState = {
   sessionId: null,
   cancelType: 'immediate',
   isCancelScheduled: false,
+  subscribedNodeIds: [],
 };
 
 export const systemSlice = createSlice({
@@ -324,6 +329,12 @@ export const systemSlice = createSlice({
      */
     cancelTypeChanged: (state, action: PayloadAction<CancelType>) => {
       state.cancelType = action.payload;
+    },
+    /**
+     * The array of subscribed node ids was changed
+     */
+    subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
+      state.subscribedNodeIds = action.payload;
     },
   },
   extraReducers(builder) {
@@ -524,6 +535,7 @@ export const {
   cancelScheduled,
   scheduledCancelAborted,
   cancelTypeChanged,
+  subscribedNodeIdsSet,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

@@ -1,5 +1,6 @@
 import { RootState } from 'app/store';
 import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
+import { find } from 'lodash';
 import {
   Graph,
   ImageToImageInvocation,
@@ -31,7 +32,12 @@ const buildBaseNode = (
   return mapTabToFunction(activeTabName)(state);
 };
 
-export const buildGraph = (state: RootState): Graph => {
+type BuildGraphOutput = {
+  graph: Graph;
+  nodeIdsToSubscribe: string[];
+};
+
+export const buildGraph = (state: RootState): BuildGraphOutput => {
   const { generation, postprocessing } = state;
   const { iterations } = generation;
   const { hiresFix, hiresStrength } = postprocessing;
@@ -39,6 +45,7 @@ export const buildGraph = (state: RootState): Graph => {
   const baseNode = buildBaseNode(state);
 
   let graph: Graph = { nodes: baseNode };
+  const nodeIdsToSubscribe: string[] = [];
 
   if (iterations > 1) {
     graph = buildIteration({ graph, iterations });
@@ -56,7 +63,8 @@ export const buildGraph = (state: RootState): Graph => {
       },
       edges: [...(graph.edges || []), edge],
     };
+    nodeIdsToSubscribe.push(Object.keys(node)[0]);
   }
 
-  return graph;
+  return { graph, nodeIdsToSubscribe };
 };
