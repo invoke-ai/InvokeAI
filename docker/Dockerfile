@@ -4,22 +4,32 @@ ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
 ##################
+# FROM blobfuse2containers.azurecr.io/azure-blobfuse2.2.0.2 AS python-base
 FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
+ENV DEBIAN_FRONTEND=noninteractive
+LABEL org.opencontainers.image.authors="mauwii@outlook.de"
+
+RUN apt update && \
+    apt install curl gnupg2 software-properties-common -y && \
+    curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
+    apt-add-repository https://packages.microsoft.com/debian/11/prod && \
+    apt update && \
+    apt install fuse3 blobfuse2 -y
 
 # Prepare apt for buildkit cache
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
-  && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
+    && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
 
 # Install dependencies
 RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update \
-  && apt-get install -y \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y \
     --no-install-recommends \
-    libgl1-mesa-glx=20.3.* \
-    libglib2.0-0=2.66.* \
-    libopencv-dev=4.5.*
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libopencv-dev
 
 # Set working directory and env
 ARG APPDIR=/usr/src
@@ -32,22 +42,24 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 # Don't fall back to legacy build system
 ENV PIP_USE_PEP517=1
+COPY ./docker/config.yaml /usr/share/blobfuse2/
 
-#######################
-##  build pyproject  ##
-#######################
+# #######################
+# ##  build pyproject  ##
+# #######################
 FROM python-base AS pyproject-builder
 
 # Install build dependencies
 RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update \
-  && apt-get install -y \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y \
     --no-install-recommends \
-    build-essential=12.9 \
-    gcc=4:10.2.* \
-    python3-dev=3.9.*
+    build-essential \
+    gcc \
+    python3-dev \
+    python3-venv
 
 # Prepare pip for buildkit cache
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
@@ -56,20 +68,21 @@ RUN mkdir -p ${PIP_CACHE_DIR}
 
 # Create virtual environment
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  python3 -m venv "${APPNAME}" \
-  --upgrade-deps
+    python3 -m venv "${APPNAME}" \
+    --upgrade-deps
 
 # Install requirements
 COPY --link pyproject.toml .
 COPY --link invokeai/version/invokeai_version.py invokeai/version/__init__.py invokeai/version/
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
+    "${APPNAME}"/bin/pip install .
 
 # Install pyproject.toml
 COPY --link . .
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  "${APPNAME}/bin/pip" install .
+    "${APPNAME}/bin/pip" install .
 
 # Build patchmatch
 RUN python3 -c "from patchmatch import patch_match"
@@ -80,44 +93,34 @@ RUN python3 -c "from patchmatch import patch_match"
 FROM python-base AS runtime
 
 # Create a new user
-ARG UNAME=appuser
-RUN useradd \
-  --no-log-init \
-  -m \
-  -U \
-  "${UNAME}"
+# ARG UNAME=appuser
+# RUN useradd \
+#     --no-log-init \
+#     -m \
+#     -U \
+#     "${UNAME}"
 
-# Create volume directory 
+# Create volume directory
 ARG VOLUME_DIR=/data
-ARG VOLUME_CONFIG_DIR=/data/configs
-ARG VOLUME_DIFF_DIR=/data/configs/stable-diffusion
 RUN mkdir -p "${VOLUME_DIR}" \
-  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
-COPY ./invokeai/configs/api_endpoints.yml /data/api_endpoints.yml
-COPY ./invokeai/configs/resleeve_configs.yml /data/resleeve_configs.yml
-RUN mkdir -p "${VOLUME_CONFIG_DIR}" \
-  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_CONFIG_DIR}"
-RUN mkdir -p "${VOLUME_DIFF_DIR}" \
-  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIFF_DIR}"
+    # && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}" \
+    && mkdir -p /blob_data
+# && chown -hR "${UNAME}:${UNAME}" /blob_data
 
 # Setup runtime environment
-USER ${UNAME}:${UNAME}
-COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
-
-COPY ./models.yaml /data/configs
-COPY ./INITIAL_MODELS.yaml /data/configs
-COPY ./v1-finetune.yaml /data/configs/stable-diffusion
-COPY ./v1-finetune_style.yaml /data/configs/stable-diffusion
-COPY ./v1-inference.yaml /data/configs/stable-diffusion
-COPY ./v1-inpainting-inference.yaml /data/configs/stable-diffusion
-COPY ./v1-m1-finetune.yaml /data/configs/stable-diffusion
-COPY ./v2-inference.yaml /data/configs/stable-diffusion
-COPY ./v2-inference-v.yaml /data/configs/stable-diffusion
-
+# USER ${UNAME}:${UNAME}
+# COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+# COPY --chown=${UNAME}:${UNAME} ./invokeai/configs/resleeve_configs.yml /data
+# COPY --chown=${UNAME}:${UNAME} ./docker/config.yaml /data/config_blobfuse.yaml
+COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+COPY ./invokeai/configs/resleeve_configs.yml /data
+COPY ./docker/config.yaml /data/config_blobfuse.yaml
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
 EXPOSE 9090
-ENTRYPOINT [ "invokeai" ]
-CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
-VOLUME [ "${VOLUME_DIR}" ]
+CMD sh -c "blobfuse2 mount /blob_data/ --config-file /data/config_blobfuse.yaml & invokeai --web --host 0.0.0.0 --port 9090"
+
+# ENTRYPOINT [ "invokeai" ]
+# CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
+# VOLUME [ "${VOLUME_DIR}" ]
