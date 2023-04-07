@@ -1,4 +1,4 @@
-import { GraphExecutionState } from '../api';
+import { Graph, GraphExecutionState } from '../api';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -9,6 +9,12 @@ export type ProgressImage = {
   height: number;
 };
 
+export type AnyInvocation = NonNullable<
+  NonNullable<Graph['nodes']>[string]['type']
+>;
+
+export type AnyResult = GraphExecutionState['results'][string];
+
 /**
  * A `generator_progress` socket.io event.
  *
@@ -16,7 +22,8 @@ export type ProgressImage = {
  */
 export type GeneratorProgressEvent = {
   graph_execution_state_id: string;
-  invocation_id: string;
+  invocation: AnyInvocation;
+  source_id: string;
   progress_image?: ProgressImage;
   step: number;
   total_steps: number;
@@ -31,8 +38,8 @@ export type GeneratorProgressEvent = {
  */
 export type InvocationCompleteEvent = {
   graph_execution_state_id: string;
-  invocation_id: string;
-  result: GraphExecutionState['results'][string];
+  source_id: string;
+  result: AnyResult;
 };
 
 /**
@@ -42,7 +49,8 @@ export type InvocationCompleteEvent = {
  */
 export type InvocationErrorEvent = {
   graph_execution_state_id: string;
-  invocation_id: string;
+  invocation: AnyInvocation;
+  source_id: string;
   error: string;
 };
 
@@ -53,7 +61,8 @@ export type InvocationErrorEvent = {
  */
 export type InvocationStartedEvent = {
   graph_execution_state_id: string;
-  invocation_id: string;
+  invocation: AnyInvocation;
+  source_id: string;
 };
 
 /**
