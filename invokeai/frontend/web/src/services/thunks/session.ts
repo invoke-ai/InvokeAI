@@ -2,23 +2,25 @@ import { createAppAsyncThunk } from 'app/storeUtils';
 import { SessionsService } from 'services/api';
 import { buildGraph } from 'common/util/buildGraph';
 import { isFulfilled } from '@reduxjs/toolkit';
+import { subscribedNodeIdsSet } from 'features/system/store/systemSlice';
 
-type SessionCreatedArg = Parameters<
-  (typeof SessionsService)['createSession']
->[0];
+// type SessionCreatedArg = {
+//   graph: Parameters<
+//     (typeof SessionsService)['createSession']
+//   >[0]['requestBody'];
+//   nodeIdsToSubscribe?: string[];
+// };
 
 /**
  * `SessionsService.createSession()` thunk
  */
 export const sessionCreated = createAppAsyncThunk(
   'api/sessionCreated',
-  async (arg: SessionCreatedArg['requestBody'], _thunkApi) => {
-    let graph = arg;
-    if (!arg) {
-      const { getState } = _thunkApi;
-      const state = getState();
-      graph = buildGraph(state);
-    }
+  async (_arg, { dispatch, getState }) => {
+    const state = getState();
+    const { graph, nodeIdsToSubscribe } = buildGraph(state);
+
+    dispatch(subscribedNodeIdsSet(nodeIdsToSubscribe));
 
     const response = await SessionsService.createSession({
       requestBody: graph,

@@ -112,6 +112,15 @@ export const socketMiddleware = () => {
       // Everything else only happens once we have created a session
       if (isFulfilledSessionCreatedAction(action)) {
         const oldSessionId = getState().system.sessionId;
+        const subscribedNodeIds = getState().system.subscribedNodeIds;
+
+        const shouldHandleEvent = (id: string): boolean => {
+          if (subscribedNodeIds.length === 1 && subscribedNodeIds[0] === '*') {
+            return true;
+          }
+
+          return subscribedNodeIds.includes(id);
+        };
 
         if (oldSessionId) {
           // Unsubscribe when invocations complete
@@ -150,28 +159,36 @@ export const socketMiddleware = () => {
 
         // Set up listeners for the present subscription
         socket.on('invocation_started', (data: InvocationStartedEvent) => {
-          dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
+          if (shouldHandleEvent(data.source_id)) {
+            dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
+          }
         });
 
         socket.on('generator_progress', (data: GeneratorProgressEvent) => {
-          dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
+          if (shouldHandleEvent(data.source_id)) {
+            dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
+          }
         });
 
         socket.on('invocation_error', (data: InvocationErrorEvent) => {
-          dispatch(invocationError({ data, timestamp: getTimestamp() }));
+          if (shouldHandleEvent(data.source_id)) {
+            dispatch(invocationError({ data, timestamp: getTimestamp() }));
+          }
         });
 
         socket.on('invocation_complete', (data: InvocationCompleteEvent) => {
-          const sessionId = data.graph_execution_state_id;
+          if (shouldHandleEvent(data.source_id)) {
+            const sessionId = data.graph_execution_state_id;
 
-          const { cancelType, isCancelScheduled } = getState().system;
+            const { cancelType, isCancelScheduled } = getState().system;
 
-          // Handle scheduled cancelation
-          if (cancelType === 'scheduled' && isCancelScheduled) {
-            dispatch(sessionCanceled({ sessionId }));
+            // Handle scheduled cancelation
+            if (cancelType === 'scheduled' && isCancelScheduled) {
+              dispatch(sessionCanceled({ sessionId }));
+            }
+
+            dispatch(invocationComplete({ data, timestamp: getTimestamp() }));
           }
-
-          dispatch(invocationComplete({ data, timestamp: getTimestamp() }));
         });
 
         // Finally we actually invoke the session, starting processing
