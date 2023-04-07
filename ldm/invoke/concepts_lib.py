@@ -83,7 +83,7 @@ class HuggingFaceConceptsLibrary(object):
             return None
         with open(file,'r') as f:
             trigger = f.readline()
-            trigger = trigger.strip()
+            trigger = trigger.strip().strip("<>")
         self.triggers[concept_name] = trigger
         self.concept_names[trigger] = concept_name
         return trigger

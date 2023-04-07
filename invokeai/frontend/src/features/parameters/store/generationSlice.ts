@@ -89,7 +89,7 @@ const textualInversionExists = (
   state: GenerationState,
   textualInversion: string
 ) => {
-  const textualInversionRegex = new RegExp(textualInversion);
+  const textualInversionRegex = new RegExp(`<${textualInversion}>`);
   if (state.prompt.match(textualInversionRegex)) return true;
   return false;
 };
@@ -200,7 +200,7 @@ export const generationSlice = createSlice({
       const textualInversions = [...state.textualInversionsInUse];
 
       if (textualInversionExists(state, newTextualInversion)) {
-        const textualInversionRegex = new RegExp(newTextualInversion, 'g');
+        const textualInversionRegex = new RegExp(`<${newTextualInversion}>`, 'g');
         const newPrompt = state.prompt.replaceAll(textualInversionRegex, '');
         state.prompt = newPrompt;
 
@@ -209,7 +209,7 @@ export const generationSlice = createSlice({
           if (newTIIndex > -1) textualInversions.splice(newTIIndex, 1);
         }
       } else {
-        state.prompt = `${state.prompt} ${newTextualInversion}`;
+        state.prompt = `${state.prompt} <${newTextualInversion}>`;
         if (!textualInversions.includes(newTextualInversion))
           textualInversions.push(newTextualInversion);
       }
