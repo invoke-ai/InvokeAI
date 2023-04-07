@@ -47,7 +47,6 @@ class TextualInversionManager(BaseTextualInversionManager):
             if (
                 self.has_textual_inversion_for_trigger_string(trigger)
                 or self.has_textual_inversion_for_trigger_string(concept_name)
-                or self.has_textual_inversion_for_trigger_string(f"<{concept_name}>")
             ):  # in case a token with literal angle brackets encountered
                 print(f">> Loaded local embedding for trigger {concept_name}")
                 continue
@@ -86,7 +85,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             return
 
         # Resolve the situation in which an earlier embedding has claimed the same
-        # trigger string. We replace the trigger with '<source_file>', as we used to.
+        # trigger string. We replace the trigger with 'source_file', as we used to.
         trigger_str = embedding_info["name"]
         sourcefile = (
             f"{ckpt_path.parent.name}/{ckpt_path.name}"
@@ -96,9 +95,9 @@ class TextualInversionManager(BaseTextualInversionManager):
 
         if trigger_str in self.trigger_to_sourcefile:
             replacement_trigger_str = (
-                f"<{ckpt_path.parent.name}>"
+                ckpt_path.parent.name
                 if ckpt_path.name == "learned_embeds.bin"
-                else f"<{ckpt_path.stem}>"
+                else ckpt_path.stem
             )
             print(
                 f">> {sourcefile}: Trigger token '{trigger_str}' is already claimed by '{self.trigger_to_sourcefile[trigger_str]}'. Trigger this concept with {replacement_trigger_str}"
@@ -165,13 +164,13 @@ class TextualInversionManager(BaseTextualInversionManager):
             )
 
         trigger_token_id = self._get_or_create_token_id_and_assign_embedding(
-            ti.trigger_string, ti.embedding[0]
+            f'<{ti.trigger_string}>', ti.embedding[0]
         )
 
         if ti.embedding_vector_length > 1:
             # for embeddings with vector length > 1
             pad_token_strings = [
-                ti.trigger_string + "-!pad-" + str(pad_index)
+                f'<{ti.trigger_string}>' + "-!pad-" + str(pad_index)
                 for pad_index in range(1, ti.embedding_vector_length)
             ]
             # todo: batched UI for faster loading when vector length >2
@@ -368,7 +367,7 @@ class TextualInversionManager(BaseTextualInversionManager):
                 embedding_info["name"] = (
                     token
                     if token != "*"
-                    else f"<{basename}>"
+                    else basename
                 )
                 embedding_info["embedding"] = embedding_ckpt[
                     "string_to_param"
@@ -390,7 +389,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         basename = Path(file_path).stem
         print(f'   | Loading v3 embedding file: {basename}')
         embedding_info = {}
-        embedding_info["name"] = f'<{basename}>'
+        embedding_info["name"] = basename
         embedding_info["num_of_embeddings"] = 1
         embedding = embedding_ckpt['emb_params']
         embedding_info["embedding"] = embedding
@@ -415,7 +414,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             for token in list(embedding_ckpt.keys()):
                 embedding_info["name"] = (
                     token
-                    or f"<{basename}>"
+                    or basename
                 )
                 embedding_info["embedding"] = embedding_ckpt[token]
                 embedding_info["num_vectors_per_token"] = 1  # All Concepts seem to default to 1

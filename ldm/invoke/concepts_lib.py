@@ -24,7 +24,7 @@ class HuggingFaceConceptsLibrary(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
-        self.match_trigger = re.compile('(<[a-zA-Z0-9_\- >]+>)') # trigger is slightly less restrictive than HF concept name
+        self.match_trigger = re.compile('<([a-zA-Z0-9_\- ]+)>') # trigger is slightly less restrictive than HF concept name
         self.match_concept = re.compile('<([a-zA-Z0-9_\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self, minimum_likes: int=0)->list:
@@ -73,7 +73,7 @@ class HuggingFaceConceptsLibrary(object):
         if concept_name in self.triggers:
             return self.triggers[concept_name]
         elif self.concept_is_local(concept_name):
-            trigger = f'<{concept_name}>'
+            trigger = concept_name
             self.triggers[concept_name] = trigger
             self.concept_names[trigger] = concept_name
             return trigger
@@ -96,7 +96,7 @@ class HuggingFaceConceptsLibrary(object):
         this.
         '''
         concept = self.concept_names.get(trigger,None)
-        return f'<{concept}>' if concept else f'{trigger}'
+        return concept if concept else trigger
 
     def replace_triggers_with_concepts(self, prompt:str)->str:
         '''
@@ -114,7 +114,7 @@ class HuggingFaceConceptsLibrary(object):
             return prompt
 
         def do_replace(match)->str:
-            return self.trigger_to_concept(match.group(1)) or f'<{match.group(1)}>'
+            return f'<{self.trigger_to_concept(match.group(1))}>' or f'<{match.group(1)}>'
         return self.match_trigger.sub(do_replace, prompt)
 
     def replace_concepts_with_triggers(self,
@@ -137,9 +137,9 @@ class HuggingFaceConceptsLibrary(object):
         load_concepts_callback(concepts)
 
         def do_replace(match)->str:
-            if excluded_tokens and f'<{match.group(1)}>' in excluded_tokens:
+            if excluded_tokens and match.group(1) in excluded_tokens:
                 return f'<{match.group(1)}>'
-            return self.concept_to_trigger(match.group(1)) or f'<{match.group(1)}>'
+            return f'<{self.concept_to_trigger(match.group(1))}>' or f'<{match.group(1)}>'
         return self.match_concept.sub(do_replace, prompt)
 
     def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin' , local_only:bool=False)->str:
