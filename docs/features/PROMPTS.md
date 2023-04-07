@@ -268,7 +268,7 @@ model is so good at inpainting, a good substitute is to use the `clipseg` text
 masking option:
 
 ```bash
-invoke> a fluffy cat eating a hotdot
+invoke> a fluffy cat eating a hotdog
 Outputs:
 [1010] outputs/000025.2182095108.png: a fluffy cat eating a hotdog
 invoke> a smiling dog eating a hotdog -I 000025.2182095108.png -tm cat
