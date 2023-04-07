@@ -24,7 +24,7 @@ def write_log_message(results, output_cntr):
     """logs to the terminal"""
     if len(results) == 0:
         return output_cntr
-    log_lines = [f"{path}: {prompt}\n" for path, prompt in results]
+    log_lines = [f"{path}: {prompt}\n" for path, prompt, a ,jsonData in results]
     if len(log_lines) > 1:
         subcntr = 1
         for l in log_lines:
@@ -47,20 +47,20 @@ def write_log_files(results, log_path, file_types):
 
 
 def write_log_default(log_path, results, file_type):
-    plain_txt_lines = [f"{path}: {prompt}\n" for path, prompt in results]
+    plain_txt_lines = [f"{path}: {prompt}\n" for path, prompt, a ,jsonData in results]
     with open(log_path + "." + file_type, "a", encoding="utf-8") as file:
         file.writelines(plain_txt_lines)
 
 
 def write_log_txt(log_path, results):
-    txt_lines = [f"{path}: {prompt}\n" for path, prompt in results]
+    txt_lines = [f"{path}: {prompt}\n" for path, prompt, a ,jsonData in results]
     with open(log_path + ".txt", "a", encoding="utf-8") as file:
         file.writelines(txt_lines)
 
 
 def write_log_markdown(log_path, results):
     md_lines = []
-    for path, prompt in results:
+    for path, prompt, a ,jsonData in results:
         file_name = os.path.basename(path)
         md_lines.append(f"## {file_name}\n![]({file_name})\n\n{prompt}\n")
     with open(log_path + ".md", "a", encoding="utf-8") as file:

@@ -327,6 +327,7 @@ class Generator:
         v_symmetry_time_pct=None,
         safety_checker: SafetyChecker=None,
         free_gpu_mem: bool = False,
+        jsonData="",
         **kwargs,
     ):
         scope = nullcontext
@@ -394,6 +395,7 @@ class Generator:
                         seed,
                         first_seed=first_seed,
                         attention_maps_image=attention_maps_image,
+                        jsonData=jsonData
                     )
 
                 seed = self.new_seed()

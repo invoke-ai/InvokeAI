@@ -341,6 +341,7 @@ def main_loop(gen, opt):
                 use_prefix=None,
                 prompt_in=None,
                 attention_maps_image=None,
+                jsonData=""
             ):
                 # note the seed is the seed of the current image
                 # the first_seed is the original seed that noise is added to
@@ -365,6 +366,7 @@ def main_loop(gen, opt):
                         metadata={},
                         name=filename,
                         compress_level=opt.png_compression,
+                        jsonData=gen.saveData.toJSON()
                     )
                     results.append([path, formatted_dream_prompt])
 
@@ -401,6 +403,7 @@ def main_loop(gen, opt):
                         ),
                         name=filename,
                         compress_level=opt.png_compression,
+                        jsonData=gen.saveData.toJSON()
                     )
 
                     # update rfc metadata
@@ -418,13 +421,13 @@ def main_loop(gen, opt):
 
                     if (not postprocessed) or opt.save_original:
                         # only append to results if we didn't overwrite an earlier output
-                        results.append([path, formatted_dream_prompt])
+                        results.append([path, formatted_dream_prompt,"",gen.saveData.toJSON()])
 
                 # so that the seed autocompletes (on linux|mac when -S or --seed specified
                 if completer and operation == "generate":
                     completer.add_seed(seed)
                     completer.add_seed(first_seed)
-                last_results.append([path, seed])
+                last_results.append([path, seed,"",gen.saveData.toJSON()])
 
             if operation == "generate":
                 catch_ctrl_c = (
@@ -466,8 +469,9 @@ def main_loop(gen, opt):
                     dream_prompt=formatted_dream_prompt,
                     metadata=metadata,
                     name=filename,
+                    jsonData=gen.saveData.toJSON()
                 )
-                results = [[path, formatted_dream_prompt]]
+                results = [[path, formatted_dream_prompt,"",gen.saveData.toJSON()]]
 
         except AssertionError as e:
             print(e)

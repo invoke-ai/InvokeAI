@@ -14,6 +14,10 @@ import time
 import traceback
 from typing import List
 
+import base64
+from io import BytesIO
+import copy
+import json
 import cv2
 import diffusers
 import numpy as np
@@ -62,6 +66,143 @@ torch.multinomial = fix_func(torch.multinomial)
 # this is fallback model in case no default is defined
 FALLBACK_MODEL_NAME = "stable-diffusion-1.5"
 
+#Class for save of parameters
+class SaveInputs():
+    def __init__(self,model_manager,model_name,prompt,iterations,steps,seed,cfg_scale,ddim_eta,skip_normalize,image_callback,step_callback,width,height,sampler_name,seamless,seamless_axes,log_tokenization,with_variations,variation_amount,threshold,perlin,h_symmetry_time_pct,v_symmetry_time_pct,karras_max,outdir,init_img,init_mask,text_mask,invert_mask,fit,strength,init_color,embiggen,embiggen_tiles,embiggen_strength,gfpgan_strength,facetool,facetool_strength,codeformer_fidelity,save_original,upscale,upscale_denoise_str,inpaint_replace,inpaint_width,inpaint_height,mask_blur_radius,catch_interrupts,hires_fix,use_mps_noise,seam_size,seam_blur,seam_strength,seam_steps,tile_size,infill_method,force_outpaint,enable_image_debugging):
+        #self.model = json.loads(model.to_json_string())
+        #self.with_variations=copy.copy(with_variations)
+        #self.model_manager=copy.copy(model_manager)
+        self.model_name=copy.copy(model_name)
+        self.prompt=copy.copy(prompt)
+        self.iterations=copy.copy(iterations)
+        self.steps=copy.copy(steps)
+        self.seed=copy.copy(seed)
+        self.cfg_scale=copy.copy(cfg_scale)
+        self.ddim_eta=copy.copy(ddim_eta)
+        self.skip_normalize=copy.copy(skip_normalize)
+        #self.image_callback=copy.copy(image_callback)
+        #self.step_callback=copy.copy(step_callback)
+        self.width=copy.copy(width)
+        self.height=copy.copy(height)
+        self.sampler_name=copy.copy(sampler_name)
+        self.seamless=copy.copy(seamless)
+        #self.seamless_axes=copy.copy(seamless_axes)
+        self.log_tokenization=copy.copy(log_tokenization)
+        self.with_variations=copy.copy(with_variations)
+        self.variation_amount=copy.copy(variation_amount)
+        self.threshold=copy.copy(threshold)
+        self.perlin=copy.copy(perlin)
+        self.h_symmetry_time_pct=copy.copy(h_symmetry_time_pct)
+        self.v_symmetry_time_pct=copy.copy(v_symmetry_time_pct)
+        self.karras_max=copy.copy(karras_max)
+        #self.outdir=copy.copy(outdir)
+        if init_img:
+            buffered = BytesIO()
+            init_imgC=copy.copy(init_img)
+            init_imgC.save(buffered, format="PNG")
+            init_imgBase64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            self.init_img=copy.copy("data:image/png;base64,"+init_imgBase64)
+        else:
+            self.init_img=copy.copy(init_img)
+
+        if init_mask:
+            buffered = BytesIO()
+            init_maskC=copy.copy(init_mask)
+            init_maskC.save(buffered, format="PNG")
+            init_maskBase64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            self.init_mask=copy.copy("data:image/png;base64,"+init_maskBase64)
+        else:
+            self.init_mask=copy.copy(init_mask)
+            
+        self.text_mask=copy.copy(text_mask)
+        self.invert_mask=copy.copy(invert_mask)
+        self.fit=copy.copy(fit)
+        self.strength=copy.copy(strength)
+        self.init_color=copy.copy(init_color)
+        self.embiggen=copy.copy(embiggen)
+        self.embiggen_tiles=copy.copy(embiggen_tiles)
+        self.embiggen_strength=copy.copy(embiggen_strength)
+        self.gfpgan_strength=copy.copy(gfpgan_strength)
+        self.facetool=copy.copy(facetool)
+        self.facetool_strength=copy.copy(facetool_strength)
+        self.codeformer_fidelity=copy.copy(codeformer_fidelity)
+        self.save_original=copy.copy(save_original)
+        self.upscale=copy.copy(upscale)
+        self.upscale_denoise_str=copy.copy(upscale_denoise_str)
+        self.inpaint_replace=copy.copy(inpaint_replace)
+        self.inpaint_width=copy.copy(inpaint_width)
+        self.inpaint_height=copy.copy(inpaint_height)
+        self.mask_blur_radius=copy.copy(mask_blur_radius)
+        self.catch_interrupts=copy.copy(catch_interrupts)
+        self.hires_fix=copy.copy(hires_fix)
+        self.use_mps_noise=copy.copy(use_mps_noise)
+        self.seam_size=copy.copy(seam_size)
+        self.seam_blur=copy.copy(seam_blur)
+        self.seam_strength=copy.copy(seam_strength)
+        self.seam_steps=copy.copy(seam_steps)
+        self.tile_size=copy.copy(tile_size)
+        self.infill_method=copy.copy(infill_method)
+        self.force_outpaint=copy.copy(force_outpaint)
+        self.enable_image_debugging=copy.copy(enable_image_debugging)
+    def print(self):
+        print("model_name",json.dumps(self.model_name))
+        print("prompt",json.dumps(self.prompt))
+        print("iterations",json.dumps(self.iterations))
+        print("steps",json.dumps(self.steps))
+        print("seed",json.dumps(self.seed))
+        print("cfg_scale",json.dumps(self.cfg_scale))
+        print("ddim_eta",json.dumps(self.ddim_eta))
+        print("skip_normalize",json.dumps(self.skip_normalize))
+        #print("image_callback",json.dumps(self.image_callback))
+        #print("step_callback",json.dumps(self.step_callback))
+        print("width",json.dumps(self.width))
+        print("height",json.dumps(self.height))
+        print("sampler_name",json.dumps(self.sampler_name))
+        print("seamless",json.dumps(self.seamless))
+        #print("seamless_axes",json.dumps(self.seamless_axes))
+        print("log_tokenization",json.dumps(self.log_tokenization))
+        print("with_variations",json.dumps(self.with_variations))
+        print("variation_amount",json.dumps(self.variation_amount))
+        print("threshold",json.dumps(self.threshold))
+        print("perlin",json.dumps(self.perlin))
+        print("h_symmetry_time_pct",json.dumps(self.h_symmetry_time_pct))
+        print("v_symmetry_time_pct",json.dumps(self.v_symmetry_time_pct))
+        print("karras_max",json.dumps(self.karras_max))
+        print("init_img",json.dumps(self.init_img))
+        print("init_mask",json.dumps(self.init_mask))
+        print("text_mask",json.dumps(self.text_mask))
+        print("invert_mask",json.dumps(self.invert_mask))
+        print("fit",json.dumps(self.fit))
+        print("strength",json.dumps(self.strength))
+        print("init_color",json.dumps(self.init_color))
+        print("embiggen",json.dumps(self.embiggen))
+        print("embiggen_tiles",json.dumps(self.embiggen_tiles))
+        print("embiggen_strength",json.dumps(self.embiggen_strength))
+        print("gfpgan_strength",json.dumps(self.gfpgan_strength))
+        print("facetool",json.dumps(self.facetool))
+        print("facetool_strength",json.dumps(self.facetool_strength))
+        print("codeformer_fidelity",json.dumps(self.codeformer_fidelity))
+        print("save_original",json.dumps(self.save_original))
+        print("upscale",json.dumps(self.upscale))
+        print("upscale_denoise_str",json.dumps(self.upscale_denoise_str))
+        print("inpaint_replace",json.dumps(self.inpaint_replace))
+        print("inpaint_width",json.dumps(self.inpaint_width))
+        print("inpaint_height",json.dumps(self.inpaint_height))
+        print("mask_blur_radius",json.dumps(self.mask_blur_radius))
+        print("catch_interrupts",json.dumps(self.catch_interrupts))
+        print("hires_fix",json.dumps(self.hires_fix))
+        print("use_mps_noise",json.dumps(self.use_mps_noise))
+        print("seam_size",json.dumps(self.seam_size))
+        print("seam_blur",json.dumps(self.seam_blur))
+        print("seam_strength",json.dumps(self.seam_strength))
+        print("seam_steps",json.dumps(self.seam_steps))
+        print("tile_size",json.dumps(self.tile_size))
+        print("infill_method",json.dumps(self.infill_method))
+        print("force_outpaint",json.dumps(self.force_outpaint))
+        print("enable_image_debugging",json.dumps(self.enable_image_debugging))
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
 """Simplified text to image API for stable diffusion/latent diffusion
 
 Example Usage:
@@ -261,12 +402,12 @@ class Generate:
         pngwriter = PngWriter(outdir)
         prefix = pngwriter.unique_prefix()
         outputs = []
-        for image, seed in results:
+        for image, seed ,attention_maps_images,jsonData in results:
             name = f"{prefix}.{seed}.png"
             path = pngwriter.save_image_and_prompt_to_png(
-                image, dream_prompt=f"{prompt} -S{seed}", name=name
+                image, dream_prompt=f"{prompt} -S{seed}", name=name,jsonData=jsonData
             )
-            outputs.append([path, seed])
+            outputs.append([path, seed,"",jsonData])
         return outputs
 
     def txt2img(self, prompt, **kwargs):
@@ -348,7 +489,7 @@ class Generate:
         enable_image_debugging=False,
         **args,
     ):  # eat up additional cruft
-        self.clear_cuda_stats()
+        self.saveData = SaveInputs(self.model_manager,self.model_name,prompt,iterations,steps,seed,cfg_scale,ddim_eta,skip_normalize,image_callback,step_callback,width,height,sampler_name,seamless,seamless_axes,log_tokenization,with_variations,variation_amount,threshold,perlin,h_symmetry_time_pct,v_symmetry_time_pct,karras_max,outdir,init_img,init_mask,text_mask,invert_mask,fit,strength,init_color,embiggen,embiggen_tiles,embiggen_strength,gfpgan_strength,facetool,facetool_strength,codeformer_fidelity,save_original,upscale,upscale_denoise_str,inpaint_replace,inpaint_width,inpaint_height,mask_blur_radius,catch_interrupts,hires_fix,use_mps_noise,seam_size,seam_blur,seam_strength,seam_steps,tile_size,infill_method,force_outpaint,enable_image_debugging)
         """
         ldm.generate.prompt2image() is the common entry point for txt2img() and img2img()
         It takes the following arguments:
@@ -501,7 +642,6 @@ class Generate:
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             generator.use_mps_noise = use_mps_noise
-
             results = generator.generate(
                 prompt,
                 iterations=iterations,
@@ -541,6 +681,7 @@ class Generate:
                 enable_image_debugging=enable_image_debugging,
                 free_gpu_mem=self.free_gpu_mem,
                 clear_cuda_cache=self.clear_cuda_cache,
+                jsonData = self.saveData.toJSON()
             )
 
             if init_color:
@@ -740,6 +881,7 @@ class Generate:
                 embiggen_strength=opt.embiggen_strength,
                 image_callback=callback,
                 clear_cuda_cache=self.clear_cuda_cache,
+                jsonData = self.saveData.toJSON()
             )
         elif tool == "outpaint":
             from .restoration.outpaint import Outpaint
@@ -1004,11 +1146,11 @@ class Generate:
                 )
 
             if image_callback is not None:
-                image_callback(image, seed, upscaled=True, use_prefix=prefix)
+                image_callback(image, seed, upscaled=True, use_prefix=prefix,JsonData=self.saveData.toJSON())
             else:
                 r[0] = image
 
-            results.append([image, seed])
+            results.append([image, seed,"",self.saveData])
 
         return results
 

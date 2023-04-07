@@ -35,9 +35,14 @@ class PngWriter:
     # saves image named _image_ to outdir/name, writing metadata from prompt
     # returns full path of output
     def save_image_and_prompt_to_png(
-        self, image, dream_prompt, name, metadata=None, compress_level=6
+        self, image, dream_prompt, name, metadata=None, compress_level=6,jsonData=""
     ):
         path = os.path.join(self.outdir, name)
+        #Save in JSON file Parameter of gereration
+        f = open('.'.join(path.split('.')[:-1])+".json", "w")
+        f.write(jsonData)
+        f.close()
+
         info = PngImagePlugin.PngInfo()
         info.add_text("Dream", dream_prompt)
         if metadata:

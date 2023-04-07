@@ -1110,7 +1110,7 @@ class InvokeAIWebServer:
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-            def image_done(image, seed, first_seed, attention_maps_image=None):
+            def image_done(image, seed, first_seed, attention_maps_image=None,jsonData=""):
                 if self.canceled.is_set():
                     raise CanceledException
 
@@ -1257,6 +1257,7 @@ class InvokeAIWebServer:
                     metadata,
                     generated_image_outdir,
                     postprocessing=postprocessing,
+                    jsonData=jsonData
                 )
 
                 thumbnail_path = save_thumbnail(
@@ -1491,6 +1492,7 @@ class InvokeAIWebServer:
         output_dir,
         step_index=None,
         postprocessing=False,
+        jsonData=""
     ):
         try:
             pngwriter = PngWriter(output_dir)
@@ -1520,6 +1522,7 @@ class InvokeAIWebServer:
                 dream_prompt=command,
                 metadata=metadata,
                 name=filename,
+                jsonData=jsonData
             )
 
             return os.path.abspath(path)
