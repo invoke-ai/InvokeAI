@@ -33,7 +33,6 @@ class Invoker:
         self.services.graph_execution_manager.set(graph_execution_state)
 
         # Queue the invocation
-        print(f"queueing item {invocation.id}")
         self.services.queue.put(
             InvocationQueueItem(
                 # session_id    = session.id,
