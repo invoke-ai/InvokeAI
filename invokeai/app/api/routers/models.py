@@ -121,7 +121,7 @@ async def delete_model(model_name: str) -> None:
         print(f">> Deleting Model: {model_name}")
         ApiDependencies.invoker.services.model_manager.del_model(model_name, delete_files=True)
         print(f">> Model Deleted: {model_name}")
-        raise HTTPException(status_code=200, detail=f"Model '{model_name}' deleted successfully")
+        raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
     if not model_exists:
         print(f">> Model not found")
