@@ -51,6 +51,13 @@ export interface SystemState
   toastQueue: UseToastOptions[];
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
+  foundLoras: InvokeAI.FoundLora[] | null;
+  foundLocalTextualInversionTriggers:
+    | InvokeAI.FoundTextualInversionTriggers[]
+    | null;
+  foundHuggingFaceTextualInversionTriggers:
+    | InvokeAI.FoundTextualInversionTriggers[]
+    | null;
   openModel: string | null;
   cancelOptions: {
     cancelType: CancelType;
@@ -93,6 +100,9 @@ const initialSystemState: SystemState = {
   toastQueue: [],
   searchFolder: null,
   foundModels: null,
+  foundLoras: null,
+  foundLocalTextualInversionTriggers: null,
+  foundHuggingFaceTextualInversionTriggers: null,
   openModel: null,
   cancelOptions: {
     cancelType: 'immediate',
@@ -262,6 +272,24 @@ export const systemSlice = createSlice({
     ) => {
       state.foundModels = action.payload;
     },
+    setFoundLoras: (
+      state,
+      action: PayloadAction<InvokeAI.FoundLora[] | null>
+    ) => {
+      state.foundLoras = action.payload;
+    },
+    setFoundLocalTextualInversionTriggers: (
+      state,
+      action: PayloadAction<InvokeAI.FoundTextualInversionTriggers[] | null>
+    ) => {
+      state.foundLocalTextualInversionTriggers = action.payload;
+    },
+    setFoundHuggingFaceTextualInversionTriggers: (
+      state,
+      action: PayloadAction<InvokeAI.FoundTextualInversionTriggers[] | null>
+    ) => {
+      state.foundHuggingFaceTextualInversionTriggers = action.payload;
+    },
     setOpenModel: (state, action: PayloadAction<string | null>) => {
       state.openModel = action.payload;
     },
@@ -303,6 +331,9 @@ export const {
   setProcessingIndeterminateTask,
   setSearchFolder,
   setFoundModels,
+  setFoundLoras,
+  setFoundLocalTextualInversionTriggers,
+  setFoundHuggingFaceTextualInversionTriggers,
   setOpenModel,
   setCancelType,
   setCancelAfter,

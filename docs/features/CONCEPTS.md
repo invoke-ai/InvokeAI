@@ -25,10 +25,14 @@ library which downloads and merges TI files automatically upon request. You can
 also install your own or others' TI files by placing them in a designated
 directory.
 
+You may also be interested in using [LoRA Models](LORAS.md) to
+generate images with specialized styles and subjects.
+
 ### An Example
 
-Here are a few examples to illustrate how it works. All these images were
-generated using the command-line client and the Stable Diffusion 1.5 model:
+Here are a few examples to illustrate how Textual Inversion works. All
+these images were generated using the command-line client and the
+Stable Diffusion 1.5 model:
 
 |         Japanese gardener          | Japanese gardener &lt;ghibli-face&gt; | Japanese gardener &lt;hoi4-leaders&gt; | Japanese gardener &lt;cartoona-animals&gt; |
 | :--------------------------------: | :-----------------------------------: | :------------------------------------: | :----------------------------------------: |
@@ -146,6 +150,13 @@ the base name of the file (without the file extension) surrounded by
 angle brackets. In the example above `<easynegative`> is such a file
 (the filename was `easynegative.safetensors`). In such cases, you can
 change the trigger term simply by renaming the file.
+
+## Training your own Textual Inversion models
+
+InvokeAI provides a script that lets you train your own Textual
+Inversion embeddings using a small number (about a half-dozen) images
+of your desired style or subject. Please see [Textual
+Inversion](TEXTUAL_INVERSION.md) for details.
 
 ## Further Reading
 

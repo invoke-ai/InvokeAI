@@ -159,6 +159,7 @@ This method is recommended for those familiar with running Docker containers
 -   [Inpainting](features/INPAINTING.md)
 -   [Outpainting](features/OUTPAINTING.md)
 -   [Adding custom styles and subjects](features/CONCEPTS.md)
+-   [Using LoRA models](features/LORAS.md)
 -   [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
 -   [Embiggen upscaling](features/EMBIGGEN.md)
 -   [Other Features](features/OTHER.md)

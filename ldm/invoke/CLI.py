@@ -64,7 +64,7 @@ def main():
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
     Globals.sequential_guidance = args.sequential_guidance
-    Globals.ckpt_convert = args.ckpt_convert
+    Globals.ckpt_convert = True  # always true as of 2.3.4 for LoRA support
 
     # run any post-install patches needed
     run_patches()
@@ -109,6 +109,9 @@ def main():
             embedding_path = opt.embedding_path
     else:
         embedding_path = None
+
+    if opt.lora_path:
+        Globals.lora_models_dir = opt.lora_path
 
     # migrate legacy models
     ModelManager.migrate_models()
@@ -168,14 +171,13 @@ def main():
     if path := opt.autoimport:
         gen.model_manager.heuristic_import(
             str(path),
-            convert=False,
             commit_to_conf=opt.conf,
             config_file_callback=lambda x: _pick_configuration_file(completer,x),
         )
 
     if path := opt.autoconvert:
         gen.model_manager.heuristic_import(
-            str(path), convert=True, commit_to_conf=opt.conf
+            str(path), commit_to_conf=opt.conf
         )
 
     # web server loops forever
@@ -637,7 +639,7 @@ def set_default_output_dir(opt: Args, completer: Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def import_model(model_path: str, gen, opt, completer, convert=False):
+def import_model(model_path: str, gen, opt, completer):
     """
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path;
     (3) a huggingface repository id; or (4) a local directory containing a
@@ -668,7 +670,6 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
         model_path,
         model_name=model_name,
         description=model_desc,
-        convert=convert,
         config_file_callback=lambda x: _pick_configuration_file(completer,x),
     )
     if not imported_name:
@@ -790,7 +791,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
         )
     else:
         try:
-            import_model(model_name_or_path, gen, opt, completer, convert=True)
+            import_model(model_name_or_path, gen, opt, completer)
         except KeyboardInterrupt:
             return
 
@@ -1337,6 +1338,9 @@ def do_version_update(root_version: version.Version, app_version: Union[str, ver
     from release to release. This is not an elegant solution. Instead, the 
     launcher should be moved into the source tree and installed using pip.
     """
+    if root_version < version.Version('v2.3.4'):
+        dest = Path(Globals.root,'loras')
+        dest.mkdir(exist_ok=True)
     if root_version < version.Version('v2.3.3'):
         if sys.platform == "linux":
             print('>> Downloading new version of launcher script and its config file')

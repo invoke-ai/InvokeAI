@@ -23,6 +23,7 @@ Globals = Namespace()
 Globals.initfile = 'invokeai.init'
 Globals.models_file = 'models.yaml'
 Globals.models_dir = 'models'
+Globals.lora_models_dir = 'loras'
 Globals.config_dir = 'configs'
 Globals.autoscan_dir = 'weights'
 Globals.converted_ckpts_dir = 'converted_ckpts'
@@ -61,7 +62,7 @@ Globals.sequential_guidance = False
 Globals.full_precision = False
 
 # whether we should convert ckpt files into diffusers models on the fly
-Globals.ckpt_convert = False
+Globals.ckpt_convert = True
 
 # logging tokenization everywhere
 Globals.log_tokenization = False
@@ -74,6 +75,11 @@ def global_config_dir()->Path:
 
 def global_models_dir()->Path:
     return Path(Globals.root, Globals.models_dir)
+
+def global_lora_models_dir()->Path:
+    return Path(Globals.lora_models_dir) \
+        if Path(Globals.lora_models_dir).is_absolute() \
+           else Path(Globals.root, Globals.lora_models_dir)
 
 def global_autoscan_dir()->Path:
     return Path(Globals.root, Globals.autoscan_dir)

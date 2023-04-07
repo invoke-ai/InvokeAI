@@ -57,11 +57,22 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
     legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
     positive_prompt: FlattenedPrompt|Blend
+    lora_conditions = None
     if legacy_blend is not None:
         positive_prompt = legacy_blend
     else:
-        positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt: FlattenedPrompt|Blend = Compel.parse_prompt_string(negative_prompt_string)
+        positive_conjunction = Compel.parse_prompt_string(positive_prompt_string)
+        positive_prompt = positive_conjunction.prompts[0]
+        should_use_lora_manager = True
+        lora_weights = positive_conjunction.lora_weights
+        if model.peft_manager:
+            should_use_lora_manager = model.peft_manager.should_use(lora_weights)
+            if not should_use_lora_manager:
+                model.peft_manager.set_loras(lora_weights)
+        if model.lora_manager and should_use_lora_manager:
+            lora_conditions = model.lora_manager.set_loras_conditions(lora_weights)
+    negative_conjunction = Compel.parse_prompt_string(negative_prompt_string)
+    negative_prompt: FlattenedPrompt | Blend = negative_conjunction.prompts[0]
 
     if log_tokens or getattr(Globals, "log_tokenization", False):
         log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
@@ -73,7 +84,8 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
 
     ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
                                                          cross_attention_control_args=options.get(
-                                                             'cross_attention_control', None))
+                                                             'cross_attention_control', None),
+                                                         lora_conditions=lora_conditions)
     return uc, c, ec
 
 
@@ -85,8 +97,10 @@ def get_prompt_structure(prompt_string, skip_normalize_legacy_blend: bool = Fals
     if legacy_blend is not None:
         positive_prompt = legacy_blend
     else:
-        positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
-    negative_prompt: FlattenedPrompt|Blend = Compel.parse_prompt_string(negative_prompt_string)
+        positive_conjunction = Compel.parse_prompt_string(positive_prompt_string)
+        positive_prompt = positive_conjunction.prompts[0]
+    negative_conjunction = Compel.parse_prompt_string(negative_prompt_string)
+    negative_prompt: FlattenedPrompt|Blend = negative_conjunction.prompts[0]
 
     return positive_prompt, negative_prompt
 

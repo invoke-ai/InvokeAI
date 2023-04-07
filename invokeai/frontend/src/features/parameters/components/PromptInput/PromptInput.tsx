@@ -2,12 +2,13 @@ import { FormControl, Textarea } from '@chakra-ui/react';
 import { generateImage } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { ChangeEvent, KeyboardEvent, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, useRef, useState } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { readinessSelector } from 'app/selectors/readinessSelector';
 import {
   GenerationState,
+  handlePromptCheckers,
   setPrompt,
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -40,11 +41,19 @@ const PromptInput = () => {
   const { isReady } = useAppSelector(readinessSelector);
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  const [promptTimer, setPromptTimer] = useState<number | undefined>(undefined);
 
   const { t } = useTranslation();
 
   const handleChangePrompt = (e: ChangeEvent<HTMLTextAreaElement>) => {
     dispatch(setPrompt(e.target.value));
+
+    // Debounce Prompt UI Checking
+    clearTimeout(promptTimer);
+    const newPromptTimer = window.setTimeout(() => {
+      dispatch(handlePromptCheckers(e.target.value));
+    }, 500);
+    setPromptTimer(newPromptTimer);
   };
 
   useHotkeys(

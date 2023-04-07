@@ -7,13 +7,14 @@ import {
   MenuButtonProps,
   MenuListProps,
   MenuItemProps,
+  Text,
 } from '@chakra-ui/react';
 import { MouseEventHandler, ReactNode } from 'react';
 import { MdArrowDropDown, MdArrowDropUp } from 'react-icons/md';
 import IAIButton from './IAIButton';
 import IAIIconButton from './IAIIconButton';
 
-interface IAIMenuItem {
+export interface IAIMenuItem {
   item: ReactNode | string;
   onClick: MouseEventHandler<HTMLButtonElement> | undefined;
 }
@@ -43,6 +44,7 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
 
   const renderMenuItems = () => {
     const menuItemsToRender: ReactNode[] = [];
+
     menuItems.forEach((menuItem, index) => {
       menuItemsToRender.push(
         <MenuItem
@@ -82,12 +84,16 @@ export default function IAISimpleMenu(props: IAIMenuProps) {
             fontSize="1.5rem"
             {...menuButtonProps}
           >
-            {menuType === 'regular' && buttonText}
+            {menuType === 'regular' && (
+              <Text fontSize="0.9rem">{buttonText}</Text>
+            )}
           </MenuButton>
           <MenuList
             zIndex={15}
             padding={0}
             borderRadius="0.5rem"
+            overflowY="scroll"
+            maxHeight={500}
             backgroundColor="var(--background-color-secondary)"
             color="var(--text-color-secondary)"
             borderColor="var(--border-color)"

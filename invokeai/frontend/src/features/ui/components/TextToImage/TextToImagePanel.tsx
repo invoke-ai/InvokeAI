@@ -10,6 +10,8 @@ import UpscaleSettings from 'features/parameters/components/AdvancedParameters/U
 import UpscaleToggle from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleToggle';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
+import LoraManager from 'features/parameters/components/LoraManager/LoraManager';
+import TextualInversionManager from 'features/parameters/components/TextualInversionManager/TextualInversionManager';
 import MainSettings from 'features/parameters/components/MainParameters/MainParameters';
 import ParametersAccordion from 'features/parameters/components/ParametersAccordion';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
@@ -62,6 +64,8 @@ export default function TextToImagePanel() {
       <Flex flexDir="column" rowGap="0.5rem">
         <PromptInput />
         <NegativePromptInput />
+        <LoraManager />
+        <TextualInversionManager />
       </Flex>
       <ProcessButtons />
       <MainSettings />

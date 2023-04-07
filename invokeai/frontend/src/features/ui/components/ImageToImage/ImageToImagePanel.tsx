@@ -18,6 +18,8 @@ import PromptInput from 'features/parameters/components/PromptInput/PromptInput'
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { useTranslation } from 'react-i18next';
 import ImageToImageOptions from './ImageToImageOptions';
+import LoraManager from 'features/parameters/components/LoraManager/LoraManager';
+import TextualInversionManager from 'features/parameters/components/TextualInversionManager/TextualInversionManager';
 
 export default function ImageToImagePanel() {
   const { t } = useTranslation();
@@ -63,6 +65,8 @@ export default function ImageToImagePanel() {
       <Flex flexDir="column" rowGap="0.5rem">
         <PromptInput />
         <NegativePromptInput />
+        <LoraManager />
+        <TextualInversionManager />
       </Flex>
       <ProcessButtons />
       <MainSettings />

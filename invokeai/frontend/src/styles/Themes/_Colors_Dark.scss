@@ -8,7 +8,6 @@
   --accent-color-bright: rgb(104, 60, 230);
   --accent-color-hover: var(--accent-color-bright);
 
-  // App Colors
   --root-bg-color: rgb(10, 10, 10);
   --background-color: rgb(26, 26, 32);
   --background-color-light: rgb(40, 44, 48);
@@ -119,6 +118,7 @@
   --context-menu-bg-color: rgb(46, 48, 58);
   --context-menu-box-shadow: none;
   --context-menu-bg-color-hover: rgb(30, 32, 42);
+  --context-menu-active-item: var(--accent-color-bright);
 
   // Shadows
   --floating-button-drop-shadow-color: var(--accent-color);
