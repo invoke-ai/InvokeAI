@@ -63,12 +63,13 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
     else:
         positive_prompt = Compel.parse_prompt_string(positive_prompt_string)
         should_use_lora_manager = True
+        lora_weights = getattr(positive_prompt, 'lora_weights', [])
         if model.peft_manager:
-            should_use_lora_manager = model.peft_manager.should_use(positive_prompt.lora_weights)
+            should_use_lora_manager = model.peft_manager.should_use(lora_weights)
             if not should_use_lora_manager:
-                model.peft_manager.set_loras(positive_prompt.lora_weights)
+                model.peft_manager.set_loras(lora_weights)
         if model.lora_manager and should_use_lora_manager:
-            lora_conditions = model.lora_manager.set_loras_conditions(positive_prompt.lora_weights)
+            lora_conditions = model.lora_manager.set_loras_conditions(lora_weights)
     negative_prompt: FlattenedPrompt|Blend = Compel.parse_prompt_string(negative_prompt_string)
 
     if log_tokens or getattr(Globals, "log_tokenization", False):
