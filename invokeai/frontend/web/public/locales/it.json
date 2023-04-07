@@ -8,7 +8,6 @@
         "darkTheme": "Scuro",
         "lightTheme": "Chiaro",
         "greenTheme": "Verde",
-        "text2img": "Testo a Immagine",
         "img2img": "Immagine a Immagine",
         "unifiedCanvas": "Tela unificata",
         "nodes": "Nodi",
@@ -70,7 +69,11 @@
         "loading": "Caricamento in corso",
         "oceanTheme": "Oceano",
         "langHebrew": "Ebraico",
-        "loadingInvokeAI": "Caricamento Invoke AI"
+        "loadingInvokeAI": "Caricamento Invoke AI",
+        "postprocessing": "Post Elaborazione",
+        "txt2img": "Testo a Immagine",
+        "accept": "Accetta",
+        "cancel": "Annulla"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -404,7 +407,8 @@
         "v2_768": "v2 (768px)",
         "none": "niente",
         "addDifference": "Aggiungi differenza",
-        "pickModelType": "Scegli il tipo di modello"
+        "pickModelType": "Scegli il tipo di modello",
+        "scanForModels": "Cerca modelli"
     },
     "parameters": {
         "images": "Immagini",
@@ -574,7 +578,7 @@
         "autoSaveToGallery": "Salvataggio automatico nella Galleria",
         "saveBoxRegionOnly": "Salva solo l'area di selezione",
         "limitStrokesToBox": "Limita i tratti all'area di selezione",
-        "showCanvasDebugInfo": "Mostra informazioni di debug della Tela",
+        "showCanvasDebugInfo": "Mostra ulteriori informazioni sulla Tela",
         "clearCanvasHistory": "Cancella cronologia Tela",
         "clearHistory": "Cancella la cronologia",
         "clearCanvasHistoryMessage": "La cancellazione della cronologia della tela lascia intatta la tela corrente, ma cancella in modo irreversibile la cronologia degli annullamenti e dei ripristini.",
@@ -612,7 +616,7 @@
         "copyMetadataJson": "Copia i metadati JSON",
         "exitViewer": "Esci dal visualizzatore",
         "zoomIn": "Zoom avanti",
-        "zoomOut": "Zoom Indietro",
+        "zoomOut": "Zoom indietro",
         "rotateCounterClockwise": "Ruotare in senso antiorario",
         "rotateClockwise": "Ruotare in senso orario",
         "flipHorizontally": "Capovolgi orizzontalmente",

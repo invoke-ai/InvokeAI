@@ -168,11 +168,15 @@ used by Stable Diffusion 1.4 and 1.5.
 After installation, your `models.yaml` should contain an entry that looks like
 this one:
 
-inpainting-1.5: weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
-description: SD inpainting v1.5 config:
-configs/stable-diffusion/v1-inpainting-inference.yaml vae:
-models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt width: 512
-height: 512
+```yml
+inpainting-1.5:
+  weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
+  description: SD inpainting v1.5
+  config: configs/stable-diffusion/v1-inpainting-inference.yaml
+  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+  width: 512
+  height: 512
+```
 
 As shown in the example, you may include a VAE fine-tuning weights file as well.
 This is strongly recommended.

@@ -8,7 +8,6 @@
         "darkTheme": "Темная",
         "lightTheme": "Светлая",
         "greenTheme": "Зеленая",
-        "text2img": "Изображение из текста (text2img)",
         "img2img": "Изображение в изображение (img2img)",
         "unifiedCanvas": "Универсальный холст",
         "nodes": "Ноды",

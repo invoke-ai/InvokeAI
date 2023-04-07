@@ -8,7 +8,6 @@
         "darkTheme": "Sombre",
         "lightTheme": "Clair",
         "greenTheme": "Vert",
-        "text2img": "Texte en image",
         "img2img": "Image en image",
         "unifiedCanvas": "Canvas unifié",
         "nodes": "Nœuds",
@@ -47,7 +46,19 @@
         "statusLoadingModel": "Chargement du modèle",
         "statusModelChanged": "Modèle changé",
         "discordLabel": "Discord",
-        "githubLabel": "Github"
+        "githubLabel": "Github",
+        "accept": "Accepter",
+        "statusMergingModels": "Mélange des modèles",
+        "loadingInvokeAI": "Chargement de Invoke AI",
+        "cancel": "Annuler",
+        "langEnglish": "Anglais",
+        "statusConvertingModel": "Conversion du modèle",
+        "statusModelConverted": "Modèle converti",
+        "loading": "Chargement",
+        "pinOptionsPanel": "Épingler la page d'options",
+        "statusMergedModels": "Modèles mélangés",
+        "txt2img": "Texte vers image",
+        "postprocessing": "Post-Traitement"
     },
     "gallery": {
         "generations": "Générations",
@@ -518,5 +529,15 @@
         "betaDarkenOutside": "Assombrir à l'extérieur",
         "betaLimitToBox": "Limiter à la boîte",
         "betaPreserveMasked": "Conserver masqué"
+    },
+    "accessibility": {
+        "uploadImage": "Charger une image",
+        "reset": "Réinitialiser",
+        "nextImage": "Image suivante",
+        "previousImage": "Image précédente",
+        "useThisParameter": "Utiliser ce paramètre",
+        "zoomIn": "Zoom avant",
+        "zoomOut": "Zoom arrière",
+        "showOptionsPanel": "Montrer la page d'options"
     }
 }

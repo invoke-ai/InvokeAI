@@ -456,7 +456,7 @@ def get_torch_source() -> (Union[str, None],str):
     optional_modules = None
     if OS == "Linux":
         if device == "rocm":
-            url = "https://download.pytorch.org/whl/rocm5.2"
+            url = "https://download.pytorch.org/whl/rocm5.4.2"
         elif device == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
 

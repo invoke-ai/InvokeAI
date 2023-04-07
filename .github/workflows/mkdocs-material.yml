@@ -5,6 +5,9 @@ on:
       - 'main'
       - 'development'
 
+permissions:
+    contents: write
+
 jobs:
   mkdocs-material:
     if: github.event.pull_request.draft == false
