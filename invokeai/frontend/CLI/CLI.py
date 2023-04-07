@@ -576,6 +576,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
 
     elif command.startswith("!replay"):
         file_path = command.replace("!replay", "", 1).strip()
+        file_path = os.path.join(opt.outdir, file_path)
         if infile is None and os.path.isfile(file_path):
             infile = open(file_path, "r", encoding="utf-8")
         completer.add_history(command)

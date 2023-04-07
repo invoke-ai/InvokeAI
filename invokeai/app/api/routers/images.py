@@ -23,6 +23,16 @@ async def get_image(
     filename = ApiDependencies.invoker.services.images.get_path(image_type, image_name)
     return FileResponse(filename)
 
+@images_router.get("/{image_type}/thumbnails/{image_name}", operation_id="get_thumbnail")
+async def get_thumbnail(
+    image_type: ImageType = Path(description="The type of image to get"),
+    image_name: str = Path(description="The name of the image to get"),
+):
+    """Gets a thumbnail"""
+    # TODO: This is not really secure at all. At least make sure only output results are served
+    filename = ApiDependencies.invoker.services.images.get_path(image_type, 'thumbnails/' + image_name)
+    return FileResponse(filename)
+
 
 @images_router.post(
     "/uploads/",

@@ -1069,9 +1069,8 @@ class GraphExecutionState(BaseModel):
                 n
                 for n in prepared_nodes
                 if all(
-                    pit
+                    nx.has_path(execution_graph, pit[0], n)
                     for pit in parent_iterators
-                    if nx.has_path(execution_graph, pit[0], n)
                 )
             ),
             None,
