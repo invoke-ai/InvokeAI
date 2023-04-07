@@ -199,17 +199,6 @@ class addModelsForm(npyscreen.FormMultiPage):
             relx=4,
             scroll_exit=True,
         )
-        self.nextrely += 1
-        self.convert_models = self.add_widget_intelligent(
-            npyscreen.TitleSelectOne,
-            name="== CONVERT IMPORTED MODELS INTO DIFFUSERS==",
-            values=["Keep original format", "Convert to diffusers"],
-            value=0,
-            begin_entry_at=4,
-            max_height=4,
-            hidden=True,  # will appear when imported models box is edited
-            scroll_exit=True,
-        )
         self.cancel = self.add_widget_intelligent(
             npyscreen.ButtonPress,
             name="CANCEL",
@@ -244,8 +233,6 @@ class addModelsForm(npyscreen.FormMultiPage):
             self.show_directory_fields.addVisibleWhenSelected(i)
 
         self.show_directory_fields.when_value_edited = self._clear_scan_directory
-        self.import_model_paths.when_value_edited = self._show_hide_convert
-        self.autoload_directory.when_value_edited = self._show_hide_convert
 
     def resize(self):
         super().resize()
@@ -255,13 +242,6 @@ class addModelsForm(npyscreen.FormMultiPage):
     def _clear_scan_directory(self):
         if not self.show_directory_fields.value:
             self.autoload_directory.value = ""
-
-    def _show_hide_convert(self):
-        model_paths = self.import_model_paths.value or ""
-        autoload_directory = self.autoload_directory.value or ""
-        self.convert_models.hidden = (
-            len(model_paths) == 0 and len(autoload_directory) == 0
-        )
 
     def _get_starter_model_labels(self) -> List[str]:
         window_width, window_height = get_terminal_size()
@@ -322,7 +302,6 @@ class addModelsForm(npyscreen.FormMultiPage):
         .scan_directory: Path to a directory of models to scan and import
         .autoscan_on_startup:  True if invokeai should scan and import at startup time
         .import_model_paths:   list of URLs, repo_ids and file paths to import
-        .convert_to_diffusers: if True, convert legacy checkpoints into diffusers
         """
         # we're using a global here rather than storing the result in the parentapp
         # due to some bug in npyscreen that is causing attributes to be lost
@@ -359,7 +338,6 @@ class addModelsForm(npyscreen.FormMultiPage):
 
         # URLs and the like
         selections.import_model_paths = self.import_model_paths.value.split()
-        selections.convert_to_diffusers = self.convert_models.value[0] == 1
 
 
 class AddModelApplication(npyscreen.NPSAppManaged):
@@ -372,7 +350,6 @@ class AddModelApplication(npyscreen.NPSAppManaged):
             scan_directory=None,
             autoscan_on_startup=None,
             import_model_paths=None,
-            convert_to_diffusers=None,
         )
 
     def onStart(self):
@@ -393,7 +370,6 @@ def process_and_execute(opt: Namespace, selections: Namespace):
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
-    convert_to_diffusers = selections.convert_to_diffusers
 
     install_requested_models(
         install_initial_models=models_to_install,
@@ -401,7 +377,6 @@ def process_and_execute(opt: Namespace, selections: Namespace):
         scan_directory=Path(directory_to_scan) if directory_to_scan else None,
         external_models=potential_models_to_install,
         scan_at_startup=scan_at_startup,
-        convert_to_diffusers=convert_to_diffusers,
         precision="float32"
         if opt.full_precision
         else choose_precision(torch.device(choose_torch_device())),

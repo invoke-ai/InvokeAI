@@ -561,7 +561,7 @@ class Args(object):
             "--autoimport",
             default=None,
             type=str,
-            help="Check the indicated directory for .ckpt/.safetensors weights files at startup and import directly",
+            help="(DEPRECATED - NONFUNCTIONAL). Check the indicated directory for .ckpt/.safetensors weights files at startup and import directly",
         )
         model_group.add_argument(
             "--autoconvert",
