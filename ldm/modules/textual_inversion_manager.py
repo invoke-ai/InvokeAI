@@ -42,6 +42,7 @@ class TextualInversionManager(BaseTextualInversionManager):
     def load_huggingface_concepts(self, concepts: list[str]):
         for concept_name in concepts:
             if concept_name in self.hf_concepts_library.concepts_loaded:
+                print(f">> Loaded remote embedding for trigger {concept_name}")
                 continue
             trigger = self.hf_concepts_library.concept_to_trigger(concept_name)
             concept_trigger = self._format_trigger(concept_name)
@@ -49,12 +50,12 @@ class TextualInversionManager(BaseTextualInversionManager):
                 self.has_textual_inversion_for_trigger_string(trigger)
                 or self.has_textual_inversion_for_trigger_string(concept_trigger)
             ):  # in case a token with literal angle brackets encountered
-                print(f">> Loaded local embedding for trigger {concept_trigger}")
+                print(f">> Loaded local embedding for trigger {concept_name}")
                 continue
             bin_file = self.hf_concepts_library.get_concept_model_path(concept_name)
             if not bin_file:
                 continue
-            print(f">> Loaded remote embedding for trigger {concept_trigger}")
+            print(f">> Loaded remote embedding for trigger {concept_name}")
             self.load_textual_inversion(bin_file)
             self.hf_concepts_library.concepts_loaded[concept_name] = True
 
@@ -327,7 +328,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             return self._parse_embedding_v4(ckpt, embedding_file)     # usually a '.bin' file
 
     def _format_trigger(self, trigger: str) -> str:
-        if not (trigger[:1] == "<" and trigger[-1:] == ">"):
+        if not (trigger.startswith("<") and trigger.endswith(">")):
             trigger = f'<{trigger}>'
         return trigger
 
