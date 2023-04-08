@@ -34,6 +34,7 @@ import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/Uni
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import NodeEditor from 'features/nodes/components/NodeEditor';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -65,7 +66,7 @@ const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
     {
       id: 'nodes',
       icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
-      workarea: <NodesWIP />,
+      workarea: <NodeEditor />,
     },
     {
       id: 'postprocessing',
