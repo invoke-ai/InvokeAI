@@ -24,7 +24,10 @@ const useSetBothPrompts = () => {
 
     dispatch(setPrompt(prompt));
     dispatch(setNegativePrompt(negativePrompt));
-    dispatch(handlePromptCheckers(prompt));
+    dispatch(handlePromptCheckers({ prompt: prompt, toNegative: false }));
+    dispatch(
+      handlePromptCheckers({ prompt: negativePrompt, toNegative: true })
+    );
   };
 };
 
