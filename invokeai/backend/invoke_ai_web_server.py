@@ -549,7 +549,7 @@ class InvokeAIWebServer:
                 locals = [{'name': x} for x in sorted(local_triggers, key=str.casefold)]
                 concepts = HuggingFaceConceptsLibrary().list_concepts(minimum_likes=5)
                 local_lower_triggers = [lti.lower() for lti in local_triggers]
-                concepts = [{'name': f'{x}'} for x in sorted(concepts, key=str.casefold) if f'{x.lower()}' not in local_lower_triggers]
+                concepts = [{'name': f'<{x}>'} for x in sorted(concepts, key=str.casefold) if f'<{x.lower()}>' not in local_lower_triggers]
                 socketio.emit("foundTextualInversionTriggers", {'local_triggers': locals, 'huggingface_concepts': concepts})
             except Exception as e:
                 self.handle_exceptions(e)

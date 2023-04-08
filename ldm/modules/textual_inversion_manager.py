@@ -44,16 +44,17 @@ class TextualInversionManager(BaseTextualInversionManager):
             if concept_name in self.hf_concepts_library.concepts_loaded:
                 continue
             trigger = self.hf_concepts_library.concept_to_trigger(concept_name)
+            concept_trigger = self._format_trigger(concept_name)
             if (
                 self.has_textual_inversion_for_trigger_string(trigger)
-                or self.has_textual_inversion_for_trigger_string(concept_name)
+                or self.has_textual_inversion_for_trigger_string(concept_trigger)
             ):  # in case a token with literal angle brackets encountered
-                print(f">> Loaded local embedding for trigger {concept_name}")
+                print(f">> Loaded local embedding for trigger {concept_trigger}")
                 continue
             bin_file = self.hf_concepts_library.get_concept_model_path(concept_name)
             if not bin_file:
                 continue
-            print(f">> Loaded remote embedding for trigger {concept_name}")
+            print(f">> Loaded remote embedding for trigger {concept_trigger}")
             self.load_textual_inversion(bin_file)
             self.hf_concepts_library.concepts_loaded[concept_name] = True
 
@@ -84,11 +85,8 @@ class TextualInversionManager(BaseTextualInversionManager):
             )
             return
 
-        # Clean up embedding name/trigger as some include <>, some not
-        embedding_info["name"] = embedding_info["name"].strip().strip("<>")
-
         # Resolve the situation in which an earlier embedding has claimed the same
-        # trigger string. We replace the trigger with 'source_file', as we used to.
+        # trigger string. We replace the trigger with '<source_file>', as we used to.
         trigger_str = embedding_info["name"]
         sourcefile = (
             f"{ckpt_path.parent.name}/{ckpt_path.name}"
@@ -97,7 +95,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         )
 
         if trigger_str in self.trigger_to_sourcefile:
-            replacement_trigger_str = (
+            replacement_trigger_str = self._format_trigger(
                 ckpt_path.parent.name
                 if ckpt_path.name == "learned_embeds.bin"
                 else ckpt_path.stem
@@ -167,13 +165,13 @@ class TextualInversionManager(BaseTextualInversionManager):
             )
 
         trigger_token_id = self._get_or_create_token_id_and_assign_embedding(
-            f'<{ti.trigger_string}>', ti.embedding[0]
+            ti.trigger_string, ti.embedding[0]
         )
 
         if ti.embedding_vector_length > 1:
             # for embeddings with vector length > 1
             pad_token_strings = [
-                f'<{ti.trigger_string}>' + "-!pad-" + str(pad_index)
+                ti.trigger_string + "-!pad-" + str(pad_index)
                 for pad_index in range(1, ti.embedding_vector_length)
             ]
             # todo: batched UI for faster loading when vector length >2
@@ -328,12 +326,19 @@ class TextualInversionManager(BaseTextualInversionManager):
         else:
             return self._parse_embedding_v4(ckpt, embedding_file)     # usually a '.bin' file
 
+    def _format_trigger(self, trigger: str) -> str:
+        if not (trigger[:1] == "<" and trigger[-1:] == ">"):
+            trigger = f'<{trigger}>'
+        return trigger
+
     def _parse_embedding_v1(self, embedding_ckpt: dict, file_path: str):
         basename = Path(file_path).stem
         print(f'   | Loading v1 embedding file: {basename}')
 
         embedding_info = {}
-        embedding_info["name"] = embedding_ckpt["name"]
+        embedding_info["name"] = self._format_trigger(
+            embedding_ckpt["name"]
+        )
                 
         # Check num of embeddings and warn user only the first will be used
         embedding_info["num_of_embeddings"] = len(
@@ -367,7 +372,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             list(embedding_ckpt["string_to_token"].values())[0], torch.Tensor
         ):
             for token in list(embedding_ckpt["string_to_token"].keys()):
-                embedding_info["name"] = (
+                embedding_info["name"] = self._format_trigger(
                     token
                     if token != "*"
                     else basename
@@ -392,7 +397,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         basename = Path(file_path).stem
         print(f'   | Loading v3 embedding file: {basename}')
         embedding_info = {}
-        embedding_info["name"] = basename
+        embedding_info["name"] = self._format_trigger(basename)
         embedding_info["num_of_embeddings"] = 1
         embedding = embedding_ckpt['emb_params']
         embedding_info["embedding"] = embedding
@@ -415,7 +420,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             embedding_info = None
         else:
             for token in list(embedding_ckpt.keys()):
-                embedding_info["name"] = (
+                embedding_info["name"] = self._format_trigger(
                     token
                     or basename
                 )

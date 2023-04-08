@@ -7,7 +7,7 @@ The interface is through the Concepts() object.
 import os
 import re
 import traceback
-from typing import Callable
+from typing import Callable, Optional
 from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
@@ -24,7 +24,7 @@ class HuggingFaceConceptsLibrary(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
-        self.match_trigger = re.compile('<([a-zA-Z0-9_\- ]+)>') # trigger is slightly less restrictive than HF concept name
+        self.match_trigger = re.compile('(<[a-zA-Z0-9_\- ]+>)') # trigger is slightly less restrictive than HF concept name
         self.match_concept = re.compile('<([a-zA-Z0-9_\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self, minimum_likes: int=0)->list:
@@ -65,7 +65,7 @@ class HuggingFaceConceptsLibrary(object):
             return None
         return self.get_concept_file(concept_name.lower(),'learned_embeds.bin')
 
-    def concept_to_trigger(self, concept_name:str)->str:
+    def concept_to_trigger(self, concept_name:str)->Optional[str]:
         '''
         Given a concept name returns its trigger by looking in the
         "token_identifier.txt" file.
@@ -73,7 +73,7 @@ class HuggingFaceConceptsLibrary(object):
         if concept_name in self.triggers:
             return self.triggers[concept_name]
         elif self.concept_is_local(concept_name):
-            trigger = concept_name
+            trigger = f'<{concept_name}>'
             self.triggers[concept_name] = trigger
             self.concept_names[trigger] = concept_name
             return trigger
@@ -83,20 +83,22 @@ class HuggingFaceConceptsLibrary(object):
             return None
         with open(file,'r') as f:
             trigger = f.readline()
-            trigger = trigger.strip().strip("<>")
+            trigger = trigger.strip()
+            if not (trigger.startswith("<") and trigger.endswith(">")):
+                trigger = f"<{trigger}>"
         self.triggers[concept_name] = trigger
         self.concept_names[trigger] = concept_name
         return trigger
 
-    def trigger_to_concept(self, trigger:str)->str:
+    def trigger_to_concept(self, trigger:str)->Optional[str]:
         '''
         Given a trigger phrase, maps it to the concept library name.
         Only works if concept_to_trigger() has previously been called
         on this library. There needs to be a persistent database for
         this.
         '''
-        concept = self.concept_names.get(trigger,None)
-        return concept if concept else trigger
+        concept_name = self.concept_names.get(trigger,None)
+        return f'<{concept_name}>' if concept_name else None
 
     def replace_triggers_with_concepts(self, prompt:str)->str:
         '''
@@ -114,7 +116,8 @@ class HuggingFaceConceptsLibrary(object):
             return prompt
 
         def do_replace(match)->str:
-            return f'<{self.trigger_to_concept(match.group(1))}>' or f'<{match.group(1)}>'
+            trigger = match.group(1)
+            return self.trigger_to_concept(trigger) or trigger
         return self.match_trigger.sub(do_replace, prompt)
 
     def replace_concepts_with_triggers(self,
@@ -137,9 +140,11 @@ class HuggingFaceConceptsLibrary(object):
         load_concepts_callback(concepts)
 
         def do_replace(match)->str:
-            if excluded_tokens and match.group(1) in excluded_tokens:
-                return f'<{match.group(1)}>'
-            return f'<{self.concept_to_trigger(match.group(1))}>' or f'<{match.group(1)}>'
+            concept = match.group(0)
+            concept_name = match.group(1)
+            if excluded_tokens and concept in excluded_tokens:
+                return concept
+            return self.concept_to_trigger(concept_name) or concept
         return self.match_concept.sub(do_replace, prompt)
 
     def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin' , local_only:bool=False)->str:
