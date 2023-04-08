@@ -8,9 +8,9 @@ import {
   Tooltip,
   Icon,
 } from '@chakra-ui/react';
-import { filter } from 'lodash';
+import { filter, uniq } from 'lodash';
 import { FaInfoCircle } from 'react-icons/fa';
-import { PRIMITIVE_FIELDS } from '../constants';
+// import { PRIMITIVE_FIELDS } from '../constants';
 import {
   Invocations,
   isNodeSchemaObject,
@@ -29,7 +29,7 @@ import { parseOutputRef } from './parseRef';
 // build object of invocations UI components keyed by their name
 export const buildInvocations = async (): Promise<{
   invocations: Invocations;
-  customFields: string[];
+  fieldTypes: string[];
 }> => {
   // get schema - cast as the modified OpenAPI document type
   const openApi = (await fetchOpenAPISchema()) as NodesOpenAPIDocument;
@@ -44,10 +44,11 @@ export const buildInvocations = async (): Promise<{
       !key.includes('Collect') &&
       !key.includes('Range') &&
       !key.includes('Iterate') &&
+      !key.includes('LoadImage') &&
       !key.includes('Graph')
   );
 
-  const customFields: string[] = [];
+  let fieldTypes: string[] = [];
 
   // actually build the UI components
   // reduce the array of schemas into an object of react function components, keyed by name (eg NodeTypes)
@@ -70,27 +71,22 @@ export const buildInvocations = async (): Promise<{
 
       inputs.forEach((input) => {
         if (input.allOf && isReferenceObject(input.allOf[0])) {
-          input.fieldType = input.allOf[0].$ref.split('/').slice(-1)[0];
+          input.fieldType = input.allOf[0].$ref
+            .split('/')
+            .slice(-1)[0]
+            .toLowerCase()
+            .replace('field', ''); // ImageField --> image
         } else {
-          input.fieldType = input.type;
+          input.fieldType = input.type.toLowerCase().replace('number', 'float');
         }
 
-        if (
-          !customFields.includes(input.fieldType) &&
-          !PRIMITIVE_FIELDS.includes(input.fieldType)
-        ) {
-          customFields.push(input.fieldType);
-        }
+        fieldTypes.push(input.fieldType);
       });
 
       const outputs = [parseOutputRef(openApi.components, schema.output.$ref)];
+
       outputs.forEach(({ fieldType }) => {
-        if (
-          !customFields.includes(fieldType) &&
-          !PRIMITIVE_FIELDS.includes(fieldType)
-        ) {
-          customFields.push(fieldType);
-        }
+        fieldTypes.push(fieldType);
       });
 
       // assemble!
@@ -170,5 +166,7 @@ export const buildInvocations = async (): Promise<{
     {}
   );
 
-  return { invocations, customFields };
+  fieldTypes = uniq(fieldTypes);
+
+  return { invocations, fieldTypes };
 };
