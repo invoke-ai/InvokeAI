@@ -114,13 +114,16 @@ export const socketMiddleware = () => {
         const oldSessionId = getState().system.sessionId;
         const subscribedNodeIds = getState().system.subscribedNodeIds;
 
-        const shouldHandleEvent = (id: string): boolean => {
-          if (subscribedNodeIds.length === 1 && subscribedNodeIds[0] === '*') {
-            return true;
-          }
+        // temp disable this
+        const shouldHandleEvent = (id: string): boolean => true;
 
-          return subscribedNodeIds.includes(id);
-        };
+        // const shouldHandleEvent = (id: string): boolean => {
+        //   if (subscribedNodeIds.length === 1 && subscribedNodeIds[0] === '*') {
+        //     return true;
+        //   }
+
+        //   return subscribedNodeIds.includes(id);
+        // };
 
         if (oldSessionId) {
           // Unsubscribe when invocations complete
