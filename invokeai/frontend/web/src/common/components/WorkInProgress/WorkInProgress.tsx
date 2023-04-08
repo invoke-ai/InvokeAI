@@ -15,6 +15,7 @@ const WorkInProgress = (props: WorkInProgressProps) => {
         height: '100%',
         bg: 'base.850',
         borderRadius: 'base',
+        position: 'relative',
       }}
     >
       {children}
