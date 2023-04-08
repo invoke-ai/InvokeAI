@@ -6,7 +6,7 @@ from torch import Tensor
 import torch
 
 from ...backend.model_management.model_manager import ModelManager
-from ...backend.util.devices import CUDA_DEVICE, torch_dtype
+from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
@@ -110,7 +110,7 @@ class NoiseInvocation(BaseInvocation):
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
-        device = torch.device(CUDA_DEVICE)
+        device = torch.device(choose_torch_device())
         noise = get_noise(self.width, self.height, device, self.seed)
 
         name = f'{context.graph_execution_state_id}__{self.id}'
