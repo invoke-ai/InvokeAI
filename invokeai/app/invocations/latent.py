@@ -4,14 +4,15 @@ from PIL import Image
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from torch import Tensor
+import einops
 import torch
 
 from ...backend.model_management.model_manager import ModelManager
-from ...backend.util.devices import CUDA_DEVICE, torch_dtype, choose_torch_device
+from ...backend.util.devices import torch_dtype, choose_torch_device
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
-from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
+from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline, image_resized_to_grid_as_tensor
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 import numpy as np
 from ..services.image_storage import ImageType
@@ -319,6 +320,7 @@ class LatentsToImageInvocation(BaseInvocation):
                 image=ImageField(image_type=image_type, image_name=image_name)
             )
 
+    # this should be refactored - duplicated code in diffusers.pipelines.stable_diffusion_pipeline
     @classmethod
     def _decode_latents(self, vae:AutoencoderKL, latents:torch.Tensor)->Image:
         latents = 1 / vae.config.scaling_factor * latents
@@ -326,5 +328,45 @@ class LatentsToImageInvocation(BaseInvocation):
         image = (image / 2 + 0.5).clamp(0, 1)
         image = image.cpu().permute(0, 2, 3, 1).float().numpy()
         return image
+
+
+# Image to latent
+class ImageToLatentsInvocation(BaseInvocation):
+    """Generates latents from an image."""
+
+    type: Literal["i2l"] = "i2l"
+
+    # Inputs
+    image: Optional[ImageField] = Field(description="The image to generate latents from")
+    model: str = Field(default="", description="The model to use")
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        image = context.services.images.get(self.image.image_type,self.image.image_name)
+        vae = context.services.model_manager.get_model_vae(self.model)
+
+        with torch.inference_mode():
+            result_latents = self._encode_latents(vae,image)
+            name = f'{context.graph_execution_state_id}__{self.id}'
+            context.services.latents.set(name, result_latents)
+            return LatentsOutput(
+                latents=LatentsField(latents_name=name)
+            )
+
+    # this should be refactored - similar code in invokeai.stable_diffusion.diffusers_pipeline
+    @classmethod
+    def _encode_latents(self, vae:AutoencoderKL, image:Image)->torch.Tensor:
+        device = choose_torch_device()
+        dtype = torch_dtype(device)
+        image_tensor = image_resized_to_grid_as_tensor(image)
+        if image_tensor.dim() == 3:
+            image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
+        image_tensor = image_tensor.to(device=device, dtype=dtype)
+        init_latent_dist = vae.encode(image_tensor).latent_dist
+        init_latents = init_latent_dist.sample().to(
+            dtype=dtype
+        )
+        init_latents = 0.18215 * init_latents
+        return init_latents
 
         

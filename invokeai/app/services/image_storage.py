@@ -1,13 +1,13 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import datetime
+import PIL
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 from queue import Queue
 from typing import Dict
-
 from PIL.Image import Image
 from invokeai.app.util.save_thumbnail import save_thumbnail
 
@@ -18,7 +18,7 @@ class ImageType(str, Enum):
     RESULT = "results"
     INTERMEDIATE = "intermediates"
     UPLOAD = "uploads"
-
+    LOCAL = "local"   # a local path, relative to cwd or absolute
 
 class ImageStorageBase(ABC):
     """Responsible for storing and retrieving images."""
@@ -77,13 +77,16 @@ class DiskImageStorage(ImageStorageBase):
         if cache_item:
             return cache_item
 
-        image = Image.open(image_path)
+        image = PIL.Image.open(image_path)
         self.__set_cache(image_path, image)
         return image
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(self, image_type: ImageType, image_name: str) -> str:
-        path = os.path.join(self.__output_folder, image_type, image_name)
+        if image_type == ImageType.LOCAL:
+            path = image_name
+        else:
+            path = os.path.join(self.__output_folder, image_type, image_name)
         return path
 
     def save(self, image_type: ImageType, image_name: str, image: Image) -> None:
