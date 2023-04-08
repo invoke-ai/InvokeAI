@@ -3,7 +3,11 @@ import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import * as InvokeAI from 'app/invokeai';
 import promptToString from 'common/util/promptToString';
 import { useAppDispatch } from 'app/storeHooks';
-import { setNegativePrompt, setPrompt } from '../store/generationSlice';
+import {
+  handlePromptCheckers,
+  setNegativePrompt,
+  setPrompt,
+} from '../store/generationSlice';
 
 // TECHDEBT: We have two metadata prompt formats and need to handle recalling either of them.
 // This hook provides a function to do that.
@@ -20,6 +24,7 @@ const useSetBothPrompts = () => {
 
     dispatch(setPrompt(prompt));
     dispatch(setNegativePrompt(negativePrompt));
+    dispatch(handlePromptCheckers(prompt));
   };
 };
 
