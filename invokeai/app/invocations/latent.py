@@ -320,7 +320,7 @@ class LatentsToImageInvocation(BaseInvocation):
                 image=ImageField(image_type=image_type, image_name=image_name)
             )
 
-    # this should be refactored - duplicated code in diffusers.pipelines.stable_diffusion_pipeline
+    # this should be refactored - duplicated code in diffusers.pipelines.stable_diffusion
     @classmethod
     def _decode_latents(self, vae:AutoencoderKL, latents:torch.Tensor)->Image:
         latents = 1 / vae.config.scaling_factor * latents
@@ -353,7 +353,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                 latents=LatentsField(latents_name=name)
             )
 
-    # this should be refactored - similar code in invokeai.stable_diffusion.diffusers_pipeline
+    # this should be refactored - similar code in invokeai.backend.stable_diffusion.diffusers_pipeline
     @classmethod
     def _encode_latents(self, vae:AutoencoderKL, image:Image)->torch.Tensor:
         device = choose_torch_device()
