@@ -1,28 +1,27 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
+1# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
+from PIL import Image
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from torch import Tensor
 import torch
 
 from ...backend.model_management.model_manager import ModelManager
-from ...backend.util.devices import CUDA_DEVICE, torch_dtype
+from ...backend.util.devices import CUDA_DEVICE, torch_dtype, choose_torch_device
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 import numpy as np
-from accelerate.utils import set_seed
 from ..services.image_storage import ImageType
-from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
 from ...backend.generator import Generator
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util.util import image_to_dataURL
 from diffusers.schedulers import SchedulerMixin as Scheduler
 import diffusers
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, AutoencoderKL
 
 
 class LatentsField(BaseModel):
@@ -110,7 +109,7 @@ class NoiseInvocation(BaseInvocation):
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
-        device = torch.device(CUDA_DEVICE)
+        device = choose_torch_device()
         noise = get_noise(self.width, self.height, device, self.seed)
 
         name = f'{context.graph_execution_state_id}__{self.id}'
@@ -170,8 +169,6 @@ class TextToLatentsInvocation(BaseInvocation):
     
     def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
         model_info = model_manager.get_model(self.model)
-        model_name = model_info['model_name']
-        model_hash = model_info['hash']
         model: StableDiffusionGeneratorPipeline = model_info['model']
         model.scheduler = get_scheduler(
             model=model,
@@ -211,7 +208,10 @@ class TextToLatentsInvocation(BaseInvocation):
 
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        noise = context.services.latents.get(self.noise.latents_name)
+        if self.noise:
+            noise = context.services.latents.get(self.noise.latents_name)
+        else:
+            noise = get_noise(self.width, self.height, choose_torch_device(), self.seed)
 
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, state.latents, state.step)
@@ -230,7 +230,8 @@ class TextToLatentsInvocation(BaseInvocation):
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        torch.cuda.empty_cache()
+        if torch.has_cuda:
+            torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, result_latents)
@@ -280,7 +281,8 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        torch.cuda.empty_cache()
+        if torch.has_cuda:
+            torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, result_latents)
@@ -302,14 +304,11 @@ class LatentsToImageInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
-
-        # TODO: this only really needs the vae
-        model_info = context.services.model_manager.get_model(self.model)
-        model: StableDiffusionGeneratorPipeline = model_info['model']
+        vae = context.services.model_manager.get_model_vae(self.model)
 
         with torch.inference_mode():
-            np_image = model.decode_latents(latents)
-            image = model.numpy_to_pil(np_image)[0]
+            np_image = self._decode_latents(vae,latents)
+            image = StableDiffusionGeneratorPipeline.numpy_to_pil(np_image)[0]
 
             image_type = ImageType.RESULT
             image_name = context.services.images.create_name(
@@ -319,3 +318,13 @@ class LatentsToImageInvocation(BaseInvocation):
             return ImageOutput(
                 image=ImageField(image_type=image_type, image_name=image_name)
             )
+
+    @classmethod
+    def _decode_latents(self, vae:AutoencoderKL, latents:torch.Tensor)->Image:
+        latents = 1 / vae.config.scaling_factor * latents
+        image = vae.decode(latents).sample
+        image = (image / 2 + 0.5).clamp(0, 1)
+        image = image.cpu().permute(0, 2, 3, 1).float().numpy()
+        return image
+
+        

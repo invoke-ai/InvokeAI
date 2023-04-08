@@ -72,11 +72,10 @@ def get_model_manager(config: Args) -> ModelManager:
     # try to autoconvert new models
     # autoimport new .ckpt files
     if path := config.autoconvert:
-        model_manager.autoconvert_weights(
-            conf_path=config.conf,
-            weights_directory=path,
+        model_manager.heuristic_import(
+            str(path), commit_to_conf=config.conf
         )
-
+        
     return model_manager
 
 def report_model_error(opt: Namespace, e: Exception):

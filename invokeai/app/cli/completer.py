@@ -4,6 +4,7 @@ You may import the global singleton `completer` to get access to the
 completer object.
 """
 import atexit
+import re
 import readline
 import shlex
 
@@ -66,6 +67,8 @@ class Completer(object):
         """
         if len(buffer)==0:
             return None, None
+        if re.search('\|\s*[a-zA-Z0-9]*$',buffer): # reset command on pipe symbol
+            return None,None
         tokens = shlex.split(buffer)
         command = None
         switch = None
