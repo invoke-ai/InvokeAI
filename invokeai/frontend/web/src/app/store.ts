@@ -15,6 +15,7 @@ import postprocessingReducer from 'features/parameters/store/postprocessingSlice
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import modelsReducer from 'features/system/store/modelSlice';
+import nodesReducer from 'features/nodes/store/nodesSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
@@ -85,6 +86,7 @@ const rootReducer = combineReducers({
   results: resultsReducer,
   uploads: uploadsReducer,
   models: modelsReducer,
+  nodes: nodesReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -97,9 +99,9 @@ const rootPersistConfig = getPersistConfig({
     ...galleryBlacklist,
     ...lightboxBlacklist,
     ...apiBlacklist,
-    // for now, never persist the results/uploads slices
     'results',
     'uploads',
+    // 'nodes',
   ],
   debounce: 300,
 });
