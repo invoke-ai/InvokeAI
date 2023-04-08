@@ -123,7 +123,7 @@ async def delete_model(model_name: str) -> None:
         print(f">> Model Deleted: {model_name}")
         raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
-    if not model_exists:
+    else:
         print(f">> Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
     
