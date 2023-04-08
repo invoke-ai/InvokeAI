@@ -19,14 +19,14 @@ export const AVAILABLE_COLORS = [
   'orange',
   'yellow',
   'green',
-  'teal',
   'blue',
-  'cyan',
   'purple',
   'pink',
+  'teal',
+  'cyan',
 ];
 
-export const { invocations: INVOCATIONS, customFields } =
+export const { invocations: INVOCATIONS, fieldTypes } =
   await buildInvocations();
 
 export const INVOCATION_NAMES: (keyof typeof INVOCATIONS)[] = map(
@@ -48,17 +48,11 @@ export const NODE_TYPE_NAMES: (keyof typeof NODE_TYPES)[] = map(
   (_, key) => key
 );
 
-console.log(customFields);
-
 // all field types, maybe we can dynamically generate this in the future?
-export const FIELDS = [
-  ...PRIMITIVE_FIELDS,
-  ...customFields,
-].reduce<FieldConfig>((acc, val, i) => {
+export const FIELDS = fieldTypes.reduce<FieldConfig>((acc, val, i) => {
   let color = AVAILABLE_COLORS[i];
   if (!color) {
     color = 'gray';
-    console.log('RAN OUTTA COLORS YO');
   }
 
   acc[val] = {

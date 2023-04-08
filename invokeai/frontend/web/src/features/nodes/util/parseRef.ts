@@ -28,10 +28,12 @@ export const parseOutputRef = (
       output.fieldType = filteredProperties[0].allOf[0].$ref
         .split('/')
         .slice(-1)[0]
-        .toString();
+        .toString()
+        .toLowerCase()
+        .replace('field', '');
     }
   } else {
-    output.fieldType = filteredProperties[0].type;
+    output.fieldType = filteredProperties[0].type.replace('number', 'float');
   }
 
   return output;
