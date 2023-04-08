@@ -71,7 +71,6 @@ class TextualInversionManager(BaseTextualInversionManager):
         if str(ckpt_path).endswith(".DS_Store"):
             return
         embedding_info = self._parse_embedding(str(ckpt_path))
-        embedding_info["name"] = embedding_info["name"].strip().strip("<>")
 
         if embedding_info is None:
             # We've already put out an error message about the bad embedding in _parse_embedding, so just return.
@@ -84,6 +83,9 @@ class TextualInversionManager(BaseTextualInversionManager):
                 f"   ** Notice: {ckpt_path.parents[0].name}/{ckpt_path.name} was trained on a model with an incompatible token dimension: {self.text_encoder.get_input_embeddings().weight.data[0].shape[0]} vs {embedding_info['token_dim']}."
             )
             return
+
+        # Clean up embedding name/trigger as some include <>, some not
+        embedding_info["name"] = embedding_info["name"].strip().strip("<>")
 
         # Resolve the situation in which an earlier embedding has claimed the same
         # trigger string. We replace the trigger with 'source_file', as we used to.
