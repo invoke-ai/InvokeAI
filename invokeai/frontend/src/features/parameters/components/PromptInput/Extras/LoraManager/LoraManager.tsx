@@ -57,6 +57,7 @@ export default function LoraManager() {
       menuItems={makeLoraItems()}
       menuType="regular"
       buttonText={`${t('modelManager.addLora')} (${numOfActiveLoras()})`}
+      menuButtonProps={{ width: 'auto', padding: '0 1rem' }}
     />
   ) : (
     <Box

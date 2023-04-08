@@ -99,6 +99,10 @@ export default function TextualInversionManager() {
       buttonText={`${t(
         'modelManager.addTextualInversionTrigger'
       )} (${numOfActiveTextualInversions()})`}
+      menuButtonProps={{
+        width: 'auto',
+        padding: '0 1rem',
+      }}
     />
   ) : (
     <Box
