@@ -1,29 +1,52 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
-import { SessionsService } from 'services/api';
+import { Graph, SessionsService } from 'services/api';
 import { buildGraph } from 'common/util/buildGraph';
-import { isFulfilled } from '@reduxjs/toolkit';
+import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
 import { subscribedNodeIdsSet } from 'features/system/store/systemSlice';
+import { buildNodesGraph } from 'features/nodes/util/buildNodesGraph';
+import { size } from 'lodash';
 
-// type SessionCreatedArg = {
-//   graph: Parameters<
-//     (typeof SessionsService)['createSession']
-//   >[0]['requestBody'];
-//   nodeIdsToSubscribe?: string[];
-// };
+export const linearGraphBuilt = createAppAsyncThunk(
+  'api/linearGraphBuilt',
+  async (_, { dispatch, getState }) => {
+    const graph = buildGraph(getState()).graph;
+
+    dispatch(sessionCreated({ graph }));
+
+    return graph;
+  }
+);
+
+export const nodesGraphBuilt = createAppAsyncThunk(
+  'api/nodesGraphBuilt',
+  async (_, { dispatch, getState }) => {
+    const graph = buildNodesGraph(getState());
+
+    dispatch(sessionCreated({ graph }));
+
+    return graph;
+  }
+);
+
+export const isFulfilledAnyGraphBuilt = isAnyOf(
+  linearGraphBuilt.fulfilled,
+  nodesGraphBuilt.fulfilled
+);
+
+type SessionCreatedArg = {
+  graph: Parameters<
+    (typeof SessionsService)['createSession']
+  >[0]['requestBody'];
+};
 
 /**
  * `SessionsService.createSession()` thunk
  */
 export const sessionCreated = createAppAsyncThunk(
   'api/sessionCreated',
-  async (_arg, { dispatch, getState }) => {
-    const state = getState();
-    const { graph, nodeIdsToSubscribe } = buildGraph(state);
-
-    dispatch(subscribedNodeIdsSet(nodeIdsToSubscribe));
-
+  async (arg: SessionCreatedArg, { dispatch, getState }) => {
     const response = await SessionsService.createSession({
-      requestBody: graph,
+      requestBody: arg.graph,
     });
 
     return response;
