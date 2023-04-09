@@ -1,7 +1,6 @@
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
 
-
 import enum
 import math
 from typing import Callable, Optional
@@ -550,7 +549,10 @@ def get_mem_free_total(device):
 
 
 class InvokeAIDiffusersCrossAttention(
-    diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin
+    #  in diffusers >= 0.15.0.dev, CrossAttention renamed to Attention
+    #  diffusers.models.attention.CrossAttention,
+    diffusers.models.attention.Attention,
+    InvokeAICrossAttentionMixin
 ):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
