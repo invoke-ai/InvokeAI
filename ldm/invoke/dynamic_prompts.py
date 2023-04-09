@@ -116,7 +116,10 @@ def _get_fn_format(directory:str, sequence:int)->str:
     Get a filename that doesn't exceed filename length restrictions
     on the current platform.
     """
-    max_length = os.pathconf(directory,'PC_NAME_MAX')
+    try:
+        max_length = os.pathconf(directory,'PC_NAME_MAX')
+    except:
+        max_length = 255
     prefix = f'dp.{sequence:04}.'
     suffix = '.png'
     max_length -= len(prefix)+len(suffix)
