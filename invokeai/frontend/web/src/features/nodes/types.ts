@@ -1,138 +1,14 @@
 import { OpenAPIV3 } from 'openapi-types';
-import { FunctionComponent } from 'react';
 
 export const isReferenceObject = (
-  obj:
-    | OpenAPIV3.ReferenceObject
-    | OpenAPIV3.SchemaObject
-    | NodeSchemaObject
-    | ProcessedNodeSchemaObject
-): obj is OpenAPIV3.ReferenceObject => '$ref' in obj;
-
-export const _isReferenceObject = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
 ): obj is OpenAPIV3.ReferenceObject => '$ref' in obj;
 
-export const _isSchemaObject = (
+export const isSchemaObject = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
 ): obj is OpenAPIV3.SchemaObject => !('$ref' in obj);
 
-// export const isNodeSchemaObject = (
-//   obj:
-//     | OpenAPIV3.ReferenceObject
-//     | OpenAPIV3.SchemaObject
-//     | NodeSchemaObject
-//     | ProcessedNodeSchemaObject
-// ): obj is NodeSchemaObject => {
-//   return !('$ref' in obj);
-// };
-
-export const isArraySchemaObject = (
-  obj: OpenAPIV3.ArraySchemaObject | OpenAPIV3.NonArraySchemaObject
-): obj is OpenAPIV3.ArraySchemaObject => 'items' in obj;
-
-export const isNonArraySchemaObject = (
-  obj: OpenAPIV3.ArraySchemaObject | OpenAPIV3.NonArraySchemaObject
-): obj is OpenAPIV3.NonArraySchemaObject => !('items' in obj);
-
-// helper types - we have some guarantees about the schema - so we can override some optional
-// properties
-
-export type RequiredInvocationProperties = {
-  type: string;
-  title: string;
-  id: string;
-  output: OpenAPIV3.ReferenceObject; // add the `output` custom schema prop
-  properties: {
-    [name: string]: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject;
-  };
-};
-
-export type NodeSchemaObject = Omit<
-  OpenAPIV3.SchemaObject,
-  keyof RequiredInvocationProperties
-> &
-  RequiredInvocationProperties;
-
-export type ProcessedNodeSchemaObject = NodeSchemaObject & {
-  fieldType: string;
-};
-
-export type NodesComponentsObject = Omit<
-  OpenAPIV3.ComponentsObject,
-  'schemas'
-> & {
-  // we know we always have schemas
-  schemas: {
-    [key: string]:
-      | OpenAPIV3.ReferenceObject
-      | (NodeSchemaObject & { properties: { type: { default: string } } });
-  };
-};
-
-export type NodesOpenAPIDocument = Omit<OpenAPIV3.Document, 'components'> & {
-  // we know we always have components
-  components: NodesComponentsObject;
-};
-
-// export type CustomisedAnySchemaObject =
-//   | OpenAPIV3.ReferenceObject
-//   | (Omit<OpenAPIV3.SchemaObject, 'properties'> & {
-//       properties: (OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject) & {
-//         type: {
-//           default: string;
-//         };
-//       };
-//     });
-
-// export type CustomisedOpenAPIDocument = Omit<
-//   OpenAPIV3.Document,
-//   'components'
-// > & {
-//   components: Omit<OpenAPIV3.ComponentsObject, 'schemas'> & {
-//     schemas: {
-//       [name: string]: CustomisedAnySchemaObject;
-//     };
-//   };
-// };
-
-// Invocations have an `output` key that is a ref to the output schema
-export type CustomisedSchemaObject = Omit<
-  OpenAPIV3.SchemaObject,
-  keyof RequiredInvocationProperties
-> &
-  RequiredInvocationProperties;
-
 export type Invocation = {
-  title: string;
-  type: string;
-  description: string;
-  schema: NodeSchemaObject;
-  outputs: ProcessedNodeSchemaObject[];
-  inputs: ProcessedNodeSchemaObject[];
-  component: FunctionComponent;
-};
-
-export type Invocations = { [name: string]: Invocation };
-
-export type FieldConfig = {
-  [type: string]: {
-    color: string;
-    isPrimitive: boolean;
-  };
-};
-
-export type InvocationSchema = {
-  title: string;
-  required?: string[];
-  properties: {
-    [name: string]: OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject;
-  };
-  description?: string;
-  output?: OpenAPIV3.ReferenceObject;
-};
-
-export type _Invocation = {
   /**
    * Unique type of the invocation
    */
