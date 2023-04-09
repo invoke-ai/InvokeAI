@@ -9,7 +9,7 @@ import {
   Switch,
 } from '@chakra-ui/react';
 import { ReactNode } from 'react';
-import { ProcessedNodeSchemaObject } from '../types';
+import { InputField, ProcessedNodeSchemaObject } from '../types';
 
 // build an individual input element based on the schema
 export const buildFieldComponent = (
@@ -39,6 +39,45 @@ export const buildFieldComponent = (
           <NumberDecrementStepper />
         </NumberInputStepper>
       </NumberInput>
+    );
+  }
+};
+
+// build an individual input element based on the schema
+export const _buildFieldComponent = (
+  nodeId: string,
+  field: InputField
+): ReactNode => {
+  const { type } = field;
+
+  if (type === 'string') {
+    return <Input></Input>;
+  }
+
+  if (type === 'boolean') {
+    return <Switch></Switch>;
+  }
+
+  if (['integer', 'number'].includes(type)) {
+    return (
+      <NumberInput>
+        <NumberInputField />
+        <NumberInputStepper>
+          <NumberIncrementStepper />
+          <NumberDecrementStepper />
+        </NumberInputStepper>
+      </NumberInput>
+    );
+  }
+
+  // `string` fields may either be a text input or an enum ie select
+  if (type === 'enum') {
+    return (
+      <Select>
+        {field.options.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </Select>
     );
   }
 };

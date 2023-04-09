@@ -9,14 +9,27 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { filter, uniq } from 'lodash';
+import { OpenAPIV3 } from 'openapi-types';
 import { FaInfoCircle } from 'react-icons/fa';
 // import { PRIMITIVE_FIELDS } from '../constants';
 import {
+  // CustomisedOpenAPIDocument,
+  // CustomisedSchemaObject,
+  // FloatField,
+  // IntegerField,
+  InputField,
   Invocations,
-  isNodeSchemaObject,
+  InvocationSchema,
+  // isNodeSchemaObject,
   isReferenceObject,
+  NodeSchemaObject,
   NodesOpenAPIDocument,
   ProcessedNodeSchemaObject,
+  _Invocation,
+  _isReferenceObject,
+  OutputField,
+  _isSchemaObject,
+  Invocation,
 } from '../types';
 import { buildFieldComponent } from './buildFieldComponent';
 import {
@@ -24,7 +37,84 @@ import {
   buildOutputHandleComponent,
 } from './buildHandleComponent';
 import { fetchOpenAPISchema } from './fetchOpenAPISchema';
-import { parseOutputRef } from './parseRef';
+import { buildInputField, buildOutputFields } from './invocationFieldBuilders';
+import { parseOutputRef, _parseOutputRef as _parseOutput } from './parseRef';
+
+const parseSchema = (openAPI: OpenAPIV3.Document) => {
+  // filter out non-invocation schemas, plus some tricky invocations for now
+  const filteredSchemas = filter(
+    openAPI.components!.schemas,
+    (schema, key) =>
+      key.includes('Invocation') &&
+      !key.includes('InvocationOutput') &&
+      !key.includes('Collect') &&
+      !key.includes('Range') &&
+      !key.includes('Iterate') &&
+      !key.includes('LoadImage') &&
+      !key.includes('Graph')
+  );
+
+  const invocations = filteredSchemas.reduce<Record<string, _Invocation>>(
+    (acc, schema: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject) => {
+      // only want SchemaObjects
+      if (_isReferenceObject(schema)) {
+        return acc;
+      }
+
+      const type = (
+        schema.properties!.type as OpenAPIV3.SchemaObject & { default: string }
+      ).default;
+
+      const title = schema
+        .title!.replace('Invocation', '')
+        .split(/(?=[A-Z])/) // split PascalCase into array
+        .join(' ');
+
+      // `type` and `id` are not valid inputs/outputs
+      const rawInputs = filter(
+        schema.properties,
+        (prop, key) => !['type', 'id'].includes(key) && _isSchemaObject(prop)
+      ) as OpenAPIV3.SchemaObject[];
+
+      const inputs: InputField[] = [];
+
+      rawInputs.forEach((input) => {
+        const field = buildInputField(input);
+        if (field) {
+          inputs.push(field);
+        }
+      });
+
+      // `type` and `id` are not valid inputs/outputs
+      const rawOutputs = (
+        schema as OpenAPIV3.SchemaObject & {
+          output: OpenAPIV3.ReferenceObject;
+        }
+      ).output;
+
+      const outputs = buildOutputFields(rawOutputs, openAPI);
+
+      const invocation: _Invocation = {
+        title,
+        type,
+        description: schema.description ?? '',
+        inputs,
+        outputs,
+      };
+
+      acc[type] = invocation;
+
+      return acc;
+    },
+    {}
+  );
+
+  return invocations;
+};
+
+const openApi = await fetchOpenAPISchema();
+
+// console.log('parsed schema:', parseSchema(openApi));
 
 // build object of invocations UI components keyed by their name
 export const buildInvocations = async (): Promise<{

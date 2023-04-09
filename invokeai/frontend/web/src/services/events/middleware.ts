@@ -31,6 +31,7 @@ import {
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 import { receivedModels } from 'services/thunks/model';
+import { receivedOpenAPISchema } from 'services/thunks/schema';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -85,17 +86,23 @@ export const socketMiddleware = () => {
         socket.on('connect', () => {
           dispatch(socketConnected({ timestamp: getTimestamp() }));
 
+          const { results, uploads, models, nodes } = getState();
+
           // These thunks need to be dispatch in middleware; cannot handle in a reducer
-          if (!getState().results.ids.length) {
+          if (!results.ids.length) {
             dispatch(receivedResultImagesPage());
           }
 
-          if (!getState().uploads.ids.length) {
+          if (!uploads.ids.length) {
             dispatch(receivedUploadImagesPage());
           }
 
-          if (!getState().models.modelList.length) {
+          if (!models.modelList.length) {
             dispatch(receivedModels());
+          }
+
+          if (!nodes.schema) {
+            dispatch(receivedOpenAPISchema());
           }
         });
 
