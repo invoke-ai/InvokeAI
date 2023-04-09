@@ -139,7 +139,7 @@ class PasteImageInvocation(BaseInvocation):
             None
             if self.mask is None
             else ImageOps.invert(
-                services.images.get(self.mask.image_type, self.mask.image_name)
+                context.services.images.get(self.mask.image_type, self.mask.image_name)
             )
         )
         # TODO: probably shouldn't invert mask here... should user be required to do it?
