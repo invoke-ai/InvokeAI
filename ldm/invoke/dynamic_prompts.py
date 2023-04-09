@@ -100,8 +100,8 @@ def expand_prompts(
             for command in commands:
                 sequence += 1
                 format = _get_fn_format(outdir, sequence)
-                parent_conn.send(
-                    command + f' --fnformat="{format}"'
+                parent_conn.send_bytes(
+                    (command + f' --fnformat="{format}"').encode('utf-8')
                 )
             parent_conn.close()
         else:
@@ -133,7 +133,7 @@ class MessageToStdin(object):
     def readline(self) -> str:
         try:
             if len(self.linebuffer) == 0:
-                message = self.connection.recv()
+                message = self.connection.recv_bytes().decode('utf-8')
                 self.linebuffer = message.split("\n")
             result = self.linebuffer.pop(0)
             return result
