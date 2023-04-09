@@ -75,7 +75,10 @@ export const Flow = () => {
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
       connectionLineType={ConnectionLineType.SmoothStep}
-      defaultEdgeOptions={{ type: 'smoothstep' }}
+      defaultEdgeOptions={{
+        type: 'smoothstep',
+        style: { strokeWidth: 2 },
+      }}
     >
       <Background />
       <Controls />
