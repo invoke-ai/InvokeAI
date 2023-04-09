@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import argparse
-from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_type_hints, Union
 from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ def add_parsers(
     """Adds parsers for each command to the subparsers"""
 
     # Create subparsers for each command
-    for command in commands:
+    for command in sorted(commands, key=lambda x: get_args(get_type_hints(x)[command_field])[0]):
         hints = get_type_hints(command)
         cmd_name = get_args(hints[command_field])[0]
         command_parser = subparsers.add_parser(cmd_name, help=command.__doc__)

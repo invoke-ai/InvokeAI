@@ -90,17 +90,17 @@ class DiskImageStorage(ImageStorageBase):
         return path
 
     def save(self, image_type: ImageType, image_name: str, image: Image) -> None:
-        image_subpath = os.path.join(image_type, image_name)
+        path = self.get_path(image_type, image_name)
         self.__pngWriter.save_image_and_prompt_to_png(
-            image, "", image_subpath, None
+            image, "", path, None
         )  # TODO: just pass full path to png writer
-        save_thumbnail(
-            image=image,
-            filename=image_name,
-            path=os.path.join(self.__output_folder, image_type, "thumbnails"),
-        )
-        image_path = self.get_path(image_type, image_name)
-        self.__set_cache(image_path, image)
+        # LS: Save_thumbnail() should be a separate invocation, shouldn't it?
+        # save_thumbnail(
+        #     image=image,
+        #     filename=image_name,
+        #     path=os.path.join(self.__output_folder, image_type, "thumbnails"),
+        # )
+        self.__set_cache(path, image)
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         image_path = self.get_path(image_type, image_name)

@@ -67,6 +67,29 @@ class LoadImageInvocation(BaseInvocation):
             image=ImageField(image_type=self.image_type, image_name=self.image_name)
         )
 
+class SaveImageInvocation(BaseInvocation):
+    """Take an image as input and save it as a PNG file to a filename."""
+    #fmt: off
+    type: Literal["save_image"] = "save_image"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to save")
+    image_type: ImageType = Field(description="The type of the image")
+    image_name:       str = Field(description="The filename or path to save the image to")
+    #fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+        context.services.images.save(
+            self.image_type, self.image_name, image
+        )
+        return ImageOutput(
+            image=ImageField(
+                image_type=self.image_type, image_name=self.image_name
+            )
+        )
 
 class ShowImageInvocation(BaseInvocation):
     """Displays a provided image, and passes it forward in the pipeline."""

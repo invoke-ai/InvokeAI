@@ -9,8 +9,9 @@ from typing import (
     Union,
     get_type_hints,
 )
-
-from pydantic import BaseModel
+from argparse import HelpFormatter
+from operator import attrgetter
+from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
 
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -57,10 +58,14 @@ def add_invocation_args(command_parser):
         help="A link from all fields in the specified node. Node can be relative to history (e.g. -1)",
     )
 
+class SortedHelpFormatter(HelpFormatter):
+    def add_arguments(self, actions):
+        actions = sorted(actions, key=attrgetter('option_strings'))
+        super(SortedHelpFormatter, self).add_arguments(actions)
 
 def get_command_parser() -> argparse.ArgumentParser:
     # Create invocation parser
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=SortedHelpFormatter)
 
     def exit(*args, **kwargs):
         raise InvalidArgs
@@ -286,6 +291,9 @@ def invoke_cli():
             # Start a new session
             print("Session error: creating a new session")
             context.session = context.invoker.create_execution_state()
+
+        except ValidationError as e:
+            print(f'Validation error: {str(e)}')
 
         except ExitCli:
             break
