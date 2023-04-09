@@ -1,7 +1,6 @@
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
 
-
 import enum
 import math
 from typing import Callable, Optional
