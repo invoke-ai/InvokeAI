@@ -33,11 +33,14 @@ def get_versions()->dict:
 
 def invokeai_is_running()->bool:
     for p in psutil.process_iter():
-        cmdline = p.cmdline()
-        matches = [x for x in cmdline if x.endswith('invokeai')]
-        if matches:
-            print(f':exclamation: [bold red]An InvokeAI instance appears to be running as process {p.pid}[/red bold]')
-            return True
+        try:
+            cmdline = p.cmdline()
+            matches = [x for x in cmdline if x.endswith(('invokeai','invokeai.exe'))]
+            if matches:
+                print(f':exclamation: [bold red]An InvokeAI instance appears to be running as process {p.pid}[/red bold]')
+                return True
+        except psutil.AccessDenied:
+            continue
     return False
         
     
