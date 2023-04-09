@@ -14,31 +14,25 @@ import {
   IconButton,
 } from '@chakra-ui/react';
 import { FaPlus } from 'react-icons/fa';
-import {
-  FIELDS,
-  FIELD_NAMES,
-  INVOCATIONS,
-  INVOCATION_NAMES,
-} from '../constants';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { nodeAdded } from '../store/nodesSlice';
 import { Flow } from './Flow';
+import { FIELDS } from '../types';
+import { map } from 'lodash';
+import { RootState } from 'app/store';
 
 const NodeEditor = () => {
   const dispatch = useAppDispatch();
 
+  const invocations = useAppSelector(
+    (state: RootState) => state.nodes.invocations
+  );
+
   const addNode = useCallback(
     (nodeType: string) => {
-      dispatch(
-        nodeAdded({
-          id: uuidv4(),
-          type: nodeType,
-          position: { x: 0, y: 0 },
-          data: {},
-        })
-      );
+      dispatch(nodeAdded({ id: uuidv4(), invocation: invocations[nodeType] }));
     },
-    [dispatch]
+    [dispatch, invocations]
   );
 
   return (
@@ -53,14 +47,12 @@ const NodeEditor = () => {
     >
       <Flow />
       <HStack sx={{ position: 'absolute', top: 2, right: 2 }}>
-        {FIELD_NAMES.map((field) => (
-          <Badge
-            key={field}
-            colorScheme={FIELDS[field].color}
-            sx={{ userSelect: 'none' }}
-          >
-            {field}
-          </Badge>
+        {map(FIELDS, ({ title, description, color }, key) => (
+          <Tooltip key={key} label={description}>
+            <Badge colorScheme={color} sx={{ userSelect: 'none' }}>
+              {title}
+            </Badge>
+          </Tooltip>
         ))}
       </HStack>
       <Menu>
@@ -71,18 +63,10 @@ const NodeEditor = () => {
           sx={{ position: 'absolute', top: 2, left: 2 }}
         />
         <MenuList>
-          {INVOCATION_NAMES.map((name) => {
-            const invocation = INVOCATIONS[name];
+          {map(invocations, ({ title, description, type }, key) => {
             return (
-              <Tooltip
-                key={name}
-                label={invocation.description}
-                placement="end"
-                hasArrow
-              >
-                <MenuItem onClick={() => addNode(invocation.title)}>
-                  {invocation.title}
-                </MenuItem>
+              <Tooltip key={key} label={description} placement="end" hasArrow>
+                <MenuItem onClick={() => addNode(type)}>{title}</MenuItem>
               </Tooltip>
             );
           })}
