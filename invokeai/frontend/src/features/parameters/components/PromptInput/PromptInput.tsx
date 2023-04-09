@@ -51,7 +51,9 @@ const PromptInput = () => {
     // Debounce Prompt UI Checking
     clearTimeout(promptTimer);
     const newPromptTimer = window.setTimeout(() => {
-      dispatch(handlePromptCheckers(e.target.value));
+      dispatch(
+        handlePromptCheckers({ prompt: e.target.value, toNegative: false })
+      );
     }, 500);
     setPromptTimer(newPromptTimer);
   };

@@ -18,9 +18,11 @@ export interface GenerationState {
   prompt: string;
   negativePrompt: string;
   lorasInUse: string[];
-  localTextualInversionTriggers: string[];
   huggingFaceTextualInversionConcepts: string[];
+  localTextualInversionTriggers: string[];
   textualInversionsInUse: string[];
+  negativeTextualInversionsInUse: string[];
+  addTIToNegative: boolean;
   sampler: string;
   seamBlur: number;
   seamless: boolean;
@@ -53,9 +55,11 @@ const initialGenerationState: GenerationState = {
   prompt: '',
   negativePrompt: '',
   lorasInUse: [],
-  localTextualInversionTriggers: [],
   huggingFaceTextualInversionConcepts: [],
+  localTextualInversionTriggers: [],
   textualInversionsInUse: [],
+  negativeTextualInversionsInUse: [],
+  addTIToNegative: false,
   sampler: 'k_lms',
   seamBlur: 16,
   seamless: false,
@@ -85,13 +89,84 @@ const loraExists = (state: GenerationState, lora: string) => {
   return false;
 };
 
+const getTIRegex = (textualInversion: string) => {
+  if (textualInversion.includes('<' || '>')) {
+    return new RegExp(`${textualInversion}`);
+  } else {
+    return new RegExp(`\\b${textualInversion}\\b`);
+  }
+};
+
 const textualInversionExists = (
   state: GenerationState,
   textualInversion: string
 ) => {
-  const textualInversionRegex = new RegExp(textualInversion);
-  if (state.prompt.match(textualInversionRegex)) return true;
+  const textualInversionRegex = getTIRegex(textualInversion);
+
+  if (!state.addTIToNegative) {
+    if (state.prompt.match(textualInversionRegex)) return true;
+  } else {
+    if (state.negativePrompt.match(textualInversionRegex)) return true;
+  }
   return false;
+};
+
+const handleTypedTICheck = (
+  state: GenerationState,
+  newPrompt: string,
+  toNegative: boolean
+) => {
+  let textualInversionsInUse = !toNegative
+    ? [...state.textualInversionsInUse]
+    : [...state.negativeTextualInversionsInUse]; // Get Words In Prompt
+
+  const textualInversionRegex = /([\w<>!@%&*_-]+)/g; // Scan For Each Word
+
+  const textualInversionMatches = [
+    ...newPrompt.matchAll(textualInversionRegex),
+  ]; // Match All Words
+
+  if (textualInversionMatches.length > 0) {
+    textualInversionsInUse = []; // Reset Textual Inversions In Use
+
+    textualInversionMatches.forEach((textualInversionMatch) => {
+      const textualInversionName = textualInversionMatch[0];
+      if (
+        (!textualInversionsInUse.includes(textualInversionName) &&
+          state.localTextualInversionTriggers.includes(textualInversionName)) ||
+        state.huggingFaceTextualInversionConcepts.includes(textualInversionName)
+      ) {
+        textualInversionsInUse.push(textualInversionName); // Add Textual Inversions In Prompt
+      }
+    });
+  } else {
+    textualInversionsInUse = []; // If No Matches, Remove Textual Inversions In Use
+  }
+
+  if (!toNegative) {
+    state.textualInversionsInUse = textualInversionsInUse;
+  } else {
+    state.negativeTextualInversionsInUse = textualInversionsInUse;
+  }
+};
+
+const handleTypedLoraCheck = (state: GenerationState, newPrompt: string) => {
+  let lorasInUse = [...state.lorasInUse]; // Get Loras In Prompt
+
+  const loraRegex = /withLora\(([^\\)]+)\)/g; // Scan For Lora Syntax
+  const loraMatches = [...newPrompt.matchAll(loraRegex)]; // Match All Lora Syntaxes
+
+  if (loraMatches.length > 0) {
+    lorasInUse = []; // Reset Loras In Use
+    loraMatches.forEach((loraMatch) => {
+      const loraName = loraMatch[1].split(',')[0];
+      if (!lorasInUse.includes(loraName)) lorasInUse.push(loraName); // Add Loras In Prompt
+    });
+  } else {
+    lorasInUse = []; // If No Matches, Remove Loras In Use
+  }
+
+  state.lorasInUse = lorasInUse;
 };
 
 export const generationSlice = createSlice({
@@ -118,6 +193,20 @@ export const generationSlice = createSlice({
         state.negativePrompt = promptToString(newPrompt);
       }
     },
+    handlePromptCheckers: (
+      state,
+      action: PayloadAction<{
+        prompt: string | InvokeAI.Prompt;
+        toNegative: boolean;
+      }>
+    ) => {
+      const newPrompt = action.payload.prompt;
+
+      if (typeof newPrompt === 'string') {
+        if (!action.payload.toNegative) handleTypedLoraCheck(state, newPrompt);
+        handleTypedTICheck(state, newPrompt, action.payload.toNegative);
+      }
+    },
     setLorasInUse: (state, action: PayloadAction<string>) => {
       const newLora = action.payload;
       const loras = [...state.lorasInUse];
@@ -128,94 +217,99 @@ export const generationSlice = createSlice({
           'g'
         );
         const newPrompt = state.prompt.replaceAll(loraRegex, '');
-        state.prompt = newPrompt;
+        state.prompt = newPrompt.trim();
 
         if (loras.includes(newLora)) {
           const newLoraIndex = loras.indexOf(newLora);
           if (newLoraIndex > -1) loras.splice(newLoraIndex, 1);
         }
       } else {
-        state.prompt = `${state.prompt} withLora(${newLora},0.75)`;
+        state.prompt = `${state.prompt.trim()} withLora(${newLora},0.75)`;
         if (!loras.includes(newLora)) loras.push(newLora);
       }
       state.lorasInUse = loras;
     },
-    handlePromptCheckers: (
-      state,
-      action: PayloadAction<string | InvokeAI.Prompt>
-    ) => {
-      const newPrompt = action.payload;
+    setClearLoras: (state) => {
+      const lorasInUse = [...state.lorasInUse];
 
-      // Tackle User Typed Lora Syntax
-      let lorasInUse = [...state.lorasInUse]; // Get Loras In Prompt
-      const loraRegex = /withLora\(([^\\)]+)\)/g; // Scan For Lora Syntax
-      if (typeof newPrompt === 'string') {
-        const loraMatches = [...newPrompt.matchAll(loraRegex)]; // Match All Lora Syntaxes
-        if (loraMatches.length > 0) {
-          lorasInUse = []; // Reset Loras In Use
-          loraMatches.forEach((loraMatch) => {
-            const loraName = loraMatch[1].split(',')[0];
-            if (!lorasInUse.includes(loraName)) lorasInUse.push(loraName); // Add Loras In Prompt
-          });
-        } else {
-          lorasInUse = []; // If No Matches, Remove Loras In Use
-        }
-      }
-      state.lorasInUse = lorasInUse;
+      lorasInUse.forEach((lora) => {
+        const loraRegex = new RegExp(
+          `withLora\\(${lora},?\\s*([^\\)]+)?\\)`,
+          'g'
+        );
+        const newPrompt = state.prompt.replaceAll(loraRegex, '');
+        state.prompt = newPrompt.trim();
+      });
 
-      // Tackle User Typed Textual Inversion
-      let textualInversionsInUse = [...state.textualInversionsInUse]; // Get Words In Prompt
-      const textualInversionRegex = /([\w<>!@%&*_-]+)/g; // Scan For Each Word
-      if (typeof newPrompt === 'string') {
-        const textualInversionMatches = [
-          ...newPrompt.matchAll(textualInversionRegex),
-        ]; // Match All Words
-        if (textualInversionMatches.length > 0) {
-          textualInversionsInUse = []; // Reset Textual Inversions In Use
-          console.log(textualInversionMatches);
-          textualInversionMatches.forEach((textualInversionMatch) => {
-            const textualInversionName = textualInversionMatch[0];
-            console.log(textualInversionName);
-            if (
-              !textualInversionsInUse.includes(textualInversionName) &&
-              (state.localTextualInversionTriggers.includes(
-                textualInversionName
-              ) ||
-                state.huggingFaceTextualInversionConcepts.includes(
-                  textualInversionName
-                ))
-            )
-              textualInversionsInUse.push(textualInversionName); // Add Textual Inversions In Prompt
-          });
-        } else {
-          textualInversionsInUse = []; // If No Matches, Remove Textual Inversions In Use
-        }
-      }
-
-      console.log([...state.huggingFaceTextualInversionConcepts]);
-      state.textualInversionsInUse = textualInversionsInUse;
+      state.lorasInUse = [];
     },
     setTextualInversionsInUse: (state, action: PayloadAction<string>) => {
       const newTextualInversion = action.payload;
+
       const textualInversions = [...state.textualInversionsInUse];
+      const negativeTextualInversions = [
+        ...state.negativeTextualInversionsInUse,
+      ];
 
       if (textualInversionExists(state, newTextualInversion)) {
-        const textualInversionRegex = new RegExp(newTextualInversion, 'g');
-        const newPrompt = state.prompt.replaceAll(textualInversionRegex, '');
-        state.prompt = newPrompt;
+        const textualInversionRegex = getTIRegex(newTextualInversion);
 
-        if (textualInversions.includes(newTextualInversion)) {
+        if (!state.addTIToNegative) {
+          const newPrompt = state.prompt.replace(textualInversionRegex, '');
+          state.prompt = newPrompt.trim();
+
           const newTIIndex = textualInversions.indexOf(newTextualInversion);
           if (newTIIndex > -1) textualInversions.splice(newTIIndex, 1);
+        } else {
+          const newPrompt = state.negativePrompt.replace(
+            textualInversionRegex,
+            ''
+          );
+          state.negativePrompt = newPrompt.trim();
+
+          const newTIIndex =
+            negativeTextualInversions.indexOf(newTextualInversion);
+          if (newTIIndex > -1) negativeTextualInversions.splice(newTIIndex, 1);
         }
       } else {
-        state.prompt = `${state.prompt} ${newTextualInversion}`;
-        if (!textualInversions.includes(newTextualInversion))
+        if (!state.addTIToNegative) {
+          state.prompt = `${state.prompt.trim()} ${newTextualInversion}`;
           textualInversions.push(newTextualInversion);
+        } else {
+          state.negativePrompt = `${state.negativePrompt.trim()} ${newTextualInversion}`;
+          negativeTextualInversions.push(newTextualInversion);
+        }
       }
-      state.lorasInUse = textualInversions;
 
       state.textualInversionsInUse = textualInversions;
+      state.negativeTextualInversionsInUse = negativeTextualInversions;
+    },
+    setClearTextualInversions: (state) => {
+      const textualInversions = [...state.textualInversionsInUse];
+      const negativeTextualInversions = [
+        ...state.negativeTextualInversionsInUse,
+      ];
+
+      textualInversions.forEach((ti) => {
+        const textualInversionRegex = getTIRegex(ti);
+        const newPrompt = state.prompt.replace(textualInversionRegex, '');
+        state.prompt = newPrompt.trim();
+      });
+
+      negativeTextualInversions.forEach((ti) => {
+        const textualInversionRegex = getTIRegex(ti);
+        const newPrompt = state.negativePrompt.replace(
+          textualInversionRegex,
+          ''
+        );
+        state.negativePrompt = newPrompt.trim();
+      });
+
+      state.textualInversionsInUse = [];
+      state.negativeTextualInversionsInUse = [];
+    },
+    setAddTIToNegative: (state, action: PayloadAction<boolean>) => {
+      state.addTIToNegative = action.payload;
     },
     setLocalTextualInversionTriggers: (
       state,
@@ -509,11 +603,14 @@ export const {
   setPerlin,
   setPrompt,
   setNegativePrompt,
-  setLorasInUse,
-  setLocalTextualInversionTriggers,
-  setHuggingFaceTextualInversionConcepts,
-  setTextualInversionsInUse,
   handlePromptCheckers,
+  setLorasInUse,
+  setClearLoras,
+  setHuggingFaceTextualInversionConcepts,
+  setLocalTextualInversionTriggers,
+  setTextualInversionsInUse,
+  setAddTIToNegative,
+  setClearTextualInversions,
   setSampler,
   setSeamBlur,
   setSeamless,
