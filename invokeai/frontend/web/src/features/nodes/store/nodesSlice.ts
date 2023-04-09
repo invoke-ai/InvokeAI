@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf, PayloadAction } from '@reduxjs/toolkit';
 import { OpenAPIV3 } from 'openapi-types';
 import {
   addEdge,
@@ -11,8 +11,15 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
+import { Graph } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
+import {
+  isFulfilledAnyGraphBuilt,
+  linearGraphBuilt,
+  nodesGraphBuilt,
+} from 'services/thunks/session';
 import { Invocation } from '../types';
+import { buildNodesGraph } from '../util/buildNodesGraph';
 import { parseSchema } from '../util/parseSchema';
 
 export type NodesState = {
@@ -21,6 +28,7 @@ export type NodesState = {
   schema: OpenAPIV3.Document | null;
   invocations: Record<string, Invocation>;
   pendingConnection: OnConnectStartParams | null;
+  lastGraph: Graph | null;
 };
 
 export const initialNodesState: NodesState = {
@@ -29,6 +37,7 @@ export const initialNodesState: NodesState = {
   schema: null,
   invocations: {},
   pendingConnection: null,
+  lastGraph: null,
 };
 
 const nodesSlice = createSlice({
@@ -86,6 +95,10 @@ const nodesSlice = createSlice({
       console.log('schema received');
       state.schema = action.payload;
       state.invocations = parseSchema(action.payload);
+    });
+
+    builder.addMatcher(isFulfilledAnyGraphBuilt, (state, action) => {
+      state.lastGraph = action.payload;
     });
   },
 });

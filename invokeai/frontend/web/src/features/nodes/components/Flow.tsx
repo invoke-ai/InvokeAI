@@ -9,6 +9,7 @@ import {
   ConnectionLineType,
   OnConnectStart,
   OnConnectEnd,
+  Panel,
 } from 'reactflow';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
@@ -21,6 +22,10 @@ import {
 } from '../store/nodesSlice';
 import { useCallback } from 'react';
 import { InvocationComponent } from './InvocationComponent';
+import { AddNodeMenu } from './AddNodeMenu';
+import { FieldTypeLegend } from './FieldTypeLegend';
+import { Button } from '@chakra-ui/react';
+import { nodesGraphBuilt } from 'services/thunks/session';
 
 const nodeTypes = { invocation: InvocationComponent };
 
@@ -64,6 +69,10 @@ export const Flow = () => {
     [dispatch]
   );
 
+  const handleInvoke = useCallback(() => {
+    dispatch(nodesGraphBuilt());
+  }, [dispatch]);
+
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
@@ -80,6 +89,15 @@ export const Flow = () => {
         style: { strokeWidth: 2 },
       }}
     >
+      <Panel position="top-left">
+        <AddNodeMenu />
+      </Panel>
+      <Panel position="top-center">
+        <Button onClick={handleInvoke}>Will it blend?</Button>
+      </Panel>
+      <Panel position="top-right">
+        <FieldTypeLegend />
+      </Panel>
       <Background />
       <Controls />
       <MiniMap nodeStrokeWidth={3} zoomable pannable />

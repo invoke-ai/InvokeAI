@@ -1,39 +1,14 @@
-import { v4 as uuidv4 } from 'uuid';
-
 import 'reactflow/dist/style.css';
-import { useCallback } from 'react';
-import {
-  Box,
-  Tooltip,
-  Badge,
-  HStack,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  IconButton,
-} from '@chakra-ui/react';
-import { FaPlus } from 'react-icons/fa';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { nodeAdded } from '../store/nodesSlice';
+import { Box } from '@chakra-ui/react';
 import { Flow } from './Flow';
-import { map } from 'lodash';
+import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
-import { FIELDS } from '../constants';
+import { buildNodesGraph } from '../util/buildNodesGraph';
 
 const NodeEditor = () => {
-  const dispatch = useAppDispatch();
+  const state = useAppSelector((state: RootState) => state);
 
-  const invocations = useAppSelector(
-    (state: RootState) => state.nodes.invocations
-  );
-
-  const addNode = useCallback(
-    (nodeType: string) => {
-      dispatch(nodeAdded({ id: uuidv4(), invocation: invocations[nodeType] }));
-    },
-    [dispatch, invocations]
-  );
+  const graph = buildNodesGraph(state);
 
   return (
     <Box
@@ -46,32 +21,20 @@ const NodeEditor = () => {
       }}
     >
       <Flow />
-      <HStack sx={{ position: 'absolute', top: 2, right: 2 }}>
-        {map(FIELDS, ({ title, description, color }, key) => (
-          <Tooltip key={key} label={description}>
-            <Badge colorScheme={color} sx={{ userSelect: 'none' }}>
-              {title}
-            </Badge>
-          </Tooltip>
-        ))}
-      </HStack>
-      <Menu>
-        <MenuButton
-          as={IconButton}
-          aria-label="Add Node"
-          icon={<FaPlus />}
-          sx={{ position: 'absolute', top: 2, left: 2 }}
-        />
-        <MenuList>
-          {map(invocations, ({ title, description, type }, key) => {
-            return (
-              <Tooltip key={key} label={description} placement="end" hasArrow>
-                <MenuItem onClick={() => addNode(type)}>{title}</MenuItem>
-              </Tooltip>
-            );
-          })}
-        </MenuList>
-      </Menu>
+      <Box
+        as="pre"
+        fontFamily="monospace"
+        position="absolute"
+        top={2}
+        left={2}
+        width="full"
+        height="full"
+        userSelect="none"
+        pointerEvents="none"
+        opacity={0.7}
+      >
+        {JSON.stringify(graph, undefined, 2)}
+      </Box>
     </Box>
   );
 };
