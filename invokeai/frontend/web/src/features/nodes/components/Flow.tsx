@@ -6,11 +6,13 @@ import {
   OnNodesChange,
   ReactFlow,
 } from 'reactflow';
-import { NODE_TYPES } from '../constants';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import { edgesChanged, nodesChanged } from '../store/nodesSlice';
 import { useCallback } from 'react';
+import { InvocationComponent } from './InvocationComponent';
+
+const nodeTypes = { invocation: InvocationComponent };
 
 export const Flow = () => {
   const dispatch = useAppDispatch();
@@ -29,7 +31,7 @@ export const Flow = () => {
 
   return (
     <ReactFlow
-      nodeTypes={NODE_TYPES}
+      nodeTypes={nodeTypes}
       nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}
