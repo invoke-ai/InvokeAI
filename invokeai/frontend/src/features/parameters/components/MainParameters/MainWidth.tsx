@@ -34,7 +34,6 @@ export default function MainWidth() {
       withSliderMarks
       sliderMarkRightOffset={-8}
       inputWidth="6.2rem"
-      inputReadOnly
       sliderNumberInputProps={{ max: 15360 }}
     />
   ) : (

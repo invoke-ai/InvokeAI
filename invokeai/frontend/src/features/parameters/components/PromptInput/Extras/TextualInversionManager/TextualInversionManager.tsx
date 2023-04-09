@@ -1,17 +1,28 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { getTextualInversionTriggers } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
 import IAISimpleMenu, { IAIMenuItem } from 'common/components/IAISimpleMenu';
-import { setTextualInversionsInUse } from 'features/parameters/store/generationSlice';
+import {
+  setAddTIToNegative,
+  setClearTextualInversions,
+  setTextualInversionsInUse,
+} from 'features/parameters/store/generationSlice';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MdArrowDownward, MdClear } from 'react-icons/md';
 
 export default function TextualInversionManager() {
   const dispatch = useAppDispatch();
   const textualInversionsInUse = useAppSelector(
     (state: RootState) => state.generation.textualInversionsInUse
   );
+
+  const negativeTextualInversionsInUse = useAppSelector(
+    (state: RootState) => state.generation.negativeTextualInversionsInUse
+  );
+
   const foundLocalTextualInversionTriggers = useAppSelector(
     (state) => state.system.foundLocalTextualInversionTriggers
   );
@@ -31,6 +42,10 @@ export default function TextualInversionManager() {
     (state) => state.ui.shouldShowHuggingFaceConcepts
   );
 
+  const addTIToNegative = useAppSelector(
+    (state) => state.generation.addTIToNegative
+  );
+
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -41,14 +56,25 @@ export default function TextualInversionManager() {
     dispatch(setTextualInversionsInUse(textual_inversion));
   };
 
-  const renderTextualInversionOption = (textual_inversion: string) => {
-    const thisTIExists = textualInversionsInUse.includes(textual_inversion);
-    const tiExistsStyle = {
-      fontWeight: 'bold',
-      color: 'var(--context-menu-active-item)',
-    };
+  const TIPip = ({ color }: { color: string }) => {
     return (
-      <Box style={thisTIExists ? tiExistsStyle : {}}>{textual_inversion}</Box>
+      <Box width={2} height={2} borderRadius={9999} backgroundColor={color}>
+        {' '}
+      </Box>
+    );
+  };
+
+  const renderTextualInversionOption = (textual_inversion: string) => {
+    return (
+      <Flex alignItems="center" columnGap={1}>
+        {textual_inversion}
+        {textualInversionsInUse.includes(textual_inversion) && (
+          <TIPip color="var(--context-menu-active-item)" />
+        )}
+        {negativeTextualInversionsInUse.includes(textual_inversion) && (
+          <TIPip color="var(--status-bad-color)" />
+        )}
+      </Flex>
     );
   };
 
@@ -56,8 +82,10 @@ export default function TextualInversionManager() {
     const allTextualInversions = localTextualInversionTriggers.concat(
       huggingFaceTextualInversionConcepts
     );
-    return allTextualInversions.filter((ti) =>
-      textualInversionsInUse.includes(ti)
+    return allTextualInversions.filter(
+      (ti) =>
+        textualInversionsInUse.includes(ti) ||
+        negativeTextualInversionsInUse.includes(ti)
     ).length;
   };
 
@@ -93,13 +121,34 @@ export default function TextualInversionManager() {
       (foundHuggingFaceTextualInversionTriggers &&
         foundHuggingFaceTextualInversionTriggers?.length > 0 &&
         shouldShowHuggingFaceConcepts)) ? (
-    <IAISimpleMenu
-      menuItems={makeTextualInversionItems()}
-      menuType="regular"
-      buttonText={`${t(
-        'modelManager.addTextualInversionTrigger'
-      )} (${numOfActiveTextualInversions()})`}
-    />
+    <Flex columnGap={2}>
+      <IAISimpleMenu
+        menuItems={makeTextualInversionItems()}
+        menuType="regular"
+        buttonText={`${t(
+          'modelManager.addTextualInversionTrigger'
+        )} (${numOfActiveTextualInversions()})`}
+        menuButtonProps={{
+          width: '100%',
+          padding: '0 1rem',
+        }}
+      />
+      <IAIIconButton
+        icon={<MdArrowDownward />}
+        style={{
+          backgroundColor: addTIToNegative ? 'var(--btn-delete-image)' : '',
+        }}
+        tooltip={t('modelManager.addTIToNegative')}
+        aria-label={t('modelManager.addTIToNegative')}
+        onClick={() => dispatch(setAddTIToNegative(!addTIToNegative))}
+      />
+      <IAIIconButton
+        icon={<MdClear />}
+        tooltip={t('modelManager.clearTextualInversions')}
+        aria-label={t('modelManager.clearTextualInversions')}
+        onClick={() => dispatch(setClearTextualInversions())}
+      />
+    </Flex>
   ) : (
     <Box
       background="var(--btn-base-color)"
