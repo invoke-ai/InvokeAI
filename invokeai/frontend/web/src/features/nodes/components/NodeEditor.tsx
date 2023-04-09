@@ -58,7 +58,7 @@ const NodeEditor = () => {
       <Menu>
         <MenuButton
           as={IconButton}
-          aria-label="Options"
+          aria-label="Add Node"
           icon={<FaPlus />}
           sx={{ position: 'absolute', top: 2, left: 2 }}
         />
