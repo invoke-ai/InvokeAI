@@ -17,9 +17,9 @@ import { FaPlus } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { nodeAdded } from '../store/nodesSlice';
 import { Flow } from './Flow';
-import { FIELDS } from '../types';
 import { map } from 'lodash';
 import { RootState } from 'app/store';
+import { FIELDS } from '../constants';
 
 const NodeEditor = () => {
   const dispatch = useAppDispatch();

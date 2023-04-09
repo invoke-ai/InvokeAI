@@ -1,3 +1,4 @@
+import { Box } from '@chakra-ui/react';
 import { InputField } from '../types';
 import { BooleanInputFieldComponent } from './fields/BooleanInputFieldComponent';
 import { EnumInputFieldComponent } from './fields/EnumInputFieldComponent';
@@ -39,4 +40,6 @@ export const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'latents') {
     return <LatentsInputFieldComponent nodeId={nodeId} field={field} />;
   }
+
+  return <Box p={2}>Unknown field type: {type}</Box>;
 };

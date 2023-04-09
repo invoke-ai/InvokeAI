@@ -82,7 +82,12 @@ const nodesSlice = createSlice({
   },
 });
 
-export const { nodesChanged, edgesChanged, nodeAdded, fieldValueChanged } =
-  nodesSlice.actions;
+export const {
+  nodesChanged,
+  edgesChanged,
+  nodeAdded,
+  fieldValueChanged,
+  connectionMade,
+} = nodesSlice.actions;
 
 export default nodesSlice.reducer;

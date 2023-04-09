@@ -1,9 +1,9 @@
 import { reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
+import { FIELD_TYPE_MAP } from '../constants';
 import {
   BooleanInputField,
   EnumInputField,
-  FIELD_TYPE_MAP,
   FloatInputField,
   ImageInputField,
   IntegerInputField,

@@ -1,20 +1,29 @@
 import { Tooltip } from '@chakra-ui/react';
-import { Handle, Position } from 'reactflow';
-import { FIELDS, InputField } from '../types';
+import { Handle, Position, Connection } from 'reactflow';
+import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../constants';
+import { InputField } from '../types';
 
 type InputHandleProps = {
   nodeId: string;
   field: InputField;
+  isValidConnection: (connection: Connection) => boolean;
 };
 
 export const InputHandle = (props: InputHandleProps) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, isValidConnection } = props;
   const { name, title, type, description } = field;
   return (
-    <Tooltip key={name} label={`${title} (${type})`} placement="start" hasArrow>
+    <Tooltip
+      key={name}
+      label={`${title} (${type})`}
+      placement="start"
+      hasArrow
+      openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
+    >
       <Handle
         type="target"
         id={name}
+        isValidConnection={isValidConnection}
         position={Position.Left}
         style={{
           position: 'absolute',

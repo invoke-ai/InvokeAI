@@ -1,4 +1,4 @@
-import { NodeProps } from 'reactflow';
+import { Connection, Edge, NodeProps, useReactFlow } from 'reactflow';
 import {
   Box,
   Flex,
@@ -15,10 +15,56 @@ import { InputFieldComponent } from './InputFieldComponent';
 import { OutputHandle } from './OutputHandle';
 import { InputHandle } from './InputHandle';
 import { map, size } from 'lodash';
+import { memo, useCallback } from 'react';
 
-export const InvocationComponent = (props: NodeProps<Invocation>) => {
+export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
   const { id, data, selected } = props;
   const { type, title, description, inputs, outputs } = data;
+
+  const flow = useReactFlow();
+
+  // Check if an in-progress connection is valid
+  const isValidConnection = useCallback(
+    (connection: Connection): boolean => {
+      const edges = flow.getEdges();
+
+      // Connection is invalid if target already has a connection
+      if (
+        edges.find((edge) => {
+          return (
+            edge.target === connection.target &&
+            edge.targetHandle === connection.targetHandle
+          );
+        })
+      ) {
+        return false;
+      }
+
+      // Find the source and target nodes...
+      if (connection.source && connection.target) {
+        const sourceNode = flow.getNode(connection.source);
+        const targetNode = flow.getNode(connection.target);
+
+        // Conditional guards against undefined nodes/handles
+        if (
+          sourceNode &&
+          targetNode &&
+          connection.sourceHandle &&
+          connection.targetHandle
+        ) {
+          // connection types must be the same for a connection
+          return (
+            sourceNode.data.outputs[connection.sourceHandle].type ===
+            targetNode.data.inputs[connection.targetHandle].type
+          );
+        }
+      }
+
+      // Default to invalid
+      return false;
+    },
+    [flow]
+  );
 
   return (
     <Box
@@ -65,9 +111,13 @@ export const InvocationComponent = (props: NodeProps<Invocation>) => {
                       <Icon color="base.400" as={FaInfoCircle} />
                     </Tooltip>
                   </HStack>
-                  {InputFieldComponent({ nodeId: id, field: input })}
+                  <InputFieldComponent nodeId={id} field={input} />
                 </FormControl>
-                {InputHandle({ nodeId: id, field: input })}
+                <InputHandle
+                  nodeId={id}
+                  field={input}
+                  isValidConnection={isValidConnection}
+                />
               </Box>
             );
           })}
@@ -75,8 +125,18 @@ export const InvocationComponent = (props: NodeProps<Invocation>) => {
       </Flex>
       {map(outputs).map((output, i) => {
         const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
-        return OutputHandle({ nodeId: id, field: output, top });
+        return (
+          <OutputHandle
+            key={output.name}
+            nodeId={id}
+            field={output}
+            isValidConnection={isValidConnection}
+            top={top}
+          />
+        );
       })}
     </Box>
   );
-};
+});
+
+InvocationComponent.displayName = 'InvocationComponent';
