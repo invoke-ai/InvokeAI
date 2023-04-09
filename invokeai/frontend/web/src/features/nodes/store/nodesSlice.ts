@@ -9,7 +9,7 @@ import {
   EdgeChange,
   Node,
   NodeChange,
-  NodeTypes,
+  OnConnectStartParams,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { Invocation } from '../types';
@@ -20,6 +20,7 @@ export type NodesState = {
   edges: Edge[];
   schema: OpenAPIV3.Document | null;
   invocations: Record<string, Invocation>;
+  pendingConnection: OnConnectStartParams | null;
 };
 
 export const initialNodesState: NodesState = {
@@ -27,6 +28,7 @@ export const initialNodesState: NodesState = {
   edges: [],
   schema: null,
   invocations: {},
+  pendingConnection: null,
 };
 
 const nodesSlice = createSlice({
@@ -54,8 +56,14 @@ const nodesSlice = createSlice({
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
     },
+    connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
+      state.pendingConnection = action.payload;
+    },
     connectionMade: (state, action: PayloadAction<Connection>) => {
       state.edges = addEdge(action.payload, state.edges);
+    },
+    connectionEnded: (state) => {
+      state.pendingConnection = null;
     },
     fieldValueChanged: (
       state,
@@ -88,6 +96,8 @@ export const {
   nodeAdded,
   fieldValueChanged,
   connectionMade,
+  connectionStarted,
+  connectionEnded,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

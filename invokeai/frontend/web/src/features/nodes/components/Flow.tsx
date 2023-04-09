@@ -8,11 +8,14 @@ import {
   ReactFlow,
   ConnectionLineType,
   OnConnectStart,
+  OnConnectEnd,
 } from 'reactflow';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import {
+  connectionEnded,
   connectionMade,
+  connectionStarted,
   edgesChanged,
   nodesChanged,
 } from '../store/nodesSlice';
@@ -40,17 +43,26 @@ export const Flow = () => {
     [dispatch]
   );
 
-  const onConnect: OnConnect = useCallback(
-    (changes) => {
-      console.log('connect');
-      dispatch(connectionMade(changes));
+  const onConnectStart: OnConnectStart = useCallback(
+    (event, params) => {
+      dispatch(connectionStarted(params));
     },
     [dispatch]
   );
 
-  const onConnectStart: OnConnectStart = useCallback((changes) => {
-    console.log('connect start');
-  }, []);
+  const onConnect: OnConnect = useCallback(
+    (connection) => {
+      dispatch(connectionMade(connection));
+    },
+    [dispatch]
+  );
+
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (event) => {
+      dispatch(connectionEnded());
+    },
+    [dispatch]
+  );
 
   return (
     <ReactFlow
@@ -59,8 +71,9 @@ export const Flow = () => {
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
       onConnectStart={onConnectStart}
+      onConnect={onConnect}
+      onConnectEnd={onConnectEnd}
       connectionLineType={ConnectionLineType.SmoothStep}
       defaultEdgeOptions={{ type: 'smoothstep' }}
     >

@@ -1,4 +1,4 @@
-import { Connection, Edge, NodeProps, useReactFlow } from 'reactflow';
+import { Connection, NodeProps, useReactFlow } from 'reactflow';
 import {
   Box,
   Flex,
@@ -12,8 +12,7 @@ import {
 import { FaInfoCircle } from 'react-icons/fa';
 import { Invocation } from '../types';
 import { InputFieldComponent } from './InputFieldComponent';
-import { OutputHandle } from './OutputHandle';
-import { InputHandle } from './InputHandle';
+import { FieldHandle } from './FieldHandle';
 import { map, size } from 'lodash';
 import { memo, useCallback } from 'react';
 
@@ -73,6 +72,8 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
         bg: 'base.800',
         borderRadius: 'md',
         boxShadow: 'dark-lg',
+        borderWidth: 2,
+        borderColor: selected ? 'base.400' : 'transparent',
       }}
     >
       <Flex flexDirection="column" gap={2}>
@@ -113,28 +114,33 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
                   </HStack>
                   <InputFieldComponent nodeId={id} field={input} />
                 </FormControl>
-                <InputHandle
+                <FieldHandle
                   nodeId={id}
                   field={input}
                   isValidConnection={isValidConnection}
+                  handleType="target"
                 />
               </Box>
             );
           })}
         </>
       </Flex>
-      {map(outputs).map((output, i) => {
-        const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
-        return (
-          <OutputHandle
-            key={output.name}
-            nodeId={id}
-            field={output}
-            isValidConnection={isValidConnection}
-            top={top}
-          />
-        );
-      })}
+      <Flex>
+        {map(outputs).map((output, i) => {
+          const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
+
+          return (
+            <FieldHandle
+              key={i}
+              nodeId={id}
+              field={output}
+              isValidConnection={isValidConnection}
+              handleType="source"
+              styles={{ top }}
+            />
+          );
+        })}
+      </Flex>
     </Box>
   );
 });
