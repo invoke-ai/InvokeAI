@@ -11,11 +11,10 @@ import {
 } from '@chakra-ui/react';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Invocation } from '../types';
-import { buildFieldComponent } from '../util/buildFieldComponent';
-import {
-  buildInputHandleComponent,
-  buildOutputHandleComponent,
-} from '../util/buildHandleComponent';
+import { InputFieldComponent } from './InputFieldComponent';
+import { OutputHandle } from './OutputHandle';
+import { InputHandle } from './InputHandle';
+import { map, size } from 'lodash';
 
 export const InvocationComponent = (props: NodeProps<Invocation>) => {
   const { id, data, selected } = props;
@@ -45,7 +44,7 @@ export const InvocationComponent = (props: NodeProps<Invocation>) => {
               <Icon color="base.300" as={FaInfoCircle} />
             </Tooltip>
           </HStack>
-          {inputs.map((input, i) => {
+          {map(inputs, (input, i) => {
             return (
               <Box
                 key={i}
@@ -66,17 +65,17 @@ export const InvocationComponent = (props: NodeProps<Invocation>) => {
                       <Icon color="base.400" as={FaInfoCircle} />
                     </Tooltip>
                   </HStack>
-                  {buildFieldComponent(id, input)}
+                  {InputFieldComponent({ nodeId: id, field: input })}
                 </FormControl>
-                {buildInputHandleComponent(id, input)}
+                {InputHandle({ nodeId: id, field: input })}
               </Box>
             );
           })}
         </>
       </Flex>
-      {outputs.map((output, i) => {
-        const top = `${(100 / (outputs.length + 1)) * (i + 1)}%`;
-        return buildOutputHandleComponent(id, output, top);
+      {map(outputs).map((output, i) => {
+        const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
+        return OutputHandle({ nodeId: id, field: output, top });
       })}
     </Box>
   );

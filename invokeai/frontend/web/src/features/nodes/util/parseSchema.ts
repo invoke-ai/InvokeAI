@@ -1,4 +1,4 @@
-import { filter } from 'lodash';
+import { filter, reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
 import {
   InputField,
@@ -38,29 +38,32 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
         .split(/(?=[A-Z])/) // split PascalCase into array
         .join(' ');
 
-      // `type` and `id` are not valid inputs/outputs
-      const rawInputs = filter(
+      const inputs = reduce(
         schema.properties,
-        (prop, key) => !['type', 'id'].includes(key) && isSchemaObject(prop)
-      ) as OpenAPIV3.SchemaObject[];
+        (inputsAccumulator, property, propertyName) => {
+          if (
+            // `type` and `id` are not valid inputs/outputs
+            !['type', 'id'].includes(propertyName) &&
+            isSchemaObject(property)
+          ) {
+            const field = buildInputField(property, propertyName);
 
-      const inputs: InputField[] = [];
+            if (field) {
+              inputsAccumulator[propertyName] = field;
+            }
+          }
+          return inputsAccumulator;
+        },
+        {} as Record<string, InputField>
+      );
 
-      rawInputs.forEach((input) => {
-        const field = buildInputField(input);
-        if (field) {
-          inputs.push(field);
-        }
-      });
-
-      // `type` and `id` are not valid inputs/outputs
-      const rawOutputs = (
+      const rawOutput = (
         schema as OpenAPIV3.SchemaObject & {
           output: OpenAPIV3.ReferenceObject;
         }
       ).output;
 
-      const outputs = buildOutputFields(rawOutputs, openAPI);
+      const outputs = buildOutputFields(rawOutput, openAPI);
 
       const invocation: Invocation = {
         title,

@@ -16,7 +16,7 @@ import { Invocation } from '../types';
 import { parseSchema } from '../util/parseSchema';
 
 export type NodesState = {
-  nodes: Node[];
+  nodes: Node<Invocation>[];
   edges: Edge[];
   schema: OpenAPIV3.Document | null;
   invocations: Record<string, Invocation>;
@@ -57,6 +57,21 @@ const nodesSlice = createSlice({
     connectionMade: (state, action: PayloadAction<Connection>) => {
       state.edges = addEdge(action.payload, state.edges);
     },
+    fieldValueChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fieldId: string;
+        value: string | number | boolean | undefined;
+      }>
+    ) => {
+      const { nodeId, fieldId, value } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      if (nodeIndex > -1) {
+        state.nodes[nodeIndex].data.inputs[fieldId].value = value;
+      }
+    },
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
@@ -67,6 +82,7 @@ const nodesSlice = createSlice({
   },
 });
 
-export const { nodesChanged, edgesChanged, nodeAdded } = nodesSlice.actions;
+export const { nodesChanged, edgesChanged, nodeAdded, fieldValueChanged } =
+  nodesSlice.actions;
 
 export default nodesSlice.reducer;

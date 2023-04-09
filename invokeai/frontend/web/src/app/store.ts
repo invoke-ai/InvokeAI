@@ -71,8 +71,8 @@ const lightboxBlacklist = ['isLightboxOpen'].map(
   (blacklistItem) => `lightbox.${blacklistItem}`
 );
 
-const apiBlacklist = ['sessionId', 'status', 'progress', 'progressImage'].map(
-  (blacklistItem) => `api.${blacklistItem}`
+const nodesBlacklist = ['schema', 'invocations'].map(
+  (blacklistItem) => `nodes.${blacklistItem}`
 );
 
 const rootReducer = combineReducers({
@@ -98,7 +98,7 @@ const rootPersistConfig = getPersistConfig({
     ...systemBlacklist,
     ...galleryBlacklist,
     ...lightboxBlacklist,
-    ...apiBlacklist,
+    ...nodesBlacklist,
     'results',
     'uploads',
     // 'nodes',

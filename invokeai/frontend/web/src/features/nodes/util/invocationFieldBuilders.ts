@@ -1,4 +1,4 @@
-import { filter } from 'lodash';
+import { reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
 import {
   BooleanInputField,
@@ -26,12 +26,15 @@ export const refObjectToFieldType = (
 ): keyof typeof FIELD_TYPE_MAP => refObject.$ref.split('/').slice(-1)[0];
 
 const buildIntegerInputField = (
-  input: OpenAPIV3.SchemaObject
+  input: OpenAPIV3.SchemaObject,
+  name: string
 ): IntegerInputField => {
   const field: IntegerInputField = {
     type: 'integer',
+    name,
     title: input.title ?? '',
     description: input.description ?? '',
+    value: input.default ?? 0,
   };
 
   if (input.multipleOf !== undefined) {
@@ -58,12 +61,15 @@ const buildIntegerInputField = (
 };
 
 const buildFloatInputField = (
-  input: OpenAPIV3.SchemaObject
+  input: OpenAPIV3.SchemaObject,
+  name: string
 ): FloatInputField => {
   const field: FloatInputField = {
     type: 'float',
+    name,
     title: input.title ?? '',
     description: input.description ?? '',
+    value: input.default ?? 0,
   };
 
   if (input.multipleOf !== undefined) {
@@ -90,12 +96,15 @@ const buildFloatInputField = (
 };
 
 const buildStringInputField = (
-  input: OpenAPIV3.SchemaObject
+  input: OpenAPIV3.SchemaObject,
+  name: string
 ): StringInputField => {
   const field: StringInputField = {
     type: 'string',
+    name,
     title: input.title ?? '',
     description: input.description ?? '',
+    value: input.default ?? '',
   };
 
   if (input.minLength !== undefined) {
@@ -114,45 +123,59 @@ const buildStringInputField = (
 };
 
 const buildBooleanInputField = (
-  input: OpenAPIV3.SchemaObject
+  input: OpenAPIV3.SchemaObject,
+  name: string
 ): BooleanInputField => {
   const field: BooleanInputField = {
     type: 'boolean',
+    name,
     title: input.title ?? '',
     description: input.description ?? '',
+    value: input.default ?? false,
   };
 
   return field;
 };
 
 const buildImageInputField = (
-  input: OpenAPIV3.SchemaObject
+  input: OpenAPIV3.SchemaObject,
+  name: string
 ): ImageInputField => {
   const field: ImageInputField = {
     type: 'image',
+    name,
     title: input.title ?? '',
     description: input.description ?? '',
+    value: input.default ?? '',
   };
 
   return field;
 };
 
 const buildLatentsInputField = (
-  input: OpenAPIV3.SchemaObject
+  input: OpenAPIV3.SchemaObject,
+  name: string
 ): LatentsInputField => {
   const field: LatentsInputField = {
     type: 'latents',
+    name,
     title: input.title ?? '',
     description: input.description ?? '',
+    value: input.default ?? '',
   };
 
   return field;
 };
 
-const buildEnumInputField = (input: OpenAPIV3.SchemaObject): EnumInputField => {
+const buildEnumInputField = (
+  input: OpenAPIV3.SchemaObject,
+  name: string
+): EnumInputField => {
   const field: EnumInputField = {
     type: 'enum',
+    name,
     title: input.title ?? '',
+    value: input.default,
     enumType: (input.type as 'string' | 'number') ?? 'string', // TODO: dangerous?
     options: input.enum ?? [],
     description: input.description ?? '',
@@ -166,7 +189,10 @@ const buildEnumInputField = (input: OpenAPIV3.SchemaObject): EnumInputField => {
  * @param schemaObject The schema object
  * @returns An input field
  */
-export const buildInputField = (schemaObject: OpenAPIV3.SchemaObject) => {
+export const buildInputField = (
+  schemaObject: OpenAPIV3.SchemaObject,
+  name: string
+) => {
   if (!schemaObject.type) {
     // the this input/output is a ref! extract the ref string
     const rawType = refObjectToFieldType(
@@ -176,26 +202,26 @@ export const buildInputField = (schemaObject: OpenAPIV3.SchemaObject) => {
     const fieldType = FIELD_TYPE_MAP[rawType];
 
     if (fieldType === 'image') {
-      return buildImageInputField(schemaObject);
+      return buildImageInputField(schemaObject, name);
     }
     if (fieldType === 'latents') {
-      return buildLatentsInputField(schemaObject);
+      return buildLatentsInputField(schemaObject, name);
     }
   }
   if (schemaObject.enum) {
-    return buildEnumInputField(schemaObject);
+    return buildEnumInputField(schemaObject, name);
   }
   if (schemaObject.type === 'integer') {
-    return buildIntegerInputField(schemaObject);
+    return buildIntegerInputField(schemaObject, name);
   }
   if (schemaObject.type === 'number') {
-    return buildFloatInputField(schemaObject);
+    return buildFloatInputField(schemaObject, name);
   }
   if (schemaObject.type === 'string') {
-    return buildStringInputField(schemaObject);
+    return buildStringInputField(schemaObject, name);
   }
   if (schemaObject.type === 'boolean') {
-    return buildBooleanInputField(schemaObject);
+    return buildBooleanInputField(schemaObject, name);
   }
 
   return;
@@ -205,47 +231,53 @@ export const buildInputField = (schemaObject: OpenAPIV3.SchemaObject) => {
  * Builds invocation output fields from an invocation's output reference object.
  * @param openAPI The OpenAPI schema
  * @param refObject The output reference object
- * @returns An array of outputs
+ * @returns A record of outputs
  */
 export const buildOutputFields = (
   refObject: OpenAPIV3.ReferenceObject,
   openAPI: OpenAPIV3.Document
-): OutputField[] => {
+): Record<string, OutputField> => {
   // extract output schema name from ref
   const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
 
   // get the output schema itself
   const outputSchema = openAPI.components!.schemas![outputSchemaName];
 
-  // filter out 'type' properties of the schema
-  const filteredProperties = filter(
-    (outputSchema as OpenAPIV3.SchemaObject).properties,
-    (prop, key) => key !== 'type'
-  );
+  if (isSchemaObject(outputSchema)) {
+    const outputFields = reduce(
+      outputSchema.properties as OpenAPIV3.SchemaObject,
+      (outputsAccumulator, property, propertyName) => {
+        if (
+          !['type', 'id'].includes(propertyName) &&
+          isSchemaObject(property)
+        ) {
+          let rawType: string;
 
-  const outputFields: OutputField[] = [];
+          if (property.allOf) {
+            // we need to parse the ref to get the actual output field types
+            rawType = refObjectToFieldType(
+              property.allOf[0] as OpenAPIV3.ReferenceObject
+            );
+          } else {
+            // we can just use the property's type
+            rawType = property.type!;
+          }
 
-  filteredProperties.forEach((property) => {
-    if (isSchemaObject(property)) {
-      // we need to parse the ref to get the actual output field types
-      let rawType: string;
+          outputsAccumulator[propertyName] = {
+            name: propertyName,
+            title: property.title ?? '',
+            description: property.description ?? '',
+            type: FIELD_TYPE_MAP[rawType],
+          };
+        }
 
-      if (property.allOf) {
-        rawType = refObjectToFieldType(
-          property.allOf[0] as OpenAPIV3.ReferenceObject
-        );
-      } else {
-        // we can just use the property's type
-        rawType = property.type!;
-      }
+        return outputsAccumulator;
+      },
+      {} as Record<string, OutputField>
+    );
 
-      outputFields.push({
-        title: property.title ?? '',
-        description: property.description ?? '',
-        type: FIELD_TYPE_MAP[rawType],
-      });
-    }
-  });
+    return outputFields;
+  }
 
-  return outputFields;
+  return {};
 };
