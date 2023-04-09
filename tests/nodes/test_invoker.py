@@ -24,10 +24,11 @@ def mock_services() -> InvocationServices:
         model_manager = None, # type: ignore
         events = TestEventService(),
         images = None, # type: ignore
+        latents = None, # type: ignore
         queue = MemoryInvocationQueue(),
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
         processor = DefaultInvocationProcessor(),
-        restoration = None,
+        restoration = None, # type: ignore
     )
 
 @pytest.fixture()

@@ -9,6 +9,7 @@ from queue import Queue
 from typing import Dict
 
 from PIL.Image import Image
+from invokeai.app.util.save_thumbnail import save_thumbnail
 
 from invokeai.backend.image_util import PngWriter
 
@@ -66,6 +67,9 @@ class DiskImageStorage(ImageStorageBase):
             Path(os.path.join(output_folder, image_type)).mkdir(
                 parents=True, exist_ok=True
             )
+            Path(os.path.join(output_folder, image_type, "thumbnails")).mkdir(
+                parents=True, exist_ok=True
+            )
 
     def get(self, image_type: ImageType, image_name: str) -> Image:
         image_path = self.get_path(image_type, image_name)
@@ -87,7 +91,11 @@ class DiskImageStorage(ImageStorageBase):
         self.__pngWriter.save_image_and_prompt_to_png(
             image, "", image_subpath, None
         )  # TODO: just pass full path to png writer
-
+        save_thumbnail(
+            image=image,
+            filename=image_name,
+            path=os.path.join(self.__output_folder, image_type, "thumbnails"),
+        )
         image_path = self.get_path(image_type, image_name)
         self.__set_cache(image_path, image)
 

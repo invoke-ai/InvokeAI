@@ -158,14 +158,9 @@ def main():
         report_model_error(opt, e)
 
     # try to autoconvert new models
-    if path := opt.autoimport:
-        gen.model_manager.heuristic_import(
-            str(path), convert=False, commit_to_conf=opt.conf
-        )
-
     if path := opt.autoconvert:
         gen.model_manager.heuristic_import(
-            str(path), convert=True, commit_to_conf=opt.conf
+            str(path), commit_to_conf=opt.conf
         )
 
     # web server loops forever
@@ -581,6 +576,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
 
     elif command.startswith("!replay"):
         file_path = command.replace("!replay", "", 1).strip()
+        file_path = os.path.join(opt.outdir, file_path)
         if infile is None and os.path.isfile(file_path):
             infile = open(file_path, "r", encoding="utf-8")
         completer.add_history(command)
@@ -626,7 +622,7 @@ def set_default_output_dir(opt: Args, completer: Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def import_model(model_path: str, gen, opt, completer, convert=False):
+def import_model(model_path: str, gen, opt, completer):
     """
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path;
     (3) a huggingface repository id; or (4) a local directory containing a
@@ -657,7 +653,6 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
         model_path,
         model_name=model_name,
         description=model_desc,
-        convert=convert,
     )
 
     if not imported_name:
@@ -666,7 +661,6 @@ def import_model(model_path: str, gen, opt, completer, convert=False):
                 model_path,
                 model_name=model_name,
                 description=model_desc,
-                convert=convert,
                 model_config_file=config_file,
             )
     if not imported_name:
@@ -757,7 +751,6 @@ def _get_model_name_and_desc(
     )
     return model_name, model_description
 
-
 def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
     model_name_or_path = model_name_or_path.replace("\\", "/")  # windows
     manager = gen.model_manager
@@ -788,7 +781,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
         )
     else:
         try:
-            import_model(model_name_or_path, gen, opt, completer, convert=True)
+            import_model(model_name_or_path, gen, opt, completer)
         except KeyboardInterrupt:
             return
 
