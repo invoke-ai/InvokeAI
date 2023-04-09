@@ -24,11 +24,13 @@ export type Invocation = {
   /**
    * Array of invocation inputs
    */
-  inputs: InputField[];
+  inputs: Record<string, InputField>;
+  // inputs: InputField[];
   /**
    * Array of the invocation outputs
    */
-  outputs: OutputField[];
+  outputs: Record<string, OutputField>;
+  // outputs: OutputField[];
 };
 
 export const FIELD_TYPE_MAP: Record<string, FieldType> = {
@@ -106,6 +108,7 @@ export type InputField =
 export type OutputField = FieldBase;
 
 export type FieldBase = {
+  name: string;
   title: string;
   description: string;
   type: FieldType;
