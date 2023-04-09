@@ -10,7 +10,7 @@ import {
   LatentsInputField,
   OutputField,
   StringInputField,
-  _isSchemaObject,
+  isSchemaObject,
 } from '../types';
 
 /**
@@ -226,7 +226,7 @@ export const buildOutputFields = (
   const outputFields: OutputField[] = [];
 
   filteredProperties.forEach((property) => {
-    if (_isSchemaObject(property)) {
+    if (isSchemaObject(property)) {
       // we need to parse the ref to get the actual output field types
       let rawType: string;
 
