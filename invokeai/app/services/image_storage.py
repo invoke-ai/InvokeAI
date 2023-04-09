@@ -2,22 +2,23 @@
 
 import datetime
 import os
+from glob import glob
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 from queue import Queue
-from typing import Dict
+from typing import Callable, Dict, List
 
 from PIL.Image import Image
+import PIL.Image as PILImage
+from pydantic import BaseModel
+from invokeai.app.api.models.images import ImageResponse
+from invokeai.app.models.image import ImageField, ImageType
+from invokeai.app.models.metadata import ImageMetadata
+from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.save_thumbnail import save_thumbnail
 
 from invokeai.backend.image_util import PngWriter
-
-
-class ImageType(str, Enum):
-    RESULT = "results"
-    INTERMEDIATE = "intermediates"
-    UPLOAD = "uploads"
 
 
 class ImageStorageBase(ABC):
@@ -27,9 +28,17 @@ class ImageStorageBase(ABC):
     def get(self, image_type: ImageType, image_name: str) -> Image:
         pass
 
+    @abstractmethod
+    def list(
+        self, image_type: ImageType, page: int = 0, per_page: int = 10
+    ) -> PaginatedResults[ImageResponse]:
+        pass
+
     # TODO: make this a bit more flexible for e.g. cloud storage
     @abstractmethod
-    def get_path(self, image_type: ImageType, image_name: str) -> str:
+    def get_path(
+        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+    ) -> str:
         pass
 
     @abstractmethod
@@ -71,19 +80,74 @@ class DiskImageStorage(ImageStorageBase):
                 parents=True, exist_ok=True
             )
 
+    def list(
+        self, image_type: ImageType, page: int = 0, per_page: int = 10
+    ) -> PaginatedResults[ImageResponse]:
+        dir_path = os.path.join(self.__output_folder, image_type)
+        image_paths = glob(f"{dir_path}/*.png")
+        count = len(image_paths)
+
+        sorted_image_paths = sorted(
+            glob(f"{dir_path}/*.png"), key=os.path.getctime, reverse=True
+        )
+
+        page_of_image_paths = sorted_image_paths[
+            page * per_page : (page + 1) * per_page
+        ]
+
+        page_of_images: List[ImageResponse] = []
+
+        for path in page_of_image_paths:
+            filename = os.path.basename(path)
+            img = PILImage.open(path)
+            page_of_images.append(
+                ImageResponse(
+                    image_type=image_type.value,
+                    image_name=filename,
+                    # TODO: DiskImageStorage should not be building URLs...?
+                    image_url=f"api/v1/images/{image_type.value}/{filename}",
+                    thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
+                    # TODO: Creation of this object should happen elsewhere, just making it fit here so it works
+                    metadata=ImageMetadata(
+                        timestamp=os.path.getctime(path),
+                        width=img.width,
+                        height=img.height,
+                    ),
+                )
+            )
+
+        page_count_trunc = int(count / per_page)
+        page_count_mod = count % per_page
+        page_count = page_count_trunc if page_count_mod == 0 else page_count_trunc + 1
+
+        return PaginatedResults[ImageResponse](
+            items=page_of_images,
+            page=page,
+            pages=page_count,
+            per_page=per_page,
+            total=count,
+        )
+
     def get(self, image_type: ImageType, image_name: str) -> Image:
         image_path = self.get_path(image_type, image_name)
         cache_item = self.__get_cache(image_path)
         if cache_item:
             return cache_item
 
-        image = Image.open(image_path)
+        image = PILImage.open(image_path)
         self.__set_cache(image_path, image)
         return image
 
     # TODO: make this a bit more flexible for e.g. cloud storage
-    def get_path(self, image_type: ImageType, image_name: str) -> str:
-        path = os.path.join(self.__output_folder, image_type, image_name)
+    def get_path(
+        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+    ) -> str:
+        if is_thumbnail:
+            path = os.path.join(
+                self.__output_folder, image_type, "thumbnails", image_name
+            )
+        else:
+            path = os.path.join(self.__output_folder, image_type, image_name)
         return path
 
     def save(self, image_type: ImageType, image_name: str, image: Image) -> None:
@@ -101,11 +165,18 @@ class DiskImageStorage(ImageStorageBase):
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         image_path = self.get_path(image_type, image_name)
+        thumbnail_path = self.get_path(image_type, image_name, True)
         if os.path.exists(image_path):
             os.remove(image_path)
 
         if image_path in self.__cache:
             del self.__cache[image_path]
+
+        if os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
+
+        if thumbnail_path in self.__cache:
+            del self.__cache[thumbnail_path]
 
     def __get_cache(self, image_name: str) -> Image:
         return None if image_name not in self.__cache else self.__cache[image_name]

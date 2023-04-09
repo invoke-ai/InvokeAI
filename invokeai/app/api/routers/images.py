@@ -1,17 +1,19 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from datetime import datetime, timezone
+import uuid
 
-from fastapi import Path, Request, UploadFile
+from fastapi import Path, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRouter
 from PIL import Image
+from invokeai.app.api.models.images import ImageResponse
+from invokeai.app.services.item_storage import PaginatedResults
 
 from ...services.image_storage import ImageType
 from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
-
 
 @images_router.get("/{image_type}/{image_name}", operation_id="get_image")
 async def get_image(
@@ -53,14 +55,30 @@ async def upload_image(file: UploadFile, request: Request):
         # Error opening the image
         return Response(status_code=415)
 
-    filename = f"{str(int(datetime.now(timezone.utc).timestamp()))}.png"
+    filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
     ApiDependencies.invoker.services.images.save(ImageType.UPLOAD, filename, im)
 
     return Response(
         status_code=201,
         headers={
             "Location": request.url_for(
-                "get_image", image_type=ImageType.UPLOAD, image_name=filename
+                "get_image", image_type=ImageType.UPLOAD.value, image_name=filename
             )
         },
     )
+
+@images_router.get(
+    "/",
+    operation_id="list_images",
+    responses={200: {"model": PaginatedResults[ImageResponse]}},
+)
+async def list_images(
+    image_type: ImageType = Query(default=ImageType.RESULT, description="The type of images to get"),
+    page: int = Query(default=0, description="The page of images to get"),
+    per_page: int = Query(default=10, description="The number of images per page"),
+) -> PaginatedResults[ImageResponse]:
+    """Gets a list of images"""
+    result = ApiDependencies.invoker.services.images.list(
+        image_type, page, per_page
+    )
+    return result
