@@ -2,13 +2,20 @@ import {
   Background,
   Controls,
   MiniMap,
+  OnConnect,
   OnEdgesChange,
   OnNodesChange,
   ReactFlow,
+  ConnectionLineType,
+  OnConnectStart,
 } from 'reactflow';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
-import { edgesChanged, nodesChanged } from '../store/nodesSlice';
+import {
+  connectionMade,
+  edgesChanged,
+  nodesChanged,
+} from '../store/nodesSlice';
 import { useCallback } from 'react';
 import { InvocationComponent } from './InvocationComponent';
 
@@ -20,14 +27,30 @@ export const Flow = () => {
   const edges = useAppSelector((state: RootState) => state.nodes.edges);
 
   const onNodesChange: OnNodesChange = useCallback(
-    (changes) => dispatch(nodesChanged(changes)),
+    (changes) => {
+      dispatch(nodesChanged(changes));
+    },
     [dispatch]
   );
 
   const onEdgesChange: OnEdgesChange = useCallback(
-    (changes) => dispatch(edgesChanged(changes)),
+    (changes) => {
+      dispatch(edgesChanged(changes));
+    },
     [dispatch]
   );
+
+  const onConnect: OnConnect = useCallback(
+    (changes) => {
+      console.log('connect');
+      dispatch(connectionMade(changes));
+    },
+    [dispatch]
+  );
+
+  const onConnectStart: OnConnectStart = useCallback((changes) => {
+    console.log('connect start');
+  }, []);
 
   return (
     <ReactFlow
@@ -36,6 +59,10 @@ export const Flow = () => {
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onConnectStart={onConnectStart}
+      connectionLineType={ConnectionLineType.SmoothStep}
+      defaultEdgeOptions={{ type: 'smoothstep' }}
     >
       <Background />
       <Controls />
