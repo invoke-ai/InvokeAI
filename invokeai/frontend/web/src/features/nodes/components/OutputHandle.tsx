@@ -10,17 +10,12 @@ type OutputHandleProps = {
 
 export const OutputHandle = (props: OutputHandleProps) => {
   const { nodeId, field, top } = props;
-  const { title, type, description } = field;
+  const { name, title, type, description } = field;
   return (
-    <Tooltip
-      key={type}
-      label={`${title}: ${description}`}
-      placement="end"
-      hasArrow
-    >
+    <Tooltip key={name} label={`${title} (${type})`} placement="end" hasArrow>
       <Handle
         type="target"
-        id={type}
+        id={name}
         position={Position.Right}
         style={{
           position: 'absolute',
