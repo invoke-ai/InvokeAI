@@ -12,14 +12,14 @@ import {
   NodeTypes,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
-import { _Invocation } from '../types';
+import { Invocation } from '../types';
 import { parseSchema } from '../util/parseSchema';
 
 export type NodesState = {
   nodes: Node[];
   edges: Edge[];
   schema: OpenAPIV3.Document | null;
-  invocations: Record<string, _Invocation>;
+  invocations: Record<string, Invocation>;
 };
 
 export const initialNodesState: NodesState = {
@@ -38,7 +38,7 @@ const nodesSlice = createSlice({
     },
     nodeAdded: (
       state,
-      action: PayloadAction<{ id: string; invocation: _Invocation }>
+      action: PayloadAction<{ id: string; invocation: Invocation }>
     ) => {
       const { id, invocation } = action.payload;
 

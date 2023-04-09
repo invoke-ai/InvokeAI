@@ -2,9 +2,9 @@ import { filter } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
 import {
   InputField,
-  _Invocation,
-  _isReferenceObject,
-  _isSchemaObject,
+  Invocation,
+  isReferenceObject,
+  isSchemaObject,
 } from '../types';
 import { buildInputField, buildOutputFields } from './invocationFieldBuilders';
 
@@ -22,10 +22,10 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
       !key.includes('Graph')
   );
 
-  const invocations = filteredSchemas.reduce<Record<string, _Invocation>>(
+  const invocations = filteredSchemas.reduce<Record<string, Invocation>>(
     (acc, schema: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject) => {
       // only want SchemaObjects
-      if (_isReferenceObject(schema)) {
+      if (isReferenceObject(schema)) {
         return acc;
       }
 
@@ -41,7 +41,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
       // `type` and `id` are not valid inputs/outputs
       const rawInputs = filter(
         schema.properties,
-        (prop, key) => !['type', 'id'].includes(key) && _isSchemaObject(prop)
+        (prop, key) => !['type', 'id'].includes(key) && isSchemaObject(prop)
       ) as OpenAPIV3.SchemaObject[];
 
       const inputs: InputField[] = [];
@@ -62,7 +62,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
 
       const outputs = buildOutputFields(rawOutputs, openAPI);
 
-      const invocation: _Invocation = {
+      const invocation: Invocation = {
         title,
         type,
         description: schema.description ?? '',
