@@ -12,7 +12,7 @@ class ImageType(str, Enum):
 class ImageField(BaseModel):
     """An image field used for passing image objects between invocations"""
 
-    image_type: str = Field(
+    image_type: ImageType = Field(
         default=ImageType.RESULT, description="The type of the image"
     )
     image_name: Optional[str] = Field(default=None, description="The name of the image")

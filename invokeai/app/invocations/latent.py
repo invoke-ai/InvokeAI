@@ -136,7 +136,7 @@ class TextToLatentsInvocation(BaseInvocation):
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    sampler_name: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The sampler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     model:       str = Field(default="", description="The model to use (currently ignored)")
@@ -175,7 +175,7 @@ class TextToLatentsInvocation(BaseInvocation):
         model: StableDiffusionGeneratorPipeline = model_info['model']
         model.scheduler = get_scheduler(
             model=model,
-            scheduler_name=self.sampler_name
+            scheduler_name=self.scheduler
         )
         
         if isinstance(model, DiffusionPipeline):
