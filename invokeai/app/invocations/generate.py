@@ -35,7 +35,7 @@ class TextToImageInvocation(BaseInvocation):
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    sampler_name: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The sampler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     model:       str = Field(default="", description="The model to use (currently ignored)")
     progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
