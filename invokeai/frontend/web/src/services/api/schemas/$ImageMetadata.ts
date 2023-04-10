@@ -16,7 +16,7 @@ export const $ImageMetadata = {
     },
     height: {
       type: 'number',
-      description: `The width of the image in pixels`,
+      description: `The height of the image in pixels`,
       isRequired: true,
     },
     sd_metadata: {

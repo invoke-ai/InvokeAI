@@ -11,6 +11,10 @@ import {
   OutputField,
   StringInputField,
   isSchemaObject,
+  ModelInputField,
+  TypeHints,
+  FieldType,
+  isReferenceObject,
 } from '../types';
 
 /**
@@ -137,6 +141,21 @@ const buildBooleanInputField = (
   return field;
 };
 
+const buildModelInputField = (
+  input: OpenAPIV3.SchemaObject,
+  name: string
+): ModelInputField => {
+  const field: ModelInputField = {
+    type: 'model',
+    name,
+    title: input.title ?? '',
+    description: input.description ?? '',
+    value: input.default ?? '',
+  };
+
+  return field;
+};
+
 const buildImageInputField = (
   input: OpenAPIV3.SchemaObject,
   name: string
@@ -184,6 +203,28 @@ const buildEnumInputField = (
   return field;
 };
 
+export const getFieldType = (
+  schemaObject: OpenAPIV3.SchemaObject,
+  name: string,
+  typeHints?: TypeHints
+): FieldType | undefined => {
+  let rawFieldType = '';
+
+  if (typeHints && name in typeHints) {
+    rawFieldType = typeHints[name];
+  } else if (!schemaObject.type) {
+    rawFieldType = refObjectToFieldType(
+      schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
+    );
+  } else if (schemaObject.enum) {
+    rawFieldType = 'enum';
+  } else if (schemaObject.type) {
+    rawFieldType = schemaObject.type;
+  }
+
+  return FIELD_TYPE_MAP[rawFieldType];
+};
+
 /**
  * Builds an input field from an invocation schema property.
  * @param schemaObject The schema object
@@ -191,36 +232,37 @@ const buildEnumInputField = (
  */
 export const buildInputField = (
   schemaObject: OpenAPIV3.SchemaObject,
-  name: string
+  name: string,
+  typeHints?: TypeHints
 ) => {
-  if (!schemaObject.type) {
-    // the this input/output is a ref! extract the ref string
-    const rawType = refObjectToFieldType(
-      schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
-    );
+  const fieldType = getFieldType(schemaObject, name, typeHints);
 
-    const fieldType = FIELD_TYPE_MAP[rawType];
-
-    if (fieldType === 'image') {
-      return buildImageInputField(schemaObject, name);
-    }
-    if (fieldType === 'latents') {
-      return buildLatentsInputField(schemaObject, name);
-    }
+  if (!fieldType) {
+    throw `Field type "${fieldType}" is unknown!`;
   }
-  if (schemaObject.enum) {
+
+  if (['image', 'ImageField'].includes(fieldType)) {
+    return buildImageInputField(schemaObject, name);
+  }
+  if (['latents', 'LatentsField'].includes(fieldType)) {
+    return buildLatentsInputField(schemaObject, name);
+  }
+  if (['model'].includes(fieldType)) {
+    return buildModelInputField(schemaObject, name);
+  }
+  if (['enum'].includes(fieldType)) {
     return buildEnumInputField(schemaObject, name);
   }
-  if (schemaObject.type === 'integer') {
+  if (['integer'].includes(fieldType)) {
     return buildIntegerInputField(schemaObject, name);
   }
-  if (schemaObject.type === 'number') {
+  if (['number', 'float'].includes(fieldType)) {
     return buildFloatInputField(schemaObject, name);
   }
-  if (schemaObject.type === 'string') {
+  if (['string'].includes(fieldType)) {
     return buildStringInputField(schemaObject, name);
   }
-  if (schemaObject.type === 'boolean') {
+  if (['boolean'].includes(fieldType)) {
     return buildBooleanInputField(schemaObject, name);
   }
 
@@ -235,7 +277,8 @@ export const buildInputField = (
  */
 export const buildOutputFields = (
   refObject: OpenAPIV3.ReferenceObject,
-  openAPI: OpenAPIV3.Document
+  openAPI: OpenAPIV3.Document,
+  typeHints?: TypeHints
 ): Record<string, OutputField> => {
   // extract output schema name from ref
   const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
@@ -251,23 +294,17 @@ export const buildOutputFields = (
           !['type', 'id'].includes(propertyName) &&
           isSchemaObject(property)
         ) {
-          let rawType: string;
+          const fieldType = getFieldType(property, propertyName, typeHints);
 
-          if (property.allOf) {
-            // we need to parse the ref to get the actual output field types
-            rawType = refObjectToFieldType(
-              property.allOf[0] as OpenAPIV3.ReferenceObject
-            );
-          } else {
-            // we can just use the property's type
-            rawType = property.type!;
+          if (!fieldType) {
+            throw `Field type "${fieldType}" is unknown!`;
           }
 
           outputsAccumulator[propertyName] = {
             name: propertyName,
             title: property.title ?? '',
             description: property.description ?? '',
-            type: FIELD_TYPE_MAP[rawType],
+            type: fieldType,
           };
         }
 

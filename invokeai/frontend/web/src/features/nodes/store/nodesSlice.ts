@@ -92,7 +92,6 @@ const nodesSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
-      console.log('schema received');
       state.schema = action.payload;
       state.invocations = parseSchema(action.payload);
     });

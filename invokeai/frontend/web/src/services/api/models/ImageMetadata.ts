@@ -15,7 +15,7 @@ export type ImageMetadata = {
    */
   width: number;
   /**
-   * The width of the image in pixels
+   * The height of the image in pixels
    */
   height: number;
   /**

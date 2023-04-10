@@ -1,0 +1,1201 @@
+{
+  "add": {
+    "title": "Add",
+    "type": "add",
+    "description": "Adds two numbers",
+    "inputs": {
+      "a": {
+        "type": "integer",
+        "name": "a",
+        "title": "A",
+        "description": "The first number",
+        "value": 0
+      },
+      "b": {
+        "type": "integer",
+        "name": "b",
+        "title": "B",
+        "description": "The second number",
+        "value": 0
+      }
+    },
+    "outputs": {
+      "a": {
+        "name": "a",
+        "title": "A",
+        "description": "The output integer",
+        "type": "integer"
+      }
+    }
+  },
+  "blur": {
+    "title": "Blur",
+    "type": "blur",
+    "description": "Blurs an image",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to blur",
+        "value": ""
+      },
+      "radius": {
+        "type": "float",
+        "name": "radius",
+        "title": "Radius",
+        "description": "The blur radius",
+        "value": 8,
+        "minimum": 0
+      },
+      "blur_type": {
+        "type": "enum",
+        "name": "blur_type",
+        "title": "Blur Type",
+        "value": "gaussian",
+        "enumType": "string",
+        "options": ["gaussian", "box"],
+        "description": "The type of blur"
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "crop": {
+    "title": "Crop Image",
+    "type": "crop",
+    "description": "Crops an image to a specified box. The box can be outside of the image.",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to crop",
+        "value": ""
+      },
+      "x": {
+        "type": "integer",
+        "name": "x",
+        "title": "X",
+        "description": "The left x coordinate of the crop rectangle",
+        "value": 0
+      },
+      "y": {
+        "type": "integer",
+        "name": "y",
+        "title": "Y",
+        "description": "The top y coordinate of the crop rectangle",
+        "value": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the crop rectangle",
+        "value": 512,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the crop rectangle",
+        "value": 512,
+        "exclusiveMinimum": 0
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "cv_inpaint": {
+    "title": "Cv Inpaint",
+    "type": "cv_inpaint",
+    "description": "Simple inpaint using opencv.",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to inpaint",
+        "value": ""
+      },
+      "mask": {
+        "type": "image",
+        "name": "mask",
+        "title": "Mask",
+        "description": "The mask to use when inpainting",
+        "value": ""
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "div": {
+    "title": "Divide",
+    "type": "div",
+    "description": "Divides two numbers",
+    "inputs": {
+      "a": {
+        "type": "integer",
+        "name": "a",
+        "title": "A",
+        "description": "The first number",
+        "value": 0
+      },
+      "b": {
+        "type": "integer",
+        "name": "b",
+        "title": "B",
+        "description": "The second number",
+        "value": 0
+      }
+    },
+    "outputs": {
+      "a": {
+        "name": "a",
+        "title": "A",
+        "description": "The output integer",
+        "type": "integer"
+      }
+    }
+  },
+  "img2img": {
+    "title": "Image To Image",
+    "type": "img2img",
+    "description": "Generates an image using img2img.",
+    "inputs": {
+      "prompt": {
+        "type": "string",
+        "name": "prompt",
+        "title": "Prompt",
+        "description": "The prompt to generate an image from",
+        "value": ""
+      },
+      "seed": {
+        "type": "integer",
+        "name": "seed",
+        "title": "Seed",
+        "description": "The seed to use (-1 for a random seed)",
+        "value": -1,
+        "maximum": 4294967295,
+        "minimum": -1
+      },
+      "steps": {
+        "type": "integer",
+        "name": "steps",
+        "title": "Steps",
+        "description": "The number of steps to use to generate the image",
+        "value": 10,
+        "exclusiveMinimum": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "cfg_scale": {
+        "type": "float",
+        "name": "cfg_scale",
+        "title": "Cfg Scale",
+        "description": "The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
+        "value": 7.5,
+        "exclusiveMinimum": 0
+      },
+      "sampler_name": {
+        "type": "enum",
+        "name": "sampler_name",
+        "title": "Sampler Name",
+        "value": "k_lms",
+        "enumType": "string",
+        "options": [
+          "ddim",
+          "dpmpp_2",
+          "k_dpm_2",
+          "k_dpm_2_a",
+          "k_dpmpp_2",
+          "k_euler",
+          "k_euler_a",
+          "k_heun",
+          "k_lms",
+          "plms"
+        ],
+        "description": "The sampler to use"
+      },
+      "seamless": {
+        "type": "boolean",
+        "name": "seamless",
+        "title": "Seamless",
+        "description": "Whether or not to generate an image that can tile without seams",
+        "value": false
+      },
+      "model": {
+        "type": "model",
+        "name": "model",
+        "title": "Model",
+        "description": "The model to use (currently ignored)",
+        "value": {
+          "model": ""
+        }
+      },
+      "progress_images": {
+        "type": "boolean",
+        "name": "progress_images",
+        "title": "Progress Images",
+        "description": "Whether or not to produce progress images during generation",
+        "value": false
+      },
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The input image",
+        "value": ""
+      },
+      "strength": {
+        "type": "float",
+        "name": "strength",
+        "title": "Strength",
+        "description": "The strength of the original image",
+        "value": 0.75,
+        "maximum": 1,
+        "exclusiveMinimum": 0
+      },
+      "fit": {
+        "type": "boolean",
+        "name": "fit",
+        "title": "Fit",
+        "description": "Whether or not the result should be fit to the aspect ratio of the input image",
+        "value": true
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "inpaint": {
+    "title": "Inpaint",
+    "type": "inpaint",
+    "description": "Generates an image using inpaint.",
+    "inputs": {
+      "prompt": {
+        "type": "string",
+        "name": "prompt",
+        "title": "Prompt",
+        "description": "The prompt to generate an image from",
+        "value": ""
+      },
+      "seed": {
+        "type": "integer",
+        "name": "seed",
+        "title": "Seed",
+        "description": "The seed to use (-1 for a random seed)",
+        "value": -1,
+        "maximum": 4294967295,
+        "minimum": -1
+      },
+      "steps": {
+        "type": "integer",
+        "name": "steps",
+        "title": "Steps",
+        "description": "The number of steps to use to generate the image",
+        "value": 10,
+        "exclusiveMinimum": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "cfg_scale": {
+        "type": "float",
+        "name": "cfg_scale",
+        "title": "Cfg Scale",
+        "description": "The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
+        "value": 7.5,
+        "exclusiveMinimum": 0
+      },
+      "sampler_name": {
+        "type": "enum",
+        "name": "sampler_name",
+        "title": "Sampler Name",
+        "value": "k_lms",
+        "enumType": "string",
+        "options": [
+          "ddim",
+          "dpmpp_2",
+          "k_dpm_2",
+          "k_dpm_2_a",
+          "k_dpmpp_2",
+          "k_euler",
+          "k_euler_a",
+          "k_heun",
+          "k_lms",
+          "plms"
+        ],
+        "description": "The sampler to use"
+      },
+      "seamless": {
+        "type": "boolean",
+        "name": "seamless",
+        "title": "Seamless",
+        "description": "Whether or not to generate an image that can tile without seams",
+        "value": false
+      },
+      "model": {
+        "type": "model",
+        "name": "model",
+        "title": "Model",
+        "description": "The model to use (currently ignored)",
+        "value": {
+          "model": ""
+        }
+      },
+      "progress_images": {
+        "type": "boolean",
+        "name": "progress_images",
+        "title": "Progress Images",
+        "description": "Whether or not to produce progress images during generation",
+        "value": false
+      },
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The input image",
+        "value": ""
+      },
+      "strength": {
+        "type": "float",
+        "name": "strength",
+        "title": "Strength",
+        "description": "The strength of the original image",
+        "value": 0.75,
+        "maximum": 1,
+        "exclusiveMinimum": 0
+      },
+      "fit": {
+        "type": "boolean",
+        "name": "fit",
+        "title": "Fit",
+        "description": "Whether or not the result should be fit to the aspect ratio of the input image",
+        "value": true
+      },
+      "mask": {
+        "type": "image",
+        "name": "mask",
+        "title": "Mask",
+        "description": "The mask",
+        "value": ""
+      },
+      "inpaint_replace": {
+        "type": "float",
+        "name": "inpaint_replace",
+        "title": "Inpaint Replace",
+        "description": "The amount by which to replace masked areas with latent noise",
+        "value": 0,
+        "maximum": 1,
+        "minimum": 0
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "ilerp": {
+    "title": "Inverse Lerp",
+    "type": "ilerp",
+    "description": "Inverse linear interpolation of all pixels of an image",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to lerp",
+        "value": ""
+      },
+      "min": {
+        "type": "integer",
+        "name": "min",
+        "title": "Min",
+        "description": "The minimum input value",
+        "value": 0,
+        "maximum": 255,
+        "minimum": 0
+      },
+      "max": {
+        "type": "integer",
+        "name": "max",
+        "title": "Max",
+        "description": "The maximum input value",
+        "value": 255,
+        "maximum": 255,
+        "minimum": 0
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "l2i": {
+    "title": "Latents To Image",
+    "type": "l2i",
+    "description": "Generates an image from latents.",
+    "inputs": {
+      "latents": {
+        "type": "latents",
+        "name": "latents",
+        "title": "Latents",
+        "description": "The latents to generate an image from",
+        "value": ""
+      },
+      "model": {
+        "type": "string",
+        "name": "model",
+        "title": "Model",
+        "description": "The model to use",
+        "value": ""
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "l2l": {
+    "title": "Latents To Latents",
+    "type": "l2l",
+    "description": "Generates latents using latents as base image.",
+    "inputs": {
+      "prompt": {
+        "type": "string",
+        "name": "prompt",
+        "title": "Prompt",
+        "description": "The prompt to generate an image from",
+        "value": ""
+      },
+      "seed": {
+        "type": "integer",
+        "name": "seed",
+        "title": "Seed",
+        "description": "The seed to use (-1 for a random seed)",
+        "value": -1,
+        "maximum": 4294967295,
+        "minimum": -1
+      },
+      "noise": {
+        "type": "latents",
+        "name": "noise",
+        "title": "Noise",
+        "description": "The noise to use",
+        "value": ""
+      },
+      "steps": {
+        "type": "integer",
+        "name": "steps",
+        "title": "Steps",
+        "description": "The number of steps to use to generate the image",
+        "value": 10,
+        "exclusiveMinimum": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "cfg_scale": {
+        "type": "float",
+        "name": "cfg_scale",
+        "title": "Cfg Scale",
+        "description": "The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
+        "value": 7.5,
+        "exclusiveMinimum": 0
+      },
+      "sampler_name": {
+        "type": "enum",
+        "name": "sampler_name",
+        "title": "Sampler Name",
+        "value": "k_lms",
+        "enumType": "string",
+        "options": [
+          "ddim",
+          "dpmpp_2",
+          "k_dpm_2",
+          "k_dpm_2_a",
+          "k_dpmpp_2",
+          "k_euler",
+          "k_euler_a",
+          "k_heun",
+          "k_lms",
+          "plms"
+        ],
+        "description": "The sampler to use"
+      },
+      "seamless": {
+        "type": "boolean",
+        "name": "seamless",
+        "title": "Seamless",
+        "description": "Whether or not to generate an image that can tile without seams",
+        "value": false
+      },
+      "seamless_axes": {
+        "type": "string",
+        "name": "seamless_axes",
+        "title": "Seamless Axes",
+        "description": "The axes to tile the image on, 'x' and/or 'y'",
+        "value": ""
+      },
+      "model": {
+        "type": "string",
+        "name": "model",
+        "title": "Model",
+        "description": "The model to use (currently ignored)",
+        "value": ""
+      },
+      "progress_images": {
+        "type": "boolean",
+        "name": "progress_images",
+        "title": "Progress Images",
+        "description": "Whether or not to produce progress images during generation",
+        "value": false
+      },
+      "latents": {
+        "type": "latents",
+        "name": "latents",
+        "title": "Latents",
+        "description": "The latents to use as a base image",
+        "value": ""
+      },
+      "strength": {
+        "type": "float",
+        "name": "strength",
+        "title": "Strength",
+        "description": "The strength of the latents to use",
+        "value": 0.5
+      }
+    },
+    "outputs": {
+      "latents": {
+        "name": "latents",
+        "title": "Latents",
+        "description": "The output latents",
+        "type": "latents"
+      }
+    }
+  },
+  "lerp": {
+    "title": "Lerp",
+    "type": "lerp",
+    "description": "Linear interpolation of all pixels of an image",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to lerp",
+        "value": ""
+      },
+      "min": {
+        "type": "integer",
+        "name": "min",
+        "title": "Min",
+        "description": "The minimum output value",
+        "value": 0,
+        "maximum": 255,
+        "minimum": 0
+      },
+      "max": {
+        "type": "integer",
+        "name": "max",
+        "title": "Max",
+        "description": "The maximum output value",
+        "value": 255,
+        "maximum": 255,
+        "minimum": 0
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "tomask": {
+    "title": "Mask From Alpha",
+    "type": "tomask",
+    "description": "Extracts the alpha channel of an image as a mask.",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to create the mask from",
+        "value": ""
+      },
+      "invert": {
+        "type": "boolean",
+        "name": "invert",
+        "title": "Invert",
+        "description": "Whether or not to invert the mask",
+        "value": false
+      }
+    },
+    "outputs": {
+      "mask": {
+        "name": "mask",
+        "title": "Mask",
+        "description": "The output mask",
+        "type": "image"
+      }
+    }
+  },
+  "mul": {
+    "title": "Multiply",
+    "type": "mul",
+    "description": "Multiplies two numbers",
+    "inputs": {
+      "a": {
+        "type": "integer",
+        "name": "a",
+        "title": "A",
+        "description": "The first number",
+        "value": 0
+      },
+      "b": {
+        "type": "integer",
+        "name": "b",
+        "title": "B",
+        "description": "The second number",
+        "value": 0
+      }
+    },
+    "outputs": {
+      "a": {
+        "name": "a",
+        "title": "A",
+        "description": "The output integer",
+        "type": "integer"
+      }
+    }
+  },
+  "noise": {
+    "title": "Noise",
+    "type": "noise",
+    "description": "Generates latent noise.",
+    "inputs": {
+      "seed": {
+        "type": "integer",
+        "name": "seed",
+        "title": "Seed",
+        "description": "The seed to use",
+        "value": 0,
+        "maximum": 4294967295,
+        "minimum": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the resulting noise",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the resulting noise",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      }
+    },
+    "outputs": {
+      "noise": {
+        "name": "noise",
+        "title": "Noise",
+        "description": "The output noise",
+        "type": "latents"
+      }
+    }
+  },
+  "paste": {
+    "title": "Paste Image",
+    "type": "paste",
+    "description": "Pastes an image into another image.",
+    "inputs": {
+      "base_image": {
+        "type": "image",
+        "name": "base_image",
+        "title": "Base Image",
+        "description": "The base image",
+        "value": ""
+      },
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to paste",
+        "value": ""
+      },
+      "mask": {
+        "type": "image",
+        "name": "mask",
+        "title": "Mask",
+        "description": "The mask to use when pasting",
+        "value": ""
+      },
+      "x": {
+        "type": "integer",
+        "name": "x",
+        "title": "X",
+        "description": "The left x coordinate at which to paste the image",
+        "value": 0
+      },
+      "y": {
+        "type": "integer",
+        "name": "y",
+        "title": "Y",
+        "description": "The top y coordinate at which to paste the image",
+        "value": 0
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "restore_face": {
+    "title": "Restore Face",
+    "type": "restore_face",
+    "description": "Restores faces in an image.",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The input image",
+        "value": ""
+      },
+      "strength": {
+        "type": "float",
+        "name": "strength",
+        "title": "Strength",
+        "description": "The strength of the restoration",
+        "value": 0.75,
+        "maximum": 1,
+        "exclusiveMinimum": 0
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "show_image": {
+    "title": "Show Image",
+    "type": "show_image",
+    "description": "Displays a provided image, and passes it forward in the pipeline.",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The image to show",
+        "value": ""
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "sub": {
+    "title": "Subtract",
+    "type": "sub",
+    "description": "Subtracts two numbers",
+    "inputs": {
+      "a": {
+        "type": "integer",
+        "name": "a",
+        "title": "A",
+        "description": "The first number",
+        "value": 0
+      },
+      "b": {
+        "type": "integer",
+        "name": "b",
+        "title": "B",
+        "description": "The second number",
+        "value": 0
+      }
+    },
+    "outputs": {
+      "a": {
+        "name": "a",
+        "title": "A",
+        "description": "The output integer",
+        "type": "integer"
+      }
+    }
+  },
+  "txt2img": {
+    "title": "Text To Image",
+    "type": "txt2img",
+    "description": "Generates an image using text2img.",
+    "inputs": {
+      "prompt": {
+        "type": "string",
+        "name": "prompt",
+        "title": "Prompt",
+        "description": "The prompt to generate an image from",
+        "value": ""
+      },
+      "seed": {
+        "type": "integer",
+        "name": "seed",
+        "title": "Seed",
+        "description": "The seed to use (-1 for a random seed)",
+        "value": -1,
+        "maximum": 4294967295,
+        "minimum": -1
+      },
+      "steps": {
+        "type": "integer",
+        "name": "steps",
+        "title": "Steps",
+        "description": "The number of steps to use to generate the image",
+        "value": 10,
+        "exclusiveMinimum": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "cfg_scale": {
+        "type": "float",
+        "name": "cfg_scale",
+        "title": "Cfg Scale",
+        "description": "The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
+        "value": 7.5,
+        "exclusiveMinimum": 0
+      },
+      "sampler_name": {
+        "type": "enum",
+        "name": "sampler_name",
+        "title": "Sampler Name",
+        "value": "k_lms",
+        "enumType": "string",
+        "options": [
+          "ddim",
+          "dpmpp_2",
+          "k_dpm_2",
+          "k_dpm_2_a",
+          "k_dpmpp_2",
+          "k_euler",
+          "k_euler_a",
+          "k_heun",
+          "k_lms",
+          "plms"
+        ],
+        "description": "The sampler to use"
+      },
+      "seamless": {
+        "type": "boolean",
+        "name": "seamless",
+        "title": "Seamless",
+        "description": "Whether or not to generate an image that can tile without seams",
+        "value": false
+      },
+      "model": {
+        "type": "model",
+        "name": "model",
+        "title": "Model",
+        "description": "The model to use (currently ignored)",
+        "value": {
+          "model": ""
+        }
+      },
+      "progress_images": {
+        "type": "boolean",
+        "name": "progress_images",
+        "title": "Progress Images",
+        "description": "Whether or not to produce progress images during generation",
+        "value": false
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  },
+  "t2l": {
+    "title": "Text To Latents",
+    "type": "t2l",
+    "description": "Generates latents from a prompt.",
+    "inputs": {
+      "prompt": {
+        "type": "string",
+        "name": "prompt",
+        "title": "Prompt",
+        "description": "The prompt to generate an image from",
+        "value": ""
+      },
+      "seed": {
+        "type": "integer",
+        "name": "seed",
+        "title": "Seed",
+        "description": "The seed to use (-1 for a random seed)",
+        "value": -1,
+        "maximum": 4294967295,
+        "minimum": -1
+      },
+      "noise": {
+        "type": "latents",
+        "name": "noise",
+        "title": "Noise",
+        "description": "The noise to use",
+        "value": ""
+      },
+      "steps": {
+        "type": "integer",
+        "name": "steps",
+        "title": "Steps",
+        "description": "The number of steps to use to generate the image",
+        "value": 10,
+        "exclusiveMinimum": 0
+      },
+      "width": {
+        "type": "integer",
+        "name": "width",
+        "title": "Width",
+        "description": "The width of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "integer",
+        "name": "height",
+        "title": "Height",
+        "description": "The height of the resulting image",
+        "value": 512,
+        "multipleOf": 64,
+        "exclusiveMinimum": 0
+      },
+      "cfg_scale": {
+        "type": "float",
+        "name": "cfg_scale",
+        "title": "Cfg Scale",
+        "description": "The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
+        "value": 7.5,
+        "exclusiveMinimum": 0
+      },
+      "sampler_name": {
+        "type": "enum",
+        "name": "sampler_name",
+        "title": "Sampler Name",
+        "value": "k_lms",
+        "enumType": "string",
+        "options": [
+          "ddim",
+          "dpmpp_2",
+          "k_dpm_2",
+          "k_dpm_2_a",
+          "k_dpmpp_2",
+          "k_euler",
+          "k_euler_a",
+          "k_heun",
+          "k_lms",
+          "plms"
+        ],
+        "description": "The sampler to use"
+      },
+      "seamless": {
+        "type": "boolean",
+        "name": "seamless",
+        "title": "Seamless",
+        "description": "Whether or not to generate an image that can tile without seams",
+        "value": false
+      },
+      "seamless_axes": {
+        "type": "string",
+        "name": "seamless_axes",
+        "title": "Seamless Axes",
+        "description": "The axes to tile the image on, 'x' and/or 'y'",
+        "value": ""
+      },
+      "model": {
+        "type": "string",
+        "name": "model",
+        "title": "Model",
+        "description": "The model to use (currently ignored)",
+        "value": ""
+      },
+      "progress_images": {
+        "type": "boolean",
+        "name": "progress_images",
+        "title": "Progress Images",
+        "description": "Whether or not to produce progress images during generation",
+        "value": false
+      }
+    },
+    "outputs": {
+      "latents": {
+        "name": "latents",
+        "title": "Latents",
+        "description": "The output latents",
+        "type": "latents"
+      }
+    }
+  },
+  "upscale": {
+    "title": "Upscale",
+    "type": "upscale",
+    "description": "Upscales an image.",
+    "inputs": {
+      "image": {
+        "type": "image",
+        "name": "image",
+        "title": "Image",
+        "description": "The input image",
+        "value": ""
+      },
+      "strength": {
+        "type": "float",
+        "name": "strength",
+        "title": "Strength",
+        "description": "The strength",
+        "value": 0.75,
+        "maximum": 1,
+        "exclusiveMinimum": 0
+      },
+      "level": {
+        "type": "enum",
+        "name": "level",
+        "title": "Level",
+        "value": 2,
+        "enumType": "integer",
+        "options": [2, 4],
+        "description": "The upscale level"
+      }
+    },
+    "outputs": {
+      "image": {
+        "name": "image",
+        "title": "Image",
+        "description": "The output image",
+        "type": "image"
+      }
+    }
+  }
+}
