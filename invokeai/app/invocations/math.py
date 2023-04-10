@@ -1,15 +1,24 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Literal
 
-import numpy
-from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..services.image_storage import ImageType
-from ..services.invocation_services import InvocationServices
+from invokeai.app.invocations.models.config import InvocationConfig
+
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+
+
+class MathInvocationConfig(BaseModel):
+    """Helper class to provide all math invocations with additional config"""
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["math"],
+            }
+        }
 
 
 class IntOutput(BaseInvocationOutput):
@@ -20,7 +29,7 @@ class IntOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class AddInvocation(BaseInvocation):
+class AddInvocation(BaseInvocation, MathInvocationConfig):
     """Adds two numbers"""
     #fmt: off
     type: Literal["add"] = "add"
@@ -32,7 +41,7 @@ class AddInvocation(BaseInvocation):
         return IntOutput(a=self.a + self.b)
 
 
-class SubtractInvocation(BaseInvocation):
+class SubtractInvocation(BaseInvocation, MathInvocationConfig):
     """Subtracts two numbers"""
     #fmt: off
     type: Literal["sub"] = "sub"
@@ -44,7 +53,7 @@ class SubtractInvocation(BaseInvocation):
         return IntOutput(a=self.a - self.b)
 
 
-class MultiplyInvocation(BaseInvocation):
+class MultiplyInvocation(BaseInvocation, MathInvocationConfig):
     """Multiplies two numbers"""
     #fmt: off
     type: Literal["mul"] = "mul"
@@ -56,7 +65,7 @@ class MultiplyInvocation(BaseInvocation):
         return IntOutput(a=self.a * self.b)
 
 
-class DivideInvocation(BaseInvocation):
+class DivideInvocation(BaseInvocation, MathInvocationConfig):
     """Divides two numbers"""
     #fmt: off
     type: Literal["div"] = "div"
