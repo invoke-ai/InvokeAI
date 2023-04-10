@@ -4,7 +4,6 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 import torch
 
-from invokeai.app.invocations.models.config import InvocationConfig
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.invocations.util.get_model import choose_model
 from invokeai.app.util.step_callback import diffusers_step_callback_adapter
@@ -15,7 +14,7 @@ from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import Post
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
 from ..services.image_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext

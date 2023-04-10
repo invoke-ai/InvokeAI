@@ -6,10 +6,9 @@ import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
-from invokeai.app.invocations.models.config import InvocationConfig
 
 from invokeai.app.models.image import ImageField, ImageType
-from .baseinvocation import BaseInvocation, InvocationContext
+from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput
 
 

@@ -7,11 +7,9 @@ import numpy
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.models.config import InvocationConfig
-
 from ..models.image import ImageField, ImageType
 from ..services.invocation_services import InvocationServices
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 
 
 class PILInvocationConfig(BaseModel):

@@ -4,9 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.models.config import InvocationConfig
-
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 
 
 class MathInvocationConfig(BaseModel):
