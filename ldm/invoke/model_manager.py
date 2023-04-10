@@ -372,12 +372,6 @@ class ModelManager(object):
         )
         from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
 
-#        try:
-#            if self.list_models()[self.current_model]['status'] == 'active':
-#                self.offload_model(self.current_model)
-#        except Exception:
-#            pass
-
         if self._has_cuda():
             torch.cuda.empty_cache()
         pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
