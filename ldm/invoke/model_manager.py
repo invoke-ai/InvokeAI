@@ -423,9 +423,9 @@ class ModelManager(object):
             pipeline_args.update(cache_dir=global_cache_dir("hub"))
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
-            fp_args_list = [{"revision": "fp16"}, {}]
-        else:
-            fp_args_list = [{}]
+        revision = mconfig.get('revision') or ('fp16' if using_fp16 else None)
+        fp_args_list = [{"revision": revision}] if revision else []
+        fp_args_list.append({})
 
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
