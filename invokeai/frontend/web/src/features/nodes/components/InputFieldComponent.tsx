@@ -4,6 +4,7 @@ import { BooleanInputFieldComponent } from './fields/BooleanInputFieldComponent'
 import { EnumInputFieldComponent } from './fields/EnumInputFieldComponent';
 import { ImageInputFieldComponent } from './fields/ImageInputFieldComponent';
 import { LatentsInputFieldComponent } from './fields/LatentsInputFieldComponent';
+import { ModelInputFieldComponent } from './fields/ModelInputFieldComponent';
 import { NumberInputFieldComponent } from './fields/NumberInputFieldComponent';
 import { StringInputFieldComponent } from './fields/StringInputFieldComponent';
 
@@ -39,6 +40,10 @@ export const InputFieldComponent = (props: InputFieldComponentProps) => {
 
   if (type === 'latents') {
     return <LatentsInputFieldComponent nodeId={nodeId} field={field} />;
+  }
+
+  if (type === 'model') {
+    return <ModelInputFieldComponent nodeId={nodeId} field={field} />;
   }
 
   return <Box p={2}>Unknown field type: {type}</Box>;

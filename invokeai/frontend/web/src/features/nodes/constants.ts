@@ -10,6 +10,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   enum: 'enum',
   ImageField: 'image',
   LatentsField: 'latents',
+  model: 'model',
 };
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
@@ -47,5 +48,10 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'pink',
     title: 'Latents',
     description: 'Latents may be passed between nodes.',
+  },
+  model: {
+    color: 'teal',
+    title: 'Model',
+    description: 'Models are models.',
   },
 };

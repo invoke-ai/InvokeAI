@@ -6,6 +6,9 @@ export const receivedOpenAPISchema = createAsyncThunk(
   async () => {
     const response = await fetch(`openapi.json`);
     const jsonData = (await response.json()) as OpenAPIV3.Document;
+
+    console.debug('OpenAPI schema: ', jsonData);
+
     return jsonData;
   }
 );
