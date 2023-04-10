@@ -6,9 +6,13 @@ from typing import Literal, Optional, Union
 import numpy as np
 from torch import Tensor
 
-from pydantic import Field
+from pydantic import BaseModel, Field
+from invokeai.app.invocations.models.config import (
+    InvocationConfig,
+)
 
 from invokeai.app.models.image import ImageField, ImageType
+from invokeai.app.invocations.util.get_model import choose_model
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageOutput
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
@@ -16,12 +20,26 @@ from ...backend.stable_diffusion import PipelineIntermediateState
 from ..models.exceptions import CanceledException
 from ..util.step_callback import diffusers_step_callback_adapter
 
-SAMPLER_NAME_VALUES = Literal[
-    tuple(InvokeAIGenerator.schedulers())
-]
+SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
+
+
+class SDImageInvocation(BaseModel):
+    """Helper class to provide all Stable Diffusion raster image invocations with additional config"""
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["stable-diffusion", "image"],
+                "type_hints": {
+                    "model": "model",
+                },
+            },
+        }
+
 
 # Text to image
-class TextToImageInvocation(BaseInvocation):
+class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     """Generates an image using text2img."""
 
     type: Literal["txt2img"] = "txt2img"
@@ -59,16 +77,9 @@ class TextToImageInvocation(BaseInvocation):
         diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        # def step_callback(state: PipelineIntermediateState):
-        #     if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-        #         raise CanceledException
-        #     self.dispatch_progress(context, state.latents, state.step)
-
         # Handle invalid model parameter
-        # TODO: figure out if this can be done via a validator that uses the model_cache
-        # TODO: How to get the default model name now?
-        #       (right now uses whatever current model is set in model manager)
-        model= context.services.model_manager.get_model()
+        model = choose_model(context.services.model_manager, self.model)
+
         outputs = Txt2Img(model).generate(
             prompt=self.prompt,
             step_callback=partial(self.dispatch_progress, context),
@@ -135,9 +146,8 @@ class ImageToImageInvocation(TextToImageInvocation):
         mask = None
 
         # Handle invalid model parameter
-        # TODO: figure out if this can be done via a validator that uses the model_cache
-        # TODO: How to get the default model name now?
-        model = context.services.model_manager.get_model()
+        model = choose_model(context.services.model_manager, self.model)
+
         outputs = Img2Img(model).generate(
                 prompt=self.prompt,
                 init_image=image,
@@ -211,9 +221,8 @@ class InpaintInvocation(ImageToImageInvocation):
         )
 
         # Handle invalid model parameter
-        # TODO: figure out if this can be done via a validator that uses the model_cache
-        # TODO: How to get the default model name now?
-        model = context.services.model_manager.get_model()
+        model = choose_model(context.services.model_manager, self.model)   
+
         outputs = Inpaint(model).generate(
                 prompt=self.prompt,
                 init_img=image,

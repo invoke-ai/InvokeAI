@@ -5,14 +5,27 @@ from typing import Literal
 import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
-from pydantic import Field
+from pydantic import BaseModel, Field
+from invokeai.app.invocations.models.config import InvocationConfig
 
 from invokeai.app.models.image import ImageField, ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageOutput
 
 
-class CvInpaintInvocation(BaseInvocation):
+class CVInvocation(BaseModel):
+    """Helper class to provide all OpenCV invocations with additional config"""
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["cv", "image"],
+            },
+        }
+
+
+class CvInpaintInvocation(BaseInvocation, CVInvocation):
     """Simple inpaint using opencv."""
     #fmt: off
     type: Literal["cv_inpaint"] = "cv_inpaint"
