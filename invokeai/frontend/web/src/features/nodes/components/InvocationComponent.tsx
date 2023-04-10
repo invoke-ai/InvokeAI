@@ -1,4 +1,4 @@
-import { Connection, NodeProps, useReactFlow } from 'reactflow';
+import { NodeProps } from 'reactflow';
 import {
   Box,
   Flex,
@@ -15,56 +15,14 @@ import { Invocation } from '../types';
 import { InputFieldComponent } from './InputFieldComponent';
 import { FieldHandle } from './FieldHandle';
 import { map, size } from 'lodash';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
+import { useIsValidConnection } from '../hooks/useIsValidConnection';
 
 export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
   const { id, data, selected } = props;
   const { type, title, description, inputs, outputs } = data;
 
-  const flow = useReactFlow();
-
-  // Check if an in-progress connection is valid
-  const isValidConnection = useCallback(
-    (connection: Connection): boolean => {
-      const edges = flow.getEdges();
-
-      // Connection is invalid if target already has a connection
-      if (
-        edges.find((edge) => {
-          return (
-            edge.target === connection.target &&
-            edge.targetHandle === connection.targetHandle
-          );
-        })
-      ) {
-        return false;
-      }
-
-      // Find the source and target nodes...
-      if (connection.source && connection.target) {
-        const sourceNode = flow.getNode(connection.source);
-        const targetNode = flow.getNode(connection.target);
-
-        // Conditional guards against undefined nodes/handles
-        if (
-          sourceNode &&
-          targetNode &&
-          connection.sourceHandle &&
-          connection.targetHandle
-        ) {
-          // connection types must be the same for a connection
-          return (
-            sourceNode.data.outputs[connection.sourceHandle].type ===
-            targetNode.data.inputs[connection.targetHandle].type
-          );
-        }
-      }
-
-      // Default to invalid
-      return false;
-    },
-    [flow]
-  );
+  const isValidConnection = useIsValidConnection();
 
   return (
     <Box

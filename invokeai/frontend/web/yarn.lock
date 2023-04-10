@@ -907,6 +907,11 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
+"@dagrejs/graphlib@^2.1.12":
+  version "2.1.12"
+  resolved "https://registry.yarnpkg.com/@dagrejs/graphlib/-/graphlib-2.1.12.tgz#97d29eae006e4efcb68863505464e0e3f28fa5c7"
+  integrity sha512-yHk2G7ZNzDEHhQTlYtbtEy5PqlIoioCxZUKcrlBgubMvrLmewXqSV3v4rhc8RAt5s8lr8PcWbiovEPuORxe2KA==
+
 "@emotion/babel-plugin@^11.10.6":
   version "11.10.6"
   resolved "https://registry.yarnpkg.com/@emotion/babel-plugin/-/babel-plugin-11.10.6.tgz#a68ee4b019d661d6f37dec4b8903255766925ead"

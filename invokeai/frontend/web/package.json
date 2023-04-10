@@ -44,6 +44,7 @@
     "@chakra-ui/react": "^2.5.1",
     "@chakra-ui/styled-system": "^2.6.1",
     "@chakra-ui/theme-tools": "^2.0.16",
+    "@dagrejs/graphlib": "^2.1.12",
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
     "@reduxjs/toolkit": "^1.9.3",
