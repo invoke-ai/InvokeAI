@@ -1,14 +1,17 @@
 import 'reactflow/dist/style.css';
-import { Box } from '@chakra-ui/react';
+import { Box, HStack } from '@chakra-ui/react';
 import { Flow } from './Flow';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import { buildNodesGraph } from '../util/buildNodesGraph';
+import { buildAdjacencyList } from '../util/isCyclic';
 
 const NodeEditor = () => {
   const state = useAppSelector((state: RootState) => state);
 
   const graph = buildNodesGraph(state);
+
+  const adjacencyList = buildAdjacencyList(state.nodes.edges);
 
   return (
     <Box
@@ -33,7 +36,10 @@ const NodeEditor = () => {
         pointerEvents="none"
         opacity={0.7}
       >
-        {JSON.stringify(graph, undefined, 2)}
+        <HStack alignItems={'flex-start'} justifyContent="space-between">
+          <Box w="50%">{JSON.stringify(graph, null, 2)}</Box>
+          <Box w="50%">{JSON.stringify(adjacencyList, null, 2)}</Box>
+        </HStack>
       </Box>
     </Box>
   );

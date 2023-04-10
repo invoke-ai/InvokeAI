@@ -8,6 +8,7 @@ import {
   HStack,
   Tooltip,
   Icon,
+  Code,
 } from '@chakra-ui/react';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Invocation } from '../types';
@@ -78,6 +79,7 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
     >
       <Flex flexDirection="column" gap={2}>
         <>
+          <Code>{id}</Code>
           <HStack justifyContent="space-between">
             <Heading size="sm" fontWeight={500} color="base.100">
               {title}

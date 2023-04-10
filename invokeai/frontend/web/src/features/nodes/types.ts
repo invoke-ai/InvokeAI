@@ -22,6 +22,10 @@ export type Invocation = {
    */
   description: string;
   /**
+   * Invocation tags
+   */
+  tags: string[];
+  /**
    * Array of invocation inputs
    */
   inputs: Record<string, InputField>;
@@ -34,7 +38,15 @@ export type Invocation = {
 };
 
 export type FieldUIConfig = {
-  color: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink';
+  color:
+    | 'red'
+    | 'orange'
+    | 'yellow'
+    | 'green'
+    | 'blue'
+    | 'purple'
+    | 'pink'
+    | 'teal';
   title: string;
   description: string;
 };
@@ -46,7 +58,8 @@ export type FieldType =
   | 'boolean'
   | 'enum'
   | 'image'
-  | 'latents';
+  | 'latents'
+  | 'model';
 
 export type InputField =
   | IntegerInputField
@@ -55,7 +68,8 @@ export type InputField =
   | BooleanInputField
   | ImageInputField
   | LatentsInputField
-  | EnumInputField;
+  | EnumInputField
+  | ModelInputField;
 
 export type OutputField = FieldBase;
 
@@ -116,3 +130,55 @@ export type EnumInputField = FieldBase & {
   enumType: 'string' | 'integer' | 'number';
   options: Array<string | number>;
 };
+
+export type ModelInputField = FieldBase & {
+  type: 'model';
+  value?: string;
+};
+
+/**
+ * JANKY CUSTOMISATION OF OpenAPI SCHEMA TYPES
+ */
+
+export type TypeHints = {
+  [fieldName: string]: FieldType;
+};
+
+export type InvocationSchemaExtra = {
+  output: OpenAPIV3.ReferenceObject; // the output of the invocation
+  ui?: {
+    tags?: string[];
+    type_hints?: TypeHints;
+  };
+  title: string;
+  properties: Omit<
+    NonNullable<OpenAPIV3.SchemaObject['properties']>,
+    'type'
+  > & {
+    type: Omit<OpenAPIV3.SchemaObject, 'default'> & { default: string };
+  };
+};
+
+export type InvocationSchemaType = {
+  default: string; // the type of the invocation
+};
+
+export type InvocationBaseSchemaObject = Omit<
+  OpenAPIV3.BaseSchemaObject,
+  'title' | 'type' | 'properties'
+> &
+  InvocationSchemaExtra;
+
+interface ArraySchemaObject extends InvocationBaseSchemaObject {
+  type: OpenAPIV3.ArraySchemaObjectType;
+  items: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject;
+}
+interface NonArraySchemaObject extends InvocationBaseSchemaObject {
+  type?: OpenAPIV3.NonArraySchemaObjectType;
+}
+
+export type InvocationSchemaObject = ArraySchemaObject | NonArraySchemaObject;
+
+export const isInvocationSchemaObject = (
+  obj: OpenAPIV3.ReferenceObject | InvocationSchemaObject
+): obj is InvocationSchemaObject => !('$ref' in obj);

@@ -1,6 +1,4 @@
-import { Edge, Node } from 'reactflow';
 import { Graph } from 'services/api';
-import { Invocation } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { reduce } from 'lodash';
 import { RootState } from 'app/store';
@@ -62,5 +60,5 @@ export const buildNodesGraph = (state: RootState): Graph => {
     edges: parsedEdges,
   };
 
-  return graph as Graph;
+  return graph;
 };
