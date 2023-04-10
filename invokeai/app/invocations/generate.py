@@ -7,13 +7,10 @@ import numpy as np
 from torch import Tensor
 
 from pydantic import BaseModel, Field
-from invokeai.app.invocations.models.config import (
-    InvocationConfig,
-)
 
 from invokeai.app.models.image import ImageField, ImageType
 from invokeai.app.invocations.util.get_model import choose_model
-from .baseinvocation import BaseInvocation, InvocationContext
+from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
 from ...backend.stable_diffusion import PipelineIntermediateState

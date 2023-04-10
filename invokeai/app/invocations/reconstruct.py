@@ -2,11 +2,10 @@ from datetime import datetime, timezone
 from typing import Literal, Union
 
 from pydantic import Field
-from invokeai.app.invocations.models.config import InvocationConfig
 
 from invokeai.app.models.image import ImageField, ImageType
 from ..services.invocation_services import InvocationServices
-from .baseinvocation import BaseInvocation, InvocationContext
+from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput
 
 class RestoreFaceInvocation(BaseInvocation):
