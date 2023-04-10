@@ -2,7 +2,7 @@ import { Tooltip } from '@chakra-ui/react';
 import { CSSProperties } from 'react';
 import { Handle, Position, Connection, HandleType } from 'reactflow';
 import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../constants';
-import { useConnectionEventStyles } from '../hooks/useConnectionEventStyles';
+// import { useConnectionEventStyles } from '../hooks/useConnectionEventStyles';
 import { InputField, OutputField } from '../types';
 
 const handleBaseStyles: CSSProperties = {
@@ -32,11 +32,13 @@ export const FieldHandle = (props: FieldHandleProps) => {
   const { nodeId, field, isValidConnection, handleType, styles } = props;
   const { name, title, type, description } = field;
 
-  const connectionEventStyles = useConnectionEventStyles(
-    nodeId,
-    type,
-    handleType
-  );
+  // this needs to iterate over every candicate target node, calculating graph cycles
+  // WIP
+  // const connectionEventStyles = useConnectionEventStyles(
+  //   nodeId,
+  //   type,
+  //   handleType
+  // );
 
   return (
     <Tooltip
@@ -56,7 +58,7 @@ export const FieldHandle = (props: FieldHandleProps) => {
           ...styles,
           ...(handleType === 'target' ? inputHandleStyles : outputHandleStyles),
           ...handleBaseStyles,
-          ...connectionEventStyles,
+          // ...connectionEventStyles,
         }}
       />
     </Tooltip>
