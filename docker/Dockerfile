@@ -119,7 +119,8 @@ ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
 EXPOSE 9090
-CMD sh -c "blobfuse2 mount /blob_data/ --config-file /data/config_blobfuse.yaml & invokeai --web --host 0.0.0.0 --port 9090"
+CMD sh -c "blobfuse2 mount /blob_data/ --config-file /data/config_blobfuse.yaml & bash" 
+# & invokeai --web --host 0.0.0.0 --port 9090"
 
 # ENTRYPOINT [ "invokeai" ]
 # CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
