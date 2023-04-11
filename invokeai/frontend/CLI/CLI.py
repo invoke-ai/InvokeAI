@@ -16,7 +16,7 @@ if sys.platform == "darwin":
 import pyparsing  # type: ignore
 
 import invokeai.version as invokeai
-import invokeai.backend.util.logging as ialog
+import invokeai.backend.util.logging as log
 
 from ...backend import Generate, ModelManager
 from ...backend.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
@@ -70,7 +70,7 @@ def main():
     # run any post-install patches needed
     run_patches()
 
-    ialog.info(f"Internet connectivity is {Globals.internet_available}")
+    log.info(f"Internet connectivity is {Globals.internet_available}")
 
     if not args.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
@@ -79,8 +79,8 @@ def main():
                 opt, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    ialog.info(f"{invokeai.__app_name__}, version {invokeai.__version__}")
-    ialog.info(f'InvokeAI runtime directory is "{Globals.root}"')
+    log.info(f"{invokeai.__app_name__}, version {invokeai.__version__}")
+    log.info(f'InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
@@ -122,7 +122,7 @@ def main():
             else:
                 raise FileNotFoundError(f"{opt.infile} not found.")
         except (FileNotFoundError, IOError) as e:
-            ialog.critical('Aborted',exc_info=True)
+            log.critical('Aborted',exc_info=True)
             sys.exit(-1)
 
     # creating a Generate object:
@@ -144,11 +144,11 @@ def main():
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(opt, e)
     except (IOError, KeyError):
-        ialog.critical("Aborted",exc_info=True)
+        log.critical("Aborted",exc_info=True)
         sys.exit(-1)
 
     if opt.seamless:
-        ialog.info("Changed to seamless tiling mode")
+        log.info("Changed to seamless tiling mode")
 
     # preload the model
     try:
@@ -181,7 +181,7 @@ def main():
             f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
         )
     except Exception:
-        ialog.error("An error occurred",exc_info=True)
+        log.error("An error occurred",exc_info=True)
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt):
@@ -247,7 +247,7 @@ def main_loop(gen, opt):
                 if not opt.prompt:
                     oldargs = metadata_from_png(opt.init_img)
                     opt.prompt = oldargs.prompt
-                    ialog.info(f'Retrieved old prompt "{opt.prompt}" from {opt.init_img}')
+                    log.info(f'Retrieved old prompt "{opt.prompt}" from {opt.init_img}')
             except (OSError, AttributeError, KeyError):
                 pass
 
@@ -264,9 +264,9 @@ def main_loop(gen, opt):
         if opt.init_img is not None and re.match("^-\\d+$", opt.init_img):
             try:
                 opt.init_img = last_results[int(opt.init_img)][0]
-                ialog.info(f"Reusing previous image {opt.init_img}")
+                log.info(f"Reusing previous image {opt.init_img}")
             except IndexError:
-                ialog.info(f"No previous initial image at position {opt.init_img} found")
+                log.info(f"No previous initial image at position {opt.init_img} found")
                 opt.init_img = None
                 continue
 
@@ -287,9 +287,9 @@ def main_loop(gen, opt):
         if opt.seed is not None and opt.seed < 0 and operation != "postprocess":
             try:
                 opt.seed = last_results[opt.seed][1]
-                ialog.info(f"Reusing previous seed {opt.seed}")
+                log.info(f"Reusing previous seed {opt.seed}")
             except IndexError:
-                ialog.info(f"No previous seed at position {opt.seed} found")
+                log.info(f"No previous seed at position {opt.seed} found")
                 opt.seed = None
                 continue
 
@@ -308,7 +308,7 @@ def main_loop(gen, opt):
             subdir = subdir[: (path_max - 39 - len(os.path.abspath(opt.outdir)))]
             current_outdir = os.path.join(opt.outdir, subdir)
 
-            ialog.info('Writing files to directory: "' + current_outdir + '"')
+            log.info('Writing files to directory: "' + current_outdir + '"')
 
             # make sure the output directory exists
             if not os.path.exists(current_outdir):
@@ -438,13 +438,13 @@ def main_loop(gen, opt):
                         **vars(opt),
                     )
                 except (PromptParser.ParsingException, pyparsing.ParseException):
-                    ialog.error("An error occurred while processing your prompt",exc_info=True)
+                    log.error("An error occurred while processing your prompt",exc_info=True)
             elif operation == "postprocess":
-                ialog.info(f"fixing {opt.prompt}")
+                log.info(f"fixing {opt.prompt}")
                 opt.last_operation = do_postprocess(gen, opt, image_writer)
 
             elif operation == "mask":
-                ialog.info(f"generating masks from {opt.prompt}")
+                log.info(f"generating masks from {opt.prompt}")
                 do_textmask(gen, opt, image_writer)
 
             if opt.grid and len(grid_images) > 0:
@@ -468,11 +468,11 @@ def main_loop(gen, opt):
                 results = [[path, formatted_dream_prompt]]
 
         except AssertionError:
-            ialog.error(e)
+            log.error(e)
             continue
 
         except OSError as e:
-            ialog.error(e)
+            log.error(e)
             continue
 
         print("Outputs:")
@@ -511,7 +511,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
             gen.set_model(model_name)
             add_embedding_terms(gen, completer)
         except KeyError as e:
-            ialog.error(e)
+            log.error(e)
         except Exception as e:
             report_model_error(opt, e)
         completer.add_history(command)
@@ -525,7 +525,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
     elif command.startswith("!import"):
         path = shlex.split(command)
         if len(path) < 2:
-            ialog.warning(
+            log.warning(
                 "please provide (1) a URL to a .ckpt file to import; (2) a local path to a .ckpt file; or (3) a diffusers repository id in the form stabilityai/stable-diffusion-2-1"
             )
         else:
@@ -539,7 +539,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
     elif command.startswith(("!convert", "!optimize")):
         path = shlex.split(command)
         if len(path) < 2:
-            ialog.warning("please provide the path to a .ckpt or .safetensors model")
+            log.warning("please provide the path to a .ckpt or .safetensors model")
         else:
             try:
                 convert_model(path[1], gen, opt, completer)
@@ -551,7 +551,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
     elif command.startswith("!edit"):
         path = shlex.split(command)
         if len(path) < 2:
-            ialog.warning("please provide the name of a model")
+            log.warning("please provide the name of a model")
         else:
             edit_model(path[1], gen, opt, completer)
         completer.add_history(command)
@@ -560,7 +560,7 @@ def do_command(command: str, gen, opt: Args, completer) -> tuple:
     elif command.startswith("!del"):
         path = shlex.split(command)
         if len(path) < 2:
-            ialog.warning("please provide the name of a model")
+            log.warning("please provide the name of a model")
         else:
             del_config(path[1], gen, opt, completer)
         completer.add_history(command)
@@ -641,7 +641,7 @@ def import_model(model_path: str, gen, opt, completer):
                 default_name = url_attachment_name(model_path)
                 default_name = Path(default_name).stem
             except Exception:
-                ialog.warning(f"A problem occurred while assigning the name of the downloaded model",exc_info=True)
+                log.warning(f"A problem occurred while assigning the name of the downloaded model",exc_info=True)
             model_name, model_desc = _get_model_name_and_desc(
                 gen.model_manager,
                 completer,
@@ -662,11 +662,11 @@ def import_model(model_path: str, gen, opt, completer):
                 model_config_file=config_file,
             )
     if not imported_name:
-        ialog.error("Aborting import.")
+        log.error("Aborting import.")
         return
 
     if not _verify_load(imported_name, gen):
-        ialog.error("model failed to load. Discarding configuration entry")
+        log.error("model failed to load. Discarding configuration entry")
         gen.model_manager.del_model(imported_name)
         return
     if click.confirm("Make this the default model?", default=False):
@@ -674,7 +674,7 @@ def import_model(model_path: str, gen, opt, completer):
 
     gen.model_manager.commit(opt.conf)
     completer.update_models(gen.model_manager.list_models())
-    ialog.info(f"{imported_name} successfully installed")
+    log.info(f"{imported_name} successfully installed")
 
 def _pick_configuration_file(completer)->Path:
     print(
@@ -718,21 +718,21 @@ Please select the type of this model:
     return choice
 
 def _verify_load(model_name: str, gen) -> bool:
-    ialog.info("Verifying that new model loads...")
+    log.info("Verifying that new model loads...")
     current_model = gen.model_name
     try:
         if not gen.set_model(model_name):
             return
     except Exception as e:
-        ialog.warning(f"model failed to load: {str(e)}")
-        ialog.warning(
+        log.warning(f"model failed to load: {str(e)}")
+        log.warning(
             "** note that importing 2.X checkpoints is not supported. Please use !convert_model instead."
         )
         return False
     if click.confirm("Keep model loaded?", default=True):
         gen.set_model(model_name)
     else:
-        ialog.info("Restoring previous model")
+        log.info("Restoring previous model")
         gen.set_model(current_model)
     return True
 
@@ -755,7 +755,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
     ckpt_path = None
     original_config_file = None
     if model_name_or_path == gen.model_name:
-        ialog.warning("Can't convert the active model. !switch to another model first. **")
+        log.warning("Can't convert the active model. !switch to another model first. **")
         return
     elif model_info := manager.model_info(model_name_or_path):
         if "weights" in model_info:
@@ -765,7 +765,7 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
             model_description = model_info["description"]
             vae_path = model_info.get("vae")
         else:
-            ialog.warning(f"{model_name_or_path} is not a legacy .ckpt weights file")
+            log.warning(f"{model_name_or_path} is not a legacy .ckpt weights file")
             return
         model_name = manager.convert_and_import(
             ckpt_path,
@@ -786,16 +786,16 @@ def convert_model(model_name_or_path: Union[Path, str], gen, opt, completer):
     manager.commit(opt.conf)
     if click.confirm(f"Delete the original .ckpt file at {ckpt_path}?", default=False):
         ckpt_path.unlink(missing_ok=True)
-        ialog.warning(f"{ckpt_path} deleted")
+        log.warning(f"{ckpt_path} deleted")
 
 
 def del_config(model_name: str, gen, opt, completer):
     current_model = gen.model_name
     if model_name == current_model:
-        ialog.warning("Can't delete active model. !switch to another model first. **")
+        log.warning("Can't delete active model. !switch to another model first. **")
         return
     if model_name not in gen.model_manager.config:
-        ialog.warning(f"Unknown model {model_name}")
+        log.warning(f"Unknown model {model_name}")
         return
 
     if not click.confirm(
@@ -808,17 +808,17 @@ def del_config(model_name: str, gen, opt, completer):
     )
     gen.model_manager.del_model(model_name, delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
-    ialog.warning(f"{model_name} deleted")
+    log.warning(f"{model_name} deleted")
     completer.update_models(gen.model_manager.list_models())
 
 
 def edit_model(model_name: str, gen, opt, completer):
     manager = gen.model_manager
     if not (info := manager.model_info(model_name)):
-        ialog.warning(f"** Unknown model {model_name}")
+        log.warning(f"** Unknown model {model_name}")
         return
     print()
-    ialog.info(f"Editing model {model_name} from configuration file {opt.conf}")
+    log.info(f"Editing model {model_name} from configuration file {opt.conf}")
     new_name = _get_model_name(manager.list_models(), completer, model_name)
 
     for attribute in info.keys():
@@ -856,7 +856,7 @@ def edit_model(model_name: str, gen, opt, completer):
         manager.set_default_model(new_name)
     manager.commit(opt.conf)
     completer.update_models(manager.list_models())
-    ialog.info("Model successfully updated")
+    log.info("Model successfully updated")
 
 
 def _get_model_name(existing_names, completer, default_name: str = "") -> str:
@@ -867,11 +867,11 @@ def _get_model_name(existing_names, completer, default_name: str = "") -> str:
         if len(model_name) == 0:
             model_name = default_name
         if not re.match("^[\w._+:/-]+$", model_name):
-            ialog.warning(
+            log.warning(
                 'model name must contain only words, digits and the characters "._+:/-" **'
             )
         elif model_name != default_name and model_name in existing_names:
-            ialog.warning(f"the name {model_name} is already in use. Pick another.")
+            log.warning(f"the name {model_name} is already in use. Pick another.")
         else:
             done = True
     return model_name
@@ -938,10 +938,10 @@ def do_postprocess(gen, opt, callback):
             opt=opt,
         )
     except OSError:
-        ialog.error(f"{file_path}: file could not be read",exc_info=True)
+        log.error(f"{file_path}: file could not be read",exc_info=True)
         return
     except (KeyError, AttributeError):
-        ialog.error(f"an error occurred while applying the {tool} postprocessor",exc_info=True)
+        log.error(f"an error occurred while applying the {tool} postprocessor",exc_info=True)
         return
     return opt.last_operation
 
@@ -996,12 +996,12 @@ def prepare_image_metadata(
         try:
             filename = opt.fnformat.format(**wildcards)
         except KeyError as e:
-            ialog.error(
+            log.error(
                 f"The filename format contains an unknown key '{e.args[0]}'. Will use {{prefix}}.{{seed}}.png' instead"
             )
             filename = f"{prefix}.{seed}.png"
         except IndexError:
-            ialog.error(
+            log.error(
                 "The filename format is broken or complete. Will use '{prefix}.{seed}.png' instead"
             )
             filename = f"{prefix}.{seed}.png"
@@ -1091,14 +1091,14 @@ def split_variations(variations_string) -> list:
     for part in variations_string.split(","):
         seed_and_weight = part.split(":")
         if len(seed_and_weight) != 2:
-            ialog.warning(f'Could not parse with_variation part "{part}"')
+            log.warning(f'Could not parse with_variation part "{part}"')
             broken = True
             break
         try:
             seed = int(seed_and_weight[0])
             weight = float(seed_and_weight[1])
         except ValueError:
-            ialog.warning(f'Could not parse with_variation part "{part}"')
+            log.warning(f'Could not parse with_variation part "{part}"')
             broken = True
             break
         parts.append([seed, weight])
@@ -1122,23 +1122,23 @@ def load_face_restoration(opt):
                     opt.gfpgan_model_path
                 )
             else:
-                ialog.info("Face restoration disabled")
+                log.info("Face restoration disabled")
             if opt.esrgan:
                 esrgan = restoration.load_esrgan(opt.esrgan_bg_tile)
             else:
-                ialog.info("Upscaling disabled")
+                log.info("Upscaling disabled")
         else:
-            ialog.info("Face restoration and upscaling disabled")
+            log.info("Face restoration and upscaling disabled")
     except (ModuleNotFoundError, ImportError):
         print(traceback.format_exc(), file=sys.stderr)
-        ialog.info("You may need to install the ESRGAN and/or GFPGAN modules")
+        log.info("You may need to install the ESRGAN and/or GFPGAN modules")
     return gfpgan, codeformer, esrgan
 
 
 def make_step_callback(gen, opt, prefix):
     destination = os.path.join(opt.outdir, "intermediates", prefix)
     os.makedirs(destination, exist_ok=True)
-    ialog.info(f"Intermediate images will be written into {destination}")
+    log.info(f"Intermediate images will be written into {destination}")
 
     def callback(state: PipelineIntermediateState):
         latents = state.latents
@@ -1180,11 +1180,11 @@ def retrieve_dream_command(opt, command, completer):
     try:
         cmd = dream_cmd_from_png(path)
     except OSError:
-        ialog.error(f"{tokens[0]}: file could not be read")
+        log.error(f"{tokens[0]}: file could not be read")
     except (KeyError, AttributeError, IndexError):
-        ialog.error(f"{tokens[0]}: file has no metadata")
+        log.error(f"{tokens[0]}: file has no metadata")
     except:
-        ialog.error(f"{tokens[0]}: file could not be processed")
+        log.error(f"{tokens[0]}: file could not be processed")
     if len(cmd) > 0:
         completer.set_line(cmd)
 
@@ -1193,7 +1193,7 @@ def write_commands(opt, file_path: str, outfilepath: str):
     try:
         paths = sorted(list(Path(dir).glob(basename)))
     except ValueError:
-        ialog.error(f'"{basename}": unacceptable pattern')
+        log.error(f'"{basename}": unacceptable pattern')
         return
 
     commands = []
@@ -1202,9 +1202,9 @@ def write_commands(opt, file_path: str, outfilepath: str):
         try:
             cmd = dream_cmd_from_png(path)
         except (KeyError, AttributeError, IndexError):
-            ialog.error(f"{path}: file has no metadata")
+            log.error(f"{path}: file has no metadata")
         except:
-            ialog.error(f"{path}: file could not be processed")
+            log.error(f"{path}: file could not be processed")
         if cmd:
             commands.append(f"# {path}")
             commands.append(cmd)
@@ -1214,17 +1214,17 @@ def write_commands(opt, file_path: str, outfilepath: str):
             outfilepath = os.path.join(opt.outdir, basename)
         with open(outfilepath, "w", encoding="utf-8") as f:
             f.write("\n".join(commands))
-        ialog.info(f"File {outfilepath} with commands created")
+        log.info(f"File {outfilepath} with commands created")
 
 
 def report_model_error(opt: Namespace, e: Exception):
-    ialog.warning(f'An error occurred while attempting to initialize the model: "{str(e)}"')
-    ialog.warning(
+    log.warning(f'An error occurred while attempting to initialize the model: "{str(e)}"')
+    log.warning(
         "This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models."
     )
     yes_to_all = os.environ.get("INVOKE_MODEL_RECONFIGURE")
     if yes_to_all:
-        ialog.warning(
+        log.warning(
             "Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
         )
     else:
@@ -1234,7 +1234,7 @@ def report_model_error(opt: Namespace, e: Exception):
         ):
             return
 
-    ialog.info("invokeai-configure is launching....\n")
+    log.info("invokeai-configure is launching....\n")
 
     # Match arguments that were set on the CLI
     # only the arguments accepted by the configuration script are parsed
@@ -1251,7 +1251,7 @@ def report_model_error(opt: Namespace, e: Exception):
     from ..install import invokeai_configure
 
     invokeai_configure()
-    ialog.warning("InvokeAI will now restart")
+    log.warning("InvokeAI will now restart")
     sys.argv = previous_args
     main()  # would rather do a os.exec(), but doesn't exist?
     sys.exit(0)
