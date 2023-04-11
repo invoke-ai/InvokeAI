@@ -51,6 +51,9 @@ def log(level, msg, *args, **kwargs):
 def disable(level=logging.CRITICAL):
     InvokeAILogger.getLogger().disable(level)
 
+def basicConfig(**kwargs):
+    InvokeAILogger.getLogger().basicConfig(**kwargs)
+
 class InvokeAILogFormatter(logging.Formatter):
     '''
     Repurposed from:
@@ -100,14 +103,3 @@ class InvokeAILogger(object):
             logger.addHandler(ch)
             self.loggers[name] = logger
         return self.loggers[name]
-
-def test():
-    logger = InvokeAILogger.getLogger('foobar')
-    logger.info('InvokeAI initialized')
-    logger.info('Running on GPU 14')
-    logger.info('Loading model foobar')
-    logger.debug('scanning for malware')
-    logger.debug('combobulating')
-    logger.warning('Oops. This model is strange.')
-    logger.error('Bailing out. sorry.')
-    logging.info('what happens when I log with logging?')
