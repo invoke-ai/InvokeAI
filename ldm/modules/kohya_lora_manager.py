@@ -1,9 +1,7 @@
-import re
 from pathlib import Path
 from typing import Optional
 
 import torch
-from compel import Compel
 from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from torch.utils.hooks import RemovableHandle
@@ -16,6 +14,9 @@ This module supports loading LoRA weights trained with https://github.com/kohya-
 To be removed once support for diffusers LoRA weights is well supported
 """
 
+class IncompatibleModelException(Exception):
+    "Raised when there is an attempt to load a LoRA into a model that is incompatible with it"
+    pass
 
 class LoRALayer:
     lora_name: str
@@ -331,7 +332,10 @@ class KohyaLoraManager:
             checkpoint = load_file(path_file.absolute().as_posix(), device="cpu")
         else:
             checkpoint = torch.load(path_file, map_location="cpu")
-
+            
+        if not self.check_model_compatibility(checkpoint):
+            raise IncompatibleModelException
+        
         lora = LoRA(name, self.device, self.dtype, self.wrapper, multiplier)
         lora.load_from_dict(checkpoint)
         self.wrapper.loaded_loras[name] = lora
@@ -339,12 +343,14 @@ class KohyaLoraManager:
         return lora
 
     def apply_lora_model(self, name, mult: float = 1.0):
+        path_file = None
         for suffix in ["ckpt", "safetensors", "pt"]:
-            path_file = Path(self.lora_path, f"{name}.{suffix}")
-            if path_file.exists():
+            path_files = [x for x in Path(self.lora_path).glob(f"**/{name}.{suffix}")]
+            if len(path_files):
+                path_file = path_files[0]
                 print(f"   | Loading lora {path_file.name} with weight {mult}")
                 break
-        if not path_file.exists():
+        if not path_file:
             print(f"   ** Unable to find lora: {name}")
             return
 
@@ -355,13 +361,53 @@ class KohyaLoraManager:
         lora.multiplier = mult
         self.wrapper.applied_loras[name] = lora
 
-    def unload_applied_lora(self, lora_name: str):
+    def unload_applied_lora(self, lora_name: str)->bool:
+        '''If the indicated LoRA has previously been applied then
+        unload it and return True. Return False if the LoRA was
+        not previously applied (for status reporting)
+        '''
         if lora_name in self.wrapper.applied_loras:
             del self.wrapper.applied_loras[lora_name]
+            return True
+        return False
 
-    def unload_lora(self, lora_name: str):
+    def unload_lora(self, lora_name: str)->bool:
         if lora_name in self.wrapper.loaded_loras:
             del self.wrapper.loaded_loras[lora_name]
+            return True
+        return False
 
     def clear_loras(self):
         self.wrapper.clear_applied_loras()
+
+    def check_model_compatibility(self, checkpoint)->bool:
+        '''Checks whether the LoRA checkpoint is compatible with the token vector
+        length of the model that this manager is associated with.
+        '''
+        model_token_vector_length = self.text_encoder.get_input_embeddings().weight.data[0].shape[0]
+        lora_token_vector_length = self.vector_length_from_checkpoint(checkpoint)
+        return model_token_vector_length == lora_token_vector_length
+    
+    @staticmethod
+    def vector_length_from_checkpoint(checkpoint:dict)->int:
+        '''Return the vector token length for the passed LoRA checkpoint object.
+        This is used to determine which SD model version the LoRA was based on.
+        768 -> SDv1
+        1024-> SDv2
+        '''
+        key1 = 'lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight'
+        key2 = 'lora_te_text_model_encoder_layers_0_self_attn_k_proj.hada_w1_a'
+        lora_token_vector_length = checkpoint[key1].shape[1] if key1 in checkpoint \
+            else checkpoint[key2].shape[0] if key2 in checkpoint \
+                 else 768
+        return lora_token_vector_length
+
+    @staticmethod
+    def vector_length_from_checkpoint_file(checkpoint_path: Path)->int:
+        if checkpoint_path.suffix == ".safetensors":
+            checkpoint = load_file(checkpoint_path.absolute().as_posix(), device="cpu")
+        else:
+            checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        return KohyaLoraManager.vector_length_from_checkpoint(checkpoint)
+
+        
