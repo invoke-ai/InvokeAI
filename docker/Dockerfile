@@ -114,13 +114,13 @@ RUN mkdir -p "${VOLUME_DIR}" \
 # COPY --chown=${UNAME}:${UNAME} ./docker/config.yaml /data/config_blobfuse.yaml
 COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 COPY ./invokeai/configs/resleeve_configs.yml /data
-COPY ./docker/config.yaml /data/config_blobfuse.yaml
+COPY ./docker/config.yaml /blob_configs/config_blobfuse.yaml
+COPY ./docker/app.sh /usr/src/app.sh
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
 EXPOSE 9090
-CMD sh -c "blobfuse2 mount /blob_data/ --config-file /data/config_blobfuse.yaml & bash" 
-# & invokeai --web --host 0.0.0.0 --port 9090"
+CMD ["bash", "/usr/src/app.sh"]
 
 # ENTRYPOINT [ "invokeai" ]
 # CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
