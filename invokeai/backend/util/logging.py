@@ -28,22 +28,28 @@ import invokeai.backend.util.logging as ialog
 ialog.debug('this is a debugging message')
 """
 import logging
-import sys
 
-def debug(msg:str):
-    InvokeAILogger.getLogger().debug(msg)
+# module level functions
+def debug(msg, *args, **kwargs):
+    InvokeAILogger.getLogger().debug(msg, *args, **kwargs)
 
-def info(msg:str):
-    InvokeAILogger.getLogger().info(msg)
+def info(msg, *args, **kwargs):
+    InvokeAILogger.getLogger().info(msg, *args, **kwargs)
 
-def warning(msg:str):
-    InvokeAILogger.getLogger().warning(msg)
+def warning(msg, *args, **kwargs):
+    InvokeAILogger.getLogger().warning(msg, *args, **kwargs)
 
-def error(msg:str):
-    InvokeAILogger.getLogger().error(msg)
+def error(msg, *args, **kwargs):
+    InvokeAILogger.getLogger().error(msg, *args, **kwargs)
     
-def critical(msg:str):
-    InvokeAILogger.getLogger().critical(msg)
+def critical(msg, *args, **kwargs):
+    InvokeAILogger.getLogger().critical(msg, *args, **kwargs)
+
+def log(level, msg, *args, **kwargs):
+    InvokeAILogger.getLogger().log(level, msg, *args, **kwargs)
+
+def disable(level=logging.CRITICAL):
+    InvokeAILogger.getLogger().disable(level)
 
 class InvokeAILogFormatter(logging.Formatter):
     '''
