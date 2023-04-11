@@ -1,6 +1,12 @@
 import { Tooltip } from '@chakra-ui/react';
-import { CSSProperties } from 'react';
-import { Handle, Position, Connection, HandleType } from 'reactflow';
+import { CSSProperties, useMemo } from 'react';
+import {
+  Handle,
+  Position,
+  Connection,
+  HandleType,
+  useReactFlow,
+} from 'reactflow';
 import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../constants';
 // import { useConnectionEventStyles } from '../hooks/useConnectionEventStyles';
 import { InputField, OutputField } from '../types';
@@ -9,6 +15,7 @@ const handleBaseStyles: CSSProperties = {
   position: 'absolute',
   width: '1rem',
   height: '1rem',
+  opacity: 0.5,
   borderWidth: 0,
 };
 
@@ -18,6 +25,10 @@ const inputHandleStyles: CSSProperties = {
 
 const outputHandleStyles: CSSProperties = {
   right: '-0.5rem',
+};
+
+const requiredConnectionStyles: CSSProperties = {
+  opacity: 1,
 };
 
 type FieldHandleProps = {
@@ -30,7 +41,7 @@ type FieldHandleProps = {
 
 export const FieldHandle = (props: FieldHandleProps) => {
   const { nodeId, field, isValidConnection, handleType, styles } = props;
-  const { name, title, type, description } = field;
+  const { name, title, type, description, connectionType } = field;
 
   // this needs to iterate over every candicate target node, calculating graph cycles
   // WIP
@@ -56,8 +67,9 @@ export const FieldHandle = (props: FieldHandleProps) => {
         style={{
           backgroundColor: `var(--invokeai-colors-${FIELDS[type].color}-500)`,
           ...styles,
-          ...(handleType === 'target' ? inputHandleStyles : outputHandleStyles),
           ...handleBaseStyles,
+          ...(handleType === 'target' ? inputHandleStyles : outputHandleStyles),
+          ...(connectionType === 'always' ? requiredConnectionStyles : {}),
           // ...connectionEventStyles,
         }}
       />
