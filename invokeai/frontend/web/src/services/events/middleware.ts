@@ -1,11 +1,9 @@
 import { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 
 import {
-  GeneratorProgressEvent,
-  InvocationCompleteEvent,
-  InvocationErrorEvent,
-  InvocationStartedEvent,
+  ClientToServerEvents,
+  ServerToClientEvents,
 } from 'services/events/types';
 import {
   generatorProgress,
@@ -36,25 +34,31 @@ import { receivedOpenAPISchema } from 'services/thunks/schema';
 export const socketMiddleware = () => {
   let areListenersSet = false;
 
-  let socket_url = `ws://${window.location.host}`;
+  let socketUrl = `ws://${window.location.host}`;
+
+  const socketOptions: Parameters<typeof io>[0] = {
+    timeout: 60000,
+    path: '/ws/socket.io',
+    autoConnect: false, // achtung! removing this breaks the dynamic middleware
+  };
 
   // if building in package mode, replace socket url with open api base url minus the http protocol
-  if (import.meta.env.MODE === 'package') {
+  if (['nodes', 'package'].includes(import.meta.env.MODE)) {
     if (OpenAPI.BASE) {
       //eslint-disable-next-line
-      socket_url = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+      socketUrl = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
     }
 
     if (OpenAPI.TOKEN) {
       // TODO: handle providing jwt to socket.io
+      socketOptions.auth = { token: OpenAPI.TOKEN };
     }
   }
 
-  const socket = io(socket_url, {
-    timeout: 60000,
-    path: '/ws/socket.io',
-    autoConnect: false, // achtung! removing this breaks the dynamic middleware
-  });
+  const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
+    socketUrl,
+    socketOptions
+  );
 
   const middleware: Middleware =
     (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
@@ -65,7 +69,7 @@ export const socketMiddleware = () => {
         const { sessionId } = getState().system;
 
         if (sessionId) {
-          socket.emit('unsubscribe', { sessionId });
+          socket.emit('unsubscribe', { session: sessionId });
           dispatch(
             socketUnsubscribed({ sessionId, timestamp: getTimestamp() })
           );
@@ -119,11 +123,11 @@ export const socketMiddleware = () => {
       // Everything else only happens once we have created a session
       if (isFulfilledSessionCreatedAction(action)) {
         const oldSessionId = getState().system.sessionId;
-        const subscribedNodeIds = getState().system.subscribedNodeIds;
 
-        // temp disable this
+        // temp disable event subscription
         const shouldHandleEvent = (id: string): boolean => true;
 
+        // const subscribedNodeIds = getState().system.subscribedNodeIds;
         // const shouldHandleEvent = (id: string): boolean => {
         //   if (subscribedNodeIds.length === 1 && subscribedNodeIds[0] === '*') {
         //     return true;
@@ -145,13 +149,17 @@ export const socketMiddleware = () => {
             })
           );
 
-          // Remove listeners for these events; we need to set them up fresh whenever we subscribe
-          [
+          const listenersToRemove: (keyof ServerToClientEvents)[] = [
             'invocation_started',
             'generator_progress',
             'invocation_error',
             'invocation_complete',
-          ].forEach((event) => socket.removeAllListeners(event));
+          ];
+
+          // Remove listeners for these events; we need to set them up fresh whenever we subscribe
+          listenersToRemove.forEach((event: keyof ServerToClientEvents) => {
+            socket.removeAllListeners(event);
+          });
         }
 
         const sessionId = action.payload.id;
@@ -168,25 +176,25 @@ export const socketMiddleware = () => {
         );
 
         // Set up listeners for the present subscription
-        socket.on('invocation_started', (data: InvocationStartedEvent) => {
+        socket.on('invocation_started', (data) => {
           if (shouldHandleEvent(data.source_id)) {
             dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
           }
         });
 
-        socket.on('generator_progress', (data: GeneratorProgressEvent) => {
+        socket.on('generator_progress', (data) => {
           if (shouldHandleEvent(data.source_id)) {
             dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
           }
         });
 
-        socket.on('invocation_error', (data: InvocationErrorEvent) => {
+        socket.on('invocation_error', (data) => {
           if (shouldHandleEvent(data.source_id)) {
             dispatch(invocationError({ data, timestamp: getTimestamp() }));
           }
         });
 
-        socket.on('invocation_complete', (data: InvocationCompleteEvent) => {
+        socket.on('invocation_complete', (data) => {
           if (shouldHandleEvent(data.source_id)) {
             const sessionId = data.graph_execution_state_id;
 

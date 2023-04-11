@@ -47,7 +47,7 @@ export const $LatentsToLatentsInvocation = {
       type: 'number',
       description: `The Classifier-Free Guidance, higher values may result in a result closer to the prompt`,
     },
-    sampler_name: {
+    scheduler: {
       type: 'Enum',
     },
     seamless: {
