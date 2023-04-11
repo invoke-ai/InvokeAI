@@ -7,7 +7,8 @@ from safetensors.torch import load_file
 from torch.utils.hooks import RemovableHandle
 from transformers import CLIPTextModel
 
-from ldm.invoke.devices import choose_torch_device
+from ..invoke.devices import choose_torch_device
+
 
 """
 This module supports loading LoRA weights trained with https://github.com/kohya-ss/sd-scripts
