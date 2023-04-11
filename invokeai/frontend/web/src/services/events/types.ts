@@ -73,3 +73,28 @@ export type InvocationStartedEvent = {
 export type GraphExecutionStateCompleteEvent = {
   graph_execution_state_id: string;
 };
+
+export type ClientEmitSubscribe = {
+  session: string;
+};
+
+export type ClientEmitUnsubscribe = {
+  session: string;
+};
+
+export type ServerToClientEvents = {
+  generator_progress: (payload: GeneratorProgressEvent) => void;
+  invocation_complete: (payload: InvocationCompleteEvent) => void;
+  invocation_error: (payload: InvocationErrorEvent) => void;
+  invocation_started: (payload: InvocationStartedEvent) => void;
+  graph_execution_state_complete: (
+    payload: GraphExecutionStateCompleteEvent
+  ) => void;
+};
+
+export type ClientToServerEvents = {
+  connect: () => void;
+  disconnect: () => void;
+  subscribe: (payload: ClientEmitSubscribe) => void;
+  unsubscribe: (payload: ClientEmitUnsubscribe) => void;
+};
