@@ -12,7 +12,7 @@ from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput
 
 
-class CVInvocation(BaseModel):
+class CvInvocationConfig(BaseModel):
     """Helper class to provide all OpenCV invocations with additional config"""
 
     # Schema customisation
@@ -24,7 +24,7 @@ class CVInvocation(BaseModel):
         }
 
 
-class CvInpaintInvocation(BaseInvocation, CVInvocation):
+class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
     """Simple inpaint using opencv."""
     #fmt: off
     type: Literal["cv_inpaint"] = "cv_inpaint"
