@@ -24,6 +24,8 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
 
   const isValidConnection = useIsValidConnection();
 
+  // TODO: determine if a field/handle is connected and disable the input if so
+
   return (
     <Box
       sx={{
@@ -74,12 +76,14 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
                   </HStack>
                   <InputFieldComponent nodeId={id} field={input} />
                 </FormControl>
-                <FieldHandle
-                  nodeId={id}
-                  field={input}
-                  isValidConnection={isValidConnection}
-                  handleType="target"
-                />
+                {input.connectionType !== 'never' && (
+                  <FieldHandle
+                    nodeId={id}
+                    field={input}
+                    isValidConnection={isValidConnection}
+                    handleType="target"
+                  />
+                )}
               </Box>
             );
           })}

@@ -73,11 +73,14 @@ export type InputField =
 
 export type OutputField = FieldBase;
 
+export type ConnectionType = 'never' | 'always';
+
 export type FieldBase = {
   name: string;
   title: string;
   description: string;
   type: FieldType;
+  connectionType?: ConnectionType;
 };
 
 export type NumberInvocationField = {
