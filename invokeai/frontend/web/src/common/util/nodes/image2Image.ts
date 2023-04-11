@@ -48,7 +48,7 @@ export const buildImg2ImgNode = (
       width,
       height,
       cfg_scale: cfgScale,
-      sampler_name: sampler as ImageToImageInvocation['sampler_name'],
+      scheduler: sampler as ImageToImageInvocation['scheduler'],
       seamless,
       model,
       progress_images: shouldDisplayInProgressType === 'full-res',

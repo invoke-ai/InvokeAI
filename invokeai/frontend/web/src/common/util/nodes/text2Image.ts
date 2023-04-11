@@ -34,7 +34,7 @@ export const buildTxt2ImgNode = (
       width,
       height,
       cfg_scale,
-      sampler_name: sampler as TextToImageInvocation['sampler_name'],
+      scheduler: sampler as TextToImageInvocation['scheduler'],
       seamless,
       model,
       progress_images: shouldDisplayInProgressType === 'full-res',

@@ -38,9 +38,9 @@ export type ImageToImageInvocation = {
    */
   cfg_scale?: number;
   /**
-   * The sampler to use
+   * The scheduler to use
    */
-  sampler_name?: 'ddim' | 'dpmpp_2' | 'k_dpm_2' | 'k_dpm_2_a' | 'k_dpmpp_2' | 'k_euler' | 'k_euler_a' | 'k_heun' | 'k_lms' | 'plms';
+  scheduler?: 'ddim' | 'dpmpp_2' | 'k_dpm_2' | 'k_dpm_2_a' | 'k_dpmpp_2' | 'k_euler' | 'k_euler_a' | 'k_heun' | 'k_lms' | 'plms';
   /**
    * Whether or not to generate an image that can tile without seams
    */
