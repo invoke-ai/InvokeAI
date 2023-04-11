@@ -35,6 +35,11 @@ from ..stable_diffusion import PipelineIntermediateState
 from .modules.get_canvas_generation_mode import get_canvas_generation_mode
 from .modules.parameters import parameters_to_command
 from ..util import upload_on_blob
+from .jwt_utiles import get_user_id_from_jwt
+
+
+ENCODED_JWT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2ODAzMzY4OTksImV4cCI6MTcxMTg3Mjg5OSwiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwic3ViIjoidGVzdF9pbnZva2VhaV9oaXN0b3J5X3VzZXIifQ.Ktg84SeWH9j4efCerB6vsSvLK8LfLAKE16Pvlfwrtug"
+
 
 # Loading Arguments
 opt = Args()
@@ -116,7 +121,12 @@ class InvokeAIWebServer:
 
         @self.app.route("/outputs/<path:file_path>")
         def outputs(file_path):
-            return send_from_directory(self.app.config["OUTPUTS_FOLDER"], file_path)
+            encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+            user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+            return send_from_directory(
+                get_local_path(user_id, self.app.config["OUTPUTS_FOLDER"]),
+                file_path
+            )
 
         # Base Route
         @self.app.route("/")
@@ -129,6 +139,9 @@ class InvokeAIWebServer:
         @self.app.route("/upload", methods=["POST"])
         def upload():
             try:
+                encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+                user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
                 data = json.loads(request.form["data"])
                 filename = ""
                 # check if the post request has the file part
@@ -174,7 +187,7 @@ class InvokeAIWebServer:
                 split = os.path.splitext(secured_filename)
                 name = f"{split[0]}.{truncated_uuid}{split[1]}"
 
-                file_path = os.path.join(path, name)
+                file_path = get_local_path(user_id, os.path.join(path, name), create_path=True)
 
                 if "dataURL" in data:
                     with open(file_path, "wb") as f:
@@ -194,7 +207,9 @@ class InvokeAIWebServer:
                 (width, height) = pil_image.size
 
                 thumbnail_path = save_thumbnail(
-                    pil_image, os.path.basename(file_path), self.thumbnail_image_path
+                    pil_image,
+                    os.path.basename(file_path),
+                    get_local_path(user_id, self.thumbnail_image_path, create_path=True)
                 )
 
                 response = {
@@ -538,8 +553,13 @@ class InvokeAIWebServer:
         @socketio.on("requestSaveStagingAreaImageToGallery")
         def save_temp_image_to_gallery(url):
             try:
+                encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+                user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
                 image_path = self.get_image_path_from_url(url)
+                image_path = get_local_path(user_id, image_path)
                 new_path = os.path.join(self.result_path, os.path.basename(image_path))
+                new_path = get_local_path(user_id, new_path, create_path=True)
                 shutil.copy2(image_path, new_path)
 
                 if os.path.splitext(new_path)[1] == ".png":
@@ -552,7 +572,9 @@ class InvokeAIWebServer:
                 (width, height) = pil_image.size
 
                 thumbnail_path = save_thumbnail(
-                    pil_image, os.path.basename(new_path), self.thumbnail_image_path
+                    pil_image,
+                    os.path.basename(new_path),
+                    get_local_path(user_id, self.thumbnail_image_path, create_path=True)
                 )
 
                 image_array = [
@@ -578,9 +600,13 @@ class InvokeAIWebServer:
         @socketio.on("requestLatestImages")
         def handle_request_latest_images(category, latest_mtime):
             try:
+                encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+                user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
                 base_path = (
                     self.result_path if category == "result" else self.init_image_path
                 )
+                base_path = get_local_path(user_id, base_path)
 
                 paths = []
 
@@ -611,15 +637,15 @@ class InvokeAIWebServer:
                         (width, height) = pil_image.size
 
                         thumbnail_path = save_thumbnail(
-                            pil_image, os.path.basename(path), self.thumbnail_image_path
+                            pil_image,
+                            os.path.basename(path),
+                            get_local_path(user_id, self.thumbnail_image_path, create_path=True)
                         )
 
                         image_array.append(
                             {
                                 "url": self.get_url_from_image_path(path),
-                                "thumbnail": self.get_url_from_image_path(
-                                    thumbnail_path
-                                ),
+                                "thumbnail": self.get_url_from_image_path(thumbnail_path),
                                 "mtime": os.path.getmtime(path),
                                 "metadata": metadata.get("sd-metadata"),
                                 "dreamPrompt": metadata.get("Dream"),
@@ -644,11 +670,15 @@ class InvokeAIWebServer:
         @socketio.on("requestImages")
         def handle_request_images(category, earliest_mtime=None):
             try:
+                encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+                user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
                 page_size = 50
 
                 base_path = (
                     self.result_path if category == "result" else self.init_image_path
                 )
+                base_path = get_local_path(user_id, base_path)
 
                 paths = []
                 for ext in ("*.png", "*.jpg", "*.jpeg"):
@@ -681,15 +711,15 @@ class InvokeAIWebServer:
                         (width, height) = pil_image.size
 
                         thumbnail_path = save_thumbnail(
-                            pil_image, os.path.basename(path), self.thumbnail_image_path
+                            pil_image,
+                            os.path.basename(path),
+                            get_local_path(user_id, self.thumbnail_image_path, create_path=True)
                         )
 
                         image_array.append(
                             {
                                 "url": self.get_url_from_image_path(path),
-                                "thumbnail": self.get_url_from_image_path(
-                                    thumbnail_path
-                                ),
+                                "thumbnail": self.get_url_from_image_path(thumbnail_path),
                                 "mtime": os.path.getmtime(path),
                                 "metadata": metadata.get("sd-metadata"),
                                 "dreamPrompt": metadata.get("Dream"),
@@ -751,6 +781,9 @@ class InvokeAIWebServer:
         @socketio.on("runPostprocessing")
         def handle_run_postprocessing(original_image, postprocessing_parameters):
             try:
+                encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+                user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
                 print(
                     f'>> Postprocessing requested for "{original_image["url"]}": {postprocessing_parameters}'
                 )
@@ -763,6 +796,7 @@ class InvokeAIWebServer:
                 original_image_path = self.get_image_path_from_url(
                     original_image["url"]
                 )
+                original_image_path = get_local_path(user_id, original_image_path)
 
                 image = Image.open(original_image_path)
 
@@ -829,12 +863,14 @@ class InvokeAIWebServer:
                     image,
                     command,
                     metadata,
-                    self.result_path,
+                    get_local_path(user_id, self.result_path, create_path=True),
                     postprocessing=postprocessing_parameters["type"],
                 )
 
                 thumbnail_path = save_thumbnail(
-                    image, os.path.basename(path), self.thumbnail_image_path
+                    image,
+                    os.path.basename(path),
+                    get_local_path(user_id, self.thumbnail_image_path, create_path=True)
                 )
 
                 self.write_log_message(
@@ -869,11 +905,16 @@ class InvokeAIWebServer:
         @socketio.on("deleteImage")
         def handle_delete_image(url, thumbnail, uuid, category):
             try:
+                encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+                user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
                 print(f'>> Delete requested "{url}"')
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
+                path = get_local_path(user_id, path)
                 thumbnail_path = self.get_image_path_from_url(thumbnail)
+                thumbnail_path = get_local_path(user_id, thumbnail_path)
 
                 send2trash(path)
                 send2trash(thumbnail_path)
@@ -906,6 +947,9 @@ class InvokeAIWebServer:
         self, generation_parameters, esrgan_parameters, facetool_parameters
     ):
         try:
+            encoded_jwt = request.cookies.get("fastapiusersauth", default=ENCODED_JWT_TOKEN)
+            user_id = get_user_id_from_jwt(encoded_jwt=encoded_jwt)
+
             self.canceled.clear()
 
             step_index = 1
@@ -1020,6 +1064,7 @@ class InvokeAIWebServer:
             elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
+                init_img_path = get_local_path(user_id, init_img_path)
                 generation_parameters["init_img"] = Image.open(init_img_path).convert(
                     "RGB"
                 )
@@ -1064,7 +1109,7 @@ class InvokeAIWebServer:
                         image,
                         command,
                         metadata,
-                        self.intermediate_path,
+                        get_local_path(user_id, self.intermediate_path, create_path=True),
                         step_index=step_index,
                         postprocessing=False,
                     )
@@ -1222,7 +1267,8 @@ class InvokeAIWebServer:
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
                 all_parameters["init_img"] = (
-                    init_img_url
+                    # init_img_url
+                    init_img_path
                     if generation_parameters["generation_mode"] == "img2img"
                     else ""
                 )
@@ -1251,23 +1297,15 @@ class InvokeAIWebServer:
                     image,
                     command,
                     metadata,
-                    generated_image_outdir,
+                    get_local_path(user_id, generated_image_outdir, create_path=True),
                     postprocessing=postprocessing,
                 )
 
                 thumbnail_path = save_thumbnail(
-                    image, os.path.basename(path), self.thumbnail_image_path
+                    image,
+                    os.path.basename(path),
+                    get_local_path(user_id, self.thumbnail_image_path, create_path=True)
                 )
-
-                print(f'\n\n>> Image generated: "{path}"\n')
-                #FIXME change user with id
-                response = upload_on_blob(container="generatedimage",
-                               user_id="final",
-                               image=image,
-                               generation_mode=generation_parameters["generation_mode"],
-                               filename= path.split("/")[-1])
-                logger.debug(f"generatedimage{response.content}")
-                self.write_log_message(f'[Generated] "{path}": {command}')
 
                 if progress.total_iterations > progress.current_iteration:
                     progress.set_current_step(1)
@@ -1428,9 +1466,7 @@ class InvokeAIWebServer:
             if rfc_dict["type"] == "img2img":
                 rfc_dict["strength"] = parameters["strength"]
                 rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
-                rfc_dict["orig_hash"] = calculate_init_img_hash(
-                    self.get_image_path_from_url(parameters["init_img"])
-                )
+                rfc_dict["orig_hash"] = calculate_init_img_hash(parameters["init_img"])
                 rfc_dict["init_image_path"] = parameters[
                     "init_img"
                 ]  # TODO: Noncompliant
@@ -1809,3 +1845,60 @@ def save_thumbnail(
     image_copy.save(thumbnail_path, "WEBP")
 
     return thumbnail_path
+
+
+def is_file_pattern(pattern):
+    """
+    Checks if the given pattern is a file pattern.
+    
+    Args:
+        pattern (str): The pattern to check.
+        
+    Returns:
+        bool: True if the pattern is a file pattern, False otherwise.
+    """
+    return True if Path(pattern).suffix else False
+
+
+def is_directory_pattern(pattern):
+    """
+    Checks if the given pattern is a directory pattern.
+    
+    Args:
+        pattern (str): The pattern to check.
+        
+    Returns:
+        bool: True if the pattern is a directory pattern, False otherwise.
+    """
+    return True if not Path(pattern).suffix else False
+
+
+def get_local_path(user_id: str, path: str, create_path: bool = False) -> str:
+    """
+    Concatenates the given user ID with the root directory of the given path.
+    
+    Args:
+        user_id (str): The user ID to add to the path.
+        path (str): The path to modify.
+        
+    Returns:
+        str: The new path with the user ID added to the root directory.
+    """
+    # Split the path into a list of directories
+    directories = path.split('/')
+    
+    # Insert the user ID after the first directory
+    directories.insert(2, user_id)
+    
+    # Join the directories back together into a new path
+    new_path = '/'.join(directories)
+    
+    # Make directory if needed
+    if create_path:
+        if is_file_pattern(new_path):
+            Path(new_path).parent.mkdir(parents=True, exist_ok=True)
+
+        if is_directory_pattern(new_path):
+            Path(new_path).mkdir(parents=True, exist_ok=True)
+
+    return new_path
