@@ -54,13 +54,16 @@ def disable(level=logging.CRITICAL):
 def basicConfig(**kwargs):
     InvokeAILogger.getLogger().basicConfig(**kwargs)
 
+def getLogger(name: str=None)->logging.Logger:
+    return InvokeAILogger.getLogger(name)
+
 class InvokeAILogFormatter(logging.Formatter):
     '''
     Repurposed from:
     https://stackoverflow.com/questions/14844970/modifying-logging-message-format-based-on-message-logging-level-in-python3
     '''
     crit_fmt = "### %(msg)s"
-    err_fmt = "!!! %(msg)s !!!"
+    err_fmt = "*** %(msg)s"
     warn_fmt = "** %(msg)s"
     info_fmt = ">> %(msg)s"
     dbg_fmt = "   | %(msg)s"
