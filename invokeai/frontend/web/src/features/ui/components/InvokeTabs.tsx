@@ -175,6 +175,7 @@ export default function InvokeTabs() {
         dispatch(setActiveTab(index));
       }}
       flexGrow={1}
+      isLazy
     >
       <TabList>{tabs}</TabList>
       <TabPanels>{tabPanels}</TabPanels>
