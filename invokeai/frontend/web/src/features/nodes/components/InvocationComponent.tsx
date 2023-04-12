@@ -1,4 +1,4 @@
-import { NodeProps } from 'reactflow';
+import { NodeProps, useReactFlow } from 'reactflow';
 import {
   Box,
   Flex,
@@ -9,14 +9,30 @@ import {
   Tooltip,
   Icon,
   Code,
+  Text,
 } from '@chakra-ui/react';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Invocation } from '../types';
 import { InputFieldComponent } from './InputFieldComponent';
 import { FieldHandle } from './FieldHandle';
-import { map, size } from 'lodash';
-import { memo } from 'react';
+import { isEqual, map, size } from 'lodash';
+import { memo, useMemo } from 'react';
 import { useIsValidConnection } from '../hooks/useIsValidConnection';
+import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
+
+const connectedInputFieldsSelector = createSelector(
+  (state: RootState) => state.nodes.edges,
+  (edges) => {
+    return edges.map((e) => e.targetHandle);
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: isEqual,
+    },
+  }
+);
 
 export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
   const { id, data, selected } = props;
@@ -24,6 +40,7 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
 
   const isValidConnection = useIsValidConnection();
 
+  const connectedInputs = useAppSelector(connectedInputFieldsSelector);
   // TODO: determine if a field/handle is connected and disable the input if so
 
   return (
@@ -54,6 +71,7 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
             </Tooltip>
           </HStack>
           {map(inputs, (input, i) => {
+            const isConnected = connectedInputs.includes(input.name);
             return (
               <Box
                 key={i}
@@ -61,8 +79,14 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
                 p={2}
                 borderWidth={1}
                 borderRadius="md"
+                sx={{
+                  borderColor:
+                    !isConnected && input.connectionType === 'always'
+                      ? 'warning.400'
+                      : undefined,
+                }}
               >
-                <FormControl>
+                <FormControl isDisabled={isConnected}>
                   <HStack justifyContent="space-between" alignItems="center">
                     <FormLabel>{input.title}</FormLabel>
                     <Tooltip
@@ -87,24 +111,33 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
               </Box>
             );
           })}
+          {map(outputs).map((output, i) => {
+            // const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
+            const { name, title } = output;
+            return (
+              <Box
+                key={name}
+                position="relative"
+                p={2}
+                borderWidth={1}
+                borderRadius="md"
+              >
+                <FormControl>
+                  <FormLabel textAlign="end">{title} Output</FormLabel>
+                </FormControl>
+                <FieldHandle
+                  key={name}
+                  nodeId={id}
+                  field={output}
+                  isValidConnection={isValidConnection}
+                  handleType="source"
+                />
+              </Box>
+            );
+          })}
         </>
       </Flex>
-      <Flex>
-        {map(outputs).map((output, i) => {
-          const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
-
-          return (
-            <FieldHandle
-              key={i}
-              nodeId={id}
-              field={output}
-              isValidConnection={isValidConnection}
-              handleType="source"
-              styles={{ top }}
-            />
-          );
-        })}
-      </Flex>
+      <Flex></Flex>
     </Box>
   );
 });
