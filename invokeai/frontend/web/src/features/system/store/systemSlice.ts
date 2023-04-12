@@ -92,6 +92,10 @@ export interface SystemState
    * Array of node IDs that we want to handle when events received
    */
   subscribedNodeIds: string[];
+  /**
+   * Whether or not URLs should be transformed to use a different host
+   */
+  shouldTransformUrls: boolean;
 }
 
 const initialSystemState: SystemState = {
@@ -139,6 +143,7 @@ const initialSystemState: SystemState = {
   cancelType: 'immediate',
   isCancelScheduled: false,
   subscribedNodeIds: [],
+  shouldTransformUrls: false,
 };
 
 export const systemSlice = createSlice({
@@ -335,6 +340,12 @@ export const systemSlice = createSlice({
      */
     subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
       state.subscribedNodeIds = action.payload;
+    },
+    /**
+     * `shouldTransformUrls` was changed
+     */
+    shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldTransformUrls = action.payload;
     },
   },
   extraReducers(builder) {
@@ -536,6 +547,7 @@ export const {
   scheduledCancelAborted,
   cancelTypeChanged,
   subscribedNodeIdsSet,
+  shouldTransformUrlsChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
