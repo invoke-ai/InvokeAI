@@ -1,11 +1,17 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and 2023 Kent Keirsey (https://github.com/hipsterusername)
 
+import shutil
+import asyncio
 from typing import Annotated, Any, List, Literal, Optional, Union
 
-from fastapi.routing import APIRouter
+from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
-
+from pathlib import Path
 from ..dependencies import ApiDependencies
+from invokeai.backend.globals import Globals, global_converted_ckpts_dir
+from invokeai.backend.args import Args
+
+
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -15,11 +21,9 @@ class VaeRepo(BaseModel):
     path: Optional[str] = Field(description="The path to the VAE")
     subfolder: Optional[str] = Field(description="The subfolder to use for this VAE")
 
-
 class ModelInfo(BaseModel):
     description: Optional[str] = Field(description="A description of the model")
     
-
 class CkptModelInfo(ModelInfo):
     format: Literal['ckpt'] = 'ckpt'
 
@@ -29,7 +33,6 @@ class CkptModelInfo(ModelInfo):
     width: Optional[int] = Field(description="The width of the model")
     height: Optional[int] = Field(description="The height of the model")
 
-
 class DiffusersModelInfo(ModelInfo):
     format: Literal['diffusers'] = 'diffusers'
 
@@ -37,10 +40,27 @@ class DiffusersModelInfo(ModelInfo):
     repo_id: Optional[str] = Field(description="The repo ID to use for this model")
     path: Optional[str] = Field(description="The path to the model")
 
+class CreateModelRequest(BaseModel):
+    name: str = Field(description="The name of the model")
+    info: Union[CkptModelInfo, DiffusersModelInfo] = Field(discriminator="format", description="The model info")
+
+class CreateModelResponse(BaseModel):
+    name: str = Field(description="The name of the new model")
+    info: Union[CkptModelInfo, DiffusersModelInfo] = Field(discriminator="format", description="The model info")
+    status: str = Field(description="The status of the API response")
+
+class ConversionRequest(BaseModel):
+    name: str = Field(description="The name of the new model")
+    info: CkptModelInfo = Field(description="The converted model info")
+    save_location: str = Field(description="The path to save the converted model weights")
+    
+
+class ConvertedModelResponse(BaseModel):
+    name: str = Field(description="The name of the new model")
+    info: DiffusersModelInfo = Field(description="The converted model info")
 
 class ModelsList(BaseModel):
     models: dict[str, Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")]]
-
 
 
 @models_router.get(
@@ -54,108 +74,61 @@ async def list_models() -> ModelsList:
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
 
-        # @socketio.on("requestSystemConfig")
-        # def handle_request_capabilities():
-        #     print(">> System config requested")
-        #     config = self.get_system_config()
-        #     config["model_list"] = self.generate.model_manager.list_models()
-        #     config["infill_methods"] = infill_methods()
-        #     socketio.emit("systemConfig", config)
 
-        # @socketio.on("searchForModels")
-        # def handle_search_models(search_folder: str):
-        #     try:
-        #         if not search_folder:
-        #             socketio.emit(
-        #                 "foundModels",
-        #                 {"search_folder": None, "found_models": None},
-        #             )
-        #         else:
-        #             (
-        #                 search_folder,
-        #                 found_models,
-        #             ) = self.generate.model_manager.search_models(search_folder)
-        #             socketio.emit(
-        #                 "foundModels",
-        #                 {"search_folder": search_folder, "found_models": found_models},
-        #             )
-        #     except Exception as e:
-        #         self.handle_exceptions(e)
-        #         print("\n")
+@models_router.post(
+    "/",
+    operation_id="update_model",
+    responses={200: {"status": "success"}},
+)
+async def update_model(
+    model_request: CreateModelRequest
+) -> CreateModelResponse:
+    """ Add Model """
+    model_request_info = model_request.info
+    info_dict = model_request_info.dict()
+    model_response = CreateModelResponse(name=model_request.name, info=model_request.info, status="success")
 
-        # @socketio.on("addNewModel")
-        # def handle_add_model(new_model_config: dict):
-        #     try:
-        #         model_name = new_model_config["name"]
-        #         del new_model_config["name"]
-        #         model_attributes = new_model_config
-        #         if len(model_attributes["vae"]) == 0:
-        #             del model_attributes["vae"]
-        #         update = False
-        #         current_model_list = self.generate.model_manager.list_models()
-        #         if model_name in current_model_list:
-        #             update = True
+    ApiDependencies.invoker.services.model_manager.add_model(
+        model_name=model_request.name,
+        model_attributes=info_dict,
+        clobber=True,
+    )
 
-        #         print(f">> Adding New Model: {model_name}")
+    return model_response
 
-        #         self.generate.model_manager.add_model(
-        #             model_name=model_name,
-        #             model_attributes=model_attributes,
-        #             clobber=True,
-        #         )
-        #         self.generate.model_manager.commit(opt.conf)
 
-        #         new_model_list = self.generate.model_manager.list_models()
-        #         socketio.emit(
-        #             "newModelAdded",
-        #             {
-        #                 "new_model_name": model_name,
-        #                 "model_list": new_model_list,
-        #                 "update": update,
-        #             },
-        #         )
-        #         print(f">> New Model Added: {model_name}")
-        #     except Exception as e:
-        #         self.handle_exceptions(e)
+@models_router.delete(
+    "/{model_name}",
+    operation_id="del_model",
+    responses={
+        204: {
+        "description": "Model deleted successfully"
+        }, 
+        404: {
+        "description": "Model not found"
+        }
+    },
+)
+async def delete_model(model_name: str) -> None:
+    """Delete Model"""
+    model_names = ApiDependencies.invoker.services.model_manager.model_names()
+    model_exists = model_name in model_names
 
-        # @socketio.on("deleteModel")
-        # def handle_delete_model(model_name: str):
-        #     try:
-        #         print(f">> Deleting Model: {model_name}")
-        #         self.generate.model_manager.del_model(model_name)
-        #         self.generate.model_manager.commit(opt.conf)
-        #         updated_model_list = self.generate.model_manager.list_models()
-        #         socketio.emit(
-        #             "modelDeleted",
-        #             {
-        #                 "deleted_model_name": model_name,
-        #                 "model_list": updated_model_list,
-        #             },
-        #         )
-        #         print(f">> Model Deleted: {model_name}")
-        #     except Exception as e:
-        #         self.handle_exceptions(e)
+    # check if model exists
+    print(f">> Checking for model {model_name}...")
+           
+    if model_exists:
+        print(f">> Deleting Model: {model_name}")
+        ApiDependencies.invoker.services.model_manager.del_model(model_name, delete_files=True)
+        print(f">> Model Deleted: {model_name}")
+        raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
+    
+    else:
+        print(f">> Model not found")
+        raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
+    
 
-        # @socketio.on("requestModelChange")
-        # def handle_set_model(model_name: str):
-        #     try:
-        #         print(f">> Model change requested: {model_name}")
-        #         model = self.generate.set_model(model_name)
-        #         model_list = self.generate.model_manager.list_models()
-        #         if model is None:
-        #             socketio.emit(
-        #                 "modelChangeFailed",
-        #                 {"model_name": model_name, "model_list": model_list},
-        #             )
-        #         else:
-        #             socketio.emit(
-        #                 "modelChanged",
-        #                 {"model_name": model_name, "model_list": model_list},
-        #             )
-        #     except Exception as e:
-        #         self.handle_exceptions(e)
-
-        # @socketio.on("convertToDiffusers")
+            # @socketio.on("convertToDiffusers")
         # def convert_to_diffusers(model_to_convert: dict):
         #     try:
         #         if model_info := self.generate.model_manager.model_info(
@@ -276,4 +249,3 @@ async def list_models() -> ModelsList:
         #         print(f">> Models Merged: {models_to_merge}")
         #         print(f">> New Model Added: {model_merge_info['merged_model_name']}")
         #     except Exception as e:
-        #         self.handle_exceptions(e)

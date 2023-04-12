@@ -3,10 +3,10 @@ from typing import Literal, Union
 
 from pydantic import Field
 
-from ..services.image_storage import ImageType
+from invokeai.app.models.image import ImageField, ImageType
 from ..services.invocation_services import InvocationServices
-from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
+from .image import ImageOutput
 
 class RestoreFaceInvocation(BaseInvocation):
     """Restores faces in an image."""
@@ -18,6 +18,14 @@ class RestoreFaceInvocation(BaseInvocation):
     strength:                float = Field(default=0.75, gt=0, le=1, description="The strength of the restoration"  )
     #fmt: on
     
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["restoration", "image"],
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
             self.image.image_type, self.image.image_name
