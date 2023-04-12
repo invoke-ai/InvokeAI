@@ -24,7 +24,7 @@ const inputHandleStyles: CSSProperties = {
 };
 
 const outputHandleStyles: CSSProperties = {
-  right: '-0.5rem',
+  right: '-1.7rem',
 };
 
 const requiredConnectionStyles: CSSProperties = {
