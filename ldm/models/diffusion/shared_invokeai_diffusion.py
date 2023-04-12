@@ -5,7 +5,7 @@ from typing import Callable, Optional, Union, Any, Dict
 
 import numpy as np
 import torch
-from diffusers.models.cross_attention import AttnProcessor
+from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
 from ldm.invoke.globals import Globals
@@ -110,7 +110,7 @@ class InvokeAIDiffuserComponent:
 
     def override_attention_processors(
         self, conditioning: ExtraConditioningInfo, step_count: int
-    ) -> Dict[str, AttnProcessor]:
+    ) -> Dict[str, AttentionProcessor]:
         """
         setup cross attention .swap control. for diffusers this replaces the attention processor, so
         the previous attention processor is returned so that the caller can restore it later.
@@ -135,7 +135,7 @@ class InvokeAIDiffuserComponent:
         return old_attn_processors
 
     def restore_default_cross_attention(
-        self, processors_to_restore: Optional[dict[str, "AttnProcessor"]] = None
+        self, processors_to_restore: Optional[dict[str, "AttentionProcessor"]] = None
     ):
         self.cross_attention_control_context = None
         restore_default_cross_attention(

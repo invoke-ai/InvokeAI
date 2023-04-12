@@ -14,7 +14,7 @@ from torch import nn
 
 from compel.cross_attention_control import Arguments
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
-from diffusers.models.cross_attention import AttnProcessor
+from diffusers.models.attention_processor import AttentionProcessor
 from ldm.invoke.devices import torch_dtype
 
 
@@ -163,7 +163,7 @@ class Context:
 
 class InvokeAICrossAttentionMixin:
     """
-    Enable InvokeAI-flavoured CrossAttention calculation, which does aggressive low-memory slicing and calls
+    Enable InvokeAI-flavoured Attention calculation, which does aggressive low-memory slicing and calls
     through both to an attention_slice_wrangler and a slicing_strategy_getter for custom attention map wrangling
     and dymamic slicing strategy selection.
     """
@@ -178,7 +178,7 @@ class InvokeAICrossAttentionMixin:
         Set custom attention calculator to be called when attention is calculated
         :param wrangler: Callback, with args (module, suggested_attention_slice, dim, offset, slice_size),
         which returns either the suggested_attention_slice or an adjusted equivalent.
-            `module` is the current CrossAttention module for which the callback is being invoked.
+            `module` is the current Attention module for which the callback is being invoked.
             `suggested_attention_slice` is the default-calculated attention slice
             `dim` is -1 if the attenion map has not been sliced, or 0 or 1 for dimension-0 or dimension-1 slicing.
                 If `dim` is >= 0, `offset` and `slice_size` specify the slice start and length.
@@ -289,10 +289,10 @@ class InvokeAICrossAttentionMixin:
 
 
 
-def restore_default_cross_attention(model, is_running_diffusers: bool, processors_to_restore: Optional[AttnProcessor]=None):
+def restore_default_cross_attention(model, is_running_diffusers: bool, processors_to_restore: Optional[AttentionProcessor]=None):
     if is_running_diffusers:
         unet = model
-        unet.set_attn_processor(processors_to_restore or CrossAttnProcessor())
+        unet.set_attn_processor(processors_to_restore or AttnProcessor())
     else:
         remove_attention_function(model)
 
@@ -342,7 +342,7 @@ def override_cross_attention(model, context: Context, is_running_diffusers = Fal
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
-    from ldm.modules.attention import CrossAttention # avoid circular import
+    from ldm.modules.attention import CrossAttention # avoid circular import # TODO: rename as in diffusers?
     cross_attention_class: type = InvokeAIDiffusersCrossAttention if isinstance(model,UNet2DConditionModel) else CrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
@@ -448,7 +448,7 @@ def get_mem_free_total(device):
 
 
 
-class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin):
+class InvokeAIDiffusersCrossAttention(diffusers.models.attention.Attention, InvokeAICrossAttentionMixin):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -473,8 +473,8 @@ class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention,
 """
 # base implementation
 
-class CrossAttnProcessor:
-    def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None):
+class AttnProcessor:
+    def __call__(self, attn: Attention, hidden_states, encoder_hidden_states=None, attention_mask=None):
         batch_size, sequence_length, _ = hidden_states.shape
         attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
 
@@ -503,7 +503,7 @@ from dataclasses import field, dataclass
 
 import torch
 
-from diffusers.models.cross_attention import CrossAttention, CrossAttnProcessor, SlicedAttnProcessor
+from diffusers.models.attention_processor import Attention, AttnProcessor, SlicedAttnProcessor
 
 
 @dataclass
@@ -548,7 +548,7 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
 
     # TODO: dynamically pick slice size based on memory conditions
 
-    def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None,
+    def __call__(self, attn: Attention, hidden_states, encoder_hidden_states=None, attention_mask=None,
                  # kwargs
                  swap_cross_attn_context: SwapCrossAttnContext=None):
 
