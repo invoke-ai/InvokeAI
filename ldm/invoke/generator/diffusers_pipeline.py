@@ -471,7 +471,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                                              step_count=len(self.scheduler.timesteps)
                                                              ):
 
-            yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
+            yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.config.num_train_timesteps,
                                             latents=latents)
 
             batch_size = latents.shape[0]
