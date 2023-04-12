@@ -246,11 +246,12 @@ def invoke_cli():
 
         try:
             # Refresh the state of the session
-            history = list(get_graph_execution_history(context.session))
+            #history = list(get_graph_execution_history(context.session))
+            history = list(reversed(context.nodes_added))
 
             # Split the command for piping
             cmds = cmd_input.split("|")
-            start_id = len(history)
+            start_id = len(context.nodes_added)
             current_id = start_id
             new_invocations = list()
             for cmd in cmds:
@@ -277,6 +278,7 @@ def invoke_cli():
                             field = exposed_input.field
                             setattr(node, field, args[exposed_input.alias])
                     command = CliCommand(command = invocation)
+                    context.graph_nodes[invocation.id] = system_graph.id
                 else:
                     args["id"] = current_id
                     command = CliCommand(command=args)
@@ -349,10 +351,10 @@ def invoke_cli():
                 current_id = current_id + 1
 
                 # Add the node to the session
-                context.session.add_node(command.command)
+                context.add_node(command.command)
                 for edge in edges:
                     print(edge)
-                    context.session.add_edge(edge)
+                    context.add_edge(edge)
 
             # Execute all remaining nodes
             invoke_all(context)
