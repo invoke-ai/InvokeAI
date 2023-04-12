@@ -71,6 +71,7 @@ dependencies = [
   "safetensors~=0.3.0",
   "scikit-image>=0.19",
   "send2trash",
+  "sqlalchemy~=2.0.9",
   "test-tube>=0.7.5",
   "torch>=1.13.1",
   "torchvision>=0.14.1",
