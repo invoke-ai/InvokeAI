@@ -85,8 +85,8 @@ def expand_prompts(
                 p = Process(
                     target=_run_invoke,
                     kwargs=dict(
-#                        entry_point=ldm.invoke.CLI.main,
-                        entry_point=_dummy_cli_main,
+                        entry_point=ldm.invoke.CLI.main,
+#                        entry_point=_dummy_cli_main,
                         conn_in=child_conn,
                         conn_out=parent_conn,
                         args=invokeai_args,
@@ -187,9 +187,9 @@ def _run_invoke(
     os.environ["CUDA_VISIBLE_DEVICES"] = f"{gpu}"
     sys.argv = args
     sys.stdin = MessageToStdin(conn_in)
-    sys.stdout = FilterStream(sys.stdout, include=re.compile("^\[\d+\]"))
-    with open(logfile, "w") as stderr, redirect_stderr(stderr):
-        entry_point()
+#    sys.stdout = FilterStream(sys.stdout, include=re.compile("^\[\d+\]"))
+#    with open(logfile, "w") as stderr, redirect_stderr(stderr):
+    entry_point()
 
 
 def _filter_output(stream: TextIOBase):
