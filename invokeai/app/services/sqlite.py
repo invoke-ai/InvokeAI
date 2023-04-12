@@ -1,10 +1,10 @@
-from typing import Generic, TypeVar, Union, get_args
+from typing import Generic, TypeVar, Union, get_args, get_origin
 from pydantic import BaseModel, parse_raw_as
 
 from .item_storage import ItemStorageABC, PaginatedResults
 
-from sqlalchemy import create_engine, TEXT, Engine, select
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+from sqlalchemy import create_engine, String, TEXT, Engine, select
+from sqlalchemy.orm import DeclarativeBase, mapped_column, Session
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -28,16 +28,24 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
 
-        self._engine = create_engine(f"sqlite+pysqlite:///{self._filename}", echo=True)
+        self._engine = create_engine(f"sqlite+pysqlite:///{self._filename}")
         self._create_table()
 
     def _create_table(self):
-        class Item(Base):
-            __tablename__ = self._table_name
-            id: Mapped[str] = mapped_column(primary_key=True)
-            item = mapped_column(TEXT, nullable=False)
+        # dynamically create the ORM model class to avoid name collisions
 
-        self._table = Item
+        # cannot access `self.__orig_class__` in `__init__` or `__new__` so
+        # format the table name into the class name
+        pascal_table_name = self._table_name.replace("_", " ").title()
+        pascal_table_name = pascal_table_name.replace(" ", "")
+
+        table_dict = dict(
+            __tablename__=self._table_name,
+            id=mapped_column(String, primary_key=True),
+            item=mapped_column(TEXT, nullable=False),
+        )
+
+        self._table = type(pascal_table_name, (Base,), table_dict)
 
         Base.metadata.create_all(self._engine)
 
@@ -61,7 +69,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def get(self, id: str) -> Union[T, None]:
         session = Session(self._engine)
 
-        item = session.get(self._table, id)
+        item = session.get(self._table, str(id))
 
         session.close()
 
