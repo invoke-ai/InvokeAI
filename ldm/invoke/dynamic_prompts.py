@@ -85,7 +85,8 @@ def expand_prompts(
                 p = Process(
                     target=_run_invoke,
                     kwargs=dict(
-                        entry_point=ldm.invoke.CLI.main,
+#                        entry_point=ldm.invoke.CLI.main,
+                        entry_point=_dummy_cli_main,
                         conn_in=child_conn,
                         conn_out=parent_conn,
                         args=invokeai_args,
@@ -110,6 +111,13 @@ def expand_prompts(
     except KeyboardInterrupt:
         for p in children:
             p.terminate()
+
+def _dummy_cli_main():
+    counter = 0
+    while line := sys.stdin.readline():
+        print(f'[{counter}] {os.getpid()} got command {line.rstrip()}\n')
+        counter += 1
+        time.sleep(1)
 
 def _get_fn_format(directory:str, sequence:int)->str:
     """
