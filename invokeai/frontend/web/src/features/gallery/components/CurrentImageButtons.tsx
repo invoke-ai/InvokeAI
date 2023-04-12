@@ -54,6 +54,7 @@ import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { useGetUrl } from 'common/util/getUrl';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -129,6 +130,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     activeTabName,
     selectedImage,
   } = useAppSelector(currentImageButtonsSelector);
+  const { getUrl, shouldTransformUrls } = useGetUrl();
 
   const toast = useToast();
   const { t } = useTranslation();
@@ -146,7 +148,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const handleCopyImage = async () => {
     if (!selectedImage) return;
 
-    const blob = await fetch(selectedImage.url).then((res) => res.blob());
+    const blob = await fetch(getUrl(selectedImage.url)).then((res) =>
+      res.blob()
+    );
     const data = [new ClipboardItem({ [blob.type]: blob })];
 
     await navigator.clipboard.write(data);
@@ -160,18 +164,20 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleCopyImageLink = () => {
-    navigator.clipboard
-      .writeText(
-        selectedImage ? window.location.toString() + selectedImage.url : ''
-      )
-      .then(() => {
-        toast({
-          title: t('toast.imageLinkCopied'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
+    const url = selectedImage
+      ? shouldTransformUrls
+        ? getUrl(selectedImage.url)
+        : window.location.toString() + selectedImage.url
+      : '';
+
+    navigator.clipboard.writeText(url).then(() => {
+      toast({
+        title: t('toast.imageLinkCopied'),
+        status: 'success',
+        duration: 2500,
+        isClosable: true,
       });
+    });
   };
 
   useHotkeys(
@@ -461,7 +467,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               {t('parameters.copyImageToLink')}
             </IAIButton>
 
-            <Link download={true} href={selectedImage?.url}>
+            <Link download={true} href={getUrl(selectedImage!.url)}>
               <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                 {t('parameters.downloadImage')}
               </IAIButton>

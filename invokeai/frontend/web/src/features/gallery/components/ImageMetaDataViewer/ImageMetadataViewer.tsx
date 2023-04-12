@@ -11,6 +11,7 @@ import {
 } from '@chakra-ui/react';
 import * as InvokeAI from 'app/invokeai';
 import { useAppDispatch } from 'app/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
@@ -164,6 +165,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   } = metadata;
 
   const { t } = useTranslation();
+  const { getUrl } = useGetUrl();
 
   const metadataJSON = JSON.stringify(image.metadata, null, 2);
 
@@ -184,7 +186,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     >
       <Flex gap={2}>
         <Text fontWeight="semibold">File:</Text>
-        <Link href={image.url} isExternal maxW="calc(100% - 3rem)">
+        <Link href={getUrl(image.url)} isExternal maxW="calc(100% - 3rem)">
           {image.url.length > 64
             ? image.url.substring(0, 64).concat('...')
             : image.url}
