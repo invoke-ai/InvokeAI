@@ -3,6 +3,7 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import CurrentImageHidden from 'features/gallery/components/CurrentImageHidden';
+import { useGetUrl } from 'common/util/getUrl';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,7 @@ export default function InitImagePreview() {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
+  const { getUrl } = useGetUrl();
 
   const toast = useToast();
 
@@ -71,8 +73,8 @@ export default function InitImagePreview() {
               shouldHidePreview
                 ? undefined
                 : typeof initialImage === 'string'
-                ? initialImage
-                : initialImage.url
+                ? getUrl(initialImage)
+                : getUrl(initialImage.url)
             }
             fallback={<CurrentImageHidden />}
             onError={alertMissingInitImage}

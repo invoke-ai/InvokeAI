@@ -1,6 +1,7 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
@@ -53,6 +54,7 @@ export const imagesSelector = createSelector(
 export default function CurrentImagePreview() {
   const { shouldShowImageDetails, imageToDisplay, shouldHidePreview } =
     useAppSelector(imagesSelector);
+  const { getUrl } = useGetUrl();
 
   return (
     <Flex
@@ -66,7 +68,13 @@ export default function CurrentImagePreview() {
     >
       {imageToDisplay && (
         <Image
-          src={shouldHidePreview ? undefined : imageToDisplay.url}
+          src={
+            shouldHidePreview
+              ? undefined
+              : imageToDisplay.isProgressImage
+              ? imageToDisplay.url
+              : getUrl(imageToDisplay.url)
+          }
           width={imageToDisplay.width}
           height={imageToDisplay.height}
           fallback={

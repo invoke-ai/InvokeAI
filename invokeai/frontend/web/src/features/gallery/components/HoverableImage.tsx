@@ -34,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useGetUrl } from 'common/util/getUrl';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -59,6 +60,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, thumbnail, name, metadata } = image;
+  const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -244,7 +246,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
             }
             rounded="md"
-            src={thumbnail || url}
+            src={getUrl(thumbnail || url)}
             loading="lazy"
             sx={{
               position: 'absolute',

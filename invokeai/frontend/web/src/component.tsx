@@ -29,6 +29,7 @@ interface Props extends PropsWithChildren {
   disabledPanels?: string[];
   disabledTabs?: InvokeTabName[];
   token?: string;
+  shouldTransformUrls?: boolean;
 }
 
 export default function Component({
@@ -37,6 +38,7 @@ export default function Component({
   disabledTabs = [],
   token,
   children,
+  shouldTransformUrls,
 }: Props) {
   useEffect(() => {
     // configure API client token
@@ -67,7 +69,11 @@ export default function Component({
         <PersistGate loading={<Loading />} persistor={persistor}>
           <React.Suspense fallback={<Loading showText />}>
             <ThemeLocaleProvider>
-              <App options={{ disabledPanels, disabledTabs }}>{children}</App>
+              <App
+                options={{ disabledPanels, disabledTabs, shouldTransformUrls }}
+              >
+                {children}
+              </App>
             </ThemeLocaleProvider>
           </React.Suspense>
         </PersistGate>
