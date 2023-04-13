@@ -1,31 +1,17 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from abc import ABC, abstractmethod
-from queue import Queue
 import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from queue import Queue
 
 
-# TODO: make this serializable
+@dataclass
 class InvocationQueueItem:
-    # session_id: str
     graph_execution_state_id: str
     invocation_id: str
     invoke_all: bool
-    timestamp: float
-
-    def __init__(
-        self,
-        # session_id: str,
-        graph_execution_state_id: str,
-        invocation_id: str,
-        invoke_all: bool = False,
-    ):
-        # self.session_id = session_id
-        self.graph_execution_state_id = graph_execution_state_id
-        self.invocation_id = invocation_id
-        self.invoke_all = invoke_all
-        self.timestamp = time.time()
-
+    timestamp: float = time.time()
 
 class InvocationQueueABC(ABC):
     """Abstract base class for all invocation queues"""
