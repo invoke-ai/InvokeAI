@@ -40,7 +40,7 @@ dependencies = [
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==1.0.1",
   "datasets",
-  "diffusers[torch]~=0.14",
+  "diffusers[torch]==0.14.0",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
@@ -78,6 +78,7 @@ dependencies = [
   "uvicorn[standard]==0.20.0",
   "windows-curses; sys_platform=='win32'",
   "loguru",
+  "pyjwt==2.6.0",
 ]
 
 [project.optional-dependencies]
