@@ -38,11 +38,11 @@ from ldm.invoke.globals import (
     Globals,
     global_converted_ckpts_dir,
     global_models_dir,
-    global_lora_models_dir,
 )
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from compel.prompt_parser import Blend
 from ldm.invoke.merge_diffusers import merge_diffusion_models
+from ldm.modules.lora_manager import LoraManager
 
 # Loading Arguments
 opt = Args()
@@ -524,20 +524,12 @@ class InvokeAIWebServer:
         @socketio.on("getLoraModels")
         def get_lora_models():
             try:
-                lora_path = global_lora_models_dir()
-                loras = []
-                for root, _, files in os.walk(lora_path):
-                    models = [
-                        Path(root, x)
-                        for x in files
-                        if Path(x).suffix in [".ckpt", ".pt", ".safetensors"]
-                    ]
-                    loras = loras + models
-
+                model = self.generate.model
+                lora_mgr = LoraManager(model)
+                loras = lora_mgr.list_compatible_loras()
                 found_loras = []
-                for lora in sorted(loras, key=lambda s: s.stem.lower()):
-                    location = str(lora.resolve()).replace("\\", "/")
-                    found_loras.append({"name": lora.stem, "location": location})
+                for lora in sorted(loras, key=str.casefold):
+                    found_loras.append({"name":lora,"location":str(loras[lora])})
                 socketio.emit("foundLoras", found_loras)
             except Exception as e:
                 self.handle_exceptions(e)
