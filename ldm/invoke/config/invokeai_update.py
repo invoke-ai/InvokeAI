@@ -47,9 +47,13 @@ def do_post_install():
     '''
     Run postinstallation script.
     '''
-    from ldm.invoke.config.post_install.py import post_install
-    post_install()
-    
+    print("Looking for postinstallation script to run on this version...")
+    try:
+        from ldm.invoke.config.post_install.py import post_install
+        post_install()
+    except:
+        print("Postinstallation script not available for this version of InvokeAI")
+        
 def welcome(versions: dict):
     
     @group()

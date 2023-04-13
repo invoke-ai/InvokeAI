@@ -669,6 +669,12 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
                         dirs_exist_ok=True,
                         copy_function=shutil.copyfile,
                         )
+    # Fix up directory permissions so that they are writable
+    # This can happen when running under Nix environment which
+    # makes the runtime directory template immutable.
+    for root,dirs,_ in os.walk(os.path.join(root,name)):
+        for d in dirs:
+            Path(root,d).chmod(0o775)
 
 # -------------------------------------
 def run_console_ui(
