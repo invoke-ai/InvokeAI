@@ -43,7 +43,7 @@ class LoraCondition:
 class LoraManager:
     def __init__(self, pipe):
         # Kohya class handles lora not generated through diffusers
-        self.kohya = KohyaLoraManager(pipe, global_lora_models_dir())
+        self.kohya = KohyaLoraManager(pipe)
 
     def set_loras_conditions(self, lora_weights: list):
         conditions = []
