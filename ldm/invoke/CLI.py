@@ -1322,15 +1322,16 @@ def install_missing_config_files():
     install ckpt configuration files that may have been added to the
     distro after original root directory configuration
     """
-    import invokeai.configs as conf
-    from shutil import copyfile
+    pass
+    # import invokeai.configs as conf
+    # from shutil import copyfile
     
-    root_configs = Path(global_config_dir(), 'stable-diffusion')
-    repo_configs = Path(conf.__path__[0], 'stable-diffusion')
-    for src in repo_configs.iterdir():
-        dest = root_configs / src.name
-        if not dest.exists():
-            copyfile(src,dest)
+    # root_configs = Path(global_config_dir(), 'stable-diffusion')
+    # repo_configs = Path(conf.__path__[0], 'stable-diffusion')
+    # for src in repo_configs.iterdir():
+    #     dest = root_configs / src.name
+    #     if not dest.exists():
+    #         copyfile(src,dest)
     
 def do_version_update(root_version: version.Version, app_version: Union[str, version.Version]):
     """
