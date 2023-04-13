@@ -34,7 +34,7 @@ dependencies = [
   "clip_anytorch",
   "compel~=1.1.0",
   "datasets",
-  "diffusers[torch]~=0.14",
+  "diffusers[torch]==0.14",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
