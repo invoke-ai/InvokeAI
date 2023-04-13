@@ -17,6 +17,8 @@ if sys.platform == "darwin":
 
 import pyparsing  # type: ignore
 
+print(f'DEBUG: [1] All system modules imported', file=sys.stderr)
+
 import ldm.invoke
 
 from ..generate import Generate
@@ -31,12 +33,16 @@ from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
 from ..util import url_attachment_name
 
+print(f'DEBUG: [2] All invokeai modules imported', file=sys.stderr)
+
 # global used in multiple functions (fix)
 infile = None
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
+    
+    print(f'DEBUG: [3] Entered main()', file=sys.stderr)
 
     opt = Args()
     args = opt.parse_args()
@@ -66,8 +72,12 @@ def main():
     Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = True  # always true as of 2.3.4 for LoRA support
 
+    print(f'DEBUG: [4] Globals initialized', file=sys.stderr)
+
     # run any post-install patches needed
     run_patches()
+
+    print(f'DEBUG: [5] Patches run', file=sys.stderr)
 
     print(f">> Internet connectivity is {Globals.internet_available}")
 
@@ -84,8 +94,9 @@ def main():
     # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
+    print(f'DEBUG: [6] Importing torch modules', file=sys.stderr)
+    
     import transformers  # type: ignore
-
     from ldm.generate import Generate
 
     transformers.logging.set_verbosity_error()
@@ -93,6 +104,7 @@ def main():
 
     diffusers.logging.set_verbosity_error()
 
+    print(f'DEBUG: [7] loading restoration models', file=sys.stderr)
     # Loading Face Restoration and ESRGAN Modules
     gfpgan, codeformer, esrgan = load_face_restoration(opt)
 
@@ -114,6 +126,7 @@ def main():
         Globals.lora_models_dir = opt.lora_path
 
     # migrate legacy models
+    print(f'DEBUG: [8] migrating  models', file=sys.stderr)
     ModelManager.migrate_models()
 
     # load the infile as a list of lines
@@ -131,6 +144,7 @@ def main():
 
     model = opt.model or retrieve_last_used_model()
 
+    print(f'DEBUG: [9] Creating generate object', file=sys.stderr)
     # creating a Generate object:
     try:
         gen = Generate(
@@ -157,6 +171,7 @@ def main():
         print(">> changed to seamless tiling mode")
 
     # preload the model
+    print(f'DEBUG: [10] Loading default model', file=sys.stderr)
     try:
         gen.load_model()
     except KeyError:
@@ -204,6 +219,7 @@ def main():
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt, completer):
     """prompt/read/execute loop"""
+    print(f'DEBUG: [11] In main loop', file=sys.stderr)
     global infile
     done = False
     doneAfterInFile = infile is not None
