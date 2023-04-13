@@ -389,7 +389,11 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     if config_file is default_config_file() and not config_file.parent.exists():
         configs_src = Dataset_path.parent
         configs_dest = default_config_file().parent
-        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
+        shutil.copytree(configs_src,
+                        configs_dest,
+                        dirs_exist_ok=True,
+                        copy_function=shutil.copyfile,
+                        )
 
     yaml = new_config_file_contents(successfully_downloaded, config_file)
 

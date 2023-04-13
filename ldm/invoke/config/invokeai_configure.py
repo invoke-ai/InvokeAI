@@ -664,8 +664,11 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     configs_src = Path(configs.__path__[0])
     configs_dest = Path(root) / "configs"
     if not os.path.samefile(configs_src, configs_dest):
-        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
-
+        shutil.copytree(configs_src,
+                        configs_dest,
+                        dirs_exist_ok=True,
+                        copy_function=shutil.copyfile,
+                        )
 
 # -------------------------------------
 def run_console_ui(
