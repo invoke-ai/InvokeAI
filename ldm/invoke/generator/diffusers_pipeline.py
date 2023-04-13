@@ -400,8 +400,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     @property
     def _submodels(self) -> Sequence[torch.nn.Module]:
         module_names, _, _ = self.extract_init_dict(dict(self.config))
-        values = [getattr(self, name, getattr(self.config, name)) for name in module_names.keys()]
-        return [m for m in values if isinstance(m, torch.nn.Module)]
+        submodels = []
+        for name in module_names.keys():
+            if hasattr(self, name):
+                value = getattr(self, name)
+            else:
+                value = getattr(self.config, name)
+            if isinstance(value, torch.nn.Module):
+                submodels.append(value)
+        return submodels
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
