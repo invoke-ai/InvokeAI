@@ -2,16 +2,16 @@
 
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
 from queue import Queue
 
 
-@dataclass
-class InvocationQueueItem:
+class InvocationQueueItem(BaseModel):
     graph_execution_state_id: str
     invocation_id: str
     invoke_all: bool
-    timestamp: float = time.time()
+    timestamp: float = Field(default_factory=time.time)
+
 
 class InvocationQueueABC(ABC):
     """Abstract base class for all invocation queues"""
