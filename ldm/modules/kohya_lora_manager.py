@@ -339,12 +339,14 @@ class KohyaLoraManager:
         return lora
 
     def apply_lora_model(self, name, mult: float = 1.0):
+        path_file = None
         for suffix in ["ckpt", "safetensors", "pt"]:
-            path_file = Path(self.lora_path, f"{name}.{suffix}")
-            if path_file.exists():
+            path_files = [x for x in Path(self.lora_path).glob(f"**/{name}.{suffix}")]
+            if len(path_files):
+                path_file = path_files[0]
                 print(f"   | Loading lora {path_file.name} with weight {mult}")
                 break
-        if not path_file.exists():
+        if not path_file:
             print(f"   ** Unable to find lora: {name}")
             return
 
