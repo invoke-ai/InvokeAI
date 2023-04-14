@@ -84,7 +84,7 @@ installing lots of models.
 
 6. Wait while the installer does its thing. After installing the software,
 the installer will launch a script that lets you configure InvokeAI and
-select a set of starting image generaiton models.
+select a set of starting image generation models.
 
 7. Find the folder that InvokeAI was installed into (it is not the
 same as the unpacked zip file directory!) The default location of this
