@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 import torch
 
 from invokeai.app.models.exceptions import CanceledException
-from invokeai.app.invocations.util.get_model import choose_model
+from invokeai.app.invocations.util.choose_model import choose_model
 from invokeai.app.util.step_callback import diffusers_step_callback_adapter
 
 from ...backend.model_management.model_manager import ModelManager
@@ -19,7 +19,7 @@ from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationCont
 import numpy as np
 from ..services.image_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from .image import ImageField, ImageOutput, build_image_output
 from ...backend.stable_diffusion import PipelineIntermediateState
 from diffusers.schedulers import SchedulerMixin as Scheduler
 import diffusers
@@ -355,7 +355,9 @@ class LatentsToImageInvocation(BaseInvocation):
             image_name = context.services.images.create_name(
                 context.graph_execution_state_id, self.id
             )
-            context.services.images.save(image_type, image_name, image)
-            return ImageOutput(
-                image=ImageField(image_type=image_type, image_name=image_name)
+            context.services.images.save(image_type, image_name, image, self.dict())
+            return build_image_output(
+                image_type=image_type,
+                image_name=image_name,
+                image=image
             )

@@ -413,7 +413,13 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(generatorProgress, (state, action) => {
-      const { step, total_steps, progress_image } = action.payload.data;
+      const {
+        step,
+        total_steps,
+        progress_image,
+        invocation,
+        graph_execution_state_id,
+      } = action.payload.data;
 
       state.currentStatusHasSteps = true;
       state.currentStep = step + 1; // TODO: step starts at -1, think this is a bug

@@ -1,3 +1,4 @@
+from re import S
 import torch
 from ..invocations.baseinvocation import InvocationContext
 from ...backend.util.util import image_to_dataURL
@@ -20,12 +21,18 @@ def fast_latents_step_callback(
 
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
+    graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+    source_id = graph_execution_state.prepared_source_mapping[id]
+
+    invocation = graph_execution_state.execution_graph.get_node(id)
+
     context.services.events.emit_generator_progress(
-        context.graph_execution_state_id,
-        id,
-        {"width": width, "height": height, "dataURL": dataURL},
-        step,
-        steps,
+        graph_execution_state_id=context.graph_execution_state_id,
+        invocation_dict=invocation.dict(),
+        source_id=source_id,
+        progress_image={"width": width, "height": height, "dataURL": dataURL},
+        step=step,
+        total_steps=steps,
     )
 
 

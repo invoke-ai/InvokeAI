@@ -66,5 +66,7 @@ export const buildGraph = (state: RootState): BuildGraphOutput => {
     nodeIdsToSubscribe.push(Object.keys(node)[0]);
   }
 
+  console.log('buildGraph: ', graph);
+
   return { graph, nodeIdsToSubscribe };
 };

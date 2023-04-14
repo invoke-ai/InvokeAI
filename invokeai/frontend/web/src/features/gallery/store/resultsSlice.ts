@@ -8,8 +8,14 @@ import {
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
 import { isImageOutput } from 'services/types/guards';
-import { deserializeImageField } from 'services/util/deserializeImageField';
+import {
+  buildImageUrls,
+  deserializeImageField,
+  extractTimestampFromImageName,
+} from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
+import { getUrlAlt } from 'common/util/getUrl';
+import { ImageMetadata } from 'services/api';
 // import { deserializeImageField } from 'services/util/deserializeImageField';
 
 // use `createEntityAdapter` to create a slice for results images
@@ -21,7 +27,7 @@ export const resultsAdapter = createEntityAdapter<Image>({
   // `(item) => item.id`, but for our result images, the `name` is the unique identifier.
   selectId: (image) => image.name,
   // Order all images by their time (in descending order)
-  sortComparer: (a, b) => b.metadata.timestamp - a.metadata.timestamp,
+  sortComparer: (a, b) => b.metadata.created - a.metadata.created,
 });
 
 // This type is intersected with the Entity type to create the shape of the state
@@ -34,22 +40,31 @@ type AdditionalResultsState = {
   nextPage: number; // the next page to request
 };
 
-const resultsSlice = createSlice({
-  name: 'results',
-  initialState: resultsAdapter.getInitialState<AdditionalResultsState>({
+// export type ResultsState = ReturnType<
+//   typeof resultsAdapter.getInitialState<AdditionalResultsState>
+// >;
+
+export const initialResultsState =
+  resultsAdapter.getInitialState<AdditionalResultsState>({
     // provide the additional initial state
     page: 0,
     pages: 0,
     isLoading: false,
     nextPage: 0,
-  }),
+  });
+
+export type ResultsState = typeof initialResultsState;
+
+const resultsSlice = createSlice({
+  name: 'results',
+  initialState: initialResultsState,
   reducers: {
     // the adapter provides some helper reducers; see the docs for all of them
     // can use them as helper functions within a reducer, or use the function itself as a reducer
 
     // here we just use the function itself as the reducer. we'll call this on `invocation_complete`
     // to add a single result
-    resultAdded: resultsAdapter.addOne,
+    resultAdded: resultsAdapter.upsertOne,
   },
   extraReducers: (builder) => {
     // here we can respond to a fulfilled call of the `getNextResultsPage` thunk
@@ -86,10 +101,34 @@ const resultsSlice = createSlice({
      */
     builder.addCase(invocationComplete, (state, action) => {
       const { data } = action.payload;
+      const { result, invocation, graph_execution_state_id, source_id } = data;
 
-      if (isImageOutput(data.result)) {
-        const resultImage = deserializeImageField(data.result.image);
-        resultsAdapter.addOne(state, resultImage);
+      if (isImageOutput(result)) {
+        const name = result.image.image_name;
+        const type = result.image.image_type;
+        const { url, thumbnail } = buildImageUrls(type, name);
+
+        const timestamp = extractTimestampFromImageName(name);
+
+        const image: Image = {
+          name,
+          type,
+          url,
+          thumbnail,
+          metadata: {
+            created: timestamp,
+            width: result.width, // TODO: add tese dimensions
+            height: result.height,
+            invokeai: {
+              session: graph_execution_state_id,
+              source_id,
+              invocation,
+            },
+          },
+        };
+
+        // const resultImage = deserializeImageField(result.image, invocation);
+        resultsAdapter.addOne(state, image);
       }
     });
   },

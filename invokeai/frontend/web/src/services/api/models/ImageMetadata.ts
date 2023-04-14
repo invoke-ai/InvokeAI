@@ -2,14 +2,16 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvokeAIMetadata } from './InvokeAIMetadata';
+
 /**
- * An image's metadata
+ * An image's general metadata
  */
 export type ImageMetadata = {
   /**
    * The creation timestamp of the image
    */
-  timestamp: number;
+  created: number;
   /**
    * The width of the image in pixels
    */
@@ -19,8 +21,8 @@ export type ImageMetadata = {
    */
   height: number;
   /**
-   * The image's SD-specific metadata
+   * The image's InvokeAI-specific metadata
    */
-  sd_metadata?: any;
+  invokeai?: InvokeAIMetadata;
 };
 
