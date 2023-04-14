@@ -11,6 +11,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   ImageField: 'image',
   LatentsField: 'latents',
   model: 'model',
+  array: 'array',
 };
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
@@ -53,5 +54,10 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'teal',
     title: 'Model',
     description: 'Models are models.',
+  },
+  array: {
+    color: 'gray',
+    title: 'Array',
+    description: 'TODO: Array type description.',
   },
 };

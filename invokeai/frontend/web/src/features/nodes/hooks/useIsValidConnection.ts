@@ -8,6 +8,7 @@ export const useIsValidConnection = () => {
   // Check if an in-progress connection is valid
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
+      return true;
       const edges = flow.getEdges();
       const nodes = flow.getNodes();
 

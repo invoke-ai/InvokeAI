@@ -46,7 +46,8 @@ export type FieldUIConfig = {
     | 'blue'
     | 'purple'
     | 'pink'
-    | 'teal';
+    | 'teal'
+    | 'gray';
   title: string;
   description: string;
 };
@@ -59,7 +60,8 @@ export type FieldType =
   | 'enum'
   | 'image'
   | 'latents'
-  | 'model';
+  | 'model'
+  | 'array';
 
 export type InputField =
   | IntegerInputField
@@ -69,7 +71,8 @@ export type InputField =
   | ImageInputField
   | LatentsInputField
   | EnumInputField
-  | ModelInputField;
+  | ModelInputField
+  | ArrayInputField;
 
 export type OutputField = FieldBase;
 
@@ -139,6 +142,11 @@ export type ModelInputField = FieldBase & {
   value?: string;
 };
 
+export type ArrayInputField = FieldBase & {
+  type: 'array';
+  value?: string;
+};
+
 /**
  * JANKY CUSTOMISATION OF OpenAPI SCHEMA TYPES
  */
@@ -172,11 +180,11 @@ export type InvocationBaseSchemaObject = Omit<
 > &
   InvocationSchemaExtra;
 
-interface ArraySchemaObject extends InvocationBaseSchemaObject {
+export interface ArraySchemaObject extends InvocationBaseSchemaObject {
   type: OpenAPIV3.ArraySchemaObjectType;
   items: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject;
 }
-interface NonArraySchemaObject extends InvocationBaseSchemaObject {
+export interface NonArraySchemaObject extends InvocationBaseSchemaObject {
   type?: OpenAPIV3.NonArraySchemaObjectType;
 }
 
