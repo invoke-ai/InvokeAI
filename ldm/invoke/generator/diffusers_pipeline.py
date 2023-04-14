@@ -762,7 +762,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     @property
     def channels(self) -> int:
         """Compatible with DiffusionWrapper"""
-        return self.unet.in_channels
+        return self.unet.config.in_channels
 
     def decode_latents(self, latents):
         # Explicit call to get the vae loaded, since `decode` isn't the forward method.
