@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
+import random
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 import torch
@@ -99,13 +100,17 @@ def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_c
     return x
 
 
+def random_seed():
+    return random.randint(0, np.iinfo(np.uint32).max)
+
+
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
     type: Literal["noise"] = "noise"
 
     # Inputs
-    seed:        int = Field(default=0, ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", )
+    seed:        int = Field(ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", default_factory=random_seed)
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting noise", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
 
@@ -267,6 +272,56 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 }
             },
         }
+
+    # Inputs
+    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
+    strength: float = Field(default=0.5, description="The strength of the latents to use")
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        noise = context.services.latents.get(self.noise.latents_name)
+        latent = context.services.latents.get(self.latents.latents_name)
+
+        def step_callback(state: PipelineIntermediateState):
+            self.dispatch_progress(context, state)
+
+        model = self.get_model(context.services.model_manager)
+        conditioning_data = self.get_conditioning_data(model)
+
+        # TODO: Verify the noise is the right size
+
+        initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
+            latent, device=model.device, dtype=latent.dtype
+        )
+        
+        timesteps, _ = model.get_img2img_timesteps(
+            self.steps,
+            self.strength,
+            device=model.device,
+        )
+
+        result_latents, result_attention_map_saver = model.latents_from_embeddings(
+            latents=initial_latents,
+            timesteps=timesteps,
+            noise=noise,
+            num_inference_steps=self.steps,
+            conditioning_data=conditioning_data,
+            callback=step_callback
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f'{context.graph_execution_state_id}__{self.id}'
+        context.services.latents.set(name, result_latents)
+        return LatentsOutput(
+            latents=LatentsField(latents_name=name)
+        )
+
+
+class LatentsToLatentsInvocation(TextToLatentsInvocation):
+    """Generates latents using latents as base image."""
+
+    type: Literal["l2l"] = "l2l"
 
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
