@@ -6,19 +6,31 @@ import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { getPersistConfig } from 'redux-deep-persist';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
-import galleryReducer from 'features/gallery/store/gallerySlice';
-import resultsReducer from 'features/gallery/store/resultsSlice';
+import galleryReducer, {
+  GalleryState,
+} from 'features/gallery/store/gallerySlice';
+import resultsReducer, {
+  resultsAdapter,
+  ResultsState,
+} from 'features/gallery/store/resultsSlice';
 import uploadsReducer from 'features/gallery/store/uploadsSlice';
-import lightboxReducer from 'features/lightbox/store/lightboxSlice';
-import generationReducer from 'features/parameters/store/generationSlice';
-import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
-import systemReducer from 'features/system/store/systemSlice';
+import lightboxReducer, {
+  LightboxState,
+} from 'features/lightbox/store/lightboxSlice';
+import generationReducer, {
+  GenerationState,
+} from 'features/parameters/store/generationSlice';
+import postprocessingReducer, {
+  PostprocessingState,
+} from 'features/parameters/store/postprocessingSlice';
+import systemReducer, { SystemState } from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import modelsReducer from 'features/system/store/modelSlice';
-import nodesReducer from 'features/nodes/store/nodesSlice';
+import nodesReducer, { NodesState } from 'features/nodes/store/nodesSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
+import { CanvasState } from 'features/canvas/store/canvasTypes';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -34,13 +46,21 @@ import { socketMiddleware } from 'services/events/middleware';
  * The necesssary nested persistors with blacklists are configured below.
  */
 
-const canvasBlacklist = [
+/**
+ * Canvas slice persist blacklist
+ */
+const canvasBlacklist: (keyof CanvasState)[] = [
   'cursorPosition',
   'isCanvasInitialized',
   'doesCanvasNeedScaling',
-].map((blacklistItem) => `canvas.${blacklistItem}`);
+];
 
-const systemBlacklist = [
+canvasBlacklist.map((blacklistItem) => `canvas.${blacklistItem}`);
+
+/**
+ * System slice persist blacklist
+ */
+const systemBlacklist: (keyof SystemState)[] = [
   'currentIteration',
   'currentStatus',
   'currentStep',
@@ -53,40 +73,101 @@ const systemBlacklist = [
   'totalIterations',
   'totalSteps',
   'openModel',
-  'cancelOptions.cancelAfter',
   'isCancelScheduled',
   'sessionId',
-].map((blacklistItem) => `system.${blacklistItem}`);
+  'progressImage',
+];
 
-const galleryBlacklist = [
+systemBlacklist.map((blacklistItem) => `system.${blacklistItem}`);
+
+/**
+ * Gallery slice persist blacklist
+ */
+const galleryBlacklist: (keyof GalleryState)[] = [
   'categories',
   'currentCategory',
   'currentImage',
   'currentImageUuid',
   'shouldAutoSwitchToNewImages',
   'intermediateImage',
-].map((blacklistItem) => `gallery.${blacklistItem}`);
+];
 
-const lightboxBlacklist = ['isLightboxOpen'].map(
-  (blacklistItem) => `lightbox.${blacklistItem}`
+galleryBlacklist.map((blacklistItem) => `gallery.${blacklistItem}`);
+
+/**
+ * Lightbox slice persist blacklist
+ */
+const lightboxBlacklist: (keyof LightboxState)[] = ['isLightboxOpen'];
+
+lightboxBlacklist.map((blacklistItem) => `lightbox.${blacklistItem}`);
+
+/**
+ * Nodes slice persist blacklist
+ */
+const nodesBlacklist: (keyof NodesState)[] = ['schema', 'invocations'];
+
+nodesBlacklist.map((blacklistItem) => `nodes.${blacklistItem}`);
+
+/**
+ * Generation slice persist blacklist
+ */
+const generationBlacklist: (keyof GenerationState)[] = [];
+
+generationBlacklist.map((blacklistItem) => `generation.${blacklistItem}`);
+
+/**
+ * Postprocessing slice persist blacklist
+ */
+const postprocessingBlacklist: (keyof PostprocessingState)[] = [];
+
+postprocessingBlacklist.map(
+  (blacklistItem) => `postprocessing.${blacklistItem}`
 );
 
-const nodesBlacklist = ['schema', 'invocations'].map(
-  (blacklistItem) => `nodes.${blacklistItem}`
-);
+/**
+ * Results slice persist blacklist
+ *
+ * Currently blacklisting results slice entirely, see persist config below
+ */
+const resultsBlacklist: (keyof ResultsState)[] = [];
+
+resultsBlacklist.map((blacklistItem) => `results.${blacklistItem}`);
+
+/**
+ * Uploads slice persist blacklist
+ *
+ * Currently blacklisting uploads slice entirely, see persist config below
+ */
+const uploadsBlacklist: (keyof NodesState)[] = [];
+
+uploadsBlacklist.map((blacklistItem) => `uploads.${blacklistItem}`);
+
+/**
+ * Models slice persist blacklist
+ */
+const modelsBlacklist: (keyof NodesState)[] = [];
+
+modelsBlacklist.map((blacklistItem) => `models.${blacklistItem}`);
+
+/**
+ * UI slice persist blacklist
+ */
+const uiBlacklist: (keyof NodesState)[] = [];
+
+uiBlacklist.map((blacklistItem) => `ui.${blacklistItem}`);
 
 const rootReducer = combineReducers({
-  generation: generationReducer,
-  postprocessing: postprocessingReducer,
-  gallery: galleryReducer,
-  system: systemReducer,
   canvas: canvasReducer,
-  ui: uiReducer,
+  gallery: galleryReducer,
+  generation: generationReducer,
   lightbox: lightboxReducer,
-  results: resultsReducer,
-  uploads: uploadsReducer,
   models: modelsReducer,
   nodes: nodesReducer,
+  postprocessing: postprocessingReducer,
+  results: resultsReducer,
+  system: systemReducer,
+  ui: uiReducer,
+  uploads: uploadsReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -95,13 +176,18 @@ const rootPersistConfig = getPersistConfig({
   rootReducer,
   blacklist: [
     ...canvasBlacklist,
-    ...systemBlacklist,
     ...galleryBlacklist,
+    ...generationBlacklist,
     ...lightboxBlacklist,
+    ...modelsBlacklist,
     ...nodesBlacklist,
+    ...postprocessingBlacklist,
+    // ...resultsBlacklist,
     'results',
+    ...systemBlacklist,
+    ...uiBlacklist,
+    // ...uploadsBlacklist,
     'uploads',
-    // 'nodes',
   ],
   debounce: 300,
 });

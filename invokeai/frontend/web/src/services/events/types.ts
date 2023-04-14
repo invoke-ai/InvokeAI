@@ -13,6 +13,12 @@ export type AnyInvocationType = NonNullable<
   NonNullable<Graph['nodes']>[string]['type']
 >;
 
+export type AnyInvocation = {
+  id: string;
+  type: AnyInvocationType | string;
+  [key: string]: any;
+};
+
 export type AnyResult = GraphExecutionState['results'][string];
 
 /**
@@ -22,7 +28,7 @@ export type AnyResult = GraphExecutionState['results'][string];
  */
 export type GeneratorProgressEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocationType;
+  invocation: AnyInvocation;
   source_id: string;
   progress_image?: ProgressImage;
   step: number;
@@ -38,6 +44,7 @@ export type GeneratorProgressEvent = {
  */
 export type InvocationCompleteEvent = {
   graph_execution_state_id: string;
+  invocation: AnyInvocation;
   source_id: string;
   result: AnyResult;
 };
@@ -49,7 +56,7 @@ export type InvocationCompleteEvent = {
  */
 export type InvocationErrorEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocationType;
+  invocation: AnyInvocation;
   source_id: string;
   error: string;
 };
@@ -61,8 +68,8 @@ export type InvocationErrorEvent = {
  */
 export type InvocationStartedEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocationType;
   source_id: string;
+  invocation: AnyInvocation;
 };
 
 /**

@@ -1,5 +1,6 @@
 import { Image } from 'app/invokeai';
 import { ImageField, ImageType } from 'services/api';
+import { AnyInvocation } from 'services/events/types';
 
 export const buildImageUrls = (
   imageType: ImageType,
@@ -34,23 +35,21 @@ export const extractTimestampFromImageName = (imageName: string) => {
  * TODO: do some more janky stuff here to get image dimensions instead of defaulting to 512x512?
  * TODO: better yet, improve the nodes server (wip)
  */
-export const deserializeImageField = (image: ImageField): Image => {
+export const deserializeImageField = (
+  image: ImageField,
+  invocation: AnyInvocation
+): Image => {
   const name = image.image_name;
   const type = image.image_type;
 
   const { url, thumbnail } = buildImageUrls(type, name);
-
-  const timestamp = extractTimestampFromImageName(name);
 
   return {
     name,
     type,
     url,
     thumbnail,
-    metadata: {
-      timestamp,
-      height: 512,
-      width: 512,
-    },
+    timestamp,
+    metadata: invocation,
   };
 };

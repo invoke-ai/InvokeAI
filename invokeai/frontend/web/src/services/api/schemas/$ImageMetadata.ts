@@ -2,9 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $ImageMetadata = {
-  description: `An image's metadata`,
+  description: `An image's general metadata`,
   properties: {
-    timestamp: {
+    created: {
       type: 'number',
       description: `The creation timestamp of the image`,
       isRequired: true,
@@ -19,10 +19,12 @@ export const $ImageMetadata = {
       description: `The height of the image in pixels`,
       isRequired: true,
     },
-    sd_metadata: {
-      description: `The image's SD-specific metadata`,
-      properties: {
-      },
+    invokeai: {
+      type: 'all-of',
+      description: `The image's InvokeAI-specific metadata`,
+      contains: [{
+        type: 'InvokeAIMetadata',
+      }],
     },
   },
 } as const;

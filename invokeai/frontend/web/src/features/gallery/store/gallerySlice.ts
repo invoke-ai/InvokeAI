@@ -295,7 +295,7 @@ export const gallerySlice = createSlice({
      * Upload Image - FULFILLED
      */
     builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const location = action.payload;
+      const { location } = action.payload;
       const imageName = location.split('/').pop() || '';
       state.selectedImageName = imageName;
     });

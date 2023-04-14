@@ -46,6 +46,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import * as png from '@stevebel/png';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -167,7 +168,17 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   const { t } = useTranslation();
   const { getUrl } = useGetUrl();
 
-  const metadataJSON = JSON.stringify(image.metadata, null, 2);
+  const metadataJSON = JSON.stringify(image, null, 2);
+
+  // fetch(getUrl(image.url))
+  //   .then((r) => r.arrayBuffer())
+  //   .then((buffer) => {
+  //     const { text } = png.decode(buffer);
+  //     const metadata = text?.['sd-metadata']
+  //       ? JSON.parse(text['sd-metadata'] ?? {})
+  //       : {};
+  //     console.log(metadata);
+  //   });
 
   return (
     <Flex
@@ -192,6 +203,37 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             : image.url}
           <ExternalLinkIcon mx="2px" />
         </Link>
+      </Flex>
+      <Flex gap={2} direction="column">
+        <Flex gap={2}>
+          <Tooltip label="Copy metadata JSON">
+            <IconButton
+              aria-label={t('accessibility.copyMetadataJson')}
+              icon={<FaCopy />}
+              size="xs"
+              variant="ghost"
+              fontSize={14}
+              onClick={() => navigator.clipboard.writeText(metadataJSON)}
+            />
+          </Tooltip>
+          <Text fontWeight="semibold">Metadata JSON:</Text>
+        </Flex>
+        <Box
+          sx={{
+            mt: 0,
+            mr: 2,
+            mb: 4,
+            ml: 2,
+            padding: 4,
+            borderRadius: 'base',
+            overflowX: 'scroll',
+            wordBreak: 'break-all',
+            bg: 'whiteAlpha.500',
+            _dark: { bg: 'blackAlpha.500' },
+          }}
+        >
+          <pre>{metadataJSON}</pre>
+        </Box>
       </Flex>
       {Object.keys(metadata).length > 0 ? (
         <>
@@ -411,37 +453,6 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           {dreamPrompt && (
             <MetadataItem withCopy label="Dream Prompt" value={dreamPrompt} />
           )}
-          <Flex gap={2} direction="column">
-            <Flex gap={2}>
-              <Tooltip label="Copy metadata JSON">
-                <IconButton
-                  aria-label={t('accessibility.copyMetadataJson')}
-                  icon={<FaCopy />}
-                  size="xs"
-                  variant="ghost"
-                  fontSize={14}
-                  onClick={() => navigator.clipboard.writeText(metadataJSON)}
-                />
-              </Tooltip>
-              <Text fontWeight="semibold">Metadata JSON:</Text>
-            </Flex>
-            <Box
-              sx={{
-                mt: 0,
-                mr: 2,
-                mb: 4,
-                ml: 2,
-                padding: 4,
-                borderRadius: 'base',
-                overflowX: 'scroll',
-                wordBreak: 'break-all',
-                bg: 'whiteAlpha.500',
-                _dark: { bg: 'blackAlpha.500' },
-              }}
-            >
-              <pre>{metadataJSON}</pre>
-            </Box>
-          </Flex>
         </>
       ) : (
         <Center width="100%" pt={10}>

@@ -2,16 +2,17 @@
 
 import datetime
 import os
+import json
 from glob import glob
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 from queue import Queue
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List, Union
 
 from PIL.Image import Image
 import PIL.Image as PILImage
-from pydantic import BaseModel
+from pydantic import BaseModel, Json
 from invokeai.app.api.models.images import ImageResponse
 from invokeai.app.models.image import ImageField, ImageType
 from invokeai.app.models.metadata import ImageMetadata
@@ -42,7 +43,7 @@ class ImageStorageBase(ABC):
         pass
 
     @abstractmethod
-    def save(self, image_type: ImageType, image_name: str, image: Image) -> None:
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: Dict[str, Any] | None = None) -> str:
         pass
 
     @abstractmethod
@@ -100,6 +101,8 @@ class DiskImageStorage(ImageStorageBase):
         for path in page_of_image_paths:
             filename = os.path.basename(path)
             img = PILImage.open(path)
+            invokeai_metadata = json.loads(img.info.get("invokeai", "{}"))
+
             page_of_images.append(
                 ImageResponse(
                     image_type=image_type.value,
@@ -109,9 +112,10 @@ class DiskImageStorage(ImageStorageBase):
                     thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
                     # TODO: Creation of this object should happen elsewhere, just making it fit here so it works
                     metadata=ImageMetadata(
-                        timestamp=os.path.getctime(path),
+                        created=int(os.path.getctime(path)),
                         width=img.width,
                         height=img.height,
+                        invokeai=invokeai_metadata
                     ),
                 )
             )
@@ -150,10 +154,11 @@ class DiskImageStorage(ImageStorageBase):
             path = os.path.join(self.__output_folder, image_type, image_name)
         return path
 
-    def save(self, image_type: ImageType, image_name: str, image: Image) -> None:
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: Dict[str, Any] | None = None) -> str:
+        print(metadata)
         image_subpath = os.path.join(image_type, image_name)
         self.__pngWriter.save_image_and_prompt_to_png(
-            image, "", image_subpath, None
+            image, "", image_subpath, metadata
         )  # TODO: just pass full path to png writer
         save_thumbnail(
             image=image,
@@ -162,6 +167,7 @@ class DiskImageStorage(ImageStorageBase):
         )
         image_path = self.get_path(image_type, image_name)
         self.__set_cache(image_path, image)
+        return image_path
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         image_path = self.get_path(image_type, image_name)

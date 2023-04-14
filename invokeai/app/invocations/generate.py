@@ -9,9 +9,9 @@ from torch import Tensor
 from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ImageField, ImageType
-from invokeai.app.invocations.util.get_model import choose_model
+from invokeai.app.invocations.util.choose_model import choose_model
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
-from .image import ImageOutput
+from .image import ImageOutput, build_image_output
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ..models.exceptions import CanceledException
@@ -76,6 +76,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
+        self.model_name = model["model_name"]
 
         outputs = Txt2Img(model).generate(
             prompt=self.prompt,
@@ -95,9 +96,22 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, generate_output.image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_id = graph_execution_state.prepared_source_mapping[self.id]
+        invocation = graph_execution_state.execution_graph.get_node(self.id)
+        
+        metadata = {
+          "session": context.graph_execution_state_id,
+          "source_id": source_id,
+          "invocation": invocation.dict()
+        }
+
+        context.services.images.save(image_type, image_name, generate_output.image, metadata)
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=generate_output.image
         )
 
 
@@ -144,6 +158,7 @@ class ImageToImageInvocation(TextToImageInvocation):
 
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
+        self.model = model["model_name"]
 
         outputs = Img2Img(model).generate(
                 prompt=self.prompt,
@@ -168,9 +183,11 @@ class ImageToImageInvocation(TextToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, result_image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+        context.services.images.save(image_type, image_name, result_image, self.dict())
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=result_image
         )
 
 class InpaintInvocation(ImageToImageInvocation):
@@ -218,7 +235,8 @@ class InpaintInvocation(ImageToImageInvocation):
         )
 
         # Handle invalid model parameter
-        model = choose_model(context.services.model_manager, self.model)   
+        model = choose_model(context.services.model_manager, self.model)
+        self.model = model["model_name"]
 
         outputs = Inpaint(model).generate(
                 prompt=self.prompt,
@@ -243,7 +261,9 @@ class InpaintInvocation(ImageToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, result_image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+        context.services.images.save(image_type, image_name, result_image, self.dict())
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=result_image
         )
