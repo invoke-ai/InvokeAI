@@ -80,6 +80,7 @@ interface InvokeProps extends PropsWithChildren {
   disabledPanels?: string[];
   disabledTabs?: InvokeTabName[];
   token?: string;
+  shouldTransformUrls?: boolean;
 }
 
 declare function Invoke(props: InvokeProps): JSX.Element;
