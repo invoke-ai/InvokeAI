@@ -675,6 +675,8 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     for root,dirs,_ in os.walk(os.path.join(root,name)):
         for d in dirs:
             Path(root,d).chmod(0o775)
+        for f in files:
+            Path(root,d).chmod(0o644)
 
 # -------------------------------------
 def run_console_ui(

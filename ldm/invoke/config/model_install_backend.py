@@ -397,9 +397,11 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     # Fix up directory permissions so that they are writable
     # This can happen when running under Nix environment which
     # makes the runtime directory template immutable.
-    for root,dirs,_ in os.walk(default_config_file().parent):
+    for root,dirs,files in os.walk(default_config_file().parent):
         for d in dirs:
             Path(root,d).chmod(0o775)
+        for f in files:
+            Path(root,d).chmod(0o644)
 
     yaml = new_config_file_contents(successfully_downloaded, config_file)
 
