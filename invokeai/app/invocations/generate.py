@@ -76,7 +76,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
-        self.model_name = model["model_name"]
+        self.model = model["model_name"]
 
         outputs = Txt2Img(model).generate(
             prompt=self.prompt,

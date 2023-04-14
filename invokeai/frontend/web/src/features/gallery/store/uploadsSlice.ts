@@ -22,18 +22,19 @@ type AdditionalUploadsState = {
   nextPage: number;
 };
 
-export type UploadssState = ReturnType<
-  typeof uploadsAdapter.getInitialState<AdditionalUploadsState>
->;
-
-const uploadsSlice = createSlice({
-  name: 'uploads',
-  initialState: uploadsAdapter.getInitialState<AdditionalUploadsState>({
+const initialUploadsState =
+  uploadsAdapter.getInitialState<AdditionalUploadsState>({
     page: 0,
     pages: 0,
     nextPage: 0,
     isLoading: false,
-  }),
+  });
+
+export type UploadsState = typeof initialUploadsState;
+
+const uploadsSlice = createSlice({
+  name: 'uploads',
+  initialState: initialUploadsState,
   reducers: {
     uploadAdded: uploadsAdapter.addOne,
   },
