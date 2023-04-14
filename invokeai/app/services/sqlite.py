@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, Union, get_args
+from typing import Any, Generic, TypeVar, Union, get_args
 from pydantic import BaseModel, parse_raw_as
 
 from .item_storage import ItemStorageABC, PaginatedResults
@@ -19,7 +19,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _table_name: str
     _id_field: str
     _engine: Engine
-    # _table: ??? # TODO: figure out how to type this
+    _table: Any # TODO: figure out how to type this
 
     def __init__(self, filename: str, table_name: str, id_field: str = "id"):
         super().__init__()
