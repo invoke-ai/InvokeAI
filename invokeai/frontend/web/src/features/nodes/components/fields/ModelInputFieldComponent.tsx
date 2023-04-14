@@ -4,14 +4,19 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import { ModelInputField } from 'features/nodes/types';
+import {
+  selectModelsById,
+  selectModelsIds,
+} from 'features/system/store/modelSlice';
 import { isEqual, map } from 'lodash';
 import { ChangeEvent } from 'react';
 import { FieldComponentProps } from './types';
 
 const availableModelsSelector = createSelector(
-  (state: RootState) => state.models.modelList,
-  (modelList) => {
-    return map(modelList, (_, name) => name);
+  [selectModelsIds],
+  (allModelNames) => {
+    return { allModelNames };
+    // return map(modelList, (_, name) => name);
   },
   {
     memoizeOptions: {
@@ -27,7 +32,7 @@ export const ModelInputFieldComponent = (
 
   const dispatch = useAppDispatch();
 
-  const availableModels = useAppSelector(availableModelsSelector);
+  const { allModelNames } = useAppSelector(availableModelsSelector);
 
   const handleValueChanged = (e: ChangeEvent<HTMLSelectElement>) => {
     dispatch(
@@ -41,7 +46,7 @@ export const ModelInputFieldComponent = (
 
   return (
     <Select onChange={handleValueChanged} value={field.value}>
-      {availableModels.map((option) => (
+      {allModelNames.map((option) => (
         <option key={option}>{option}</option>
       ))}
     </Select>

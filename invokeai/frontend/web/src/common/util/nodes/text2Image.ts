@@ -9,7 +9,7 @@ export const buildTxt2ImgNode = (
   const { generation, system, models } = state;
 
   const { shouldDisplayInProgressType } = system;
-  const { currentModel: model } = models;
+  const { selectedModelName } = models;
 
   const {
     prompt,
@@ -24,20 +24,22 @@ export const buildTxt2ImgNode = (
   } = generation;
 
   // missing fields in TextToImageInvocation: strength, hires_fix
+  const textToImageNode: TextToImageInvocation = {
+    id: nodeId,
+    type: 'txt2img',
+    prompt,
+    seed: shouldRandomizeSeed ? -1 : seed,
+    steps,
+    width,
+    height,
+    cfg_scale,
+    scheduler: sampler as TextToImageInvocation['scheduler'],
+    seamless,
+    model: selectedModelName,
+    progress_images: shouldDisplayInProgressType === 'full-res',
+  };
+
   return {
-    [nodeId]: {
-      id: nodeId,
-      type: 'txt2img',
-      prompt,
-      seed: shouldRandomizeSeed ? -1 : seed,
-      steps,
-      width,
-      height,
-      cfg_scale,
-      scheduler: sampler as TextToImageInvocation['scheduler'],
-      seamless,
-      model,
-      progress_images: shouldDisplayInProgressType === 'full-res',
-    },
+    [nodeId]: textToImageNode,
   };
 };

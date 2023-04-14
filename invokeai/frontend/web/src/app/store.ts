@@ -10,10 +10,11 @@ import galleryReducer, {
   GalleryState,
 } from 'features/gallery/store/gallerySlice';
 import resultsReducer, {
-  resultsAdapter,
   ResultsState,
 } from 'features/gallery/store/resultsSlice';
-import uploadsReducer from 'features/gallery/store/uploadsSlice';
+import uploadsReducer, {
+  UploadsState,
+} from 'features/gallery/store/uploadsSlice';
 import lightboxReducer, {
   LightboxState,
 } from 'features/lightbox/store/lightboxSlice';
@@ -25,12 +26,13 @@ import postprocessingReducer, {
 } from 'features/parameters/store/postprocessingSlice';
 import systemReducer, { SystemState } from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
-import modelsReducer from 'features/system/store/modelSlice';
+import modelsReducer, { ModelsState } from 'features/system/store/modelSlice';
 import nodesReducer, { NodesState } from 'features/nodes/store/nodesSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
 import { CanvasState } from 'features/canvas/store/canvasTypes';
+import { UIState } from 'features/ui/store/uiTypes';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -138,21 +140,21 @@ resultsBlacklist.map((blacklistItem) => `results.${blacklistItem}`);
  *
  * Currently blacklisting uploads slice entirely, see persist config below
  */
-const uploadsBlacklist: (keyof NodesState)[] = [];
+const uploadsBlacklist: (keyof UploadsState)[] = [];
 
 uploadsBlacklist.map((blacklistItem) => `uploads.${blacklistItem}`);
 
 /**
  * Models slice persist blacklist
  */
-const modelsBlacklist: (keyof NodesState)[] = [];
+const modelsBlacklist: (keyof ModelsState)[] = ['entities', 'ids'];
 
 modelsBlacklist.map((blacklistItem) => `models.${blacklistItem}`);
 
 /**
  * UI slice persist blacklist
  */
-const uiBlacklist: (keyof NodesState)[] = [];
+const uiBlacklist: (keyof UIState)[] = [];
 
 uiBlacklist.map((blacklistItem) => `ui.${blacklistItem}`);
 

@@ -101,7 +101,7 @@ export const socketMiddleware = () => {
             dispatch(receivedUploadImagesPage());
           }
 
-          if (!models.modelList.length) {
+          if (!models.ids.length) {
             dispatch(receivedModels());
           }
 

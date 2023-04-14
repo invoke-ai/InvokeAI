@@ -15,7 +15,7 @@ export const buildImg2ImgNode = (
   const { generation, system, models } = state;
 
   const { shouldDisplayInProgressType } = system;
-  const { currentModel: model } = models;
+  const { selectedModelName } = models;
 
   const {
     prompt,
@@ -38,27 +38,29 @@ export const buildImg2ImgNode = (
     throw 'no initial image';
   }
 
-  return {
-    [nodeId]: {
-      id: nodeId,
-      type: 'img2img',
-      prompt,
-      seed: shouldRandomizeSeed ? -1 : seed,
-      steps,
-      width,
-      height,
-      cfg_scale: cfgScale,
-      scheduler: sampler as ImageToImageInvocation['scheduler'],
-      seamless,
-      model,
-      progress_images: shouldDisplayInProgressType === 'full-res',
-      image: {
-        image_name: initialImage.name,
-        image_type: initialImage.type,
-      },
-      strength,
-      fit,
+  const imageToImageNode: ImageToImageInvocation = {
+    id: nodeId,
+    type: 'img2img',
+    prompt,
+    seed: shouldRandomizeSeed ? -1 : seed,
+    steps,
+    width,
+    height,
+    cfg_scale: cfgScale,
+    scheduler: sampler as ImageToImageInvocation['scheduler'],
+    seamless,
+    model: selectedModelName,
+    progress_images: shouldDisplayInProgressType === 'full-res',
+    image: {
+      image_name: initialImage.name,
+      image_type: initialImage.type,
     },
+    strength,
+    fit,
+  };
+
+  return {
+    [nodeId]: imageToImageNode,
   };
 };
 

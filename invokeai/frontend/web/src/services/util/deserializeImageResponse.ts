@@ -10,8 +10,6 @@ export const deserializeImageResponse = (
   const { image_name, image_type, image_url, metadata, thumbnail_url } =
     imageResponse;
 
-  const { width, height, timestamp, invokeai } = metadata;
-
   // TODO: parse metadata - just leaving it as-is for now
 
   return {
@@ -19,7 +17,6 @@ export const deserializeImageResponse = (
     type: image_type,
     url: image_url,
     thumbnail: thumbnail_url,
-    timestamp,
-    metadata: invokeai,
+    metadata,
   };
 };
