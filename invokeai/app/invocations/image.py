@@ -1,6 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import numpy
@@ -8,7 +7,6 @@ from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
 from ..models.image import ImageField, ImageType
-from ..services.invocation_services import InvocationServices
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -34,8 +32,6 @@ class ImageOutput(BaseInvocationOutput):
     # fmt: off
     type: Literal["image"] = "image"
     image:      ImageField = Field(default=None, description="The output image")
-    width:             int = Field(description="The width of the image in pixels")
-    height:            int = Field(description="The height of the image in pixels")
     # fmt: on
 
     class Config:
@@ -52,9 +48,16 @@ class ImageOutput(BaseInvocationOutput):
 def build_image_output(
     image_type: ImageType, image_name: str, image: Image.Image
 ) -> ImageOutput:
-    image_field = ImageField(image_name=image_name, image_type=image_type)
-
-    return ImageOutput(image=image_field, width=image.width, height=image.height)
+    """Builds an ImageOutput and its ImageField"""
+    image_field = ImageField(
+        image_name=image_name,
+        image_type=image_type,
+        width=image.width,
+        height=image.height,
+        mode=image.mode,
+        info=image.info,
+    )
+    return ImageOutput(image=image_field)
 
 
 class MaskOutput(BaseInvocationOutput):
