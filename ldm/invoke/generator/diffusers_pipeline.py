@@ -32,6 +32,7 @@ from ldm.modules.textual_inversion_manager import TextualInversionManager
 from ldm.modules.lora_manager import LoraManager
 from ldm.modules.peft_manager import PeftManager
 from ..devices import normalize_device, CPU_DEVICE
+from ..model_manager import DiffusersModelAttributes, ModelManager
 from ..offloading import LazilyLoadedModelGroup, FullyLoadedModelGroup, ModelGroup
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from compel import EmbeddingsProvider
@@ -158,12 +159,9 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool=True
         tensor = tensor * 2.0 - 1.0
     return tensor
 
-def is_inpainting_model(unet: UNet2DConditionModel):
-    return unet.conv_in.in_channels == 9
+def is_inpainting_model(model: StableDiffusionPipeline):
+    return DiffusersModelAttributes.INPAINTING in ModelManager.model_attributes(model)
 
-def is_sd2_model(model: StableDiffusionPipeline):
-    # TODO there should be a better way to check this
-    return model.text_encoder.config.hidden_size == 1024
 
 CallbackType = TypeVar('CallbackType')
 ReturnType = TypeVar('ReturnType')
@@ -552,7 +550,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     def _unet_forward(self, latents, t, text_embeddings, cross_attention_kwargs: Optional[dict[str,Any]] = None):
         """predict the noise residual"""
-        if is_inpainting_model(self.unet) and latents.size(1) == 4:
+        if is_inpainting_model(self) and latents.size(1) == 4:
             # Pad out normal non-inpainting inputs for an inpainting model.
             # FIXME: There are too many layers of functions and we have too many different ways of
             #     overriding things! This should get handled in a way more consistent with the other
@@ -665,7 +663,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         guidance: List[Callable] = []
 
-        if is_inpainting_model(self.unet):
+        if is_inpainting_model(self):
             # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
             # (that's why there's a mask!) but it seems to really want that blanked out.
             masked_init_image = init_image * torch.where(mask < 0.5, 1, 0)

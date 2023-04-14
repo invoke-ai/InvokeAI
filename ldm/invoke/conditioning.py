@@ -15,7 +15,7 @@ from compel import Compel
 from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser, \
     Conjunction
 from .devices import torch_dtype
-from .generator.diffusers_pipeline import is_sd2_model
+from .model_manager import ModelManager, DiffusersModelAttributes
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
 
@@ -49,11 +49,12 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
 
     tokenizer = get_tokenizer(model)
     text_encoder = get_text_encoder(model)
+    wants_penultimate_clip = DiffusersModelAttributes.USES_PENULTIMATE_CLIP_HIDDEN_STATES in ModelManager.model_attributes(model)
     compel = Compel(tokenizer=tokenizer,
                     text_encoder=text_encoder,
                     textual_inversion_manager=model.textual_inversion_manager,
                     dtype_for_device_getter=torch_dtype,
-                    use_penultimate_clip_layer=is_sd2_model(model))
+                    use_penultimate_clip_layer=wants_penultimate_clip)
 
     # get rid of any newline characters
     prompt_string = prompt_string.replace("\n", " ")

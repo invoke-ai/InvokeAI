@@ -16,7 +16,7 @@ import sys
 import textwrap
 import time
 import warnings
-from enum import Enum
+from enum import Enum, auto, IntFlag
 from pathlib import Path
 from shutil import move, rmtree
 from typing import Any, Callable, Optional, Union, List
@@ -25,7 +25,7 @@ import safetensors
 import safetensors.torch
 import torch
 import transformers
-from diffusers import AutoencoderKL
+from diffusers import AutoencoderKL, StableDiffusionPipeline
 from diffusers import logging as dlogging
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
@@ -33,7 +33,7 @@ from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.devices import CPU_DEVICE
-from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+#from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import Globals, global_cache_dir
 from ldm.util import ask_user, download_with_resume, instantiate_from_config, url_attachment_name
 
@@ -45,6 +45,12 @@ class SDLegacyType(Enum):
     V2_e = 4
     V2_v = 5
     UNKNOWN = 99
+
+class DiffusersModelAttributes(IntFlag):
+    NONE = 0
+    INPAINTING = auto()
+    USES_PENULTIMATE_CLIP_HIDDEN_STATES = auto()
+
 
 DEFAULT_MAX_MODELS = 2
 
@@ -115,7 +121,7 @@ class ModelManager(object):
         self.current_model = model_name
         self._push_newest_model(model_name)
         return self.models[model_name]
-    
+
     def default_model(self) -> str | None:
         """
         Returns the name of the default model, or None
@@ -365,7 +371,7 @@ class ModelManager(object):
                 vae_path = path
         # then we look for a file with the same basename
         vae_path = vae_path or self._scan_for_matching_file(Path(weights))
-            
+
         # Do the conversion and return a diffusers pipeline
         print(
             f">> Converting legacy checkpoint {model_name} into a diffusers model..."
@@ -405,6 +411,9 @@ class ModelManager(object):
     def _load_diffusers_model(self, mconfig):
         name_or_path = self.model_name_or_path(mconfig)
         using_fp16 = self.precision == "float16"
+
+        # avoid circular import by locally importing
+        from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
         print(f">> Loading diffusers model from {name_or_path}")
         if using_fp16:
@@ -839,7 +848,7 @@ class ModelManager(object):
 
         if (vae_path := self._scan_for_matching_file(model_path)):
             print(f"   | Using VAE file {vae_path.name}")
-        
+
         diffuser_path = Path(
             Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
         )
@@ -1108,7 +1117,8 @@ class ModelManager(object):
         if self.device == CPU_DEVICE:
             return model
 
-        if isinstance(model, StableDiffusionGeneratorPipeline):
+        if isinstance(model, StableDiffusionPipeline):
+            # assume StableDiffusionGeneratorPipeline (but avoid circular import)
             model.offload_all()
             return model
 
@@ -1126,7 +1136,8 @@ class ModelManager(object):
         if self.device == CPU_DEVICE:
             return model
 
-        if isinstance(model, StableDiffusionGeneratorPipeline):
+        if isinstance(model, StableDiffusionPipeline):
+            # assume StableDiffusionGeneratorPipeline (but avoid circular import)
             model.ready()
             return model
 
@@ -1234,7 +1245,7 @@ class ModelManager(object):
             if model_path.with_suffix(suffix).exists():
                 vae_path = model_path.with_suffix(suffix)
         return vae_path
-                               
+
     def _load_vae(self, vae_config) -> AutoencoderKL:
         vae_args = {}
         try:
@@ -1311,3 +1322,16 @@ class ModelManager(object):
         return (
             os.getenv("HF_HOME") is not None or os.getenv("XDG_CACHE_HOME") is not None
         )
+
+    @classmethod
+    def model_attributes(cls, model: StableDiffusionPipeline) -> DiffusersModelAttributes:
+        attributes = DiffusersModelAttributes.NONE
+
+        if model.unet.conv_in.in_channels == 9:
+            attributes |= DiffusersModelAttributes.INPAINTING
+
+        is_sd2_model = (model.text_encoder.config.hidden_size == 1024)
+        if is_sd2_model:
+            attributes |= DiffusersModelAttributes.USES_PENULTIMATE_CLIP_HIDDEN_STATES
+
+        return attributes
