@@ -12,7 +12,7 @@ import { deserializeImageResponse } from 'services/util/deserializeImageResponse
 
 export const uploadsAdapter = createEntityAdapter<Image>({
   selectId: (image) => image.name,
-  sortComparer: (a, b) => b.metadata.timestamp - a.metadata.timestamp,
+  sortComparer: (a, b) => b.metadata.created - a.metadata.created,
 });
 
 type AdditionalUploadsState = {
@@ -21,6 +21,10 @@ type AdditionalUploadsState = {
   isLoading: boolean;
   nextPage: number;
 };
+
+export type UploadssState = ReturnType<
+  typeof uploadsAdapter.getInitialState<AdditionalUploadsState>
+>;
 
 const uploadsSlice = createSlice({
   name: 'uploads',
@@ -61,12 +65,17 @@ const uploadsSlice = createSlice({
      * Upload Image - FULFILLED
      */
     builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const location = action.payload;
+      const { location, response } = action.payload;
+      const { image_name, image_url, image_type, metadata, thumbnail_url } =
+        response;
 
-      const uploadedImage = deserializeImageField({
-        image_name: location.split('/').pop() || '',
-        image_type: 'uploads',
-      });
+      const uploadedImage: Image = {
+        name: image_name,
+        url: image_url,
+        thumbnail: thumbnail_url,
+        type: 'uploads',
+        metadata,
+      };
 
       uploadsAdapter.addOne(state, uploadedImage);
     });

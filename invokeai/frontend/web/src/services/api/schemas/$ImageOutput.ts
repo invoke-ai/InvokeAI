@@ -16,5 +16,15 @@ export const $ImageOutput = {
       }],
       isRequired: true,
     },
+    width: {
+      type: 'number',
+      description: `The width of the image in pixels`,
+      isRequired: true,
+    },
+    height: {
+      type: 'number',
+      description: `The height of the image in pixels`,
+      isRequired: true,
+    },
   },
 } as const;

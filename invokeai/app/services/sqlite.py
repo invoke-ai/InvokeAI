@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, Union, get_args, get_origin
+from typing import Generic, TypeVar, Union, get_args
 from pydantic import BaseModel, parse_raw_as
 
 from .item_storage import ItemStorageABC, PaginatedResults

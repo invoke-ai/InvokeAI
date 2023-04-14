@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Body_upload_image } from '../models/Body_upload_image';
+import type { ImageResponse } from '../models/ImageResponse';
 import type { ImageType } from '../models/ImageType';
 import type { PaginatedResults_ImageResponse_ } from '../models/PaginatedResults_ImageResponse_';
 
@@ -77,14 +78,14 @@ export class ImagesService {
 
   /**
    * Upload Image
-   * @returns any Successful Response
+   * @returns ImageResponse The image was uploaded successfully
    * @throws ApiError
    */
   public static uploadImage({
     formData,
   }: {
     formData: Body_upload_image,
-  }): CancelablePromise<any> {
+  }): CancelablePromise<ImageResponse> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/images/uploads/',

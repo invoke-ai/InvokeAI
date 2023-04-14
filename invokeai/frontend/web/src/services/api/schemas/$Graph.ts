@@ -12,8 +12,6 @@ export const $Graph = {
       contains: {
         type: 'one-of',
         contains: [{
-          type: 'LoadImageInvocation',
-        }, {
           type: 'ShowImageInvocation',
         }, {
           type: 'CropImageInvocation',

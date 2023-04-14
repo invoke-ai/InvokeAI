@@ -15,6 +15,7 @@
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { ImageMetadata, ImageType } from 'services/api';
+import { AnyInvocation } from 'services/events/types';
 
 /**
  * TODO:

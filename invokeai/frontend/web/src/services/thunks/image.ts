@@ -26,7 +26,7 @@ export const imageUploaded = createAppAsyncThunk(
   async (arg: ImageUploadedArg, _thunkApi) => {
     const response = await ImagesService.uploadImage(arg);
     const { location } = getHeaders(response);
-    return location;
+    return { response, location };
   }
 );
 
