@@ -161,7 +161,7 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool=True
 def is_inpainting_model(unet: UNet2DConditionModel):
     return unet.conv_in.in_channels == 9
 
-def is_penultimate_clip_trained_model(model: StableDiffusionPipeline):
+def is_sd2_model(model: StableDiffusionPipeline):
     # TODO there should be a better way to check this
     return model.text_encoder.config.hidden_size == 1024
 
