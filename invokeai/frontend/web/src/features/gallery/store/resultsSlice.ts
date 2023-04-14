@@ -117,8 +117,8 @@ const resultsSlice = createSlice({
           thumbnail,
           metadata: {
             created: timestamp,
-            width: result.width, // TODO: add tese dimensions
-            height: result.height,
+            width: result.image.width, // TODO: add tese dimensions
+            height: result.image.height,
             invokeai: {
               session: graph_execution_state_id,
               source_id,
@@ -127,7 +127,6 @@ const resultsSlice = createSlice({
           },
         };
 
-        // const resultImage = deserializeImageField(result.image, invocation);
         resultsAdapter.addOne(state, image);
       }
     });

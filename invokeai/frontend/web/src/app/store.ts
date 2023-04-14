@@ -6,33 +6,28 @@ import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { getPersistConfig } from 'redux-deep-persist';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
-import galleryReducer, {
-  GalleryState,
-} from 'features/gallery/store/gallerySlice';
-import resultsReducer, {
-  ResultsState,
-} from 'features/gallery/store/resultsSlice';
-import uploadsReducer, {
-  UploadsState,
-} from 'features/gallery/store/uploadsSlice';
-import lightboxReducer, {
-  LightboxState,
-} from 'features/lightbox/store/lightboxSlice';
-import generationReducer, {
-  GenerationState,
-} from 'features/parameters/store/generationSlice';
-import postprocessingReducer, {
-  PostprocessingState,
-} from 'features/parameters/store/postprocessingSlice';
-import systemReducer, { SystemState } from 'features/system/store/systemSlice';
+import galleryReducer from 'features/gallery/store/gallerySlice';
+import resultsReducer from 'features/gallery/store/resultsSlice';
+import uploadsReducer from 'features/gallery/store/uploadsSlice';
+import lightboxReducer from 'features/lightbox/store/lightboxSlice';
+import generationReducer from 'features/parameters/store/generationSlice';
+import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
+import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
-import modelsReducer, { ModelsState } from 'features/system/store/modelSlice';
-import nodesReducer, { NodesState } from 'features/nodes/store/nodesSlice';
+import modelsReducer from 'features/system/store/modelSlice';
+import nodesReducer from 'features/nodes/store/nodesSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
-import { CanvasState } from 'features/canvas/store/canvasTypes';
-import { UIState } from 'features/ui/store/uiTypes';
+import { canvasBlacklist } from 'features/canvas/store/canvasPersistBlacklist';
+import { galleryBlacklist } from 'features/gallery/store/galleryPersistBlacklist';
+import { generationBlacklist } from 'features/parameters/store/generationPersistBlacklist';
+import { lightboxBlacklist } from 'features/lightbox/store/lightboxPersistBlacklist';
+import { modelsBlacklist } from 'features/system/store/modelsPersistBlacklist';
+import { nodesBlacklist } from 'features/nodes/store/nodesPersistBlacklist';
+import { postprocessingBlacklist } from 'features/parameters/store/postprocessingPersistBlacklist';
+import { systemBlacklist } from 'features/system/store/systemPersistsBlacklist';
+import { uiBlacklist } from 'features/ui/store/uiPersistBlacklist';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -47,116 +42,6 @@ import { UIState } from 'features/ui/store/uiTypes';
  *
  * The necesssary nested persistors with blacklists are configured below.
  */
-
-/**
- * Canvas slice persist blacklist
- */
-const canvasBlacklist: (keyof CanvasState)[] = [
-  'cursorPosition',
-  'isCanvasInitialized',
-  'doesCanvasNeedScaling',
-];
-
-canvasBlacklist.map((blacklistItem) => `canvas.${blacklistItem}`);
-
-/**
- * System slice persist blacklist
- */
-const systemBlacklist: (keyof SystemState)[] = [
-  'currentIteration',
-  'currentStatus',
-  'currentStep',
-  'isCancelable',
-  'isConnected',
-  'isESRGANAvailable',
-  'isGFPGANAvailable',
-  'isProcessing',
-  'socketId',
-  'totalIterations',
-  'totalSteps',
-  'openModel',
-  'isCancelScheduled',
-  'sessionId',
-  'progressImage',
-];
-
-systemBlacklist.map((blacklistItem) => `system.${blacklistItem}`);
-
-/**
- * Gallery slice persist blacklist
- */
-const galleryBlacklist: (keyof GalleryState)[] = [
-  'categories',
-  'currentCategory',
-  'currentImage',
-  'currentImageUuid',
-  'shouldAutoSwitchToNewImages',
-  'intermediateImage',
-];
-
-galleryBlacklist.map((blacklistItem) => `gallery.${blacklistItem}`);
-
-/**
- * Lightbox slice persist blacklist
- */
-const lightboxBlacklist: (keyof LightboxState)[] = ['isLightboxOpen'];
-
-lightboxBlacklist.map((blacklistItem) => `lightbox.${blacklistItem}`);
-
-/**
- * Nodes slice persist blacklist
- */
-const nodesBlacklist: (keyof NodesState)[] = ['schema', 'invocations'];
-
-nodesBlacklist.map((blacklistItem) => `nodes.${blacklistItem}`);
-
-/**
- * Generation slice persist blacklist
- */
-const generationBlacklist: (keyof GenerationState)[] = [];
-
-generationBlacklist.map((blacklistItem) => `generation.${blacklistItem}`);
-
-/**
- * Postprocessing slice persist blacklist
- */
-const postprocessingBlacklist: (keyof PostprocessingState)[] = [];
-
-postprocessingBlacklist.map(
-  (blacklistItem) => `postprocessing.${blacklistItem}`
-);
-
-/**
- * Results slice persist blacklist
- *
- * Currently blacklisting results slice entirely, see persist config below
- */
-const resultsBlacklist: (keyof ResultsState)[] = [];
-
-resultsBlacklist.map((blacklistItem) => `results.${blacklistItem}`);
-
-/**
- * Uploads slice persist blacklist
- *
- * Currently blacklisting uploads slice entirely, see persist config below
- */
-const uploadsBlacklist: (keyof UploadsState)[] = [];
-
-uploadsBlacklist.map((blacklistItem) => `uploads.${blacklistItem}`);
-
-/**
- * Models slice persist blacklist
- */
-const modelsBlacklist: (keyof ModelsState)[] = ['entities', 'ids'];
-
-modelsBlacklist.map((blacklistItem) => `models.${blacklistItem}`);
-
-/**
- * UI slice persist blacklist
- */
-const uiBlacklist: (keyof UIState)[] = [];
-
-uiBlacklist.map((blacklistItem) => `ui.${blacklistItem}`);
 
 const rootReducer = combineReducers({
   canvas: canvasReducer,

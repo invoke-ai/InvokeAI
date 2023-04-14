@@ -16,5 +16,21 @@ export type ImageField = {
    * The name of the image
    */
   image_name: string;
+  /**
+   * The width of the image in pixels
+   */
+  width: number;
+  /**
+   * The height of the image in pixels
+   */
+  height: number;
+  /**
+   * The image mode (ie pixel format)
+   */
+  mode: string;
+  /**
+   * The image file's metadata
+   */
+  info: any;
 };
 

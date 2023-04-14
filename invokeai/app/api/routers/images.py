@@ -61,15 +61,16 @@ async def upload_image(file: UploadFile, request: Request, response: Response) -
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
     image_path = ApiDependencies.invoker.services.images.save(ImageType.UPLOAD, filename, img)
+
+    # TODO: handle old `sd-metadata` style metadata
     invokeai_metadata = json.loads(img.info.get("invokeai", "{}"))
 
+    # TODO: should creation of this object should happen elsewhere?
     res = ImageResponse(
         image_type=ImageType.UPLOAD,
         image_name=filename,
-        # TODO: DiskImageStorage should not be building URLs...?
         image_url=f"api/v1/images/{ImageType.UPLOAD.value}/{filename}",
         thumbnail_url=f"api/v1/images/{ImageType.UPLOAD.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
-        # TODO: Creation of this object should happen elsewhere, just making it fit here so it works
         metadata=ImageMetadata(
             created=int(os.path.getctime(image_path)),
             width=img.width,

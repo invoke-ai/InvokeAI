@@ -17,5 +17,26 @@ export const $ImageField = {
       description: `The name of the image`,
       isRequired: true,
     },
+    width: {
+      type: 'number',
+      description: `The width of the image in pixels`,
+      isRequired: true,
+    },
+    height: {
+      type: 'number',
+      description: `The height of the image in pixels`,
+      isRequired: true,
+    },
+    mode: {
+      type: 'string',
+      description: `The image mode (ie pixel format)`,
+      isRequired: true,
+    },
+    info: {
+      description: `The image file's metadata`,
+      properties: {
+      },
+      isRequired: true,
+    },
   },
 } as const;

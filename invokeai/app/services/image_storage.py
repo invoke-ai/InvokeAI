@@ -5,16 +5,14 @@ import os
 import json
 from glob import glob
 from abc import ABC, abstractmethod
-from enum import Enum
 from pathlib import Path
 from queue import Queue
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Dict, List
 
 from PIL.Image import Image
 import PIL.Image as PILImage
-from pydantic import BaseModel, Json
 from invokeai.app.api.models.images import ImageResponse
-from invokeai.app.models.image import ImageField, ImageType
+from invokeai.app.models.image import  ImageType
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.save_thumbnail import save_thumbnail
@@ -101,6 +99,8 @@ class DiskImageStorage(ImageStorageBase):
         for path in page_of_image_paths:
             filename = os.path.basename(path)
             img = PILImage.open(path)
+
+            # TODO: handle old `sd-metadata` format
             invokeai_metadata = json.loads(img.info.get("invokeai", "{}"))
 
             page_of_images.append(
