@@ -2,7 +2,6 @@
 
 import copy
 import itertools
-import traceback
 import uuid
 from types import NoneType
 from typing import (
@@ -751,7 +750,7 @@ class GraphExecutionState(BaseModel):
     """Tracks the state of a graph execution"""
 
     id: str = Field(
-        description="The id of the execution state", default_factory=uuid.uuid4
+        description="The id of the execution state", default_factory=lambda: uuid.uuid4().__str__()
     )
 
     # TODO: Store a reference to the graph instead of the actual graph?
@@ -1171,7 +1170,7 @@ class LibraryGraph(BaseModel):
         if len(v) != len(set(i.alias for i in v)):
             raise ValueError("Duplicate exposed alias")
         return v
-    
+
     @root_validator
     def validate_exposed_nodes(cls, values):
         graph = values['graph']
