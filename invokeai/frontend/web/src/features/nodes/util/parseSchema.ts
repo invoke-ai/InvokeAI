@@ -1,13 +1,19 @@
 import { filter, reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
 import {
+  FieldBase,
   InputField,
   Invocation,
+  InvocationBaseSchemaObject,
   InvocationSchemaObject,
   isInvocationSchemaObject,
   isSchemaObject,
+  NonArraySchemaObject,
+  OutputField,
 } from '../types';
 import { buildInputField, buildOutputFields } from './invocationFieldBuilders';
+
+const invocationBlacklist = ['Graph', 'Collect', 'LoadImage'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
@@ -16,11 +22,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
     (schema, key) =>
       key.includes('Invocation') &&
       !key.includes('InvocationOutput') &&
-      !key.includes('Collect') &&
-      !key.includes('Range') &&
-      !key.includes('Iterate') &&
-      !key.includes('LoadImage') &&
-      !key.includes('Graph')
+      !invocationBlacklist.some((blacklistItem) => key.includes(blacklistItem))
   ) as (OpenAPIV3.ReferenceObject | InvocationSchemaObject)[];
 
   const invocations = filteredSchemas.reduce<Record<string, Invocation>>(
@@ -44,8 +46,18 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
               !['type', 'id'].includes(propertyName) &&
               isSchemaObject(property)
             ) {
-              const field = buildInputField(property, propertyName, typeHints);
-
+              let field: InputField | undefined;
+              if (propertyName === 'collection') {
+                field = {
+                  name: 'collection',
+                  title: property.title ?? '',
+                  description: property.description ?? '',
+                  type: 'array',
+                  connectionType: 'always',
+                };
+              } else {
+                field = buildInputField(property, propertyName, typeHints);
+              }
               if (field) {
                 inputsAccumulator[propertyName] = field;
               }
@@ -57,7 +69,27 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
 
         const rawOutput = (schema as InvocationSchemaObject).output;
 
-        const outputs = buildOutputFields(rawOutput, openAPI, typeHints);
+        let outputs: Record<string, OutputField>;
+
+        // some special handling is needed for collect, iterate and range nodes
+        if (type === 'iterate') {
+          // this is guaranteed to be a SchemaObject
+          const iterationOutput = openAPI.components!.schemas![
+            'IterateInvocationOutput'
+          ] as OpenAPIV3.SchemaObject;
+
+          outputs = {
+            item: {
+              name: 'item',
+              title: iterationOutput.title ?? '',
+              description: iterationOutput.description ?? '',
+              type: 'array',
+              connectionType: 'always',
+            },
+          };
+        } else {
+          outputs = buildOutputFields(rawOutput, openAPI, typeHints);
+        }
 
         const invocation: Invocation = {
           title,

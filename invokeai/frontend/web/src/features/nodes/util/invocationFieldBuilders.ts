@@ -194,7 +194,7 @@ export const getFieldType = (
   schemaObject: OpenAPIV3.SchemaObject,
   name: string,
   typeHints?: TypeHints
-): FieldType | undefined => {
+): FieldType => {
   let rawFieldType = '';
 
   if (typeHints && name in typeHints) {
@@ -209,7 +209,13 @@ export const getFieldType = (
     rawFieldType = schemaObject.type;
   }
 
-  return FIELD_TYPE_MAP[rawFieldType];
+  const fieldType = FIELD_TYPE_MAP[rawFieldType];
+
+  if (!fieldType) {
+    throw `Field type "${rawFieldType}" is unknown!`;
+  }
+
+  return fieldType;
 };
 
 /**
@@ -223,10 +229,6 @@ export const buildInputField = (
   typeHints?: TypeHints
 ) => {
   const fieldType = getFieldType(schemaObject, name, typeHints);
-
-  if (!fieldType) {
-    throw `Field type "${fieldType}" is unknown!`;
-  }
 
   const baseField = {
     name,
@@ -288,10 +290,6 @@ export const buildOutputFields = (
           isSchemaObject(property)
         ) {
           const fieldType = getFieldType(property, propertyName, typeHints);
-
-          if (!fieldType) {
-            throw `Field type "${fieldType}" is unknown!`;
-          }
 
           outputsAccumulator[propertyName] = {
             name: propertyName,

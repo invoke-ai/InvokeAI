@@ -1,5 +1,6 @@
 import { Box } from '@chakra-ui/react';
 import { InputField } from '../types';
+import { ArrayInputFieldComponent } from './fields/ArrayInputField.tsx';
 import { BooleanInputFieldComponent } from './fields/BooleanInputFieldComponent';
 import { EnumInputFieldComponent } from './fields/EnumInputFieldComponent';
 import { ImageInputFieldComponent } from './fields/ImageInputFieldComponent';
@@ -44,6 +45,10 @@ export const InputFieldComponent = (props: InputFieldComponentProps) => {
 
   if (type === 'model') {
     return <ModelInputFieldComponent nodeId={nodeId} field={field} />;
+  }
+
+  if (type === 'array') {
+    return <ArrayInputFieldComponent nodeId={nodeId} field={field} />;
   }
 
   return <Box p={2}>Unknown field type: {type}</Box>;
