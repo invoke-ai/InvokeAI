@@ -3,13 +3,12 @@
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
 class InvocationQueueItem(BaseModel):
-    graph_execution_state_id: UUID
+    graph_execution_state_id: str
     invocation_id: str
     invoke_all: bool
     timestamp: float = Field(default_factory=time.time)
