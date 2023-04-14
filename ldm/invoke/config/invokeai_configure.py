@@ -21,7 +21,6 @@ from urllib import request
 from shutil import get_terminal_size
 
 import npyscreen
-import torch
 import transformers
 from diffusers import AutoencoderKL
 from huggingface_hub import HfFolder
@@ -672,7 +671,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     # Fix up directory permissions so that they are writable
     # This can happen when running under Nix environment which
     # makes the runtime directory template immutable.
-    for root,dirs,_ in os.walk(os.path.join(root,name)):
+    for root,dirs,files in os.walk(os.path.join(root,name)):
         for d in dirs:
             Path(root,d).chmod(0o775)
         for f in files:
