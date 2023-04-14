@@ -8,6 +8,7 @@ import torch
 from diffusers.models.cross_attention import AttnProcessor
 from typing_extensions import TypeAlias
 
+import invokeai.backend.util.logging as log
 from invokeai.backend.globals import Globals
 
 from .cross_attention_control import (
@@ -262,7 +263,7 @@ class InvokeAIDiffuserComponent:
             # TODO remove when compvis codepath support is dropped
             if step_index is None and sigma is None:
                 raise ValueError(
-                    f"Either step_index or sigma is required when doing cross attention control, but both are None."
+                    "Either step_index or sigma is required when doing cross attention control, but both are None."
                 )
             percent_through = self.estimate_percent_through(step_index, sigma)
         return percent_through
@@ -466,10 +467,14 @@ class InvokeAIDiffuserComponent:
             outside = torch.count_nonzero(
                 (latents < -current_threshold) | (latents > current_threshold)
             )
-            print(
-                f"\nThreshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
-                f"  | min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}\n"
-                f"  | {outside / latents.numel() * 100:.2f}% values outside threshold"
+            log.info(
+                f"Threshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})"
+                )
+            log.debug(
+                f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}"
+            )
+            log.debug(   
+                f"{outside / latents.numel() * 100:.2f}% values outside threshold"
             )
 
         if maxval < current_threshold and minval > -current_threshold:
@@ -496,9 +501,11 @@ class InvokeAIDiffuserComponent:
             )
 
         if self.debug_thresholding:
-            print(
-                f"  | min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})\n"
-                f"  | {num_altered / latents.numel() * 100:.2f}% values altered"
+            log.debug(
+                f"min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})"
+            )
+            log.debug(
+                f"{num_altered / latents.numel() * 100:.2f}% values altered"
             )
 
         return latents
@@ -599,7 +606,6 @@ class InvokeAIDiffuserComponent:
         )
 
         # below is fugly omg
-        num_actual_conditionings = len(c_or_weighted_c_list)
         conditionings = [uc] + [c for c, weight in weighted_cond_list]
         weights = [1] + [weight for c, weight in weighted_cond_list]
         chunk_count = ceil(len(conditionings) / 2)
