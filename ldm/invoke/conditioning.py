@@ -15,6 +15,7 @@ from compel import Compel
 from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser, \
     Conjunction
 from .devices import torch_dtype
+from .generator.diffusers_pipeline import is_penultimate_clip_trained_model
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
 
@@ -48,10 +49,12 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
 
     tokenizer = get_tokenizer(model)
     text_encoder = get_text_encoder(model)
+    print("using penultimate clip layer:", is_penultimate_clip_trained_model(model))
     compel = Compel(tokenizer=tokenizer,
                     text_encoder=text_encoder,
                     textual_inversion_manager=model.textual_inversion_manager,
-                    dtype_for_device_getter=torch_dtype)
+                    dtype_for_device_getter=torch_dtype,
+                    use_penultimate_clip_layer=is_penultimate_clip_trained_model(model))
 
     # get rid of any newline characters
     prompt_string = prompt_string.replace("\n", " ")

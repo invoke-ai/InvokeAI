@@ -158,9 +158,12 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool=True
         tensor = tensor * 2.0 - 1.0
     return tensor
 
-
 def is_inpainting_model(unet: UNet2DConditionModel):
     return unet.conv_in.in_channels == 9
+
+def is_penultimate_clip_trained_model(model: StableDiffusionPipeline):
+    # TODO there should be a better way to check this
+    return model.text_encoder.config.hidden_size == 1024
 
 CallbackType = TypeVar('CallbackType')
 ReturnType = TypeVar('ReturnType')
