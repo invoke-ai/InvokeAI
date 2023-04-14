@@ -332,7 +332,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         latent = context.services.latents.get(self.latents.latents_name)
 
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state.latents, state.step)
+            self.dispatch_progress(context, state)
 
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(model)
