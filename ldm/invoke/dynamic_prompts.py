@@ -32,8 +32,8 @@ def expand_prompts(
     template_file: Path,
     run_invoke: bool = False,
     invoke_model: str = None,
-    invoke_outdir: Path = None,
-    invoke_root: Path = None,
+    invoke_outdir: str = None,
+    invoke_root: str = None,
     processes_per_gpu: int = 1,
 ):
     """
