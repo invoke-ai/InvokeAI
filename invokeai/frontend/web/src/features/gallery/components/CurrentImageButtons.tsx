@@ -82,7 +82,7 @@ const currentImageButtonsSelector = createSelector(
 
     const { shouldShowImageDetails } = ui;
 
-    const { intermediateImage, currentImage, hidden } = gallery;
+    const { intermediateImage, currentImage, shouldHidePreview } = gallery;
 
     return {
       isProcessing,
@@ -96,7 +96,7 @@ const currentImageButtonsSelector = createSelector(
       shouldShowImageDetails,
       activeTabName,
       isLightboxOpen,
-      hidden,
+      shouldHidePreview,
     };
   },
   {
@@ -126,7 +126,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     currentImage,
     isLightboxOpen,
     activeTabName,
-    hidden,
+    shouldHidePreview,
   } = useAppSelector(currentImageButtonsSelector);
 
   const toast = useToast();
@@ -196,7 +196,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const handleHiddenChange = () => {
-    dispatch(setHiddenState(!hidden));
+    dispatch(setHiddenState(!shouldHidePreview));
   };
 
   const handleClickUseAllParameters = () => {
@@ -467,14 +467,18 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           </Flex>
         </IAIPopover>
         <IAIIconButton
-          icon={hidden ? <FaEyeSlash /> : <FaEye />}
+          icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
           tooltip={
-            !hidden ? t('parameters.hidePreview') : t('parameters.showPreview')
+            !shouldHidePreview
+              ? t('parameters.hidePreview')
+              : t('parameters.showPreview')
           }
           aria-label={
-            !hidden ? t('parameters.hidePreview') : t('parameters.showPreview')
+            !shouldHidePreview
+              ? t('parameters.hidePreview')
+              : t('parameters.showPreview')
           }
-          isChecked={hidden}
+          isChecked={shouldHidePreview}
           onClick={handleHiddenChange}
         />
         <IAIIconButton

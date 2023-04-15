@@ -11,7 +11,9 @@ export default function InitImagePreview() {
     (state: RootState) => state.generation.initialImage
   );
 
-  const { hidden } = useAppSelector((state: RootState) => state.gallery);
+  const { shouldHidePreview } = useAppSelector(
+    (state: RootState) => state.gallery
+  );
 
   const { t } = useTranslation();
 
@@ -69,7 +71,7 @@ export default function InitImagePreview() {
               position: 'absolute',
             }}
             src={
-              hidden
+              shouldHidePreview
                 ? undefined
                 : typeof initialImage === 'string'
                 ? initialImage
