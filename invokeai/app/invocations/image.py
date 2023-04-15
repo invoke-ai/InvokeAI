@@ -9,7 +9,18 @@ from pydantic import BaseModel, Field
 
 from ..models.image import ImageField, ImageType
 from ..services.invocation_services import InvocationServices
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+
+
+class PILInvocationConfig(BaseModel):
+    """Helper class to provide all PIL invocations with additional config"""
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["PIL", "image"],
+            },
+        }
 
 class ImageOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
@@ -82,7 +93,7 @@ class ShowImageInvocation(BaseInvocation):
         )
 
 
-class CropImageInvocation(BaseInvocation):
+class CropImageInvocation(BaseInvocation, PILInvocationConfig):
     """Crops an image to a specified box. The box can be outside of the image."""
     #fmt: off
     type: Literal["crop"] = "crop"
@@ -115,7 +126,7 @@ class CropImageInvocation(BaseInvocation):
         )
 
 
-class PasteImageInvocation(BaseInvocation):
+class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
     """Pastes an image into another image."""
     #fmt: off
     type: Literal["paste"] = "paste"
@@ -139,7 +150,7 @@ class PasteImageInvocation(BaseInvocation):
             None
             if self.mask is None
             else ImageOps.invert(
-                services.images.get(self.mask.image_type, self.mask.image_name)
+                context.services.images.get(self.mask.image_type, self.mask.image_name)
             )
         )
         # TODO: probably shouldn't invert mask here... should user be required to do it?
@@ -165,7 +176,7 @@ class PasteImageInvocation(BaseInvocation):
         )
 
 
-class MaskFromAlphaInvocation(BaseInvocation):
+class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
     """Extracts the alpha channel of an image as a mask."""
     #fmt: off
     type: Literal["tomask"] = "tomask"
@@ -192,7 +203,7 @@ class MaskFromAlphaInvocation(BaseInvocation):
         return MaskOutput(mask=ImageField(image_type=image_type, image_name=image_name))
 
 
-class BlurInvocation(BaseInvocation):
+class BlurInvocation(BaseInvocation, PILInvocationConfig):
     """Blurs an image"""
 
     #fmt: off
@@ -226,7 +237,7 @@ class BlurInvocation(BaseInvocation):
         )
 
 
-class LerpInvocation(BaseInvocation):
+class LerpInvocation(BaseInvocation, PILInvocationConfig):
     """Linear interpolation of all pixels of an image"""
     #fmt: off
     type: Literal["lerp"] = "lerp"
@@ -257,7 +268,7 @@ class LerpInvocation(BaseInvocation):
         )
 
 
-class InverseLerpInvocation(BaseInvocation):
+class InverseLerpInvocation(BaseInvocation, PILInvocationConfig):
     """Inverse linear interpolation of all pixels of an image"""
     #fmt: off
     type: Literal["ilerp"] = "ilerp"

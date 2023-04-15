@@ -7,9 +7,38 @@ from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from ..models.image import ImageField
-from ..services.graph import GraphExecutionState
+from ..invocations.baseinvocation import BaseInvocation
+from ..invocations.image import ImageField
+from ..services.graph import GraphExecutionState, LibraryGraph, GraphInvocation, Edge
 from ..services.invoker import Invoker
+
+
+def add_field_argument(command_parser, name: str, field, default_override = None):
+    default = default_override if default_override is not None else field.default if field.default_factory is None else field.default_factory()
+    if get_origin(field.type_) == Literal:
+        allowed_values = get_args(field.type_)
+        allowed_types = set()
+        for val in allowed_values:
+            allowed_types.add(type(val))
+        allowed_types_list = list(allowed_types)
+        field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
+
+        command_parser.add_argument(
+            f"--{name}",
+            dest=name,
+            type=field_type,
+            default=default,
+            choices=allowed_values,
+            help=field.field_info.description,
+        )
+    else:
+        command_parser.add_argument(
+            f"--{name}",
+            dest=name,
+            type=field.type_,
+            default=default,
+            help=field.field_info.description,
+        )
 
 
 def add_parsers(
@@ -36,30 +65,26 @@ def add_parsers(
             if name in exclude_fields:
                 continue
 
-            if get_origin(field.type_) == Literal:
-                allowed_values = get_args(field.type_)
-                allowed_types = set()
-                for val in allowed_values:
-                    allowed_types.add(type(val))
-                allowed_types_list = list(allowed_types)
-                field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
+            add_field_argument(command_parser, name, field)
 
-                command_parser.add_argument(
-                    f"--{name}",
-                    dest=name,
-                    type=field_type,
-                    default=field.default if field.default_factory is None else field.default_factory(),
-                    choices=allowed_values,
-                    help=field.field_info.description,
-                )
-            else:
-                command_parser.add_argument(
-                    f"--{name}",
-                    dest=name,
-                    type=field.type_,
-                    default=field.default if field.default_factory is None else field.default_factory(),
-                    help=field.field_info.description,
-                )
+
+def add_graph_parsers(
+    subparsers,
+    graphs: list[LibraryGraph],
+    add_arguments: Callable[[argparse.ArgumentParser], None]|None = None
+):
+    for graph in graphs:
+        command_parser = subparsers.add_parser(graph.name, help=graph.description)
+        
+        if add_arguments is not None:
+            add_arguments(command_parser)
+
+        # Add arguments for inputs
+        for exposed_input in graph.exposed_inputs:
+            node = graph.graph.get_node(exposed_input.node_path)
+            field = node.__fields__[exposed_input.field]
+            default_override = getattr(node, exposed_input.field)
+            add_field_argument(command_parser, exposed_input.alias, field, default_override)
 
 
 class CliContext:
@@ -67,16 +92,37 @@ class CliContext:
     session: GraphExecutionState
     parser: argparse.ArgumentParser
     defaults: dict[str, Any]
+    graph_nodes: dict[str, str]
+    nodes_added: list[str]
 
     def __init__(self, invoker: Invoker, session: GraphExecutionState, parser: argparse.ArgumentParser):
         self.invoker = invoker
         self.session = session
         self.parser = parser
         self.defaults = dict()
+        self.graph_nodes = dict()
+        self.nodes_added = list()
 
     def get_session(self):
         self.session = self.invoker.services.graph_execution_manager.get(self.session.id)
         return self.session
+
+    def reset(self):
+        self.session = self.invoker.create_execution_state()
+        self.graph_nodes = dict()
+        self.nodes_added = list()
+        # Leave defaults unchanged
+
+    def add_node(self, node: BaseInvocation):
+        self.get_session()
+        self.session.graph.add_node(node)
+        self.nodes_added.append(node.id)
+        self.invoker.services.graph_execution_manager.set(self.session)
+
+    def add_edge(self, edge: Edge):
+        self.get_session()
+        self.session.add_edge(edge)
+        self.invoker.services.graph_execution_manager.set(self.session)
 
 
 class ExitCli(Exception):
