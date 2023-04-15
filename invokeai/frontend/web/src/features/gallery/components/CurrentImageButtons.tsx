@@ -8,10 +8,7 @@ import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import {
-  GalleryState,
-  setShouldHidePreview,
-} from 'features/gallery/store/gallerySlice';
+import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
@@ -30,6 +27,7 @@ import {
 } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
+  setShouldHidePreview,
   setShouldShowImageDetails,
 } from 'features/ui/store/uiSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -80,9 +78,9 @@ const currentImageButtonsSelector = createSelector(
 
     const { isLightboxOpen } = lightbox;
 
-    const { shouldShowImageDetails } = ui;
+    const { shouldShowImageDetails, shouldHidePreview } = ui;
 
-    const { intermediateImage, currentImage, shouldHidePreview } = gallery;
+    const { intermediateImage, currentImage } = gallery;
 
     return {
       isProcessing,

@@ -16,6 +16,7 @@ const initialtabsState: UIState = {
   addNewModelUIOption: null,
   shouldPinGallery: true,
   shouldShowGallery: true,
+  shouldHidePreview: false,
 };
 
 const initialState: UIState = initialtabsState;
@@ -52,6 +53,9 @@ export const uiSlice = createSlice({
     },
     setShouldUseCanvasBetaLayout: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCanvasBetaLayout = action.payload;
+    },
+    setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
+      state.shouldHidePreview = action.payload;
     },
     setShouldShowExistingModelsInSearch: (
       state,
@@ -106,6 +110,7 @@ export const {
   setShouldShowExistingModelsInSearch,
   setShouldUseSliders,
   setAddNewModelUIOption,
+  setShouldHidePreview,
   setShouldPinGallery,
   setShouldShowGallery,
   togglePanels,
