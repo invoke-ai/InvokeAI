@@ -15,14 +15,14 @@ import CurrentImageHidden from './CurrentImageHidden';
 export const imagesSelector = createSelector(
   [gallerySelector, uiSelector],
   (gallery: GalleryState, ui) => {
-    const { currentImage, intermediateImage, hidden } = gallery;
+    const { currentImage, intermediateImage, shouldHidePreview } = gallery;
     const { shouldShowImageDetails } = ui;
 
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
       isIntermediate: Boolean(intermediateImage),
       shouldShowImageDetails,
-      hidden,
+      shouldHidePreview,
     };
   },
   {
@@ -33,8 +33,12 @@ export const imagesSelector = createSelector(
 );
 
 export default function CurrentImagePreview() {
-  const { shouldShowImageDetails, imageToDisplay, isIntermediate, hidden } =
-    useAppSelector(imagesSelector);
+  const {
+    shouldShowImageDetails,
+    imageToDisplay,
+    isIntermediate,
+    shouldHidePreview,
+  } = useAppSelector(imagesSelector);
 
   return (
     <Flex
@@ -48,11 +52,11 @@ export default function CurrentImagePreview() {
     >
       {imageToDisplay && (
         <Image
-          src={hidden ? undefined : imageToDisplay.url}
+          src={shouldHidePreview ? undefined : imageToDisplay.url}
           width={imageToDisplay.width}
           height={imageToDisplay.height}
           fallback={
-            hidden ? (
+            shouldHidePreview ? (
               <CurrentImageHidden />
             ) : !isIntermediate ? (
               <CurrentImageFallback />
