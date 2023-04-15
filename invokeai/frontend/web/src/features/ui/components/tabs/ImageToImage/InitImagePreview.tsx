@@ -11,9 +11,7 @@ export default function InitImagePreview() {
     (state: RootState) => state.generation.initialImage
   );
 
-  const { shouldHidePreview } = useAppSelector(
-    (state: RootState) => state.gallery
-  );
+  const { shouldHidePreview } = useAppSelector((state: RootState) => state.ui);
 
   const { t } = useTranslation();
 

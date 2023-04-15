@@ -15,8 +15,8 @@ import CurrentImageHidden from './CurrentImageHidden';
 export const imagesSelector = createSelector(
   [gallerySelector, uiSelector],
   (gallery: GalleryState, ui) => {
-    const { currentImage, intermediateImage, shouldHidePreview } = gallery;
-    const { shouldShowImageDetails } = ui;
+    const { currentImage, intermediateImage } = gallery;
+    const { shouldShowImageDetails, shouldHidePreview } = ui;
 
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,

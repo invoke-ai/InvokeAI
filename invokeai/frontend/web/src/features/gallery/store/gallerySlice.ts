@@ -39,7 +39,6 @@ export interface GalleryState {
   currentCategory: GalleryCategory;
   galleryWidth: number;
   shouldUseSingleGalleryColumn: boolean;
-  shouldHidePreview: boolean;
 }
 
 const initialState: GalleryState = {
@@ -64,7 +63,6 @@ const initialState: GalleryState = {
   },
   galleryWidth: 300,
   shouldUseSingleGalleryColumn: false,
-  shouldHidePreview: false,
 };
 
 export const gallerySlice = createSlice({
@@ -253,15 +251,11 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
-    setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
-      state.shouldHidePreview = action.payload;
-    },
   },
 });
 
 export const {
   addImage,
-  setShouldHidePreview,
   clearIntermediateImage,
   removeImage,
   setCurrentImage,
