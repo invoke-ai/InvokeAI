@@ -10,17 +10,19 @@ import { gallerySelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
+import CurrentImageHidden from './CurrentImageHidden';
 
 export const imagesSelector = createSelector(
   [gallerySelector, uiSelector],
   (gallery: GalleryState, ui) => {
     const { currentImage, intermediateImage } = gallery;
-    const { shouldShowImageDetails } = ui;
+    const { shouldShowImageDetails, shouldHidePreview } = ui;
 
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
       isIntermediate: Boolean(intermediateImage),
       shouldShowImageDetails,
+      shouldHidePreview,
     };
   },
   {
@@ -31,8 +33,12 @@ export const imagesSelector = createSelector(
 );
 
 export default function CurrentImagePreview() {
-  const { shouldShowImageDetails, imageToDisplay, isIntermediate } =
-    useAppSelector(imagesSelector);
+  const {
+    shouldShowImageDetails,
+    imageToDisplay,
+    isIntermediate,
+    shouldHidePreview,
+  } = useAppSelector(imagesSelector);
 
   return (
     <Flex
@@ -46,10 +52,16 @@ export default function CurrentImagePreview() {
     >
       {imageToDisplay && (
         <Image
-          src={imageToDisplay.url}
+          src={shouldHidePreview ? undefined : imageToDisplay.url}
           width={imageToDisplay.width}
           height={imageToDisplay.height}
-          fallback={!isIntermediate ? <CurrentImageFallback /> : undefined}
+          fallback={
+            shouldHidePreview ? (
+              <CurrentImageHidden />
+            ) : !isIntermediate ? (
+              <CurrentImageFallback />
+            ) : undefined
+          }
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',

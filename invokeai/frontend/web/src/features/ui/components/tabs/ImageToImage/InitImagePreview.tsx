@@ -2,6 +2,7 @@ import { Flex, Image, Text, useToast } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
+import CurrentImageHidden from 'features/gallery/components/CurrentImageHidden';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +10,8 @@ export default function InitImagePreview() {
   const initialImage = useAppSelector(
     (state: RootState) => state.generation.initialImage
   );
+
+  const { shouldHidePreview } = useAppSelector((state: RootState) => state.ui);
 
   const { t } = useTranslation();
 
@@ -66,8 +69,13 @@ export default function InitImagePreview() {
               position: 'absolute',
             }}
             src={
-              typeof initialImage === 'string' ? initialImage : initialImage.url
+              shouldHidePreview
+                ? undefined
+                : typeof initialImage === 'string'
+                ? initialImage
+                : initialImage.url
             }
+            fallback={<CurrentImageHidden />}
             onError={alertMissingInitImage}
           />
         </Flex>

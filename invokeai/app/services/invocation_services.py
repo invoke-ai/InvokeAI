@@ -19,6 +19,7 @@ class InvocationServices:
     restoration: RestorationServices
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
+    graph_library: ItemStorageABC["LibraryGraph"]
     graph_execution_manager: ItemStorageABC["GraphExecutionState"]
     processor: "InvocationProcessorABC"
 
@@ -29,6 +30,7 @@ class InvocationServices:
             latents: LatentsStorageBase,
             images: ImageStorageBase,
             queue: InvocationQueueABC,
+            graph_library: ItemStorageABC["LibraryGraph"],
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
             processor: "InvocationProcessorABC",
             restoration: RestorationServices,
@@ -38,6 +40,7 @@ class InvocationServices:
         self.latents = latents
         self.images = images
         self.queue = queue
+        self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager
         self.processor = processor
         self.restoration = restoration

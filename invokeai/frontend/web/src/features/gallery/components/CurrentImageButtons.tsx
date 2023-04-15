@@ -27,6 +27,7 @@ import {
 } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
+  setShouldHidePreview,
   setShouldShowImageDetails,
 } from 'features/ui/store/uiSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -38,6 +39,8 @@ import {
   FaDownload,
   FaExpand,
   FaExpandArrowsAlt,
+  FaEye,
+  FaEyeSlash,
   FaGrinStars,
   FaQuoteRight,
   FaSeedling,
@@ -75,7 +78,7 @@ const currentImageButtonsSelector = createSelector(
 
     const { isLightboxOpen } = lightbox;
 
-    const { shouldShowImageDetails } = ui;
+    const { shouldShowImageDetails, shouldHidePreview } = ui;
 
     const { intermediateImage, currentImage } = gallery;
 
@@ -91,6 +94,7 @@ const currentImageButtonsSelector = createSelector(
       shouldShowImageDetails,
       activeTabName,
       isLightboxOpen,
+      shouldHidePreview,
     };
   },
   {
@@ -120,6 +124,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     currentImage,
     isLightboxOpen,
     activeTabName,
+    shouldHidePreview,
   } = useAppSelector(currentImageButtonsSelector);
 
   const toast = useToast();
@@ -187,6 +192,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     },
     [currentImage]
   );
+
+  const handlePreviewVisibility = () => {
+    dispatch(setShouldHidePreview(!shouldHidePreview));
+  };
 
   const handleClickUseAllParameters = () => {
     if (!currentImage) return;
@@ -455,6 +464,21 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             </Link>
           </Flex>
         </IAIPopover>
+        <IAIIconButton
+          icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
+          tooltip={
+            !shouldHidePreview
+              ? t('parameters.hidePreview')
+              : t('parameters.showPreview')
+          }
+          aria-label={
+            !shouldHidePreview
+              ? t('parameters.hidePreview')
+              : t('parameters.showPreview')
+          }
+          isChecked={shouldHidePreview}
+          onClick={handlePreviewVisibility}
+        />
         <IAIIconButton
           icon={<FaExpand />}
           tooltip={
