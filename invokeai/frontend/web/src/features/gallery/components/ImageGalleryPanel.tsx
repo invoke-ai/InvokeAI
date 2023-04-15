@@ -26,6 +26,8 @@ import {
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { isMobile } from 'theme/util/isMobile';
+import MediaQuery from 'react-responsive';
 
 const GALLERY_TAB_WIDTHS: Record<
   InvokeTabName,
@@ -147,6 +149,7 @@ export default function ImageGalleryPanel() {
   );
 
   const IMAGE_SIZE_STEP = 32;
+  const screenWidth = window.innerWidth;
 
   useHotkeys(
     'shift+up',
@@ -179,24 +182,35 @@ export default function ImageGalleryPanel() {
   );
 
   return (
-    <ResizableDrawer
-      direction="right"
-      isResizable={isResizable || !shouldPinGallery}
-      isOpen={shouldShowGallery}
-      onClose={handleCloseGallery}
-      isPinned={shouldPinGallery && !isLightboxOpen}
-      minWidth={
-        shouldPinGallery
-          ? GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
-          : 200
-      }
-      maxWidth={
-        shouldPinGallery
-          ? GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
-          : undefined
-      }
-    >
-      <ImageGalleryContent />
-    </ResizableDrawer>
+    <>
+      <MediaQuery minDeviceWidth={768}>
+        <ResizableDrawer
+          direction="right"
+          isResizable={isResizable || !shouldPinGallery}
+          isOpen={shouldShowGallery}
+          onClose={handleCloseGallery}
+          isPinned={shouldPinGallery && !isLightboxOpen}
+          minWidth={
+            shouldPinGallery
+              ? isMobile
+                ? screenWidth
+                : GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
+              : 200
+          }
+          maxWidth={
+            shouldPinGallery
+              ? isMobile
+                ? screenWidth
+                : GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
+              : undefined
+          }
+        >
+          <ImageGalleryContent />
+        </ResizableDrawer>
+      </MediaQuery>
+      <MediaQuery maxDeviceWidth={768}>
+        <ImageGalleryContent />
+      </MediaQuery>
+    </>
   );
 }

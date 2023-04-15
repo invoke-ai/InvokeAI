@@ -1,6 +1,7 @@
 import { Flex, Spinner, Text } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 
+import { updateIsMobile } from 'theme/util/isMobile';
 interface LoaderProps {
   showText?: boolean;
   text?: string;
@@ -9,6 +10,7 @@ interface LoaderProps {
 // This component loads before the theme so we cannot use theme tokens here
 
 const Loading = (props: LoaderProps) => {
+  updateIsMobile();
   const { t } = useTranslation();
   const { showText = false, text = t('common.loadingInvokeAI') } = props;
 

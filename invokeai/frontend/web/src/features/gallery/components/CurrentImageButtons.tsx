@@ -409,6 +409,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         justifyContent: 'center',
         alignItems: 'center',
         columnGap: '0.5em',
+        flexWrap: 'wrap',
       }}
       {...props}
     >

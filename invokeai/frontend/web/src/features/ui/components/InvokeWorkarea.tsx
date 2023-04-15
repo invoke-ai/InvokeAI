@@ -13,6 +13,9 @@ import useGetImageByUuid from 'features/gallery/hooks/useGetImageByUuid';
 import { isEqual } from 'lodash';
 import { APP_CONTENT_HEIGHT } from 'theme/util/constants';
 import ParametersPanel from './ParametersPanel';
+import MediaQuery from 'react-responsive';
+import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
+import { isMobile } from 'theme/util/isMobile';
 
 const workareaSelector = createSelector(
   [uiSelector, activeTabNameSelector],
@@ -54,12 +57,31 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   };
 
   return (
-    <Flex {...rest} pos="relative" w="full" h={APP_CONTENT_HEIGHT} gap={4}>
-      <ParametersPanel>{parametersPanelContent}</ParametersPanel>
-      <Box pos="relative" w="100%" h="100%" onDrop={handleDrop}>
-        {children}
-      </Box>
-    </Flex>
+    <>
+      <MediaQuery minDeviceWidth={768}>
+        <Flex {...rest} pos="relative" w="full" h={APP_CONTENT_HEIGHT} gap={4}>
+          <ParametersPanel>{parametersPanelContent}</ParametersPanel>
+          <Box pos="relative" w="100%" h="100%" onDrop={handleDrop}>
+            {children}
+          </Box>
+        </Flex>
+      </MediaQuery>
+      <MediaQuery maxDeviceWidth={768}>
+        <Flex
+          {...rest}
+          display="block"
+          pos="relative"
+          w="full"
+          h={APP_CONTENT_HEIGHT}
+        >
+          <Box pos="sticky" w="full" h="70%" onDrop={handleDrop}>
+            {children}
+          </Box>
+          <ParametersPanel>{parametersPanelContent}</ParametersPanel>
+          {isMobile && <ImageGalleryPanel />}
+        </Flex>
+      </MediaQuery>
+    </>
   );
 };
 

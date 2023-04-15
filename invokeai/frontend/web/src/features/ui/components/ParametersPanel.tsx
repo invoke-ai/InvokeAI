@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 
 import { memo, ReactNode } from 'react';
@@ -19,6 +19,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 import { isEqual } from 'lodash';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import MediaQuery from 'react-responsive';
 
 const parametersPanelSelector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],
@@ -89,40 +90,49 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
     []
   );
   return (
-    <ResizableDrawer
-      direction="left"
-      isResizable={isResizable || !shouldPinParametersPanel}
-      isOpen={shouldShowParametersPanel}
-      onClose={closeParametersPanel}
-      isPinned={shouldPinParametersPanel || isLightboxOpen}
-      sx={{
-        borderColor: 'base.700',
-        p: shouldPinParametersPanel ? 0 : 4,
-        bg: 'base.900',
-      }}
-      initialWidth={PARAMETERS_PANEL_WIDTH}
-      minWidth={PARAMETERS_PANEL_WIDTH}
-    >
-      <Flex flexDir="column" position="relative" h="full" w="full">
-        {!shouldPinParametersPanel && (
-          <Flex
-            paddingTop={1.5}
-            paddingBottom={4}
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <InvokeAILogoComponent />
-            <PinParametersPanelButton />
+    <>
+      <MediaQuery minDeviceWidth={768}>
+        <ResizableDrawer
+          direction="left"
+          isResizable={isResizable || !shouldPinParametersPanel}
+          isOpen={shouldShowParametersPanel}
+          onClose={closeParametersPanel}
+          isPinned={shouldPinParametersPanel || isLightboxOpen}
+          sx={{
+            borderColor: 'base.700',
+            p: shouldPinParametersPanel ? 0 : 4,
+            bg: 'base.900',
+          }}
+          initialWidth={PARAMETERS_PANEL_WIDTH}
+          minWidth={PARAMETERS_PANEL_WIDTH}
+        >
+          <Flex flexDir="column" position="relative" h="full" w="full">
+            {!shouldPinParametersPanel && (
+              <Flex
+                paddingTop={1.5}
+                paddingBottom={4}
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <InvokeAILogoComponent />
+                <PinParametersPanelButton />
+              </Flex>
+            )}
+            <Scrollable>{children}</Scrollable>
+            {shouldPinParametersPanel && (
+              <PinParametersPanelButton
+                sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
+              />
+            )}
           </Flex>
-        )}
-        <Scrollable>{children}</Scrollable>
-        {shouldPinParametersPanel && (
-          <PinParametersPanelButton
-            sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
-          />
-        )}
-      </Flex>
-    </ResizableDrawer>
+        </ResizableDrawer>
+      </MediaQuery>
+      <MediaQuery maxDeviceWidth={768}>
+        <Box flexDir="column" w="full" h="50rem">
+          {children}
+        </Box>
+      </MediaQuery>
+    </>
   );
 };
 

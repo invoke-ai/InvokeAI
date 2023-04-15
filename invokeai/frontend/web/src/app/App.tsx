@@ -15,6 +15,8 @@ import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppSelector } from './storeHooks';
 import { PropsWithChildren, useEffect } from 'react';
+import { isMobile } from 'theme/util/isMobile';
+import MediaQuery from 'react-responsive';
 
 keepGUIAlive();
 
@@ -35,16 +37,23 @@ const App = (props: PropsWithChildren) => {
         <ProgressBar />
         <Grid
           gap={4}
-          p={4}
-          gridAutoRows="min-content auto"
+          p={isMobile ? 1 : 4}
+          gridAutoRows="max-content auto"
           w={APP_WIDTH}
           h={APP_HEIGHT}
         >
           {props.children || <SiteHeader />}
-          <Flex gap={4} w="full" h="full">
-            <InvokeTabs />
-            <ImageGalleryPanel />
-          </Flex>
+          <MediaQuery minDeviceWidth={768}>
+            <Flex gap={4} w="full" h="full">
+              <InvokeTabs />
+              <ImageGalleryPanel />
+            </Flex>
+          </MediaQuery>
+          <MediaQuery maxDeviceWidth={768}>
+            <Box position="relative" overflowY="scroll">
+              <InvokeTabs />
+            </Box>
+          </MediaQuery>
         </Grid>
         <Box>
           <Console />
