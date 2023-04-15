@@ -8,7 +8,10 @@ import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
+import {
+  GalleryState,
+  setHiddenState,
+} from 'features/gallery/store/gallerySlice';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
@@ -38,6 +41,8 @@ import {
   FaDownload,
   FaExpand,
   FaExpandArrowsAlt,
+  FaEye,
+  FaEyeSlash,
   FaGrinStars,
   FaQuoteRight,
   FaSeedling,
@@ -77,7 +82,7 @@ const currentImageButtonsSelector = createSelector(
 
     const { shouldShowImageDetails } = ui;
 
-    const { intermediateImage, currentImage } = gallery;
+    const { intermediateImage, currentImage, hidden } = gallery;
 
     return {
       isProcessing,
@@ -91,6 +96,7 @@ const currentImageButtonsSelector = createSelector(
       shouldShowImageDetails,
       activeTabName,
       isLightboxOpen,
+      hidden,
     };
   },
   {
@@ -120,6 +126,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     currentImage,
     isLightboxOpen,
     activeTabName,
+    hidden,
   } = useAppSelector(currentImageButtonsSelector);
 
   const toast = useToast();
@@ -187,6 +194,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     },
     [currentImage]
   );
+
+  const handleHiddenChange = () => {
+    dispatch(setHiddenState(!hidden));
+  };
 
   const handleClickUseAllParameters = () => {
     if (!currentImage) return;
@@ -455,6 +466,17 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             </Link>
           </Flex>
         </IAIPopover>
+        <IAIIconButton
+          icon={hidden ? <FaEyeSlash /> : <FaEye />}
+          tooltip={
+            !hidden ? t('parameters.hidePreview') : t('parameters.showPreview')
+          }
+          aria-label={
+            !hidden ? t('parameters.hidePreview') : t('parameters.showPreview')
+          }
+          isChecked={hidden}
+          onClick={handleHiddenChange}
+        />
         <IAIIconButton
           icon={<FaExpand />}
           tooltip={

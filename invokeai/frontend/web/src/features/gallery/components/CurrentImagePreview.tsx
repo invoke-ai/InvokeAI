@@ -10,17 +10,19 @@ import { gallerySelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
+import CurrentImageHidden from './CurrentImageHidden';
 
 export const imagesSelector = createSelector(
   [gallerySelector, uiSelector],
   (gallery: GalleryState, ui) => {
-    const { currentImage, intermediateImage } = gallery;
+    const { currentImage, intermediateImage, hidden } = gallery;
     const { shouldShowImageDetails } = ui;
 
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
       isIntermediate: Boolean(intermediateImage),
       shouldShowImageDetails,
+      hidden,
     };
   },
   {
@@ -31,7 +33,7 @@ export const imagesSelector = createSelector(
 );
 
 export default function CurrentImagePreview() {
-  const { shouldShowImageDetails, imageToDisplay, isIntermediate } =
+  const { shouldShowImageDetails, imageToDisplay, isIntermediate, hidden } =
     useAppSelector(imagesSelector);
 
   return (
@@ -46,10 +48,16 @@ export default function CurrentImagePreview() {
     >
       {imageToDisplay && (
         <Image
-          src={imageToDisplay.url}
+          src={hidden ? undefined : imageToDisplay.url}
           width={imageToDisplay.width}
           height={imageToDisplay.height}
-          fallback={!isIntermediate ? <CurrentImageFallback /> : undefined}
+          fallback={
+            hidden ? (
+              <CurrentImageHidden />
+            ) : !isIntermediate ? (
+              <CurrentImageFallback />
+            ) : undefined
+          }
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',
