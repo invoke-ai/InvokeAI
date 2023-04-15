@@ -10,7 +10,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   GalleryState,
-  setHiddenState,
+  setShouldHidePreview,
 } from 'features/gallery/store/gallerySlice';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
@@ -195,8 +195,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [currentImage]
   );
 
-  const handleHiddenChange = () => {
-    dispatch(setHiddenState(!shouldHidePreview));
+  const handlePreviewVisibility = () => {
+    dispatch(setShouldHidePreview(!shouldHidePreview));
   };
 
   const handleClickUseAllParameters = () => {
@@ -479,7 +479,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               : t('parameters.showPreview')
           }
           isChecked={shouldHidePreview}
-          onClick={handleHiddenChange}
+          onClick={handlePreviewVisibility}
         />
         <IAIIconButton
           icon={<FaExpand />}
