@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
-    "dev": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
+    "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",

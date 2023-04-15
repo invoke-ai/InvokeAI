@@ -1,5 +1,5 @@
 import { Box, Flex, Grid } from '@chakra-ui/react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ModelSelect from './ModelSelect';
 import StatusIndicator from './StatusIndicator';
 
