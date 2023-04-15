@@ -253,7 +253,7 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
-    setHiddenState: (state, action: PayloadAction<boolean>) => {
+    setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
       state.shouldHidePreview = action.payload;
     },
   },
@@ -261,7 +261,7 @@ export const gallerySlice = createSlice({
 
 export const {
   addImage,
-  setHiddenState,
+  setShouldHidePreview,
   clearIntermediateImage,
   removeImage,
   setCurrentImage,
