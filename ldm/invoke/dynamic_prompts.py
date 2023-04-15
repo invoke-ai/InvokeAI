@@ -33,6 +33,7 @@ def expand_prompts(
     run_invoke: bool = False,
     invoke_model: str = None,
     invoke_outdir: Path = None,
+    invoke_root: Path = None,
     processes_per_gpu: int = 1,
 ):
     """
@@ -61,6 +62,8 @@ def expand_prompts(
             invokeai_args = [shutil.which("invokeai"), "--from_file", "-"]
             if invoke_model:
                 invokeai_args.extend(("--model", invoke_model))
+            if invoke_root:
+                invokeai_args.extend(("--root", invoke_root))
             if invoke_outdir:
                 outdir = os.path.expanduser(invoke_outdir)
                 invokeai_args.extend(("--outdir", outdir))
@@ -250,6 +253,10 @@ def main():
         default=1,
         help="When executing invokeai, how many parallel processes to execute per CUDA GPU.",
     )
+    parser.add_argument(
+        '--root_dir',
+        default=None,
+        help='Path to directory containing "models", "outputs" and "configs". If not present will read from environment variable INVOKEAI_ROOT. Defaults to ~/invokeai'    )
     opt = parser.parse_args()
 
     if opt.example:
@@ -273,6 +280,7 @@ def main():
         run_invoke=opt.invoke,
         invoke_model=opt.model,
         invoke_outdir=opt.outdir,
+        invoke_root=opt.root,
         processes_per_gpu=opt.processes_per_gpu,
     )
 
