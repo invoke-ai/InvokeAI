@@ -79,6 +79,11 @@ def expand_prompts(
             )
             import ldm.invoke.CLI
 
+            print(f'DEBUG: BATCH PARENT ENVIRONMENT:')
+            print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+            print("\n".join([f'{x}:{os.environ[x]}' for x in os.environ.keys()]))
+            print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+            
             parent_conn, child_conn = Pipe()
             children = set()
             for i in range(processes_to_launch):
@@ -86,7 +91,6 @@ def expand_prompts(
                     target=_run_invoke,
                     kwargs=dict(
                         entry_point=ldm.invoke.CLI.main,
-#                        entry_point=_dummy_cli_main,
                         conn_in=child_conn,
                         conn_out=parent_conn,
                         args=invokeai_args,

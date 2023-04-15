@@ -42,8 +42,12 @@ def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
     
-    print(f'DEBUG: [3] Entered main()', file=sys.stderr)
-
+    print('DEBUG: [3] Entered main()', file=sys.stderr)
+    print('DEBUG: INVOKEAI ENVIRONMENT:')
+    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print("\n".join([f'{x}:{os.environ[x]}' for x in os.environ.keys()]))
+    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    
     opt = Args()
     args = opt.parse_args()
     if not args:
