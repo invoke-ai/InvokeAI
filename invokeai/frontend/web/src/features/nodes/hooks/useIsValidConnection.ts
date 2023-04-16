@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
-import { Connection, useReactFlow } from 'reactflow';
+import { Connection, Node, useReactFlow } from 'reactflow';
 import graphlib from '@dagrejs/graphlib';
+import { InvocationValue } from '../types';
 
 export const useIsValidConnection = () => {
   const flow = useReactFlow();
@@ -8,7 +9,6 @@ export const useIsValidConnection = () => {
   // Check if an in-progress connection is valid
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
-      return true;
       const edges = flow.getEdges();
       const nodes = flow.getNodes();
 
@@ -27,11 +27,12 @@ export const useIsValidConnection = () => {
       }
 
       // Find the source and target nodes
-      const sourceNode = flow.getNode(source);
-      const targetNode = flow.getNode(target);
+      const sourceNode = flow.getNode(source) as Node<InvocationValue>;
+
+      const targetNode = flow.getNode(target) as Node<InvocationValue>;
 
       // Conditional guards against undefined nodes/handles
-      if (!(sourceNode && targetNode)) {
+      if (!(sourceNode && targetNode && sourceNode.data && targetNode.data)) {
         return false;
       }
 
@@ -44,6 +45,28 @@ export const useIsValidConnection = () => {
       }
 
       // Graphs much be acyclic (no loops!)
+
+      /**
+       * TODO: use `graphlib.alg.findCycles()` to identify strong connections
+       *
+       * this validation func only runs when the cursor hits the second handle of the connection,
+       * and only on that second handle - so it cannot tell us exhaustively which connections
+       * are valid.
+       *
+       * ideally, we check when the connection starts to calculate all invalid handles at once.
+       *
+       * requires making a new graphlib graph - and calling `findCycles()` - for each potential
+       * handle. instead of using the `isValidConnection` prop, it would use the `onConnectStart`
+       * prop.
+       *
+       * the strong connections should be stored in global state.
+       *
+       * then, `isValidConnection` would simple loop through the strong connections and if the
+       * source and target are in a single strong connection, return false.
+       *
+       * and also, we can use this knowledge to style every handle when a connection starts,
+       * which is otherwise not possible.
+       */
 
       // build a graphlib graph
       const g = new graphlib.Graph();

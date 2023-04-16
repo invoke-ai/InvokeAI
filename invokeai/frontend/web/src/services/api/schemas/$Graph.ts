@@ -12,6 +12,8 @@ export const $Graph = {
       contains: {
         type: 'one-of',
         contains: [{
+          type: 'LoadImageInvocation',
+        }, {
           type: 'ShowImageInvocation',
         }, {
           type: 'CropImageInvocation',
@@ -32,8 +34,6 @@ export const $Graph = {
         }, {
           type: 'LatentsToImageInvocation',
         }, {
-          type: 'CvInpaintInvocation',
-        }, {
           type: 'AddInvocation',
         }, {
           type: 'SubtractInvocation',
@@ -41,6 +41,10 @@ export const $Graph = {
           type: 'MultiplyInvocation',
         }, {
           type: 'DivideInvocation',
+        }, {
+          type: 'ParamIntInvocation',
+        }, {
+          type: 'CvInpaintInvocation',
         }, {
           type: 'RangeInvocation',
         }, {

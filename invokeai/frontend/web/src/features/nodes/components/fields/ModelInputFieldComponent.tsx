@@ -3,7 +3,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import { ModelInputField } from 'features/nodes/types';
+import {
+  ModelInputFieldTemplate,
+  ModelInputFieldValue,
+} from 'features/nodes/types';
 import {
   selectModelsById,
   selectModelsIds,
@@ -26,7 +29,7 @@ const availableModelsSelector = createSelector(
 );
 
 export const ModelInputFieldComponent = (
-  props: FieldComponentProps<ModelInputField>
+  props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
 
@@ -38,7 +41,7 @@ export const ModelInputFieldComponent = (
     dispatch(
       fieldValueChanged({
         nodeId,
-        fieldId: field.name,
+        fieldName: field.name,
         value: e.target.value,
       })
     );

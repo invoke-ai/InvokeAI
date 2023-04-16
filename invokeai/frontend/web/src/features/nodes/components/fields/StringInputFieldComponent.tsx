@@ -1,12 +1,15 @@
 import { Input } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import { StringInputField } from 'features/nodes/types';
+import {
+  StringInputFieldTemplate,
+  StringInputFieldValue,
+} from 'features/nodes/types';
 import { ChangeEvent } from 'react';
 import { FieldComponentProps } from './types';
 
 export const StringInputFieldComponent = (
-  props: FieldComponentProps<StringInputField>
+  props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
 
@@ -14,7 +17,11 @@ export const StringInputFieldComponent = (
 
   const handleValueChanged = (e: ChangeEvent<HTMLInputElement>) => {
     dispatch(
-      fieldValueChanged({ nodeId, fieldId: field.name, value: e.target.value })
+      fieldValueChanged({
+        nodeId,
+        fieldName: field.name,
+        value: e.target.value,
+      })
     );
   };
 

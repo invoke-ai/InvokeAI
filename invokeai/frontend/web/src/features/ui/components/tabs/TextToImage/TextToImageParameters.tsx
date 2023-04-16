@@ -2,6 +2,7 @@ import { Flex } from '@chakra-ui/react';
 import { Feature } from 'app/features';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import FaceRestoreToggle from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreToggle';
+import ImageToImageSettings from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageSettings';
 import OutputSettings from 'features/parameters/components/AdvancedParameters/Output/OutputSettings';
 import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
 import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
@@ -26,6 +27,11 @@ const TextToImageParameters = () => {
       header: `${t('parameters.general')}`,
       feature: undefined,
       content: <MainSettings />,
+    },
+    imageToImage: {
+      header: `${t('parameters.imageToImage')}`,
+      feature: undefined,
+      content: <ImageToImageSettings />,
     },
     seed: {
       header: `${t('parameters.seed')}`,

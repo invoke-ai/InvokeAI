@@ -1,5 +1,5 @@
 import { Box } from '@chakra-ui/react';
-import { InputField } from '../types';
+import { InputFieldTemplate, InputFieldValue } from '../types';
 import { ArrayInputFieldComponent } from './fields/ArrayInputField.tsx';
 import { BooleanInputFieldComponent } from './fields/BooleanInputFieldComponent';
 import { EnumInputFieldComponent } from './fields/EnumInputFieldComponent';
@@ -11,44 +11,96 @@ import { StringInputFieldComponent } from './fields/StringInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
-  field: InputField;
+  field: InputFieldValue;
+  template: InputFieldTemplate;
 };
 
 // build an individual input element based on the schema
 export const InputFieldComponent = (props: InputFieldComponentProps) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, template } = props;
   const { type, value } = field;
 
-  if (type === 'string') {
-    return <StringInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'string' && template.type === 'string') {
+    return (
+      <StringInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'boolean') {
-    return <BooleanInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'boolean' && template.type === 'boolean') {
+    return (
+      <BooleanInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'integer' || type === 'float') {
-    return <NumberInputFieldComponent nodeId={nodeId} field={field} />;
+  if (
+    (type === 'integer' && template.type === 'integer') ||
+    (type === 'float' && template.type === 'float')
+  ) {
+    return (
+      <NumberInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'enum') {
-    return <EnumInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'enum' && template.type === 'enum') {
+    return (
+      <EnumInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'image') {
-    return <ImageInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'image' && template.type === 'image') {
+    return (
+      <ImageInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'latents') {
-    return <LatentsInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'latents' && template.type === 'latents') {
+    return (
+      <LatentsInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'model') {
-    return <ModelInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'model' && template.type === 'model') {
+    return (
+      <ModelInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
-  if (type === 'array') {
-    return <ArrayInputFieldComponent nodeId={nodeId} field={field} />;
+  if (type === 'array' && template.type === 'array') {
+    return (
+      <ArrayInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
   }
 
   return <Box p={2}>Unknown field type: {type}</Box>;

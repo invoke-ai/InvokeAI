@@ -51,9 +51,7 @@ export const HiresStrength = () => {
       // inputWidth={22}
       withReset
       handleReset={handleHiResStrengthReset}
-      isSliderDisabled={!hiresFix}
-      isInputDisabled={!hiresFix}
-      isResetDisabled={!hiresFix}
+      isDisabled={!hiresFix}
     />
   );
 };

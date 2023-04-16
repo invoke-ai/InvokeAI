@@ -7,18 +7,26 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import { IntegerInputField, FloatInputField } from 'features/nodes/types';
+import {
+  FloatInputFieldTemplate,
+  FloatInputFieldValue,
+  IntegerInputFieldTemplate,
+  IntegerInputFieldValue,
+} from 'features/nodes/types';
 import { FieldComponentProps } from './types';
 
 export const NumberInputFieldComponent = (
-  props: FieldComponentProps<IntegerInputField | FloatInputField>
+  props: FieldComponentProps<
+    IntegerInputFieldValue | FloatInputFieldValue,
+    IntegerInputFieldTemplate | FloatInputFieldTemplate
+  >
 ) => {
   const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
 
   const handleValueChanged = (_: string, value: number) => {
-    dispatch(fieldValueChanged({ nodeId, fieldId: field.name, value }));
+    dispatch(fieldValueChanged({ nodeId, fieldName: field.name, value }));
   };
 
   return (

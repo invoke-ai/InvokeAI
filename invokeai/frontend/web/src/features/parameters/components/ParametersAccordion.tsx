@@ -62,7 +62,6 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
     <Accordion
       defaultIndex={openAccordions}
       allowMultiple
-      reduceMotion
       onChange={handleChangeAccordionState}
       sx={{
         display: 'flex',
