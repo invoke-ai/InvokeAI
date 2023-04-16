@@ -9,13 +9,12 @@ import {
 } from 'reactflow';
 import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../constants';
 // import { useConnectionEventStyles } from '../hooks/useConnectionEventStyles';
-import { InputField, OutputField } from '../types';
+import { InputFieldTemplate, OutputFieldTemplate } from '../types';
 
 const handleBaseStyles: CSSProperties = {
   position: 'absolute',
   width: '1rem',
   height: '1rem',
-  opacity: 0.5,
   borderWidth: 0,
 };
 
@@ -28,12 +27,12 @@ const outputHandleStyles: CSSProperties = {
 };
 
 const requiredConnectionStyles: CSSProperties = {
-  opacity: 1,
+  boxShadow: '0 0 0.5rem 0.5rem var(--invokeai-colors-error-400)',
 };
 
 type FieldHandleProps = {
   nodeId: string;
-  field: InputField | OutputField;
+  field: InputFieldTemplate | OutputFieldTemplate;
   isValidConnection: (connection: Connection) => boolean;
   handleType: HandleType;
   styles?: CSSProperties;
@@ -41,20 +40,12 @@ type FieldHandleProps = {
 
 export const FieldHandle = (props: FieldHandleProps) => {
   const { nodeId, field, isValidConnection, handleType, styles } = props;
-  const { name, title, type, description, connectionType } = field;
-
-  // this needs to iterate over every candicate target node, calculating graph cycles
-  // WIP
-  // const connectionEventStyles = useConnectionEventStyles(
-  //   nodeId,
-  //   type,
-  //   handleType
-  // );
+  const { name, title, type, description } = field;
 
   return (
     <Tooltip
       key={name}
-      label={`${title} (${type})`}
+      label={type}
       placement={handleType === 'target' ? 'start' : 'end'}
       hasArrow
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
@@ -65,11 +56,11 @@ export const FieldHandle = (props: FieldHandleProps) => {
         isValidConnection={isValidConnection}
         position={handleType === 'target' ? Position.Left : Position.Right}
         style={{
-          backgroundColor: `var(--invokeai-colors-${FIELDS[type].color}-500)`,
+          backgroundColor: FIELDS[type].colorCssVar,
           ...styles,
           ...handleBaseStyles,
           ...(handleType === 'target' ? inputHandleStyles : outputHandleStyles),
-          ...(connectionType === 'always' ? requiredConnectionStyles : {}),
+          // ...(inputRequirement === 'always' ? requiredConnectionStyles : {}),
           // ...connectionEventStyles,
         }}
       />

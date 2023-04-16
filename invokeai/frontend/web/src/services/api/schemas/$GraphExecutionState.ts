@@ -48,13 +48,13 @@ export const $GraphExecutionState = {
         }, {
           type: 'MaskOutput',
         }, {
-          type: 'PromptOutput',
-        }, {
           type: 'LatentsOutput',
         }, {
           type: 'NoiseOutput',
         }, {
           type: 'IntOutput',
+        }, {
+          type: 'PromptOutput',
         }, {
           type: 'IntCollectionOutput',
         }, {

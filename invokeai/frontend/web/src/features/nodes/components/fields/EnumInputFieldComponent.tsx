@@ -1,14 +1,17 @@
 import { Select } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import { EnumInputField } from 'features/nodes/types';
+import {
+  EnumInputFieldTemplate,
+  EnumInputFieldValue,
+} from 'features/nodes/types';
 import { ChangeEvent } from 'react';
 import { FieldComponentProps } from './types';
 
 export const EnumInputFieldComponent = (
-  props: FieldComponentProps<EnumInputField>
+  props: FieldComponentProps<EnumInputFieldValue, EnumInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, template } = props;
 
   const dispatch = useAppDispatch();
 
@@ -16,7 +19,7 @@ export const EnumInputFieldComponent = (
     dispatch(
       fieldValueChanged({
         nodeId,
-        fieldId: field.name,
+        fieldName: field.name,
         value: e.target.value,
       })
     );
@@ -24,7 +27,7 @@ export const EnumInputFieldComponent = (
 
   return (
     <Select onChange={handleValueChanged} value={field.value}>
-      {field.options.map((option) => (
+      {template.options.map((option) => (
         <option key={option}>{option}</option>
       ))}
     </Select>

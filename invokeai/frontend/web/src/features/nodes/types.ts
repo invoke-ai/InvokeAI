@@ -1,4 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { ImageField } from 'services/api';
 
 export const isReferenceObject = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
@@ -8,7 +9,14 @@ export const isSchemaObject = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
 ): obj is OpenAPIV3.SchemaObject => !('$ref' in obj);
 
-export type Invocation = {
+export type InvocationValue = {
+  id: string;
+  type: string;
+  inputs: Record<string, InputFieldValue>;
+  outputs: Record<string, OutputFieldValue>;
+};
+
+export type InvocationTemplate = {
   /**
    * Unique type of the invocation
    */
@@ -28,30 +36,24 @@ export type Invocation = {
   /**
    * Array of invocation inputs
    */
-  inputs: Record<string, InputField>;
+  inputs: Record<string, InputFieldTemplate>;
   // inputs: InputField[];
   /**
    * Array of the invocation outputs
    */
-  outputs: Record<string, OutputField>;
+  outputs: Record<string, OutputFieldTemplate>;
   // outputs: OutputField[];
 };
 
 export type FieldUIConfig = {
-  color:
-    | 'red'
-    | 'orange'
-    | 'yellow'
-    | 'green'
-    | 'blue'
-    | 'purple'
-    | 'pink'
-    | 'teal'
-    | 'gray';
+  colorCssVar: string;
   title: string;
   description: string;
 };
 
+/**
+ * The valid invocation field types
+ */
 export type FieldType =
   | 'integer'
   | 'float'
@@ -63,31 +65,136 @@ export type FieldType =
   | 'model'
   | 'array';
 
-export type InputField =
-  | IntegerInputField
-  | FloatInputField
-  | StringInputField
-  | BooleanInputField
-  | ImageInputField
-  | LatentsInputField
-  | EnumInputField
-  | ModelInputField
-  | ArrayInputField;
+/**
+ * An input field is persisted across reloads as part of the user's local state.
+ *
+ * An input field has three properties:
+ * - `id` a unique identifier
+ * - `name` the name of the field, which comes from the python dataclass
+ * - `value` the field's value
+ */
+export type InputFieldValue =
+  | IntegerInputFieldValue
+  | FloatInputFieldValue
+  | StringInputFieldValue
+  | BooleanInputFieldValue
+  | ImageInputFieldValue
+  | LatentsInputFieldValue
+  | EnumInputFieldValue
+  | ModelInputFieldValue
+  | ArrayInputFieldValue;
 
-export type OutputField = FieldBase;
+/**
+ * An input field template is generated on each page load from the OpenAPI schema.
+ *
+ * The template provides the field type and other field metadata (e.g. title, description,
+ * maximum length, pattern to match, etc).
+ */
+export type InputFieldTemplate =
+  | IntegerInputFieldTemplate
+  | FloatInputFieldTemplate
+  | StringInputFieldTemplate
+  | BooleanInputFieldTemplate
+  | ImageInputFieldTemplate
+  | LatentsInputFieldTemplate
+  | EnumInputFieldTemplate
+  | ModelInputFieldTemplate
+  | ArrayInputFieldTemplate;
 
-export type ConnectionType = 'never' | 'always';
+/**
+ * An output field is persisted across as part of the user's local state.
+ *
+ * An output field has two properties:
+ * - `id` a unique identifier
+ * - `name` the name of the field, which comes from the python dataclass
+ */
+export type OutputFieldValue = FieldValueBase;
 
-export type FieldBase = {
+/**
+ * An output field template is generated on each page load from the OpenAPI schema.
+ *
+ * The template provides the output field's name, type, title, and description.
+ */
+export type OutputFieldTemplate = {
+  name: string;
+  type: FieldType;
+  title: string;
+  description: string;
+};
+
+/**
+ * Indicates when/if this field needs an input.
+ */
+export type InputRequirement = 'always' | 'never' | 'optional';
+
+/**
+ * Indicates the kind of input(s) this field may have.
+ */
+export type InputKind = 'connection' | 'direct' | 'any';
+
+export type FieldValueBase = {
+  id: string;
+  name: string;
+  type: FieldType;
+};
+
+export type IntegerInputFieldValue = FieldValueBase & {
+  type: 'integer';
+  value?: number;
+};
+
+export type FloatInputFieldValue = FieldValueBase & {
+  type: 'float';
+  value?: number;
+};
+
+export type StringInputFieldValue = FieldValueBase & {
+  type: 'string';
+  value?: string;
+};
+
+export type BooleanInputFieldValue = FieldValueBase & {
+  type: 'boolean';
+  value?: boolean;
+};
+
+export type EnumInputFieldValue = FieldValueBase & {
+  type: 'enum';
+  value?: number | string;
+};
+
+export type LatentsInputFieldValue = FieldValueBase & {
+  type: 'latents';
+  value?: undefined;
+};
+
+export type ImageInputFieldValue = FieldValueBase & {
+  type: 'image';
+  value?: Pick<ImageField, 'image_name' | 'image_type'>;
+};
+
+export type ModelInputFieldValue = FieldValueBase & {
+  type: 'model';
+  value?: string;
+};
+
+export type ArrayInputFieldValue = FieldValueBase & {
+  type: 'array';
+  value?: (string | number)[];
+};
+
+export type InputFieldTemplateBase = {
   name: string;
   title: string;
   description: string;
   type: FieldType;
-  connectionType?: ConnectionType;
+  inputRequirement: InputRequirement;
+  inputKind: InputKind;
 };
 
-export type NumberInvocationField = {
-  value?: number;
+export type IntegerInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'integer';
+  default: number;
   multipleOf?: number;
   maximum?: number;
   exclusiveMaximum?: boolean;
@@ -95,56 +202,54 @@ export type NumberInvocationField = {
   exclusiveMinimum?: boolean;
 };
 
-export type IntegerInputField = FieldBase &
-  NumberInvocationField & {
-    type: 'integer';
-  };
+export type FloatInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'float';
+  default: number;
+  multipleOf?: number;
+  maximum?: number;
+  exclusiveMaximum?: boolean;
+  minimum?: number;
+  exclusiveMinimum?: boolean;
+};
 
-export type FloatInputField = FieldBase &
-  NumberInvocationField & {
-    type: 'float';
-  };
-
-export type StringInputField = FieldBase & {
+export type StringInputFieldTemplate = InputFieldTemplateBase & {
   type: 'string';
-  value?: string;
+  default: string;
   maxLength?: number;
   minLength?: number;
   pattern?: string;
 };
 
-export type BooleanInputField = FieldBase & {
+export type BooleanInputFieldTemplate = InputFieldTemplateBase & {
+  default: boolean;
   type: 'boolean';
-  value?: boolean;
 };
 
-export type ImageInputField = FieldBase & {
+export type ImageInputFieldTemplate = InputFieldTemplateBase & {
+  default: Pick<ImageField, 'image_name' | 'image_type'>;
   type: 'image';
-  // TODO: use a better value
-  value?: string;
 };
 
-export type LatentsInputField = FieldBase & {
+export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
   type: 'latents';
-  // TODO: use a better value
-  value?: string;
 };
 
-export type EnumInputField = FieldBase & {
+export type EnumInputFieldTemplate = InputFieldTemplateBase & {
+  default: string | number;
   type: 'enum';
-  value?: string | number;
-  enumType: 'string' | 'integer' | 'number';
+  enumType: 'string' | 'number';
   options: Array<string | number>;
 };
 
-export type ModelInputField = FieldBase & {
+export type ModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
   type: 'model';
-  value?: string;
 };
 
-export type ArrayInputField = FieldBase & {
+export type ArrayInputFieldTemplate = InputFieldTemplateBase & {
+  default: (string | number)[];
   type: 'array';
-  value?: string;
 };
 
 /**
@@ -160,6 +265,7 @@ export type InvocationSchemaExtra = {
   ui?: {
     tags?: string[];
     type_hints?: TypeHints;
+    title?: string;
   };
   title: string;
   properties: Omit<

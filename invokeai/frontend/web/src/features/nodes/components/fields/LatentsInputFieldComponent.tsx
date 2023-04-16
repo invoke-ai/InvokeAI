@@ -1,11 +1,13 @@
-import { LatentsInputField } from 'features/nodes/types';
-import { TbBrandMatrix } from 'react-icons/tb';
+import {
+  LatentsInputFieldTemplate,
+  LatentsInputFieldValue,
+} from 'features/nodes/types';
 import { FieldComponentProps } from './types';
 
 export const LatentsInputFieldComponent = (
-  props: FieldComponentProps<LatentsInputField>
+  props: FieldComponentProps<LatentsInputFieldValue, LatentsInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
 
-  return <TbBrandMatrix />;
+  return null;
 };

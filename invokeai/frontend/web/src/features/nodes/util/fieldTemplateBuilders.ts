@@ -2,26 +2,29 @@ import { reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
 import { FIELD_TYPE_MAP } from '../constants';
 import {
-  BooleanInputField,
-  EnumInputField,
-  FloatInputField,
-  ImageInputField,
-  IntegerInputField,
-  LatentsInputField,
-  OutputField,
-  StringInputField,
+  BooleanInputFieldTemplate,
+  EnumInputFieldTemplate,
+  FloatInputFieldTemplate,
+  ImageInputFieldTemplate,
+  IntegerInputFieldTemplate,
+  LatentsInputFieldTemplate,
+  StringInputFieldTemplate,
+  ModelInputFieldTemplate,
+  InputFieldTemplateBase,
+  OutputFieldTemplate,
   isSchemaObject,
-  ModelInputField,
   TypeHints,
   FieldType,
-  InputField,
 } from '../types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
 
 export type BuildInputFieldArg = {
   schemaObject: OpenAPIV3.SchemaObject;
-  baseField: Pick<InputField, BaseFieldProperties>;
+  baseField: Omit<
+    InputFieldTemplateBase,
+    'type' | 'inputRequirement' | 'inputKind'
+  >;
 };
 
 /**
@@ -36,158 +39,179 @@ export const refObjectToFieldType = (
   refObject: OpenAPIV3.ReferenceObject
 ): keyof typeof FIELD_TYPE_MAP => refObject.$ref.split('/').slice(-1)[0];
 
-const buildIntegerInputField = ({
+const buildIntegerInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): IntegerInputField => {
-  const field: Omit<IntegerInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): IntegerInputFieldTemplate => {
+  const template: IntegerInputFieldTemplate = {
+    ...baseField,
     type: 'integer',
-    value: schemaObject.default ?? 0,
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? 0,
   };
 
   if (schemaObject.multipleOf !== undefined) {
-    field.multipleOf = schemaObject.multipleOf;
+    template.multipleOf = schemaObject.multipleOf;
   }
 
   if (schemaObject.maximum !== undefined) {
-    field.maximum = schemaObject.maximum;
+    template.maximum = schemaObject.maximum;
   }
 
   if (schemaObject.exclusiveMaximum !== undefined) {
-    field.exclusiveMaximum = schemaObject.exclusiveMaximum;
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
   }
 
   if (schemaObject.minimum !== undefined) {
-    field.minimum = schemaObject.minimum;
+    template.minimum = schemaObject.minimum;
   }
 
   if (schemaObject.exclusiveMinimum !== undefined) {
-    field.exclusiveMinimum = schemaObject.exclusiveMinimum;
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
   }
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildFloatInputField = ({
+const buildFloatInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): FloatInputField => {
-  const field: Omit<FloatInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): FloatInputFieldTemplate => {
+  const template: FloatInputFieldTemplate = {
+    ...baseField,
     type: 'float',
-    value: schemaObject.default ?? 0,
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? 0,
   };
 
   if (schemaObject.multipleOf !== undefined) {
-    field.multipleOf = schemaObject.multipleOf;
+    template.multipleOf = schemaObject.multipleOf;
   }
 
   if (schemaObject.maximum !== undefined) {
-    field.maximum = schemaObject.maximum;
+    template.maximum = schemaObject.maximum;
   }
 
   if (schemaObject.exclusiveMaximum !== undefined) {
-    field.exclusiveMaximum = schemaObject.exclusiveMaximum;
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
   }
 
   if (schemaObject.minimum !== undefined) {
-    field.minimum = schemaObject.minimum;
+    template.minimum = schemaObject.minimum;
   }
 
   if (schemaObject.exclusiveMinimum !== undefined) {
-    field.exclusiveMinimum = schemaObject.exclusiveMinimum;
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
   }
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildStringInputField = ({
+const buildStringInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): StringInputField => {
-  const field: Omit<StringInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): StringInputFieldTemplate => {
+  const template: StringInputFieldTemplate = {
+    ...baseField,
     type: 'string',
-    value: schemaObject.default ?? '',
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? '',
   };
 
   if (schemaObject.minLength !== undefined) {
-    field.minLength = schemaObject.minLength;
+    template.minLength = schemaObject.minLength;
   }
 
   if (schemaObject.maxLength !== undefined) {
-    field.maxLength = schemaObject.maxLength;
+    template.maxLength = schemaObject.maxLength;
   }
 
   if (schemaObject.pattern !== undefined) {
-    field.pattern = schemaObject.pattern;
+    template.pattern = schemaObject.pattern;
   }
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildBooleanInputField = ({
+const buildBooleanInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): BooleanInputField => {
-  const field: Omit<BooleanInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): BooleanInputFieldTemplate => {
+  const template: BooleanInputFieldTemplate = {
+    ...baseField,
     type: 'boolean',
-    value: schemaObject.default ?? false,
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? false,
   };
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildModelInputField = ({
+const buildModelInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): ModelInputField => {
-  const field: Omit<ModelInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): ModelInputFieldTemplate => {
+  const template: ModelInputFieldTemplate = {
+    ...baseField,
     type: 'model',
-    value: schemaObject.default ?? '',
-    connectionType: 'never',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
   };
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildImageInputField = ({
+const buildImageInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): ImageInputField => {
-  const field: Omit<ImageInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): ImageInputFieldTemplate => {
+  const template: ImageInputFieldTemplate = {
+    ...baseField,
     type: 'image',
-    value: schemaObject.default ?? '',
-    connectionType: 'always',
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? undefined,
   };
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildLatentsInputField = ({
+const buildLatentsInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): LatentsInputField => {
-  const field: Omit<LatentsInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): LatentsInputFieldTemplate => {
+  const template: LatentsInputFieldTemplate = {
+    ...baseField,
     type: 'latents',
-    value: schemaObject.default ?? '',
-    connectionType: 'always',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
   };
 
-  return { ...baseField, ...field };
+  return template;
 };
 
-const buildEnumInputField = ({
+const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): EnumInputField => {
-  const field: Omit<EnumInputField, BaseFieldProperties> = {
+}: BuildInputFieldArg): EnumInputFieldTemplate => {
+  const options = schemaObject.enum ?? [];
+  const template: EnumInputFieldTemplate = {
     ...baseField,
     type: 'enum',
-    value: schemaObject.default,
     enumType: (schemaObject.type as 'string' | 'number') ?? 'string', // TODO: dangerous?
-    options: schemaObject.enum ?? [],
+    options: options,
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? options[0],
   };
 
-  return { ...baseField, ...field };
+  return template;
 };
 
 export const getFieldType = (
@@ -223,7 +247,7 @@ export const getFieldType = (
  * @param schemaObject The schema object
  * @returns An input field
  */
-export const buildInputField = (
+export const buildInputFieldTemplate = (
   schemaObject: OpenAPIV3.SchemaObject,
   name: string,
   typeHints?: TypeHints
@@ -237,28 +261,28 @@ export const buildInputField = (
   };
 
   if (['image'].includes(fieldType)) {
-    return buildImageInputField({ schemaObject, baseField });
+    return buildImageInputFieldTemplate({ schemaObject, baseField });
   }
   if (['latents'].includes(fieldType)) {
-    return buildLatentsInputField({ schemaObject, baseField });
+    return buildLatentsInputFieldTemplate({ schemaObject, baseField });
   }
   if (['model'].includes(fieldType)) {
-    return buildModelInputField({ schemaObject, baseField });
+    return buildModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['enum'].includes(fieldType)) {
-    return buildEnumInputField({ schemaObject, baseField });
+    return buildEnumInputFieldTemplate({ schemaObject, baseField });
   }
   if (['integer'].includes(fieldType)) {
-    return buildIntegerInputField({ schemaObject, baseField });
+    return buildIntegerInputFieldTemplate({ schemaObject, baseField });
   }
   if (['number', 'float'].includes(fieldType)) {
-    return buildFloatInputField({ schemaObject, baseField });
+    return buildFloatInputFieldTemplate({ schemaObject, baseField });
   }
   if (['string'].includes(fieldType)) {
-    return buildStringInputField({ schemaObject, baseField });
+    return buildStringInputFieldTemplate({ schemaObject, baseField });
   }
   if (['boolean'].includes(fieldType)) {
-    return buildBooleanInputField({ schemaObject, baseField });
+    return buildBooleanInputFieldTemplate({ schemaObject, baseField });
   }
 
   return;
@@ -270,11 +294,11 @@ export const buildInputField = (
  * @param refObject The output reference object
  * @returns A record of outputs
  */
-export const buildOutputFields = (
+export const buildOutputFieldTemplates = (
   refObject: OpenAPIV3.ReferenceObject,
   openAPI: OpenAPIV3.Document,
   typeHints?: TypeHints
-): Record<string, OutputField> => {
+): Record<string, OutputFieldTemplate> => {
   // extract output schema name from ref
   const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
 
@@ -301,7 +325,7 @@ export const buildOutputFields = (
 
         return outputsAccumulator;
       },
-      {} as Record<string, OutputField>
+      {} as Record<string, OutputFieldTemplate>
     );
 
     return outputFields;

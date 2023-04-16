@@ -115,9 +115,7 @@ const InfillAndScalingSettings = () => {
         onChange={handleChangeBoundingBoxScaleMethod}
       />
       <IAISlider
-        isInputDisabled={!isManual}
-        isResetDisabled={!isManual}
-        isSliderDisabled={!isManual}
+        isDisabled={!isManual}
         label={t('parameters.scaledWidth')}
         min={64}
         max={1024}
@@ -132,9 +130,7 @@ const InfillAndScalingSettings = () => {
         handleReset={handleResetScaledWidth}
       />
       <IAISlider
-        isInputDisabled={!isManual}
-        isResetDisabled={!isManual}
-        isSliderDisabled={!isManual}
+        isDisabled={!isManual}
         label={t('parameters.scaledHeight')}
         min={64}
         max={1024}
@@ -155,9 +151,7 @@ const InfillAndScalingSettings = () => {
         onChange={(e) => dispatch(setInfillMethod(e.target.value))}
       />
       <IAISlider
-        isInputDisabled={infillMethod !== 'tile'}
-        isResetDisabled={infillMethod !== 'tile'}
-        isSliderDisabled={infillMethod !== 'tile'}
+        isDisabled={infillMethod !== 'tile'}
         label={t('parameters.tileSize')}
         min={16}
         max={64}

@@ -13,28 +13,44 @@ import {
 import { FaPlus } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { nodeAdded } from '../store/nodesSlice';
-import { map } from 'lodash';
+import { cloneDeep, map } from 'lodash';
 import { RootState } from 'app/store';
+import { useBuildInvocation } from '../hooks/useBuildInvocation';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/hooks/useToastWatcher';
 
 export const AddNodeMenu = () => {
   const dispatch = useAppDispatch();
 
-  const invocations = useAppSelector(
-    (state: RootState) => state.nodes.invocations
+  const invocationTemplates = useAppSelector(
+    (state: RootState) => state.nodes.invocationTemplates
   );
+
+  const buildInvocation = useBuildInvocation();
 
   const addNode = useCallback(
     (nodeType: string) => {
-      dispatch(nodeAdded({ id: uuidv4(), invocation: invocations[nodeType] }));
+      const invocation = buildInvocation(nodeType);
+
+      if (!invocation) {
+        const toast = makeToast({
+          status: 'error',
+          title: `Unknown Invocation type ${nodeType}`,
+        });
+        dispatch(addToast(toast));
+        return;
+      }
+
+      dispatch(nodeAdded(invocation));
     },
-    [dispatch, invocations]
+    [dispatch, buildInvocation]
   );
 
   return (
     <Menu>
       <MenuButton as={IconButton} aria-label="Add Node" icon={<FaPlus />} />
       <MenuList>
-        {map(invocations, ({ title, description, type }, key) => {
+        {map(invocationTemplates, ({ title, description, type }, key) => {
           return (
             <Tooltip key={key} label={description} placement="end" hasArrow>
               <MenuItem onClick={() => addNode(type)}>{title}</MenuItem>

@@ -11,16 +11,17 @@ import {
   Code,
   Text,
 } from '@chakra-ui/react';
-import { FaInfoCircle } from 'react-icons/fa';
-import { Invocation } from '../types';
+import { FaExclamationCircle, FaInfoCircle } from 'react-icons/fa';
+import { InvocationValue } from '../types';
 import { InputFieldComponent } from './InputFieldComponent';
 import { FieldHandle } from './FieldHandle';
 import { isEqual, map, size } from 'lodash';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useIsValidConnection } from '../hooks/useIsValidConnection';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
+import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
 
 const connectedInputFieldsSelector = createSelector(
   (state: RootState) => state.nodes.edges,
@@ -34,14 +35,36 @@ const connectedInputFieldsSelector = createSelector(
   }
 );
 
-export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
-  const { id, data, selected } = props;
-  const { type, title, description, inputs, outputs } = data;
+export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
+  const { id: nodeId, data, selected } = props;
+  const { type, inputs, outputs } = data;
 
   const isValidConnection = useIsValidConnection();
 
   const connectedInputs = useAppSelector(connectedInputFieldsSelector);
+  const getInvocationTemplate = useGetInvocationTemplate();
   // TODO: determine if a field/handle is connected and disable the input if so
+
+  const template = useRef(getInvocationTemplate(type));
+
+  if (!template.current) {
+    return (
+      <Box
+        sx={{
+          padding: 4,
+          bg: 'base.800',
+          borderRadius: 'md',
+          boxShadow: 'dark-lg',
+          borderWidth: 2,
+          borderColor: selected ? 'base.400' : 'transparent',
+        }}
+      >
+        <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>
+          <Icon color="base.400" boxSize={32} as={FaExclamationCircle}></Icon>
+        </Flex>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -56,13 +79,13 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
     >
       <Flex flexDirection="column" gap={2}>
         <>
-          <Code>{id}</Code>
+          <Code>{nodeId}</Code>
           <HStack justifyContent="space-between">
             <Heading size="sm" fontWeight={500} color="base.100">
-              {title}
+              {template.current.title}
             </Heading>
             <Tooltip
-              label={description}
+              label={template.current.description}
               placement="top"
               hasArrow
               shouldWrapChildren
@@ -71,26 +94,54 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
             </Tooltip>
           </HStack>
           {map(inputs, (input, i) => {
+            const { id: fieldId } = input;
+            const inputTemplate = template.current?.inputs[input.name];
+
+            if (!inputTemplate) {
+              return (
+                <Box
+                  key={fieldId}
+                  position="relative"
+                  p={2}
+                  borderWidth={1}
+                  borderRadius="md"
+                  sx={{
+                    borderColor: 'error.400',
+                  }}
+                >
+                  <FormControl isDisabled={true}>
+                    <HStack justifyContent="space-between" alignItems="center">
+                      <FormLabel>Unknown input: {input.name}</FormLabel>
+                    </HStack>
+                  </FormControl>
+                </Box>
+              );
+            }
+
             const isConnected = connectedInputs.includes(input.name);
             return (
               <Box
-                key={i}
+                key={fieldId}
                 position="relative"
                 p={2}
                 borderWidth={1}
                 borderRadius="md"
                 sx={{
                   borderColor:
-                    !isConnected && input.connectionType === 'always'
+                    !isConnected &&
+                    ['always', 'connectionOnly'].includes(
+                      String(inputTemplate?.inputRequirement)
+                    ) &&
+                    input.value === undefined
                       ? 'warning.400'
                       : undefined,
                 }}
               >
                 <FormControl isDisabled={isConnected}>
                   <HStack justifyContent="space-between" alignItems="center">
-                    <FormLabel>{input.title}</FormLabel>
+                    <FormLabel>{inputTemplate?.title}</FormLabel>
                     <Tooltip
-                      label={input.description}
+                      label={inputTemplate?.description}
                       placement="top"
                       hasArrow
                       shouldWrapChildren
@@ -98,12 +149,18 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
                       <Icon color="base.400" as={FaInfoCircle} />
                     </Tooltip>
                   </HStack>
-                  <InputFieldComponent nodeId={id} field={input} />
-                </FormControl>
-                {input.connectionType !== 'never' && (
-                  <FieldHandle
-                    nodeId={id}
+                  <InputFieldComponent
+                    nodeId={nodeId}
                     field={input}
+                    template={inputTemplate}
+                  />
+                </FormControl>
+                {!['never', 'directOnly'].includes(
+                  inputTemplate?.inputRequirement ?? ''
+                ) && (
+                  <FieldHandle
+                    nodeId={nodeId}
+                    field={inputTemplate}
                     isValidConnection={isValidConnection}
                     handleType="target"
                   />
@@ -112,23 +169,46 @@ export const InvocationComponent = memo((props: NodeProps<Invocation>) => {
             );
           })}
           {map(outputs).map((output, i) => {
-            // const top = `${(100 / (size(outputs) + 1)) * (i + 1)}%`;
-            const { name, title } = output;
+            const outputTemplate = template.current?.outputs[output.name];
+
+            if (!outputTemplate) {
+              return (
+                <Box
+                  key={output.id}
+                  position="relative"
+                  p={2}
+                  borderWidth={1}
+                  borderRadius="md"
+                  sx={{
+                    borderColor: 'error.400',
+                  }}
+                >
+                  <FormControl isDisabled={true}>
+                    <HStack justifyContent="space-between" alignItems="center">
+                      <FormLabel>Unknown output: {output.name}</FormLabel>
+                    </HStack>
+                  </FormControl>
+                </Box>
+              );
+            }
+
             return (
               <Box
-                key={name}
+                key={output.id}
                 position="relative"
                 p={2}
                 borderWidth={1}
                 borderRadius="md"
               >
                 <FormControl>
-                  <FormLabel textAlign="end">{title} Output</FormLabel>
+                  <FormLabel textAlign="end">
+                    {outputTemplate?.title} Output
+                  </FormLabel>
                 </FormControl>
                 <FieldHandle
-                  key={name}
-                  nodeId={id}
-                  field={output}
+                  key={output.id}
+                  nodeId={nodeId}
+                  field={outputTemplate}
                   isValidConnection={isValidConnection}
                   handleType="source"
                 />

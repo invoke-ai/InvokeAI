@@ -17,7 +17,7 @@ export const useGetUrl = () => {
 
   return {
     shouldTransformUrls,
-    getUrl: (url: string) => {
+    getUrl: (url?: string) => {
       if (OpenAPI.BASE && shouldTransformUrls) {
         return [OpenAPI.BASE, url].join('/');
       }
