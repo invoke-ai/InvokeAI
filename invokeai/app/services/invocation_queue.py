@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class InvocationQueueItem(BaseModel):
     graph_execution_state_id: str
     invocation_id: str
-    invoke_all: bool
+    invoke_all: bool = Field(default=False)
     timestamp: float = Field(default_factory=time.time)
 
 
