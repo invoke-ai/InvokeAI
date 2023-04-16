@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 
 
 class InvocationQueueItem(BaseModel):
-    graph_execution_state_id: str
-    invocation_id: str
+    graph_execution_state_id: str = Field(description="The ID of the graph execution state")
+    invocation_id: str = Field(description="The ID of the node being invoked")
     invoke_all: bool = Field(default=False)
     timestamp: float = Field(default_factory=time.time)
 
