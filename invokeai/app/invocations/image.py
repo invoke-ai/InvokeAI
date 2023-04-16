@@ -77,23 +77,24 @@ class MaskOutput(BaseInvocationOutput):
         }
 
 
-# # TODO: this isn't really necessary anymore
-# class LoadImageInvocation(BaseInvocation):
-#     """Load an image from a filename and provide it as output."""
-#     #fmt: off
-#     type: Literal["load_image"] = "load_image"
+class LoadImageInvocation(BaseInvocation):
+    """Load an image and provide it as output."""
 
-#     # Inputs
-#     image_type: ImageType = Field(description="The type of the image")
-#     image_name:       str = Field(description="The name of the image")
-#     #fmt: on
+    type: Literal["load_image"] = "load_image"
 
-#     def invoke(self, context: InvocationContext) -> ImageOutput:
-#         return ImageOutput(
-#             image_type=self.image_type,
-#             image_name=self.image_name,
-#             image=result_image
-#         )
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to show")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+
+        return build_image_output(
+            image_type=self.image.image_type,
+            image_name=self.image.image_name,
+            image=image,
+        )
 
 
 class ShowImageInvocation(BaseInvocation):
