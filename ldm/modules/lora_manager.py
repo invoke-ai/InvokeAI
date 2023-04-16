@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+
+from diffusers import UNet2DConditionModel, StableDiffusionPipeline
 from ldm.invoke.globals import global_lora_models_dir
 from .kohya_lora_manager import KohyaLoraManager
 from typing import Optional, Dict
@@ -8,20 +10,29 @@ class LoraCondition:
     name: str
     weight: float
 
-    def __init__(self, name, weight: float = 1.0, kohya_manager: Optional[KohyaLoraManager]=None):
+    def __init__(self,
+                 name,
+                 weight: float = 1.0,
+                 unet: UNet2DConditionModel=None,  # for diffusers format LoRAs
+                 kohya_manager: Optional[KohyaLoraManager]=None,  # for KohyaLoraManager-compatible LoRAs
+                 ):
         self.name = name
         self.weight = weight
         self.kohya_manager = kohya_manager
+        self.unet = unet
 
-    def __call__(self, model):
+    def __call__(self):
         # TODO: make model able to load from huggingface, rather then just local files
         path = Path(global_lora_models_dir(), self.name)
         if path.is_dir():
-            if model.load_attn_procs:
+            if not self.unet:
+                print(f"   ** Unable to load diffusers-format LoRA {self.name}: unet is None")
+                return
+            if self.unet.load_attn_procs:
                 file = Path(path, "pytorch_lora_weights.bin")
                 if file.is_file():
                     print(f">> Loading LoRA: {path}")
-                    model.load_attn_procs(path.absolute().as_posix())
+                    self.unet.load_attn_procs(path.absolute().as_posix())
                 else:
                     print(f"   ** Unable to find valid LoRA at: {path}")
             else:
@@ -37,15 +48,16 @@ class LoraCondition:
             self.kohya_manager.unload_applied_lora(self.name)
 
 class LoraManager:
-    def __init__(self, pipe):
+    def __init__(self, pipe: StableDiffusionPipeline):
         # Kohya class handles lora not generated through diffusers
         self.kohya = KohyaLoraManager(pipe, global_lora_models_dir())
+        self.unet = pipe.unet
 
     def set_loras_conditions(self, lora_weights: list):
         conditions = []
         if len(lora_weights) > 0:
             for lora in lora_weights:
-                conditions.append(LoraCondition(lora.model, lora.weight, self.kohya))
+                conditions.append(LoraCondition(lora.model, lora.weight, self.unet, self.kohya))
 
         if len(conditions) > 0:
             return conditions
@@ -63,4 +75,4 @@ class LoraManager:
                 if suffix in [".ckpt", ".pt", ".safetensors"]:
                     models_found[name]=Path(root,x)
         return models_found
-            
+

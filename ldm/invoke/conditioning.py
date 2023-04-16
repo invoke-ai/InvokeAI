@@ -15,6 +15,7 @@ from compel import Compel
 from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser, \
     Conjunction
 from .devices import torch_dtype
+from .generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
 
@@ -32,7 +33,7 @@ class UnsqueezingLDMTransformer:
 
 
 def get_uc_and_c_and_ec(prompt_string,
-                        model: StableDiffusionPipeline,
+                        model: StableDiffusionGeneratorPipeline,
                         log_tokens=False, skip_normalize_legacy_blend=False):
     # lazy-load any deferred textual inversions.
     # this might take a couple of seconds the first time a textual inversion is used.
@@ -75,7 +76,7 @@ def get_uc_and_c_and_ec(prompt_string,
     # some LoRA models also mess with the text encoder, so they must be active while compel builds conditioning tensors
     lora_conditioning_ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
                                                                                             lora_conditions=lora_conditions)
-    with InvokeAIDiffuserComponent.custom_attention_context(model,
+    with InvokeAIDiffuserComponent.custom_attention_context(model.unet,
                                                             extra_conditioning_info=lora_conditioning_ec,
                                                             step_count=-1):
         c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)

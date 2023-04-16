@@ -86,7 +86,7 @@ class LoHALayer:
             rebuild1 = torch.einsum('i j k l, j r, i p -> p r k l', self.t1, self.w1_b, self.w1_a)
             rebuild2 = torch.einsum('i j k l, j r, i p -> p r k l', self.t2, self.w2_b, self.w2_a)
             weight = rebuild1 * rebuild2
-        
+
         bias = self.bias if self.bias is not None else 0
         return output + op(
             *input_h,

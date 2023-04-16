@@ -288,7 +288,7 @@ class InvokeAICrossAttentionMixin:
         return self.einsum_op_tensor_mem(q, k, v, 32)
 
 
-def setup_cross_attention_control_attention_processors(model, context: Context):
+def setup_cross_attention_control_attention_processors(unet: UNet2DConditionModel, context: Context):
     """
     Inject attention parameters and functions into the passed in model to enable cross attention editing.
 
@@ -314,7 +314,6 @@ def setup_cross_attention_control_attention_processors(model, context: Context):
 
     context.cross_attention_mask = mask.to(device)
     context.cross_attention_index_map = indices.to(device)
-    unet = model
     old_attn_processors = unet.attn_processors
     if torch.backends.mps.is_available():
         # see note in StableDiffusionGeneratorPipeline.__init__ about borked slicing on MPS
