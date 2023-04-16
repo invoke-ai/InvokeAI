@@ -95,7 +95,7 @@ class UIConfig(TypedDict, total=False):
         ],
     ]
     tags: List[str]
-
+    title: str
 
 class CustomisedSchemaExtra(TypedDict):
     ui: UIConfig
