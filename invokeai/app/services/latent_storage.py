@@ -4,7 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict
+from typing import Dict, Union
 
 import torch
 
@@ -56,7 +56,7 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
         if name in self.__cache:
             del self.__cache[name]
 
-    def __get_cache(self, name: str) -> torch.Tensor|None:
+    def __get_cache(self, name: str) -> Union[torch.Tensor,None]:
         return None if name not in self.__cache else self.__cache[name]
 
     def __set_cache(self, name: str, data: torch.Tensor):

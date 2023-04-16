@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import argparse
-from typing import Any, Callable, Iterable, Literal, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Iterable, Literal, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -46,7 +46,7 @@ def add_parsers(
     commands: list[type],
     command_field: str = "type",
     exclude_fields: list[str] = ["id", "type"],
-    add_arguments: Callable[[argparse.ArgumentParser], None]|None = None
+    add_arguments: Union[Callable[[argparse.ArgumentParser], None], None] = None
     ):
     """Adds parsers for each command to the subparsers"""
 
@@ -71,7 +71,7 @@ def add_parsers(
 def add_graph_parsers(
     subparsers,
     graphs: list[LibraryGraph],
-    add_arguments: Callable[[argparse.ArgumentParser], None]|None = None
+    add_arguments: Union[Callable[[argparse.ArgumentParser], None], None] = None
 ):
     for graph in graphs:
         command_parser = subparsers.add_parser(graph.name, help=graph.description)

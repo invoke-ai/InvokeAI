@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any, Dict, TypedDict
+from typing import Any, Dict, TypedDict, Union
 
 ProgressImage = TypedDict(
     "ProgressImage", {"dataURL": str, "width": int, "height": int}
@@ -26,7 +26,7 @@ class EventServiceBase:
         self,
         graph_execution_state_id: str,
         invocation_id: str,
-        progress_image: ProgressImage | None,
+        progress_image: Union[ProgressImage,None],
         step: int,
         total_steps: int,
     ) -> None:

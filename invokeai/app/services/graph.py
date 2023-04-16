@@ -4,7 +4,6 @@ import copy
 import itertools
 import traceback
 import uuid
-from types import NoneType
 from typing import (
     Annotated,
     Any,
@@ -15,6 +14,7 @@ from typing import (
     get_origin,
     get_type_hints,
 )
+NoneType = type(None)
 
 import networkx as nx
 from pydantic import BaseModel, root_validator, validator
@@ -809,7 +809,7 @@ class GraphExecutionState(BaseModel):
             ]
         }
 
-    def next(self) -> BaseInvocation | None:
+    def next(self) -> Union[BaseInvocation, None]:
         """Gets the next node ready to execute."""
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
