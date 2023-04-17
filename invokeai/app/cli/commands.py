@@ -37,6 +37,7 @@ def add_field_argument(command_parser, name: str, field, default_override = None
             dest=name,
             type=field.type_,
             default=default,
+            action=argparse.BooleanOptionalAction if field.type_==bool else 'store',
             help=field.field_info.description,
         )
 
