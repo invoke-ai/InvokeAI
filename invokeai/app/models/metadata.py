@@ -5,11 +5,7 @@ from pydantic import BaseModel, Field
 class InvokeAIMetadata(BaseModel):
     """An image's InvokeAI-specific metadata"""
 
-    session: Optional[str] = Field(description="The session that generated this image")
-    source_id: Optional[str] = Field(
-        description="The source id of the invocation that generated this image"
-    )
-    # TODO: figure out metadata
+    session_id: Optional[str] = Field(description="The session that generated this image")
     invocation: Optional[Dict[str, Any]] = Field(
         default={}, description="The prepared invocation that generated this image"
     )

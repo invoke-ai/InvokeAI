@@ -13,7 +13,7 @@ from PIL.Image import Image
 import PIL.Image as PILImage
 from invokeai.app.api.models.images import ImageResponse
 from invokeai.app.models.image import  ImageType
-from invokeai.app.models.metadata import ImageMetadata
+from invokeai.app.models.metadata import ImageMetadata, InvokeAIMetadata
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.save_thumbnail import save_thumbnail
 
@@ -41,7 +41,7 @@ class ImageStorageBase(ABC):
         pass
 
     @abstractmethod
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: Dict[str, Any] | None = None) -> str:
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | Dict[str, Any] | None = None) -> str:
         pass
 
     @abstractmethod
