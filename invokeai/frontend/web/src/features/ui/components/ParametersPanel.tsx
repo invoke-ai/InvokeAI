@@ -19,6 +19,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 import { isEqual } from 'lodash';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import useResolution from 'common/hooks/useResolution';
 
 const parametersPanelSelector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],
@@ -58,6 +59,8 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
     dispatch(setShouldShowParametersPanel(false));
   };
 
+  const resolution = useResolution();
+
   useHotkeys(
     'o',
     () => {
@@ -88,21 +91,9 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
     },
     []
   );
-  return (
-    <ResizableDrawer
-      direction="left"
-      isResizable={isResizable || !shouldPinParametersPanel}
-      isOpen={shouldShowParametersPanel}
-      onClose={closeParametersPanel}
-      isPinned={shouldPinParametersPanel || isLightboxOpen}
-      sx={{
-        borderColor: 'base.700',
-        p: shouldPinParametersPanel ? 0 : 4,
-        bg: 'base.900',
-      }}
-      initialWidth={PARAMETERS_PANEL_WIDTH}
-      minWidth={PARAMETERS_PANEL_WIDTH}
-    >
+
+  const parametersPanelContent = () => {
+    return (
       <Flex flexDir="column" position="relative" h="full" w="full">
         {!shouldPinParametersPanel && (
           <Flex
@@ -122,8 +113,37 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
           />
         )}
       </Flex>
-    </ResizableDrawer>
-  );
+    );
+  };
+
+  const resizableParametersPanelContent = () => {
+    return (
+      <ResizableDrawer
+        direction="left"
+        isResizable={isResizable || !shouldPinParametersPanel}
+        isOpen={shouldShowParametersPanel}
+        onClose={closeParametersPanel}
+        isPinned={shouldPinParametersPanel || isLightboxOpen}
+        sx={{
+          borderColor: 'base.700',
+          p: shouldPinParametersPanel ? 0 : 4,
+          bg: 'base.900',
+        }}
+        initialWidth={PARAMETERS_PANEL_WIDTH}
+        minWidth={PARAMETERS_PANEL_WIDTH}
+      >
+        {parametersPanelContent()}
+      </ResizableDrawer>
+    );
+  };
+
+  const renderParametersPanel = () => {
+    if (['mobile', 'tablet'].includes(resolution))
+      return parametersPanelContent();
+    return resizableParametersPanelContent();
+  };
+
+  return resizableParametersPanelContent();
 };
 
 export default memo(ParametersPanel);

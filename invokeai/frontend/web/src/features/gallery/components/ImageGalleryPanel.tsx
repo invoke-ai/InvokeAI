@@ -26,6 +26,7 @@ import {
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import useResolution from 'common/hooks/useResolution';
 
 const GALLERY_TAB_WIDTHS: Record<
   InvokeTabName,
@@ -95,6 +96,8 @@ export default function ImageGalleryPanel() {
     dispatch(setShouldShowGallery(false));
     shouldPinGallery && dispatch(requestCanvasRescale());
   };
+
+  const resolution = useResolution();
 
   useHotkeys(
     'g',
@@ -178,6 +181,11 @@ export default function ImageGalleryPanel() {
     [galleryImageMinimumWidth]
   );
 
+  const calcGalleryMinHeight = () => {
+    if (resolution == 'desktop') return;
+    return 600;
+  };
+
   return (
     <ResizableDrawer
       direction="right"
@@ -195,6 +203,7 @@ export default function ImageGalleryPanel() {
           ? GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
           : undefined
       }
+      minHeight={calcGalleryMinHeight()}
     >
       <ImageGalleryContent />
     </ResizableDrawer>

@@ -1,4 +1,4 @@
-import { Box, BoxProps, Flex } from '@chakra-ui/react';
+import { Box, BoxProps, Flex, Grid, GridItem } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setInitialImage } from 'features/parameters/store/generationSlice';
@@ -54,12 +54,26 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   };
 
   return (
-    <Flex {...rest} pos="relative" w="full" h={APP_CONTENT_HEIGHT} gap={4}>
+    <Grid
+      {...rest}
+      gridTemplateAreas={{
+        base: `'workarea-display' 'workarea-panel'`,
+        md: `'workarea-panel workarea-display'`,
+      }}
+      gridAutoRows={{ base: 'maxcontent auto' }}
+      gridAutoColumns={{ md: 'max-content auto' }}
+      pos="relative"
+      w="full"
+      h={APP_CONTENT_HEIGHT}
+      gap={4}
+    >
       <ParametersPanel>{parametersPanelContent}</ParametersPanel>
-      <Box pos="relative" w="100%" h="100%" onDrop={handleDrop}>
-        {children}
-      </Box>
-    </Flex>
+      <GridItem gridArea="workarea-display">
+        <Box pos="relative" w="100%" h="100%" onDrop={handleDrop}>
+          {children}
+        </Box>
+      </GridItem>
+    </Grid>
   );
 };
 

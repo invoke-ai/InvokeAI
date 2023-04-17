@@ -174,8 +174,10 @@ export default function InvokeTabs() {
         dispatch(setActiveTab(index));
       }}
       flexGrow={1}
+      flexDir={{ base: 'column', xl: 'row' }}
+      gap={{ base: 4 }}
     >
-      <TabList>{tabs}</TabList>
+      <TabList flexDir={{ base: 'row', xl: 'column' }}>{tabs}</TabList>
       <TabPanels>{tabPanels}</TabPanels>
     </Tabs>
   );
