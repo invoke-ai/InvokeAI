@@ -20,12 +20,18 @@ const SiteHeader = () => {
 
   return (
     <Grid
-      gridTemplateColumns="auto max-content"
+      gridTemplateColumns={{ base: 'auto', sm: 'auto max-content' }}
       paddingRight={{ base: 10, xl: 0 }}
+      gap={2}
     >
-      <InvokeAILogoComponent />
-
-      <Flex alignItems="center" gap={2}>
+      <Flex justifyContent={{ base: 'center', sm: 'start' }}>
+        <InvokeAILogoComponent />
+      </Flex>
+      <Flex
+        alignItems="center"
+        gap={2}
+        justifyContent={{ base: 'center', sm: 'start' }}
+      >
         <StatusIndicator />
 
         <ModelSelect />
@@ -48,7 +54,7 @@ const SiteHeader = () => {
         <Flex
           position="absolute"
           right={6}
-          top={16}
+          top={{ base: 28, sm: 16 }}
           backgroundColor="base.800"
           padding={4}
           borderRadius={4}
