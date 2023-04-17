@@ -27,6 +27,7 @@ import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import useResolution from 'common/hooks/useResolution';
+import { Flex } from '@chakra-ui/react';
 
 const GALLERY_TAB_WIDTHS: Record<
   InvokeTabName,
@@ -182,30 +183,47 @@ export default function ImageGalleryPanel() {
   );
 
   const calcGalleryMinHeight = () => {
-    if (resolution == 'desktop') return;
-    return 600;
+    if (resolution === 'desktop') return;
+    return 300;
   };
 
-  return (
-    <ResizableDrawer
-      direction="right"
-      isResizable={isResizable || !shouldPinGallery}
-      isOpen={shouldShowGallery}
-      onClose={handleCloseGallery}
-      isPinned={shouldPinGallery && !isLightboxOpen}
-      minWidth={
-        shouldPinGallery
-          ? GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
-          : 200
-      }
-      maxWidth={
-        shouldPinGallery
-          ? GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
-          : undefined
-      }
-      minHeight={calcGalleryMinHeight()}
-    >
-      <ImageGalleryContent />
-    </ResizableDrawer>
-  );
+  const imageGalleryContent = () => {
+    return (
+      <Flex w="100vw" h="100vh">
+        <ImageGalleryContent />;
+      </Flex>
+    );
+  };
+
+  const resizableImageGalleryContent = () => {
+    return (
+      <ResizableDrawer
+        direction="right"
+        isResizable={isResizable || !shouldPinGallery}
+        isOpen={shouldShowGallery}
+        onClose={handleCloseGallery}
+        isPinned={shouldPinGallery && !isLightboxOpen}
+        minWidth={
+          shouldPinGallery
+            ? GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
+            : 200
+        }
+        maxWidth={
+          shouldPinGallery
+            ? GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
+            : undefined
+        }
+        minHeight={calcGalleryMinHeight()}
+      >
+        <ImageGalleryContent />
+      </ResizableDrawer>
+    );
+  };
+
+  const renderImageGallery = () => {
+    if (['mobile', 'tablet'].includes(resolution)) return imageGalleryContent();
+    return resizableImageGalleryContent();
+  };
+
+  return renderImageGallery();
 }

@@ -94,7 +94,12 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
 
   const parametersPanelContent = () => {
     return (
-      <Flex flexDir="column" position="relative" h="full" w="full">
+      <Flex
+        flexDir="column"
+        position="relative"
+        h="full"
+        w={{ sm: 'full', lg: '100vw', xl: 'full' }}
+      >
         {!shouldPinParametersPanel && (
           <Flex
             paddingTop={1.5}
@@ -143,7 +148,7 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
     return resizableParametersPanelContent();
   };
 
-  return resizableParametersPanelContent();
+  return renderParametersPanel();
 };
 
 export default memo(ParametersPanel);

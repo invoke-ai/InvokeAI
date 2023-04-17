@@ -58,7 +58,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
       {...rest}
       gridTemplateAreas={{
         base: `'workarea-display' 'workarea-panel'`,
-        md: `'workarea-panel workarea-display'`,
+        xl: `'workarea-panel workarea-display'`,
       }}
       gridAutoRows={{ base: 'maxcontent auto' }}
       gridAutoColumns={{ md: 'max-content auto' }}
@@ -69,7 +69,12 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
     >
       <ParametersPanel>{parametersPanelContent}</ParametersPanel>
       <GridItem gridArea="workarea-display">
-        <Box pos="relative" w="100%" h="100%" onDrop={handleDrop}>
+        <Box
+          pos="relative"
+          w={{ base: '100vw', xl: 'full' }}
+          h="100%"
+          onDrop={handleDrop}
+        >
           {children}
         </Box>
       </GridItem>

@@ -32,7 +32,7 @@ const ImageToImageContent = () => {
       sx={{
         w: '100%',
         h: '100%',
-        gridTemplateColumns: '1fr 1fr',
+        gridTemplateColumns: { base: '1fr 4fr', xl: '1fr 1fr' },
         borderRadius: 'base',
         bg: 'base.850',
       }}

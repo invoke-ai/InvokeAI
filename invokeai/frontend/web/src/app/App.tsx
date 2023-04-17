@@ -35,7 +35,7 @@ const App = (props: PropsWithChildren) => {
         <ProgressBar />
         <Grid
           gap={4}
-          p={4}
+          p={{ base: 1, lg: 4 }}
           gridAutoRows="min-content auto"
           w={APP_WIDTH}
           h={APP_HEIGHT}
@@ -43,7 +43,7 @@ const App = (props: PropsWithChildren) => {
           {props.children || <SiteHeader />}
           <Flex
             gap={4}
-            w="full"
+            w={{ base: '100vw', xl: 'full' }}
             h="full"
             flexDir={{ base: 'column', xl: 'row' }}
           >

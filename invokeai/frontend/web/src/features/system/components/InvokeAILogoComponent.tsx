@@ -11,18 +11,20 @@ const InvokeAILogoComponent = () => {
   return (
     <Flex alignItems="center" gap={3} ps={1}>
       <Image src={InvokeAILogoImage} alt="invoke-ai-logo" w="32px" h="32px" />
-      <Text fontSize="xl">
-        invoke <strong>ai</strong>
-      </Text>
-      <Text
-        sx={{
-          fontWeight: 300,
-          marginTop: 1,
-        }}
-        variant="subtext"
-      >
-        {appVersion}
-      </Text>
+      <Flex gap={3} display={{ base: 'none', sm: 'inherit' }}>
+        <Text fontSize="xl">
+          invoke <strong>ai</strong>
+        </Text>
+        <Text
+          sx={{
+            fontWeight: 300,
+            marginTop: 1,
+          }}
+          variant="subtext"
+        >
+          {appVersion}
+        </Text>
+      </Flex>
     </Flex>
   );
 };
