@@ -15,7 +15,6 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { isMobile } from 'theme/util/isMobile';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -77,7 +76,7 @@ const PromptInput = () => {
           onKeyDown={handleKeyDown}
           resize="vertical"
           ref={promptRef}
-          minH={isMobile ? 20 : 40}
+          minH={40}
         />
       </FormControl>
     </Box>

@@ -23,7 +23,7 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
   return (
     <AccordionItem>
       <AccordionButton>
-        <Flex width="100vw" gap={2} align="center">
+        <Flex width="100%" gap={2} align="center">
           <Box flexGrow={1} textAlign="start">
             {header}
           </Box>
