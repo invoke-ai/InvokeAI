@@ -12,11 +12,12 @@ import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
+import CurrentImageHidden from './CurrentImageHidden';
 
 export const imagesSelector = createSelector(
   [uiSelector, selectedImageSelector, systemSelector],
   (ui, selectedImage, system) => {
-    const { shouldShowImageDetails } = ui;
+    const { shouldShowImageDetails, shouldHidePreview } = ui;
     const { progressImage } = system;
 
     // TODO: Clean this up, this is really gross
@@ -41,6 +42,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       imageToDisplay,
+      shouldHidePreview,
     };
   },
   {
@@ -51,7 +53,7 @@ export const imagesSelector = createSelector(
 );
 
 export default function CurrentImagePreview() {
-  const { shouldShowImageDetails, imageToDisplay } =
+  const { shouldShowImageDetails, imageToDisplay, shouldHidePreview } =
     useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
 
@@ -68,14 +70,18 @@ export default function CurrentImagePreview() {
       {imageToDisplay && (
         <Image
           src={
-            imageToDisplay.isProgressImage
+            shouldHidePreview
+              ? undefined
+              : imageToDisplay.isProgressImage
               ? imageToDisplay.url
               : getUrl(imageToDisplay.url)
           }
           width={imageToDisplay.width}
           height={imageToDisplay.height}
           fallback={
-            !imageToDisplay.isProgressImage ? (
+            shouldHidePreview ? (
+              <CurrentImageHidden />
+            ) : !imageToDisplay.isProgressImage ? (
               <CurrentImageFallback />
             ) : undefined
           }

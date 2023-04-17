@@ -3,11 +3,15 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import { useGetUrl } from 'common/util/getUrl';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
+import CurrentImageHidden from 'features/gallery/components/CurrentImageHidden';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
+import { RootState } from 'app/store';
 
 export default function InitImagePreview() {
   const initialImage = useAppSelector(initialImageSelector);
+
+  const { shouldHidePreview } = useAppSelector((state: RootState) => state.ui);
 
   const { t } = useTranslation();
 
@@ -66,10 +70,13 @@ export default function InitImagePreview() {
               position: 'absolute',
             }}
             src={
-              typeof initialImage === 'string'
+              shouldHidePreview
+                ? undefined
+                : typeof initialImage === 'string'
                 ? getUrl(initialImage)
                 : getUrl(initialImage.url)
             }
+            fallback={<CurrentImageHidden />}
             onError={alertMissingInitImage}
           />
         </Flex>

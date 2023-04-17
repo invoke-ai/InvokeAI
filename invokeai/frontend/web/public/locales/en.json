@@ -505,7 +505,9 @@
         "info": "Info",
         "deleteImage": "Delete Image",
         "initialImage": "Initial Image",
-        "showOptionsPanel": "Show Options Panel"
+        "showOptionsPanel": "Show Options Panel",
+        "hidePreview": "Hide Preview",
+        "showPreview": "Show Preview"
     },
     "settings": {
         "models": "Models",
