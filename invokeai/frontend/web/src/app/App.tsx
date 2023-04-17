@@ -35,7 +35,7 @@ const App = (props: PropsWithChildren) => {
         <ProgressBar />
         <Grid
           gap={4}
-          p={{ base: 1, lg: 4 }}
+          p={4}
           gridAutoRows="min-content auto"
           w={APP_WIDTH}
           h={APP_HEIGHT}

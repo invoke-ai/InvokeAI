@@ -7,6 +7,8 @@ import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SiteHeaderMenu from './SiteHeaderMenu';
 import useResolution from 'common/hooks/useResolution';
 import { FaBars } from 'react-icons/fa';
+import { IAIIconButton } from 'exports';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
@@ -14,11 +16,13 @@ import { FaBars } from 'react-icons/fa';
 const SiteHeader = () => {
   const [menuOpened, setMenuOpened] = useState(false);
   const resolution = useResolution();
-
-  const isMobile = ['mobile', 'tablet'].includes(resolution);
+  const { t } = useTranslation();
 
   return (
-    <Grid gridTemplateColumns="auto max-content">
+    <Grid
+      gridTemplateColumns="auto max-content"
+      paddingRight={{ base: 10, xl: 0 }}
+    >
       <InvokeAILogoComponent />
 
       <Flex alignItems="center" gap={2}>
@@ -26,12 +30,33 @@ const SiteHeader = () => {
 
         <ModelSelect />
 
-        {!isMobile && <SiteHeaderMenu />}
-        <Flex>
-          {isMobile && <FaBars onClick={() => setMenuOpened(!menuOpened)} />}
-        </Flex>
+        {resolution === 'desktop' ? (
+          <SiteHeaderMenu />
+        ) : (
+          <IAIIconButton
+            icon={<FaBars />}
+            aria-label={t('accessibility.menu')}
+            background={menuOpened ? 'base.800' : 'none'}
+            _hover={{ background: menuOpened ? 'base.800' : 'none' }}
+            onClick={() => setMenuOpened(!menuOpened)}
+            p={0}
+          ></IAIIconButton>
+        )}
       </Flex>
-      <Flex>{isMobile && menuOpened && <SiteHeaderMenu />}</Flex>
+
+      {resolution !== 'desktop' && menuOpened && (
+        <Flex
+          position="absolute"
+          right={6}
+          top={16}
+          backgroundColor="base.800"
+          padding={4}
+          borderRadius={4}
+          zIndex={{ base: 99, xl: 0 }}
+        >
+          <SiteHeaderMenu />
+        </Flex>
+      )}
     </Grid>
   );
 };

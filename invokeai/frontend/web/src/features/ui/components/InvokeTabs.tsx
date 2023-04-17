@@ -1,5 +1,6 @@
 import {
   ChakraProps,
+  Flex,
   Icon,
   Tab,
   TabList,
@@ -177,7 +178,12 @@ export default function InvokeTabs() {
       flexDir={{ base: 'column', xl: 'row' }}
       gap={{ base: 4 }}
     >
-      <TabList flexDir={{ base: 'row', xl: 'column' }}>{tabs}</TabList>
+      <TabList
+        flexDir={{ base: 'row', xl: 'column' }}
+        justifyContent={{ base: 'center', xl: 'start' }}
+      >
+        {tabs}
+      </TabList>
       <TabPanels>{tabPanels}</TabPanels>
     </Tabs>
   );

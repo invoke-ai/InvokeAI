@@ -19,7 +19,8 @@
         "toggleAutoscroll": "Toggle autoscroll",
         "toggleLogViewer": "Toggle Log Viewer",
         "showGallery": "Show Gallery",
-        "showOptionsPanel": "Show Options Panel"
+        "showOptionsPanel": "Show Options Panel",
+        "menu": "Menu"
     },
     "common": {
         "hotkeysLabel": "Hotkeys",

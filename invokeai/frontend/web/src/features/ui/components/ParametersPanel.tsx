@@ -99,6 +99,7 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
         position="relative"
         h="full"
         w={{ sm: 'full', lg: '100vw', xl: 'full' }}
+        paddingRight={{ base: 8, xl: 0 }}
       >
         {!shouldPinParametersPanel && (
           <Flex
@@ -108,11 +109,11 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
             alignItems="center"
           >
             <InvokeAILogoComponent />
-            <PinParametersPanelButton />
+            {resolution == 'desktop' && <PinParametersPanelButton />}
           </Flex>
         )}
         <Scrollable>{children}</Scrollable>
-        {shouldPinParametersPanel && (
+        {shouldPinParametersPanel && resolution == 'desktop' && (
           <PinParametersPanelButton
             sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
           />

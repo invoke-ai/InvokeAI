@@ -13,7 +13,11 @@ const SiteHeaderMenu = () => {
   const { t } = useTranslation();
 
   return (
-    <>
+    <Flex
+      alignItems="center"
+      flexDirection={{ base: 'column', xl: 'row' }}
+      gap={{ base: 4, xl: 1 }}
+    >
       <ModelManagerModal>
         <IAIIconButton
           aria-label={t('modelManager.modelManager')}
@@ -101,7 +105,7 @@ const SiteHeaderMenu = () => {
           icon={<MdSettings />}
         />
       </SettingsModal>
-    </>
+    </Flex>
   );
 };
 
