@@ -60,12 +60,11 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
         base: `'workarea-display' 'workarea-panel'`,
         xl: `'workarea-panel workarea-display'`,
       }}
-      gridAutoRows={{ base: 'maxcontent auto' }}
+      gridAutoRows={{ base: 'auto', xl: 'auto' }}
       gridAutoColumns={{ md: 'max-content auto' }}
       pos="relative"
       w="full"
-      h={APP_CONTENT_HEIGHT}
-      minH={{ base: 1000, xl: 'auto' }}
+      h={{ base: 'auto', xl: APP_CONTENT_HEIGHT }}
       gap={4}
     >
       <ParametersPanel>{parametersPanelContent}</ParametersPanel>
@@ -74,7 +73,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
           pos="relative"
           w={{ base: '100vw', xl: 'full' }}
           paddingRight={{ base: 8, xl: 0 }}
-          h="100%"
+          h={{ base: 600, xl: '100%' }}
           onDrop={handleDrop}
         >
           {children}

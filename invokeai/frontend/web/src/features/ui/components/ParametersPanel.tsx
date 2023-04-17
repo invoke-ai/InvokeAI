@@ -97,7 +97,7 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
       <Flex
         flexDir="column"
         position="relative"
-        h="full"
+        h={{ base: 600, xl: 'full' }}
         w={{ sm: 'full', lg: '100vw', xl: 'full' }}
         paddingRight={{ base: 8, xl: 0 }}
       >
