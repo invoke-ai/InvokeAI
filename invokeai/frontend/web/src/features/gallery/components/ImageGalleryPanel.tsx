@@ -189,7 +189,12 @@ export default function ImageGalleryPanel() {
 
   const imageGalleryContent = () => {
     return (
-      <Flex w="100vw" h="100vh" paddingRight={{ base: 8, xl: 0 }}>
+      <Flex
+        w="100vw"
+        h={{ base: 300, xl: '100vh' }}
+        paddingRight={{ base: 8, xl: 0 }}
+        paddingBottom={{ base: 4, xl: 0 }}
+      >
         <ImageGalleryContent />
       </Flex>
     );

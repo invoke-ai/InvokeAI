@@ -18,7 +18,7 @@ const InvokeAILogoComponent = () => {
         minW="32px"
         minH="32px"
       />
-      <Flex gap={3} display={{ base: 'none', md: 'inherit' }}>
+      <Flex gap={3} display={{ base: 'inherit', sm: 'none', md: 'inherit' }}>
         <Text fontSize="xl">
           invoke <strong>ai</strong>
         </Text>

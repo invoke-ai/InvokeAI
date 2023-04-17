@@ -1,6 +1,5 @@
 import {
   ChakraProps,
-  Flex,
   Icon,
   Tab,
   TabList,
