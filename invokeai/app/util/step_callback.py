@@ -1,4 +1,3 @@
-from re import S
 import torch
 from ..invocations.baseinvocation import InvocationContext
 from ...backend.util.util import image_to_dataURL
