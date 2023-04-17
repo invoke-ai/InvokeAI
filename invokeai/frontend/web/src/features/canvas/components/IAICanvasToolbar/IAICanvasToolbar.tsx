@@ -233,6 +233,7 @@ const IAICanvasToolbar = () => {
     <Flex
       sx={{
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: 2,
       }}
     >

@@ -65,6 +65,7 @@
     "react-konva": "^18.2.4",
     "react-konva-utils": "^0.3.2",
     "react-redux": "^8.0.5",
+    "react-responsive": "^9.0.2",
     "react-transition-group": "^4.4.5",
     "react-zoom-pan-pinch": "^2.6.1",
     "redux-deep-persist": "^1.0.7",

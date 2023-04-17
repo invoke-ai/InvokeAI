@@ -7,6 +7,7 @@ import { MdPhoto } from 'react-icons/md';
 import { gallerySelector } from '../store/gallerySelectors';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
+import { isMobile } from 'theme/util/isMobile';
 
 export const currentImageDisplaySelector = createSelector(
   [gallerySelector],
@@ -36,7 +37,7 @@ const CurrentImageDisplay = () => {
         flexDirection: 'column',
         height: '100%',
         width: '100%',
-        rowGap: 4,
+        rowGap: isMobile ? 0 : 4,
         borderRadius: 'base',
       }}
     >
