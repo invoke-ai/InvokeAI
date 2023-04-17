@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ImageField, ImageType
 from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.models.metadata import InvokeAIMetadata
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput, build_image_output
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
@@ -95,16 +96,11 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-        source_id = graph_execution_state.prepared_source_mapping[self.id]
-        invocation = graph_execution_state.execution_graph.get_node(self.id)
         
-        metadata = {
-          "session": context.graph_execution_state_id,
-          "source_id": source_id,
-          "invocation": invocation.dict()
-        }
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
 
         context.services.images.save(image_type, image_name, generate_output.image, metadata)
         return build_image_output(
@@ -181,7 +177,13 @@ class ImageToImageInvocation(TextToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, result_image, self.dict())
+        
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+
+        context.services.images.save(image_type, image_name, result_image, metadata)
         return build_image_output(
             image_type=image_type,
             image_name=image_name,
@@ -258,7 +260,13 @@ class InpaintInvocation(ImageToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, result_image, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+
+        context.services.images.save(image_type, image_name, result_image, metadata)
         return build_image_output(
             image_type=image_type,
             image_name=image_name,

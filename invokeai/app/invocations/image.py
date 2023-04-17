@@ -6,6 +6,8 @@ import numpy
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
+from invokeai.app.models.metadata import InvokeAIMetadata
+
 from ..models.image import ImageField, ImageType
 from .baseinvocation import (
     BaseInvocation,
@@ -151,7 +153,13 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, image_crop, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+
+        context.services.images.save(image_type, image_name, image_crop, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=image_crop
         )
@@ -202,7 +210,13 @@ class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, new_image, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+
+        context.services.images.save(image_type, image_name, new_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=new_image
         )
@@ -232,7 +246,12 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, image_mask, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+        context.services.images.save(image_type, image_name, image_mask, metadata)
         return MaskOutput(mask=ImageField(image_type=image_type, image_name=image_name))
 
 
@@ -264,7 +283,12 @@ class BlurInvocation(BaseInvocation, PILInvocationConfig):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, blur_image, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+        context.services.images.save(image_type, image_name, blur_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=blur_image
         )
@@ -296,7 +320,12 @@ class LerpInvocation(BaseInvocation, PILInvocationConfig):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, lerp_image, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+        context.services.images.save(image_type, image_name, lerp_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=lerp_image
         )
@@ -333,7 +362,12 @@ class InverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, ilerp_image, self.dict())
+
+        metadata = InvokeAIMetadata(
+          session_id=context.graph_execution_state_id,
+          invocation=self.dict()
+        )
+        context.services.images.save(image_type, image_name, ilerp_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=ilerp_image
         )

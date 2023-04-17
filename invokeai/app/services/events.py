@@ -45,9 +45,10 @@ class EventServiceBase:
         )
 
     def emit_invocation_complete(
-        self, graph_execution_state_id: str, result: Dict, invocation_dict: Dict, source_id: str,
+        self, graph_execution_state_id: str, result: dict, invocation_dict: dict, source_id: str,
     ) -> None:
         """Emitted when an invocation has completed"""
+        print(result)
         self.__emit_session_event(
             event_name="invocation_complete",
             payload=dict(
@@ -59,7 +60,7 @@ class EventServiceBase:
         )
 
     def emit_invocation_error(
-        self, graph_execution_state_id: str, invocation_dict: Dict, source_id: str, error: str
+        self, graph_execution_state_id: str, invocation_dict: dict, source_id: str, error: str
     ) -> None:
         """Emitted when an invocation has completed"""
         self.__emit_session_event(
@@ -73,7 +74,7 @@ class EventServiceBase:
         )
 
     def emit_invocation_started(
-        self, graph_execution_state_id: str, invocation_dict: Dict, source_id: str
+        self, graph_execution_state_id: str, invocation_dict: dict, source_id: str
     ) -> None:
         """Emitted when an invocation has started"""
         self.__emit_session_event(
