@@ -7,6 +7,7 @@ import torch
 
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.models.metadata import InvokeAIMetadata
 from invokeai.app.util.step_callback import diffusers_step_callback_adapter
 
 from ...backend.model_management.model_manager import ModelManager
@@ -355,7 +356,12 @@ class LatentsToImageInvocation(BaseInvocation):
             image_name = context.services.images.create_name(
                 context.graph_execution_state_id, self.id
             )
-            context.services.images.save(image_type, image_name, image, self.dict())
+
+            metadata = InvokeAIMetadata(
+              session_id=context.graph_execution_state_id,
+              invocation=self.dict()
+            )
+            context.services.images.save(image_type, image_name, image, metadata)
             return build_image_output(
                 image_type=image_type,
                 image_name=image_name,

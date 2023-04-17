@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 
 from PIL.Image import Image
 import PIL.Image as PILImage
+from PIL import PngImagePlugin
 from invokeai.app.api.models.images import ImageResponse
 from invokeai.app.models.image import  ImageType
 from invokeai.app.models.metadata import ImageMetadata, InvokeAIMetadata
@@ -41,7 +42,7 @@ class ImageStorageBase(ABC):
         pass
 
     @abstractmethod
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | Dict[str, Any] | None = None) -> str:
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> str:
         pass
 
     @abstractmethod
@@ -99,9 +100,12 @@ class DiskImageStorage(ImageStorageBase):
         for path in page_of_image_paths:
             filename = os.path.basename(path)
             img = PILImage.open(path)
-
+            
             # TODO: handle old `sd-metadata` format
-            invokeai_metadata = json.loads(img.info.get("invokeai", "{}"))
+            invokeai_metadata = img.info.get("invokeai", None)
+
+            if invokeai_metadata is not None:
+                invokeai_metadata = InvokeAIMetadata(**json.loads(invokeai_metadata))
 
             page_of_images.append(
                 ImageResponse(
@@ -115,6 +119,7 @@ class DiskImageStorage(ImageStorageBase):
                         created=int(os.path.getctime(path)),
                         width=img.width,
                         height=img.height,
+                        mode=img.mode,
                         invokeai=invokeai_metadata
                     ),
                 )
@@ -154,16 +159,21 @@ class DiskImageStorage(ImageStorageBase):
             path = os.path.join(self.__output_folder, image_type, image_name)
         return path
 
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: Dict[str, Any] | None = None) -> str:
-        print(metadata)
-        image_subpath = os.path.join(image_type, image_name)
-        self.__pngWriter.save_image_and_prompt_to_png(
-            image, "", image_subpath, metadata
-        )  # TODO: just pass full path to png writer
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> str:
+        image_subpath = os.path.join(self.__output_folder, image_type)
+        image_path = os.path.join(image_subpath, image_name)
+
+        info = PngImagePlugin.PngInfo()
+
+        if metadata:
+            info.add_text("invokeai", metadata.json())
+
+        image.save(image_path, "PNG", pnginfo=info)
+
         save_thumbnail(
             image=image,
             filename=image_name,
-            path=os.path.join(self.__output_folder, image_type, "thumbnails"),
+            path=os.path.join(image_subpath, "thumbnails"),
         )
         image_path = self.get_path(image_type, image_name)
         self.__set_cache(image_path, image)
