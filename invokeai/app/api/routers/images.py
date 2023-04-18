@@ -81,7 +81,7 @@ async def upload_image(
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
-    image_path = ApiDependencies.invoker.services.images.save(
+    (image_path, thumbnail_path, ctime) = ApiDependencies.invoker.services.images.save(
         ImageType.UPLOAD, filename, img
     )
 
@@ -98,7 +98,7 @@ async def upload_image(
         image_url=f"api/v1/images/{ImageType.UPLOAD.value}/{filename}",
         thumbnail_url=f"api/v1/images/{ImageType.UPLOAD.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
         metadata=ImageMetadata(
-            created=int(os.path.getctime(image_path)),
+            created=ctime,
             width=img.width,
             height=img.height,
             mode=img.mode,
