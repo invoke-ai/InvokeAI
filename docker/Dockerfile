@@ -4,7 +4,6 @@ ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
 ##################
-# FROM blobfuse2containers.azurecr.io/azure-blobfuse2.2.0.2 AS python-base
 FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
 ENV DEBIAN_FRONTEND=noninteractive
 LABEL org.opencontainers.image.authors="mauwii@outlook.de"
@@ -42,7 +41,6 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 # Don't fall back to legacy build system
 ENV PIP_USE_PEP517=1
-COPY ./docker/config.yaml /usr/share/blobfuse2/
 
 # #######################
 # ##  build pyproject  ##
@@ -92,36 +90,19 @@ RUN python3 -c "from patchmatch import patch_match"
 #####################
 FROM python-base AS runtime
 
-# Create a new user
-# ARG UNAME=appuser
-# RUN useradd \
-#     --no-log-init \
-#     -m \
-#     -U \
-#     "${UNAME}"
-
 # Create volume directory
 ARG VOLUME_DIR=/data
 RUN mkdir -p "${VOLUME_DIR}" \
-    # && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}" \
     && mkdir -p /blob_data
-# && chown -hR "${UNAME}:${UNAME}" /blob_data
 
 # Setup runtime environment
-# USER ${UNAME}:${UNAME}
-# COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
-# COPY --chown=${UNAME}:${UNAME} ./invokeai/configs/resleeve_configs.yml /data
-# COPY --chown=${UNAME}:${UNAME} ./docker/config.yaml /data/config_blobfuse.yaml
 COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 COPY ./invokeai/configs/resleeve_configs.yml /data
-COPY ./docker/config.yaml /blob_configs/config_blobfuse.yaml
+COPY ./invokeai/configs/blobfuse2/config.yaml /blob_configs/config_blobfuse.yaml
+COPY ./invokeai/configs/certificates/BaltimoreCyberTrustRoot.crt.pem /certificates/db_certificate.crt.pem
 COPY ./docker/app.sh /usr/src/app.sh
 ENV INVOKEAI_ROOT ${VOLUME_DIR}
 ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
 EXPOSE 9090
 CMD ["bash", "/usr/src/app.sh"]
-
-# ENTRYPOINT [ "invokeai" ]
-# CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
-# VOLUME [ "${VOLUME_DIR}" ]

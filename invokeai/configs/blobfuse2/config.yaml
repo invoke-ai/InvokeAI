@@ -1,0 +1,43 @@
+# Refer ./setup/baseConfig.yaml for full set of config parameters
+allow-other: true
+
+logging:
+  type: syslog
+
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+
+libfuse:
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 120
+  negative-entry-expiration-sec: 240
+
+file_cache:
+  path: /tmp/blobfuse_temp
+  timeout-sec: 0 
+  allow-non-empty-temp: true
+  cleanup-on-start: true
+
+attr_cache:
+  timeout-sec: 7200
+
+logging:
+  level: log_debug
+  # type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - syslog>
+  # file-path: <path where log files shall be stored. Default - '$HOME/.blobfuse2/blobfuse2.log'>
+  # max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
+  # file-count: <maximum number of files to be rotated to preserve old logs. Default - 10>
+  # track-time: true|false <track time taken by important operations>
+
+azstorage:
+  type: adls
+  virtual-directory: true
+  account-name: resleevev2userdata
+  # account-key: FINDzkWieTHiGmKLsYD+5fo6UtUmoMShJnqAAATTtpr10WZSlclWm1SUDIJb6hRqIUTQ7DCyCcPs+AStaeFkSQ==
+  container: generatedimage
+  endpoint: https://resleevev2userdata.blob.core.windows.net
+  mode: sas
+  sas: ?sv=2021-12-02&ss=bfqt&srt=sco&sp=rwdlacupyx&se=2023-05-11T14:57:26Z&st=2023-04-11T06:57:26Z&spr=https&sig=lfnTN3JLmaiS%2FfafAh31Wo86J9yd3tEVOgJPXIBx6PQ%3D
