@@ -10,26 +10,27 @@ import { buildHiResNode, buildImg2ImgNode } from './nodes/image2Image';
 import { buildIteration } from './nodes/iteration';
 import { buildTxt2ImgNode } from './nodes/text2Image';
 
-function mapTabToFunction(activeTabName: InvokeTabName) {
-  switch (activeTabName) {
-    case 'txt2img':
-      return buildTxt2ImgNode;
+// function mapTabToFunction(activeTabName: InvokeTabName) {
+//   switch (activeTabName) {
+//     case 'txt2img':
+//       return buildTxt2ImgNode;
 
-    case 'img2img':
-      return buildImg2ImgNode;
+//     case 'img2img':
+//       return buildImg2ImgNode;
 
-    default:
-      return buildTxt2ImgNode;
-  }
-}
+//     default:
+//       return buildTxt2ImgNode;
+//   }
+// }
 
 const buildBaseNode = (
   state: RootState
 ): Record<string, TextToImageInvocation | ImageToImageInvocation> => {
-  const { activeTab } = state.ui;
-  const activeTabName = tabMap[activeTab];
+  if (state.generation.isImageToImageEnabled) {
+    return buildImg2ImgNode(state);
+  }
 
-  return mapTabToFunction(activeTabName)(state);
+  return buildTxt2ImgNode(state);
 };
 
 type BuildGraphOutput = {
@@ -39,7 +40,7 @@ type BuildGraphOutput = {
 
 export const buildGraph = (state: RootState): BuildGraphOutput => {
   const { generation, postprocessing } = state;
-  const { iterations } = generation;
+  const { iterations, isImageToImageEnabled } = generation;
   const { hiresFix, hiresStrength } = postprocessing;
 
   const baseNode = buildBaseNode(state);
@@ -47,11 +48,11 @@ export const buildGraph = (state: RootState): BuildGraphOutput => {
   let graph: Graph = { nodes: baseNode };
   const nodeIdsToSubscribe: string[] = [];
 
-  if (iterations > 1) {
-    graph = buildIteration({ graph, iterations });
-  }
+  graph = buildIteration(graph, state);
 
-  if (hiresFix) {
+  // TODO: Is hires fix actually just img2img w/ a larger size and fit?
+  // pretty sure it does stuff in latent space, and this isn't the whole story
+  if (hiresFix && !isImageToImageEnabled) {
     const { node, edge } = buildHiResNode(
       baseNode as Record<string, TextToImageInvocation>,
       hiresStrength

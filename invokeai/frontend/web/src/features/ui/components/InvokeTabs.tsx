@@ -23,6 +23,7 @@ import {
   MdDeviceHub,
   MdFlashOn,
   MdGridOn,
+  MdImage,
   MdPhotoFilter,
   MdPhotoLibrary,
   MdTextFields,
@@ -35,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import NodeEditor from 'features/nodes/components/NodeEditor';
+import LinearWorkarea from './tabs/Linear/LinearWorkarea';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -48,15 +50,20 @@ const tabIconStyles: ChakraProps['sx'] = {
 
 const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
   const tabs: InvokeTabInfo[] = [
+    // {
+    //   id: 'txt2img',
+    //   icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
+    //   workarea: <TextToImageWorkarea />,
+    // },
+    // {
+    //   id: 'img2img',
+    //   icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
+    //   workarea: <ImageToImageWorkarea />,
+    // },
     {
-      id: 'txt2img',
-      icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
-      workarea: <TextToImageWorkarea />,
-    },
-    {
-      id: 'img2img',
+      id: 'linear',
       icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
-      workarea: <ImageToImageWorkarea />,
+      workarea: <LinearWorkarea />,
     },
     {
       id: 'unifiedCanvas',
@@ -68,16 +75,16 @@ const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
       icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
       workarea: <NodeEditor />,
     },
-    {
-      id: 'postprocessing',
-      icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
-      workarea: <PostProcessingWIP />,
-    },
-    {
-      id: 'training',
-      icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
-      workarea: <TrainingWIP />,
-    },
+    // {
+    //   id: 'postprocessing',
+    //   icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
+    //   workarea: <PostProcessingWIP />,
+    // },
+    // {
+    //   id: 'training',
+    //   icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
+    //   workarea: <TrainingWIP />,
+    // },
   ];
   return tabs.filter((tab) => !disabledTabs.includes(tab.id));
 };

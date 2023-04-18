@@ -36,6 +36,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
+  isImageToImageEnabled: boolean;
 }
 
 const initialGenerationState: GenerationState = {
@@ -67,6 +68,7 @@ const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
+  isImageToImageEnabled: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -355,6 +357,10 @@ export const generationSlice = createSlice({
     },
     initialImageSelected: (state, action: PayloadAction<string>) => {
       state.initialImage = action.payload;
+      state.isImageToImageEnabled = true;
+    },
+    isImageToImageEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isImageToImageEnabled = action.payload;
     },
   },
 });
@@ -398,6 +404,7 @@ export const {
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
   initialImageSelected,
+  isImageToImageEnabledChanged,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

@@ -14,7 +14,6 @@ export const buildImg2ImgNode = (
   const nodeId = uuidv4();
   const { generation, system, models } = state;
 
-  const { shouldDisplayInProgressType } = system;
   const { selectedModelName } = models;
 
   const {
@@ -42,7 +41,6 @@ export const buildImg2ImgNode = (
     id: nodeId,
     type: 'img2img',
     prompt,
-    seed: shouldRandomizeSeed ? -1 : seed,
     steps,
     width,
     height,
@@ -50,7 +48,7 @@ export const buildImg2ImgNode = (
     scheduler: sampler as ImageToImageInvocation['scheduler'],
     seamless,
     model: selectedModelName,
-    progress_images: shouldDisplayInProgressType === 'full-res',
+    progress_images: true,
     image: {
       image_name: initialImage.name,
       image_type: initialImage.type,
@@ -58,6 +56,10 @@ export const buildImg2ImgNode = (
     strength,
     fit,
   };
+
+  if (!shouldRandomizeSeed) {
+    imageToImageNode.seed = seed;
+  }
 
   return {
     [nodeId]: imageToImageNode,
@@ -84,6 +86,7 @@ export const buildHiResNode = (
         id: nodeId,
         type: 'img2img',
         strength,
+        fit: true,
       },
     },
     edge: {
