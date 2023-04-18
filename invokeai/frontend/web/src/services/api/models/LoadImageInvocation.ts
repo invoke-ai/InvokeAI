@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageField } from './ImageField';
+import type { ImageType } from './ImageType';
 
 /**
  * Load an image and provide it as output.
@@ -14,8 +14,12 @@ export type LoadImageInvocation = {
   id: string;
   type?: 'load_image';
   /**
-   * The image to show
+   * The type of the image
    */
-  image?: ImageField;
+  image_type: ImageType;
+  /**
+   * The name of the image
+   */
+  image_name: string;
 };
 

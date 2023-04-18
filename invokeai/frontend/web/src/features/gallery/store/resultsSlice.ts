@@ -101,7 +101,7 @@ const resultsSlice = createSlice({
      */
     builder.addCase(invocationComplete, (state, action) => {
       const { data } = action.payload;
-      const { result, invocation, graph_execution_state_id, source_id } = data;
+      const { result, invocation, graph_execution_state_id } = data;
 
       if (isImageOutput(result)) {
         const name = result.image.image_name;
@@ -119,9 +119,9 @@ const resultsSlice = createSlice({
             created: timestamp,
             width: result.image.width, // TODO: add tese dimensions
             height: result.image.height,
+            mode: result.image.mode,
             invokeai: {
-              session: graph_execution_state_id,
-              source_id,
+              session_id: graph_execution_state_id,
               invocation,
             },
           },

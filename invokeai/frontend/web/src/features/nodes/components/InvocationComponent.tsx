@@ -24,9 +24,10 @@ import { useAppSelector } from 'app/storeHooks';
 import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
 
 const connectedInputFieldsSelector = createSelector(
-  (state: RootState) => state.nodes.edges,
+  [(state: RootState) => state.nodes.edges],
   (edges) => {
-    return edges.map((e) => e.targetHandle);
+    // return edges.map((e) => e.targetHandle);
+    return edges;
   },
   {
     memoizeOptions: {
@@ -118,7 +119,15 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
               );
             }
 
-            const isConnected = connectedInputs.includes(input.name);
+            const isConnected = Boolean(
+              connectedInputs.filter((connectedInput) => {
+                return (
+                  connectedInput.target === nodeId &&
+                  connectedInput.targetHandle === input.name
+                );
+              }).length
+            );
+
             return (
               <Box
                 key={fieldId}
@@ -171,6 +180,15 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
           {map(outputs).map((output, i) => {
             const outputTemplate = template.current?.outputs[output.name];
 
+            const isConnected = Boolean(
+              connectedInputs.filter((connectedInput) => {
+                return (
+                  connectedInput.source === nodeId &&
+                  connectedInput.sourceHandle === output.name
+                );
+              }).length
+            );
+
             if (!outputTemplate) {
               return (
                 <Box
@@ -200,7 +218,7 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
                 borderWidth={1}
                 borderRadius="md"
               >
-                <FormControl>
+                <FormControl isDisabled={isConnected}>
                   <FormLabel textAlign="end">
                     {outputTemplate?.title} Output
                   </FormLabel>

@@ -311,6 +311,7 @@ export const buildOutputFieldTemplates = (
       (outputsAccumulator, property, propertyName) => {
         if (
           !['type', 'id'].includes(propertyName) &&
+          !['object'].includes(property.type) && // TODO: handle objects?
           isSchemaObject(property)
         ) {
           const fieldType = getFieldType(property, propertyName, typeHints);

@@ -15,8 +15,7 @@ from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput, build_image_output
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
 from ...backend.stable_diffusion import PipelineIntermediateState
-from ..models.exceptions import CanceledException
-from ..util.step_callback import diffusers_step_callback_adapter
+from ..util.step_callback import stable_diffusion_step_callback
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
 
@@ -59,28 +58,26 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
+        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState, 
     ) -> None:
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-        
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            invocation_dict=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         outputs = Txt2Img(model).generate(
             prompt=self.prompt,
-            step_callback=partial(self.dispatch_progress, context),
+            step_callback=partial(self.dispatch_progress, context, source_node_id),
             **self.dict(
                 exclude={"prompt"}
             ),  # Shorthand for passing all of the parameters above manually
@@ -106,7 +103,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         return build_image_output(
             image_type=image_type,
             image_name=image_name,
-            image=generate_output.image
+            image=generate_output.image,
         )
 
 
@@ -126,20 +123,14 @@ class ImageToImageInvocation(TextToImageInvocation):
     )
 
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
+        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
     ) -> None:  
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            invocation_dict=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = (
@@ -154,11 +145,15 @@ class ImageToImageInvocation(TextToImageInvocation):
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+        
         outputs = Img2Img(model).generate(
                 prompt=self.prompt,
                 init_image=image,
                 init_mask=mask,
-                step_callback=partial(self.dispatch_progress, context),
+                step_callback=partial(self.dispatch_progress, context, source_node_id),
                 **self.dict(
                     exclude={"prompt", "image", "mask"}
                 ),  # Shorthand for passing all of the parameters above manually
@@ -187,7 +182,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         return build_image_output(
             image_type=image_type,
             image_name=image_name,
-            image=result_image
+            image=result_image,
         )
 
 class InpaintInvocation(ImageToImageInvocation):
@@ -205,20 +200,14 @@ class InpaintInvocation(ImageToImageInvocation):
     )
 
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
-    ) -> None:  
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
+        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
+    ) -> None:
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            invocation_dict=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = (
@@ -237,11 +226,15 @@ class InpaintInvocation(ImageToImageInvocation):
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         outputs = Inpaint(model).generate(
                 prompt=self.prompt,
                 init_img=image,
                 init_mask=mask,
-                step_callback=partial(self.dispatch_progress, context),
+                step_callback=partial(self.dispatch_progress, context, source_node_id),
                 **self.dict(
                     exclude={"prompt", "image", "mask"}
                 ),  # Shorthand for passing all of the parameters above manually
@@ -270,5 +263,5 @@ class InpaintInvocation(ImageToImageInvocation):
         return build_image_output(
             image_type=image_type,
             image_name=image_name,
-            image=result_image
+            image=result_image,
         )

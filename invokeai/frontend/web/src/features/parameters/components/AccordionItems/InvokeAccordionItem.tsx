@@ -32,7 +32,7 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
           <AccordionIcon />
         </Flex>
       </AccordionButton>
-      <AccordionPanel>{content}</AccordionPanel>
+      <AccordionPanel p={4}>{content}</AccordionPanel>
     </AccordionItem>
   );
 }

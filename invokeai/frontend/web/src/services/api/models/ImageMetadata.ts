@@ -5,7 +5,7 @@
 import type { InvokeAIMetadata } from './InvokeAIMetadata';
 
 /**
- * An image's general metadata
+ * An image's metadata. Used only in HTTP responses.
  */
 export type ImageMetadata = {
   /**
@@ -20,6 +20,10 @@ export type ImageMetadata = {
    * The height of the image in pixels
    */
   height: number;
+  /**
+   * The color mode of the image
+   */
+  mode: string;
   /**
    * The image's InvokeAI-specific metadata
    */

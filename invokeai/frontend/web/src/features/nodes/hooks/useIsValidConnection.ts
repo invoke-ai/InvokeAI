@@ -12,6 +12,8 @@ export const useIsValidConnection = () => {
       const edges = flow.getEdges();
       const nodes = flow.getNodes();
 
+      return true;
+
       // Connection must have valid targets
       if (!(source && sourceHandle && target && targetHandle)) {
         return false;

@@ -8,7 +8,7 @@ import torch
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.invocations.util.choose_model import choose_model
 from invokeai.app.models.metadata import InvokeAIMetadata
-from invokeai.app.util.step_callback import diffusers_step_callback_adapter
+from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype
@@ -171,21 +171,14 @@ class TextToLatentsInvocation(BaseInvocation):
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
+        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
     ) -> None:
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
-
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            invocation_dict=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
         model_info = choose_model(model_manager, self.model)
@@ -232,8 +225,12 @@ class TextToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state)
+            self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(model)
@@ -282,8 +279,12 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         noise = context.services.latents.get(self.noise.latents_name)
         latent = context.services.latents.get(self.latents.latents_name)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state)
+            self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(model)

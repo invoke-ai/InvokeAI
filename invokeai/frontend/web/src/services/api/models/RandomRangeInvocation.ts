@@ -23,5 +23,9 @@ export type RandomRangeInvocation = {
    * The number of values to generate
    */
   size?: number;
+  /**
+   * The seed for the RNG
+   */
+  seed?: number;
 };
 

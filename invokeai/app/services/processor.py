@@ -43,14 +43,14 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     queue_item.invocation_id
                 )
 
-                # get the source node to provide to cliepnts (the prepared node is not as useful)
-                source_id = graph_execution_state.prepared_source_mapping[invocation.id]
+                # get the source node id to provide to clients (the prepared node id is not as useful)
+                source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
 
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
                     graph_execution_state_id=graph_execution_state.id,
                     invocation_dict=invocation.dict(),
-                    source_id=source_id
+                    source_node_id=source_node_id
                 )
 
                 # Invoke
@@ -80,7 +80,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     self.__invoker.services.events.emit_invocation_complete(
                         graph_execution_state_id=graph_execution_state.id,
                         invocation_dict=invocation.dict(),
-                        source_id=source_id,
+                        source_node_id=source_node_id,
                         result=outputs.dict(),
                     )
 
@@ -105,7 +105,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     self.__invoker.services.events.emit_invocation_error(
                         graph_execution_state_id=graph_execution_state.id,
                         invocation_dict=invocation.dict(),
-                        source_id=source_id,
+                        source_node_id=source_node_id,
                         error=error,
                     )
 

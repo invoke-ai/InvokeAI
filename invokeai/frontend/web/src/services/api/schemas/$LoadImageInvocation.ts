@@ -12,12 +12,18 @@ export const $LoadImageInvocation = {
     type: {
       type: 'Enum',
     },
-    image: {
+    image_type: {
       type: 'all-of',
-      description: `The image to show`,
+      description: `The type of the image`,
       contains: [{
-        type: 'ImageField',
+        type: 'ImageType',
       }],
+      isRequired: true,
+    },
+    image_name: {
+      type: 'string',
+      description: `The name of the image`,
+      isRequired: true,
     },
   },
 } as const;
