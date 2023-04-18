@@ -8,9 +8,7 @@ import {
 import { _Image } from 'app/invokeai';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 
-export const buildImg2ImgNode = (
-  state: RootState
-): Record<string, ImageToImageInvocation> => {
+export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
   const nodeId = uuidv4();
   const { generation, system, models } = state;
 
@@ -61,9 +59,7 @@ export const buildImg2ImgNode = (
     imageToImageNode.seed = seed;
   }
 
-  return {
-    [nodeId]: imageToImageNode,
-  };
+  return imageToImageNode;
 };
 
 type hiresReturnType = {

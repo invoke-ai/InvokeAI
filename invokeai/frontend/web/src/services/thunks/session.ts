@@ -1,15 +1,13 @@
 import { createAppAsyncThunk } from 'app/storeUtils';
-import { Graph, SessionsService } from 'services/api';
-import { buildGraph } from 'common/util/buildGraph';
+import { SessionsService } from 'services/api';
+import { buildLinearGraph } from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
-import { subscribedNodeIdsSet } from 'features/system/store/systemSlice';
-import { buildNodesGraph } from 'features/nodes/util/buildNodesGraph';
-import { size } from 'lodash';
+import { buildNodesGraph } from 'features/nodes/util/nodesGraphBuilder/buildNodesGraph';
 
 export const linearGraphBuilt = createAppAsyncThunk(
   'api/linearGraphBuilt',
   async (_, { dispatch, getState }) => {
-    const graph = buildGraph(getState()).graph;
+    const graph = buildLinearGraph(getState());
 
     dispatch(sessionCreated({ graph }));
 
