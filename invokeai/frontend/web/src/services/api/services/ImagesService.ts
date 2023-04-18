@@ -92,7 +92,7 @@ export class ImagesService {
       formData: formData,
       mediaType: 'multipart/form-data',
       errors: {
-        404: `Session not found`,
+        415: `Image upload failed`,
         422: `Validation Error`,
       },
     });

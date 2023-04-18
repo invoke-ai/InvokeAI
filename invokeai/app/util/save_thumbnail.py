@@ -1,17 +1,19 @@
 import os
 from PIL import Image
 
+from invokeai.app.models.image import ImageType
+
 
 def save_thumbnail(
     image: Image.Image,
     filename: str,
-    path: str,
+    image_type: ImageType,
     size: int = 256,
 ) -> str:
     """
     Saves a thumbnail of an image, returning its path.
     """
-    base_filename = os.path.splitext(filename)[0]
+    base_filename = 
     thumbnail_path = os.path.join(path, base_filename + ".webp")
 
     if os.path.exists(thumbnail_path):

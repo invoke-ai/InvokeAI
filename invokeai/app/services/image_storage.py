@@ -7,7 +7,7 @@ from glob import glob
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from PIL.Image import Image
 import PIL.Image as PILImage
@@ -16,7 +16,7 @@ from invokeai.app.api.models.images import ImageResponse
 from invokeai.app.models.image import  ImageType
 from invokeai.app.models.metadata import ImageMetadata, InvokeAIMetadata
 from invokeai.app.services.item_storage import PaginatedResults
-from invokeai.app.util.save_thumbnail import save_thumbnail
+from invokeai.app.util.get_timestamp import get_timestamp
 
 from invokeai.backend.image_util import PngWriter
 
@@ -26,12 +26,14 @@ class ImageStorageBase(ABC):
 
     @abstractmethod
     def get(self, image_type: ImageType, image_name: str) -> Image:
+        """Retrieves an image as PIL Image."""
         pass
 
     @abstractmethod
     def list(
         self, image_type: ImageType, page: int = 0, per_page: int = 10
     ) -> PaginatedResults[ImageResponse]:
+        """Gets a paginated list of images."""
         pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
@@ -39,32 +41,34 @@ class ImageStorageBase(ABC):
     def get_path(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
     ) -> str:
+        """Gets the path to an image."""
         pass
 
     @abstractmethod
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> str:
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
+        """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image path, thumbnail path, and created timestamp."""
         pass
 
     @abstractmethod
     def delete(self, image_type: ImageType, image_name: str) -> None:
+        """Deletes an image and its thumbnail (if one exists)."""
         pass
 
     def create_name(self, context_id: str, node_id: str) -> str:
-        return f"{context_id}_{node_id}_{str(int(datetime.datetime.now(datetime.timezone.utc).timestamp()))}.png"
+        """Creates a unique contextual image filename."""
+        return f"{context_id}_{node_id}_{str(get_timestamp())}.png"
 
 
 class DiskImageStorage(ImageStorageBase):
     """Stores images on disk"""
 
     __output_folder: str
-    __pngWriter: PngWriter
     __cache_ids: Queue  # TODO: this is an incredibly naive cache
     __cache: Dict[str, Image]
     __max_cache_size: int
 
     def __init__(self, output_folder: str):
         self.__output_folder = output_folder
-        self.__pngWriter = PngWriter(output_folder)
         self.__cache = dict()
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
@@ -114,7 +118,7 @@ class DiskImageStorage(ImageStorageBase):
                     # TODO: DiskImageStorage should not be building URLs...?
                     image_url=f"api/v1/images/{image_type.value}/{filename}",
                     thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
-                    # TODO: Creation of this object should happen elsewhere, just making it fit here so it works
+                    # TODO: Creation of this object should happen elsewhere (?), just making it fit here so it works
                     metadata=ImageMetadata(
                         created=int(os.path.getctime(path)),
                         width=img.width,
@@ -159,9 +163,11 @@ class DiskImageStorage(ImageStorageBase):
             path = os.path.join(self.__output_folder, image_type, image_name)
         return path
 
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> str:
-        image_subpath = os.path.join(self.__output_folder, image_type)
-        image_path = os.path.join(image_subpath, image_name)
+    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
+        image_path = self.get_path(image_type, image_name)
+
+        thumbnail_name = os.path.splitext(image_name)[0] + ".webp"
+        thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)
 
         info = PngImagePlugin.PngInfo()
 
@@ -170,14 +176,14 @@ class DiskImageStorage(ImageStorageBase):
 
         image.save(image_path, "PNG", pnginfo=info)
 
-        save_thumbnail(
-            image=image,
-            filename=image_name,
-            path=os.path.join(image_subpath, "thumbnails"),
-        )
-        image_path = self.get_path(image_type, image_name)
+        thumbnail = image.copy()
+        thumbnail.thumbnail(size=(256, 256))
+        thumbnail.save(thumbnail_path, "WEBP")
+
         self.__set_cache(image_path, image)
-        return image_path
+        self.__set_cache(thumbnail_path, thumbnail)
+
+        return (image_path, thumbnail_path, int(os.path.getctime(image_path)))
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         image_path = self.get_path(image_type, image_name)

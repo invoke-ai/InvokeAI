@@ -1,10 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any, Dict, TypedDict
+from typing import Any
+from invokeai.app.api.models.images import ProgressImage
+from invokeai.app.util.get_timestamp import get_timestamp
 
-ProgressImage = TypedDict(
-    "ProgressImage", {"dataURL": str, "width": int, "height": int}
-)
 
 class EventServiceBase:
     session_event: str = "session_event"
@@ -14,7 +13,7 @@ class EventServiceBase:
     def dispatch(self, event_name: str, payload: Any) -> None:
         pass
 
-    def __emit_session_event(self, event_name: str, payload: Dict) -> None:
+    def __emit_session_event(self, event_name: str, payload: dict) -> None:
         self.dispatch(
             event_name=EventServiceBase.session_event,
             payload=dict(event=event_name, data=payload),
@@ -26,7 +25,7 @@ class EventServiceBase:
         self,
         graph_execution_state_id: str,
         invocation_dict: dict,
-        source_id: str,
+        source_node_id: str,
         progress_image: ProgressImage | None,
         step: int,
         total_steps: int,
@@ -37,15 +36,20 @@ class EventServiceBase:
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
                 invocation=invocation_dict,
-                source_id=source_id,
-                progress_image=progress_image,
+                source_node_id=source_node_id,
+                progress_image=progress_image.dict() if progress_image is not None else None,
                 step=step,
                 total_steps=total_steps,
+                timestamp=get_timestamp(),
             ),
         )
 
     def emit_invocation_complete(
-        self, graph_execution_state_id: str, result: dict, invocation_dict: dict, source_id: str,
+        self,
+        graph_execution_state_id: str,
+        result: dict,
+        invocation_dict: dict,
+        source_node_id: str,
     ) -> None:
         """Emitted when an invocation has completed"""
         print(result)
@@ -54,13 +58,18 @@ class EventServiceBase:
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
                 invocation=invocation_dict,
-                source_id=source_id,
+                source_node_id=source_node_id,
                 result=result,
+                timestamp=get_timestamp(),
             ),
         )
 
     def emit_invocation_error(
-        self, graph_execution_state_id: str, invocation_dict: dict, source_id: str, error: str
+        self,
+        graph_execution_state_id: str,
+        invocation_dict: dict,
+        source_node_id: str,
+        error: str,
     ) -> None:
         """Emitted when an invocation has completed"""
         self.__emit_session_event(
@@ -68,13 +77,14 @@ class EventServiceBase:
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
                 invocation=invocation_dict,
-                source_id=source_id,
+                source_node_id=source_node_id,
                 error=error,
+                timestamp=get_timestamp(),
             ),
         )
 
     def emit_invocation_started(
-        self, graph_execution_state_id: str, invocation_dict: dict, source_id: str
+        self, graph_execution_state_id: str, invocation_dict: dict, source_node_id: str
     ) -> None:
         """Emitted when an invocation has started"""
         self.__emit_session_event(
@@ -82,7 +92,8 @@ class EventServiceBase:
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
                 invocation=invocation_dict,
-                source_id=source_id,
+                source_node_id=source_node_id,
+                timestamp=get_timestamp(),
             ),
         )
 
@@ -90,5 +101,8 @@ class EventServiceBase:
         """Emitted when a session has completed all invocations"""
         self.__emit_session_event(
             event_name="graph_execution_state_complete",
-            payload=dict(graph_execution_state_id=graph_execution_state_id),
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                timestamp=get_timestamp(),
+            ),
         )

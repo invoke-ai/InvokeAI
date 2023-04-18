@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $ImageMetadata = {
-  description: `An image's general metadata`,
+  description: `An image's metadata. Used only in HTTP responses.`,
   properties: {
     created: {
       type: 'number',
@@ -17,6 +17,11 @@ export const $ImageMetadata = {
     height: {
       type: 'number',
       description: `The height of the image in pixels`,
+      isRequired: true,
+    },
+    mode: {
+      type: 'string',
+      description: `The color mode of the image`,
       isRequired: true,
     },
     invokeai: {

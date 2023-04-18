@@ -13,7 +13,7 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const invocationBlacklist = ['Graph', 'Collect'];
+const invocationBlacklist = ['Graph', 'Collect', 'LoadImage'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
@@ -52,7 +52,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
             let field: InputFieldTemplate | undefined;
             if (propertyName === 'collection') {
               field = {
-                default: property.default ?? undefined,
+                default: property.default ?? [],
                 name: 'collection',
                 title: property.title ?? '',
                 description: property.description ?? '',

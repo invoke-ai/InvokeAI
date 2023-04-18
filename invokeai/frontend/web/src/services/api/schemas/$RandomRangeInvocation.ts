@@ -24,5 +24,10 @@ export const $RandomRangeInvocation = {
       type: 'number',
       description: `The number of values to generate`,
     },
+    seed: {
+      type: 'number',
+      description: `The seed for the RNG`,
+      maximum: 2147483647,
+    },
   },
 } as const;

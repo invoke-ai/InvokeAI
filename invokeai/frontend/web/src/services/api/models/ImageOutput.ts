@@ -13,5 +13,17 @@ export type ImageOutput = {
    * The output image
    */
   image: ImageField;
+  /**
+   * The width of the image in pixels
+   */
+  width: number;
+  /**
+   * The height of the image in pixels
+   */
+  height: number;
+  /**
+   * The image mode (ie pixel format)
+   */
+  mode: string;
 };
 
