@@ -1,13 +1,13 @@
 import { filter, reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
+import { isSchemaObject } from '../types/typeGuards';
 import {
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
   isInvocationSchemaObject,
-  isSchemaObject,
   OutputFieldTemplate,
-} from '../types';
+} from '../types/types';
 import {
   buildInputFieldTemplate,
   buildOutputFieldTemplates,
@@ -108,7 +108,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
         outputs,
       };
 
-      acc[type] = invocation;
+      Object.assign(acc, { [type]: invocation });
     }
 
     return acc;

@@ -14,7 +14,7 @@ import {
 import { Graph, ImageField } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { isFulfilledAnyGraphBuilt } from 'services/thunks/session';
-import { InvocationTemplate, InvocationValue } from '../types';
+import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 
 export type NodesState = {

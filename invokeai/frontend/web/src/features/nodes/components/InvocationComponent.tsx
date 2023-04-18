@@ -12,7 +12,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { FaExclamationCircle, FaInfoCircle } from 'react-icons/fa';
-import { InvocationValue } from '../types';
+import { InvocationValue } from '../types/types';
 import { InputFieldComponent } from './InputFieldComponent';
 import { FieldHandle } from './FieldHandle';
 import { isEqual, map, size } from 'lodash';

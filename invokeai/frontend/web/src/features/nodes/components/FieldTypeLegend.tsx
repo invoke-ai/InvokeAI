@@ -1,7 +1,7 @@
 import 'reactflow/dist/style.css';
 import { Tooltip, Badge, HStack } from '@chakra-ui/react';
 import { map } from 'lodash';
-import { FIELDS } from '../constants';
+import { FIELDS } from '../types/constants';
 
 export const FieldTypeLegend = () => {
   return (

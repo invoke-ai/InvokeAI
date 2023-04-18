@@ -10,13 +10,9 @@ import {
 import { isImageOutput } from 'services/types/guards';
 import {
   buildImageUrls,
-  deserializeImageField,
   extractTimestampFromImageName,
 } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
-import { getUrlAlt } from 'common/util/getUrl';
-import { ImageMetadata } from 'services/api';
-// import { deserializeImageField } from 'services/util/deserializeImageField';
 
 // use `createEntityAdapter` to create a slice for results images
 // https://redux-toolkit.js.org/api/createEntityAdapter#overview
@@ -117,9 +113,9 @@ const resultsSlice = createSlice({
           thumbnail,
           metadata: {
             created: timestamp,
-            width: result.image.width, // TODO: add tese dimensions
-            height: result.image.height,
-            mode: result.image.mode,
+            width: result.width, // TODO: add tese dimensions
+            height: result.height,
+            mode: result.mode,
             invokeai: {
               session_id: graph_execution_state_id,
               invocation,

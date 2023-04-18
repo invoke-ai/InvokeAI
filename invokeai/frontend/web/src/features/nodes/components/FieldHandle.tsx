@@ -7,9 +7,9 @@ import {
   HandleType,
   useReactFlow,
 } from 'reactflow';
-import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../constants';
+import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../types/constants';
 // import { useConnectionEventStyles } from '../hooks/useConnectionEventStyles';
-import { InputFieldTemplate, OutputFieldTemplate } from '../types';
+import { InputFieldTemplate, OutputFieldTemplate } from '../types/types';
 
 const handleBaseStyles: CSSProperties = {
   position: 'absolute',
