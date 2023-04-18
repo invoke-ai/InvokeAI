@@ -41,7 +41,7 @@ class ImageOutput(BaseInvocationOutput):
 
     class Config:
         schema_extra = {
-            "required": ["type", "image", "created", "width", "height", "mode", "info"]
+            "required": ["type", "image", "width", "height", "mode"]
         }
 
 
