@@ -26,14 +26,14 @@ async def get_image(
 ) -> FileResponse | Response:
     """Gets a result"""
 
-    try:
-        path = ApiDependencies.invoker.services.images.get_path(
-            image_type=image_type, image_name=image_name
-        )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404)
+    path = ApiDependencies.invoker.services.images.get_path(
+        image_type=image_type, image_name=image_name
+    )
 
-    return FileResponse(path)
+    if ApiDependencies.invoker.services.images.validate_path(path):
+        return FileResponse(path)
+    else:
+        raise HTTPException(status_code=404)
 
 
 @images_router.get(
@@ -45,14 +45,14 @@ async def get_thumbnail(
 ) -> FileResponse | Response:
     """Gets a thumbnail"""
 
-    try:
-        path = ApiDependencies.invoker.services.images.get_path(
-            image_type=image_type, image_name=image_name, is_thumbnail=True
-        )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404)
+    path = ApiDependencies.invoker.services.images.get_path(
+        image_type=image_type, image_name=image_name, is_thumbnail=True
+    )
 
-    return FileResponse(path)
+    if ApiDependencies.invoker.services.images.validate_path(path):
+        return FileResponse(path)
+    else:
+        raise HTTPException(status_code=404)
 
 
 @images_router.post(

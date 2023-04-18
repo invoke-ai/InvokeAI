@@ -44,6 +44,14 @@ class ImageStorageBase(ABC):
         """Gets the path to an image or its thumbnail."""
         pass
 
+    # TODO: make this a bit more flexible for e.g. cloud storage
+    @abstractmethod
+    def validate_path(
+        self, path: str
+    ) -> bool:
+        """Validates an image path."""
+        pass
+
     @abstractmethod
     def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image path, thumbnail path, and created timestamp."""
@@ -165,12 +173,17 @@ class DiskImageStorage(ImageStorageBase):
         else:
             path = os.path.join(self.__output_folder, image_type, basename)
 
+        return path
+
+    def validate_path(
+        self, path: str
+    ) -> bool:
         try:
             os.stat(path)
-        except:
-            raise FileNotFoundError
+            return True
+        except Exception:
+            return False
 
-        return path
 
     def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
         image_path = self.get_path(image_type, image_name)
