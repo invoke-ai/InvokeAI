@@ -33,7 +33,7 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-
+from .services.config_management import get_app_config
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -188,7 +188,7 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    config = Args()
+    config = get_app_config()
     config.parse_args()
     model_manager = get_model_manager(config)
 
@@ -200,9 +200,7 @@ def invoke_cli():
 
     events = EventServiceBase()
 
-    output_folder = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../../outputs")
-    )
+    output_folder = config.output_path
 
     # TODO: build a file/path manager?
     db_location = os.path.join(output_folder, "invokeai.db")

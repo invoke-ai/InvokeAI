@@ -2,45 +2,16 @@
 
 from abc import ABC, abstractmethod
 import argparse
-from typing import Any, Callable, Iterable, Literal, Union, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Iterable, Literal, Union, get_args, get_type_hints
 from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
 
 from ..invocations.baseinvocation import BaseInvocation
 from ..invocations.image import ImageField
-from ..services.graph import GraphExecutionState, LibraryGraph, GraphInvocation, Edge
+from ..services.config_management import add_field_argument
+from ..services.graph import GraphExecutionState, LibraryGraph, Edge
 from ..services.invoker import Invoker
-
-
-def add_field_argument(command_parser, name: str, field, default_override = None):
-    default = default_override if default_override is not None else field.default if field.default_factory is None else field.default_factory()
-    if get_origin(field.type_) == Literal:
-        allowed_values = get_args(field.type_)
-        allowed_types = set()
-        for val in allowed_values:
-            allowed_types.add(type(val))
-        allowed_types_list = list(allowed_types)
-        field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
-
-        command_parser.add_argument(
-            f"--{name}",
-            dest=name,
-            type=field_type,
-            default=default,
-            choices=allowed_values,
-            help=field.field_info.description,
-        )
-    else:
-        command_parser.add_argument(
-            f"--{name}",
-            dest=name,
-            type=field.type_,
-            default=default,
-            action=argparse.BooleanOptionalAction if field.type_==bool else 'store',
-            help=field.field_info.description,
-        )
-
 
 def add_parsers(
     subparsers,

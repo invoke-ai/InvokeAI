@@ -7,7 +7,7 @@ from typing import get_args, get_type_hints, Dict, List, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from ..services.invocation_services import InvocationServices
-
+from ..services.config_management import InvokeAISettings
 
 class InvocationContext:
     services: InvocationServices
@@ -18,7 +18,7 @@ class InvocationContext:
         self.graph_execution_state_id = graph_execution_state_id
 
 
-class BaseInvocationOutput(BaseModel):
+class BaseInvocationOutput(InvokeAISettings):
     """Base class for all invocation outputs"""
 
     # All outputs must include a type name like this:
