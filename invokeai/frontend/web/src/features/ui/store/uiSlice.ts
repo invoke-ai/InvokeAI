@@ -21,6 +21,8 @@ const initialtabsState: UIState = {
   shouldHidePreview: false,
   disabledParameterPanels: [],
   disabledTabs: [],
+  openLinearAccordionItems: [],
+  openUnifiedCanvasAccordionItems: [],
 };
 
 const initialState: UIState = initialtabsState;
@@ -102,13 +104,15 @@ export const uiSlice = createSlice({
     setDisabledTabs: (state, action: PayloadAction<InvokeTabName[]>) => {
       state.disabledTabs = action.payload;
     },
-  },
-  extraReducers(builder) {
-    builder.addCase(initialImageSelected, (state) => {
-      if (tabMap[state.activeTab] !== 'img2img') {
-        setActiveTabReducer(state, 'img2img');
+    openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
+      if (tabMap[state.activeTab] === 'linear') {
+        state.openLinearAccordionItems = action.payload;
       }
-    });
+
+      if (tabMap[state.activeTab] === 'unifiedCanvas') {
+        state.openUnifiedCanvasAccordionItems = action.payload;
+      }
+    },
   },
 });
 
@@ -133,6 +137,7 @@ export const {
   toggleGalleryPanel,
   setDisabledPanels,
   setDisabledTabs,
+  openAccordionItemsChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

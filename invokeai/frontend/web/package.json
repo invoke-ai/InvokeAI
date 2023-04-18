@@ -82,6 +82,7 @@
   "devDependencies": {
     "@fontsource/inter": "^4.5.15",
     "@types/dateformat": "^5.0.0",
+    "@types/lodash": "^4.14.194",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@types/react-transition-group": "^4.4.5",

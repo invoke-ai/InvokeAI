@@ -8,7 +8,6 @@ export const buildTxt2ImgNode = (
   const nodeId = uuidv4();
   const { generation, system, models } = state;
 
-  const { shouldDisplayInProgressType } = system;
   const { selectedModelName } = models;
 
   const {
@@ -28,7 +27,6 @@ export const buildTxt2ImgNode = (
     id: nodeId,
     type: 'txt2img',
     prompt,
-    seed: shouldRandomizeSeed ? -1 : seed,
     steps,
     width,
     height,
@@ -36,8 +34,12 @@ export const buildTxt2ImgNode = (
     scheduler: sampler as TextToImageInvocation['scheduler'],
     seamless,
     model: selectedModelName,
-    progress_images: shouldDisplayInProgressType === 'full-res',
+    progress_images: true,
   };
+
+  if (!shouldRandomizeSeed) {
+    textToImageNode.seed = seed;
+  }
 
   return {
     [nodeId]: textToImageNode,

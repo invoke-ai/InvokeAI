@@ -143,16 +143,17 @@ const makeSocketIOListeners = (
           }
         }
 
-        if (shouldLoopback) {
-          const activeTabName = tabMap[activeTab];
-          switch (activeTabName) {
-            case 'img2img': {
-              dispatch(initialImageSelected(newImage.uuid));
-              // dispatch(setInitialImage(newImage));
-              break;
-            }
-          }
-        }
+        // TODO: fix
+        // if (shouldLoopback) {
+        //   const activeTabName = tabMap[activeTab];
+        //   switch (activeTabName) {
+        //     case 'img2img': {
+        //       dispatch(initialImageSelected(newImage.uuid));
+        //       // dispatch(setInitialImage(newImage));
+        //       break;
+        //     }
+        //   }
+        // }
 
         dispatch(clearIntermediateImage());
 

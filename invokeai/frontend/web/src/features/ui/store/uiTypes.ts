@@ -18,4 +18,6 @@ export interface UIState {
   shouldShowGallery: boolean;
   disabledParameterPanels: string[];
   disabledTabs: InvokeTabName[];
+  openLinearAccordionItems: number[];
+  openUnifiedCanvasAccordionItems: number[];
 }

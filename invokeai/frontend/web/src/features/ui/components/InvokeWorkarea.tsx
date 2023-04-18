@@ -46,9 +46,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
     const uuid = e.dataTransfer.getData('invokeai/imageUuid');
     const image = getImageByUuid(uuid);
     if (!image) return;
-    if (activeTabName === 'img2img') {
-      dispatch(initialImageSelected(image.uuid));
-    } else if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'unifiedCanvas') {
       dispatch(setInitialCanvasImage(image));
     }
   };

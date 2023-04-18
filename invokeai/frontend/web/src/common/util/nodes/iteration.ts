@@ -4,27 +4,45 @@ import {
   Graph,
   ImageToImageInvocation,
   IterateInvocation,
+  RandomRangeInvocation,
   RangeInvocation,
   TextToImageInvocation,
 } from 'services/api';
 import { buildImg2ImgNode } from './image2Image';
+import { RootState } from 'app/store';
 
 type BuildIteration = {
   graph: Graph;
   iterations: number;
+  shouldRandomizeSeed: boolean;
+};
+
+type BuildRangeNodeArg = {
+  state: RootState;
 };
 
 const buildRangeNode = (
-  iterations: number
-): Record<string, RangeInvocation> => {
+  state: RootState
+): Record<string, RangeInvocation | RandomRangeInvocation> => {
   const nodeId = uuidv4();
+  const { shouldRandomizeSeed, iterations, seed } = state.generation;
+
+  if (shouldRandomizeSeed) {
+    return {
+      [nodeId]: {
+        id: nodeId,
+        type: 'random_range',
+        size: iterations,
+      },
+    };
+  }
+
   return {
     [nodeId]: {
       id: nodeId,
       type: 'range',
-      start: 0,
-      stop: iterations,
-      step: 1,
+      start: seed,
+      stop: seed + iterations,
     },
   };
 };
@@ -41,13 +59,11 @@ const buildIterateNode = (): Record<string, IterateInvocation> => {
   };
 };
 
-export const buildIteration = ({
-  graph,
-  iterations,
-}: BuildIteration): Graph => {
-  const rangeNode = buildRangeNode(iterations);
+export const buildIteration = (graph: Graph, state: RootState): Graph => {
+  const rangeNode = buildRangeNode(state);
   const iterateNode = buildIterateNode();
   const baseNode: Graph['nodes'] = graph.nodes;
+
   const edges: Edge[] = [
     {
       source: {
