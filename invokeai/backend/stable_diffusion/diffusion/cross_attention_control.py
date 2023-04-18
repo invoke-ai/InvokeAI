@@ -11,7 +11,6 @@ import psutil
 import torch
 from compel.cross_attention_control import Arguments
 from diffusers.models.attention_processor import AttentionProcessor
-from diffusers.models.unet_2d_condition import UNet2DConditionModel
 from torch import nn
 
 from ...util import torch_dtype
@@ -408,12 +407,9 @@ def override_cross_attention(model, context: Context, is_running_diffusers=False
 def get_cross_attention_modules(
     model, which: CrossAttentionType
 ) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
-    from ldm.modules.attention import CrossAttention  # avoid circular import - TODO: rename as in diffusers?
 
     cross_attention_class: type = (
         InvokeAIDiffusersCrossAttention
-        if isinstance(model, UNet2DConditionModel)
-        else CrossAttention
     )
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [
