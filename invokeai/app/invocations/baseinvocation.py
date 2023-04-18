@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from inspect import signature
 from typing import get_args, get_type_hints, Dict, List, Literal, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BaseSettings, Field
 
 from ..services.invocation_services import InvocationServices
 from ..services.config_management import InvokeAISettings
@@ -36,7 +36,7 @@ class BaseInvocationOutput(InvokeAISettings):
         return tuple(subclasses)
 
 
-class BaseInvocation(ABC, BaseModel):
+class BaseInvocation(ABC, InvokeAISettings):
     """A node to process inputs and produce outputs.
     May use dependency injection in __init__ to receive providers.
     """
@@ -101,8 +101,8 @@ class CustomisedSchemaExtra(TypedDict):
     ui: UIConfig
 
 
-class InvocationConfig(BaseModel.Config):
-    """Customizes pydantic's BaseModel.Config class for use by Invocations.
+class InvocationConfig(BaseSettings.Config):
+    """Customizes pydantic's BaseSettings.Config class for use by Invocations.
 
     Provide `schema_extra` a `ui` dict to add hints for generated UIs.
 

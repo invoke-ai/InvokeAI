@@ -7,13 +7,13 @@ from omegaconf import OmegaConf
 from pathlib import Path
 
 import invokeai.version
-from .config_management import InvokeAIAppConfig
+from .config_management import InvokeAISettings
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
 
 # TODO: Replace with an abstract class base ModelManagerBase
-def get_model_manager(config:InvokeAIAppConfig) -> ModelManager:
+def get_model_manager(config:InvokeAISettings) -> ModelManager:
     model_config = config.model_conf_path
     if not model_config.exists():
         report_model_error(

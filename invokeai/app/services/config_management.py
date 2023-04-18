@@ -44,6 +44,7 @@ print(conf.precision)
 '''
 import argparse
 import os
+import uuid
 from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
@@ -51,7 +52,6 @@ from pydantic import BaseSettings, Field
 from typing import Any, ClassVar, List, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
-_invokeai_app_config = None
 
 def _get_root_directory()->Path:
     root = None
@@ -85,14 +85,18 @@ class InvokeAISettings(BaseSettings):
             prog=__name__,
             description='InvokeAI application',
         )
+        env_prefix = self.Config.env_prefix
         default_settings_stanza = get_args(get_type_hints(self)['type'])[0]
         initconf = self.initconf.get(default_settings_stanza) if self.initconf and default_settings_stanza in self.initconf else None
 
         fields = self.__fields__
         for name, field in fields.items():
             if name not in self._excluded():
+                env_name = env_prefix+name
                 if initconf and name in initconf:
-                    field.default = initconf.get(name) 
+                    field.default = initconf.get(name)
+                if env_name in os.environ:
+                    field.default = os.environ[env_name]
                 add_field_argument(parser, name, field)
         return parser
 
@@ -104,7 +108,8 @@ class InvokeAISettings(BaseSettings):
         env_file_encoding = 'utf-8'
         arbitrary_types_allowed = True
         env_prefix = 'INVOKEAI_'
-        class_sensitive = False
+        extra = 'allow'
+        class_sensitive = True
         @classmethod
         def customise_sources(
             cls,
@@ -114,7 +119,7 @@ class InvokeAISettings(BaseSettings):
         ):
             return (
                 init_settings,
-                InvokeAIAppConfig._omegaconf_settings_source,
+                InvokeAISettings._omegaconf_settings_source,
                 env_settings,
                 file_secret_settings,
             )
@@ -128,64 +133,6 @@ class InvokeAISettings(BaseSettings):
         else:
             return {}
         
-class InvokeAIAppConfig(InvokeAISettings):
-    '''
-    Application-wide settings, not associated with any Invocation
-    '''
-    type: Literal["app_settings"] = "app_settings"
-    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = 'float16'
-    conf                : Path = Field(default='configs/models.yaml', description='Path to models definition file')
-    outdir              : Path = Field(default='outputs', description='Default folder for output images')
-    root                : Path = Field(default='~/invokeai', description='InvokeAI runtime root directory')
-    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI embeddings directory')
-    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.')
-    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.')
-    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory')
-    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention")
-    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements")
-    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching")
-    nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker")
-    restore             : bool = Field(default=True, description="Enable/disable face restoration code")
-    esrgan              : bool = Field(default=True, description="Enable/disable upscaling code")
-
-    @property
-    def root_dir(self)->Path:
-        return self.root.expanduser()
-
-    def _resolve(self,partial_path:Path)->Path:
-        return (self.root_dir / partial_path).resolve()
-
-    @property
-    def output_path(self)->Path:
-        return self._resolve(self.outdir)
-
-    @property
-    def model_conf_path(self)->Path:
-        return self._resolve(self.conf)
-
-    @property
-    def embedding_path(self)->Path:
-        return self._resolve(self.embedding_dir) if self.embedding_dir else None
-
-    @property
-    def autoconvert_path(self)->Path:
-        return self._resolve(self.autoconvert_dir) if self.autoconvert_dir else None
-
-    @property
-    def gfpgan_model_path(self)->Path:
-        return self._resolve(self.gfpgan_model_dir) if self.gfpgan_model_dir else None
-
-def get_app_config(root: Path = _get_root_directory())->InvokeAIAppConfig:
-    global _invokeai_app_config
-    if not _invokeai_app_config:
-        conf_file = root / INIT_FILE
-        try:
-            InvokeAIAppConfig.conf = OmegaConf.load(conf_file)
-        except OSError as e:
-            print(f'** Initialization file could not be read. {str(e)}')
-        _invokeai_app_config = InvokeAIAppConfig()
-    return _invokeai_app_config
-
 def add_field_argument(command_parser, name: str, field, default_override = None):
     default = default_override if default_override is not None else field.default if field.default_factory is None else field.default_factory()
     if get_origin(field.type_) == Literal:
@@ -213,4 +160,17 @@ def add_field_argument(command_parser, name: str, field, default_override = None
             action=argparse.BooleanOptionalAction if field.type_==bool else 'store',
             help=field.field_info.description,
         )
+
+def get_configuration(
+        object_type: InvokeAISettings,
+        root: Path = _get_root_directory(),
+)->InvokeAISettings:
+    conf_file = root / INIT_FILE
+    try:  # setting shared class variable
+        InvokeAISettings.initconf = OmegaConf.load(conf_file)
+    except OSError as e:
+        print(f'** Initialization file could not be read. {str(e)}')
+    return object_type(id=uuid.uuid4().hex) \
+        if 'id' in get_type_hints(object_type) \
+           else object_type()
 

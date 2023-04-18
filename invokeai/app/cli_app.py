@@ -17,7 +17,6 @@ from .services.default_graphs import create_system_graphs
 
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
-from ..backend import Args
 from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers, get_graph_execution_history
 from .cli.completer import set_autocompleter
 from .invocations import *
@@ -33,7 +32,8 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-from .services.config_management import get_app_config
+from .services.config_management import get_configuration
+from .services.app_settings import InvokeAIAppConfig
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -188,7 +188,7 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    config = get_app_config()
+    config = get_configuration(InvokeAIAppConfig)
     config.parse_args()
     
     model_manager = get_model_manager(config)
@@ -197,7 +197,7 @@ def invoke_cli():
     # Currently nothing is done with the returned Completer
     # object, but the object can be used to change autocompletion
     # behavior on the fly, if desired.
-    completer = set_autocompleter(model_manager)
+    set_autocompleter(model_manager)
 
     events = EventServiceBase()
 
@@ -220,6 +220,7 @@ def invoke_cli():
         ),
         processor=DefaultInvocationProcessor(),
         restoration=RestorationServices(config),
+        configuration=config,
     )
 
     system_graphs = create_system_graphs(services.graph_library)
@@ -259,6 +260,7 @@ def invoke_cli():
 
                 # Parse args to create invocation
                 args = vars(context.parser.parse_args(shlex.split(cmd.strip())))
+                print(f'DEBUG: cmd={cmd}, args={args}')
 
                 # Override defaults
                 for field_name, field_default in context.defaults.items():

@@ -7,6 +7,7 @@ from .image_storage import ImageStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
 from .item_storage import ItemStorageABC
+from .config_management import InvokeAISettings
 
 class InvocationServices:
     """Services that can be used by invocations"""
@@ -16,6 +17,7 @@ class InvocationServices:
     images: ImageStorageBase
     queue: InvocationQueueABC
     model_manager: ModelManager
+    configuration: InvokeAISettings
     restoration: RestorationServices
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
@@ -34,6 +36,7 @@ class InvocationServices:
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
             processor: "InvocationProcessorABC",
             restoration: RestorationServices,
+            configuration: InvokeAISettings,
     ):
         self.model_manager = model_manager
         self.events = events
@@ -44,3 +47,4 @@ class InvocationServices:
         self.graph_execution_manager = graph_execution_manager
         self.processor = processor
         self.restoration = restoration
+        self.configuration = configuration

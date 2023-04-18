@@ -12,12 +12,13 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 
-from ..backend import Args
 from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
+from .services.config_management import get_configuration
+from .services.app_settings import InvokeAIWebConfig, InvokeAIAppConfig
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -33,15 +34,15 @@ app.add_middleware(
     middleware_id=event_handler_id,
 )
 
-# Add CORS
-# TODO: use configuration for this
-origins = []
+# Add CORS, using the web configuration stanza in `invokeai.yaml`
+web_conf = get_configuration(InvokeAIWebConfig)
+web_conf.parse_args()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=web_conf.allow_origins,
+    allow_credentials=web_conf.allow_credentials,
+    allow_methods=web_conf.allow_methods,
+    allow_headers=web_conf.allow_headers,
 )
 
 socket_io = SocketIO(app)
@@ -52,7 +53,7 @@ config = {}
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    config = Args()
+    config = get_configuration(InvokeAIAppConfig)
     config.parse_args()
 
     ApiDependencies.initialize(

@@ -77,6 +77,8 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
+        print(f'DEBUG: steps = {self.steps}')
+
         outputs = Txt2Img(model).generate(
             prompt=self.prompt,
             step_callback=partial(self.dispatch_progress, context),
