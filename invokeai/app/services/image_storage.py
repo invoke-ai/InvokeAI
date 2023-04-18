@@ -41,7 +41,7 @@ class ImageStorageBase(ABC):
     def get_path(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
     ) -> str:
-        """Gets the path to an image."""
+        """Gets the path to an image or its thumbnail."""
         pass
 
     @abstractmethod
@@ -155,12 +155,21 @@ class DiskImageStorage(ImageStorageBase):
     def get_path(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
     ) -> str:
+        # strip out any relative path shenanigans
+        basename = os.path.basename(image_name)
+
         if is_thumbnail:
             path = os.path.join(
-                self.__output_folder, image_type, "thumbnails", image_name
+                self.__output_folder, image_type, "thumbnails", basename
             )
         else:
-            path = os.path.join(self.__output_folder, image_type, image_name)
+            path = os.path.join(self.__output_folder, image_type, basename)
+
+        try:
+            os.stat(path)
+        except:
+            raise FileNotFoundError
+
         return path
 
     def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
