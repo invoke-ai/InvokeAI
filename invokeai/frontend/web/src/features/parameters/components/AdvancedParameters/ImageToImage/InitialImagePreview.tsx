@@ -1,4 +1,4 @@
-import { Box, ButtonGroup, Flex, Image, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, Image, Spinner, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -15,8 +15,6 @@ import { isEqual } from 'lodash';
 import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
-import { FaUndo, FaUpload } from 'react-icons/fa';
-import Loading from 'Loading';
 import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
 
 const initialImagePreviewSelector = createSelector(
@@ -59,6 +57,7 @@ const InitialImagePreview = () => {
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
+      setIsLoaded(false);
       const name = e.dataTransfer.getData('invokeai/imageName');
       const type = e.dataTransfer.getData('invokeai/imageType') as ImageType;
 
