@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Connection, Node, useReactFlow } from 'reactflow';
 import graphlib from '@dagrejs/graphlib';
-import { InvocationValue } from '../types';
+import { InvocationValue } from '../types/types';
 
 export const useIsValidConnection = () => {
   const flow = useReactFlow();

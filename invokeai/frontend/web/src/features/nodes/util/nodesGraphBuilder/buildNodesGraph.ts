@@ -28,7 +28,7 @@ export const buildNodesGraph = (state: RootState): Graph => {
       );
 
       // Build this specific node
-      const graphNode: AnyInvocation = {
+      const graphNode = {
         type,
         id,
         ...transformedInputs,

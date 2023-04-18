@@ -27,29 +27,3 @@ export const extractTimestampFromImageName = (imageName: string) => {
 
   return Number(timestamp);
 };
-
-/**
- * Process ImageField objects. These come from `invocation_complete` events and do not contain all
- * the data we need, so we need to do some janky stuff to get urls and timestamps.
- *
- * TODO: do some more janky stuff here to get image dimensions instead of defaulting to 512x512?
- * TODO: better yet, improve the nodes server (wip)
- */
-export const deserializeImageField = (
-  image: ImageField,
-  invocation: AnyInvocation
-): Image => {
-  const name = image.image_name;
-  const type = image.image_type;
-
-  const { url, thumbnail } = buildImageUrls(type, name);
-
-  return {
-    name,
-    type,
-    url,
-    thumbnail,
-    timestamp,
-    metadata: invocation,
-  };
-};

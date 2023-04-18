@@ -7,7 +7,6 @@ import {
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
 import { imageUploaded } from 'services/thunks/image';
-import { deserializeImageField } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
 export const uploadsAdapter = createEntityAdapter<Image>({

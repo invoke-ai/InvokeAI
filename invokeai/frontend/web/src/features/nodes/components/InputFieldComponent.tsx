@@ -1,5 +1,5 @@
 import { Box } from '@chakra-ui/react';
-import { InputFieldTemplate, InputFieldValue } from '../types';
+import { InputFieldTemplate, InputFieldValue } from '../types/types';
 import { ArrayInputFieldComponent } from './fields/ArrayInputField.tsx';
 import { BooleanInputFieldComponent } from './fields/BooleanInputFieldComponent';
 import { EnumInputFieldComponent } from './fields/EnumInputFieldComponent';

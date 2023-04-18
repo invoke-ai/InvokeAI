@@ -2,14 +2,6 @@ import { OpenAPIV3 } from 'openapi-types';
 import { ImageField } from 'services/api';
 import { AnyInvocationType } from 'services/events/types';
 
-export const isReferenceObject = (
-  obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
-): obj is OpenAPIV3.ReferenceObject => '$ref' in obj;
-
-export const isSchemaObject = (
-  obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
-): obj is OpenAPIV3.SchemaObject => !('$ref' in obj);
-
 export type InvocationValue = {
   id: string;
   type: AnyInvocationType;
@@ -273,7 +265,9 @@ export type InvocationSchemaExtra = {
     NonNullable<OpenAPIV3.SchemaObject['properties']>,
     'type'
   > & {
-    type: Omit<OpenAPIV3.SchemaObject, 'default'> & { default: string };
+    type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
+      default: AnyInvocationType;
+    };
   };
 };
 

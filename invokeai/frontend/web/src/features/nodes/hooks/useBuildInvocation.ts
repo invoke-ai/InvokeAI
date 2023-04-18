@@ -2,8 +2,13 @@ import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { reduce } from 'lodash';
 import { Node } from 'reactflow';
+import { AnyInvocationType } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
-import { InputFieldValue, InvocationValue, OutputFieldValue } from '../types';
+import {
+  InputFieldValue,
+  InvocationValue,
+  OutputFieldValue,
+} from '../types/types';
 import { buildInputFieldValue } from '../util/fieldValueBuilders';
 
 export const useBuildInvocation = () => {
@@ -11,7 +16,7 @@ export const useBuildInvocation = () => {
     (state: RootState) => state.nodes.invocationTemplates
   );
 
-  return (type: string) => {
+  return (type: AnyInvocationType) => {
     const template = invocationTemplates[type];
 
     if (template === undefined) {

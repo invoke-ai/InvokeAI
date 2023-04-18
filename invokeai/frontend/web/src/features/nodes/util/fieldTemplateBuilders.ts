@@ -1,6 +1,7 @@
 import { reduce } from 'lodash';
 import { OpenAPIV3 } from 'openapi-types';
-import { FIELD_TYPE_MAP } from '../constants';
+import { FIELD_TYPE_MAP } from '../types/constants';
+import { isSchemaObject } from '../types/typeGuards';
 import {
   BooleanInputFieldTemplate,
   EnumInputFieldTemplate,
@@ -12,10 +13,9 @@ import {
   ModelInputFieldTemplate,
   InputFieldTemplateBase,
   OutputFieldTemplate,
-  isSchemaObject,
   TypeHints,
   FieldType,
-} from '../types';
+} from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
 

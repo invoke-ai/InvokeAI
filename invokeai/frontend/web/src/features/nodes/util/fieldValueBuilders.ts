@@ -1,4 +1,4 @@
-import { InputFieldTemplate, InputFieldValue } from '../types';
+import { InputFieldTemplate, InputFieldValue } from '../types/types';
 
 export const buildInputFieldValue = (
   id: string,
