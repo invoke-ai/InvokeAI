@@ -26,18 +26,14 @@ async def get_image(
 ) -> FileResponse | Response:
     """Gets a result"""
 
-    # Send only the filename (no relative path shenanigans)
-    basename = os.path.basename(image_name)  # only send the filename
-    filename = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_name=basename
-    )
-
     try:
-        os.stat(filename)
+        path = ApiDependencies.invoker.services.images.get_path(
+            image_type=image_type, image_name=image_name
+        )
     except FileNotFoundError:
         raise HTTPException(status_code=404)
 
-    return FileResponse(filename)
+    return FileResponse(path)
 
 
 @images_router.get(
@@ -49,18 +45,14 @@ async def get_thumbnail(
 ) -> FileResponse | Response:
     """Gets a thumbnail"""
 
-    # Send only the filename (no relative path shenanigans)
-    basename = os.path.basename(image_name)
-    filename = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_name=basename, is_thumbnail=True
-    )
-
     try:
-        os.stat(filename)
+        path = ApiDependencies.invoker.services.images.get_path(
+            image_type=image_type, image_name=image_name, is_thumbnail=True
+        )
     except FileNotFoundError:
         raise HTTPException(status_code=404)
 
-    return FileResponse(filename)
+    return FileResponse(path)
 
 
 @images_router.post(
@@ -86,7 +78,7 @@ async def upload_image(
         img = Image.open(io.BytesIO(contents))
     except:
         # Error opening the image
-        raise HTTPException(status_code=415, detail="Image reading failed")
+        raise HTTPException(status_code=415, detail="Failed to read image")
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
     image_path = ApiDependencies.invoker.services.images.save(
