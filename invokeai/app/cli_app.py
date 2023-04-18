@@ -190,6 +190,7 @@ def invoke_all(context: CliContext):
 def invoke_cli():
     config = get_app_config()
     config.parse_args()
+    
     model_manager = get_model_manager(config)
 
     # This initializes the autocompleter and returns it.

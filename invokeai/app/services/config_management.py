@@ -103,6 +103,8 @@ class InvokeAISettings(BaseSettings):
     class Config:
         env_file_encoding = 'utf-8'
         arbitrary_types_allowed = True
+        env_prefix = 'INVOKEAI_'
+        class_sensitive = False
         @classmethod
         def customise_sources(
             cls,
