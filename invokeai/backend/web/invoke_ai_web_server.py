@@ -10,6 +10,7 @@ import traceback
 from pathlib import Path
 from threading import Event
 from uuid import uuid4
+from typing import Dict, Any
 
 import eventlet
 from compel.prompt_parser import Blend
@@ -36,9 +37,11 @@ from .modules.get_canvas_generation_mode import get_canvas_generation_mode
 from .modules.parameters import parameters_to_command
 from ..util import upload_on_blob
 from .jwt_utiles import get_user_id_from_jwt
+from .database_model import session_maker, Parameters, InputImage, GeneratedImage, Job
 
 
-ENCODED_JWT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2ODAzMzY4OTksImV4cCI6MTcxMTg3Mjg5OSwiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwic3ViIjoidGVzdF9pbnZva2VhaV9oaXN0b3J5X3VzZXIifQ.Ktg84SeWH9j4efCerB6vsSvLK8LfLAKE16Pvlfwrtug"
+# ENCODED_JWT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2ODAzMzY4OTksImV4cCI6MTcxMTg3Mjg5OSwiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwic3ViIjoidGVzdF9pbnZva2VhaV9oaXN0b3J5X3VzZXIifQ.Ktg84SeWH9j4efCerB6vsSvLK8LfLAKE16Pvlfwrtug"
+ENCODED_JWT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2ODE0NjM2NzcsImV4cCI6MTcxMjk5OTY3NywiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwic3ViIjoidGVzdF91c2VyX2hpc3RvcnlfdmFpZGVoaSJ9.JsJONZYWFGhhi-q-jal8Txp01NndrjnGxfGDHVkiFqE"
 
 
 # Loading Arguments
@@ -976,6 +979,9 @@ class InvokeAIWebServer:
             """
             Prepare for generation based on generation_mode
             """
+            # Store generated image path
+            generated_image_path = None
+            all_used_parameters = None
             if generation_parameters["generation_mode"] == "unifiedCanvas":
                 """
                 generation_parameters["init_img"] is a base64 image
@@ -1283,6 +1289,7 @@ class InvokeAIWebServer:
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 
                 command = parameters_to_command(all_parameters)
+                all_used_parameters = all_parameters
 
                 (width, height) = image.size
 
@@ -1300,6 +1307,7 @@ class InvokeAIWebServer:
                     get_local_path(user_id, generated_image_outdir, create_path=True),
                     postprocessing=postprocessing,
                 )
+                generated_image_path = path
 
                 thumbnail_path = save_thumbnail(
                     image,
@@ -1363,6 +1371,9 @@ class InvokeAIWebServer:
                 step_callback=diffusers_step_callback_adapter,
                 image_callback=image_done,
             )
+
+            # Store all the job information in DB
+            update_database(all_used_parameters, generated_image_path)
 
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception
@@ -1902,3 +1913,44 @@ def get_local_path(user_id: str, path: str, create_path: bool = False) -> str:
             Path(new_path).mkdir(parents=True, exist_ok=True)
 
     return new_path
+
+
+def update_database(all_used_parameters: Dict[str, Any], generated_image_path: str) -> None:
+    # Add a record to the Parameters table
+    negative_prompt = ""
+    if all_used_parameters["prompt"].find("  [") != -1:
+        # TODO: make sure you can extract negative prompt without any problem or bugs
+        negative_prompt = all_used_parameters["prompt"][
+            all_used_parameters["prompt"].find("  [") + 3:
+            -1
+        ]
+
+    with session_maker() as session:
+        params = Parameters(
+            prompt=all_used_parameters["prompt"],
+            negative_prompt=negative_prompt,
+            image_height=all_used_parameters["height"],
+            image_width=all_used_parameters["width"],
+            guidance=all_used_parameters["cfg_scale"],
+            denoising_strength=all_used_parameters.get("strength", 0.75),
+            num_of_image=1
+        )
+        session.add(params)
+
+        # Add a record to the InputImage table
+        if "init_img" in all_used_parameters:
+            input_image = InputImage(img_path=all_used_parameters["init_img"])
+            session.add(input_image)
+
+        # Add a record to the GeneratedImage table
+        generated_image = GeneratedImage(img_path=generated_image_path)
+        session.add(generated_image)
+
+        # Add a record to the Job table
+        job = Job(
+            parameters=params,
+            input_image=[input_image],
+            generated_image=[generated_image]
+        )
+        session.add(job)
+        session.commit()
