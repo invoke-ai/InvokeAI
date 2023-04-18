@@ -5,7 +5,7 @@ import { ReactFlowProvider } from 'reactflow';
 import { Flow } from './Flow';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
-import { buildNodesGraph } from '../util/buildNodesGraph';
+import { buildNodesGraph } from '../util/nodesGraphBuilder/buildNodesGraph';
 
 const NodeEditor = () => {
   const state = useAppSelector((state: RootState) => state);

@@ -1,5 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { ImageField } from 'services/api';
+import { AnyInvocationType } from 'services/events/types';
 
 export const isReferenceObject = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
@@ -11,7 +12,7 @@ export const isSchemaObject = (
 
 export type InvocationValue = {
   id: string;
-  type: string;
+  type: AnyInvocationType;
   inputs: Record<string, InputFieldValue>;
   outputs: Record<string, OutputFieldValue>;
 };
@@ -20,7 +21,7 @@ export type InvocationTemplate = {
   /**
    * Unique type of the invocation
    */
-  type: string;
+  type: AnyInvocationType;
   /**
    * Display name of the invocation
    */

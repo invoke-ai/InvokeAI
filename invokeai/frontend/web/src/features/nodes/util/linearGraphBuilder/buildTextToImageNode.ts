@@ -2,11 +2,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store';
 import { TextToImageInvocation } from 'services/api';
 
-export const buildTxt2ImgNode = (
-  state: RootState
-): Record<string, TextToImageInvocation> => {
+export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
   const nodeId = uuidv4();
-  const { generation, system, models } = state;
+  const { generation, models } = state;
 
   const { selectedModelName } = models;
 
@@ -22,8 +20,7 @@ export const buildTxt2ImgNode = (
     shouldRandomizeSeed,
   } = generation;
 
-  // missing fields in TextToImageInvocation: strength, hires_fix
-  const textToImageNode: TextToImageInvocation = {
+  const textToImageNode: NonNullable<TextToImageInvocation> = {
     id: nodeId,
     type: 'txt2img',
     prompt,
@@ -41,7 +38,5 @@ export const buildTxt2ImgNode = (
     textToImageNode.seed = seed;
   }
 
-  return {
-    [nodeId]: textToImageNode,
-  };
+  return textToImageNode;
 };
