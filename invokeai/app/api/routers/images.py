@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRouter
 from PIL import Image
 from invokeai.app.api.models.images import ImageResponse
-from invokeai.app.models.metadata import ImageMetadata, InvokeAIMetadata
+from invokeai.app.modules.metadata import ImageMetadata, InvokeAIMetadata
 from invokeai.app.services.item_storage import PaginatedResults
 
 from ...services.image_storage import ImageType

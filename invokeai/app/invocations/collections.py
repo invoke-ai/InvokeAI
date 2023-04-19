@@ -6,7 +6,12 @@ import numpy as np
 import numpy.random
 from pydantic import Field
 
-from .baseinvocation import BaseInvocation, InvocationContext, BaseInvocationOutput
+from .baseinvocation import (
+    BaseInvocation,
+    InvocationConfig,
+    InvocationContext,
+    BaseInvocationOutput,
+)
 
 
 class IntCollectionOutput(BaseInvocationOutput):
@@ -41,12 +46,14 @@ class RandomRangeInvocation(BaseInvocation):
 
     # Inputs
     low: int = Field(default=0, description="The inclusive low value")
-    high: int = Field(default=np.iinfo(np.int32).max, description="The exclusive high value")
+    high: int = Field(
+        default=np.iinfo(np.int32).max, description="The exclusive high value"
+    )
     size: int = Field(default=1, description="The number of values to generate")
     seed: Optional[int] = Field(
         ge=0,
         le=np.iinfo(np.int32).max,
-        description="The seed for the RNG",
+        description="The seed for the RNG, provide None or -1 for random",
         default_factory=lambda: numpy.random.randint(0, np.iinfo(np.int32).max),
     )
 

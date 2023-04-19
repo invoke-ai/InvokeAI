@@ -2,17 +2,17 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $InvokeAIMetadata = {
-  description: `An image's InvokeAI-specific metadata`,
   properties: {
     session_id: {
       type: 'string',
-      description: `The session that generated this image`,
-      isRequired: true,
+      description: `The session in which this image was created`,
     },
-    invocation: {
-      description: `The prepared invocation that generated this image`,
-      properties: {
-      },
+    node: {
+      type: 'all-of',
+      description: `The node that created this image`,
+      contains: [{
+        type: 'NodeMetadata',
+      }],
     },
   },
 } as const;

@@ -5,9 +5,9 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 import torch
 
-from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.models.metadata import InvokeAIMetadata
+from invokeai.app.modules.metadata import MetadataModule
+
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ...backend.model_management.model_manager import ModelManager
@@ -358,10 +358,10 @@ class LatentsToImageInvocation(BaseInvocation):
                 context.graph_execution_state_id, self.id
             )
 
-            metadata = InvokeAIMetadata(
-              session_id=context.graph_execution_state_id,
-              invocation=self.dict()
+            metadata = MetadataModule.build_metadata(
+                session_id=context.graph_execution_state_id, invocation=self
             )
+
             context.services.images.save(image_type, image_name, image, metadata)
             return build_image_output(
                 image_type=image_type,

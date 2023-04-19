@@ -139,7 +139,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   });
 
   const sessionId = image.metadata.invokeai?.session_id;
-  const invocation = image.metadata.invokeai?.invocation;
+  const node = image.metadata.invokeai?.node as Record<string, any>;
 
   const { t } = useTranslation();
   const { getUrl } = useGetUrl();
@@ -170,105 +170,101 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           <ExternalLinkIcon mx="2px" />
         </Link>
       </Flex>
-      {Object.keys(invocation).length > 0 ? (
+      {node && Object.keys(node).length > 0 ? (
         <>
-          {invocation.type && (
-            <MetadataItem label="Invocation type" value={invocation.type} />
+          {node.type && (
+            <MetadataItem label="Invocation type" value={node.type} />
           )}
-          {invocation.model && (
-            <MetadataItem label="Model" value={invocation.model} />
-          )}
-          {invocation.prompt && (
+          {node.model && <MetadataItem label="Model" value={node.model} />}
+          {node.prompt && (
             <MetadataItem
               label="Prompt"
               labelPosition="top"
               value={
-                typeof invocation.prompt === 'string'
-                  ? invocation.prompt
-                  : promptToString(invocation.prompt)
+                typeof node.prompt === 'string'
+                  ? node.prompt
+                  : promptToString(node.prompt)
               }
-              onClick={() => setBothPrompts(invocation.prompt)}
+              onClick={() => setBothPrompts(node.prompt)}
             />
           )}
-          {invocation.seed !== undefined && (
+          {node.seed !== undefined && (
             <MetadataItem
               label="Seed"
-              value={invocation.seed}
-              onClick={() => dispatch(setSeed(invocation.seed))}
+              value={node.seed}
+              onClick={() => dispatch(setSeed(node.seed))}
             />
           )}
-          {invocation.threshold !== undefined && (
+          {node.threshold !== undefined && (
             <MetadataItem
               label="Noise Threshold"
-              value={invocation.threshold}
-              onClick={() => dispatch(setThreshold(invocation.threshold))}
+              value={node.threshold}
+              onClick={() => dispatch(setThreshold(node.threshold))}
             />
           )}
-          {invocation.perlin !== undefined && (
+          {node.perlin !== undefined && (
             <MetadataItem
               label="Perlin Noise"
-              value={invocation.perlin}
-              onClick={() => dispatch(setPerlin(invocation.perlin))}
+              value={node.perlin}
+              onClick={() => dispatch(setPerlin(node.perlin))}
             />
           )}
-          {invocation.scheduler && (
+          {node.scheduler && (
             <MetadataItem
               label="Sampler"
-              value={invocation.scheduler}
-              onClick={() => dispatch(setSampler(invocation.scheduler))}
+              value={node.scheduler}
+              onClick={() => dispatch(setSampler(node.scheduler))}
             />
           )}
-          {invocation.steps && (
+          {node.steps && (
             <MetadataItem
               label="Steps"
-              value={invocation.steps}
-              onClick={() => dispatch(setSteps(invocation.steps))}
+              value={node.steps}
+              onClick={() => dispatch(setSteps(node.steps))}
             />
           )}
-          {invocation.cfg_scale !== undefined && (
+          {node.cfg_scale !== undefined && (
             <MetadataItem
               label="CFG scale"
-              value={invocation.cfg_scale}
-              onClick={() => dispatch(setCfgScale(invocation.cfg_scale))}
+              value={node.cfg_scale}
+              onClick={() => dispatch(setCfgScale(node.cfg_scale))}
             />
           )}
-          {invocation.variations && invocation.variations.length > 0 && (
+          {node.variations && node.variations.length > 0 && (
             <MetadataItem
               label="Seed-weight pairs"
-              value={seedWeightsToString(invocation.variations)}
+              value={seedWeightsToString(node.variations)}
               onClick={() =>
-                dispatch(
-                  setSeedWeights(seedWeightsToString(invocation.variations))
-                )
+                dispatch(setSeedWeights(seedWeightsToString(node.variations)))
               }
             />
           )}
-          {invocation.seamless && (
+          {node.seamless && (
             <MetadataItem
               label="Seamless"
-              value={invocation.seamless}
-              onClick={() => dispatch(setSeamless(invocation.seamless))}
+              value={node.seamless}
+              onClick={() => dispatch(setSeamless(node.seamless))}
             />
           )}
-          {invocation.hires_fix && (
+          {node.hires_fix && (
             <MetadataItem
               label="High Resolution Optimization"
-              value={invocation.hires_fix}
-              onClick={() => dispatch(setHiresFix(invocation.hires_fix))}
+              value={node.hires_fix}
+              onClick={() => dispatch(setHiresFix(node.hires_fix))}
             />
           )}
-          {invocation.width && (
+          {node.width && (
             <MetadataItem
               label="Width"
-              value={invocation.width}
-              onClick={() => dispatch(setWidth(invocation.width))}
+              value={node.width}
+              onClick={() => dispatch(setWidth(node.width))}
             />
           )}
-          {invocation.height && (
+          {node.height && (
             <MetadataItem
               label="Height"
-              value={invocation.height}
-              onClick={() => dispatch(setHeight(invocation.height))}
+              value={node.height}
+              onClick={() => dispatch(setHeight(node.height))}
             />
           )}
           {/* {init_image_path && (
@@ -279,20 +275,18 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               onClick={() => dispatch(setInitialImage(init_image_path))}
             />
           )} */}
-          {invocation.strength && (
+          {node.strength && (
             <MetadataItem
               label="Image to image strength"
-              value={invocation.strength}
-              onClick={() => dispatch(setImg2imgStrength(invocation.strength))}
+              value={node.strength}
+              onClick={() => dispatch(setImg2imgStrength(node.strength))}
             />
           )}
-          {invocation.fit && (
+          {node.fit && (
             <MetadataItem
               label="Image to image fit"
-              value={invocation.fit}
-              onClick={() =>
-                dispatch(setShouldFitToWidthHeight(invocation.fit))
-              }
+              value={node.fit}
+              onClick={() => dispatch(setShouldFitToWidthHeight(node.fit))}
             />
           )}
         </>
