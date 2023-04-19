@@ -36,7 +36,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .stable_diffusion.invoke_optimized import txt2img_Optimized as optimize
+from .stable_diffusion.invoke_optimized import txt2img_Optimized as optimizeONNX
 from .util import choose_precision, choose_torch_device
 
 def fix_func(orig):
@@ -302,7 +302,7 @@ class Generate:
         precision=None
     ):
         tic = time.time()
-        txt2img_onnx = optimize(width, height, steps, iterations)
+        txt2img_onnx = optimizeONNX(width, height, iterations, steps)
         txt2img_onnx.onnx_txt2img(prompt, model, precision)
         toc = time.time()
         print("\n>> Usage stats:")
