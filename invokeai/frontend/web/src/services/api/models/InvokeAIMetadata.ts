@@ -2,17 +2,16 @@
 /* tslint:disable */
 /* eslint-disable */
 
-/**
- * An image's InvokeAI-specific metadata
- */
+import type { NodeMetadata } from './NodeMetadata';
+
 export type InvokeAIMetadata = {
   /**
-   * The session that generated this image
+   * The session in which this image was created
    */
-  session_id: string;
+  session_id?: string;
   /**
-   * The prepared invocation that generated this image
+   * The node that created this image
    */
-  invocation?: any;
+  node?: NodeMetadata;
 };
 

@@ -14,9 +14,10 @@ import PIL.Image as PILImage
 from PIL import PngImagePlugin
 from invokeai.app.api.models.images import ImageResponse
 from invokeai.app.models.image import  ImageType
-from invokeai.app.models.metadata import ImageMetadata, InvokeAIMetadata
+from invokeai.app.modules.metadata import ImageMetadata, InvokeAIMetadata, MetadataModule
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.get_timestamp import get_timestamp
+from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 from invokeai.backend.image_util import PngWriter
 
@@ -113,11 +114,7 @@ class DiskImageStorage(ImageStorageBase):
             filename = os.path.basename(path)
             img = PILImage.open(path)
             
-            # TODO: handle old `sd-metadata` format
-            invokeai_metadata = img.info.get("invokeai", None)
-
-            if invokeai_metadata is not None:
-                invokeai_metadata = InvokeAIMetadata(**json.loads(invokeai_metadata))
+            invokeai_metadata = MetadataModule.get_metadata(img)
 
             page_of_images.append(
                 ImageResponse(
@@ -188,22 +185,18 @@ class DiskImageStorage(ImageStorageBase):
     def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
         image_path = self.get_path(image_type, image_name)
 
-        thumbnail_name = os.path.splitext(image_name)[0] + ".webp"
+        thumbnail_name = get_thumbnail_name(image_name)
         thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)
 
-        info = PngImagePlugin.PngInfo()
+        png_info = MetadataModule.build_png_info(metadata=metadata)
 
-        if metadata:
-            info.add_text("invokeai", metadata.json())
+        image.save(image_path, "PNG", pnginfo=png_info)
 
-        image.save(image_path, "PNG", pnginfo=info)
-
-        thumbnail = image.copy()
-        thumbnail.thumbnail(size=(256, 256))
-        thumbnail.save(thumbnail_path, "WEBP")
+        thumbnail_image = make_thumbnail(image)
+        thumbnail_image.save(thumbnail_path)
 
         self.__set_cache(image_path, image)
-        self.__set_cache(thumbnail_path, thumbnail)
+        self.__set_cache(thumbnail_path, thumbnail_image)
 
         return (image_path, thumbnail_path, int(os.path.getctime(image_path)))
 

@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ImageField, ImageType
-from invokeai.app.models.metadata import InvokeAIMetadata
+from invokeai.app.modules.metadata import MetadataModule
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput, build_image_output
 
@@ -58,9 +58,8 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-          session_id=context.graph_execution_state_id,
-          invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
         
         context.services.images.save(image_type, image_name, image_inpainted, metadata)

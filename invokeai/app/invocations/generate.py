@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ImageField, ImageType
 from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.models.metadata import InvokeAIMetadata
+from invokeai.app.modules.metadata import MetadataModule
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput, build_image_output
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
@@ -58,7 +58,10 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
-        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState, 
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        intermediate_state: PipelineIntermediateState,
     ) -> None:
         stable_diffusion_step_callback(
             context=context,
@@ -72,7 +75,9 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         model = choose_model(context.services.model_manager, self.model)
 
         # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
         outputs = Txt2Img(model).generate(
@@ -93,13 +98,14 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        
-        metadata = InvokeAIMetadata(
-          session_id=context.graph_execution_state_id,
-          invocation=self.dict()
+
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
 
-        context.services.images.save(image_type, image_name, generate_output.image, metadata)
+        context.services.images.save(
+            image_type, image_name, generate_output.image, metadata
+        )
         return build_image_output(
             image_type=image_type,
             image_name=image_name,
@@ -123,8 +129,11 @@ class ImageToImageInvocation(TextToImageInvocation):
     )
 
     def dispatch_progress(
-        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
-    ) -> None:  
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        intermediate_state: PipelineIntermediateState,
+    ) -> None:
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
@@ -146,18 +155,20 @@ class ImageToImageInvocation(TextToImageInvocation):
         model = choose_model(context.services.model_manager, self.model)
 
         # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
-        
+
         outputs = Img2Img(model).generate(
-                prompt=self.prompt,
-                init_image=image,
-                init_mask=mask,
-                step_callback=partial(self.dispatch_progress, context, source_node_id),
-                **self.dict(
-                    exclude={"prompt", "image", "mask"}
-                ),  # Shorthand for passing all of the parameters above manually
-            )
+            prompt=self.prompt,
+            init_image=image,
+            init_mask=mask,
+            step_callback=partial(self.dispatch_progress, context, source_node_id),
+            **self.dict(
+                exclude={"prompt", "image", "mask"}
+            ),  # Shorthand for passing all of the parameters above manually
+        )
 
         # Outputs is an infinite iterator that will return a new InvokeAIGeneratorOutput object
         # each time it is called. We only need the first one.
@@ -172,10 +183,9 @@ class ImageToImageInvocation(TextToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        
-        metadata = InvokeAIMetadata(
-          session_id=context.graph_execution_state_id,
-          invocation=self.dict()
+
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
 
         context.services.images.save(image_type, image_name, result_image, metadata)
@@ -184,6 +194,7 @@ class ImageToImageInvocation(TextToImageInvocation):
             image_name=image_name,
             image=result_image,
         )
+
 
 class InpaintInvocation(ImageToImageInvocation):
     """Generates an image using inpaint."""
@@ -200,7 +211,10 @@ class InpaintInvocation(ImageToImageInvocation):
     )
 
     def dispatch_progress(
-        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        intermediate_state: PipelineIntermediateState,
     ) -> None:
         stable_diffusion_step_callback(
             context=context,
@@ -227,18 +241,20 @@ class InpaintInvocation(ImageToImageInvocation):
         model = choose_model(context.services.model_manager, self.model)
 
         # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
         outputs = Inpaint(model).generate(
-                prompt=self.prompt,
-                init_img=image,
-                init_mask=mask,
-                step_callback=partial(self.dispatch_progress, context, source_node_id),
-                **self.dict(
-                    exclude={"prompt", "image", "mask"}
-                ),  # Shorthand for passing all of the parameters above manually
-            )
+            prompt=self.prompt,
+            init_img=image,
+            init_mask=mask,
+            step_callback=partial(self.dispatch_progress, context, source_node_id),
+            **self.dict(
+                exclude={"prompt", "image", "mask"}
+            ),  # Shorthand for passing all of the parameters above manually
+        )
 
         # Outputs is an infinite iterator that will return a new InvokeAIGeneratorOutput object
         # each time it is called. We only need the first one.
@@ -254,9 +270,8 @@ class InpaintInvocation(ImageToImageInvocation):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-          session_id=context.graph_execution_state_id,
-          invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
 
         context.services.images.save(image_type, image_name, result_image, metadata)

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ImageType
-from invokeai.app.models.metadata import ImageMetadata
+from invokeai.app.modules.metadata import ImageMetadata
 
 
 class ImageResponse(BaseModel):

@@ -6,7 +6,7 @@ import numpy
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.metadata import InvokeAIMetadata
+from invokeai.app.modules.metadata import MetadataModule
 
 from ..models.image import ImageField, ImageType
 from .baseinvocation import (
@@ -151,13 +151,8 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-            session_id=context.graph_execution_state_id, invocation=self.dict()
-        )
-
-        metadata = InvokeAIMetadata(
-          session_id=context.graph_execution_state_id,
-          invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
         
         context.services.images.save(image_type, image_name, image_crop, metadata)
@@ -214,13 +209,8 @@ class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-            session_id=context.graph_execution_state_id, invocation=self.dict()
-        )
-
-        metadata = InvokeAIMetadata(
-          session_id=context.graph_execution_state_id,
-          invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
         
         context.services.images.save(image_type, image_name, new_image, metadata)
@@ -256,9 +246,10 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-            session_id=context.graph_execution_state_id, invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
+
         context.services.images.save(image_type, image_name, image_mask, metadata)
         return MaskOutput(mask=ImageField(image_type=image_type, image_name=image_name))
 
@@ -292,9 +283,10 @@ class BlurInvocation(BaseInvocation, PILInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-            session_id=context.graph_execution_state_id, invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
+
         context.services.images.save(image_type, image_name, blur_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=blur_image
@@ -328,9 +320,10 @@ class LerpInvocation(BaseInvocation, PILInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-            session_id=context.graph_execution_state_id, invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
+
         context.services.images.save(image_type, image_name, lerp_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=lerp_image
@@ -369,9 +362,10 @@ class InverseLerpInvocation(BaseInvocation, PILInvocationConfig):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = InvokeAIMetadata(
-            session_id=context.graph_execution_state_id, invocation=self.dict()
+        metadata = MetadataModule.build_metadata(
+            session_id=context.graph_execution_state_id, invocation=self
         )
+
         context.services.images.save(image_type, image_name, ilerp_image, metadata)
         return build_image_output(
             image_type=image_type, image_name=image_name, image=ilerp_image
