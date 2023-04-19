@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
 
+import invokeai.backend.util.logging as log
 from ..models.image import ImageField
 from ..services.graph import GraphExecutionState
 from ..services.invoker import Invoker
@@ -183,7 +184,7 @@ class HistoryCommand(BaseCommand):
         for i in range(min(self.count, len(history))):
             entry_id = history[-1 - i]
             entry = context.get_session().graph.get_node(entry_id)
-            print(f"{entry_id}: {get_invocation_command(entry)}")
+            log.info(f"{entry_id}: {get_invocation_command(entry)}")
 
 
 class SetDefaultCommand(BaseCommand):

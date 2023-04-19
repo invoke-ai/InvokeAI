@@ -13,6 +13,7 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
+import invokeai.backend.util.logging as log
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
 from ..backend import Args
@@ -125,7 +126,7 @@ def invoke_all(context: CliContext):
     # Print any errors
     if context.session.has_error():
         for n in context.session.errors:
-            print(
+            log.error(
                 f"Error in node {n} (source node {context.session.prepared_source_mapping[n]}): {context.session.errors[n]}"
             )
         
@@ -279,12 +280,12 @@ def invoke_cli():
             invoke_all(context)
 
         except InvalidArgs:
-            print('Invalid command, use "help" to list commands')
+            log.warning('Invalid command, use "help" to list commands')
             continue
 
         except SessionError:
             # Start a new session
-            print("Session error: creating a new session")
+            log.warning("Session error: creating a new session")
             context.session = context.invoker.create_execution_state()
 
         except ExitCli:

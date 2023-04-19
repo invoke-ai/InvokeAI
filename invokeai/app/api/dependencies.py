@@ -3,8 +3,9 @@
 import os
 from argparse import Namespace
 
-from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
+import invokeai.backend.util.logging as log
 
+from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
@@ -47,8 +48,7 @@ class ApiDependencies:
         Globals.disable_xformers = not config.xformers
         Globals.ckpt_convert = config.ckpt_convert
 
-        # TODO: Use a logger
-        print(f">> Internet connectivity is {Globals.internet_available}")
+        log.info(f"Internet connectivity is {Globals.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
 

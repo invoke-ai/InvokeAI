@@ -1088,7 +1088,7 @@ class Generate:
             image = img
             log.info(f"using provided input image of size {image.width}x{image.height}")
         elif isinstance(img, str):
-            assert os.path.exists(img), f">> {img}: File not found"
+            assert os.path.exists(img), f"{img}: File not found"
 
             image = Image.open(img)
             log.info(

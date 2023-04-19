@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 from pathlib import Path
 
 import invokeai.version
+import invokeai.backend.util.logging as log
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
@@ -20,8 +21,8 @@ def get_model_manager(config: Args) -> ModelManager:
                 config, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    print(f">> {invokeai.version.__app_name__}, version {invokeai.version.__version__}")
-    print(f'>> InvokeAI runtime directory is "{Globals.root}"')
+    log.info(f"{invokeai.version.__app_name__}, version {invokeai.version.__version__}")
+    log.info(f'InvokeAI runtime directory is "{Globals.root}"')
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -66,7 +67,7 @@ def get_model_manager(config: Args) -> ModelManager:
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(config, e)
     except (IOError, KeyError) as e:
-        print(f"{e}. Aborting.")
+        log.error(f"{e}. Aborting.")
         sys.exit(-1)
 
     # try to autoconvert new models
@@ -80,14 +81,14 @@ def get_model_manager(config: Args) -> ModelManager:
     return model_manager
 
 def report_model_error(opt: Namespace, e: Exception):
-    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
-    print(
-        "** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models."
+    log.error(f'An error occurred while attempting to initialize the model: "{str(e)}"')
+    log.error(
+        "This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models."
     )
     yes_to_all = os.environ.get("INVOKE_MODEL_RECONFIGURE")
     if yes_to_all:
-        print(
-            "** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
+        log.warning
+            "Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
         )
     else:
         response = input(
@@ -96,7 +97,7 @@ def report_model_error(opt: Namespace, e: Exception):
         if response.startswith(("n", "N")):
             return
 
-    print("invokeai-configure is launching....\n")
+    log.info("invokeai-configure is launching....\n")
 
     # Match arguments that were set on the CLI
     # only the arguments accepted by the configuration script are parsed
