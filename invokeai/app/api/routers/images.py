@@ -12,6 +12,7 @@ from PIL import Image
 from invokeai.app.api.models.images import ImageResponse
 from invokeai.app.modules.metadata import ImageMetadata, InvokeAIMetadata
 from invokeai.app.services.item_storage import PaginatedResults
+from invokeai.app.util.image_paths import build_image_path
 
 from ...services.image_storage import ImageType
 from ..dependencies import ApiDependencies
@@ -35,21 +36,17 @@ async def get_image(
     else:
         raise HTTPException(status_code=404)
     
-@images_router.get("/location/{image_type}/{image_name}", operation_id="get_image_location")
-async def get_image_location(
+@images_router.get("/path/{image_type}/{image_name}", operation_id="get_image_path")
+async def get_image_path(
     image_type: ImageType = Path(description="The type of image to get"),
     image_name: str = Path(description="The name of the image to get"),
 ) -> str:
     """Gets a result location"""
 
-    path = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_name=image_name
-    )
+    path = build_image_path(image_type=image_type, image_name=image_name)
 
-    if ApiDependencies.invoker.services.images.validate_path(path):
-        return path
-    else:
-        raise HTTPException(status_code=404)
+    return path
+
 
 
 @images_router.get(

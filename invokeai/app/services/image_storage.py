@@ -17,6 +17,7 @@ from invokeai.app.models.image import  ImageType
 from invokeai.app.modules.metadata import ImageMetadata, InvokeAIMetadata, MetadataModule
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.get_timestamp import get_timestamp
+from invokeai.app.util.image_paths import build_image_path
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 from invokeai.backend.image_util import PngWriter
@@ -120,9 +121,8 @@ class DiskImageStorage(ImageStorageBase):
                 ImageResponse(
                     image_type=image_type.value,
                     image_name=filename,
-                    # TODO: DiskImageStorage should not be building URLs...?
-                    image_url=f"api/v1/images/{image_type.value}/{filename}",
-                    thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
+                    image_url=build_image_path(image_type.value, filename),
+                    thumbnail_url = build_image_path(image_type.value, filename, True),
                     # TODO: Creation of this object should happen elsewhere (?), just making it fit here so it works
                     metadata=ImageMetadata(
                         created=int(os.path.getctime(path)),
