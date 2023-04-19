@@ -2,8 +2,8 @@
 This file implements base class Inference Model for model selection
 Implements abstract methods for inference related operations
 """
-
-class inferenceModel:
+from abc import ABC, abstractmethod
+class inferenceModel(ABC):
     """
     Instantiation of Inference model class
     """
@@ -12,3 +12,7 @@ class inferenceModel:
         model_type = "Pytorch"
     ):
         self.model_type = model_type
+
+    @abstractmethod
+    def prompt2image(self):
+        pass

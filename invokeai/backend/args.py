@@ -287,8 +287,6 @@ class Args(object):
             switches.append("--seamless")
         if a["hires_fix"]:
             switches.append("--hires_fix")
-        if a["onnx"]:
-            switches.append("--onnx")
         if a["h_symmetry_time_pct"]:
             switches.append(f'--h_symmetry_time_pct {a["h_symmetry_time_pct"]}')
         if a["v_symmetry_time_pct"]:
@@ -465,11 +463,10 @@ class Args(object):
             "--version", "-V", action="store_true", help="Print InvokeAI version number"
         )
         model_group.add_argument(
-            "--optimize",
-            dest="optimize",
-            action="store_true",
-            help="Forces to use ONNX backend for inference",
-            default=False,
+            "--modeltype",
+            dest="modelType",
+            default="Pytorch",
+            help="Forces to use pytorch by default",
         )
         model_group.add_argument(
             "--root_dir",
@@ -955,12 +952,6 @@ class Args(object):
             choices=range(0, 10),
             dest="png_compression",
             help="level of PNG compression, from 0 (none) to 9 (maximum). [6]",
-        )
-        render_group.add_argument(
-            '--onnx',
-            dest='onnx',
-            action='store_true',
-            help='To instantiate ONNX backend inferencing ',
         )
         render_group.add_argument(
             "--karras_max",
