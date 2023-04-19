@@ -12,7 +12,7 @@ utils = importlib.import_module('openvino.utils')
 utils.add_openvino_libs_to_path()
 
 #Implementation of class for optimized modules.
-class txt2img_Optimized:
+class txt2img:
 
     def __init__(self, height, width, num_images, steps):
         self.height = height
