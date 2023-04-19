@@ -53,7 +53,7 @@ class RandomRangeInvocation(BaseInvocation):
     seed: Optional[int] = Field(
         ge=0,
         le=np.iinfo(np.int32).max,
-        description="The seed for the RNG, provide None or -1 for random",
+        description="The seed for the RNG",
         default_factory=lambda: numpy.random.randint(0, np.iinfo(np.int32).max),
     )
 
