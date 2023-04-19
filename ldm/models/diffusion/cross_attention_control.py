@@ -342,16 +342,14 @@ def override_cross_attention(model, context: Context, is_running_diffusers = Fal
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
-    from ldm.modules.attention import CrossAttention # avoid circular import # TODO: rename as in diffusers?
-    cross_attention_class: type = InvokeAIDiffusersCrossAttention if isinstance(model,UNet2DConditionModel) else CrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
-                isinstance(module, cross_attention_class) and which_attn in name]
+                isinstance(module, InvokeAIDiffusersCrossAttention) and which_attn in name]
     cross_attention_modules_in_model_count = len(attention_module_tuples)
     expected_count = 16
     if cross_attention_modules_in_model_count != expected_count:
         # non-fatal error but .swap() won't work.
-        print(f"Error! CrossAttentionControl found an unexpected number of {cross_attention_class} modules in the model " +
+        print(f"Error! CrossAttentionControl found an unexpected number of InvokeAIDiffusersCrossAttention modules in the model " +
               f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed " +
               f"or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, " +
               f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who knows " +

@@ -506,7 +506,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
                 predicted_original = getattr(step_output, 'pred_original_sample', None)
 
-                # TODO resuscitate attention map saving
+                # TODO resuscitate attention map saving # still TODO?
                 #if i == len(timesteps)-1 and extra_conditioning_info is not None:
                 #    eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
                 #    attention_map_token_ids = range(1, eos_token_index)
@@ -734,17 +734,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device = self._model_group.device_for(self.safety_checker)
         return super().run_safety_checker(image, device, dtype)
 
-    @torch.inference_mode()
-    def get_learned_conditioning(self, c: List[List[str]], *, return_tokens=True, fragment_weights=None):
-        """
-        Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
-        """
-        return self.embeddings_provider.get_embeddings_for_weighted_prompt_fragments(
-            text_batch=c,
-            fragment_weights_batch=fragment_weights,
-            should_return_tokens=return_tokens,
-            device=self._model_group.device_for(self.unet))
-
     @property
     def cond_stage_model(self):
         return self.embeddings_provider
@@ -758,11 +747,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             truncation=True,
             return_tensors="pt",
         )
-
-    @property
-    def channels(self) -> int:
-        """Compatible with DiffusionWrapper"""
-        return self.unet.config.in_channels
 
     def decode_latents(self, latents):
         # Explicit call to get the vae loaded, since `decode` isn't the forward method.

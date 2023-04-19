@@ -116,7 +116,7 @@ class Omnibus(Img2Img,Txt2Img):
                     # uncond cond
                     uc_cross = model.get_unconditional_conditioning(num_samples, "")
                     uc_full = {"c_concat": [c_cat], "c_crossattn": [uc_cross]}
-                    shape = [model.channels, height//8, width//8]
+                    shape = [model.unet.in_channels, height//8, width//8]
 
                     samples, _ = sampler.sample(
                         batch_size = 1,

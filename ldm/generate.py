@@ -38,9 +38,6 @@ from ldm.invoke.model_manager import ModelManager
 from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.ksampler import KSampler
-from ldm.models.diffusion.plms import PLMSSampler
 
 
 def fix_func(orig):
@@ -193,7 +190,6 @@ class Generate:
         self.size_matters = True  # used to warn once about large image sizes and VRAM
         self.txt2mask = None
         self.safety_checker = None
-        self.karras_max = None
         self.infill_method = None
 
         # Note that in previous versions, there was an option to pass the
@@ -333,7 +329,6 @@ class Generate:
         perlin=0.0,
         h_symmetry_time_pct = None,
         v_symmetry_time_pct = None,
-        karras_max=None,
         outdir=None,
         # these are specific to img2img and inpaint
         init_img=None,
@@ -439,7 +434,6 @@ class Generate:
         self.seed = seed
         self.log_tokenization = log_tokenization
         self.step_callback = step_callback
-        self.karras_max = karras_max
         self.infill_method = (
             infill_method or infill_methods()[0],
         )  # The infill method to use
@@ -489,7 +483,7 @@ class Generate:
 
         if sampler_name and (sampler_name != self.sampler_name):
             self.sampler_name = sampler_name
-            self._set_sampler()
+            self._set_scheduler()
 
         # apply the concepts library to the prompt
         prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
@@ -497,11 +491,6 @@ class Generate:
             lambda concepts: self.load_huggingface_concepts(concepts),
             self.model.textual_inversion_manager.get_all_trigger_strings(),
         )
-
-        # bit of a hack to change the cached sampler's karras threshold to
-        # whatever the user asked for
-        if karras_max is not None and isinstance(self.sampler, KSampler):
-            self.sampler.adjust_settings(karras_max=karras_max)
 
         tic = time.time()
         if self._has_cuda():
@@ -992,7 +981,7 @@ class Generate:
         )
 
         self.model_name = model_name
-        self._set_sampler()  # requires self.model_name to be set first
+        self._set_scheduler()  # requires self.model_name to be set first
         self._save_last_used_model(model_name)
         return self.model
 
@@ -1131,70 +1120,34 @@ class Generate:
     def sample_to_lowres_estimated_image(self, samples):
         return self._make_base().sample_to_lowres_estimated_image(samples)
 
-    def _set_sampler(self):
-        if isinstance(self.model, DiffusionPipeline):
-            return self._set_scheduler()
-        else:
-            return self._set_sampler_legacy()
-
-    # very repetitive code - can this be simplified? The KSampler names are
-    # consistent, at least
-    def _set_sampler_legacy(self):
-        msg = f">> Setting Sampler to {self.sampler_name}"
-        if self.sampler_name == "plms":
-            self.sampler = PLMSSampler(self.model, device=self.device)
-        elif self.sampler_name == "ddim":
-            self.sampler = DDIMSampler(self.model, device=self.device)
-        elif self.sampler_name == "k_dpm_2_a":
-            self.sampler = KSampler(self.model, "dpm_2_ancestral", device=self.device)
-        elif self.sampler_name == "k_dpm_2":
-            self.sampler = KSampler(self.model, "dpm_2", device=self.device)
-        elif self.sampler_name == "k_dpmpp_2_a":
-            self.sampler = KSampler(
-                self.model, "dpmpp_2s_ancestral", device=self.device
-            )
-        elif self.sampler_name == "k_dpmpp_2":
-            self.sampler = KSampler(self.model, "dpmpp_2m", device=self.device)
-        elif self.sampler_name == "k_euler_a":
-            self.sampler = KSampler(self.model, "euler_ancestral", device=self.device)
-        elif self.sampler_name == "k_euler":
-            self.sampler = KSampler(self.model, "euler", device=self.device)
-        elif self.sampler_name == "k_heun":
-            self.sampler = KSampler(self.model, "heun", device=self.device)
-        elif self.sampler_name == "k_lms":
-            self.sampler = KSampler(self.model, "lms", device=self.device)
-        else:
-            msg = f">> Unsupported Sampler: {self.sampler_name}, Defaulting to plms"
-            self.sampler = PLMSSampler(self.model, device=self.device)
-
-        print(msg)
-
     def _set_scheduler(self):
         default = self.model.scheduler
 
         # See https://github.com/huggingface/diffusers/issues/277#issuecomment-1371428672
         scheduler_map = dict(
-            ddim=diffusers.DDIMScheduler,
-            dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-            k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-            k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
-            # DPMSolverMultistepScheduler is technically not `k_` anything, as it is neither
-            # the k-diffusers implementation nor included in EDM (Karras 2022), but we can
-            # provide an alias for compatibility.
-            k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-            k_euler=diffusers.EulerDiscreteScheduler,
-            k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-            k_heun=diffusers.HeunDiscreteScheduler,
-            k_lms=diffusers.LMSDiscreteScheduler,
-            plms=diffusers.PNDMScheduler,
+            ddim=(diffusers.DDIMScheduler, dict()),
+            plms=(diffusers.PNDMScheduler, dict()),
+            lms=(diffusers.LMSDiscreteScheduler, dict()),
+            heun=(diffusers.HeunDiscreteScheduler, dict()),
+
+            euler=(diffusers.EulerDiscreteScheduler, dict(use_karras_sigmas=False)),
+            k_euler=(diffusers.EulerDiscreteScheduler, dict(use_karras_sigmas=True)),
+            euler_a=(diffusers.EulerAncestralDiscreteScheduler, dict()),
+
+            dpm_2=(diffusers.KDPM2DiscreteScheduler, dict()),
+            dpm_2_a=(diffusers.KDPM2AncestralDiscreteScheduler, dict()),
+
+            dpmpp_2s=(diffusers.DPMSolverSinglestepScheduler, dict()),
+            dpmpp_2m=(diffusers.DPMSolverMultistepScheduler, dict(use_karras_sigmas=False)),
+            k_dpmpp_2m=(diffusers.DPMSolverMultistepScheduler, dict(use_karras_sigmas=True)),
         )
 
         if self.sampler_name in scheduler_map:
-            sampler_class = scheduler_map[self.sampler_name]
+            sampler_class, extra_config = scheduler_map[self.sampler_name]
             msg = (
                 f">> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})"
             )
-            self.sampler = sampler_class.from_config(self.model.scheduler.config)
+            self.sampler = sampler_class.from_config({**self.model.scheduler.config, **extra_config})
         else:
             msg = (
                 f">> Unsupported Sampler: {self.sampler_name} "
