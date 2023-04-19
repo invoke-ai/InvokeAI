@@ -37,7 +37,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .stable_diffusion.invoke_optimized import txt2img_Optimized as optimizeONNX
+from stable_diffusion.onnx_pipeline import txt2img as optimizeONNX
 from .util import choose_precision, choose_torch_device
 
 def fix_func(orig):
