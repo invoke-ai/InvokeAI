@@ -13,7 +13,7 @@ class DBConfig(BaseSettings):
     password: str
     server: str
     database: str
-    certificate: str
+    certificate: str = "/certificates/db_certificate.crt.pem"
 
     class Config:
         env_prefix = "db_"
