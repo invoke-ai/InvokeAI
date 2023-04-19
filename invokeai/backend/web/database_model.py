@@ -1,8 +1,8 @@
 import ssl
 
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine, Column, ForeignKey, String, Text, DateTime, SmallInteger, Float, func, Integer
+from sqlalchemy import create_engine, Column, ForeignKey, String, Text, DateTime, SmallInteger, Float, func, Integer, VARCHAR
 from pydantic import BaseSettings
 
 
@@ -21,7 +21,7 @@ class DBConfig(BaseSettings):
 
 
 DB_CONFIG = DBConfig()
-DATABASE_URL = f"{DB_CONFIG.db_dialect}://{DB_CONFIG.db_user}:{DB_CONFIG.db_password}@{DB_CONFIG.db_server}/{DB_CONFIG.db_database}"
+DATABASE_URL = f"{DB_CONFIG.dialect}://{DB_CONFIG.user}:{DB_CONFIG.password}@{DB_CONFIG.server}/{DB_CONFIG.database}"
 Base = declarative_base()
 
 
@@ -51,7 +51,7 @@ class InputImage(Base):
 
     # Table columns
     id = Column(Integer, unique=True, nullable=False, primary_key=True, autoincrement=True)
-    img_path = Column(Text, unique=True, nullable=False)
+    img_path = Column(VARCHAR(length=255), unique=True, nullable=False)
     created_at = Column(DateTime, unique=False, nullable=False, default=func.now())
 
     # Table relationships
@@ -68,7 +68,7 @@ class ProcessedImage(Base):
 
     # Table columns
     id = Column(Integer, unique=True, nullable=False, primary_key=True, autoincrement=True)
-    img_path = Column(Text, unique=True, nullable=False)
+    img_path = Column(VARCHAR(length=255), unique=True, nullable=False)
     created_at = Column(DateTime, unique=False, nullable=False, default=func.now())
 
     # Table relationships
@@ -85,7 +85,7 @@ class GeneratedImage(Base):
 
     # Table columns
     id = Column(Integer, unique=True, nullable=False, primary_key=True, autoincrement=True)
-    img_path = Column(Text, unique=True, nullable=False)
+    img_path = Column(VARCHAR(length=255), unique=True, nullable=False)
     created_at = Column(DateTime, unique=False, nullable=False, default=func.now())
 
     # Table relationships
@@ -126,10 +126,11 @@ class Job(Base):
 # Set SSL connection argument for DB
 ctx = ssl.SSLContext()
 ctx.check_hostname = False
-ctx.load_verify_locations(cafile=DB_CONFIG.db_certificate)
+ctx.load_verify_locations(cafile=DB_CONFIG.certificate)
 ssl_args = {"ssl": ctx}
 
 
 # Create engin and sessionmaker according to database connection string and SSL information
 engine = create_engine(DATABASE_URL, connect_args=ssl_args)
+Base.metadata.create_all(engine)
 session_maker = sessionmaker(bind=engine)

@@ -980,8 +980,10 @@ class InvokeAIWebServer:
             Prepare for generation based on generation_mode
             """
             # Store generated image path
-            generated_image_path = None
-            all_used_parameters = None
+            job_params = {
+                "generated_image_path": None,
+                "all_used_parameters": None        
+            }
             if generation_parameters["generation_mode"] == "unifiedCanvas":
                 """
                 generation_parameters["init_img"] is a base64 image
@@ -1289,7 +1291,7 @@ class InvokeAIWebServer:
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 
                 command = parameters_to_command(all_parameters)
-                all_used_parameters = all_parameters
+                job_params["all_used_parameters"] = all_parameters
 
                 (width, height) = image.size
 
@@ -1307,7 +1309,7 @@ class InvokeAIWebServer:
                     get_local_path(user_id, generated_image_outdir, create_path=True),
                     postprocessing=postprocessing,
                 )
-                generated_image_path = path
+                job_params["generated_image_path"] = path
 
                 thumbnail_path = save_thumbnail(
                     image,
@@ -1373,7 +1375,7 @@ class InvokeAIWebServer:
             )
 
             # Store all the job information in DB
-            update_database(all_used_parameters, generated_image_path)
+            update_database(job_params["all_used_parameters"], job_params["generated_image_path"])
 
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception
@@ -1937,20 +1939,27 @@ def update_database(all_used_parameters: Dict[str, Any], generated_image_path: s
         )
         session.add(params)
 
-        # Add a record to the InputImage table
-        if "init_img" in all_used_parameters:
-            input_image = InputImage(img_path=all_used_parameters["init_img"])
-            session.add(input_image)
-
         # Add a record to the GeneratedImage table
         generated_image = GeneratedImage(img_path=generated_image_path)
         session.add(generated_image)
 
-        # Add a record to the Job table
-        job = Job(
-            parameters=params,
-            input_image=[input_image],
-            generated_image=[generated_image]
-        )
-        session.add(job)
+        # Add a record to the InputImage table
+        if "init_img" in all_used_parameters and all_used_parameters["init_img"]:
+            input_image = InputImage(img_path=all_used_parameters["init_img"])
+            session.add(input_image)
+            
+            # Add a record to the Job table
+            job = Job(
+                parameters=params,
+                input_image=[input_image],
+                generated_image=[generated_image]
+            )
+        else:
+            # Add a record to the Job table
+            job = Job(
+                parameters=params,
+                generated_image=[generated_image]
+            )
+            session.add(job)
+
         session.commit()
