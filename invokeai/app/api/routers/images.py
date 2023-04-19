@@ -34,6 +34,22 @@ async def get_image(
         return FileResponse(path)
     else:
         raise HTTPException(status_code=404)
+    
+@images_router.get("/location/{image_type}/{image_name}", operation_id="get_image_location")
+async def get_image_location(
+    image_type: ImageType = Path(description="The type of image to get"),
+    image_name: str = Path(description="The name of the image to get"),
+) -> str:
+    """Gets a result location"""
+
+    path = ApiDependencies.invoker.services.images.get_path(
+        image_type=image_type, image_name=image_name
+    )
+
+    if ApiDependencies.invoker.services.images.validate_path(path):
+        return path
+    else:
+        raise HTTPException(status_code=404)
 
 
 @images_router.get(
