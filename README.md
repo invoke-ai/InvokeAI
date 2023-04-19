@@ -148,6 +148,11 @@ not supported.
     pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
     ```
 
+    _For non-GPU systems:_
+    ```terminal
+    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
+    ``` 
+
     _For Macintoshes, either Intel or M1/M2:_
 
     ```sh
