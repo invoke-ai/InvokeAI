@@ -1,4 +1,4 @@
-import { DIFFUSERS_SAMPLERS, SAMPLERS } from 'app/constants';
+import { DIFFUSERS_SAMPLERS } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
@@ -23,9 +23,7 @@ export default function MainSampler() {
       label={t('parameters.sampler')}
       value={sampler}
       onChange={handleChangeSampler}
-      validValues={
-        activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
-      }
+      validValues={DIFFUSERS_SAMPLERS}
       styleClass="main-settings-block"
       minWidth="9rem"
     />

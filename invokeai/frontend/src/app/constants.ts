@@ -2,32 +2,20 @@
 
 import { InProgressImageType } from 'features/system/store/systemSlice';
 
-// Valid samplers
-export const SAMPLERS: Array<string> = [
-  'ddim',
-  'plms',
-  'k_lms',
-  'k_dpm_2',
-  'k_dpm_2_a',
-  'k_dpmpp_2',
-  'k_dpmpp_2_a',
-  'k_euler',
-  'k_euler_a',
-  'k_heun',
-];
-
 // Valid Diffusers Samplers
 export const DIFFUSERS_SAMPLERS: Array<string> = [
   'ddim',
   'plms',
-  'k_lms',
-  'dpmpp_2',
-  'k_dpm_2',
-  'k_dpm_2_a',
-  'k_dpmpp_2',
+  'lms',
+  'heun',
+  'euler',
   'k_euler',
-  'k_euler_a',
-  'k_heun',
+  'euler_a',
+  'dpm_2',
+  'dpm_2_a',
+  'dpmpp_2s',
+  'dpmpp_2m',
+  'k_dpmpp_2m',
 ];
 
 // Valid image widths
