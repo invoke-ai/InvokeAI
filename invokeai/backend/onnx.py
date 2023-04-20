@@ -2,10 +2,13 @@
 This class is derived from Inference Model class
 Implements ONNX inference related operations
 """
+import traceback
 import time
+import sys
 
-from baseModel import inferenceModel
-from stable_diffusion.onnx_pipeline import txt2img
+from .baseModel import inferenceModel
+from .stable_diffusion.onnx_pipeline import txt2img
+from ..frontend.CLI.readline import Completer, get_completer
 
 class ONNX(inferenceModel) :
     """
@@ -17,8 +20,6 @@ class ONNX(inferenceModel) :
         sampler_name="k_lms",
         precision="auto",
         outdir="outputs/img-samples",
-        opt = None,
-        args = None,
     ):
         self.height = None
         self.width = None
@@ -34,20 +35,46 @@ class ONNX(inferenceModel) :
         self.model = model or fallback
         self.model_name = model or fallback
 
-    
     def prompt2image(
         self,
         prompt,
         iterations=None,
         steps=None,
+        image_callback=None,
+        step_callback=None,
         width=None,
         height=None,
+        sampler_name=None,
         model=None,
-        precision=None
+        precision=None,
+        catch_interrupts=False,
+        **args,
     ):
+        print("Enter prompt2image of onnx")
         tic = time.time()
-        txt2img_onnx = txt2img(width, height, iterations, steps)
-        txt2img_onnx.onnx_txt2img(prompt, model, precision)
+        try:
+            txt2img_onnx = txt2img(width, height, iterations, steps)
+            txt2img_onnx.onnx_txt2img(prompt, model, precision, self.outdir)
+        except KeyboardInterrupt:
+            # Clear the CUDA cache on an exception
+            self.clear_cuda_cache()
+
+            if catch_interrupts:
+                print("**Interrupted** Partial results will be returned.")
+            else:
+                raise KeyboardInterrupt
+        except RuntimeError:
+            # Clear the CUDA cache on an exception
+            self.clear_cuda_cache()
+
+            print(traceback.format_exc(), file=sys.stderr)
+            print(">> Could not generate image.")
         toc = time.time()
         print("\n>> Usage stats:")
         print(f">> image(s) generated in", "%4.2fs" % (toc - tic))
+
+    def getCompleter(self, opt):
+        """
+        Invocation of completer
+        """
+        return get_completer(opt, models=[])

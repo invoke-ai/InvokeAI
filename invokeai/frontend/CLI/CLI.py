@@ -27,9 +27,10 @@ from ...backend.image_util import (
     write_metadata,
 )
 from ...backend.stable_diffusion import PipelineIntermediateState
-from ...backend.stable_diffusion.invoke_optimized import txt2img_Optimized as optimize
 from ...backend.util import url_attachment_name, write_log
 from .readline import Completer, get_completer
+from ...backend.onnx import ONNX
+from ...backend.pytorch import Pytorch
 
 # global used in multiple functions (fix)
 infile = None
@@ -41,6 +42,7 @@ def main():
 
     opt = Args()
     args = opt.parse_args()
+    modeltype = None
     if not args:
         sys.exit(-1)
 
@@ -71,50 +73,85 @@ def main():
     if not os.path.isabs(opt.conf):
         opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
 
-    if opt.optimize:
-        #Invocation of onnx pipeline
+    if opt.modelType == "Pytorch":
+        #invocation of pytorch model
+        opt = Pytorch.start(opt, args)
+        if opt.embeddings:
+            if not os.path.isabs(opt.embedding_path):
+                embedding_path = os.path.normpath(
+                    os.path.join(Globals.root, opt.embedding_path)
+                )
+            else:
+                embedding_path = opt.embedding_path
+        else:
+            embedding_path = None
+
         try:
-            gen = Generate(
+            modeltype = Pytorch(
                 conf=opt.conf,
                 model=opt.model,
-                optimize=opt.optimize)
-            main_loop(gen, opt)
-            sys.exit(1)
+                sampler_name=opt.sampler_name,
+                embedding_path=embedding_path,
+                full_precision=opt.full_precision,
+                precision=opt.precision,
+                gfpgan=gfpgan,
+                codeformer=codeformer,
+                esrgan=esrgan,
+                free_gpu_mem=opt.free_gpu_mem,
+                safety_checker=opt.safety_checker,
+                max_loaded_models=opt.max_loaded_models,
+            )
         except (FileNotFoundError, TypeError, AssertionError) as e:
             report_model_error(opt, e)
         except (IOError, KeyError) as e:
             print(f"{e}. Aborting.")
             sys.exit(-1)
 
-    if args.laion400m:
-        print(
-            "--laion400m flag has been deprecated. Please use --model laion400m instead."
-        )
+        # preload the model
+        # loading here to avoid long delays on startup
+        try:
+            modeltype.load_model()
+        except KeyError:
+            pass
+        except Exception as e:
+            report_model_error(opt, e)
+
+        # try to autoconvert new models
+        if path := opt.autoimport:
+            modeltype.model_manager.heuristic_import(
+                str(path), convert=False, commit_to_conf=opt.conf
+            )
+
+        if path := opt.autoconvert:
+            modeltype.model_manager.heuristic_import(
+                str(path), convert=True, commit_to_conf=opt.conf
+            )
+
+        # Loading Face Restoration and ESRGAN Modules
+        gfpgan, codeformer, esrgan = load_face_restoration(opt)
+
+        # web server loops forever
+        print("web and gui options: ", opt.gui, opt.web)
+        if opt.web or opt.gui:
+            invoke_ai_web_server_loop(modeltype, gfpgan, codeformer, esrgan)
+            sys.exit(0)
+
+    elif opt.modelType == "Onnx":
+        #Invocation of onnx pipeline
+        try:
+            modeltype = ONNX(
+                model=opt.model,
+                precision=opt.precision,
+            )
+        except (FileNotFoundError, TypeError, AssertionError) as e:
+            report_model_error(opt, e)
+        except (IOError, KeyError) as e:
+            print(f"{e}. Aborting.")
+            sys.exit(-1)
+    else:
+        print(" Aborting. modelType chosen is not defined.")
         sys.exit(-1)
-    if args.weights:
-        print(
-            "--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead."
-        )
-        sys.exit(-1)
-    if args.max_loaded_models is not None:
-        if args.max_loaded_models <= 0:
-            print("--max_loaded_models must be >= 1; using 1")
-            args.max_loaded_models = 1
 
-    # alert - setting a few globals here
-    Globals.try_patchmatch = args.patchmatch
-    Globals.always_use_cpu = args.always_use_cpu
-    Globals.internet_available = args.internet_available and check_internet()
-    Globals.disable_xformers = not args.xformers
-    Globals.sequential_guidance = args.sequential_guidance
-    Globals.ckpt_convert = True  # always true now
-
-    # run any post-install patches needed
-    run_patches()
-
-    print(f">> Internet connectivity is {Globals.internet_available}")
-
-    # loading here to avoid long delays on startup
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
     import transformers  # type: ignore
@@ -124,83 +161,13 @@ def main():
 
     diffusers.logging.set_verbosity_error()
 
-    # Loading Face Restoration and ESRGAN Modules
-    gfpgan, codeformer, esrgan = load_face_restoration(opt)
-
-    # normalize the config directory relative to root
-    if not os.path.isabs(opt.conf):
-        opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
-
-    if opt.embeddings:
-        if not os.path.isabs(opt.embedding_path):
-            embedding_path = os.path.normpath(
-                os.path.join(Globals.root, opt.embedding_path)
-            )
-        else:
-            embedding_path = opt.embedding_path
-    else:
-        embedding_path = None
-
-    # migrate legacy models
-    ModelManager.migrate_models()
-    # creating a Generate object:
-    try:
-        gen = Generate(
-            conf=opt.conf,
-            model=opt.model,
-            sampler_name=opt.sampler_name,
-            embedding_path=embedding_path,
-            full_precision=opt.full_precision,
-            precision=opt.precision,
-            gfpgan=gfpgan,
-            codeformer=codeformer,
-            esrgan=esrgan,
-            free_gpu_mem=opt.free_gpu_mem,
-            safety_checker=opt.safety_checker,
-            max_loaded_models=opt.max_loaded_models,
-        )
-    except (FileNotFoundError, TypeError, AssertionError) as e:
-        report_model_error(opt, e)
-    except (IOError, KeyError) as e:
-        print(f"{e}. Aborting.")
-        sys.exit(-1)
-
-    if opt.seamless:
-        print(">> changed to seamless tiling mode")
-
-    if not opt.optimize:
-        # preload the model
-        try:
-            gen.load_model()
-        except KeyError:
-            pass
-        except Exception as e:
-            report_model_error(opt, e)
-
-        # try to autoconvert new models
-        if path := opt.autoimport:
-            gen.model_manager.heuristic_import(
-                str(path), convert=False, commit_to_conf=opt.conf
-            )
-
-        if path := opt.autoconvert:
-            gen.model_manager.heuristic_import(
-                str(path), convert=True, commit_to_conf=opt.conf
-            )
-
-        # web server loops forever
-        print("web and gui options: ", opt.gui, opt.web)
-        if opt.web or opt.gui:
-            invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
-            sys.exit(0)
-
     if not infile:
         print(
             "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)"
         )
 
     try:
-        main_loop(gen, opt)
+        main_loop(modeltype, opt)
     except KeyboardInterrupt:
         print(
             f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
@@ -218,25 +185,23 @@ def main_loop(gen, opt):
     doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
-    completer = get_completer(opt, models=[])
 
+    completer = gen.getCompleter(opt)
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    if not opt.optimize:
-        completer = get_completer(opt, models=gen.model_manager.list_models())
-        set_default_output_dir(opt, completer)
-        if gen.model:
-            add_embedding_terms(gen, completer)
-        output_cntr = completer.get_current_history_length() + 1
+    set_default_output_dir(opt, completer)
+    # if gen.model:
+    #     add_embedding_terms(gen, completer)
+    output_cntr = completer.get_current_history_length() + 1
 
-        # os.pathconf is not available on Windows
-        if hasattr(os, "pathconf"):
-            path_max = os.pathconf(opt.outdir, "PC_PATH_MAX")
-            name_max = os.pathconf(opt.outdir, "PC_NAME_MAX")
-        else:
-            path_max = 260
-            name_max = 255
+    # os.pathconf is not available on Windows
+    if hasattr(os, "pathconf"):
+        path_max = os.pathconf(opt.outdir, "PC_PATH_MAX")
+        name_max = os.pathconf(opt.outdir, "PC_NAME_MAX")
+    else:
+        path_max = 260
+        name_max = 255
 
     while not done:
         operation = "generate"
@@ -288,23 +253,6 @@ def main_loop(gen, opt):
             opt.width = gen.width
         if not opt.height:
             opt.height = gen.height
-
-        if opt.onnx:
-            print("Starting ONNX inference.")
-            try:
-                gen.prompt2image_optimize(
-                    opt.prompt,
-                    opt.iterations,
-                    opt.steps,
-                    opt.width,
-                    opt.height,
-                    gen.model,
-                    gen.precision
-                )
-            except (PromptParser.ParsingException, pyparsing.ParseException) as e:
-                print("** An error occurred while processing your prompt **")
-                print(f"** {str(e)} **")
-            sys.exit(-1)
 
         # retrieve previous value of init image if requested
         if opt.init_img is not None and re.match("^-\\d+$", opt.init_img):
@@ -483,6 +431,7 @@ def main_loop(gen, opt):
                         catch_interrupts=catch_ctrl_c,
                         **vars(opt),
                     )
+                    sys.exit(-1)
                 except (PromptParser.ParsingException, pyparsing.ParseException) as e:
                     print("** An error occurred while processing your prompt **")
                     print(f"** {str(e)} **")
@@ -1312,37 +1261,6 @@ def report_model_error(opt: Namespace, e: Exception):
     sys.argv = previous_args
     main()  # would rather do a os.exec(), but doesn't exist?
     sys.exit(0)
-
-
-def check_internet() -> bool:
-    """
-    Return true if the internet is reachable.
-    It does this by pinging huggingface.co.
-    """
-    import urllib.request
-
-    host = "http://huggingface.co"
-    try:
-        urllib.request.urlopen(host, timeout=1)
-        return True
-    except:
-        return False
-
-# This routine performs any patch-ups needed after installation
-def run_patches():
-    # install ckpt configuration files that may have been added to the
-    # distro after original root directory configuration
-    import invokeai.configs as conf
-    from shutil import copyfile
-
-    root_configs = Path(global_config_dir(), 'stable-diffusion')
-    repo_configs = Path(conf.__path__[0], 'stable-diffusion')
-    if not root_configs.exists():
-        os.makedirs(root_configs, exist_ok=True)
-    for src in repo_configs.iterdir():
-        dest = root_configs / src.name
-        if not dest.exists():
-            copyfile(src, dest)
 
 if __name__ == "__main__":
     main()

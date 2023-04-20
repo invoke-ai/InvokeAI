@@ -466,7 +466,7 @@ class Args(object):
             "--modeltype",
             dest="modelType",
             default="Pytorch",
-            help="Forces to use pytorch by default",
+            help="Forces to use pytorch by default. Choose Onnx for onnx pipeline",
         )
         model_group.add_argument(
             "--root_dir",
