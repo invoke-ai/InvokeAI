@@ -31,18 +31,13 @@ class LoRALayer:
         self.name = name
         self.scale = alpha / rank if (alpha and rank) else 1.0
 
-    def forward(self, lora, input_h, output):
+    def forward(self, lora, input_h):
         if self.mid is None:
-            output = (
-                output
-                + self.up(self.down(*input_h)) * lora.multiplier * self.scale
-            )
+            weight = self.up(self.down(*input_h))
         else:
-            output = (
-                output
-                + self.up(self.mid(self.down(*input_h))) * lora.multiplier * self.scale
-            )
-        return output
+            weight = self.up(self.mid(self.down(*input_h)))
+
+        return weight * lora.multiplier * self.scale
 
 class LoHALayer:
     lora_name: str
@@ -64,7 +59,7 @@ class LoHALayer:
         self.name = name
         self.scale = alpha / rank if (alpha and rank) else 1.0
 
-    def forward(self, lora, input_h, output):
+    def forward(self, lora, input_h):
 
         if type(self.org_module) == torch.nn.Conv2d:
             op = torch.nn.functional.conv2d
@@ -86,13 +81,76 @@ class LoHALayer:
             rebuild1 = torch.einsum('i j k l, j r, i p -> p r k l', self.t1, self.w1_b, self.w1_a)
             rebuild2 = torch.einsum('i j k l, j r, i p -> p r k l', self.t2, self.w2_b, self.w2_a)
             weight = rebuild1 * rebuild2
-        
+
         bias = self.bias if self.bias is not None else 0
-        return output + op(
+        return op(
             *input_h,
             (weight + bias).view(self.org_module.weight.shape),
             None,
             **extra_args,
+        ) * lora.multiplier * self.scale
+
+
+class LoKRLayer:
+    lora_name: str
+    name: str
+    scale: float
+
+    w1: Optional[torch.Tensor] = None
+    w1_a: Optional[torch.Tensor] = None
+    w1_b: Optional[torch.Tensor] = None
+    w2: Optional[torch.Tensor] = None
+    w2_a: Optional[torch.Tensor] = None
+    w2_b: Optional[torch.Tensor] = None
+    t2: Optional[torch.Tensor] = None
+    bias: Optional[torch.Tensor] = None
+
+    org_module: torch.nn.Module
+
+    def __init__(self, lora_name: str, name: str, rank=4, alpha=1.0):
+        self.lora_name = lora_name
+        self.name = name
+        self.scale = alpha / rank if (alpha and rank) else 1.0
+
+    def forward(self, lora, input_h):
+
+        if type(self.org_module) == torch.nn.Conv2d:
+            op = torch.nn.functional.conv2d
+            extra_args = dict(
+                stride=self.org_module.stride,
+                padding=self.org_module.padding,
+                dilation=self.org_module.dilation,
+                groups=self.org_module.groups,
+            )
+
+        else:
+            op = torch.nn.functional.linear
+            extra_args = {}
+
+        w1 = self.w1
+        if w1 is None:
+            w1 = self.w1_a @ self.w1_b
+
+        w2 = self.w2
+        if w2 is None:
+            if self.t2 is None:
+                w2 = self.w2_a @ self.w2_b
+            else:
+                w2 = torch.einsum('i j k l, i p, j r -> p r k l', self.t2, self.w2_a, self.w2_b)
+
+
+        if len(w2.shape) == 4:
+            w1 = w1.unsqueeze(2).unsqueeze(2)
+        w2 = w2.contiguous()
+        weight = torch.kron(w1, w2).reshape(self.org_module.weight.shape)
+
+
+        bias = self.bias if self.bias is not None else 0
+        return op(
+            *input_h, 
+            (weight + bias).view(self.org_module.weight.shape),
+            None,
+            **extra_args
         ) * lora.multiplier * self.scale
 
 
@@ -159,7 +217,7 @@ class LoRAModuleWrapper:
                 layer = lora.layers.get(name, None)
                 if layer is None:
                     continue
-                output = layer.forward(lora, input_h, output)
+                output += layer.forward(lora, input_h)
             return output
 
         return lora_forward
@@ -306,6 +364,36 @@ class LoRA:
                     layer.t2 = values["hada_t2"].to(device=self.device, dtype=self.dtype)
                 else:
                     layer.t2 = None
+
+            # lokr
+            elif "lokr_w1_b" in values or "lokr_w1" in values:
+
+                if "lokr_w1_b" in values:
+                    rank = values["lokr_w1_b"].shape[0]
+                elif "lokr_w2_b" in values:
+                    rank = values["lokr_w2_b"].shape[0]
+                else:
+                    rank = None # unscaled
+
+                layer = LoKRLayer(self.name, stem, rank, alpha)
+                layer.org_module = wrapped
+                layer.bias = bias
+
+                if "lokr_w1" in values:
+                    layer.w1 = values["lokr_w1"].to(device=self.device, dtype=self.dtype)
+                else:
+                    layer.w1_a = values["lokr_w1_a"].to(device=self.device, dtype=self.dtype)
+                    layer.w1_b = values["lokr_w1_b"].to(device=self.device, dtype=self.dtype)
+
+                if "lokr_w2" in values:
+                    layer.w2 = values["lokr_w2"].to(device=self.device, dtype=self.dtype)
+                else:
+                    layer.w2_a = values["lokr_w2_a"].to(device=self.device, dtype=self.dtype)
+                    layer.w2_b = values["lokr_w2_b"].to(device=self.device, dtype=self.dtype)
+
+                if "lokr_t2" in values:
+                    layer.t2 = values["lokr_t2"].to(device=self.device, dtype=self.dtype)
+
 
             else:
                 print(
