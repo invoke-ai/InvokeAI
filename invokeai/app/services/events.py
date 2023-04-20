@@ -2,7 +2,7 @@
 
 from typing import Any
 from invokeai.app.api.models.images import ProgressImage
-from invokeai.app.util.get_timestamp import get_timestamp
+from invokeai.app.util.misc import get_timestamp
 
 
 class EventServiceBase:
@@ -14,6 +14,7 @@ class EventServiceBase:
         pass
 
     def __emit_session_event(self, event_name: str, payload: dict) -> None:
+        payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.session_event,
             payload=dict(event=event_name, data=payload),
@@ -40,7 +41,6 @@ class EventServiceBase:
                 progress_image=progress_image.dict() if progress_image is not None else None,
                 step=step,
                 total_steps=total_steps,
-                timestamp=get_timestamp(),
             ),
         )
 
@@ -60,7 +60,6 @@ class EventServiceBase:
                 invocation=invocation_dict,
                 source_node_id=source_node_id,
                 result=result,
-                timestamp=get_timestamp(),
             ),
         )
 
@@ -79,7 +78,6 @@ class EventServiceBase:
                 invocation=invocation_dict,
                 source_node_id=source_node_id,
                 error=error,
-                timestamp=get_timestamp(),
             ),
         )
 
@@ -93,7 +91,6 @@ class EventServiceBase:
                 graph_execution_state_id=graph_execution_state_id,
                 invocation=invocation_dict,
                 source_node_id=source_node_id,
-                timestamp=get_timestamp(),
             ),
         )
 
@@ -103,6 +100,5 @@ class EventServiceBase:
             event_name="graph_execution_state_complete",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
-                timestamp=get_timestamp(),
             ),
         )
