@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 import torch
 
 from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.modules.metadata import MetadataModule
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
@@ -358,8 +357,8 @@ class LatentsToImageInvocation(BaseInvocation):
                 context.graph_execution_state_id, self.id
             )
 
-            metadata = MetadataModule.build_metadata(
-                session_id=context.graph_execution_state_id, invocation=self
+            metadata = context.services.metadata.build_metadata(
+                session_id=context.graph_execution_state_id, node=self
             )
 
             context.services.images.save(image_type, image_name, image, metadata)

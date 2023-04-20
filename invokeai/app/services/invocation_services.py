@@ -1,4 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.backend import ModelManager
 
 from .events import EventServiceBase
@@ -14,6 +15,7 @@ class InvocationServices:
     events: EventServiceBase
     latents: LatentsStorageBase
     images: ImageStorageBase
+    metadata: MetadataServiceBase
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
@@ -29,6 +31,7 @@ class InvocationServices:
             events: EventServiceBase,
             latents: LatentsStorageBase,
             images: ImageStorageBase,
+            metadata: MetadataServiceBase,
             queue: InvocationQueueABC,
             graph_library: ItemStorageABC["LibraryGraph"],
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
@@ -39,6 +42,7 @@ class InvocationServices:
         self.events = events
         self.latents = latents
         self.images = images
+        self.metadata = metadata
         self.queue = queue
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager

@@ -5,7 +5,6 @@ from typing import Literal, Union
 from pydantic import Field
 
 from invokeai.app.models.image import ImageField, ImageType
-from invokeai.app.modules.metadata import MetadataModule
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput, build_image_output
 
@@ -49,8 +48,8 @@ class UpscaleInvocation(BaseInvocation):
             context.graph_execution_state_id, self.id
         )
 
-        metadata = MetadataModule.build_metadata(
-            session_id=context.graph_execution_state_id, invocation=self
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
         )
 
         context.services.images.save(image_type, image_name, results[0][0], metadata)

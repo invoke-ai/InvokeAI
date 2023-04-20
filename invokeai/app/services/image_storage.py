@@ -1,22 +1,23 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-import datetime
 import os
-import json
 from glob import glob
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 from PIL.Image import Image
 import PIL.Image as PILImage
-from PIL import PngImagePlugin
-from invokeai.app.api.models.images import ImageResponse
-from invokeai.app.models.image import  ImageType
-from invokeai.app.modules.metadata import ImageMetadata, InvokeAIMetadata, MetadataModule
+from invokeai.app.api.models.images import ImageResponse, ImageResponseMetadata
+from invokeai.app.models.image import ImageType
+from invokeai.app.services.metadata import (
+    InvokeAIMetadata,
+    MetadataServiceBase,
+    build_pnginfo,
+)
 from invokeai.app.services.item_storage import PaginatedResults
-from invokeai.app.util.get_timestamp import get_timestamp
+from invokeai.app.util.misc import get_timestamp
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 from invokeai.backend.image_util import PngWriter
@@ -47,14 +48,18 @@ class ImageStorageBase(ABC):
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     @abstractmethod
-    def validate_path(
-        self, path: str
-    ) -> bool:
+    def validate_path(self, path: str) -> bool:
         """Validates an image path."""
         pass
 
     @abstractmethod
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
+    def save(
+        self,
+        image_type: ImageType,
+        image_name: str,
+        image: Image,
+        metadata: InvokeAIMetadata | None = None,
+    ) -> Tuple[str, str, int]:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image path, thumbnail path, and created timestamp."""
         pass
 
@@ -75,12 +80,14 @@ class DiskImageStorage(ImageStorageBase):
     __cache_ids: Queue  # TODO: this is an incredibly naive cache
     __cache: Dict[str, Image]
     __max_cache_size: int
+    __metadata_service: MetadataServiceBase
 
-    def __init__(self, output_folder: str):
+    def __init__(self, output_folder: str, metadata_service: MetadataServiceBase):
         self.__output_folder = output_folder
         self.__cache = dict()
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
+        self.__metadata_service = metadata_service
 
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
@@ -113,8 +120,8 @@ class DiskImageStorage(ImageStorageBase):
         for path in page_of_image_paths:
             filename = os.path.basename(path)
             img = PILImage.open(path)
-            
-            invokeai_metadata = MetadataModule.get_metadata(img)
+
+            invokeai_metadata = self.__metadata_service.get_metadata(img)
 
             page_of_images.append(
                 ImageResponse(
@@ -124,12 +131,12 @@ class DiskImageStorage(ImageStorageBase):
                     image_url=f"api/v1/images/{image_type.value}/{filename}",
                     thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
                     # TODO: Creation of this object should happen elsewhere (?), just making it fit here so it works
-                    metadata=ImageMetadata(
+                    metadata=ImageResponseMetadata(
                         created=int(os.path.getctime(path)),
                         width=img.width,
                         height=img.height,
                         mode=img.mode,
-                        invokeai=invokeai_metadata
+                        invokeai=invokeai_metadata,
                     ),
                 )
             )
@@ -172,26 +179,26 @@ class DiskImageStorage(ImageStorageBase):
 
         return path
 
-    def validate_path(
-        self, path: str
-    ) -> bool:
+    def validate_path(self, path: str) -> bool:
         try:
             os.stat(path)
             return True
         except Exception:
             return False
 
-
-    def save(self, image_type: ImageType, image_name: str, image: Image, metadata: InvokeAIMetadata | None = None) -> Tuple[str, str, int]:
+    def save(
+        self,
+        image_type: ImageType,
+        image_name: str,
+        image: Image,
+        metadata: InvokeAIMetadata | None = None,
+    ) -> Tuple[str, str, int]:
         image_path = self.get_path(image_type, image_name)
+        pnginfo = build_pnginfo(metadata=metadata)
+        image.save(image_path, "PNG", pnginfo=pnginfo)
 
         thumbnail_name = get_thumbnail_name(image_name)
         thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)
-
-        png_info = MetadataModule.build_png_info(metadata=metadata)
-
-        image.save(image_path, "PNG", pnginfo=png_info)
-
         thumbnail_image = make_thumbnail(image)
         thumbnail_image.save(thumbnail_path)
 
