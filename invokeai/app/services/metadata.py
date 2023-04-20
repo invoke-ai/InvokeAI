@@ -60,7 +60,12 @@ def parse_image_field(image_field: dict[str, Any]) -> dict[str, Any] | None:
     if type(image_field["image_name"]) is not str:
         return None
 
-    return image_field
+    parsed = {
+        "image_type": image_field["image_type"],
+        "image_name": image_field["image_name"],
+    }
+
+    return parsed
 
 
 def parse_latents_field(latents_field: dict[str, Any]) -> dict[str, Any] | None:
@@ -78,7 +83,11 @@ def parse_latents_field(latents_field: dict[str, Any]) -> dict[str, Any] | None:
     if type(latents_field["latents_name"]) is not str:
         return None
 
-    return latents_field
+    parsed = {
+        "latents_name": latents_field["latents_name"],
+    }
+
+    return parsed
 
 
 def parse_node_metadata(node_metadata: Any) -> NodeMetadata | None:
