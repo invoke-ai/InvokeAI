@@ -54,7 +54,7 @@ class ONNX(inferenceModel) :
         tic = time.time()
         try:
             txt2img_onnx = txt2img(width, height, iterations, steps)
-            txt2img_onnx.onnx_txt2img(prompt, model, precision, self.outdir)
+            txt2img_onnx.onnx_txt2img(prompt, self.model, self.precision, self.outdir)
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception
             self.clear_cuda_cache()

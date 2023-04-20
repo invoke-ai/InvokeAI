@@ -25,6 +25,7 @@ class txt2img:
         if precision == "cpu":
             onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="CPUExecutionProvider")
         else:
+            print(f"Model used: {model}")
             onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(model, revision="onnx", provider="OpenVINOExecutionProvider")
 
         try:
