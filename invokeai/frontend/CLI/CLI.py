@@ -18,7 +18,7 @@ import pyparsing  # type: ignore
 import invokeai.version as invokeai
 import invokeai.backend.util.logging as logger
 
-from ...backend import Generate, ModelManager
+from ...backend import ModelManager
 from ...backend.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
 from ...backend.globals import Globals, global_config_dir
 from ...backend.image_util import (
@@ -1053,7 +1053,7 @@ def get_next_command(infile=None, model_name="no model") -> str:  # command stri
     return command
 
 
-def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
+def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan):
     print("\n* --web was specified, starting web server...")
     from invokeai.backend.web import InvokeAIWebServer
 
