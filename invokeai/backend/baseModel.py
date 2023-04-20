@@ -4,6 +4,7 @@ Implements abstract methods for inference related operations
 """
 from abc import ABC, abstractmethod
 class inferenceModel(ABC):
+
     """
     Instantiation of Inference model class
     """
@@ -15,4 +16,8 @@ class inferenceModel(ABC):
 
     @abstractmethod
     def prompt2image(self):
+        pass
+
+    @abstractmethod
+    def getCompleter(self):
         pass

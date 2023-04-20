@@ -41,7 +41,9 @@ from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device
-from baseModel import inferenceModel
+from ..frontend.CLI.readline import Completer, get_completer
+from .globals import Globals, global_config_dir
+from .baseModel import inferenceModel
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -254,6 +256,10 @@ class Pytorch(inferenceModel):
         else:
             print(">> NSFW checker is disabled")
 
+    def getCompleter(self, opt):
+        completer = get_completer(opt, models=self.model_manager.list_models())
+        return completer
+
     def prompt2png(self, prompt, outdir, **kwargs):
         """
         Takes a prompt and an output directory, writes out the requested number
@@ -282,6 +288,77 @@ class Pytorch(inferenceModel):
             "init_img" in kwargs
         ), "call to img2img() must include the init_img argument"
         return self.prompt2png(prompt, outdir, **kwargs)
+
+    def check_internet() -> bool:
+        """
+        Return true if the internet is reachable.
+        It does this by pinging huggingface.co.
+        """
+        import urllib.request
+
+        host = "http://huggingface.co"
+        try:
+            urllib.request.urlopen(host, timeout=1)
+            return True
+        except:
+            return False
+
+    # This routine performs any patch-ups needed after installation
+    def run_patches():
+        # install ckpt configuration files that may have been added to the
+        # distro after original root directory configuration
+        import invokeai.configs as conf
+        from shutil import copyfile
+
+        root_configs = Path(global_config_dir(), 'stable-diffusion')
+        repo_configs = Path(conf.__path__[0], 'stable-diffusion')
+        if not root_configs.exists():
+            os.makedirs(root_configs, exist_ok=True)
+        for src in repo_configs.iterdir():
+            dest = root_configs / src.name
+            if not dest.exists():
+                copyfile(src, dest)
+
+    def start(self, opt, args):
+        if args.laion400m:
+            print(
+                "--laion400m flag has been deprecated. Please use --model laion400m instead."
+            )
+            sys.exit(-1)
+        if args.weights:
+            print(
+                "--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead."
+            )
+            sys.exit(-1)
+        if args.max_loaded_models is not None:
+            if args.max_loaded_models <= 0:
+                print("--max_loaded_models must be >= 1; using 1")
+                args.max_loaded_models = 1
+
+        # alert - setting a few globals here
+        Globals.try_patchmatch = args.patchmatch
+        Globals.always_use_cpu = args.always_use_cpu
+        Globals.internet_available = args.internet_available and self.check_internet()
+        Globals.disable_xformers = not args.xformers
+        Globals.sequential_guidance = args.sequential_guidance
+        Globals.ckpt_convert = True  # always true now
+
+        # run any post-install patches needed
+        self.run_patches()
+
+        print(f">> Internet connectivity is {Globals.internet_available}")
+
+        if opt.seamless:
+            print(">> changed to seamless tiling mode")
+
+        # normalize the config directory relative to root
+        if not os.path.isabs(opt.conf):
+            opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
+
+        # migrate legacy models
+        ModelManager.migrate_models()
+
+        return opt
 
     def prompt2image(
         self,
