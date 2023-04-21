@@ -26,10 +26,5 @@ export const $ImageOutput = {
       description: `The height of the image in pixels`,
       isRequired: true,
     },
-    mode: {
-      type: 'string',
-      description: `The image mode (ie pixel format)`,
-      isRequired: true,
-    },
   },
 } as const;

@@ -177,25 +177,25 @@ export const socketMiddleware = () => {
 
         // Set up listeners for the present subscription
         socket.on('invocation_started', (data) => {
-          if (shouldHandleEvent(data.invocation.id)) {
+          if (shouldHandleEvent(data.node.id)) {
             dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
           }
         });
 
         socket.on('generator_progress', (data) => {
-          if (shouldHandleEvent(data.invocation.id)) {
+          if (shouldHandleEvent(data.node.id)) {
             dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
           }
         });
 
         socket.on('invocation_error', (data) => {
-          if (shouldHandleEvent(data.invocation.id)) {
+          if (shouldHandleEvent(data.node.id)) {
             dispatch(invocationError({ data, timestamp: getTimestamp() }));
           }
         });
 
         socket.on('invocation_complete', (data) => {
-          if (shouldHandleEvent(data.invocation.id)) {
+          if (shouldHandleEvent(data.node.id)) {
             const sessionId = data.graph_execution_state_id;
 
             const { cancelType, isCancelScheduled } = getState().system;

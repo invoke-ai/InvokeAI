@@ -177,7 +177,7 @@ class TextToLatentsInvocation(BaseInvocation):
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
-            invocation_dict=self.dict(),
+            node=self.dict(),
             source_node_id=source_node_id,
         )
 

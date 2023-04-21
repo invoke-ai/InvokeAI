@@ -49,7 +49,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
                     graph_execution_state_id=graph_execution_state.id,
-                    invocation_dict=invocation.dict(),
+                    node=invocation.dict(),
                     source_node_id=source_node_id
                 )
 
@@ -79,7 +79,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send complete event
                     self.__invoker.services.events.emit_invocation_complete(
                         graph_execution_state_id=graph_execution_state.id,
-                        invocation_dict=invocation.dict(),
+                        node=invocation.dict(),
                         source_node_id=source_node_id,
                         result=outputs.dict(),
                     )
@@ -104,7 +104,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
                         graph_execution_state_id=graph_execution_state.id,
-                        invocation_dict=invocation.dict(),
+                        node=invocation.dict(),
                         source_node_id=source_node_id,
                         error=error,
                     )

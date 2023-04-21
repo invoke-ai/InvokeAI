@@ -21,9 +21,5 @@ export type ImageOutput = {
    * The height of the image in pixels
    */
   height: number;
-  /**
-   * The image mode (ie pixel format)
-   */
-  mode: string;
 };
 

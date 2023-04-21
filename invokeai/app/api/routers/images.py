@@ -3,6 +3,7 @@ import io
 from datetime import datetime, timezone
 import json
 import os
+from typing import Any
 import uuid
 
 from fastapi import HTTPException, Path, Query, Request, UploadFile
@@ -74,6 +75,7 @@ async def upload_image(
         raise HTTPException(status_code=415, detail="Not an image")
 
     contents = await file.read()
+
     try:
         img = Image.open(io.BytesIO(contents))
     except:
@@ -81,17 +83,13 @@ async def upload_image(
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
+
     (image_path, thumbnail_path, ctime) = ApiDependencies.invoker.services.images.save(
         ImageType.UPLOAD, filename, img
     )
 
-    # TODO: handle old `sd-metadata` style metadata
-    invokeai_metadata = img.info.get("invokeai", None)
+    invokeai_metadata = ApiDependencies.invoker.services.metadata.get_metadata(img)
 
-    if invokeai_metadata is not None:
-        invokeai_metadata = InvokeAIMetadata(**json.loads(invokeai_metadata))
-
-    # TODO: should creation of this object should happen elsewhere?
     res = ImageResponse(
         image_type=ImageType.UPLOAD,
         image_name=filename,
@@ -101,7 +99,6 @@ async def upload_image(
             created=ctime,
             width=img.width,
             height=img.height,
-            mode=img.mode,
             invokeai=invokeai_metadata,
         ),
     )

@@ -66,16 +66,8 @@ const uploadsSlice = createSlice({
      */
     builder.addCase(imageUploaded.fulfilled, (state, action) => {
       const { location, response } = action.payload;
-      const { image_name, image_url, image_type, metadata, thumbnail_url } =
-        response;
 
-      const uploadedImage: Image = {
-        name: image_name,
-        url: image_url,
-        thumbnail: thumbnail_url,
-        type: 'uploads',
-        metadata,
-      };
+      const uploadedImage = deserializeImageResponse(response);
 
       uploadsAdapter.addOne(state, uploadedImage);
     });

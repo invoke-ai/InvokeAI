@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageMetadata } from './ImageMetadata';
+import type { ImageResponseMetadata } from './ImageResponseMetadata';
 import type { ImageType } from './ImageType';
 
 /**
@@ -28,6 +28,6 @@ export type ImageResponse = {
   /**
    * The image's metadata
    */
-  metadata: ImageMetadata;
+  metadata: ImageResponseMetadata;
 };
 
