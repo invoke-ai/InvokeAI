@@ -188,7 +188,6 @@ class Generate:
         self.size_matters = True  # used to warn once about large image sizes and VRAM
         self.txt2mask = None
         self.safety_checker = None
-        self.karras_max = None
         self.infill_method = None
 
         # Note that in previous versions, there was an option to pass the
@@ -304,7 +303,6 @@ class Generate:
         perlin=0.0,
         h_symmetry_time_pct=None,
         v_symmetry_time_pct=None,
-        karras_max=None,
         outdir=None,
         # these are specific to img2img and inpaint
         init_img=None,
@@ -410,11 +408,8 @@ class Generate:
         self.seed = seed
         self.log_tokenization = log_tokenization
         self.step_callback = step_callback
-        self.karras_max = karras_max
-        self.infill_method = (
-            infill_method or infill_methods()[0],
-        )  # The infill method to use
-        with_variations = [] if with_variations is None else with_variations
+        self.infill_method = infill_method or infill_methods()[0]  # The infill method to use
+        with_variations = with_variations or []
 
         # will instantiate the model or return it from cache
         model = self.set_model(self.model_name)

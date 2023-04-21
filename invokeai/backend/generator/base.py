@@ -285,7 +285,7 @@ class Generator:
         self.model = model
         self.precision = precision
         self.seed = None
-        self.latent_channels = model.channels
+        self.latent_channels = model.unet.in_channels
         self.downsampling_factor = downsampling  # BUG: should come from model or config
         self.safety_checker = None
         self.perlin = 0.0
@@ -399,9 +399,7 @@ class Generator:
                 seed = self.new_seed()
 
                 # Free up memory from the last generation.
-                clear_cuda_cache = (
-                    kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
-                )
+                clear_cuda_cache = kwargs.get("clear_cuda_cache", None)
                 if clear_cuda_cache is not None:
                     clear_cuda_cache()
 

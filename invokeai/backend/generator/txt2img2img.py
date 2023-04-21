@@ -92,7 +92,7 @@ class Txt2Img2Img(Generator):
             )
 
             # Free up memory from the last generation.
-            clear_cuda_cache = kwargs["clear_cuda_cache"] or None
+            clear_cuda_cache = kwargs.get("clear_cuda_cache", None)
             if clear_cuda_cache is not None:
                 clear_cuda_cache()
 

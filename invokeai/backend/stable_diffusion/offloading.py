@@ -257,7 +257,7 @@ class FullyLoadedModelGroup(ModelGroup):
     def device_for(self, model):
         if model not in self:
             raise KeyError(
-                "This does not manage this model f{type(model).__name__}", model
+                f"This does not manage this model {type(model).__name__}", model
             )
         return (
             self.execution_device

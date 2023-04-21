@@ -28,7 +28,7 @@ class Context:
 
     class Action(enum.Enum):
         NONE = 0
-        SAVE = (1,)
+        SAVE = 1
         APPLY = 2
 
     def __init__(self, arguments: Arguments, step_count: int):

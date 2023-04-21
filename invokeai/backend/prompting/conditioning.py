@@ -150,8 +150,8 @@ def split_prompt_to_positive_and_negative(prompt_string_uncleaned: str):
 
         # Remove Unconditioned Words From Prompt
         unconditional_regex_compile = re.compile(unconditional_regex)
-        clean_prompt = unconditional_regex_compile.sub(" ", prompt_string_uncleaned)
-        prompt_string_cleaned = re.sub(" +", " ", clean_prompt)
+        clean_prompt = unconditional_regex_compile.sub(r" ", prompt_string_uncleaned)
+        prompt_string_cleaned = re.sub(r" +", r" ", clean_prompt)
     else:
         prompt_string_cleaned = prompt_string_uncleaned
     return prompt_string_cleaned, unconditioned_words
@@ -271,7 +271,7 @@ def split_weighted_subprompts(text, skip_normalize=False) -> list:
     repeats until no text remaining
     """
     prompt_parser = re.compile(
-        """
+        r"""
             (?P<prompt>     # capture group for 'prompt'
             (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
             )               # end 'prompt'

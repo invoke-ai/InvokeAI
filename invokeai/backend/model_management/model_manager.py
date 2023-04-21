@@ -125,11 +125,7 @@ class ModelManager(object):
         'hash': A unique hash of this model's files on disk.
         """
         if not model_name:
-            return (
-                self.get_model(self.current_model)
-                if self.current_model
-                else self.get_model(self.default_model())
-            )
+            return self.get_model(self.current_model or self.default_model())
 
         if not self.valid_model(model_name):
             print(

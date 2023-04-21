@@ -704,7 +704,7 @@ def write_opts(opts: Namespace, init_file: Path):
     # initfile needs to be replaced with a fully structured format
     # such as yaml; this is a hack that will work much of the time
     args_to_skip = re.compile(
-        "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
+        r"^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
     )
     # fix windows paths
     opts.outdir = opts.outdir.replace("\\", "/")
