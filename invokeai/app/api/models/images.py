@@ -32,3 +32,10 @@ class ProgressImage(BaseModel):
     width: int = Field(description="The effective width of the image in pixels")
     height: int = Field(description="The effective height of the image in pixels")
     dataURL: str = Field(description="The image data as a b64 data URL")
+
+
+class NonNullableImageField(BaseModel):
+    """Non-nullable ImageField, used for delete_images route"""
+
+    image_type: ImageType
+    image_name: str

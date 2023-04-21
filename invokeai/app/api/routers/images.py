@@ -6,12 +6,15 @@ import os
 from typing import Any
 import uuid
 
-from fastapi import HTTPException, Path, Query, Request, UploadFile
+from fastapi import Body, HTTPException, Path, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRouter
 from PIL import Image
-from invokeai.app.api.models.images import ImageResponse, ImageResponseMetadata
-from invokeai.app.services.metadata import InvokeAIMetadata
+from invokeai.app.api.models.images import (
+    ImageResponse,
+    ImageResponseMetadata,
+    NonNullableImageField,
+)
 from invokeai.app.services.item_storage import PaginatedResults
 
 from ...services.image_storage import ImageType
@@ -35,6 +38,18 @@ async def get_image(
         return FileResponse(path)
     else:
         raise HTTPException(status_code=404)
+
+
+@images_router.delete("/{image_type}/{image_name}", operation_id="delete_image")
+async def delete_image(
+    image_type: ImageType = Path(description="The type of image to delete"),
+    image_name: str = Path(description="The name of the image to delete"),
+) -> None:
+    """Deletes an image and its thumbnail"""
+
+    ApiDependencies.invoker.services.images.delete(
+        image_type=image_type, image_name=image_name
+    )
 
 
 @images_router.get(
@@ -126,3 +141,20 @@ async def list_images(
     """Gets a list of images"""
     result = ApiDependencies.invoker.services.images.list(image_type, page, per_page)
     return result
+
+
+@images_router.delete(
+    "/",
+    operation_id="delete_images",
+)
+async def delete_images(
+    images: list[NonNullableImageField] = Body(
+        description="The list of images to delete"
+    ),
+) -> None:
+    """Deletes a list of images and their thumbnails"""
+
+    for i in images:
+        ApiDependencies.invoker.services.images.delete(
+            image_type=i.image_type, image_name=i.image_name
+        )

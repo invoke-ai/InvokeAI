@@ -210,17 +210,19 @@ class DiskImageStorage(ImageStorageBase):
         return (image_path, thumbnail_path, int(os.path.getctime(image_path)))
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
-        image_path = self.get_path(image_type, image_name)
-        thumbnail_path = self.get_path(image_type, image_name, True)
+        basename = os.path.basename(image_name)
+        image_path = self.get_path(image_type, basename)
+
         if os.path.exists(image_path):
             os.remove(image_path)
-
         if image_path in self.__cache:
             del self.__cache[image_path]
 
-        if os.path.exists(thumbnail_path):
-            os.remove(thumbnail_path)
+        thumbnail_name = f"{os.path.splitext(basename)[0]}.webp"
+        thumbnail_path = self.get_path(image_type, thumbnail_name, True)
 
+        if os.path.exists(image_path):
+            os.remove(thumbnail_path)
         if thumbnail_path in self.__cache:
             del self.__cache[thumbnail_path]
 
