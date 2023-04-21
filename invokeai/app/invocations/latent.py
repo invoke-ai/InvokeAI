@@ -31,6 +31,8 @@ class LatentsField(BaseModel):
 
     latents_name: Optional[str] = Field(default=None, description="The name of the latents")
 
+    class Config:
+        schema_extra = {"required": ["latents_name"]}
 
 class LatentsOutput(BaseInvocationOutput):
     """Base class for invocations that output latents"""
