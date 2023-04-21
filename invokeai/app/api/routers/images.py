@@ -27,8 +27,8 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 async def get_image(
     image_type: ImageType = Path(description="The type of image to get"),
     image_name: str = Path(description="The name of the image to get"),
-) -> FileResponse | Response:
-    """Gets a result"""
+) -> FileResponse:
+    """Gets an image"""
 
     path = ApiDependencies.invoker.services.images.get_path(
         image_type=image_type, image_name=image_name
@@ -53,16 +53,16 @@ async def delete_image(
 
 
 @images_router.get(
-    "/{image_type}/thumbnails/{image_name}", operation_id="get_thumbnail"
+    "/{thumbnail_type}/thumbnails/{thumbnail_name}", operation_id="get_thumbnail"
 )
 async def get_thumbnail(
-    image_type: ImageType = Path(description="The type of image to get"),
-    image_name: str = Path(description="The name of the image to get"),
+    thumbnail_type: ImageType = Path(description="The type of thumbnail to get"),
+    thumbnail_name: str = Path(description="The name of the thumbnail to get"),
 ) -> FileResponse | Response:
     """Gets a thumbnail"""
 
     path = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_name=image_name, is_thumbnail=True
+        image_type=thumbnail_type, image_name=thumbnail_name, is_thumbnail=True
     )
 
     if ApiDependencies.invoker.services.images.validate_path(path):
@@ -99,7 +99,7 @@ async def upload_image(
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
 
-    (image_path, thumbnail_path, ctime) = ApiDependencies.invoker.services.images.save(
+    (image_name, thumbnail_name, ctime) = ApiDependencies.invoker.services.images.save(
         ImageType.UPLOAD, filename, img
     )
 
@@ -107,9 +107,15 @@ async def upload_image(
 
     res = ImageResponse(
         image_type=ImageType.UPLOAD,
-        image_name=filename,
-        image_url=f"api/v1/images/{ImageType.UPLOAD.value}/{filename}",
-        thumbnail_url=f"api/v1/images/{ImageType.UPLOAD.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
+        image_name=image_name,
+        image_url=request.url_for(
+            "get_image", image_type=ImageType.UPLOAD.value, image_name=image_name
+        ),
+        thumbnail_url=request.url_for(
+            "get_thumbnail",
+            thumbnail_type=ImageType.UPLOAD.value,
+            thumbnail_name=thumbnail_name,
+        ),
         metadata=ImageResponseMetadata(
             created=ctime,
             width=img.width,

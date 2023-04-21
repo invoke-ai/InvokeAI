@@ -58,7 +58,7 @@ class ImageStorageBase(ABC):
         image: Image,
         metadata: InvokeAIMetadata | None = None,
     ) -> Tuple[str, str, int]:
-        """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image path, thumbnail path, and created timestamp."""
+        """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
         pass
 
     @abstractmethod
@@ -197,7 +197,7 @@ class DiskImageStorage(ImageStorageBase):
             pnginfo = build_invokeai_metadata_pnginfo(metadata=metadata)
             image.save(image_path, "PNG", pnginfo=pnginfo)
         else:
-            image.save(image_path) # this saved image has an empty info
+            image.save(image_path)  # this saved image has an empty info
 
         thumbnail_name = get_thumbnail_name(image_name)
         thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)
@@ -207,7 +207,7 @@ class DiskImageStorage(ImageStorageBase):
         self.__set_cache(image_path, image)
         self.__set_cache(thumbnail_path, thumbnail_image)
 
-        return (image_path, thumbnail_path, int(os.path.getctime(image_path)))
+        return (image_name, thumbnail_name, int(os.path.getctime(image_path)))
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         basename = os.path.basename(image_name)
@@ -226,7 +226,7 @@ class DiskImageStorage(ImageStorageBase):
         if thumbnail_path in self.__cache:
             del self.__cache[thumbnail_path]
 
-    def __get_cache(self, image_name: str) -> Image:
+    def __get_cache(self, image_name: str) -> Image | None:
         return None if image_name not in self.__cache else self.__cache[image_name]
 
     def __set_cache(self, image_name: str, image: Image):
