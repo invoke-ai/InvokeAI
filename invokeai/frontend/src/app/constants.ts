@@ -4,18 +4,18 @@ import { InProgressImageType } from 'features/system/store/systemSlice';
 
 // Valid Diffusers Samplers
 export const DIFFUSERS_SAMPLERS: Array<string> = [
-  'ddim',
-  'plms',
   'lms',
+  'plms',
+  'ddim',
   'heun',
-  'euler',
-  'k_euler',
-  'euler_a',
   'dpm_2',
   'dpm_2_a',
   'dpmpp_2s',
   'dpmpp_2m',
   'k_dpmpp_2m',
+  'euler',
+  'k_euler',
+  'euler_a',
 ];
 
 // Valid image widths

@@ -43,16 +43,18 @@ export declare type SeedWeights = Array<SeedWeightPair>;
 export declare type CommonGeneratedImageMetadata = {
   postprocessing: null | Array<ESRGANMetadata | GFPGANMetadata>;
   sampler:
+    | 'lms'
+    | 'plms'
     | 'ddim'
-    | 'k_dpm_2_a'
-    | 'k_dpm_2'
-    | 'k_dpmpp_2_a'
-    | 'k_dpmpp_2'
-    | 'k_euler_a'
+    | 'heun'
+    | 'dpm_2'
+    | 'dpm_2_a'
+    | 'dpmpp_2s'
+    | 'dpmpp_2m'
+    | 'k_dpmpp_2m'
+    | 'euler'
     | 'k_euler'
-    | 'k_heun'
-    | 'k_lms'
-    | 'plms';
+    | 'euler_a';
   prompt: Prompt;
   seed: number;
   variations: SeedWeights;
@@ -62,6 +64,8 @@ export declare type CommonGeneratedImageMetadata = {
   height: number;
   seamless: boolean;
   hires_fix: boolean;
+  threshold: number;
+  perlin: number;
   extra: null | Record<string, never>; // Pending development of RFC #266
 };
 

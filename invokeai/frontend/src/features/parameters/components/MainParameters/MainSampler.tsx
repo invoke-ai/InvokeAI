@@ -3,7 +3,6 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import { setSampler } from 'features/parameters/store/generationSlice';
-import { activeModelSelector } from 'features/system/store/systemSelectors';
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,7 +10,6 @@ export default function MainSampler() {
   const sampler = useAppSelector(
     (state: RootState) => state.generation.sampler
   );
-  const activeModel = useAppSelector(activeModelSelector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

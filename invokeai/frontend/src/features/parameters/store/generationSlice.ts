@@ -60,7 +60,7 @@ const initialGenerationState: GenerationState = {
   textualInversionsInUse: [],
   negativeTextualInversionsInUse: [],
   addTIToNegative: false,
-  sampler: 'k_lms',
+  sampler: 'lms',
   seamBlur: 16,
   seamless: false,
   seamSize: 96,
@@ -167,6 +167,27 @@ const handleTypedLoraCheck = (state: GenerationState, newPrompt: string) => {
   }
 
   state.lorasInUse = lorasInUse;
+};
+
+const convertOldSampler = (sampler: string) => {
+  const _convertMap: { [key: string]: string } = {
+    // ddim
+    // plms
+    k_lms: 'lms',
+    k_heun: 'heun',
+
+    k_dpm_2: 'dpm_2',
+    k_dpm_2_a: 'dpm_2_a',
+
+    // dpmpp_2s
+    dpmpp_2: 'dpmpp_2m',
+    k_dpmpp_2: 'k_dpmpp_2m',
+
+    // euler
+    // k_euler
+    k_euler_a: 'euler_a',
+  };
+  return _convertMap[sampler] || sampler;
 };
 
 export const generationSlice = createSlice({
@@ -470,7 +491,7 @@ export const generationSlice = createSlice({
     setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
       const {
         type,
-        sampler,
+        //sampler,
         prompt,
         seed,
         variations,
@@ -487,6 +508,9 @@ export const generationSlice = createSlice({
         init_image_path,
         mask_image_path,
       } = action.payload.image;
+
+      // TODO: or detect somehow that (action.payload.app_version < 2.3.5) ?
+      const sampler = convertOldSampler(action.payload.image.sampler);
 
       if (type === 'img2img') {
         if (init_image_path) state.initialImage = init_image_path;
