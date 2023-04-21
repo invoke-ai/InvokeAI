@@ -1142,6 +1142,19 @@ class Generate:
             k_dpmpp_2m=(diffusers.DPMSolverMultistepScheduler, dict(use_karras_sigmas=True)),
         )
 
+        scheduler_convert_map = {
+            "k_lms": "lms",
+            "k_heun": "heun",
+            "k_euler_a": "euler_a",
+            "k_dpm_2": "dpm_2",
+            "k_dpm_2_a": "dpm_2_a",
+            "dpmpp_2": "dpmpp_2m",
+            "k_dpmpp_2": "k_dpmpp_2m",
+        }
+
+        if self.sampler_name in scheduler_convert_map:
+            self.sampler_name = scheduler_convert_map[self.sampler_name]
+
         if self.sampler_name in scheduler_map:
             sampler_class, extra_config = scheduler_map[self.sampler_name]
             msg = (
