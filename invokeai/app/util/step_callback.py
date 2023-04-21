@@ -9,7 +9,7 @@ from ...backend.stable_diffusion import PipelineIntermediateState
 def stable_diffusion_step_callback(
     context: InvocationContext,
     intermediate_state: PipelineIntermediateState,
-    invocation_dict: dict,
+    node: dict,
     source_node_id: str,
 ):
     if context.services.queue.is_canceled(context.graph_execution_state_id):
@@ -47,9 +47,9 @@ def stable_diffusion_step_callback(
 
     context.services.events.emit_generator_progress(
         graph_execution_state_id=context.graph_execution_state_id,
-        invocation_dict=invocation_dict,
+        node=node,
         source_node_id=source_node_id,
         progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
         step=intermediate_state.step,
-        total_steps=invocation_dict["steps"],
+        total_steps=node["steps"],
     )

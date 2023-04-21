@@ -14,13 +14,11 @@ from invokeai.app.models.image import ImageType
 from invokeai.app.services.metadata import (
     InvokeAIMetadata,
     MetadataServiceBase,
-    build_pnginfo,
+    build_invokeai_metadata_pnginfo,
 )
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.util.misc import get_timestamp
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
-
-from invokeai.backend.image_util import PngWriter
 
 
 class ImageStorageBase(ABC):
@@ -135,7 +133,6 @@ class DiskImageStorage(ImageStorageBase):
                         created=int(os.path.getctime(path)),
                         width=img.width,
                         height=img.height,
-                        mode=img.mode,
                         invokeai=invokeai_metadata,
                     ),
                 )
@@ -194,8 +191,13 @@ class DiskImageStorage(ImageStorageBase):
         metadata: InvokeAIMetadata | None = None,
     ) -> Tuple[str, str, int]:
         image_path = self.get_path(image_type, image_name)
-        pnginfo = build_pnginfo(metadata=metadata)
-        image.save(image_path, "PNG", pnginfo=pnginfo)
+
+        # TODO: Reading the image and then saving it strips the metadata...
+        if metadata:
+            pnginfo = build_invokeai_metadata_pnginfo(metadata=metadata)
+            image.save(image_path, "PNG", pnginfo=pnginfo)
+        else:
+            image.save(image_path) # this saved image has an empty info
 
         thumbnail_name = get_thumbnail_name(image_name)
         thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)

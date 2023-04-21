@@ -31,7 +31,7 @@ export const $ImageResponse = {
       type: 'all-of',
       description: `The image's metadata`,
       contains: [{
-        type: 'ImageMetadata',
+        type: 'ImageResponseMetadata',
       }],
       isRequired: true,
     },

@@ -30,7 +30,8 @@ export type AnyResult = GraphExecutionState['results'][string];
  */
 export type GeneratorProgressEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocation;
+  node: AnyInvocation;
+  source_node_id: string;
   progress_image?: ProgressImage;
   step: number;
   total_steps: number;
@@ -45,7 +46,8 @@ export type GeneratorProgressEvent = {
  */
 export type InvocationCompleteEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocation;
+  node: AnyInvocation;
+  source_node_id: string;
   result: AnyResult;
 };
 
@@ -56,7 +58,8 @@ export type InvocationCompleteEvent = {
  */
 export type InvocationErrorEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocation;
+  node: AnyInvocation;
+  source_node_id: string;
   error: string;
 };
 
@@ -67,7 +70,8 @@ export type InvocationErrorEvent = {
  */
 export type InvocationStartedEvent = {
   graph_execution_state_id: string;
-  invocation: AnyInvocation;
+  node: AnyInvocation;
+  source_node_id: string;
 };
 
 /**

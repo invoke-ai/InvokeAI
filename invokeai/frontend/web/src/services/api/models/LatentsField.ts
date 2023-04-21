@@ -9,6 +9,6 @@ export type LatentsField = {
   /**
    * The name of the latents
    */
-  latents_name?: string;
+  latents_name: string;
 };
 

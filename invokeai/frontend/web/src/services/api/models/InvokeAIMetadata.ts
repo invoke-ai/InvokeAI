@@ -2,16 +2,11 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { NodeMetadata } from './NodeMetadata';
+import type { MetadataImageField } from './MetadataImageField';
+import type { MetadataLatentsField } from './MetadataLatentsField';
 
 export type InvokeAIMetadata = {
-  /**
-   * The session in which this image was created
-   */
   session_id?: string;
-  /**
-   * The node that created this image
-   */
-  node?: NodeMetadata;
+  node?: Record<string, (string | number | boolean | MetadataImageField | MetadataLatentsField)>;
 };
 

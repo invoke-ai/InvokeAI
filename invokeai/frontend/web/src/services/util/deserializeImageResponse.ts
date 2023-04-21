@@ -1,4 +1,5 @@
 import { Image } from 'app/invokeai';
+import { parseInvokeAIMetadata } from 'common/util/parseMetadata';
 import { ImageResponse } from 'services/api';
 
 /**
@@ -11,12 +12,18 @@ export const deserializeImageResponse = (
     imageResponse;
 
   // TODO: parse metadata - just leaving it as-is for now
+  const { invokeai, ...rest } = metadata;
+
+  const parsedMetadata = parseInvokeAIMetadata(invokeai);
 
   return {
     name: image_name,
     type: image_type,
     url: image_url,
     thumbnail: thumbnail_url,
-    metadata,
+    metadata: {
+      ...rest,
+      ...(invokeai ? { invokeai: parsedMetadata } : {}),
+    },
   };
 };

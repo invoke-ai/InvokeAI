@@ -43,6 +43,8 @@ type SessionCreatedArg = {
 export const sessionCreated = createAppAsyncThunk(
   'api/sessionCreated',
   async (arg: SessionCreatedArg, { dispatch, getState }) => {
+    console.log('Session created, graph: ', arg.graph);
+
     const response = await SessionsService.createSession({
       requestBody: arg.graph,
     });

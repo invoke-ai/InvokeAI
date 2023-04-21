@@ -26,7 +26,7 @@ export const $RandomRangeInvocation = {
     },
     seed: {
       type: 'number',
-      description: `The seed for the RNG, provide None or -1 for random`,
+      description: `The seed for the RNG`,
       maximum: 2147483647,
     },
   },

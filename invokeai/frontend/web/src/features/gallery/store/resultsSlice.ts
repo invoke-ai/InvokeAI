@@ -36,10 +36,6 @@ type AdditionalResultsState = {
   nextPage: number; // the next page to request
 };
 
-// export type ResultsState = ReturnType<
-//   typeof resultsAdapter.getInitialState<AdditionalResultsState>
-// >;
-
 export const initialResultsState =
   resultsAdapter.getInitialState<AdditionalResultsState>({
     // provide the additional initial state
@@ -97,7 +93,7 @@ const resultsSlice = createSlice({
      */
     builder.addCase(invocationComplete, (state, action) => {
       const { data } = action.payload;
-      const { result, invocation, graph_execution_state_id } = data;
+      const { result, node, graph_execution_state_id } = data;
 
       if (isImageOutput(result)) {
         const name = result.image.image_name;
@@ -115,10 +111,9 @@ const resultsSlice = createSlice({
             created: timestamp,
             width: result.width, // TODO: add tese dimensions
             height: result.height,
-            mode: result.mode,
             invokeai: {
               session_id: graph_execution_state_id,
-              invocation,
+              ...(node ? { node } : {}),
             },
           },
         };

@@ -11,7 +11,6 @@ class ImageResponseMetadata(BaseModel):
     created: int = Field(description="The creation timestamp of the image")
     width: int = Field(description="The width of the image in pixels")
     height: int = Field(description="The height of the image in pixels")
-    mode: str = Field(description="The color mode of the image")
     invokeai: Optional[InvokeAIMetadata] = Field(
         description="The image's InvokeAI-specific metadata"
     )

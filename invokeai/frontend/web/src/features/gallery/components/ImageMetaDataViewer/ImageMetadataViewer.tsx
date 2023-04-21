@@ -192,21 +192,21 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             <MetadataItem
               label="Seed"
               value={node.seed}
-              onClick={() => dispatch(setSeed(node.seed))}
+              onClick={() => dispatch(setSeed(Number(node.seed)))}
             />
           )}
           {node.threshold !== undefined && (
             <MetadataItem
               label="Noise Threshold"
               value={node.threshold}
-              onClick={() => dispatch(setThreshold(node.threshold))}
+              onClick={() => dispatch(setThreshold(Number(node.threshold)))}
             />
           )}
           {node.perlin !== undefined && (
             <MetadataItem
               label="Perlin Noise"
               value={node.perlin}
-              onClick={() => dispatch(setPerlin(node.perlin))}
+              onClick={() => dispatch(setPerlin(Number(node.perlin)))}
             />
           )}
           {node.scheduler && (
@@ -220,14 +220,14 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             <MetadataItem
               label="Steps"
               value={node.steps}
-              onClick={() => dispatch(setSteps(node.steps))}
+              onClick={() => dispatch(setSteps(Number(node.steps)))}
             />
           )}
           {node.cfg_scale !== undefined && (
             <MetadataItem
               label="CFG scale"
               value={node.cfg_scale}
-              onClick={() => dispatch(setCfgScale(node.cfg_scale))}
+              onClick={() => dispatch(setCfgScale(Number(node.cfg_scale)))}
             />
           )}
           {node.variations && node.variations.length > 0 && (
@@ -257,14 +257,14 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             <MetadataItem
               label="Width"
               value={node.width}
-              onClick={() => dispatch(setWidth(node.width))}
+              onClick={() => dispatch(setWidth(Number(node.width)))}
             />
           )}
           {node.height && (
             <MetadataItem
               label="Height"
               value={node.height}
-              onClick={() => dispatch(setHeight(node.height))}
+              onClick={() => dispatch(setHeight(Number(node.height)))}
             />
           )}
           {/* {init_image_path && (
@@ -279,7 +279,9 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             <MetadataItem
               label="Image to image strength"
               value={node.strength}
-              onClick={() => dispatch(setImg2imgStrength(node.strength))}
+              onClick={() =>
+                dispatch(setImg2imgStrength(Number(node.strength)))
+              }
             />
           )}
           {node.fit && (

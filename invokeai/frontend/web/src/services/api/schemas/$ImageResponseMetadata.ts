@@ -1,7 +1,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export const $ImageMetadata = {
+export const $ImageResponseMetadata = {
   description: `An image's metadata. Used only in HTTP responses.`,
   properties: {
     created: {
@@ -17,11 +17,6 @@ export const $ImageMetadata = {
     height: {
       type: 'number',
       description: `The height of the image in pixels`,
-      isRequired: true,
-    },
-    mode: {
-      type: 'string',
-      description: `The color mode of the image`,
       isRequired: true,
     },
     invokeai: {
