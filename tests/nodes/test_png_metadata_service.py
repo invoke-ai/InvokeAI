@@ -43,7 +43,7 @@ def test_can_load_and_parse_invokeai_metadata(tmp_path):
     loaded_metadata = metadata_service.get_metadata(image)
 
     assert loaded_metadata is not None
-    assert raw_metadata == loaded_metadata["invokeai"]
+    assert raw_metadata == loaded_metadata
 
 
 def test_can_build_invokeai_metadata():
