@@ -1,4 +1,8 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
+import {
+  PayloadAction,
+  createEntityAdapter,
+  createSlice,
+} from '@reduxjs/toolkit';
 import { Image } from 'app/invokeai';
 import { invocationComplete } from 'services/events/actions';
 
@@ -13,6 +17,7 @@ import {
   extractTimestampFromImageName,
 } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
+import { imageReceived, thumbnailReceived } from 'services/thunks/image';
 
 // use `createEntityAdapter` to create a slice for results images
 // https://redux-toolkit.js.org/api/createEntityAdapter#overview
@@ -34,6 +39,7 @@ type AdditionalResultsState = {
   pages: number; // the total number of pages available
   isLoading: boolean; // whether we are loading more images or not, mostly a placeholder
   nextPage: number; // the next page to request
+  shouldFetchImages: boolean; // whether we need to re-fetch images or not
 };
 
 // export type ResultsState = ReturnType<
@@ -47,6 +53,7 @@ export const initialResultsState =
     pages: 0,
     isLoading: false,
     nextPage: 0,
+    shouldFetchImages: false,
   });
 
 export type ResultsState = typeof initialResultsState;
@@ -61,6 +68,10 @@ const resultsSlice = createSlice({
     // here we just use the function itself as the reducer. we'll call this on `invocation_complete`
     // to add a single result
     resultAdded: resultsAdapter.upsertOne,
+
+    setShouldFetchImages: (state, action: PayloadAction<boolean>) => {
+      state.shouldFetchImages = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // here we can respond to a fulfilled call of the `getNextResultsPage` thunk
@@ -102,7 +113,10 @@ const resultsSlice = createSlice({
       if (isImageOutput(result)) {
         const name = result.image.image_name;
         const type = result.image.image_type;
-        const { url, thumbnail } = buildImageUrls(type, name);
+        // if we need to refetch, set URLs to placeholder for now
+        const { url, thumbnail } = state.shouldFetchImages
+          ? { url: '', thumbnail: '' }
+          : buildImageUrls(type, name);
 
         const timestamp = extractTimestampFromImageName(name);
 
@@ -118,13 +132,37 @@ const resultsSlice = createSlice({
             mode: result.mode,
             invokeai: {
               session_id: graph_execution_state_id,
-              invocation,
+              node: invocation,
             },
           },
         };
 
         resultsAdapter.addOne(state, image);
       }
+    });
+
+    builder.addCase(imageReceived.fulfilled, (state, action) => {
+      const { imagePath } = action.payload;
+      const { imageName } = action.meta.arg;
+
+      resultsAdapter.updateOne(state, {
+        id: imageName,
+        changes: {
+          url: imagePath,
+        },
+      });
+    });
+
+    builder.addCase(thumbnailReceived.fulfilled, (state, action) => {
+      const { thumbnailPath } = action.payload;
+      const { imageName } = action.meta.arg;
+
+      resultsAdapter.updateOne(state, {
+        id: imageName,
+        changes: {
+          thumbnail: thumbnailPath,
+        },
+      });
     });
   },
 });
@@ -139,6 +177,6 @@ export const {
   selectTotal: selectResultsTotal,
 } = resultsAdapter.getSelectors<RootState>((state) => state.results);
 
-export const { resultAdded } = resultsSlice.actions;
+export const { resultAdded, setShouldFetchImages } = resultsSlice.actions;
 
 export default resultsSlice.reducer;

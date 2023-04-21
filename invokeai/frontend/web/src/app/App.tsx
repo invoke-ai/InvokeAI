@@ -18,6 +18,7 @@ import { PropsWithChildren, useEffect } from 'react';
 import { setDisabledPanels, setDisabledTabs } from 'features/ui/store/uiSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { shouldTransformUrlsChanged } from 'features/system/store/systemSlice';
+import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
 
 keepGUIAlive();
 
@@ -26,6 +27,7 @@ interface Props extends PropsWithChildren {
     disabledPanels: string[];
     disabledTabs: InvokeTabName[];
     shouldTransformUrls?: boolean;
+    shouldFetchImages: boolean;
   };
 }
 
@@ -43,6 +45,10 @@ const App = (props: Props) => {
   useEffect(() => {
     dispatch(setDisabledTabs(props.options.disabledTabs));
   }, [dispatch, props.options.disabledTabs]);
+
+  useEffect(() => {
+    dispatch(setShouldFetchImages(props.options.shouldFetchImages));
+  }, [dispatch, props.options.shouldFetchImages]);
 
   useEffect(() => {
     dispatch(

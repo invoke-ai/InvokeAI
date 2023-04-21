@@ -16,6 +16,21 @@ export const imageReceived = createAppAsyncThunk(
   }
 );
 
+type ThumbnailReceivedArg = Parameters<
+  (typeof ImagesService)['getThumbnail']
+>[0];
+
+/**
+ * `ImagesService.getThumbnail()` thunk
+ */
+export const thumbnailReceived = createAppAsyncThunk(
+  'api/thumbnailReceived',
+  async (arg: ThumbnailReceivedArg, _thunkApi) => {
+    const response = await ImagesService.getThumbnail(arg);
+    return response;
+  }
+);
+
 type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
 
 /**

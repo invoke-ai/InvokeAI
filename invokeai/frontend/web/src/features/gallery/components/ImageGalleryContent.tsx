@@ -254,7 +254,7 @@ const ImageGalleryContent = () => {
                   const isSelected = currentImageUuid === name;
                   return (
                     <HoverableImage
-                      key={name}
+                      key={`${name}-${image.thumbnail}`}
                       image={image}
                       isSelected={isSelected}
                     />

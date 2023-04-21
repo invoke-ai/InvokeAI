@@ -30,6 +30,8 @@ import {
 import { OpenAPI } from 'services/api';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { isImageOutput } from 'services/types/guards';
+import { imageReceived, thumbnailReceived } from 'services/thunks/image';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -211,6 +213,21 @@ export const socketMiddleware = () => {
 
         // Finally we actually invoke the session, starting processing
         dispatch(sessionInvoked({ sessionId }));
+      }
+
+      if (invocationComplete.match(action)) {
+        const { results } = getState();
+
+        if (results.shouldFetchImages) {
+          const { result } = action.payload.data;
+          if (isImageOutput(result)) {
+            const imageName = result.image.image_name;
+            const imageType = result.image.image_type;
+
+            dispatch(imageReceived({ imageName, imageType }));
+            dispatch(thumbnailReceived({ imageName, imageType }));
+          }
+        }
       }
 
       // Always pass the action on so other middleware and reducers can handle it

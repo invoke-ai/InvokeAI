@@ -30,6 +30,7 @@ interface Props extends PropsWithChildren {
   disabledTabs?: InvokeTabName[];
   token?: string;
   shouldTransformUrls?: boolean;
+  shouldFetchImages?: boolean;
 }
 
 export default function Component({
@@ -39,6 +40,7 @@ export default function Component({
   token,
   children,
   shouldTransformUrls,
+  shouldFetchImages = false,
 }: Props) {
   useEffect(() => {
     // configure API client token
@@ -70,7 +72,12 @@ export default function Component({
           <React.Suspense fallback={<Loading showText />}>
             <ThemeLocaleProvider>
               <App
-                options={{ disabledPanels, disabledTabs, shouldTransformUrls }}
+                options={{
+                  disabledPanels,
+                  disabledTabs,
+                  shouldTransformUrls,
+                  shouldFetchImages,
+                }}
               >
                 {children}
               </App>
