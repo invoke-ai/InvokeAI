@@ -1,7 +1,7 @@
 import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { reduce } from 'lodash';
-import { Node } from 'reactflow';
+import { Node, useReactFlow } from 'reactflow';
 import { AnyInvocationType } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -15,6 +15,8 @@ export const useBuildInvocation = () => {
   const invocationTemplates = useAppSelector(
     (state: RootState) => state.nodes.invocationTemplates
   );
+
+  const reactflow = useReactFlow();
 
   return (type: AnyInvocationType) => {
     const template = invocationTemplates[type];
@@ -61,10 +63,15 @@ export const useBuildInvocation = () => {
       {} as Record<string, OutputFieldValue>
     );
 
+    const { x, y } = reactflow.project({
+      x: window.innerWidth / 2.5,
+      y: window.innerHeight / 8,
+    });
+
     const invocation: Node<InvocationValue> = {
       id: nodeId,
       type: 'invocation',
-      position: { x: 0, y: 0 },
+      position: { x: x, y: y },
       data: {
         id: nodeId,
         type,
