@@ -1,6 +1,5 @@
 import {
   Background,
-  MiniMap,
   OnConnect,
   OnEdgesChange,
   OnNodesChange,
@@ -23,6 +22,7 @@ import TopLeftPanel from './panels/TopLeftPanel';
 import TopRightPanel from './panels/TopRightPanel';
 import TopCenterPanel from './panels/TopCenterPanel';
 import BottomLeftPanel from './panels/BottomLeftPanel.tsx';
+import MinimapPanel from './panels/MinimapPanel';
 
 const nodeTypes = { invocation: InvocationComponent };
 
@@ -59,12 +59,9 @@ export const Flow = () => {
     [dispatch]
   );
 
-  const onConnectEnd: OnConnectEnd = useCallback(
-    (event) => {
-      dispatch(connectionEnded());
-    },
-    [dispatch]
-  );
+  const onConnectEnd: OnConnectEnd = useCallback(() => {
+    dispatch(connectionEnded());
+  }, [dispatch]);
 
   return (
     <ReactFlow
@@ -85,7 +82,7 @@ export const Flow = () => {
       <TopRightPanel />
       <BottomLeftPanel />
       <Background />
-      <MiniMap nodeStrokeWidth={3} zoomable pannable />
+      <MinimapPanel />
     </ReactFlow>
   );
 };
