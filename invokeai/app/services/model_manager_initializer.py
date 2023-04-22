@@ -7,10 +7,9 @@ from omegaconf import OmegaConf
 from pathlib import Path
 
 import invokeai.version
-from .config_management import InvokeAISettings
+from .config import InvokeAISettings
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
-from ...backend import Globals
 
 # TODO: Replace with an abstract class base ModelManagerBase
 def get_model_manager(config:InvokeAISettings) -> ModelManager:
@@ -21,7 +20,7 @@ def get_model_manager(config:InvokeAISettings) -> ModelManager:
         )
 
     print(f">> {invokeai.version.__app_name__}, version {invokeai.version.__version__}")
-    print(f'>> InvokeAI runtime directory is "{Globals.root}"')
+    print(f'>> InvokeAI runtime directory is "{config.root_dir}"')
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported

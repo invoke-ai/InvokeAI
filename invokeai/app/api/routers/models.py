@@ -8,10 +8,6 @@ from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from pathlib import Path
 from ..dependencies import ApiDependencies
-from invokeai.backend.globals import Globals, global_converted_ckpts_dir
-from invokeai.backend.args import Args
-
-
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 

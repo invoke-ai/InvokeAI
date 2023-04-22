@@ -25,6 +25,7 @@ from ..invocations.baseinvocation import (
     BaseInvocationOutput,
     InvocationContext,
 )
+from .config import InvokeAISettings
 
 
 class EdgeConnection(BaseModel):
@@ -211,9 +212,10 @@ class CollectInvocation(BaseInvocation):
 InvocationsUnion = Union[BaseInvocation.get_invocations()]  # type: ignore
 InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]  # type: ignore
 
-
-class Graph(BaseModel):
+class Graph(InvokeAISettings):
     id: str = Field(description="The id of this graph", default_factory=lambda: uuid.uuid4().__str__())
+    type: Literal["graph"] = "graph"
+
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
     nodes: dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]] = Field(
         description="The nodes in this graph", default_factory=dict
@@ -749,7 +751,7 @@ class GraphExecutionState(BaseModel):
     """Tracks the state of a graph execution"""
 
     id: str = Field(description="The id of the execution state", default_factory=lambda: uuid.uuid4().__str__())
-
+    
     # TODO: Store a reference to the graph instead of the actual graph?
     graph: Graph = Field(description="The graph being executed")
 
@@ -1154,8 +1156,9 @@ class ExposedNodeOutput(BaseModel):
     field: str = Field(description="The field name of the output")
     alias: str = Field(description="The alias of the output")
 
-class LibraryGraph(BaseModel):
+class LibraryGraph(InvokeAISettings):
     id: str = Field(description="The unique identifier for this library graph", default_factory=uuid.uuid4)
+    type: Literal["graph"] = "graph"
     graph: Graph = Field(description="The graph")
     name: str = Field(description="The name of the graph")
     description: str = Field(description="The description of the graph")

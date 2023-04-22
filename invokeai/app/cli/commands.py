@@ -1,15 +1,15 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
 from abc import ABC, abstractmethod
 import argparse
 from typing import Any, Callable, Iterable, Literal, Union, get_args, get_type_hints
-from pydantic import BaseModel, Field
+from pydantic import Field
 import networkx as nx
 import matplotlib.pyplot as plt
 
 from ..invocations.baseinvocation import BaseInvocation
+from ..services.config import InvokeAISettings
 from ..invocations.image import ImageField
-from ..services.config_management import add_field_argument
 from ..services.graph import GraphExecutionState, LibraryGraph, Edge
 from ..services.invoker import Invoker
 
@@ -24,21 +24,11 @@ def add_parsers(
 
     # Create subparsers for each command
     for command in commands:
-        hints = get_type_hints(command)
-        cmd_name = get_args(hints[command_field])[0]
-        command_parser = subparsers.add_parser(cmd_name, help=command.__doc__)
-
+        name = command.cmd_name()
+        command_parser = subparsers.add_parser(name, help=command.__doc__)
         if add_arguments is not None:
             add_arguments(command_parser)
-
-        # Convert all fields to arguments
-        fields = command.__fields__ # type: ignore
-        for name, field in fields.items():
-            if name in exclude_fields:
-                continue
-
-            add_field_argument(command_parser, name, field)
-
+        command.add_parser_arguments(command_parser)
 
 def add_graph_parsers(
     subparsers,
@@ -49,15 +39,14 @@ def add_graph_parsers(
         command_parser = subparsers.add_parser(graph.name, help=graph.description)
         
         if add_arguments is not None:
-            add_arguments(command_parser)
+            graph.add_parser_arguments(command_parser)
 
         # Add arguments for inputs
         for exposed_input in graph.exposed_inputs:
             node = graph.graph.get_node(exposed_input.node_path)
             field = node.__fields__[exposed_input.field]
             default_override = getattr(node, exposed_input.field)
-            add_field_argument(command_parser, exposed_input.alias, field, default_override)
-
+            graph.add_field_argument(command_parser, exposed_input.alias, field, default_override)
 
 class CliContext:
     invoker: Invoker
@@ -102,7 +91,7 @@ class ExitCli(Exception):
     pass
 
 
-class BaseCommand(ABC, BaseModel):
+class BaseCommand(ABC, InvokeAISettings):
     """A CLI command"""
 
     # All commands must include a type name like this:

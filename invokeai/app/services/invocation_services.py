@@ -7,7 +7,7 @@ from .image_storage import ImageStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
 from .item_storage import ItemStorageABC
-from .config_management import InvokeAISettings
+from .config import InvokeAISettings
 
 class InvocationServices:
     """Services that can be used by invocations"""

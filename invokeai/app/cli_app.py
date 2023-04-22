@@ -32,8 +32,7 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-from .services.config_management import get_configuration
-from .services.app_settings import InvokeAIAppConfig
+from .services.config import InvokeAIAppConfig
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -188,16 +187,13 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    config = get_configuration(InvokeAIAppConfig)
-    config.parse_args()
-    
+    config = InvokeAIAppConfig()
     model_manager = get_model_manager(config)
 
     # This initializes the autocompleter and returns it.
     # Currently nothing is done with the returned Completer
     # object, but the object can be used to change autocompletion
     # behavior on the fly, if desired.
-    set_autocompleter(model_manager)
 
     events = EventServiceBase()
 
@@ -237,6 +233,8 @@ def invoke_cli():
 
     context = CliContext(invoker, session, parser)
 
+    set_autocompleter(services)
+
     while True:
         try:
             cmd_input = input("invoke> ")
@@ -260,7 +258,6 @@ def invoke_cli():
 
                 # Parse args to create invocation
                 args = vars(context.parser.parse_args(shlex.split(cmd.strip())))
-                print(f'DEBUG: cmd={cmd}, args={args}')
 
                 # Override defaults
                 for field_name, field_default in context.defaults.items():

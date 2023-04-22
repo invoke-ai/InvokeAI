@@ -17,8 +17,7 @@ from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
-from .services.config_management import get_configuration
-from .services.app_settings import InvokeAIWebConfig, InvokeAIAppConfig
+from .services.config import InvokeAIWebConfig
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -35,8 +34,8 @@ app.add_middleware(
 )
 
 # Add CORS, using the web configuration stanza in `invokeai.yaml`
-web_conf = get_configuration(InvokeAIWebConfig)
-web_conf.parse_args()
+# Shouldn't  this be in startup_event()?
+web_conf = InvokeAIWebConfig()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=web_conf.allow_origins,
@@ -53,8 +52,7 @@ config = {}
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    config = get_configuration(InvokeAIAppConfig)
-    config.parse_args()
+    config = InvokeAIWebConfig()
 
     ApiDependencies.initialize(
         config=config, event_handler_id=event_handler_id

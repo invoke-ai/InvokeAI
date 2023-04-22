@@ -43,6 +43,7 @@ class ApiDependencies:
 
     @staticmethod
     def initialize(config, event_handler_id: int):
+        TODO: Get rid of Globals
         Globals.try_patchmatch = config.patchmatch
         Globals.always_use_cpu = config.always_use_cpu
         Globals.internet_available = config.internet_available and check_internet()

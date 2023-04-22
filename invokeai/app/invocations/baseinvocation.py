@@ -7,7 +7,7 @@ from typing import get_args, get_type_hints, Dict, List, Literal, TypedDict
 from pydantic import BaseModel, BaseSettings, Field
 
 from ..services.invocation_services import InvocationServices
-from ..services.config_management import InvokeAISettings
+from ..services.config import InvokeAISettings
 
 class InvocationContext:
     services: InvocationServices
