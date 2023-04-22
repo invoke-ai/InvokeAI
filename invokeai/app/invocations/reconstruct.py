@@ -1,12 +1,11 @@
-from datetime import datetime, timezone
 from typing import Literal, Union
 
 from pydantic import Field
 
 from invokeai.app.models.image import ImageField, ImageType
-from ..services.invocation_services import InvocationServices
+
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
-from .image import ImageOutput
+from .image import ImageOutput, build_image_output
 
 class RestoreFaceInvocation(BaseInvocation):
     """Restores faces in an image."""
@@ -44,7 +43,14 @@ class RestoreFaceInvocation(BaseInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, results[0][0])
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
+        )
+
+        context.services.images.save(image_type, image_name, results[0][0], metadata)
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=results[0][0]
         )

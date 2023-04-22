@@ -19,9 +19,7 @@ export default function MainWidth() {
 
   return shouldUseSliders ? (
     <IAISlider
-      isSliderDisabled={activeTabName === 'unifiedCanvas'}
-      isInputDisabled={activeTabName === 'unifiedCanvas'}
-      isResetDisabled={activeTabName === 'unifiedCanvas'}
+      isDisabled={activeTabName === 'unifiedCanvas'}
       label={t('parameters.width')}
       value={width}
       min={64}

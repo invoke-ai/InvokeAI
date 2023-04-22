@@ -3,6 +3,8 @@
 import os
 from argparse import Namespace
 
+from invokeai.app.services.metadata import PngMetadataService, MetadataServiceBase
+
 from ..services.default_graphs import create_system_graphs
 
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -61,7 +63,9 @@ class ApiDependencies:
 
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
 
-        images = DiskImageStorage(f'{output_folder}/images')
+        metadata = PngMetadataService()
+
+        images = DiskImageStorage(f'{output_folder}/images', metadata_service=metadata)
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
@@ -71,6 +75,7 @@ class ApiDependencies:
             events=events,
             latents=latents,
             images=images,
+            metadata=metadata,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"

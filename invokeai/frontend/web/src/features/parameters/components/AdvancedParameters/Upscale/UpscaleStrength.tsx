@@ -27,9 +27,7 @@ export default function UpscaleStrength() {
       withSliderMarks
       withInput
       withReset
-      isSliderDisabled={!isESRGANAvailable}
-      isInputDisabled={!isESRGANAvailable}
-      isResetDisabled={!isESRGANAvailable}
+      isDisabled={!isESRGANAvailable}
     />
   );
 }

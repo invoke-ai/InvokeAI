@@ -9,11 +9,14 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setCurrentImage } from 'features/gallery/store/gallerySlice';
 import {
+  imageSelected,
+  setCurrentImage,
+} from 'features/gallery/store/gallerySlice';
+import {
+  initialImageSelected,
   setAllImageToImageParameters,
   setAllParameters,
-  setInitialImage,
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { DragEvent, memo, useState } from 'react';
@@ -31,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useGetUrl } from 'common/util/getUrl';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -40,7 +44,7 @@ interface HoverableImageProps {
 const memoEqualityCheck = (
   prev: HoverableImageProps,
   next: HoverableImageProps
-) => prev.image.uuid === next.image.uuid && prev.isSelected === next.isSelected;
+) => prev.image.name === next.image.name && prev.isSelected === next.isSelected;
 
 /**
  * Gallery image component with delete/use all/use seed buttons on hover.
@@ -55,7 +59,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     shouldUseSingleGalleryColumn,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
-  const { url, thumbnail, uuid, metadata } = image;
+  const { url, thumbnail, name, metadata } = image;
+  const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -69,10 +74,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleMouseOut = () => setIsHovered(false);
 
   const handleUsePrompt = () => {
-    if (image.metadata?.image?.prompt) {
-      setBothPrompts(image.metadata?.image?.prompt);
+    if (image.metadata?.sd_metadata?.prompt) {
+      setBothPrompts(image.metadata?.sd_metadata?.prompt);
     }
-
     toast({
       title: t('toast.promptSet'),
       status: 'success',
@@ -82,7 +86,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseSeed = () => {
-    image.metadata && dispatch(setSeed(image.metadata.image.seed));
+    image.metadata.sd_metadata &&
+      dispatch(setSeed(image.metadata.sd_metadata.image.seed));
     toast({
       title: t('toast.seedSet'),
       status: 'success',
@@ -92,20 +97,11 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
-    dispatch(setInitialImage(image));
-    if (activeTabName !== 'img2img') {
-      dispatch(setActiveTab('img2img'));
-    }
-    toast({
-      title: t('toast.sentToImageToImage'),
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
+    dispatch(initialImageSelected(image.name));
   };
 
   const handleSendToCanvas = () => {
-    dispatch(setInitialCanvasImage(image));
+    // dispatch(setInitialCanvasImage(image));
 
     dispatch(resizeAndScaleCanvas());
 
@@ -122,7 +118,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseAllParameters = () => {
-    metadata && dispatch(setAllParameters(metadata));
+    metadata.sd_metadata && dispatch(setAllParameters(metadata.sd_metadata));
     toast({
       title: t('toast.parametersSet'),
       status: 'success',
@@ -132,11 +128,13 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseInitialImage = async () => {
-    if (metadata?.image?.init_image_path) {
-      const response = await fetch(metadata.image.init_image_path);
+    if (metadata.sd_metadata?.image?.init_image_path) {
+      const response = await fetch(
+        metadata.sd_metadata?.image?.init_image_path
+      );
       if (response.ok) {
         dispatch(setActiveTab('img2img'));
-        dispatch(setAllImageToImageParameters(metadata));
+        dispatch(setAllImageToImageParameters(metadata?.sd_metadata));
         toast({
           title: t('toast.initialImageSet'),
           status: 'success',
@@ -155,16 +153,20 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     });
   };
 
-  const handleSelectImage = () => dispatch(setCurrentImage(image));
+  const handleSelectImage = () => {
+    dispatch(imageSelected(image.name));
+  };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData('invokeai/imageUuid', uuid);
+    console.log('drag started');
+    e.dataTransfer.setData('invokeai/imageName', image.name);
+    e.dataTransfer.setData('invokeai/imageType', image.type);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleLightBox = () => {
-    dispatch(setCurrentImage(image));
-    dispatch(setIsLightboxOpen(true));
+    // dispatch(setCurrentImage(image));
+    // dispatch(setIsLightboxOpen(true));
   };
 
   return (
@@ -177,28 +179,30 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           </MenuItem>
           <MenuItem
             onClickCapture={handleUsePrompt}
-            isDisabled={image?.metadata?.image?.prompt === undefined}
+            isDisabled={image?.metadata?.sd_metadata?.prompt === undefined}
           >
             {t('parameters.usePrompt')}
           </MenuItem>
 
           <MenuItem
             onClickCapture={handleUseSeed}
-            isDisabled={image?.metadata?.image?.seed === undefined}
+            isDisabled={image?.metadata?.sd_metadata?.seed === undefined}
           >
             {t('parameters.useSeed')}
           </MenuItem>
           <MenuItem
             onClickCapture={handleUseAllParameters}
             isDisabled={
-              !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
+              !['txt2img', 'img2img'].includes(
+                image?.metadata?.sd_metadata?.type
+              )
             }
           >
             {t('parameters.useAll')}
           </MenuItem>
           <MenuItem
             onClickCapture={handleUseInitialImage}
-            isDisabled={image?.metadata?.image?.type !== 'img2img'}
+            isDisabled={image?.metadata?.sd_metadata?.type !== 'img2img'}
           >
             {t('parameters.useInitImg')}
           </MenuItem>
@@ -209,9 +213,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             {t('parameters.sendToUnifiedCanvas')}
           </MenuItem>
           <MenuItem data-warning>
-            <DeleteImageModal image={image}>
+            {/* <DeleteImageModal image={image}>
               <p>{t('parameters.deleteImage')}</p>
-            </DeleteImageModal>
+            </DeleteImageModal> */}
           </MenuItem>
         </MenuList>
       )}
@@ -219,7 +223,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       {(ref) => (
         <Box
           position="relative"
-          key={uuid}
+          key={name}
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
           userSelect="none"
@@ -244,7 +248,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
             }
             rounded="md"
-            src={thumbnail || url}
+            src={getUrl(thumbnail || url)}
             loading="lazy"
             sx={{
               position: 'absolute',
@@ -290,7 +294,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 insetInlineEnd: 1,
               }}
             >
-              <DeleteImageModal image={image}>
+              {/* <DeleteImageModal image={image}>
                 <IAIIconButton
                   aria-label={t('parameters.deleteImage')}
                   icon={<FaTrashAlt />}
@@ -298,7 +302,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                   fontSize={14}
                   isDisabled={!mayDeleteImage}
                 />
-              </DeleteImageModal>
+              </DeleteImageModal> */}
             </Box>
           )}
         </Box>

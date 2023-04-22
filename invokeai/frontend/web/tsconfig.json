@@ -18,5 +18,6 @@
     "jsx": "react-jsx"
   },
   "include": ["src", "index.d.ts"],
+  "exclude": ["src/services/fixtures/*"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -14,6 +14,9 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
   const img2imgStrength = useAppSelector(
     (state: RootState) => state.generation.img2imgStrength
   );
+  const isImageToImageEnabled = useAppSelector(
+    (state: RootState) => state.generation.isImageToImageEnabled
+  );
 
   const dispatch = useAppDispatch();
 
@@ -37,6 +40,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       inputWidth={22}
       withReset
       handleReset={handleImg2ImgStrengthReset}
+      isDisabled={!isImageToImageEnabled}
     />
   );
 }
