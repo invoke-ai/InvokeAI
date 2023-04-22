@@ -19,11 +19,11 @@ const handleBaseStyles: CSSProperties = {
 };
 
 const inputHandleStyles: CSSProperties = {
-  left: '-1.6rem',
+  left: '-1rem',
 };
 
 const outputHandleStyles: CSSProperties = {
-  right: '-0.6rem',
+  right: '-0.5rem',
 };
 
 const requiredConnectionStyles: CSSProperties = {

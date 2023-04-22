@@ -20,12 +20,16 @@ import {
   edgesChanged,
   nodesChanged,
 } from '../store/nodesSlice';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { InvocationComponent } from './InvocationComponent';
 import { AddNodeMenu } from './AddNodeMenu';
 import { FieldTypeLegend } from './FieldTypeLegend';
 import { Button } from '@chakra-ui/react';
 import { nodesGraphBuilt } from 'services/thunks/session';
+import { IAIIconButton } from 'exports';
+import { InfoIcon } from '@chakra-ui/icons';
+import { ViewportControls } from './ViewportControls';
+import NodeGraphOverlay from './NodeGraphOverlay';
 
 const nodeTypes = { invocation: InvocationComponent };
 
@@ -33,6 +37,9 @@ export const Flow = () => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
   const edges = useAppSelector((state: RootState) => state.nodes.edges);
+  const shouldShowGraphOverlay = useAppSelector(
+    (state: RootState) => state.nodes.shouldShowGraphOverlay
+  );
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -95,9 +102,12 @@ export const Flow = () => {
       </Panel>
       <Panel position="top-right">
         <FieldTypeLegend />
+        {shouldShowGraphOverlay && <NodeGraphOverlay />}
+      </Panel>
+      <Panel position="bottom-left">
+        <ViewportControls />
       </Panel>
       <Background />
-      <Controls />
       <MiniMap nodeStrokeWidth={3} zoomable pannable />
     </ReactFlow>
   );

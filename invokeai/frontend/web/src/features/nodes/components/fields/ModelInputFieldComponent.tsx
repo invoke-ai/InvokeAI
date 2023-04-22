@@ -6,7 +6,7 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ModelInputFieldTemplate,
   ModelInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import {
   selectModelsById,
   selectModelsIds,

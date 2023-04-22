@@ -12,7 +12,7 @@ import {
   FloatInputFieldValue,
   IntegerInputFieldTemplate,
   IntegerInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import { FieldComponentProps } from './types';
 
 export const NumberInputFieldComponent = (

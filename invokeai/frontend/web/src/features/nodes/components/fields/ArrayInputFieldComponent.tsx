@@ -1,7 +1,7 @@
 import {
   ArrayInputFieldTemplate,
   ArrayInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import { FaImage, FaList } from 'react-icons/fa';
 import { FieldComponentProps } from './types';
 
