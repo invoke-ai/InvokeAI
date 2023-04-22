@@ -1,3 +1,4 @@
+import { NODE_MIN_WIDTH } from 'app/constants';
 import { memo } from 'react';
 import { NodeResizeControl, NodeResizerProps } from 'reactflow';
 
@@ -14,7 +15,7 @@ const IAINodeResizer = (props: NodeResizerProps) => {
         bottom: 0,
         right: 0,
       }}
-      minWidth={350}
+      minWidth={NODE_MIN_WIDTH}
       {...rest}
     ></NodeResizeControl>
   );
