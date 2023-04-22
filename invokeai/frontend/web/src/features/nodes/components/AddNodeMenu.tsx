@@ -49,7 +49,7 @@ export const AddNodeMenu = () => {
   return (
     <Menu>
       <MenuButton as={IconButton} aria-label="Add Node" icon={<FaPlus />} />
-      <MenuList>
+      <MenuList overflowY="scroll" height={400}>
         {map(invocationTemplates, ({ title, description, type }, key) => {
           return (
             <Tooltip key={key} label={description} placement="end" hasArrow>
