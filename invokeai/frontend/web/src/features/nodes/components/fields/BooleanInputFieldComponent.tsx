@@ -4,11 +4,11 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   BooleanInputFieldTemplate,
   BooleanInputFieldValue,
-} from 'features/nodes/types';
-import { ChangeEvent } from 'react';
+} from 'features/nodes/types/types';
+import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
-export const BooleanInputFieldComponent = (
+const BooleanInputFieldComponent = (
   props: FieldComponentProps<BooleanInputFieldValue, BooleanInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
@@ -29,3 +29,5 @@ export const BooleanInputFieldComponent = (
     <Switch onChange={handleValueChanged} isChecked={field.value}></Switch>
   );
 };
+
+export default memo(BooleanInputFieldComponent);

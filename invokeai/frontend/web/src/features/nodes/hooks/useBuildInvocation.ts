@@ -1,7 +1,9 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { reduce } from 'lodash';
-import { Node } from 'reactflow';
+import { useCallback } from 'react';
+import { Node, useReactFlow } from 'reactflow';
 import { AnyInvocationType } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -11,68 +13,82 @@ import {
 } from '../types/types';
 import { buildInputFieldValue } from '../util/fieldValueBuilders';
 
+const templatesSelector = createSelector(
+  [(state: RootState) => state.nodes],
+  (nodes) => nodes.invocationTemplates,
+  { memoizeOptions: { resultEqualityCheck: (a, b) => true } }
+);
+
 export const useBuildInvocation = () => {
-  const invocationTemplates = useAppSelector(
-    (state: RootState) => state.nodes.invocationTemplates
-  );
+  const invocationTemplates = useAppSelector(templatesSelector);
 
-  return (type: AnyInvocationType) => {
-    const template = invocationTemplates[type];
+  const flow = useReactFlow();
 
-    if (template === undefined) {
-      console.error(`Unable to find template ${type}.`);
-      return;
-    }
+  return useCallback(
+    (type: AnyInvocationType) => {
+      const template = invocationTemplates[type];
 
-    const nodeId = uuidv4();
+      if (template === undefined) {
+        console.error(`Unable to find template ${type}.`);
+        return;
+      }
 
-    const inputs = reduce(
-      template.inputs,
-      (inputsAccumulator, inputTemplate, inputName) => {
-        const fieldId = uuidv4();
+      const nodeId = uuidv4();
 
-        const inputFieldValue: InputFieldValue = buildInputFieldValue(
-          fieldId,
-          inputTemplate
-        );
+      const inputs = reduce(
+        template.inputs,
+        (inputsAccumulator, inputTemplate, inputName) => {
+          const fieldId = uuidv4();
 
-        inputsAccumulator[inputName] = inputFieldValue;
+          const inputFieldValue: InputFieldValue = buildInputFieldValue(
+            fieldId,
+            inputTemplate
+          );
 
-        return inputsAccumulator;
-      },
-      {} as Record<string, InputFieldValue>
-    );
+          inputsAccumulator[inputName] = inputFieldValue;
 
-    const outputs = reduce(
-      template.outputs,
-      (outputsAccumulator, outputTemplate, outputName) => {
-        const fieldId = uuidv4();
+          return inputsAccumulator;
+        },
+        {} as Record<string, InputFieldValue>
+      );
 
-        const outputFieldValue: OutputFieldValue = {
-          id: fieldId,
-          name: outputName,
-          type: outputTemplate.type,
-        };
+      const outputs = reduce(
+        template.outputs,
+        (outputsAccumulator, outputTemplate, outputName) => {
+          const fieldId = uuidv4();
 
-        outputsAccumulator[outputName] = outputFieldValue;
+          const outputFieldValue: OutputFieldValue = {
+            id: fieldId,
+            name: outputName,
+            type: outputTemplate.type,
+          };
 
-        return outputsAccumulator;
-      },
-      {} as Record<string, OutputFieldValue>
-    );
+          outputsAccumulator[outputName] = outputFieldValue;
 
-    const invocation: Node<InvocationValue> = {
-      id: nodeId,
-      type: 'invocation',
-      position: { x: 0, y: 0 },
-      data: {
+          return outputsAccumulator;
+        },
+        {} as Record<string, OutputFieldValue>
+      );
+
+      const { x, y } = flow.project({
+        x: window.innerWidth / 2.5,
+        y: window.innerHeight / 8,
+      });
+
+      const invocation: Node<InvocationValue> = {
         id: nodeId,
-        type,
-        inputs,
-        outputs,
-      },
-    };
+        type: 'invocation',
+        position: { x: x, y: y },
+        data: {
+          id: nodeId,
+          type,
+          inputs,
+          outputs,
+        },
+      };
 
-    return invocation;
-  };
+      return invocation;
+    },
+    [invocationTemplates, flow]
+  );
 };

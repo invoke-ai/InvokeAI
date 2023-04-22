@@ -6,13 +6,13 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ModelInputFieldTemplate,
   ModelInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import {
   selectModelsById,
   selectModelsIds,
 } from 'features/system/store/modelSlice';
 import { isEqual, map } from 'lodash';
-import { ChangeEvent } from 'react';
+import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const availableModelsSelector = createSelector(
@@ -28,7 +28,7 @@ const availableModelsSelector = createSelector(
   }
 );
 
-export const ModelInputFieldComponent = (
+const ModelInputFieldComponent = (
   props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
@@ -55,3 +55,5 @@ export const ModelInputFieldComponent = (
     </Select>
   );
 };
+
+export default memo(ModelInputFieldComponent);

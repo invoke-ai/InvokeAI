@@ -1,13 +1,14 @@
 import { Box } from '@chakra-ui/react';
+import { memo } from 'react';
 import { InputFieldTemplate, InputFieldValue } from '../types/types';
-import { ArrayInputFieldComponent } from './fields/ArrayInputField.tsx';
-import { BooleanInputFieldComponent } from './fields/BooleanInputFieldComponent';
-import { EnumInputFieldComponent } from './fields/EnumInputFieldComponent';
-import { ImageInputFieldComponent } from './fields/ImageInputFieldComponent';
-import { LatentsInputFieldComponent } from './fields/LatentsInputFieldComponent';
-import { ModelInputFieldComponent } from './fields/ModelInputFieldComponent';
-import { NumberInputFieldComponent } from './fields/NumberInputFieldComponent';
-import { StringInputFieldComponent } from './fields/StringInputFieldComponent';
+import ArrayInputFieldComponent from './fields/ArrayInputFieldComponent';
+import BooleanInputFieldComponent from './fields/BooleanInputFieldComponent';
+import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
+import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
+import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
+import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
+import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
+import StringInputFieldComponent from './fields/StringInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -16,7 +17,7 @@ type InputFieldComponentProps = {
 };
 
 // build an individual input element based on the schema
-export const InputFieldComponent = (props: InputFieldComponentProps) => {
+const InputFieldComponent = (props: InputFieldComponentProps) => {
   const { nodeId, field, template } = props;
   const { type, value } = field;
 
@@ -105,3 +106,5 @@ export const InputFieldComponent = (props: InputFieldComponentProps) => {
 
   return <Box p={2}>Unknown field type: {type}</Box>;
 };
+
+export default memo(InputFieldComponent);

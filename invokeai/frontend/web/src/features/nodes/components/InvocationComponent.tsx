@@ -1,242 +1,98 @@
-import { NodeProps, useReactFlow } from 'reactflow';
-import {
-  Box,
-  Flex,
-  FormControl,
-  FormLabel,
-  Heading,
-  HStack,
-  Tooltip,
-  Icon,
-  Code,
-  Text,
-} from '@chakra-ui/react';
-import { FaExclamationCircle, FaInfoCircle } from 'react-icons/fa';
-import { InvocationValue } from '../types/types';
-import { InputFieldComponent } from './InputFieldComponent';
-import { FieldHandle } from './FieldHandle';
-import { isEqual, map, size } from 'lodash';
-import { memo, useMemo, useRef } from 'react';
-import { useIsValidConnection } from '../hooks/useIsValidConnection';
-import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
-import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
+import { NodeProps } from 'reactflow';
+import { Box, Flex, Icon, useToken } from '@chakra-ui/react';
+import { FaExclamationCircle } from 'react-icons/fa';
+import { InvocationTemplate, InvocationValue } from '../types/types';
 
-const connectedInputFieldsSelector = createSelector(
-  [(state: RootState) => state.nodes.edges],
-  (edges) => {
-    // return edges.map((e) => e.targetHandle);
-    return edges;
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
+import { memo, PropsWithChildren, useMemo } from 'react';
+import IAINodeOutputs from './IAINode/IAINodeOutputs';
+import IAINodeInputs from './IAINode/IAINodeInputs';
+import IAINodeHeader from './IAINode/IAINodeHeader';
+import IAINodeResizer from './IAINode/IAINodeResizer';
+import { RootState } from 'app/store';
+import { AnyInvocationType } from 'services/events/types';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/storeHooks';
+
+type InvocationComponentWrapperProps = PropsWithChildren & {
+  selected: boolean;
+};
+
+const InvocationComponentWrapper = (props: InvocationComponentWrapperProps) => {
+  const [nodeSelectedOutline, nodeShadow] = useToken('shadows', [
+    'nodeSelectedOutline',
+    'dark-lg',
+  ]);
+
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        borderRadius: 'md',
+        boxShadow: props.selected
+          ? `${nodeSelectedOutline}, ${nodeShadow}`
+          : `${nodeShadow}`,
+      }}
+    >
+      {props.children}
+    </Box>
+  );
+};
+
+const makeTemplateSelector = (type: AnyInvocationType) =>
+  createSelector(
+    [(state: RootState) => state.nodes],
+    (nodes) => {
+      const template = nodes.invocationTemplates[type];
+      if (!template) {
+        return;
+      }
+      return template;
     },
-  }
-);
+    {
+      memoizeOptions: {
+        resultEqualityCheck: (
+          a: InvocationTemplate | undefined,
+          b: InvocationTemplate | undefined
+        ) => a !== undefined && b !== undefined && a.type === b.type,
+      },
+    }
+  );
 
 export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
   const { id: nodeId, data, selected } = props;
   const { type, inputs, outputs } = data;
 
-  const isValidConnection = useIsValidConnection();
+  const templateSelector = useMemo(() => makeTemplateSelector(type), [type]);
 
-  const connectedInputs = useAppSelector(connectedInputFieldsSelector);
-  const getInvocationTemplate = useGetInvocationTemplate();
-  // TODO: determine if a field/handle is connected and disable the input if so
+  const template = useAppSelector(templateSelector);
 
-  const template = useRef(getInvocationTemplate(type));
-
-  if (!template.current) {
+  if (!template) {
     return (
-      <Box
-        sx={{
-          padding: 4,
-          bg: 'base.800',
-          borderRadius: 'md',
-          boxShadow: 'dark-lg',
-          borderWidth: 2,
-          borderColor: selected ? 'base.400' : 'transparent',
-        }}
-      >
+      <InvocationComponentWrapper selected={selected}>
         <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>
           <Icon color="base.400" boxSize={32} as={FaExclamationCircle}></Icon>
+          <IAINodeResizer />
         </Flex>
-      </Box>
+      </InvocationComponentWrapper>
     );
   }
 
   return (
-    <Box
-      sx={{
-        padding: 4,
-        bg: 'base.800',
-        borderRadius: 'md',
-        boxShadow: 'dark-lg',
-        borderWidth: 2,
-        borderColor: selected ? 'base.400' : 'transparent',
-      }}
-    >
-      <Flex flexDirection="column" gap={2}>
-        <>
-          <Code>{nodeId}</Code>
-          <HStack justifyContent="space-between">
-            <Heading size="sm" fontWeight={500} color="base.100">
-              {template.current.title}
-            </Heading>
-            <Tooltip
-              label={template.current.description}
-              placement="top"
-              hasArrow
-              shouldWrapChildren
-            >
-              <Icon color="base.300" as={FaInfoCircle} />
-            </Tooltip>
-          </HStack>
-          {map(inputs, (input, i) => {
-            const { id: fieldId } = input;
-            const inputTemplate = template.current?.inputs[input.name];
-
-            if (!inputTemplate) {
-              return (
-                <Box
-                  key={fieldId}
-                  position="relative"
-                  p={2}
-                  borderWidth={1}
-                  borderRadius="md"
-                  sx={{
-                    borderColor: 'error.400',
-                  }}
-                >
-                  <FormControl isDisabled={true}>
-                    <HStack justifyContent="space-between" alignItems="center">
-                      <FormLabel>Unknown input: {input.name}</FormLabel>
-                    </HStack>
-                  </FormControl>
-                </Box>
-              );
-            }
-
-            const isConnected = Boolean(
-              connectedInputs.filter((connectedInput) => {
-                return (
-                  connectedInput.target === nodeId &&
-                  connectedInput.targetHandle === input.name
-                );
-              }).length
-            );
-
-            return (
-              <Box
-                key={fieldId}
-                position="relative"
-                p={2}
-                borderWidth={1}
-                borderRadius="md"
-                sx={{
-                  borderColor:
-                    !isConnected &&
-                    ['always', 'connectionOnly'].includes(
-                      String(inputTemplate?.inputRequirement)
-                    ) &&
-                    input.value === undefined
-                      ? 'warning.400'
-                      : undefined,
-                }}
-              >
-                <FormControl isDisabled={isConnected}>
-                  <HStack justifyContent="space-between" alignItems="center">
-                    <FormLabel>{inputTemplate?.title}</FormLabel>
-                    <Tooltip
-                      label={inputTemplate?.description}
-                      placement="top"
-                      hasArrow
-                      shouldWrapChildren
-                    >
-                      <Icon color="base.400" as={FaInfoCircle} />
-                    </Tooltip>
-                  </HStack>
-                  <InputFieldComponent
-                    nodeId={nodeId}
-                    field={input}
-                    template={inputTemplate}
-                  />
-                </FormControl>
-                {!['never', 'directOnly'].includes(
-                  inputTemplate?.inputRequirement ?? ''
-                ) && (
-                  <FieldHandle
-                    nodeId={nodeId}
-                    field={inputTemplate}
-                    isValidConnection={isValidConnection}
-                    handleType="target"
-                  />
-                )}
-              </Box>
-            );
-          })}
-          {map(outputs).map((output, i) => {
-            const outputTemplate = template.current?.outputs[output.name];
-
-            const isConnected = Boolean(
-              connectedInputs.filter((connectedInput) => {
-                return (
-                  connectedInput.source === nodeId &&
-                  connectedInput.sourceHandle === output.name
-                );
-              }).length
-            );
-
-            if (!outputTemplate) {
-              return (
-                <Box
-                  key={output.id}
-                  position="relative"
-                  p={2}
-                  borderWidth={1}
-                  borderRadius="md"
-                  sx={{
-                    borderColor: 'error.400',
-                  }}
-                >
-                  <FormControl isDisabled={true}>
-                    <HStack justifyContent="space-between" alignItems="center">
-                      <FormLabel>Unknown output: {output.name}</FormLabel>
-                    </HStack>
-                  </FormControl>
-                </Box>
-              );
-            }
-
-            return (
-              <Box
-                key={output.id}
-                position="relative"
-                p={2}
-                borderWidth={1}
-                borderRadius="md"
-              >
-                <FormControl isDisabled={isConnected}>
-                  <FormLabel textAlign="end">
-                    {outputTemplate?.title} Output
-                  </FormLabel>
-                </FormControl>
-                <FieldHandle
-                  key={output.id}
-                  nodeId={nodeId}
-                  field={outputTemplate}
-                  isValidConnection={isValidConnection}
-                  handleType="source"
-                />
-              </Box>
-            );
-          })}
-        </>
+    <InvocationComponentWrapper selected={selected}>
+      <IAINodeHeader nodeId={nodeId} template={template} />
+      <Flex
+        sx={{
+          flexDirection: 'column',
+          borderBottomRadius: 'md',
+          bg: 'base.800',
+          py: 2,
+        }}
+      >
+        <IAINodeOutputs nodeId={nodeId} outputs={outputs} template={template} />
+        <IAINodeInputs nodeId={nodeId} inputs={inputs} template={template} />
       </Flex>
-      <Flex></Flex>
-    </Box>
+      <IAINodeResizer />
+    </InvocationComponentWrapper>
   );
 });
 

@@ -2,8 +2,9 @@ import 'reactflow/dist/style.css';
 import { Tooltip, Badge, HStack } from '@chakra-ui/react';
 import { map } from 'lodash';
 import { FIELDS } from '../types/constants';
+import { memo } from 'react';
 
-export const FieldTypeLegend = () => {
+const FieldTypeLegend = () => {
   return (
     <HStack>
       {map(FIELDS, ({ title, description, color }, key) => (
@@ -16,3 +17,5 @@ export const FieldTypeLegend = () => {
     </HStack>
   );
 };
+
+export default memo(FieldTypeLegend);

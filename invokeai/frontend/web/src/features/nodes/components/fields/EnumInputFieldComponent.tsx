@@ -4,11 +4,11 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   EnumInputFieldTemplate,
   EnumInputFieldValue,
-} from 'features/nodes/types';
-import { ChangeEvent } from 'react';
+} from 'features/nodes/types/types';
+import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
-export const EnumInputFieldComponent = (
+const EnumInputFieldComponent = (
   props: FieldComponentProps<EnumInputFieldValue, EnumInputFieldTemplate>
 ) => {
   const { nodeId, field, template } = props;
@@ -33,3 +33,5 @@ export const EnumInputFieldComponent = (
     </Select>
   );
 };
+
+export default memo(EnumInputFieldComponent);
