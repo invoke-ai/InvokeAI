@@ -67,7 +67,12 @@ const App = (props: Props) => {
           h={APP_HEIGHT}
         >
           {props.children || <SiteHeader />}
-          <Flex gap={4} w="full" h="full">
+          <Flex
+            gap={4}
+            w={{ base: '100vw', xl: 'full' }}
+            h="full"
+            flexDir={{ base: 'column', xl: 'row' }}
+          >
             <InvokeTabs />
             <ImageGalleryPanel />
           </Flex>

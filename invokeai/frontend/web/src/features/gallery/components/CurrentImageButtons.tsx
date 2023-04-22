@@ -425,9 +425,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   return (
     <Flex
       sx={{
+        flexWrap: 'wrap',
         justifyContent: 'center',
         alignItems: 'center',
-        columnGap: '0.5em',
+        gap: 2,
       }}
       {...props}
     >

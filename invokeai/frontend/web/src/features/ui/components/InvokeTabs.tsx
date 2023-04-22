@@ -138,9 +138,16 @@ export default function InvokeTabs() {
         dispatch(setActiveTab(index));
       }}
       flexGrow={1}
+      flexDir={{ base: 'column', xl: 'row' }}
+      gap={{ base: 4 }}
       isLazy
     >
-      <TabList pt={2} gap={4}>
+      <TabList
+        pt={2}
+        gap={4}
+        flexDir={{ base: 'row', xl: 'column' }}
+        justifyContent={{ base: 'center', xl: 'start' }}
+      >
         {tabs}
       </TabList>
       <TabPanels>{tabPanels}</TabPanels>

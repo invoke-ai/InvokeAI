@@ -29,7 +29,10 @@ export const theme: ThemeOverride = {
       body: {
         bg: 'base.900',
         color: 'base.50',
-        overflow: 'hidden',
+        overflow: {
+          base: 'scroll',
+          xl: 'hidden',
+        },
       },
       '*': { ...no_scrollbar },
     }),
@@ -37,6 +40,14 @@ export const theme: ThemeOverride = {
   direction: 'ltr',
   fonts: {
     body: `'Inter', sans-serif`,
+  },
+  breakpoints: {
+    base: '0em', // 0px and onwards
+    sm: '30em', // 480px and onwards
+    md: '48em', // 768px and onwards
+    lg: '62em', // 992px and onwards
+    xl: '80em', // 1280px and onwards
+    '2xl': '96em', // 1536px and onwards
   },
   shadows: {
     light: {
