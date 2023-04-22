@@ -42,8 +42,6 @@ const FieldHandle = (props: FieldHandleProps) => {
   const { nodeId, field, isValidConnection, handleType, styles } = props;
   const { name, title, type, description } = field;
 
-  console.log(props);
-
   return (
     <Tooltip
       label={type}
