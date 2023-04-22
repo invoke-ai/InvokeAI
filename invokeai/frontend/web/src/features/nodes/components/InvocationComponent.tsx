@@ -1,4 +1,4 @@
-import { NodeProps } from 'reactflow';
+import { NodeProps, NodeResizeControl } from 'reactflow';
 import { Box, Flex, Icon } from '@chakra-ui/react';
 import { FaExclamationCircle } from 'react-icons/fa';
 import { InvocationValue } from '../types/types';
@@ -8,6 +8,8 @@ import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
 import IAINodeOutputs from './IAINode/IAINodeOutputs';
 import IAINodeInputs from './IAINode/IAINodeInputs';
 import IAINodeHeader from './IAINode/IAINodeHeader';
+import { IoResize } from 'react-icons/io5';
+import IAINodeResizer from './IAINode/IAINodeResizer';
 
 export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
   const { id: nodeId, data, selected } = props;
@@ -32,6 +34,7 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
       >
         <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>
           <Icon color="base.400" boxSize={32} as={FaExclamationCircle}></Icon>
+          <IAINodeResizer />
         </Flex>
       </Box>
     );
@@ -51,6 +54,7 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
         <IAINodeHeader nodeId={nodeId} template={template} />
         <IAINodeOutputs nodeId={nodeId} outputs={outputs} template={template} />
         <IAINodeInputs nodeId={nodeId} inputs={inputs} template={template} />
+        <IAINodeResizer />
       </Flex>
     </Box>
   );
