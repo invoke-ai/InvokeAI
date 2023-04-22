@@ -4,9 +4,8 @@ import pytest
 from omegaconf import OmegaConf
 from pathlib import Path
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import InvokeAIAppConfig, InvokeAISettings
 from invokeai.app.invocations.generate import TextToImageInvocation
-from invokeai.app.cli.commands import HistoryCommand
 
 init1 = OmegaConf.create(
 '''
@@ -53,13 +52,14 @@ def test_use_init():
     assert conf2.nsfw_checker
     assert conf2.max_loaded_models==2
     assert not hasattr(conf2,'invalid_attribute')
+    
 
 def test_argv_override():
     conf = InvokeAIAppConfig(init1,['--nsfw_checker','--max_loaded=10'])
     assert conf.nsfw_checker
     assert conf.max_loaded_models==10
     assert conf.outdir==Path('outputs')  # this is the default
-
+    
 def test_env_override():
     # argv overrides 
     conf = InvokeAIAppConfig(conf=init1,argv=['--max_loaded=10'])
@@ -74,7 +74,7 @@ def test_env_override():
 
     conf = InvokeAIAppConfig(conf=init1,argv=[],max_loaded_models=20)
     assert conf.max_loaded_models==20
-
+    
 def test_invocation():
     invocation = TextToImageInvocation(conf=init1,id='foobar')
     assert invocation.steps==18

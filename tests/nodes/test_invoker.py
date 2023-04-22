@@ -8,7 +8,6 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.graph import Graph, GraphInvocation, InvalidEdgeError, LibraryGraph, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation, GraphExecutionState
 import pytest
 
-
 @pytest.fixture
 def simple_graph():
     g = Graph()
