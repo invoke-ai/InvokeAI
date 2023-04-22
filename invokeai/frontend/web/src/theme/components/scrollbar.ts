@@ -1,11 +1,13 @@
-export const no_scrollbar = {
+import { ChakraProps } from '@chakra-ui/react';
+
+export const no_scrollbar: ChakraProps['sx'] = {
   '::-webkit-scrollbar': {
     display: 'none',
   },
   scrollbarWidth: 'none',
 };
 
-export const scrollbar = {
+export const scrollbar: ChakraProps['sx'] = {
   scrollbarColor: 'accent.600 transparent',
   scrollbarWidth: 'thick',
   '::-webkit-scrollbar': {
@@ -26,6 +28,6 @@ export const scrollbar = {
     borderColor: 'accent.500',
   },
   '::-webkit-scrollbar-button': {
-    background: 'transaprent',
+    background: 'transparent',
   },
 };

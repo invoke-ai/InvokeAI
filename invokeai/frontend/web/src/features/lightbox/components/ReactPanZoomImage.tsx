@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { TransformComponent, useTransformContext } from 'react-zoom-pan-pinch';
 import * as InvokeAI from 'app/invokeai';
+import { useGetUrl } from 'common/util/getUrl';
 
 type ReactPanZoomProps = {
-  image: InvokeAI.Image;
+  image: InvokeAI._Image;
   styleClass?: string;
   alt?: string;
   ref?: React.Ref<HTMLImageElement>;
@@ -22,6 +23,7 @@ export default function ReactPanZoomImage({
   scaleY,
 }: ReactPanZoomProps) {
   const { centerView } = useTransformContext();
+  const { getUrl } = useGetUrl();
 
   return (
     <TransformComponent
@@ -35,7 +37,7 @@ export default function ReactPanZoomImage({
           transform: `rotate(${rotation}deg) scaleX(${scaleX})  scaleY(${scaleY})`,
           width: '100%',
         }}
-        src={image.url}
+        src={getUrl(image.url)}
         alt={alt}
         ref={ref}
         className={styleClass ? styleClass : ''}

@@ -14,8 +14,9 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
 import {
+  initialImageSelected,
   setAllParameters,
-  setInitialImage,
+  // setInitialImage,
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
@@ -48,11 +49,15 @@ import {
   FaShareAlt,
   FaTrash,
 } from 'react-icons/fa';
-import { gallerySelector } from '../store/gallerySelectors';
+import {
+  gallerySelector,
+  selectedImageSelector,
+} from '../store/gallerySelectors';
 import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { useGetUrl } from 'common/util/getUrl';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -62,6 +67,7 @@ const currentImageButtonsSelector = createSelector(
     uiSelector,
     lightboxSelector,
     activeTabNameSelector,
+    selectedImageSelector,
   ],
   (
     system: SystemState,
@@ -69,7 +75,8 @@ const currentImageButtonsSelector = createSelector(
     postprocessing,
     ui,
     lightbox,
-    activeTabName
+    activeTabName,
+    selectedImage
   ) => {
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
@@ -95,6 +102,7 @@ const currentImageButtonsSelector = createSelector(
       activeTabName,
       isLightboxOpen,
       shouldHidePreview,
+      selectedImage,
     };
   },
   {
@@ -121,27 +129,33 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     facetoolStrength,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
-    currentImage,
+    // currentImage,
     isLightboxOpen,
     activeTabName,
     shouldHidePreview,
+    selectedImage,
   } = useAppSelector(currentImageButtonsSelector);
+  const { getUrl, shouldTransformUrls } = useGetUrl();
 
   const toast = useToast();
   const { t } = useTranslation();
   const setBothPrompts = useSetBothPrompts();
 
   const handleClickUseAsInitialImage = () => {
-    if (!currentImage) return;
+    if (!selectedImage) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
-    dispatch(setInitialImage(currentImage));
-    dispatch(setActiveTab('img2img'));
+    dispatch(initialImageSelected(selectedImage.name));
+    // dispatch(setInitialImage(currentImage));
+
+    // dispatch(setActiveTab('img2img'));
   };
 
   const handleCopyImage = async () => {
-    if (!currentImage) return;
+    if (!selectedImage) return;
 
-    const blob = await fetch(currentImage.url).then((res) => res.blob());
+    const blob = await fetch(getUrl(selectedImage.url)).then((res) =>
+      res.blob()
+    );
     const data = [new ClipboardItem({ [blob.type]: blob })];
 
     await navigator.clipboard.write(data);
@@ -155,24 +169,26 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleCopyImageLink = () => {
-    navigator.clipboard
-      .writeText(
-        currentImage ? window.location.toString() + currentImage.url : ''
-      )
-      .then(() => {
-        toast({
-          title: t('toast.imageLinkCopied'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
+    const url = selectedImage
+      ? shouldTransformUrls
+        ? getUrl(selectedImage.url)
+        : window.location.toString() + selectedImage.url
+      : '';
+
+    navigator.clipboard.writeText(url).then(() => {
+      toast({
+        title: t('toast.imageLinkCopied'),
+        status: 'success',
+        duration: 2500,
+        isClosable: true,
       });
+    });
   };
 
   useHotkeys(
     'shift+i',
     () => {
-      if (currentImage) {
+      if (selectedImage) {
         handleClickUseAsInitialImage();
         toast({
           title: t('toast.sentToImageToImage'),
@@ -190,7 +206,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [currentImage]
+    [selectedImage]
   );
 
   const handlePreviewVisibility = () => {
@@ -198,20 +214,23 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleClickUseAllParameters = () => {
-    if (!currentImage) return;
-    currentImage.metadata && dispatch(setAllParameters(currentImage.metadata));
-    if (currentImage.metadata?.image.type === 'img2img') {
-      dispatch(setActiveTab('img2img'));
-    } else if (currentImage.metadata?.image.type === 'txt2img') {
-      dispatch(setActiveTab('txt2img'));
-    }
+    if (!selectedImage) return;
+    // selectedImage.metadata &&
+    //   dispatch(setAllParameters(selectedImage.metadata));
+    // if (selectedImage.metadata?.image.type === 'img2img') {
+    //   dispatch(setActiveTab('img2img'));
+    // } else if (selectedImage.metadata?.image.type === 'txt2img') {
+    //   dispatch(setActiveTab('txt2img'));
+    // }
   };
 
   useHotkeys(
     'a',
     () => {
       if (
-        ['txt2img', 'img2img'].includes(currentImage?.metadata?.image?.type)
+        ['txt2img', 'img2img'].includes(
+          selectedImage?.metadata?.sd_metadata?.type
+        )
       ) {
         handleClickUseAllParameters();
         toast({
@@ -230,18 +249,18 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [currentImage]
+    [selectedImage]
   );
 
   const handleClickUseSeed = () => {
-    currentImage?.metadata &&
-      dispatch(setSeed(currentImage.metadata.image.seed));
+    selectedImage?.metadata &&
+      dispatch(setSeed(selectedImage.metadata.sd_metadata.seed));
   };
 
   useHotkeys(
     's',
     () => {
-      if (currentImage?.metadata?.image?.seed) {
+      if (selectedImage?.metadata?.sd_metadata?.seed) {
         handleClickUseSeed();
         toast({
           title: t('toast.seedSet'),
@@ -259,19 +278,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [currentImage]
+    [selectedImage]
   );
 
   const handleClickUsePrompt = useCallback(() => {
-    if (currentImage?.metadata?.image?.prompt) {
-      setBothPrompts(currentImage?.metadata?.image?.prompt);
+    if (selectedImage?.metadata?.sd_metadata?.prompt) {
+      setBothPrompts(selectedImage?.metadata?.sd_metadata?.prompt);
     }
-  }, [currentImage?.metadata?.image?.prompt, setBothPrompts]);
+  }, [selectedImage?.metadata?.sd_metadata?.prompt, setBothPrompts]);
 
   useHotkeys(
     'p',
     () => {
-      if (currentImage?.metadata?.image?.prompt) {
+      if (selectedImage?.metadata?.sd_metadata?.prompt) {
         handleClickUsePrompt();
         toast({
           title: t('toast.promptSet'),
@@ -289,11 +308,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [currentImage]
+    [selectedImage]
   );
 
   const handleClickUpscale = () => {
-    currentImage && dispatch(runESRGAN(currentImage));
+    // selectedImage && dispatch(runESRGAN(selectedImage));
   };
 
   useHotkeys(
@@ -317,7 +336,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
     },
     [
-      currentImage,
+      selectedImage,
       isESRGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
@@ -327,7 +346,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const handleClickFixFaces = () => {
-    currentImage && dispatch(runFacetool(currentImage));
+    // selectedImage && dispatch(runFacetool(selectedImage));
   };
 
   useHotkeys(
@@ -351,7 +370,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
     },
     [
-      currentImage,
+      selectedImage,
       isGFPGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
@@ -364,10 +383,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
 
   const handleSendToCanvas = () => {
-    if (!currentImage) return;
+    if (!selectedImage) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
-    dispatch(setInitialCanvasImage(currentImage));
+    // dispatch(setInitialCanvasImage(selectedImage));
     dispatch(requestCanvasRescale());
 
     if (activeTabName !== 'unifiedCanvas') {
@@ -385,7 +404,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'i',
     () => {
-      if (currentImage) {
+      if (selectedImage) {
         handleClickShowImageDetails();
       } else {
         toast({
@@ -396,7 +415,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [currentImage, shouldShowImageDetails]
+    [selectedImage, shouldShowImageDetails]
   );
 
   const handleLightBox = () => {
@@ -458,7 +477,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               {t('parameters.copyImageToLink')}
             </IAIButton>
 
-            <Link download={true} href={currentImage?.url}>
+            <Link download={true} href={getUrl(selectedImage!.url)}>
               <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                 {t('parameters.downloadImage')}
               </IAIButton>
@@ -502,7 +521,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           icon={<FaQuoteRight />}
           tooltip={`${t('parameters.usePrompt')} (P)`}
           aria-label={`${t('parameters.usePrompt')} (P)`}
-          isDisabled={!currentImage?.metadata?.image?.prompt}
+          isDisabled={!selectedImage?.metadata?.sd_metadata?.prompt}
           onClick={handleClickUsePrompt}
         />
 
@@ -510,7 +529,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           icon={<FaSeedling />}
           tooltip={`${t('parameters.useSeed')} (S)`}
           aria-label={`${t('parameters.useSeed')} (S)`}
-          isDisabled={!currentImage?.metadata?.image?.seed}
+          isDisabled={!selectedImage?.metadata?.sd_metadata?.seed}
           onClick={handleClickUseSeed}
         />
 
@@ -520,7 +539,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           aria-label={`${t('parameters.useAll')} (A)`}
           isDisabled={
             !['txt2img', 'img2img'].includes(
-              currentImage?.metadata?.image?.type
+              selectedImage?.metadata?.sd_metadata?.type
             )
           }
           onClick={handleClickUseAllParameters}
@@ -546,7 +565,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             <IAIButton
               isDisabled={
                 !isGFPGANAvailable ||
-                !currentImage ||
+                !selectedImage ||
                 !(isConnected && !isProcessing) ||
                 !facetoolStrength
               }
@@ -575,7 +594,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             <IAIButton
               isDisabled={
                 !isESRGANAvailable ||
-                !currentImage ||
+                !selectedImage ||
                 !(isConnected && !isProcessing) ||
                 !upscalingLevel
               }
@@ -597,15 +616,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         />
       </ButtonGroup>
 
-      <DeleteImageModal image={currentImage}>
+      {/* <DeleteImageModal image={selectedImage}>
         <IAIIconButton
           icon={<FaTrash />}
           tooltip={`${t('parameters.deleteImage')} (Del)`}
           aria-label={`${t('parameters.deleteImage')} (Del)`}
-          isDisabled={!currentImage || !isConnected || isProcessing}
+          isDisabled={!selectedImage || !isConnected || isProcessing}
           colorScheme="error"
         />
-      </DeleteImageModal>
+      </DeleteImageModal> */}
     </Flex>
   );
 };

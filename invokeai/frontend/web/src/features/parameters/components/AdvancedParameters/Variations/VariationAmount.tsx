@@ -24,9 +24,7 @@ export default function VariationAmount() {
       step={0.01}
       min={0}
       max={1}
-      isSliderDisabled={!shouldGenerateVariations}
-      isInputDisabled={!shouldGenerateVariations}
-      isResetDisabled={!shouldGenerateVariations}
+      isDisabled={!shouldGenerateVariations}
       onChange={(v) => dispatch(setVariationAmount(v))}
       handleReset={() => dispatch(setVariationAmount(0.1))}
       withInput
