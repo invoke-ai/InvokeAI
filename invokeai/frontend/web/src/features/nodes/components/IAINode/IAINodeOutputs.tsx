@@ -3,7 +3,7 @@ import {
   OutputFieldTemplate,
   OutputFieldValue,
 } from 'features/nodes/types/types';
-import { memo, MutableRefObject, ReactNode } from 'react';
+import { memo, ReactNode, useCallback } from 'react';
 import { map } from 'lodash';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
@@ -59,11 +59,9 @@ interface IAINodeOutputsProps {
 const IAINodeOutputs = (props: IAINodeOutputsProps) => {
   const { nodeId, template, outputs } = props;
 
-  const connectedInputs = useAppSelector(
-    (state: RootState) => state.nodes.edges
-  );
+  const edges = useAppSelector((state: RootState) => state.nodes.edges);
 
-  const renderIAINodeOutputs = () => {
+  const renderIAINodeOutputs = useCallback(() => {
     const IAINodeOutputsToRender: ReactNode[] = [];
     const outputSockets = map(outputs);
 
@@ -71,7 +69,7 @@ const IAINodeOutputs = (props: IAINodeOutputsProps) => {
       const outputTemplate = template.outputs[outputSocket.name];
 
       const isConnected = Boolean(
-        connectedInputs.filter((connectedInput) => {
+        edges.filter((connectedInput) => {
           return (
             connectedInput.source === nodeId &&
             connectedInput.sourceHandle === outputSocket.name
@@ -91,7 +89,7 @@ const IAINodeOutputs = (props: IAINodeOutputsProps) => {
     });
 
     return <Flex flexDir="column">{IAINodeOutputsToRender}</Flex>;
-  };
+  }, [edges, nodeId, outputs, template.outputs]);
 
   return renderIAINodeOutputs();
 };

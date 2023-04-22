@@ -3,7 +3,7 @@ import {
   InputFieldValue,
   InvocationTemplate,
 } from 'features/nodes/types/types';
-import { memo, MutableRefObject, ReactNode } from 'react';
+import { memo, ReactNode, useCallback } from 'react';
 import { map } from 'lodash';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
@@ -14,13 +14,11 @@ import {
   FormLabel,
   HStack,
   Tooltip,
-  Icon,
   Divider,
 } from '@chakra-ui/react';
 import FieldHandle from '../FieldHandle';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import InputFieldComponent from '../InputFieldComponent';
-import { FaInfoCircle } from 'react-icons/fa';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 
 interface IAINodeInputProps {
@@ -102,11 +100,9 @@ interface IAINodeInputsProps {
 const IAINodeInputs = (props: IAINodeInputsProps) => {
   const { nodeId, template, inputs } = props;
 
-  const connectedInputs = useAppSelector(
-    (state: RootState) => state.nodes.edges
-  );
+  const edges = useAppSelector((state: RootState) => state.nodes.edges);
 
-  const renderIAINodeInputs = () => {
+  const renderIAINodeInputs = useCallback(() => {
     const IAINodeInputsToRender: ReactNode[] = [];
     const inputSockets = map(inputs);
 
@@ -114,7 +110,7 @@ const IAINodeInputs = (props: IAINodeInputsProps) => {
       const inputTemplate = template.inputs[inputSocket.name];
 
       const isConnected = Boolean(
-        connectedInputs.filter((connectedInput) => {
+        edges.filter((connectedInput) => {
           return (
             connectedInput.target === nodeId &&
             connectedInput.targetHandle === inputSocket.name
@@ -142,7 +138,7 @@ const IAINodeInputs = (props: IAINodeInputsProps) => {
         {IAINodeInputsToRender}
       </Flex>
     );
-  };
+  }, [edges, inputs, nodeId, template.inputs]);
 
   return renderIAINodeInputs();
 };
