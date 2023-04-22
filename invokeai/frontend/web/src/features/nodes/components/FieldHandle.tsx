@@ -1,5 +1,5 @@
 import { Tooltip } from '@chakra-ui/react';
-import { CSSProperties, useMemo } from 'react';
+import { CSSProperties, memo, useMemo } from 'react';
 import {
   Handle,
   Position,
@@ -38,13 +38,14 @@ type FieldHandleProps = {
   styles?: CSSProperties;
 };
 
-export const FieldHandle = (props: FieldHandleProps) => {
+const FieldHandle = (props: FieldHandleProps) => {
   const { nodeId, field, isValidConnection, handleType, styles } = props;
   const { name, title, type, description } = field;
 
+  console.log(props);
+
   return (
     <Tooltip
-      key={name}
       label={type}
       placement={handleType === 'target' ? 'start' : 'end'}
       hasArrow
@@ -67,3 +68,5 @@ export const FieldHandle = (props: FieldHandleProps) => {
     </Tooltip>
   );
 };
+
+export default memo(FieldHandle);

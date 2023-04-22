@@ -3,7 +3,7 @@ import {
   InputFieldValue,
   InvocationTemplate,
 } from 'features/nodes/types/types';
-import { MutableRefObject, ReactNode } from 'react';
+import { memo, MutableRefObject, ReactNode } from 'react';
 import { map } from 'lodash';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
@@ -17,7 +17,7 @@ import {
   Icon,
   Divider,
 } from '@chakra-ui/react';
-import { FieldHandle } from '../FieldHandle';
+import FieldHandle from '../FieldHandle';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { InputFieldComponent } from '../InputFieldComponent';
 import { FaInfoCircle } from 'react-icons/fa';
@@ -37,7 +37,6 @@ function IAINodeInput(props: IAINodeInputProps) {
 
   return (
     <Box
-      key={input.id}
       position="relative"
       borderColor={
         !template
@@ -96,11 +95,11 @@ function IAINodeInput(props: IAINodeInputProps) {
 
 interface IAINodeInputsProps {
   nodeId: string;
-  template: MutableRefObject<InvocationTemplate | undefined>;
+  template: InvocationTemplate;
   inputs: Record<string, InputFieldValue>;
 }
 
-export default function IAINodeInputs(props: IAINodeInputsProps) {
+const IAINodeInputs = (props: IAINodeInputsProps) => {
   const { nodeId, template, inputs } = props;
 
   const connectedInputs = useAppSelector(
@@ -112,7 +111,7 @@ export default function IAINodeInputs(props: IAINodeInputsProps) {
     const inputSockets = map(inputs);
 
     inputSockets.forEach((inputSocket, index) => {
-      const inputTemplate = template.current?.inputs[inputSocket.name];
+      const inputTemplate = template.inputs[inputSocket.name];
 
       const isConnected = Boolean(
         connectedInputs.filter((connectedInput) => {
@@ -129,6 +128,7 @@ export default function IAINodeInputs(props: IAINodeInputsProps) {
 
       IAINodeInputsToRender.push(
         <IAINodeInput
+          key={inputSocket.id}
           nodeId={nodeId}
           input={inputSocket}
           template={inputTemplate}
@@ -145,4 +145,6 @@ export default function IAINodeInputs(props: IAINodeInputsProps) {
   };
 
   return renderIAINodeInputs();
-}
+};
+
+export default memo(IAINodeInputs);

@@ -1,6 +1,8 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { reduce } from 'lodash';
+import { useCallback } from 'react';
 import { Node, useReactFlow } from 'reactflow';
 import { AnyInvocationType } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,75 +13,82 @@ import {
 } from '../types/types';
 import { buildInputFieldValue } from '../util/fieldValueBuilders';
 
+const templatesSelector = createSelector(
+  [(state: RootState) => state.nodes],
+  (nodes) => nodes.invocationTemplates,
+  { memoizeOptions: { resultEqualityCheck: (a, b) => true } }
+);
+
 export const useBuildInvocation = () => {
-  const invocationTemplates = useAppSelector(
-    (state: RootState) => state.nodes.invocationTemplates
-  );
+  const invocationTemplates = useAppSelector(templatesSelector);
 
-  const reactflow = useReactFlow();
+  const flow = useReactFlow();
 
-  return (type: AnyInvocationType) => {
-    const template = invocationTemplates[type];
+  return useCallback(
+    (type: AnyInvocationType) => {
+      const template = invocationTemplates[type];
 
-    if (template === undefined) {
-      console.error(`Unable to find template ${type}.`);
-      return;
-    }
+      if (template === undefined) {
+        console.error(`Unable to find template ${type}.`);
+        return;
+      }
 
-    const nodeId = uuidv4();
+      const nodeId = uuidv4();
 
-    const inputs = reduce(
-      template.inputs,
-      (inputsAccumulator, inputTemplate, inputName) => {
-        const fieldId = uuidv4();
+      const inputs = reduce(
+        template.inputs,
+        (inputsAccumulator, inputTemplate, inputName) => {
+          const fieldId = uuidv4();
 
-        const inputFieldValue: InputFieldValue = buildInputFieldValue(
-          fieldId,
-          inputTemplate
-        );
+          const inputFieldValue: InputFieldValue = buildInputFieldValue(
+            fieldId,
+            inputTemplate
+          );
 
-        inputsAccumulator[inputName] = inputFieldValue;
+          inputsAccumulator[inputName] = inputFieldValue;
 
-        return inputsAccumulator;
-      },
-      {} as Record<string, InputFieldValue>
-    );
+          return inputsAccumulator;
+        },
+        {} as Record<string, InputFieldValue>
+      );
 
-    const outputs = reduce(
-      template.outputs,
-      (outputsAccumulator, outputTemplate, outputName) => {
-        const fieldId = uuidv4();
+      const outputs = reduce(
+        template.outputs,
+        (outputsAccumulator, outputTemplate, outputName) => {
+          const fieldId = uuidv4();
 
-        const outputFieldValue: OutputFieldValue = {
-          id: fieldId,
-          name: outputName,
-          type: outputTemplate.type,
-        };
+          const outputFieldValue: OutputFieldValue = {
+            id: fieldId,
+            name: outputName,
+            type: outputTemplate.type,
+          };
 
-        outputsAccumulator[outputName] = outputFieldValue;
+          outputsAccumulator[outputName] = outputFieldValue;
 
-        return outputsAccumulator;
-      },
-      {} as Record<string, OutputFieldValue>
-    );
+          return outputsAccumulator;
+        },
+        {} as Record<string, OutputFieldValue>
+      );
 
-    const { x, y } = reactflow.project({
-      x: window.innerWidth / 2.5,
-      y: window.innerHeight / 8,
-    });
+      const { x, y } = flow.project({
+        x: window.innerWidth / 2.5,
+        y: window.innerHeight / 8,
+      });
 
-    const invocation: Node<InvocationValue> = {
-      id: nodeId,
-      type: 'invocation',
-      position: { x: x, y: y },
-      data: {
+      const invocation: Node<InvocationValue> = {
         id: nodeId,
-        type,
-        inputs,
-        outputs,
-      },
-    };
+        type: 'invocation',
+        position: { x: x, y: y },
+        data: {
+          id: nodeId,
+          type,
+          inputs,
+          outputs,
+        },
+      };
 
-    return invocation;
-  };
+      return invocation;
+    },
+    [invocationTemplates, flow]
+  );
 };

@@ -30,6 +30,10 @@ import { IAIIconButton } from 'exports';
 import { InfoIcon } from '@chakra-ui/icons';
 import { ViewportControls } from './ViewportControls';
 import NodeGraphOverlay from './NodeGraphOverlay';
+import TopLeftPanel from './panels/TopLeftPanel';
+import TopRightPanel from './panels/TopRightPanel';
+import TopCenterPanel from './panels/TopCenterPanel';
+import BottomLeftPanel from './panels/BottomLeftPanel.tsx';
 
 const nodeTypes = { invocation: InvocationComponent };
 
@@ -37,9 +41,6 @@ export const Flow = () => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
   const edges = useAppSelector((state: RootState) => state.nodes.edges);
-  const shouldShowGraphOverlay = useAppSelector(
-    (state: RootState) => state.nodes.shouldShowGraphOverlay
-  );
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -76,10 +77,6 @@ export const Flow = () => {
     [dispatch]
   );
 
-  const handleInvoke = useCallback(() => {
-    dispatch(nodesGraphBuilt());
-  }, [dispatch]);
-
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
@@ -94,19 +91,10 @@ export const Flow = () => {
         style: { strokeWidth: 2 },
       }}
     >
-      <Panel position="top-left">
-        <AddNodeMenu />
-      </Panel>
-      <Panel position="top-center">
-        <Button onClick={handleInvoke}>Will it blend?</Button>
-      </Panel>
-      <Panel position="top-right">
-        <FieldTypeLegend />
-        {shouldShowGraphOverlay && <NodeGraphOverlay />}
-      </Panel>
-      <Panel position="bottom-left">
-        <ViewportControls />
-      </Panel>
+      <TopLeftPanel />
+      <TopCenterPanel />
+      <TopRightPanel />
+      <BottomLeftPanel />
       <Background />
       <MiniMap nodeStrokeWidth={3} zoomable pannable />
     </ReactFlow>
