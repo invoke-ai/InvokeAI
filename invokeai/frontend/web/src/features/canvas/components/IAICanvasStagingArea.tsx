@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { GroupConfig } from 'konva/lib/Group';
 import { isEqual } from 'lodash';
@@ -53,11 +54,16 @@ const IAICanvasStagingArea = (props: Props) => {
     width,
     height,
   } = useAppSelector(selector);
+  const { getUrl } = useGetUrl();
 
   return (
     <Group {...rest}>
       {shouldShowStagingImage && currentStagingAreaImage && (
-        <IAICanvasImage url={currentStagingAreaImage.image.url} x={x} y={y} />
+        <IAICanvasImage
+          url={getUrl(currentStagingAreaImage.image.url)}
+          x={x}
+          y={y}
+        />
       )}
       {shouldShowStagingOutline && (
         <Group>

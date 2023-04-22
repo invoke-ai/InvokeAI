@@ -44,12 +44,10 @@ export type IAIFullSliderProps = {
   inputReadOnly?: boolean;
   withReset?: boolean;
   handleReset?: () => void;
-  isResetDisabled?: boolean;
-  isSliderDisabled?: boolean;
-  isInputDisabled?: boolean;
   tooltipSuffix?: string;
   hideTooltip?: boolean;
   isCompact?: boolean;
+  isDisabled?: boolean;
   sliderFormControlProps?: FormControlProps;
   sliderFormLabelProps?: FormLabelProps;
   sliderMarkProps?: Omit<SliderMarkProps, 'value'>;
@@ -80,10 +78,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
     withReset = false,
     hideTooltip = false,
     isCompact = false,
+    isDisabled = false,
     handleReset,
-    isResetDisabled,
-    isSliderDisabled,
-    isInputDisabled,
     sliderFormControlProps,
     sliderFormLabelProps,
     sliderMarkProps,
@@ -149,6 +145,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             }
           : {}
       }
+      isDisabled={isDisabled}
       {...sliderFormControlProps}
     >
       <FormLabel {...sliderFormLabelProps} mb={-1}>
@@ -166,15 +163,13 @@ const IAISlider = (props: IAIFullSliderProps) => {
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
           focusThumbOnChange={false}
-          isDisabled={isSliderDisabled}
-          // width={width}
+          isDisabled={isDisabled}
           {...rest}
         >
           {withSliderMarks && (
             <>
               <SliderMark
                 value={min}
-                // insetInlineStart={0}
                 sx={{
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
@@ -185,7 +180,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
               </SliderMark>
               <SliderMark
                 value={max}
-                // insetInlineEnd={0}
                 sx={{
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
@@ -221,7 +215,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
             value={localInputValue}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
-            isDisabled={isInputDisabled}
             {...sliderNumberInputProps}
           >
             <NumberInputField
@@ -246,8 +239,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
             aria-label={t('accessibility.reset')}
             tooltip="Reset"
             icon={<BiReset />}
+            isDisabled={isDisabled}
             onClick={handleResetDisable}
-            isDisabled={isResetDisabled}
             {...sliderIAIIconButtonProps}
           />
         )}

@@ -96,7 +96,6 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
       onClose={closeParametersPanel}
       isPinned={shouldPinParametersPanel || isLightboxOpen}
       sx={{
-        borderColor: 'base.700',
         p: shouldPinParametersPanel ? 0 : 4,
         bg: 'base.900',
       }}

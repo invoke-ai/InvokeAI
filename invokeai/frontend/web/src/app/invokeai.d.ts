@@ -14,6 +14,8 @@
 
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
+import { ImageMetadata, ImageType } from 'services/api';
+import { AnyInvocation } from 'services/events/types';
 
 /**
  * TODO:
@@ -113,7 +115,7 @@ export declare type Metadata = SystemGenerationMetadata & {
 };
 
 // An Image has a UUID, url, modified timestamp, width, height and maybe metadata
-export declare type Image = {
+export declare type _Image = {
   uuid: string;
   url: string;
   thumbnail: string;
@@ -124,11 +126,23 @@ export declare type Image = {
   category: GalleryCategory;
   isBase64?: boolean;
   dreamPrompt?: 'string';
+  name?: string;
+};
+
+/**
+ * ResultImage
+ */
+export declare type Image = {
+  name: string;
+  type: ImageType;
+  url: string;
+  thumbnail: string;
+  metadata: ImageMetadata;
 };
 
 // GalleryImages is an array of Image.
 export declare type GalleryImages = {
-  images: Array<Image>;
+  images: Array<_Image>;
 };
 
 /**
@@ -275,7 +289,7 @@ export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
+export declare type ImageResultResponse = Omit<_Image, 'uuid'> & {
   boundingBox?: IRect;
   generationMode: InvokeTabName;
 };
@@ -296,7 +310,7 @@ export declare type ErrorResponse = {
 };
 
 export declare type GalleryImagesResponse = {
-  images: Array<Omit<Image, 'uuid'>>;
+  images: Array<Omit<_Image, 'uuid'>>;
   areMoreImagesAvailable: boolean;
   category: GalleryCategory;
 };
