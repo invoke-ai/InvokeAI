@@ -4,7 +4,7 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   StringInputFieldTemplate,
   StringInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import { ChangeEvent } from 'react';
 import { FieldComponentProps } from './types';
 

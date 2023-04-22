@@ -4,7 +4,7 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   EnumInputFieldTemplate,
   EnumInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import { ChangeEvent } from 'react';
 import { FieldComponentProps } from './types';
 

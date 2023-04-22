@@ -22,46 +22,55 @@ const getColorTokenCssVariable = (color: string) =>
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
   integer: {
+    color: 'red',
     colorCssVar: getColorTokenCssVariable('red'),
     title: 'Integer',
     description: 'Integers are whole numbers, without a decimal point.',
   },
   float: {
+    color: 'orange',
     colorCssVar: getColorTokenCssVariable('orange'),
     title: 'Float',
     description: 'Floats are numbers with a decimal point.',
   },
   string: {
+    color: 'yellow',
     colorCssVar: getColorTokenCssVariable('yellow'),
     title: 'String',
     description: 'Strings are text.',
   },
   boolean: {
+    color: 'green',
     colorCssVar: getColorTokenCssVariable('green'),
     title: 'Boolean',
     description: 'Booleans are true or false.',
   },
   enum: {
+    color: 'blue',
     colorCssVar: getColorTokenCssVariable('blue'),
     title: 'Enum',
     description: 'Enums are values that may be one of a number of options.',
   },
   image: {
+    color: 'purple',
     colorCssVar: getColorTokenCssVariable('purple'),
     title: 'Image',
     description: 'Images may be passed between nodes.',
   },
   latents: {
+    color: 'pink',
     colorCssVar: getColorTokenCssVariable('pink'),
     title: 'Latents',
     description: 'Latents may be passed between nodes.',
   },
   model: {
+    color: 'teal',
     colorCssVar: getColorTokenCssVariable('teal'),
     title: 'Model',
     description: 'Models are models.',
   },
   array: {
+    color: 'gray',
     colorCssVar: getColorTokenCssVariable('gray'),
     title: 'Array',
     description: 'TODO: Array type description.',

@@ -53,6 +53,7 @@ export const theme: ThemeOverride = {
       working: `0 0 7px var(--invokeai-colors-working-400)`,
       error: `0 0 7px var(--invokeai-colors-error-400)`,
     },
+    nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-base-500)`,
   },
   colors: {
     ...invokeAIThemeColors,

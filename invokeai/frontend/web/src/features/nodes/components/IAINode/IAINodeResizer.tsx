@@ -5,12 +5,13 @@ export default function IAINodeResizer(props: NodeResizerProps) {
   return (
     <NodeResizeControl
       style={{
-        position: 'relative',
+        position: 'absolute',
         border: 'none',
-        background: 'none',
-        width: 10,
-        height: 10,
-        top: 10,
+        background: 'transparent',
+        width: 15,
+        height: 15,
+        bottom: 0,
+        right: 0,
       }}
       minWidth={350}
       {...rest}

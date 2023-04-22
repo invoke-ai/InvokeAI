@@ -12,7 +12,7 @@ export default function IAINodeHeader(props: IAINodeHeaderProps) {
   const { nodeId, template } = props;
   return (
     <Flex
-      borderRadius="sm"
+      borderTopRadius="md"
       justifyContent="space-between"
       background="base.700"
       px={2}
@@ -20,7 +20,7 @@ export default function IAINodeHeader(props: IAINodeHeaderProps) {
       alignItems="center"
     >
       <Tooltip label={nodeId}>
-        <Heading size="sm" fontWeight={600} color="base.100">
+        <Heading size="xs" fontWeight={600} color="base.100">
           {template.current?.title}
         </Heading>
       </Tooltip>
@@ -30,7 +30,7 @@ export default function IAINodeHeader(props: IAINodeHeaderProps) {
         hasArrow
         shouldWrapChildren
       >
-        <Icon color="base.300" as={FaInfoCircle} />
+        <Icon color="base.300" as={FaInfoCircle} h="min-content" />
       </Tooltip>
     </Flex>
   );

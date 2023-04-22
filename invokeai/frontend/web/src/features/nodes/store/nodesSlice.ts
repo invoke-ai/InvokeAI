@@ -24,6 +24,7 @@ export type NodesState = {
   invocationTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   lastGraph: Graph | null;
+  shouldShowGraphOverlay: boolean;
 };
 
 export const initialNodesState: NodesState = {
@@ -33,6 +34,7 @@ export const initialNodesState: NodesState = {
   invocationTemplates: {},
   connectionStartParams: null,
   lastGraph: null,
+  shouldShowGraphOverlay: false,
 };
 
 const nodesSlice = createSlice({
@@ -77,6 +79,9 @@ const nodesSlice = createSlice({
         state.nodes[nodeIndex].data.inputs[fieldName].value = value;
       }
     },
+    shouldShowGraphOverlayChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowGraphOverlay = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
@@ -98,6 +103,7 @@ export const {
   connectionMade,
   connectionStarted,
   connectionEnded,
+  shouldShowGraphOverlayChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

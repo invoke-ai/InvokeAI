@@ -1,15 +1,40 @@
 import { NodeProps, NodeResizeControl } from 'reactflow';
-import { Box, Flex, Icon } from '@chakra-ui/react';
+import { Box, Flex, Icon, useToken } from '@chakra-ui/react';
 import { FaExclamationCircle } from 'react-icons/fa';
 import { InvocationValue } from '../types/types';
 
-import { memo, useRef } from 'react';
+import { memo, PropsWithChildren, useRef } from 'react';
 import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
 import IAINodeOutputs from './IAINode/IAINodeOutputs';
 import IAINodeInputs from './IAINode/IAINodeInputs';
 import IAINodeHeader from './IAINode/IAINodeHeader';
 import { IoResize } from 'react-icons/io5';
 import IAINodeResizer from './IAINode/IAINodeResizer';
+
+type InvocationComponentWrapperProps = PropsWithChildren & {
+  selected: boolean;
+};
+
+const InvocationComponentWrapper = (props: InvocationComponentWrapperProps) => {
+  const [nodeSelectedOutline, nodeShadow] = useToken('shadows', [
+    'nodeSelectedOutline',
+    'dark-lg',
+  ]);
+
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        borderRadius: 'md',
+        boxShadow: props.selected
+          ? `${nodeSelectedOutline}, ${nodeShadow}`
+          : `${nodeShadow}`,
+      }}
+    >
+      {props.children}
+    </Box>
+  );
+};
 
 export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
   const { id: nodeId, data, selected } = props;
@@ -22,41 +47,31 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
 
   if (!template.current) {
     return (
-      <Box
-        sx={{
-          padding: 4,
-          bg: 'base.800',
-          borderRadius: 'md',
-          boxShadow: 'dark-lg',
-          borderWidth: 2,
-          borderColor: selected ? 'base.400' : 'transparent',
-        }}
-      >
+      <InvocationComponentWrapper selected={selected}>
         <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>
           <Icon color="base.400" boxSize={32} as={FaExclamationCircle}></Icon>
           <IAINodeResizer />
         </Flex>
-      </Box>
+      </InvocationComponentWrapper>
     );
   }
 
   return (
-    <Box
-      sx={{
-        bg: 'base.800',
-        borderRadius: 'md',
-        boxShadow: 'dark-lg',
-        borderWidth: 2,
-        borderColor: selected ? 'base.400' : 'transparent',
-      }}
-    >
-      <Flex flexDirection="column" gap={2}>
-        <IAINodeHeader nodeId={nodeId} template={template} />
+    <InvocationComponentWrapper selected={selected}>
+      <IAINodeHeader nodeId={nodeId} template={template} />
+      <Flex
+        sx={{
+          flexDirection: 'column',
+          borderBottomRadius: 'md',
+          bg: 'base.800',
+          py: 2,
+        }}
+      >
         <IAINodeOutputs nodeId={nodeId} outputs={outputs} template={template} />
         <IAINodeInputs nodeId={nodeId} inputs={inputs} template={template} />
-        <IAINodeResizer />
       </Flex>
-    </Box>
+      <IAINodeResizer />
+    </InvocationComponentWrapper>
   );
 });
 

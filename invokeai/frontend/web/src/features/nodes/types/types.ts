@@ -39,6 +39,7 @@ export type InvocationTemplate = {
 };
 
 export type FieldUIConfig = {
+  color: string;
   colorCssVar: string;
   title: string;
   description: string;

@@ -8,7 +8,7 @@ import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ImageInputFieldTemplate,
   ImageInputFieldValue,
-} from 'features/nodes/types';
+} from 'features/nodes/types/types';
 import { DragEvent, useCallback, useState } from 'react';
 import { FaImage } from 'react-icons/fa';
 import { ImageType } from 'services/api';

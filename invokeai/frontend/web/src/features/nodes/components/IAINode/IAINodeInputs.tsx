@@ -15,11 +15,13 @@ import {
   HStack,
   Tooltip,
   Icon,
+  Divider,
 } from '@chakra-ui/react';
 import { FieldHandle } from '../FieldHandle';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { InputFieldComponent } from '../InputFieldComponent';
 import { FaInfoCircle } from 'react-icons/fa';
+import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 
 interface IAINodeInputProps {
   nodeId: string;
@@ -35,13 +37,8 @@ function IAINodeInput(props: IAINodeInputProps) {
 
   return (
     <Box
-      p={2}
       key={input.id}
       position="relative"
-      borderWidth={1}
-      borderRadius="md"
-      borderLeft="none"
-      borderRight="none"
       borderColor={
         !template
           ? 'error.400'
@@ -63,14 +60,14 @@ function IAINodeInput(props: IAINodeInputProps) {
           <>
             <HStack justifyContent="space-between" alignItems="center">
               <HStack>
-                <FormLabel>{template?.title}</FormLabel>
                 <Tooltip
                   label={template?.description}
                   placement="top"
                   hasArrow
                   shouldWrapChildren
+                  openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
                 >
-                  <Icon color="base.400" as={FaInfoCircle} />
+                  <FormLabel>{template?.title}</FormLabel>
                 </Tooltip>
               </HStack>
               <InputFieldComponent
@@ -114,7 +111,7 @@ export default function IAINodeInputs(props: IAINodeInputsProps) {
     const IAINodeInputsToRender: ReactNode[] = [];
     const inputSockets = map(inputs);
 
-    inputSockets.forEach((inputSocket) => {
+    inputSockets.forEach((inputSocket, index) => {
       const inputTemplate = template.current?.inputs[inputSocket.name];
 
       const isConnected = Boolean(
@@ -125,6 +122,10 @@ export default function IAINodeInputs(props: IAINodeInputsProps) {
           );
         }).length
       );
+
+      if (index < inputSockets.length) {
+        IAINodeInputsToRender.push(<Divider />);
+      }
 
       IAINodeInputsToRender.push(
         <IAINodeInput
