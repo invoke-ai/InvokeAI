@@ -15,9 +15,7 @@ const floatingGalleryButtonSelector = createSelector(
 
     return {
       shouldPinGallery,
-      shouldShowGalleryButton:
-        (!shouldPinGallery || !shouldShowGallery) &&
-        ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName),
+      shouldShowGalleryButton: !shouldPinGallery || !shouldShowGallery,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }

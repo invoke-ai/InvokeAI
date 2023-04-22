@@ -19,7 +19,8 @@
         "toggleAutoscroll": "Toggle autoscroll",
         "toggleLogViewer": "Toggle Log Viewer",
         "showGallery": "Show Gallery",
-        "showOptionsPanel": "Show Options Panel"
+        "showOptionsPanel": "Show Options Panel",
+        "menu": "Menu"
     },
     "common": {
         "hotkeysLabel": "Hotkeys",
@@ -52,6 +53,7 @@
         "txt2img": "Text To Image",
         "img2img": "Image To Image",
         "unifiedCanvas": "Unified Canvas",
+        "linear": "Linear",
         "nodes": "Nodes",
         "postprocessing": "Post Processing",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
@@ -524,6 +526,10 @@
         "resetComplete": "Web UI has been reset. Refresh the page to reload."
     },
     "toast": {
+        "serverError": "Server Error",
+        "disconnected": "Disconnected from Server",
+        "connected": "Connected to Server",
+        "canceled": "Processing Canceled",
         "tempFoldersEmptied": "Temp Folder Emptied",
         "uploadFailed": "Upload failed",
         "uploadFailedMultipleImagesDesc": "Multiple images pasted, may only upload one image at a time",

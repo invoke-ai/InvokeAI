@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex, Grid, Icon, Text } from '@chakra-ui/react';
+import { ButtonGroup, Flex, Grid, Icon, Image, Text } from '@chakra-ui/react';
 import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -25,8 +25,43 @@ import HoverableImage from './HoverableImage';
 
 import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import {
+  resultsAdapter,
+  selectResultsAll,
+  selectResultsTotal,
+} from '../store/resultsSlice';
+import {
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
+} from 'services/thunks/gallery';
+import { selectUploadsAll, uploadsAdapter } from '../store/uploadsSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
+
+const gallerySelector = createSelector(
+  [
+    (state: RootState) => state.uploads,
+    (state: RootState) => state.results,
+    (state: RootState) => state.gallery,
+  ],
+  (uploads, results, gallery) => {
+    const { currentCategory } = gallery;
+
+    return currentCategory === 'result'
+      ? {
+          images: resultsAdapter.getSelectors().selectAll(results),
+          isLoading: results.isLoading,
+          areMoreImagesAvailable: results.page < results.pages - 1,
+        }
+      : {
+          images: uploadsAdapter.getSelectors().selectAll(uploads),
+          isLoading: uploads.isLoading,
+          areMoreImagesAvailable: uploads.page < uploads.pages - 1,
+        };
+  }
+);
 
 const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
@@ -35,7 +70,7 @@ const ImageGalleryContent = () => {
   const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
 
   const {
-    images,
+    // images,
     currentCategory,
     currentImageUuid,
     shouldPinGallery,
@@ -43,12 +78,24 @@ const ImageGalleryContent = () => {
     galleryGridTemplateColumns,
     galleryImageObjectFit,
     shouldAutoSwitchToNewImages,
-    areMoreImagesAvailable,
+    // areMoreImagesAvailable,
     shouldUseSingleGalleryColumn,
   } = useAppSelector(imageGallerySelector);
 
+  const { images, areMoreImagesAvailable, isLoading } =
+    useAppSelector(gallerySelector);
+
+  // const handleClickLoadMore = () => {
+  //   dispatch(requestImages(currentCategory));
+  // };
   const handleClickLoadMore = () => {
-    dispatch(requestImages(currentCategory));
+    if (currentCategory === 'result') {
+      dispatch(receivedResultImagesPage());
+    }
+
+    if (currentCategory === 'user') {
+      dispatch(receivedUploadImagesPage());
+    }
   };
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -203,11 +250,11 @@ const ImageGalleryContent = () => {
                 style={{ gridTemplateColumns: galleryGridTemplateColumns }}
               >
                 {images.map((image) => {
-                  const { uuid } = image;
-                  const isSelected = currentImageUuid === uuid;
+                  const { name } = image;
+                  const isSelected = currentImageUuid === name;
                   return (
                     <HoverableImage
-                      key={uuid}
+                      key={name}
                       image={image}
                       isSelected={isSelected}
                     />
@@ -217,6 +264,7 @@ const ImageGalleryContent = () => {
               <IAIButton
                 onClick={handleClickLoadMore}
                 isDisabled={!areMoreImagesAvailable}
+                isLoading={isLoading}
                 flexShrink={0}
               >
                 {areMoreImagesAvailable

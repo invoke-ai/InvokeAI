@@ -6,19 +6,18 @@ import {
   Box,
   Flex,
 } from '@chakra-ui/react';
-import { Feature } from 'app/features';
 import GuideIcon from 'common/components/GuideIcon';
-import { ReactNode } from 'react';
+import { ParametersAccordionItem } from '../ParametersAccordion';
 
-export interface InvokeAccordionItemProps {
-  header: string;
-  content: ReactNode;
-  feature?: Feature;
-  additionalHeaderComponents?: ReactNode;
-}
+type InvokeAccordionItemProps = {
+  accordionItem: ParametersAccordionItem;
+};
 
-export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
-  const { header, feature, content, additionalHeaderComponents } = props;
+export default function InvokeAccordionItem({
+  accordionItem,
+}: InvokeAccordionItemProps) {
+  const { header, feature, content, additionalHeaderComponents } =
+    accordionItem;
 
   return (
     <AccordionItem>
@@ -32,7 +31,7 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
           <AccordionIcon />
         </Flex>
       </AccordionButton>
-      <AccordionPanel>{content}</AccordionPanel>
+      <AccordionPanel p={4}>{content}</AccordionPanel>
     </AccordionItem>
   );
 }

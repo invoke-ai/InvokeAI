@@ -13,6 +13,8 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
+from invokeai.app.services.metadata import PngMetadataService
+
 from .services.default_graphs import create_system_graphs
 
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -200,6 +202,8 @@ def invoke_cli():
 
     events = EventServiceBase()
 
+    metadata = PngMetadataService()
+
     output_folder = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../../../outputs")
     )
@@ -211,7 +215,8 @@ def invoke_cli():
         model_manager=model_manager,
         events=events,
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
-        images=DiskImageStorage(f'{output_folder}/images'),
+        images=DiskImageStorage(f'{output_folder}/images', metadata_service=metadata),
+        metadata=metadata,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
             filename=db_location, table_name="graphs"
