@@ -3,12 +3,12 @@ import {
   OutputFieldTemplate,
   OutputFieldValue,
 } from 'features/nodes/types/types';
-import { MutableRefObject, ReactNode } from 'react';
+import { memo, MutableRefObject, ReactNode } from 'react';
 import { map } from 'lodash';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import { Box, Flex, FormControl, FormLabel, HStack } from '@chakra-ui/react';
-import { FieldHandle } from '../FieldHandle';
+import FieldHandle from '../FieldHandle';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 
 interface IAINodeOutputProps {
@@ -23,7 +23,7 @@ function IAINodeOutput(props: IAINodeOutputProps) {
   const isValidConnection = useIsValidConnection();
 
   return (
-    <Box key={output.id} position="relative">
+    <Box position="relative">
       <FormControl isDisabled={!template ? true : connected} paddingRight={3}>
         {!template ? (
           <HStack justifyContent="space-between" alignItems="center">
@@ -52,11 +52,11 @@ function IAINodeOutput(props: IAINodeOutputProps) {
 
 interface IAINodeOutputsProps {
   nodeId: string;
-  template: MutableRefObject<InvocationTemplate | undefined>;
+  template: InvocationTemplate;
   outputs: Record<string, OutputFieldValue>;
 }
 
-export default function IAINodeOutputs(props: IAINodeOutputsProps) {
+const IAINodeOutputs = (props: IAINodeOutputsProps) => {
   const { nodeId, template, outputs } = props;
 
   const connectedInputs = useAppSelector(
@@ -68,7 +68,7 @@ export default function IAINodeOutputs(props: IAINodeOutputsProps) {
     const outputSockets = map(outputs);
 
     outputSockets.forEach((outputSocket) => {
-      const outputTemplate = template.current?.outputs[outputSocket.name];
+      const outputTemplate = template.outputs[outputSocket.name];
 
       const isConnected = Boolean(
         connectedInputs.filter((connectedInput) => {
@@ -81,6 +81,7 @@ export default function IAINodeOutputs(props: IAINodeOutputsProps) {
 
       IAINodeOutputsToRender.push(
         <IAINodeOutput
+          key={outputSocket.id}
           nodeId={nodeId}
           output={outputSocket}
           template={outputTemplate}
@@ -93,4 +94,6 @@ export default function IAINodeOutputs(props: IAINodeOutputsProps) {
   };
 
   return renderIAINodeOutputs();
-}
+};
+
+export default memo(IAINodeOutputs);

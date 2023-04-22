@@ -49,7 +49,7 @@ export const AddNodeMenu = () => {
   );
 
   return (
-    <Menu>
+    <Menu isLazy>
       <MenuButton
         as={IAIIconButton}
         aria-label="Add Node"

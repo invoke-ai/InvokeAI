@@ -1,15 +1,19 @@
 import { NodeProps, NodeResizeControl } from 'reactflow';
 import { Box, Flex, Icon, useToken } from '@chakra-ui/react';
 import { FaExclamationCircle } from 'react-icons/fa';
-import { InvocationValue } from '../types/types';
+import { InvocationTemplate, InvocationValue } from '../types/types';
 
-import { memo, PropsWithChildren, useRef } from 'react';
+import { memo, PropsWithChildren, useMemo, useRef } from 'react';
 import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
 import IAINodeOutputs from './IAINode/IAINodeOutputs';
 import IAINodeInputs from './IAINode/IAINodeInputs';
 import IAINodeHeader from './IAINode/IAINodeHeader';
 import { IoResize } from 'react-icons/io5';
 import IAINodeResizer from './IAINode/IAINodeResizer';
+import { RootState } from 'app/store';
+import { AnyInvocationType } from 'services/events/types';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/storeHooks';
 
 type InvocationComponentWrapperProps = PropsWithChildren & {
   selected: boolean;
@@ -36,16 +40,35 @@ const InvocationComponentWrapper = (props: InvocationComponentWrapperProps) => {
   );
 };
 
+const makeTemplateSelector = (type: AnyInvocationType) =>
+  createSelector(
+    [(state: RootState) => state.nodes],
+    (nodes) => {
+      const template = nodes.invocationTemplates[type];
+      if (!template) {
+        return;
+      }
+      return template;
+    },
+    {
+      memoizeOptions: {
+        resultEqualityCheck: (
+          a: InvocationTemplate | undefined,
+          b: InvocationTemplate | undefined
+        ) => a !== undefined && b !== undefined && a.type === b.type,
+      },
+    }
+  );
+
 export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
   const { id: nodeId, data, selected } = props;
   const { type, inputs, outputs } = data;
 
-  const getInvocationTemplate = useGetInvocationTemplate();
-  // TODO: determine if a field/handle is connected and disable the input if so
+  const templateSelector = useMemo(() => makeTemplateSelector(type), [type]);
 
-  const template = useRef(getInvocationTemplate(type));
+  const template = useAppSelector(templateSelector);
 
-  if (!template.current) {
+  if (!template) {
     return (
       <InvocationComponentWrapper selected={selected}>
         <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>

@@ -5,7 +5,7 @@ import { FaInfoCircle } from 'react-icons/fa';
 
 interface IAINodeHeaderProps {
   nodeId: string;
-  template: MutableRefObject<InvocationTemplate | undefined>;
+  template: InvocationTemplate;
 }
 
 export default function IAINodeHeader(props: IAINodeHeaderProps) {
@@ -21,11 +21,11 @@ export default function IAINodeHeader(props: IAINodeHeaderProps) {
     >
       <Tooltip label={nodeId}>
         <Heading size="xs" fontWeight={600} color="base.100">
-          {template.current?.title}
+          {template.title}
         </Heading>
       </Tooltip>
       <Tooltip
-        label={template.current?.description}
+        label={template.description}
         placement="top"
         hasArrow
         shouldWrapChildren
