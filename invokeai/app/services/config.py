@@ -23,16 +23,35 @@ graphs cannot be configured this way, but their constituents can be.
    width: 1024
    height: 1024
 
-Any value can be overwritten by setting an environment variable of
-form: "INVOKEAI_<command>_<value>":
+The default name of the configuration file is `invokeai.yaml`, located
+in INVOKEAI_ROOT. You can use any OmegaConf dictionary by passing it
+to the config object at initialization time:
+
+ omegaconf = OmegaConf.load('/tmp/init.yaml')
+ conf = InvokeAIAppConfig(conf=omegaconf)
+
+By default, InvokeAIAppConfig will parse the contents of argv at
+initialization time. You may pass a list of strings in the optional
+`argv` argument to use instead of the system argv:
+
+ conf = InvokeAIAppConfig(arg=['--xformers_enabled'])
+
+It is also possible to set a value at initialization time. This value
+has highest priority.
+
+ conf = InvokeAIAppConfig(xformers_enabled=True)
+
+Any setting can be overwritten by setting an environment variable of
+form: "INVOKEAI_<command>_<value>", as in:
 
   export INVOKEAI_txt2img_steps=30
 
 Order of precedence (from highest):
-   1) command line options
-   2) environment variable options
-   3) config file options
-   4) pydantic defaults
+   1) initialization options
+   2) command line options
+   3) environment variable options
+   4) config file options
+   5) pydantic defaults
 
 Typical usage:
 
@@ -82,7 +101,7 @@ class InvokeAISettings(BaseSettings):
         fields = cls.__fields__
         for name, field in fields.items():
             if name not in cls._excluded():
-                env_name = env_prefix+name
+                env_name = env_prefix+f'{cls.cmd_name()}_{name}'
                 if initconf and name in initconf:
                     field.default = initconf.get(name)
                 if env_name in os.environ:
@@ -116,8 +135,7 @@ class InvokeAISettings(BaseSettings):
         env_file_encoding = 'utf-8'
         arbitrary_types_allowed = True
         env_prefix = 'INVOKEAI_'
-        extra = 'allow'         # TODO fix me. this is sloppy
-        #class_sensitive = True   ???
+        extra = 'allow'      # FIX: this shouldn't be allowed, but without it graphs fail to validate
         case_sensitive = True
         @classmethod
         def customise_sources(
@@ -191,7 +209,13 @@ class InvokeAIAppConfig(InvokeAISettings):
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code")
     #fmt: on
 
-    def __init__(self, conf: DictConfig = None, argv: List[str]=None):
+    def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
+        '''
+        Initialize InvokeAIAppconfig.
+        :param conf: alternate Omegaconf dictionary object
+        :param argv: aternate sys.argv list
+        :param **kwargs: attributes to initialize with
+        '''
         super().__init__()
         
         # Set the runtime root directory. We parse command-line switches here
@@ -207,6 +231,10 @@ class InvokeAIAppConfig(InvokeAISettings):
         InvokeAISettings.initconf = conf
         # parse args again in order to pick up settings in configuration file
         self.parse_args(argv)
+
+        # restore initialization values
+        for k in kwargs:
+            setattr(self,k,kwargs[k])
 
     @property
     def root_dir(self)->Path:

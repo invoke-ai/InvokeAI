@@ -16,7 +16,7 @@ from typing import (
 NoneType = type(None)
 
 import networkx as nx
-from pydantic import BaseModel, root_validator, validator
+from pydantic import BaseModel, root_validator, validator, Extra
 from pydantic.fields import Field
 
 from ..invocations import *
@@ -1164,6 +1164,9 @@ class LibraryGraph(InvokeAISettings):
     description: str = Field(description="The description of the graph")
     exposed_inputs: list[ExposedNodeInput] = Field(description="The inputs exposed by this graph", default_factory=list)
     exposed_outputs: list[ExposedNodeOutput] = Field(description="The outputs exposed by this graph", default_factory=list)
+
+    class Config:
+        extra='allow'
 
     @validator('exposed_inputs', 'exposed_outputs')
     def validate_exposed_aliases(cls, v):

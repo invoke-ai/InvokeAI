@@ -17,8 +17,8 @@ class InvocationServices:
     images: ImageStorageBase
     queue: InvocationQueueABC
     model_manager: ModelManager
-    configuration: InvokeAISettings
     restoration: RestorationServices
+    configuration: InvokeAISettings=None
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: ItemStorageABC["LibraryGraph"]
@@ -36,7 +36,7 @@ class InvocationServices:
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
             processor: "InvocationProcessorABC",
             restoration: RestorationServices,
-            configuration: InvokeAISettings,
+            configuration: InvokeAISettings=None,
     ):
         self.model_manager = model_manager
         self.events = events
