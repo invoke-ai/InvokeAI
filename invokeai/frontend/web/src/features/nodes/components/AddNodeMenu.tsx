@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 
 import 'reactflow/dist/style.css';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import {
   Tooltip,
   Menu,
@@ -21,7 +21,7 @@ import { makeToast } from 'features/system/hooks/useToastWatcher';
 import { IAIIconButton } from 'exports';
 import { AnyInvocationType } from 'services/events/types';
 
-export const AddNodeMenu = () => {
+const AddNodeMenu = () => {
   const dispatch = useAppDispatch();
 
   const invocationTemplates = useAppSelector(
@@ -67,3 +67,5 @@ export const AddNodeMenu = () => {
     </Menu>
   );
 };
+
+export default memo(AddNodeMenu);

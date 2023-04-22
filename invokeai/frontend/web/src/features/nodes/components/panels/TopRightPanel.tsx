@@ -2,7 +2,7 @@ import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { memo } from 'react';
 import { Panel } from 'reactflow';
-import { FieldTypeLegend } from '../FieldTypeLegend';
+import FieldTypeLegend from '../FieldTypeLegend';
 import NodeGraphOverlay from '../NodeGraphOverlay';
 
 const TopRightPanel = () => {

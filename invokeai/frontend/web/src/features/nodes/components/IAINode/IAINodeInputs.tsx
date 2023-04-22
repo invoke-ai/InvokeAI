@@ -19,7 +19,7 @@ import {
 } from '@chakra-ui/react';
 import FieldHandle from '../FieldHandle';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
-import { InputFieldComponent } from '../InputFieldComponent';
+import InputFieldComponent from '../InputFieldComponent';
 import { FaInfoCircle } from 'react-icons/fa';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 

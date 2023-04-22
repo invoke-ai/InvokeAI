@@ -1,12 +1,12 @@
 import { ButtonGroup } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { IAIIconButton } from 'exports';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { FaCode, FaExpand, FaMinus, FaPlus } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
 import { shouldShowGraphOverlayChanged } from '../store/nodesSlice';
 
-export const ViewportControls = () => {
+const ViewportControls = () => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
   const shouldShowGraphOverlay = useAppSelector(
@@ -55,3 +55,5 @@ export const ViewportControls = () => {
     </ButtonGroup>
   );
 };
+
+export default memo(ViewportControls);

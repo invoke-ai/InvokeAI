@@ -1,14 +1,12 @@
-import { NodeProps, NodeResizeControl } from 'reactflow';
+import { NodeProps } from 'reactflow';
 import { Box, Flex, Icon, useToken } from '@chakra-ui/react';
 import { FaExclamationCircle } from 'react-icons/fa';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 
-import { memo, PropsWithChildren, useMemo, useRef } from 'react';
-import { useGetInvocationTemplate } from '../hooks/useInvocationTemplate';
+import { memo, PropsWithChildren, useMemo } from 'react';
 import IAINodeOutputs from './IAINode/IAINodeOutputs';
 import IAINodeInputs from './IAINode/IAINodeInputs';
 import IAINodeHeader from './IAINode/IAINodeHeader';
-import { IoResize } from 'react-icons/io5';
 import IAINodeResizer from './IAINode/IAINodeResizer';
 import { RootState } from 'app/store';
 import { AnyInvocationType } from 'services/events/types';

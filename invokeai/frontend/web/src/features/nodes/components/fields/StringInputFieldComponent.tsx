@@ -5,10 +5,10 @@ import {
   StringInputFieldTemplate,
   StringInputFieldValue,
 } from 'features/nodes/types/types';
-import { ChangeEvent } from 'react';
+import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
-export const StringInputFieldComponent = (
+const StringInputFieldComponent = (
   props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
@@ -27,3 +27,5 @@ export const StringInputFieldComponent = (
 
   return <Input onChange={handleValueChanged} value={field.value}></Input>;
 };
+
+export default memo(StringInputFieldComponent);

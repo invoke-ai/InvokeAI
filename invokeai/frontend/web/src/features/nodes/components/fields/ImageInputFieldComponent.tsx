@@ -9,12 +9,12 @@ import {
   ImageInputFieldTemplate,
   ImageInputFieldValue,
 } from 'features/nodes/types/types';
-import { DragEvent, useCallback, useState } from 'react';
+import { DragEvent, memo, useCallback, useState } from 'react';
 import { FaImage } from 'react-icons/fa';
 import { ImageType } from 'services/api';
 import { FieldComponentProps } from './types';
 
-export const ImageInputFieldComponent = (
+const ImageInputFieldComponent = (
   props: FieldComponentProps<ImageInputFieldValue, ImageInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
@@ -62,3 +62,5 @@ export const ImageInputFieldComponent = (
     </Box>
   );
 };
+
+export default memo(ImageInputFieldComponent);

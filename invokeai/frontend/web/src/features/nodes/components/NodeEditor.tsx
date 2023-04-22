@@ -3,6 +3,7 @@ import { Box } from '@chakra-ui/react';
 import { ReactFlowProvider } from 'reactflow';
 
 import { Flow } from './Flow';
+import { memo } from 'react';
 
 const NodeEditor = () => {
   return (
@@ -22,4 +23,4 @@ const NodeEditor = () => {
   );
 };
 
-export default NodeEditor;
+export default memo(NodeEditor);

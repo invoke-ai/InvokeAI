@@ -13,9 +13,10 @@ import {
   IntegerInputFieldTemplate,
   IntegerInputFieldValue,
 } from 'features/nodes/types/types';
+import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
-export const NumberInputFieldComponent = (
+const NumberInputFieldComponent = (
   props: FieldComponentProps<
     IntegerInputFieldValue | FloatInputFieldValue,
     IntegerInputFieldTemplate | FloatInputFieldTemplate
@@ -39,3 +40,5 @@ export const NumberInputFieldComponent = (
     </NumberInput>
   );
 };
+
+export default memo(NumberInputFieldComponent);
