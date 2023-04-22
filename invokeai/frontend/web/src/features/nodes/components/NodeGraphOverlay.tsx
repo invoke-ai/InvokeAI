@@ -1,9 +1,10 @@
 import { Box } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
+import { memo } from 'react';
 import { buildNodesGraph } from '../util/nodesGraphBuilder/buildNodesGraph';
 
-export default function NodeGraphOverlay() {
+const NodeGraphOverlay = () => {
   const state = useAppSelector((state: RootState) => state);
   const graph = buildNodesGraph(state);
 
@@ -14,7 +15,6 @@ export default function NodeGraphOverlay() {
       position="absolute"
       top={10}
       right={2}
-      userSelect="none"
       opacity={0.7}
       background="base.800"
       p={2}
@@ -25,4 +25,6 @@ export default function NodeGraphOverlay() {
       {JSON.stringify(graph, null, 2)}
     </Box>
   );
-}
+};
+
+export default memo(NodeGraphOverlay);

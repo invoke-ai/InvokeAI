@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Panel } from 'reactflow';
-import { AddNodeMenu } from '../AddNodeMenu';
+import AddNodeMenu from '../AddNodeMenu';
 
 const TopLeftPanel = () => (
   <Panel position="top-left">

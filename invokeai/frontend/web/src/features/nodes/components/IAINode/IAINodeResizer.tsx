@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { NodeResizeControl, NodeResizerProps } from 'reactflow';
 
-export default function IAINodeResizer(props: NodeResizerProps) {
+const IAINodeResizer = (props: NodeResizerProps) => {
   const { ...rest } = props;
   return (
     <NodeResizeControl
@@ -17,4 +18,6 @@ export default function IAINodeResizer(props: NodeResizerProps) {
       {...rest}
     ></NodeResizeControl>
   );
-}
+};
+
+export default memo(IAINodeResizer);
