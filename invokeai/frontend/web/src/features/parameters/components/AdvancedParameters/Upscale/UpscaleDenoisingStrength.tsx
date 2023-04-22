@@ -30,9 +30,7 @@ export default function UpscaleDenoisingStrength() {
       withSliderMarks
       withInput
       withReset
-      isSliderDisabled={!isESRGANAvailable}
-      isInputDisabled={!isESRGANAvailable}
-      isResetDisabled={!isESRGANAvailable}
+      isDisabled={!isESRGANAvailable}
     />
   );
 }

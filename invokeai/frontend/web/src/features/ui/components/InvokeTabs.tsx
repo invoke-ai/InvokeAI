@@ -11,29 +11,20 @@ import {
 } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
-import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
-import TrainingWIP from 'common/components/WorkInProgress/Training';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
 import { ReactNode, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import {
-  MdDeviceHub,
-  MdFlashOn,
-  MdGridOn,
-  MdPhotoFilter,
-  MdPhotoLibrary,
-  MdTextFields,
-} from 'react-icons/md';
+import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { activeTabIndexSelector } from '../store/uiSelectors';
-import ImageToImageWorkarea from 'features/ui/components/tabs/ImageToImage/ImageToImageWorkarea';
-import TextToImageWorkarea from 'features/ui/components/tabs/TextToImage/TextToImageWorkarea';
 import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import NodeEditor from 'features/nodes/components/NodeEditor';
+import LinearWorkarea from './tabs/Linear/LinearWorkarea';
+import { FaImage } from 'react-icons/fa';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -45,38 +36,26 @@ const tabIconStyles: ChakraProps['sx'] = {
   boxSize: 6,
 };
 
-const tabInfo: InvokeTabInfo[] = [
-  {
-    id: 'txt2img',
-    icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
-    workarea: <TextToImageWorkarea />,
-  },
-  {
-    id: 'img2img',
-    icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
-    workarea: <ImageToImageWorkarea />,
-  },
-  {
-    id: 'unifiedCanvas',
-    icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
-    workarea: <UnifiedCanvasWorkarea />,
-  },
-  {
-    id: 'nodes',
-    icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
-    workarea: <NodesWIP />,
-  },
-  {
-    id: 'postprocessing',
-    icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
-    workarea: <PostProcessingWIP />,
-  },
-  {
-    id: 'training',
-    icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
-    workarea: <TrainingWIP />,
-  },
-];
+const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
+  const tabs: InvokeTabInfo[] = [
+    {
+      id: 'linear',
+      icon: <Icon as={FaImage} sx={tabIconStyles} />,
+      workarea: <LinearWorkarea />,
+    },
+    {
+      id: 'unifiedCanvas',
+      icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
+      workarea: <UnifiedCanvasWorkarea />,
+    },
+    {
+      id: 'nodes',
+      icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
+      workarea: <NodeEditor />,
+    },
+  ];
+  return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+};
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -85,13 +64,10 @@ export default function InvokeTabs() {
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const shouldPinGallery = useAppSelector(
-    (state: RootState) => state.ui.shouldPinGallery
-  );
+  const { shouldPinGallery, disabledTabs, shouldPinParametersPanel } =
+    useAppSelector((state: RootState) => state.ui);
 
-  const shouldPinParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldPinParametersPanel
-  );
+  const activeTabs = buildTabs(disabledTabs);
 
   const { t } = useTranslation();
 
@@ -107,18 +83,6 @@ export default function InvokeTabs() {
 
   useHotkeys('3', () => {
     dispatch(setActiveTab(2));
-  });
-
-  useHotkeys('4', () => {
-    dispatch(setActiveTab(3));
-  });
-
-  useHotkeys('5', () => {
-    dispatch(setActiveTab(4));
-  });
-
-  useHotkeys('6', () => {
-    dispatch(setActiveTab(5));
   });
 
   // Lightbox Hotkey
@@ -142,7 +106,7 @@ export default function InvokeTabs() {
 
   const tabs = useMemo(
     () =>
-      tabInfo.map((tab) => (
+      activeTabs.map((tab) => (
         <Tooltip
           key={tab.id}
           hasArrow
@@ -157,13 +121,13 @@ export default function InvokeTabs() {
           </Tab>
         </Tooltip>
       )),
-    [t]
+    [t, activeTabs]
   );
 
   const tabPanels = useMemo(
     () =>
-      tabInfo.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
-    []
+      activeTabs.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
+    [activeTabs]
   );
 
   return (
@@ -174,8 +138,11 @@ export default function InvokeTabs() {
         dispatch(setActiveTab(index));
       }}
       flexGrow={1}
+      isLazy
     >
-      <TabList>{tabs}</TabList>
+      <TabList pt={2} gap={4}>
+        {tabs}
+      </TabList>
       <TabPanels>{tabPanels}</TabPanels>
     </Tabs>
   );

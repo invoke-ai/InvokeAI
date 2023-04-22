@@ -11,7 +11,7 @@ export interface GenerationState {
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI.Image | string; // can be an Image or url
+  initialImage?: InvokeAI._Image | string; // can be an Image or url
   iterations: number;
   maskPath: string;
   perlin: number;
@@ -36,6 +36,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
+  isImageToImageEnabled: boolean;
 }
 
 const initialGenerationState: GenerationState = {
@@ -67,6 +68,7 @@ const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
+  isImageToImageEnabled: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -317,12 +319,12 @@ export const generationSlice = createSlice({
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
-    setInitialImage: (
-      state,
-      action: PayloadAction<InvokeAI.Image | string>
-    ) => {
-      state.initialImage = action.payload;
-    },
+    // setInitialImage: (
+    //   state,
+    //   action: PayloadAction<InvokeAI._Image | string>
+    // ) => {
+    //   state.initialImage = action.payload;
+    // },
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
@@ -353,6 +355,13 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
+    initialImageSelected: (state, action: PayloadAction<string>) => {
+      state.initialImage = action.payload;
+      state.isImageToImageEnabled = true;
+    },
+    isImageToImageEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isImageToImageEnabled = action.payload;
+    },
   },
 });
 
@@ -368,7 +377,7 @@ export const {
   setHeight,
   setImg2imgStrength,
   setInfillMethod,
-  setInitialImage,
+  // setInitialImage,
   setIterations,
   setMaskPath,
   setParameter,
@@ -394,6 +403,8 @@ export const {
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
+  initialImageSelected,
+  isImageToImageEnabledChanged,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

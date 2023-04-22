@@ -37,6 +37,13 @@ const invokeAIMark = defineStyle((_props) => {
 });
 
 const invokeAI = definePartsStyle((props) => ({
+  container: {
+    _disabled: {
+      opacity: 0.6,
+      cursor: 'default',
+      pointerEvents: 'none',
+    },
+  },
   track: invokeAITrack(props),
   filledTrack: invokeAIFilledTrack(props),
   thumb: invokeAIThumb(props),

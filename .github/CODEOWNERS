@@ -1,16 +1,16 @@
 # continuous integration
-/.github/workflows/ @mauwii @lstein @blessedcoolant
+/.github/workflows/  @lstein @blessedcoolant
 
 # documentation
-/docs/ @lstein @mauwii @tildebyte @blessedcoolant
-/mkdocs.yml @lstein @mauwii @blessedcoolant
+/docs/ @lstein  @tildebyte @blessedcoolant
+/mkdocs.yml @lstein  @blessedcoolant
 
 # nodes
 /invokeai/app/ @Kyle0654 @blessedcoolant
 
 # installation and configuration
-/pyproject.toml @mauwii @lstein @blessedcoolant
-/docker/ @mauwii @lstein @blessedcoolant
+/pyproject.toml  @lstein @blessedcoolant
+/docker/  @lstein @blessedcoolant
 /scripts/ @ebr @lstein
 /installer/ @lstein @ebr
 /invokeai/assets @lstein @ebr
@@ -22,11 +22,11 @@
 /invokeai/backend @blessedcoolant @psychedelicious @lstein
 
 # generation, model management, postprocessing
-/invokeai/backend @keturn @damian0815 @lstein @blessedcoolant @jpphoto
+/invokeai/backend  @damian0815 @lstein @blessedcoolant @jpphoto @gregghelt2
 
 # front ends
 /invokeai/frontend/CLI @lstein
-/invokeai/frontend/install @lstein @ebr @mauwii 
+/invokeai/frontend/install @lstein @ebr  
 /invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
 /invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
 /invokeai/frontend/web @psychedelicious @blessedcoolant

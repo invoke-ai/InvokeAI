@@ -156,7 +156,7 @@ export const canvasSlice = createSlice({
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
     },
-    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI._Image>) => {
       const image = action.payload;
       const { stageDimensions } = state;
 
@@ -291,7 +291,7 @@ export const canvasSlice = createSlice({
       state,
       action: PayloadAction<{
         boundingBox: IRect;
-        image: InvokeAI.Image;
+        image: InvokeAI._Image;
       }>
     ) => {
       const { boundingBox, image } = action.payload;
