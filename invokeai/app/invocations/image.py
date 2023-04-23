@@ -80,18 +80,19 @@ class LoadImageInvocation(BaseInvocation):
 
     # fmt: off
     type: Literal["load_image"] = "load_image"
-
     # Inputs
-    image_type: ImageType = Field(description="The type of the image")
-    image_name:       str = Field(description="The name of the image")
+    image: ImageField = Field(description="The type of the image")
     # fmt: on
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(self.image_type, self.image_name)
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
 
         return build_image_output(
-            image_type=self.image_type,
-            image_name=self.image_name,
-            image=image,
+            image_type=self.image.image_type,
+            image_name=self.image.image_name,
+            image=image
         )
 
 

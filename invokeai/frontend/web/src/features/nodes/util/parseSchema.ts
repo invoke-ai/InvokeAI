@@ -13,7 +13,7 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const invocationBlacklist = ['Graph', 'Collect', 'LoadImage'];
+const invocationBlacklist = ['Graph', 'Collect'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
