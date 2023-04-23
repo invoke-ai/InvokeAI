@@ -1,5 +1,4 @@
 from typing import Literal, Union
-
 from pydantic import Field
 
 from invokeai.app.models.image import ImageField, ImageType
@@ -14,9 +13,10 @@ class RestoreFaceInvocation(BaseInvocation):
 
     # Inputs
     image: Union[ImageField, None] = Field(description="The input image")
-    strength:                float = Field(default=0.75, gt=0, le=1, description="The strength of the restoration"  )
+    tool: Literal['gfpgan', 'codeformer'] = Field(default='gfpgan', description="Restoration method")
+    strength: float = Field(default=0.75, gt=0, le=1, description="The strength of the restoration"  )
     #fmt: on
-    
+
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
@@ -32,6 +32,7 @@ class RestoreFaceInvocation(BaseInvocation):
         results = context.services.restoration.upscale_and_reconstruct(
             image_list=[[image, 0]],
             upscale=None,
+            facetool=self.tool,
             strength=self.strength,  # GFPGAN strength
             save_original=False,
             image_callback=None,
@@ -48,7 +49,8 @@ class RestoreFaceInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id, node=self
         )
 
-        context.services.images.save(image_type, image_name, results[0][0], metadata)
+        context.services.images.save(
+            image_type, image_name, results[0][0], metadata)
         return build_image_output(
             image_type=image_type,
             image_name=image_name,

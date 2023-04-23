@@ -7,10 +7,12 @@ from ...backend.util import choose_torch_device, CPU_DEVICE, MPS_DEVICE
 # This should be a real base class for postprocessing functions,
 # but right now we just instantiate the existing gfpgan, esrgan
 # and codeformer functions.
+
+
 class RestorationServices:
     '''Face restoration and upscaling'''
-    
-    def __init__(self,args):
+
+    def __init__(self, args):
         try:
             gfpgan, codeformer, esrgan = None, None, None
             if args.restore or args.esrgan:
@@ -62,13 +64,16 @@ class RestorationServices:
                                     ">> GFPGAN not found. Face restoration is disabled."
                                 )
                             else:
-                                image = self.gfpgan.process(image, strength, seed)
+                                print(">> Restoring with: GFPGAN")
+                                image = self.gfpgan.process(
+                                    image, strength, seed)
                         if facetool == "codeformer":
                             if self.codeformer is None:
                                 print(
                                     ">> CodeFormer not found. Face restoration is disabled."
                                 )
                             else:
+                                print(">> Restoring with: CodeFormer")
                                 cf_device = (
                                     CPU_DEVICE if self.device == MPS_DEVICE else self.device
                                 )
