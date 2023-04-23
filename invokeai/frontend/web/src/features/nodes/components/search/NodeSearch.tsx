@@ -74,7 +74,7 @@ const NodeSearch = () => {
     findAllMatches: true,
     threshold: 0,
     ignoreLocation: true,
-    keys: ['title', 'type', 'tags'],
+    keys: ['title', 'type'],
   };
 
   const fuse = new Fuse(nodes, fuseOptions);
