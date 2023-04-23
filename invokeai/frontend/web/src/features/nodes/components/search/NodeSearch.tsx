@@ -5,6 +5,7 @@ import IAIInput from 'common/components/IAIInput';
 import { Panel } from 'reactflow';
 import { map } from 'lodash';
 import {
+  ChangeEvent,
   FocusEvent,
   KeyboardEvent,
   memo,
@@ -19,6 +20,8 @@ import { useBuildInvocation } from 'features/nodes/hooks/useBuildInvocation';
 import { makeToast } from 'features/system/hooks/useToastWatcher';
 import { addToast } from 'features/system/store/systemSlice';
 import { nodeAdded } from '../../store/nodesSlice';
+import Fuse from 'fuse.js';
+import { InvocationTemplate } from 'features/nodes/types/types';
 
 interface NodeListItemProps {
   title: string;
@@ -55,6 +58,9 @@ const NodeSearch = () => {
   );
 
   const nodes = map(invocationTemplates);
+  const [filteredNodes, setFilteredNodes] = useState<
+    Fuse.FuseResult<InvocationTemplate>[]
+  >([]);
 
   const buildInvocation = useBuildInvocation();
   const dispatch = useAppDispatch();
@@ -63,6 +69,21 @@ const NodeSearch = () => {
   const [showNodeList, setShowNodeList] = useState<boolean>(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const nodeSearchRef = useRef<HTMLDivElement>(null);
+
+  const fuseOptions = {
+    findAllMatches: true,
+    threshold: 0,
+    ignoreLocation: true,
+    keys: ['title', 'type', 'tags'],
+  };
+
+  const fuse = new Fuse(nodes, fuseOptions);
+
+  const findNode = (e: ChangeEvent<HTMLInputElement>) => {
+    setSearchText(e.target.value);
+    setFilteredNodes(fuse.search(e.target.value));
+    setShowNodeList(true);
+  };
 
   const addNode = useCallback(
     (nodeType: AnyInvocationType) => {
@@ -85,8 +106,24 @@ const NodeSearch = () => {
   const renderNodeList = () => {
     const nodeListToRender: ReactNode[] = [];
 
-    nodes.forEach(({ title, description, type }, index) => {
-      if (title.toLowerCase().includes(searchText)) {
+    if (searchText.length > 0) {
+      filteredNodes.forEach(({ item }, index) => {
+        const { title, description, type } = item;
+        if (title.toLowerCase().includes(searchText)) {
+          nodeListToRender.push(
+            <NodeListItem
+              key={index}
+              title={title}
+              description={description}
+              type={type}
+              isSelected={focusedIndex === index}
+              addNode={addNode}
+            />
+          );
+        }
+      });
+    } else {
+      nodes.forEach(({ title, description, type }, index) => {
         nodeListToRender.push(
           <NodeListItem
             key={index}
@@ -97,26 +134,11 @@ const NodeSearch = () => {
             addNode={addNode}
           />
         );
-      } else {
-        <NodeListItem
-          key={index}
-          title={title}
-          description={description}
-          type={type}
-          isSelected={focusedIndex === index}
-          addNode={addNode}
-        />;
-      }
-    });
+      });
+    }
 
     return (
-      <Flex
-        flexDirection="column"
-        background="base.900"
-        borderRadius={6}
-        maxHeight={400}
-        overflowY="scroll"
-      >
+      <Flex flexDirection="column" background="base.900" borderRadius={6}>
         {nodeListToRender}
       </Flex>
     );
@@ -128,12 +150,21 @@ const NodeSearch = () => {
 
     if (key === 'ArrowDown') {
       setShowNodeList(true);
-      nextIndex = (focusedIndex + 1) % nodes.length;
+      if (searchText.length > 0) {
+        nextIndex = (focusedIndex + 1) % filteredNodes.length;
+      } else {
+        nextIndex = (focusedIndex + 1) % nodes.length;
+      }
     }
 
     if (key === 'ArrowUp') {
       setShowNodeList(true);
-      nextIndex = (focusedIndex + nodes.length - 1) % nodes.length;
+      if (searchText.length > 0) {
+        nextIndex =
+          (focusedIndex + filteredNodes.length - 1) % filteredNodes.length;
+      } else {
+        nextIndex = (focusedIndex + filteredNodes.length - 1) % nodes.length;
+      }
     }
 
     // # TODO Handle Blur
@@ -141,7 +172,14 @@ const NodeSearch = () => {
     // }
 
     if (key === 'Enter') {
-      const selectedNodeType = nodes[focusedIndex].type;
+      let selectedNodeType: AnyInvocationType;
+
+      if (searchText.length > 0) {
+        selectedNodeType = filteredNodes[focusedIndex].item.type;
+      } else {
+        selectedNodeType = nodes[focusedIndex].type;
+      }
+
       addNode(selectedNodeType);
       setShowNodeList(false);
     }
@@ -163,13 +201,7 @@ const NodeSearch = () => {
         onBlur={searchInputBlurHandler}
         ref={nodeSearchRef}
       >
-        <IAIInput
-          value={searchText}
-          onChange={(e) => {
-            setSearchText(e.target.value);
-            setShowNodeList(true);
-          }}
-        />
+        <IAIInput value={searchText} onChange={findNode} />
         {showNodeList && renderNodeList()}
       </Flex>
     </Panel>
