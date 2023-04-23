@@ -163,7 +163,7 @@ const NodeSearch = () => {
         nextIndex =
           (focusedIndex + filteredNodes.length - 1) % filteredNodes.length;
       } else {
-        nextIndex = (focusedIndex + filteredNodes.length - 1) % nodes.length;
+        nextIndex = (focusedIndex + nodes.length - 1) % nodes.length;
       }
     }
 
