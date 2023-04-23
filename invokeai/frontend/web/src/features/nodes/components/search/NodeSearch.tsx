@@ -106,10 +106,10 @@ const NodeSearch = () => {
   const renderNodeList = () => {
     const nodeListToRender: ReactNode[] = [];
 
-    if (searchText.length > 0) {
+    if (searchText.trim().length > 0) {
       filteredNodes.forEach(({ item }, index) => {
         const { title, description, type } = item;
-        if (title.toLowerCase().includes(searchText)) {
+        if (title.toLowerCase().includes(searchText.trim())) {
           nodeListToRender.push(
             <NodeListItem
               key={index}
@@ -150,7 +150,7 @@ const NodeSearch = () => {
 
     if (key === 'ArrowDown') {
       setShowNodeList(true);
-      if (searchText.length > 0) {
+      if (searchText.trim().length > 0) {
         nextIndex = (focusedIndex + 1) % filteredNodes.length;
       } else {
         nextIndex = (focusedIndex + 1) % nodes.length;
@@ -159,7 +159,7 @@ const NodeSearch = () => {
 
     if (key === 'ArrowUp') {
       setShowNodeList(true);
-      if (searchText.length > 0) {
+      if (searchText.trim().length > 0) {
         nextIndex =
           (focusedIndex + filteredNodes.length - 1) % filteredNodes.length;
       } else {
@@ -174,7 +174,7 @@ const NodeSearch = () => {
     if (key === 'Enter') {
       let selectedNodeType: AnyInvocationType;
 
-      if (searchText.length > 0) {
+      if (searchText.trim().length > 0) {
         selectedNodeType = filteredNodes[focusedIndex].item.type;
       } else {
         selectedNodeType = nodes[focusedIndex].type;
@@ -201,7 +201,11 @@ const NodeSearch = () => {
         onBlur={searchInputBlurHandler}
         ref={nodeSearchRef}
       >
-        <IAIInput value={searchText} onChange={findNode} />
+        <IAIInput
+          value={searchText}
+          onChange={findNode}
+          placeholder="Search for a node .."
+        />
         {showNodeList && renderNodeList()}
       </Flex>
     </Panel>
