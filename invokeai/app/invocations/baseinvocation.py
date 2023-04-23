@@ -18,7 +18,7 @@ class InvocationContext:
         self.graph_execution_state_id = graph_execution_state_id
 
 
-class BaseInvocationOutput(InvokeAISettings):
+class BaseInvocationOutput(BaseModel):
     """Base class for all invocation outputs"""
 
     # All outputs must include a type name like this:
