@@ -45,7 +45,15 @@ class ImageStorageBase(ABC):
     def get_path(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
     ) -> str:
-        """Gets the path to an image or its thumbnail."""
+        """Gets the internal path to an image or its thumbnail."""
+        pass
+
+    # TODO: make this a bit more flexible for e.g. cloud storage
+    @abstractmethod
+    def get_uri(
+        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+    ) -> str:
+        """Gets the external URI to an image or its thumbnail."""
         pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
@@ -130,8 +138,8 @@ class DiskImageStorage(ImageStorageBase):
                     image_type=image_type.value,
                     image_name=filename,
                     # TODO: DiskImageStorage should not be building URLs...?
-                    image_url=f"api/v1/images/{image_type.value}/{filename}",
-                    thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
+                    image_url=self.get_uri(image_type, filename),
+                    thumbnail_url=self.get_uri(image_type, filename, True),
                     # TODO: Creation of this object should happen elsewhere (?), just making it fit here so it works
                     metadata=ImageResponseMetadata(
                         created=int(os.path.getctime(path)),
@@ -179,6 +187,20 @@ class DiskImageStorage(ImageStorageBase):
             path = os.path.join(self.__output_folder, image_type, basename)
 
         return path
+
+    def get_uri(
+        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+    ) -> str:
+        # strip out any relative path shenanigans
+        basename = os.path.basename(image_name)
+
+        if is_thumbnail:
+            thumbnail_basename = get_thumbnail_name(basename)
+            uri = f"api/v1/images/{image_type.value}/thumbnails/{thumbnail_basename}"
+        else:
+            uri = f"api/v1/images/{image_type.value}/{basename}"
+
+        return uri
 
     def validate_path(self, path: str) -> bool:
         try:

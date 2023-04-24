@@ -104,17 +104,19 @@ async def upload_image(
 
     invokeai_metadata = ApiDependencies.invoker.services.metadata.get_metadata(img)
 
+    image_url = ApiDependencies.invoker.services.images.get_uri(
+        ImageType.UPLOAD, saved_image.image_name
+    )
+
+    thumbnail_url = ApiDependencies.invoker.services.images.get_uri(
+        ImageType.UPLOAD, saved_image.image_name, True
+    )
+
     res = ImageResponse(
         image_type=ImageType.UPLOAD,
         image_name=saved_image.image_name,
-        image_url=request.url_for(
-            "get_image", image_type=ImageType.UPLOAD.value, image_name=saved_image.image_name
-        ),
-        thumbnail_url=request.url_for(
-            "get_thumbnail",
-            thumbnail_type=ImageType.UPLOAD.value,
-            thumbnail_name=saved_image.thumbnail_name,
-        ),
+        image_url=image_url,
+        thumbnail_url=thumbnail_url,
         metadata=ImageResponseMetadata(
             created=saved_image.created,
             width=img.width,
