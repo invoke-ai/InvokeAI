@@ -45,7 +45,7 @@ class FastAPIEventService(EventServiceBase):
                 )
 
             except Empty:
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.1)
                 pass
 
             except asyncio.CancelledError as e:
