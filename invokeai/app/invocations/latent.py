@@ -148,8 +148,6 @@ class TextToLatentsInvocation(BaseInvocation):
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
