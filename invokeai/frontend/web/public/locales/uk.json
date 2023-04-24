@@ -43,7 +43,11 @@
         "statusUpscaling": "Збільшення",
         "statusUpscalingESRGAN": "Збільшення (ESRGAN)",
         "statusLoadingModel": "Завантаження моделі",
-        "statusModelChanged": "Модель змінено"
+        "statusModelChanged": "Модель змінено",
+        "cancel": "Скасувати",
+        "accept": "Підтвердити",
+        "back": "Назад",
+        "postprocessing": "Постобробка"
     },
     "gallery": {
         "generations": "Генерації",
@@ -499,5 +503,8 @@
         "betaDarkenOutside": "Затемнити зовні",
         "betaLimitToBox": "Обмежити виділенням",
         "betaPreserveMasked": "Зберiгати замасковану область"
+    },
+    "accessibility": {
+        "nextImage": "Наступне зображення"
     }
 }
