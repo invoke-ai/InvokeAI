@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# invokeai_configure.py
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 # Before running stable-diffusion on an internet-isolated machine,
 # run this script from one with internet connectivity. The
@@ -6,9 +7,16 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-import sys
-print("Loading Python libraries...\n",file=sys.stderr)
+# Refactored imports and changed working directory
+# Author: Rich K. (https://github.com/originates)
+#
 
+import sys
+
+# Indicate the loading of Python libraries
+sys.stderr.write("Loading Python libraries...\n")
+
+# Import modules from the standard library
 import argparse
 import io
 import os
@@ -21,12 +29,12 @@ from pathlib import Path
 from shutil import get_terminal_size
 from urllib import request
 
+# Import modules from external libraries
 import npyscreen
 import torch
 import transformers
 from diffusers import AutoencoderKL
-from huggingface_hub import HfFolder
-from huggingface_hub import login as hf_hub_login
+from huggingface_hub import HfFolder, login as hf_hub_login
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
@@ -36,17 +44,34 @@ from transformers import (
     CLIPTokenizer,
 )
 
+# Get the current working directory
+current_dir = os.getcwd()
+
+# get the expected working directory based on the file location
+expected_dir = Path(__file__).resolve().parent.parent.parent 
+
+# change the working directory to the expected one if they are different
+if current_dir != expected_dir:
+    try:
+        os.chdir(expected_dir)
+    except Exception as e:
+        # Handle the error by printing it and exiting the program
+       print(f"Failed to change the working directory: {e}\n")
+       sys.exit(1)
+
+# Import modules and configs from the local invokeai package
 import invokeai.configs as configs
 
-from ...frontend.install.model_install import addModelsForm, process_and_execute
-from ...frontend.install.widgets import (
+# Import modules from the frontend and backend subpackages of invokeai
+from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
 )
-from ..args import PRECISION_CHOICES, Args
-from ..globals import Globals, global_cache_dir, global_config_dir, global_config_file
-from .model_install_backend import (
+from invokeai.backend.args import PRECISION_CHOICES, Args
+from invokeai.backend.globals import Globals, global_cache_dir, global_config_dir, global_config_file
+from invokeai.backend.config.model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,
