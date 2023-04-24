@@ -99,7 +99,8 @@
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
         "random": "Random",
-        "generate": "Generate"
+        "generate": "Generate",
+        "openInNewTab": "Open in New Tab"
     },
     "gallery": {
         "generations": "Generations",
