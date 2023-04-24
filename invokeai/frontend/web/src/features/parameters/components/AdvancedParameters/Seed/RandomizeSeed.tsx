@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldRandomizeSeed } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
+import { Switch } from '@chakra-ui/react';
 
 export default function RandomizeSeed() {
   const dispatch = useAppDispatch();
@@ -18,8 +19,8 @@ export default function RandomizeSeed() {
     dispatch(setShouldRandomizeSeed(e.target.checked));
 
   return (
-    <IAISwitch
-      label={t('parameters.randomizeSeed')}
+    <Switch
+      aria-label={t('parameters.randomizeSeed')}
       isChecked={shouldRandomizeSeed}
       onChange={handleChangeShouldRandomizeSeed}
     />

@@ -34,10 +34,9 @@ const IAISwitch = (props: Props) => {
       display="flex"
       gap={4}
       alignItems="center"
-      justifyContent="space-between"
       {...formControlProps}
     >
-      <FormLabel my={1} {...formLabelProps}>
+      <FormLabel my={1} flexGrow={1} {...formLabelProps}>
         {label}
       </FormLabel>
       <Switch {...rest} />

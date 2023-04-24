@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import NodeEditor from 'features/nodes/components/NodeEditor';
-import LinearWorkarea from './tabs/Linear/LinearWorkarea';
+import LinearWorkspace from './tabs/Linear/LinearWorkspace';
 import { FaImage } from 'react-icons/fa';
 
 export interface InvokeTabInfo {
@@ -41,7 +41,7 @@ const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
     {
       id: 'linear',
       icon: <Icon as={FaImage} sx={tabIconStyles} />,
-      workarea: <LinearWorkarea />,
+      workarea: <LinearWorkspace />,
     },
     {
       id: 'unifiedCanvas',

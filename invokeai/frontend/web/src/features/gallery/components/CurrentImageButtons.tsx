@@ -1,7 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { ButtonGroup, Flex, FlexProps, Link, useToast } from '@chakra-ui/react';
+import {
+  ButtonGroup,
+  Flex,
+  FlexProps,
+  FormControl,
+  Link,
+  useToast,
+} from '@chakra-ui/react';
 import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -446,6 +453,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         <IAIPopover
           triggerComponent={
             <IAIIconButton
+              isDisabled={!selectedImage}
               aria-label={`${t('parameters.sendTo')}...`}
               icon={<FaShareAlt />}
             />
@@ -487,7 +495,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               {t('parameters.copyImageToLink')}
             </IAIButton>
 
-            <Link download={true} href={getUrl(selectedImage?.url)}>
+            <Link download={true} href={getUrl(selectedImage?.url ?? '')}>
               <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                 {t('parameters.downloadImage')}
               </IAIButton>
