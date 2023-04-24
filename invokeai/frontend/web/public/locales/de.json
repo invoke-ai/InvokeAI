@@ -489,5 +489,8 @@
         "betaDarkenOutside": "Außen abdunkeln",
         "betaLimitToBox": "Begrenzung auf das Feld",
         "betaPreserveMasked": "Maskiertes bewahren"
+    },
+    "accessibility": {
+        "modelSelect": "Model Auswahl"
     }
 }
