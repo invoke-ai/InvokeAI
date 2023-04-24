@@ -44,21 +44,6 @@ from transformers import (
     CLIPTokenizer,
 )
 
-# Get the current working directory
-current_dir = os.getcwd()
-
-# get the expected working directory based on the file location
-expected_dir = Path(__file__).resolve().parent.parent.parent 
-
-# change the working directory to the expected one if they are different
-if current_dir != expected_dir:
-    try:
-        os.chdir(expected_dir)
-    except Exception as e:
-        # Handle the error by printing it and exiting the program
-       print(f"Failed to change the working directory: {e}\n")
-       sys.exit(1)
-
 # Import modules and configs from the local invokeai package
 import invokeai.configs as configs
 
