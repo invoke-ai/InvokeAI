@@ -1,5 +1,16 @@
-import { Flex } from '@chakra-ui/react';
+import {
+  AspectRatio,
+  Box,
+  Flex,
+  Select,
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack,
+  Text,
+} from '@chakra-ui/react';
 import { Feature } from 'app/features';
+import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import ImageToImageSettings from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageSettings';
 import ImageToImageToggle from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageToggle';
@@ -10,6 +21,7 @@ import RandomizeSeed from 'features/parameters/components/AdvancedParameters/See
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
+import DimensionsSettings from 'features/parameters/components/ImageDimensions/DimensionsSettings';
 import MainSettings from 'features/parameters/components/MainParameters/MainSettings';
 import ParametersAccordion, {
   ParametersAccordionItems,
@@ -17,14 +29,15 @@ import ParametersAccordion, {
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
-import { memo, useMemo } from 'react';
+import { findIndex } from 'lodash';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 
-const LinearParameters = () => {
+const GenerateParameters = () => {
   const { t } = useTranslation();
 
-  const linearAccordions: ParametersAccordionItems = useMemo(
+  const generateAccordionItems: ParametersAccordionItems = useMemo(
     () => ({
       // general: {
       //   name: 'general',
@@ -80,15 +93,16 @@ const LinearParameters = () => {
           gap: 2,
           bg: 'base.800',
           p: 4,
+          pb: 6,
           borderRadius: 'base',
         }}
       >
         <MainSettings />
-        <ImageToImageToggle />
       </Flex>
-      <ParametersAccordion accordionItems={linearAccordions} />
+      <ImageToImageToggle />
+      <ParametersAccordion accordionItems={generateAccordionItems} />
     </Flex>
   );
 };
 
-export default memo(LinearParameters);
+export default memo(GenerateParameters);

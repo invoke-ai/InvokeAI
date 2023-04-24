@@ -98,7 +98,8 @@
         "pinOptionsPanel": "Pin Options Panel",
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
-        "random": "Random"
+        "random": "Random",
+        "generate": "Generate"
     },
     "gallery": {
         "generations": "Generations",

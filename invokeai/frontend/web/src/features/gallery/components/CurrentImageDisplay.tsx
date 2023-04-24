@@ -59,9 +59,6 @@ const CurrentImageDisplay = () => {
         justifyContent: 'center',
       }}
     >
-      <Box sx={{ position: 'absolute', top: 0 }}>
-        <CurrentImageButtons />
-      </Box>
       <Flex
         sx={{
           w: 'full',
@@ -83,6 +80,9 @@ const CurrentImageDisplay = () => {
           />
         )}
       </Flex>
+      <Box sx={{ position: 'absolute', top: 0 }}>
+        <CurrentImageButtons />
+      </Box>
     </Flex>
   );
 };

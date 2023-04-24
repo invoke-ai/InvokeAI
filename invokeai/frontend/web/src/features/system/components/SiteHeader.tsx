@@ -34,8 +34,6 @@ const SiteHeader = () => {
       >
         <StatusIndicator />
 
-        <ModelSelect />
-
         {resolution === 'desktop' ? (
           <SiteHeaderMenu />
         ) : (

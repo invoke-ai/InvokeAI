@@ -35,7 +35,7 @@ const GALLERY_TAB_WIDTHS: Record<
 > = {
   // txt2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
   // img2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-  linear: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+  generate: { galleryMinWidth: 200, galleryMaxWidth: 500 },
   unifiedCanvas: { galleryMinWidth: 200, galleryMaxWidth: 200 },
   nodes: { galleryMinWidth: 200, galleryMaxWidth: 500 },
   // postprocessing: { galleryMinWidth: 200, galleryMaxWidth: 500 },

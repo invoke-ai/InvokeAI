@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
 
-const LinearContent = () => {
+const GenerateContent = () => {
   return (
     <Box
       sx={{
@@ -18,4 +18,4 @@ const LinearContent = () => {
   );
 };
 
-export default LinearContent;
+export default GenerateContent;
