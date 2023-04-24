@@ -7,7 +7,7 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-# Improved working directory and import management
+# Improved import management
 # Rich K. (https://github.com/originates)
 #
 
