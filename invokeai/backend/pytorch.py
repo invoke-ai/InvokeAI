@@ -43,7 +43,7 @@ from .stable_diffusion import HuggingFaceConceptsLibrary
 from .util import choose_precision, choose_torch_device
 from ..frontend.CLI.readline import Completer, get_completer
 from .globals import Globals, global_config_dir
-from .baseModel import inferenceModel
+from .inferencePipeline import inferencePipeline
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -135,7 +135,7 @@ gr = Generate(
           )
 
 """
-class Pytorch(inferenceModel):
+class Pytorch(inferencePipeline):
     """
     Instantiation of Inference model class
     """
