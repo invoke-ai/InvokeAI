@@ -75,27 +75,6 @@ class MaskOutput(BaseInvocationOutput):
         }
 
 
-class LoadImageInvocation(BaseInvocation):
-    """Load an image and provide it as output."""
-
-    # fmt: off
-    type: Literal["load_image"] = "load_image"
-    # Inputs
-    image: ImageField = Field(description="The type of the image")
-    # fmt: on
-
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
-            self.image.image_type, self.image.image_name
-        )
-
-        return build_image_output(
-            image_type=self.image.image_type,
-            image_name=self.image.image_name,
-            image=image
-        )
-
-
 class ShowImageInvocation(BaseInvocation):
     """Displays a provided image, and passes it forward in the pipeline."""
 

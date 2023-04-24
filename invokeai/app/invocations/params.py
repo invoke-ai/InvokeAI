@@ -3,6 +3,7 @@
 from typing import Literal
 from pydantic import Field
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+from .image import ImageOutput, ImageField, build_image_output
 
 # Pass-through parameter nodes - used by subgraphs
 
@@ -113,3 +114,31 @@ class ParamBooleanInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> BooleanOutput:
         return BooleanOutput(a=self.a)
+
+class ParamImageInvocation(BaseInvocation):
+    """Load an image and provide it as output."""
+
+    # fmt: off
+    type: Literal["param_image"] = "param_image"
+    # Inputs
+    image: ImageField = Field(description="The input image")
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["parameters", "image"],
+                "title": "Image"
+            }
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+
+        return build_image_output(
+            image_type=self.image.image_type,
+            image_name=self.image.image_name,
+            image=image
+        )
