@@ -30,7 +30,6 @@ from ldm.invoke.conditioning import (
     get_tokens_for_prompt_object,
     get_prompt_structure,
     split_weighted_subprompts,
-    get_tokenizer,
 )
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
@@ -1314,7 +1313,7 @@ class InvokeAIWebServer:
                     None
                     if type(parsed_prompt) is Blend
                     else get_tokens_for_prompt_object(
-                        get_tokenizer(self.generate.model), parsed_prompt
+                        self.generate.model.tokenizer, parsed_prompt
                     )
                 )
                 attention_maps_image_base64_url = (

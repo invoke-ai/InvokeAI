@@ -288,16 +288,7 @@ class InvokeAICrossAttentionMixin:
         return self.einsum_op_tensor_mem(q, k, v, 32)
 
 
-
-def restore_default_cross_attention(model, is_running_diffusers: bool, processors_to_restore: Optional[AttnProcessor]=None):
-    if is_running_diffusers:
-        unet = model
-        unet.set_attn_processor(processors_to_restore or CrossAttnProcessor())
-    else:
-        remove_attention_function(model)
-
-
-def override_cross_attention(model, context: Context, is_running_diffusers = False):
+def setup_cross_attention_control_attention_processors(unet: UNet2DConditionModel, context: Context):
     """
     Inject attention parameters and functions into the passed in model to enable cross attention editing.
 
@@ -323,22 +314,15 @@ def override_cross_attention(model, context: Context, is_running_diffusers = Fal
 
     context.cross_attention_mask = mask.to(device)
     context.cross_attention_index_map = indices.to(device)
-    if is_running_diffusers:
-        unet = model
-        old_attn_processors = unet.attn_processors
-        if torch.backends.mps.is_available():
-            # see note in StableDiffusionGeneratorPipeline.__init__ about borked slicing on MPS
-            unet.set_attn_processor(SwapCrossAttnProcessor())
-        else:
-            # try to re-use an existing slice size
-            default_slice_size = 4
-            slice_size = next((p.slice_size for p in old_attn_processors.values() if type(p) is SlicedAttnProcessor), default_slice_size)
-            unet.set_attn_processor(SlicedSwapCrossAttnProcesser(slice_size=slice_size))
+    old_attn_processors = unet.attn_processors
+    if torch.backends.mps.is_available():
+        # see note in StableDiffusionGeneratorPipeline.__init__ about borked slicing on MPS
+        unet.set_attn_processor(SwapCrossAttnProcessor())
     else:
-        context.register_cross_attention_modules(model)
-        inject_attention_function(model, context)
-
-
+        # try to re-use an existing slice size
+        default_slice_size = 4
+        slice_size = next((p.slice_size for p in old_attn_processors.values() if type(p) is SlicedAttnProcessor), default_slice_size)
+        unet.set_attn_processor(SlicedSwapCrossAttnProcesser(slice_size=slice_size))
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
