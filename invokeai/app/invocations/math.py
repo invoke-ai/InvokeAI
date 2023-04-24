@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+from .params import IntOutput
 
 
 class MathInvocationConfig(BaseModel):
@@ -17,14 +18,6 @@ class MathInvocationConfig(BaseModel):
                 "tags": ["math"],
             }
         }
-
-
-class IntOutput(BaseInvocationOutput):
-    """An integer output"""
-    #fmt: off
-    type: Literal["int_output"] = "int_output"
-    a: int = Field(default=None, description="The output integer")
-    #fmt: on
 
 
 class AddInvocation(BaseInvocation, MathInvocationConfig):
