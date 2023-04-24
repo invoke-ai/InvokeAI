@@ -53,7 +53,7 @@
         "langPortuguese": "Portogisisch",
         "langRussian": "Russisch",
         "langUkranian": "Ukrainisch",
-        "hotkeysLabel": "Hotkeys",
+        "hotkeysLabel": "Tastenkombinationen",
         "githubLabel": "Github",
         "discordLabel": "Discord",
         "txt2img": "Text zu Bild",
@@ -334,7 +334,11 @@
         "deleteModel": "Model löschen",
         "deleteConfig": "Konfiguration löschen",
         "deleteMsg1": "Möchten Sie diesen Model-Eintrag wirklich aus InvokeAI löschen?",
-        "deleteMsg2": "Dadurch wird die Modellprüfpunktdatei nicht von Ihrer Festplatte gelöscht. Sie können sie bei Bedarf erneut hinzufügen."
+        "deleteMsg2": "Dadurch wird die Modellprüfpunktdatei nicht von Ihrer Festplatte gelöscht. Sie können sie bei Bedarf erneut hinzufügen.",
+        "customConfig": "Benutzerdefinierte Konfiguration",
+        "invokeRoot": "InvokeAI Ordner",
+        "formMessageDiffusersVAELocationDesc": "Falls nicht angegeben, sucht InvokeAI nach der VAE-Datei innerhalb des oben angegebenen Modell Speicherortes.",
+        "checkpointModels": "Kontrollpunkte"
     },
     "parameters": {
         "images": "Bilder",
@@ -392,7 +396,10 @@
         "useInitImg": "Ausgangsbild verwenden",
         "deleteImage": "Bild löschen",
         "initialImage": "Ursprüngliches Bild",
-        "showOptionsPanel": "Optionsleiste zeigen"
+        "showOptionsPanel": "Optionsleiste zeigen",
+        "cancel": {
+            "setType": "Abbruchart festlegen"
+        }
     },
     "settings": {
         "displayInProgress": "Bilder in Bearbeitung anzeigen",
