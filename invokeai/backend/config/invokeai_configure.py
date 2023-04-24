@@ -7,8 +7,8 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-# Refactored imports and changed working directory
-# Author: Rich K. (https://github.com/originates)
+# Improved working directory and import management
+# Rich K. (https://github.com/originates)
 #
 
 import sys
