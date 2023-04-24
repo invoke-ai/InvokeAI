@@ -73,7 +73,8 @@
         "postprocessing": "Tratamiento posterior",
         "txt2img": "De texto a imagen",
         "accept": "Aceptar",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "linear": "Lineal"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -483,7 +484,9 @@
         "negativePrompts": "Preguntas negativas",
         "imageToImage": "Imagen a imagen",
         "denoisingStrength": "Intensidad de la eliminación del ruido",
-        "hiresStrength": "Alta resistencia"
+        "hiresStrength": "Alta resistencia",
+        "showPreview": "Mostrar la vista previa",
+        "hidePreview": "Ocultar la vista previa"
     },
     "settings": {
         "models": "Modelos",
@@ -529,7 +532,11 @@
         "metadataLoadFailed": "Error al cargar metadatos",
         "initialImageSet": "Imágen inicial establecida",
         "initialImageNotSet": "Imagen inicial no establecida",
-        "initialImageNotSetDesc": "Error al establecer la imágen inicial"
+        "initialImageNotSetDesc": "Error al establecer la imágen inicial",
+        "serverError": "Error en el servidor",
+        "disconnected": "Desconectado del servidor",
+        "canceled": "Procesando la cancelación",
+        "connected": "Conectado al servidor"
     },
     "tooltip": {
         "feature": {
@@ -625,6 +632,7 @@
         "toggleAutoscroll": "Activar el autodesplazamiento",
         "toggleLogViewer": "Alternar el visor de registros",
         "showGallery": "Mostrar galería",
-        "showOptionsPanel": "Mostrar el panel de opciones"
+        "showOptionsPanel": "Mostrar el panel de opciones",
+        "menu": "Menú"
     }
 }
