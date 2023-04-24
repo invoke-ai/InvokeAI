@@ -169,11 +169,18 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     // dispatch(setIsLightboxOpen(true));
   };
 
+  const handleOpenInNewTab = () => {
+    window.open(getUrl(image.url), '_blank');
+  };
+
   return (
     <ContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
       renderMenu={() => (
         <MenuList>
+          <MenuItem onClickCapture={handleOpenInNewTab}>
+            {t('common.openInNewTab')}
+          </MenuItem>
           {!disabledFeatures.includes('lightbox') && (
             <MenuItem onClickCapture={handleLightBox}>
               {t('parameters.openInViewer')}
