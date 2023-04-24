@@ -67,10 +67,9 @@ class ONNX(inferencePipeline) :
         iterations = iterations or self.iterations
         outdir = outdir or self.outdir
         sampler_name = self.sampler_name or sampler_name
-
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-
+        print("Output directory: ", outdir)
         tic = time.time()
         try:
             #txt2img_onnx = txt2img(width, height, iterations, steps)
@@ -83,7 +82,7 @@ class ONNX(inferencePipeline) :
 
             image = onnx_pipe(prompt, height=height, width=width, num_images_per_prompt=iterations, num_inference_steps=steps).images[0]
             timestamp = int(time.time())
-            image.save(f"{self.outdir}/Inference_{timestamp}.png")
+            image.save(f"{outdir}/Inference_{timestamp}.png")
 
         except KeyboardInterrupt:
             # Clear the CUDA cache on an exception
