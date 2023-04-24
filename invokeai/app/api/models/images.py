@@ -34,8 +34,7 @@ class ProgressImage(BaseModel):
     dataURL: str = Field(description="The image data as a b64 data URL")
 
 
-class NonNullableImageField(BaseModel):
-    """Non-nullable ImageField, used for delete_images route"""
-
-    image_type: ImageType
-    image_name: str
+class SavedImage(BaseModel):
+    image_name: str = Field(description="The name of the saved image")
+    thumbnail_name: str = Field(description="The name of the saved thumbnail")
+    created: int = Field(description="The created timestamp of the saved image")

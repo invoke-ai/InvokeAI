@@ -2,7 +2,7 @@
 
 from typing import Annotated, List, Optional, Union
 
-from fastapi import Body, HTTPException, Path, Query
+from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
@@ -258,7 +258,7 @@ async def invoke_session(
     all: bool = Query(
         default=False, description="Whether or not to invoke all remaining invocations"
     ),
-) -> None:
+) -> Response:
     """Invokes a session"""
     session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
     if session is None:
@@ -268,7 +268,7 @@ async def invoke_session(
         raise HTTPException(status_code=400)
 
     ApiDependencies.invoker.invoke(session, invoke_all=all)
-    raise HTTPException(status_code=202)
+    return Response(status_code=202)
 
 
 @session_router.delete(
@@ -280,7 +280,7 @@ async def invoke_session(
 )
 async def cancel_session_invoke(
     session_id: str = Path(description="The id of the session to cancel"),
-) -> None:
+) -> Response:
     """Invokes a session"""
     ApiDependencies.invoker.cancel(session_id)
-    raise HTTPException(status_code=202)
+    return Response(status_code=202)
