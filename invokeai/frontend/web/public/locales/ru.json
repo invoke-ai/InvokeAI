@@ -53,7 +53,13 @@
         "loading": "Загрузка",
         "loadingInvokeAI": "Загрузка Invoke AI",
         "back": "Назад",
-        "statusConvertingModel": "Конвертация модели"
+        "statusConvertingModel": "Конвертация модели",
+        "cancel": "Отменить",
+        "accept": "Принять",
+        "oceanTheme": "Океан",
+        "langUkranian": "Украинский",
+        "langEnglish": "Английский",
+        "postprocessing": "Постобработка"
     },
     "gallery": {
         "generations": "Генерации",
@@ -535,6 +541,19 @@
         "betaPreserveMasked": "Сохранять маскируемую область"
     },
     "accessibility": {
-        "modelSelect": "Выбор модели"
+        "modelSelect": "Выбор модели",
+        "uploadImage": "Загрузить изображение",
+        "nextImage": "Следующее изображение",
+        "previousImage": "Предыдущее изображение",
+        "zoomIn": "Приблизить",
+        "zoomOut": "Отдалить",
+        "rotateClockwise": "Повернуть по часовой стрелке",
+        "rotateCounterClockwise": "Повернуть против часовой стрелки",
+        "flipVertically": "Перевернуть вертикально",
+        "flipHorizontally": "Отразить горизонтально",
+        "toggleAutoscroll": "Включить автопрокрутку",
+        "toggleLogViewer": "Показать или скрыть просмотрщик логов",
+        "showOptionsPanel": "Показать опции",
+        "showGallery": "Показать галерею"
     }
 }
