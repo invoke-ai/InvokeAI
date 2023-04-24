@@ -9,7 +9,7 @@ from ..services.default_graphs import create_system_graphs
 
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
-from ...backend import Globals
+from ...backend.globals import Globals, copy_conf_to_globals
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
@@ -45,12 +45,7 @@ class ApiDependencies:
 
     @staticmethod
     def initialize(config, event_handler_id: int):
-        TODO: Get rid of Globals
-        Globals.try_patchmatch = config.patchmatch
-        Globals.always_use_cpu = config.always_use_cpu
-        Globals.internet_available = config.internet_available and check_internet()
-        Globals.disable_xformers = not config.xformers
-        Globals.ckpt_convert = config.ckpt_convert
+        copy_conf_to_globals(config)
 
         # TODO: Use a logger
         print(f">> Internet connectivity is {Globals.internet_available}")

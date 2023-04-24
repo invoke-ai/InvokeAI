@@ -66,6 +66,20 @@ Typical usage:
  text2image = TextToImageInvocation()
  print(text2image.steps)
 
+Computed properties:
+
+The InvokeAIAppConfig object has a series of properties that
+resolve paths relative to the runtime root directory. They each return
+a Path object:
+
+ root_path          - path to InvokeAI root
+ output_path        - path to default outputs directory
+ model_conf_path    - path to models.yaml
+ conf               - alias for the above
+ embedding_path     - path to the embeddings directory
+ lora_path          - path to the LoRA directory
+ 
+
 '''
 import argparse
 import os
@@ -73,10 +87,11 @@ import sys
 from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
-from pydantic import BaseSettings, Field
+from pydantic import BaseSettings, Field, parse_obj_as
 from typing import Any, ClassVar, List, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
+LEGACY_INIT_FILE = Path('invokeai.init')
 
 class InvokeAISettings(BaseSettings):
     '''
@@ -94,7 +109,7 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def add_parser_arguments(cls, parser):
-        env_prefix = cls.Config.env_prefix
+        env_prefix = cls.Config.env_prefix if hasattr(cls.Config,'env_prefix') else 'INVOKEAI_'
         default_settings_stanza = get_args(get_type_hints(cls)['type'])[0]
         initconf = cls.initconf.get(default_settings_stanza) if cls.initconf and default_settings_stanza in cls.initconf else None
 
@@ -186,6 +201,20 @@ class InvokeAISettings(BaseSettings):
                 action=argparse.BooleanOptionalAction if field.type_==bool else 'store',
                 help=field.field_info.description,
             )
+def _find_root()->Path:
+    if os.environ.get("INVOKEAI_ROOT"):
+        root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
+    elif (
+            os.environ.get("VIRTUAL_ENV")
+            and (Path(os.environ.get("VIRTUAL_ENV"), "..", INIT_FILE).exists()
+                 or
+                 Path(os.environ.get("VIRTUAL_ENV"), "..", LEGACY_INIT_FILE).exists()
+                 )
+    ):
+        root = Path(os.environ.get("VIRTUAL_ENV"), "..").resolve()
+    else:
+        root = Path("~/invokeai").expanduser().resolve()
+    return root
 
 class InvokeAIAppConfig(InvokeAISettings):
     '''
@@ -193,11 +222,14 @@ class InvokeAIAppConfig(InvokeAISettings):
     '''
     #fmt: off
     type: Literal["globals"] = "globals"
+    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory')
+    infile              : Path = Field(default=None, description='Path to a file of prompt commands to bulk generate from')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = 'float16'
-    conf                : Path = Field(default='configs/models.yaml', description='Path to models definition file')
+    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file')
+    model               : str = Field(default='stable-diffusion-1.5', description='Initial model name')
     outdir              : Path = Field(default='outputs', description='Default folder for output images')
-    root                : Path = Field(default='~/invokeai', description='InvokeAI runtime root directory')
-    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI embeddings directory')
+    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory')
+    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory')
     autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.')
     gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.')
     embeddings          : bool = Field(default=True, description='Load contents of embeddings directory')
@@ -207,6 +239,11 @@ class InvokeAIAppConfig(InvokeAISettings):
     nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker")
     restore             : bool = Field(default=True, description="Enable/disable face restoration code")
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code")
+    patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code")
+    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models")
+    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.")
+    free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.")
+    log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.")
     #fmt: on
 
     def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
@@ -216,66 +253,104 @@ class InvokeAIAppConfig(InvokeAISettings):
         :param argv: aternate sys.argv list
         :param **kwargs: attributes to initialize with
         '''
-        super().__init__()
+        super().__init__(**kwargs)
         
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
         self.parse_args(argv)
         if not self.root:
-            self.root = self._find_root()
+            self.root = self.find_root()
         if not conf:
             try:
                 conf = OmegaConf.load(self.root_dir / INIT_FILE)
             except:
                 pass
         InvokeAISettings.initconf = conf
+
         # parse args again in order to pick up settings in configuration file
         self.parse_args(argv)
 
         # restore initialization values
+        hints = get_type_hints(self)
         for k in kwargs:
-            setattr(self,k,kwargs[k])
+            setattr(self,k,parse_obj_as(hints[k],kwargs[k]))
+
+    @property
+    def root_path(self)->Path:
+        '''
+        Path to the runtime root directory
+        '''
+        if self.root:
+            return self.root.expanduser()
+        else:
+            return self.find_root()
 
     @property
     def root_dir(self)->Path:
-        return self.root.expanduser()
+        '''
+        Alias for above.
+        '''
+        return self.root_path
 
     def _resolve(self,partial_path:Path)->Path:
-        return (self.root_dir / partial_path).resolve()
+        return (self.root_path / partial_path).resolve()
 
     @property
     def output_path(self)->Path:
+        '''
+        Path to defaults outputs directory.
+        '''
         return self._resolve(self.outdir)
 
     @property
     def model_conf_path(self)->Path:
-        return self._resolve(self.conf)
+        '''
+        Path to models configuration file.
+        '''
+        return self._resolve(self.conf_path)
+
+    @property
+    def conf(self)->Path:
+        '''
+        Path to models configuration file (alias for model_conf_path).
+        '''
+        return self.model_conf_path
 
     @property
     def embedding_path(self)->Path:
+        '''
+        Path to the textual inversion embeddings directory.
+        '''
         return self._resolve(self.embedding_dir) if self.embedding_dir else None
+    
+    @property
+    def lora_path(self)->Path:
+        '''
+        Path to the LoRA models directory.
+        '''
+        return self._resolve(self.lora_dir) if self.lora_dir else None
 
     @property
     def autoconvert_path(self)->Path:
+        '''
+        Path to the directory containing models to be imported automatically at startup.
+        '''
         return self._resolve(self.autoconvert_dir) if self.autoconvert_dir else None
 
     @property
     def gfpgan_model_path(self)->Path:
+        '''
+        Path to the GFPGAN model.
+        '''
         return self._resolve(self.gfpgan_model_dir) if self.gfpgan_model_dir else None
 
     @staticmethod
     def find_root()->Path:
-        if os.environ.get("INVOKEAI_ROOT"):
-            root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
-        elif (
-                os.environ.get("VIRTUAL_ENV")
-                and Path(os.environ.get("VIRTUAL_ENV"), "..", INIT_FILE).exists()
-        ):
-            root = Path(os.environ.get("VIRTUAL_ENV"), "..").resolve()
-        else:
-            root = Path("~/invokeai").expanduser().resolve()
-        return root
-
+        '''
+        Choose the runtime root directory when not specified on command line or
+        init file.
+        '''
+        return _find_root()
 
 class InvokeAIWebConfig(InvokeAIAppConfig):
     '''

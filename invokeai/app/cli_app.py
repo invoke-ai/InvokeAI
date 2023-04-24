@@ -35,6 +35,7 @@ from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
 from .services.config import InvokeAIAppConfig
+from ..backend.globals import copy_conf_to_globals   # temporary workaround for code depending on Globals
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -190,6 +191,7 @@ def invoke_all(context: CliContext):
 
 def invoke_cli():
     config = InvokeAIAppConfig()
+    copy_conf_to_globals(config)   # temporary workaround
     model_manager = get_model_manager(config)
 
     # This initializes the autocompleter and returns it.

@@ -83,3 +83,11 @@ def test_invocation():
 
     invocation = TextToImageInvocation(conf=init1,id='foobar2',steps=30)
     assert invocation.steps==30
+
+def test_type_coercion():
+    conf = InvokeAIAppConfig(argv=['--root=/tmp/foobar'])
+    assert str(conf.root)=='/tmp/foobar'
+    assert isinstance(conf.root,Path)
+    conf = InvokeAIAppConfig(argv=['--root=/tmp/foobar'],root='/tmp/different')
+    assert str(conf.root)=='/tmp/different'
+    assert isinstance(conf.root,Path)
