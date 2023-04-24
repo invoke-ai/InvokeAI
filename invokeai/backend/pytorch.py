@@ -1,6 +1,6 @@
 """
 This class is derived from Inference Model class
-Implements pytorch inference related operations
+Implements pytorch inference pipeline
 """
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 # Derived from source code carrying the following copyrights
