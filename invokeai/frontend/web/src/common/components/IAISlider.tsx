@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { FocusEvent, memo, useEffect, useMemo, useState } from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 
 export type IAIFullSliderProps = {
   label: string;
@@ -119,7 +120,9 @@ const IAISlider = (props: IAIFullSliderProps) => {
       min,
       numberInputMax
     );
-    onChange(clamped);
+    const quantized = roundDownToMultiple(clamped, step);
+    onChange(quantized);
+    setLocalInputValue(quantized);
   };
 
   const handleInputChange = (v: number | string) => {

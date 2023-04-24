@@ -14,6 +14,7 @@ import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
+import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import modelsReducer from 'features/system/store/modelSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 
@@ -55,6 +56,7 @@ const rootReducer = combineReducers({
   system: systemReducer,
   ui: uiReducer,
   uploads: uploadsReducer,
+  hotkeys: hotkeysReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -75,6 +77,7 @@ const rootPersistConfig = getPersistConfig({
     ...uiBlacklist,
     // ...uploadsBlacklist,
     'uploads',
+    'hotkeys',
   ],
   debounce: 300,
 });

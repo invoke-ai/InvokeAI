@@ -19,6 +19,9 @@ const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   openLinearAccordionItems: [],
+  disabledParameterPanels: [],
+  disabledTabs: [],
+  openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
 };
 
@@ -96,8 +99,8 @@ export const uiSlice = createSlice({
       }
     },
     openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
-      if (tabMap[state.activeTab] === 'linear') {
-        state.openLinearAccordionItems = action.payload;
+      if (tabMap[state.activeTab] === 'generate') {
+        state.openGenerateAccordionItems = action.payload;
       }
 
       if (tabMap[state.activeTab] === 'unifiedCanvas') {

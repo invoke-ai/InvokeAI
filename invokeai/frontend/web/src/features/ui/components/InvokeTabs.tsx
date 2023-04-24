@@ -23,8 +23,10 @@ import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import NodeEditor from 'features/nodes/components/NodeEditor';
-import LinearWorkspace from './tabs/Linear/LinearWorkspace';
+import GenerateWorkspace from './tabs/Generate/GenerateWorkspace';
 import { FaImage } from 'react-icons/fa';
+import { createSelector } from '@reduxjs/toolkit';
+import { BsLightningChargeFill, BsLightningFill } from 'react-icons/bs';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -36,30 +38,36 @@ const tabIconStyles: ChakraProps['sx'] = {
   boxSize: 6,
 };
 
-const buildTabs = (disabledTabs: InvokeTabName[]): InvokeTabInfo[] => {
-  const tabs: InvokeTabInfo[] = [
-    {
-      id: 'linear',
-      icon: <Icon as={FaImage} sx={tabIconStyles} />,
-      workarea: <LinearWorkspace />,
-    },
-    {
-      id: 'unifiedCanvas',
-      icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
-      workarea: <UnifiedCanvasWorkarea />,
-    },
-    {
-      id: 'nodes',
-      icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
-      workarea: <NodeEditor />,
-    },
-  ];
-  return tabs.filter((tab) => !disabledTabs.includes(tab.id));
-};
+const tabs: InvokeTabInfo[] = [
+  {
+    id: 'generate',
+    icon: <Icon as={BsLightningChargeFill} sx={{ boxSize: 5 }} />,
+    workarea: <GenerateWorkspace />,
+  },
+  {
+    id: 'unifiedCanvas',
+    icon: <Icon as={MdGridOn} sx={{ boxSize: 6 }} />,
+    workarea: <UnifiedCanvasWorkarea />,
+  },
+  {
+    id: 'nodes',
+    icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6 }} />,
+    workarea: <NodeEditor />,
+  },
+];
+
+const enabledTabsSelector = createSelector(
+  (state: RootState) => state.ui,
+  (ui) => {
+    const { disabledTabs } = ui;
+
+    return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+  }
+);
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
-
+  const enabledTabs = useAppSelector(enabledTabsSelector);
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
@@ -72,22 +80,20 @@ export default function InvokeTabs() {
     (state: RootState) => state.system.disabledTabs
   );
 
-  const activeTabs = buildTabs(disabledTabs);
-
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
 
   useHotkeys('1', () => {
-    dispatch(setActiveTab(0));
+    dispatch(setActiveTab('generate'));
   });
 
   useHotkeys('2', () => {
-    dispatch(setActiveTab(1));
+    dispatch(setActiveTab('unifiedCanvas'));
   });
 
   useHotkeys('3', () => {
-    dispatch(setActiveTab(2));
+    dispatch(setActiveTab('nodes'));
   });
 
   // Lightbox Hotkey
@@ -111,7 +117,7 @@ export default function InvokeTabs() {
 
   const tabs = useMemo(
     () =>
-      activeTabs.map((tab) => (
+      enabledTabs.map((tab) => (
         <Tooltip
           key={tab.id}
           hasArrow
@@ -126,13 +132,15 @@ export default function InvokeTabs() {
           </Tab>
         </Tooltip>
       )),
-    [t, activeTabs]
+    [t, enabledTabs]
   );
 
   const tabPanels = useMemo(
     () =>
-      activeTabs.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
-    [activeTabs]
+      enabledTabs.map((tab) => (
+        <TabPanel key={tab.id}>{tab.workarea}</TabPanel>
+      )),
+    [enabledTabs]
   );
 
   return (

@@ -1,3 +1,4 @@
+import { Box, BoxProps } from '@chakra-ui/react';
 import { DIFFUSERS_SAMPLERS, SAMPLERS } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -7,7 +8,7 @@ import { activeModelSelector } from 'features/system/store/systemSelectors';
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function MainSampler() {
+export default function MainSampler(props: BoxProps) {
   const sampler = useAppSelector(
     (state: RootState) => state.generation.sampler
   );
@@ -19,14 +20,16 @@ export default function MainSampler() {
     dispatch(setSampler(e.target.value));
 
   return (
-    <IAISelect
-      label={t('parameters.sampler')}
-      value={sampler}
-      onChange={handleChangeSampler}
-      validValues={
-        activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
-      }
-      minWidth={36}
-    />
+    <Box {...props}>
+      <IAISelect
+        label={t('parameters.sampler')}
+        value={sampler}
+        onChange={handleChangeSampler}
+        validValues={
+          activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
+        }
+        minWidth={36}
+      />
+    </Box>
   );
 }

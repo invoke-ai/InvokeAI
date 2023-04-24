@@ -1,7 +1,7 @@
 export const tabMap = [
   // 'txt2img',
   // 'img2img',
-  'linear',
+  'generate',
   'unifiedCanvas',
   'nodes',
   // 'postprocessing',

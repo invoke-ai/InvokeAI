@@ -22,7 +22,7 @@ export default function MainWidth() {
       isDisabled={activeTabName === 'unifiedCanvas'}
       label={t('parameters.width')}
       value={width}
-      min={64}
+      min={8}
       step={64}
       max={2048}
       onChange={(v) => dispatch(setWidth(v))}

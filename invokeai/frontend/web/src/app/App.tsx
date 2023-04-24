@@ -26,6 +26,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
 import { ApplicationFeature } from './invokeai';
+import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 
 keepGUIAlive();
 
@@ -40,6 +41,7 @@ interface Props extends PropsWithChildren {
 
 const App = (props: Props) => {
   useToastWatcher();
+  useGlobalHotkeys();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
   const disabledFeatures = useAppSelector(

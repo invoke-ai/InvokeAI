@@ -4,7 +4,10 @@ import { Feature } from 'app/features';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { tabMap } from 'features/ui/store/tabMap';
-import { uiSelector } from 'features/ui/store/uiSelectors';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
 import { openAccordionItemsChanged } from 'features/ui/store/uiSlice';
 import { filter, map } from 'lodash';
 import { ReactNode, useCallback } from 'react';
@@ -23,7 +26,7 @@ const parametersAccordionSelector = createSelector(
 
     let openAccordions: number[] = [];
 
-    if (tabMap[activeTab] === 'linear') {
+    if (tabMap[activeTab] === 'generate') {
       openAccordions = openLinearAccordionItems;
     }
 

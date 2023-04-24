@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Box, BoxProps, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { ChangeEvent } from 'react';
 import { isEqual } from 'lodash';
@@ -30,7 +30,7 @@ const selector = createSelector(
   }
 );
 
-const ModelSelect = () => {
+const ModelSelect = (props: BoxProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { allModelNames, selectedModel } = useAppSelector(selector);
@@ -39,12 +39,9 @@ const ModelSelect = () => {
   };
 
   return (
-    <Flex
-      style={{
-        paddingInlineStart: 1.5,
-      }}
-    >
+    <Box {...props}>
       <IAISelect
+        label={t('modelManager.model')}
         style={{ fontSize: 'sm' }}
         aria-label={t('accessibility.modelSelect')}
         tooltip={selectedModel?.description || ''}
@@ -52,7 +49,7 @@ const ModelSelect = () => {
         validValues={allModelNames}
         onChange={handleChangeModel}
       />
-    </Flex>
+    </Box>
   );
 };
 

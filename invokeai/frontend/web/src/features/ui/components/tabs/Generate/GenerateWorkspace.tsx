@@ -1,15 +1,15 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/storeHooks';
 import { memo } from 'react';
-import LinearContent from './LinearContent';
-import LinearParameters from './LinearParameters';
+import GenerateContent from './GenerateContent';
+import GenerateParameters from './GenerateParameters';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
 import { RootState } from 'app/store';
 import Scrollable from '../../common/Scrollable';
 import ParametersSlide from '../../common/ParametersSlide';
 import AnimatedImageToImagePanel from 'features/parameters/components/AnimatedImageToImagePanel';
 
-const LinearWorkspace = () => {
+const GenerateWorkspace = () => {
   const shouldPinParametersPanel = useAppSelector(
     (state: RootState) => state.ui.shouldPinParametersPanel
   );
@@ -33,7 +33,7 @@ const LinearWorkspace = () => {
             }}
           >
             <Scrollable>
-              <LinearParameters />
+              <GenerateParameters />
             </Scrollable>
             <PinParametersPanelButton
               sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
@@ -42,12 +42,12 @@ const LinearWorkspace = () => {
         </Flex>
       ) : (
         <ParametersSlide>
-          <LinearParameters />
+          <GenerateParameters />
         </ParametersSlide>
       )}
-      <LinearContent />
+      <GenerateContent />
     </Flex>
   );
 };
 
-export default memo(LinearWorkspace);
+export default memo(GenerateWorkspace);
