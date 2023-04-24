@@ -13,7 +13,6 @@ from PIL import Image
 from invokeai.app.api.models.images import (
     ImageResponse,
     ImageResponseMetadata,
-    NonNullableImageField,
 )
 from invokeai.app.services.item_storage import PaginatedResults
 
@@ -99,7 +98,7 @@ async def upload_image(
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
 
-    (image_name, thumbnail_name, ctime) = ApiDependencies.invoker.services.images.save(
+    saved_image = ApiDependencies.invoker.services.images.save(
         ImageType.UPLOAD, filename, img
     )
 
@@ -107,17 +106,17 @@ async def upload_image(
 
     res = ImageResponse(
         image_type=ImageType.UPLOAD,
-        image_name=image_name,
+        image_name=saved_image.image_name,
         image_url=request.url_for(
-            "get_image", image_type=ImageType.UPLOAD.value, image_name=image_name
+            "get_image", image_type=ImageType.UPLOAD.value, image_name=saved_image.image_name
         ),
         thumbnail_url=request.url_for(
             "get_thumbnail",
             thumbnail_type=ImageType.UPLOAD.value,
-            thumbnail_name=thumbnail_name,
+            thumbnail_name=saved_image.thumbnail_name,
         ),
         metadata=ImageResponseMetadata(
-            created=ctime,
+            created=saved_image.created,
             width=img.width,
             height=img.height,
             invokeai=invokeai_metadata,
@@ -147,20 +146,3 @@ async def list_images(
     """Gets a list of images"""
     result = ApiDependencies.invoker.services.images.list(image_type, page, per_page)
     return result
-
-
-@images_router.delete(
-    "/",
-    operation_id="delete_images",
-)
-async def delete_images(
-    images: list[NonNullableImageField] = Body(
-        description="The list of images to delete"
-    ),
-) -> None:
-    """Deletes a list of images and their thumbnails"""
-
-    for i in images:
-        ApiDependencies.invoker.services.images.delete(
-            image_type=i.image_type, image_name=i.image_name
-        )
