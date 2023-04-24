@@ -3,7 +3,17 @@ import { FaImage } from 'react-icons/fa';
 
 const SelectImagePlaceholder = () => {
   return (
-    <Flex sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}>
+    <Flex
+      sx={{
+        w: 'full',
+        h: 'full',
+        bg: 'base.800',
+        borderRadius: 'base',
+        alignItems: 'center',
+        justifyContent: 'center',
+        aspectRatio: '1/1',
+      }}
+    >
       <Icon color="base.400" boxSize={32} as={FaImage}></Icon>
     </Flex>
   );

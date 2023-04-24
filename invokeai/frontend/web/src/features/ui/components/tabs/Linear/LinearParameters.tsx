@@ -1,10 +1,12 @@
 import { Flex } from '@chakra-ui/react';
 import { Feature } from 'app/features';
+import IAISwitch from 'common/components/IAISwitch';
 import ImageToImageSettings from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageSettings';
 import ImageToImageToggle from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageToggle';
 import OutputSettings from 'features/parameters/components/AdvancedParameters/Output/OutputSettings';
 import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
 import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
+import RandomizeSeed from 'features/parameters/components/AdvancedParameters/Seed/RandomizeSeed';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
@@ -15,58 +17,75 @@ import ParametersAccordion, {
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 
 const LinearParameters = () => {
   const { t } = useTranslation();
 
-  const linearAccordions: ParametersAccordionItems = {
-    general: {
-      name: 'general',
-      header: `${t('parameters.general')}`,
-      feature: undefined,
-      content: <MainSettings />,
-    },
-    seed: {
-      name: 'seed',
-      header: `${t('parameters.seed')}`,
-      feature: Feature.SEED,
-      content: <SeedSettings />,
-    },
-    imageToImage: {
-      name: 'imageToImage',
-      header: `${t('parameters.imageToImage')}`,
-      feature: undefined,
-      content: <ImageToImageSettings />,
-      additionalHeaderComponents: <ImageToImageToggle />,
-    },
-    variations: {
-      name: 'variations',
-      header: `${t('parameters.variations')}`,
-      feature: Feature.VARIATIONS,
-      content: <VariationsSettings />,
-      additionalHeaderComponents: <GenerateVariationsToggle />,
-    },
-    symmetry: {
-      name: 'symmetry',
-      header: `${t('parameters.symmetry')}`,
-      content: <SymmetrySettings />,
-      additionalHeaderComponents: <SymmetryToggle />,
-    },
-    other: {
-      name: 'other',
-      header: `${t('parameters.otherOptions')}`,
-      feature: Feature.OTHER,
-      content: <OutputSettings />,
-    },
-  };
+  const linearAccordions: ParametersAccordionItems = useMemo(
+    () => ({
+      // general: {
+      //   name: 'general',
+      //   header: `${t('parameters.general')}`,
+      //   feature: undefined,
+      //   content: <MainSettings />,
+      // },
+      seed: {
+        name: 'seed',
+        header: `${t('parameters.seed')}`,
+        feature: Feature.SEED,
+        content: <SeedSettings />,
+        additionalHeaderComponents: <RandomizeSeed />,
+      },
+      // imageToImage: {
+      //   name: 'imageToImage',
+      //   header: `${t('parameters.imageToImage')}`,
+      //   feature: undefined,
+      //   content: <ImageToImageSettings />,
+      //   additionalHeaderComponents: <ImageToImageToggle />,
+      // },
+      variations: {
+        name: 'variations',
+        header: `${t('parameters.variations')}`,
+        feature: Feature.VARIATIONS,
+        content: <VariationsSettings />,
+        additionalHeaderComponents: <GenerateVariationsToggle />,
+      },
+      symmetry: {
+        name: 'symmetry',
+        header: `${t('parameters.symmetry')}`,
+        content: <SymmetrySettings />,
+        additionalHeaderComponents: <SymmetryToggle />,
+      },
+      other: {
+        name: 'other',
+        header: `${t('parameters.otherOptions')}`,
+        feature: Feature.OTHER,
+        content: <OutputSettings />,
+      },
+    }),
+    [t]
+  );
 
   return (
     <Flex flexDir="column" gap={2}>
       <PromptInput />
       <NegativePromptInput />
       <ProcessButtons />
+      <Flex
+        sx={{
+          flexDirection: 'column',
+          gap: 2,
+          bg: 'base.800',
+          p: 4,
+          borderRadius: 'base',
+        }}
+      >
+        <MainSettings />
+        <ImageToImageToggle />
+      </Flex>
       <ParametersAccordion accordionItems={linearAccordions} />
     </Flex>
   );

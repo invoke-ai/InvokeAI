@@ -10,7 +10,6 @@ import Threshold from './Threshold';
 const SeedSettings = () => {
   return (
     <VStack gap={2} alignItems="stretch">
-      <RandomizeSeed />
       <Seed />
       <Threshold />
       <Perlin />

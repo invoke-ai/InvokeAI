@@ -12,10 +12,6 @@ export default function ImageFit() {
     (state: RootState) => state.generation.shouldFitToWidthHeight
   );
 
-  const isImageToImageEnabled = useAppSelector(
-    (state: RootState) => state.generation.isImageToImageEnabled
-  );
-
   const handleChangeFit = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setShouldFitToWidthHeight(e.target.checked));
 
@@ -23,7 +19,6 @@ export default function ImageFit() {
 
   return (
     <IAISwitch
-      isDisabled={!isImageToImageEnabled}
       label={t('parameters.imageFit')}
       isChecked={shouldFitToWidthHeight}
       onChange={handleChangeFit}
