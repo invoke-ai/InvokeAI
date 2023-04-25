@@ -151,11 +151,17 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleCopyImage = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage?.url) {
+      return;
+    }
 
-    const blob = await fetch(getUrl(selectedImage.url)).then((res) =>
-      res.blob()
-    );
+    const url = getUrl(selectedImage.url);
+
+    if (!url) {
+      return;
+    }
+
+    const blob = await fetch(url).then((res) => res.blob());
     const data = [new ClipboardItem({ [blob.type]: blob })];
 
     await navigator.clipboard.write(data);
@@ -174,6 +180,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         ? getUrl(selectedImage.url)
         : window.location.toString() + selectedImage.url
       : '';
+
+    if (!url) {
+      return;
+    }
 
     navigator.clipboard.writeText(url).then(() => {
       toast({
@@ -477,7 +487,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               {t('parameters.copyImageToLink')}
             </IAIButton>
 
-            <Link download={true} href={getUrl(selectedImage!.url)}>
+            <Link download={true} href={getUrl(selectedImage?.url)}>
               <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                 {t('parameters.downloadImage')}
               </IAIButton>

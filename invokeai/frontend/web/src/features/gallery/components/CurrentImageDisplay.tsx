@@ -1,6 +1,7 @@
 import { Flex, Icon } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash';
 
 import { MdPhoto } from 'react-icons/md';
@@ -12,12 +13,12 @@ import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
 
 export const currentImageDisplaySelector = createSelector(
-  [gallerySelector, selectedImageSelector],
-  (gallery, selectedImage) => {
-    const { currentImage, intermediateImage } = gallery;
+  [systemSelector, selectedImageSelector],
+  (system, selectedImage) => {
+    const { progressImage } = system;
 
     return {
-      hasAnImageToDisplay: selectedImage || intermediateImage,
+      hasAnImageToDisplay: selectedImage || progressImage,
     };
   },
   {
