@@ -14,7 +14,6 @@ from torch import nn
 
 from compel.cross_attention_control import Arguments
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
-from diffusers.models.attention_processor import AttentionProcessor
 from ldm.invoke.devices import torch_dtype
 
 
@@ -287,13 +286,6 @@ class InvokeAICrossAttentionMixin:
         # Tested on i7 with 8MB L3 cache.
         return self.einsum_op_tensor_mem(q, k, v, 32)
 
-
-def restore_default_cross_attention(model, is_running_diffusers: bool, processors_to_restore: Optional[AttentionProcessor]=None):
-    if is_running_diffusers:
-        unet = model
-        unet.set_attn_processor(processors_to_restore or AttnProcessor())
-    else:
-        remove_attention_function(model)
 
 def setup_cross_attention_control_attention_processors(unet: UNet2DConditionModel, context: Context):
     """

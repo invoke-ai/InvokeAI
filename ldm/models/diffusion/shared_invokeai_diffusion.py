@@ -1,11 +1,10 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 from math import ceil
-from typing import Callable, Optional, Union, Any, Dict
+from typing import Callable, Optional, Union, Any
 
 import numpy as np
 import torch
-from diffusers.models.attention_processor import AttentionProcessor
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
@@ -122,32 +121,6 @@ class InvokeAIDiffuserComponent:
                     lora_condition.unload()
             # TODO resuscitate attention map saving
             # self.remove_attention_map_saving()
-
-    def override_attention_processors(
-        self, conditioning: ExtraConditioningInfo, step_count: int
-    ) -> Dict[str, AttentionProcessor]:
-        """
-        setup cross attention .swap control. for diffusers this replaces the attention processor, so
-        the previous attention processor is returned so that the caller can restore it later.
-        """
-        old_attn_processors = self.model.attn_processors
-
-        # Load lora conditions into the model
-        if conditioning.has_lora_conditions:
-            for condition in conditioning.lora_conditions:
-                condition(self.model)
-
-        if conditioning.wants_cross_attention_control:
-            self.cross_attention_control_context = Context(
-                arguments=conditioning.cross_attention_control_args,
-                step_count=step_count,
-            )
-            override_cross_attention(
-                self.model,
-                self.cross_attention_control_context,
-                is_running_diffusers=self.is_running_diffusers,
-            )
-        return old_attn_processors
 
     def setup_attention_map_saving(self, saver: AttentionMapSaver):
         def callback(slice, dim, offset, slice_size, key):
