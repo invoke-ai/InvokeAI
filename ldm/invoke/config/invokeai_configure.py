@@ -21,6 +21,7 @@ from urllib import request
 from shutil import get_terminal_size
 
 import npyscreen
+import torch
 import transformers
 from diffusers import AutoencoderKL
 from huggingface_hub import HfFolder
@@ -663,19 +664,8 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     configs_src = Path(configs.__path__[0])
     configs_dest = Path(root) / "configs"
     if not os.path.samefile(configs_src, configs_dest):
-        shutil.copytree(configs_src,
-                        configs_dest,
-                        dirs_exist_ok=True,
-                        copy_function=shutil.copyfile,
-                        )
-    # Fix up directory permissions so that they are writable
-    # This can happen when running under Nix environment which
-    # makes the runtime directory template immutable.
-    for root,dirs,files in os.walk(os.path.join(root,name)):
-        for d in dirs:
-            Path(root,d).chmod(0o775)
-        for f in files:
-            Path(root,d).chmod(0o644)
+        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
+
 
 # -------------------------------------
 def run_console_ui(

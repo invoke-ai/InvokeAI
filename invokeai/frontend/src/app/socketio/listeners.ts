@@ -33,6 +33,10 @@ import {
   setIntermediateImage,
 } from 'features/gallery/store/gallerySlice';
 
+import {
+  getLoraModels,
+  getTextualInversionTriggers,
+} from 'app/socketio/actions';
 import type { RootState } from 'app/store';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
@@ -463,6 +467,8 @@ const makeSocketIOListeners = (
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));
       dispatch(setCurrentStatus(i18n.t('common.statusModelChanged')));
+      dispatch(getLoraModels());
+      dispatch(getTextualInversionTriggers());
       dispatch(setIsProcessing(false));
       dispatch(setIsCancelable(true));
       dispatch(
