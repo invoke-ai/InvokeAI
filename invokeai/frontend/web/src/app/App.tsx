@@ -13,16 +13,48 @@ import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
-import { useAppSelector } from './storeHooks';
+import { useAppDispatch, useAppSelector } from './storeHooks';
 import { PropsWithChildren, useEffect } from 'react';
+import { setDisabledPanels, setDisabledTabs } from 'features/ui/store/uiSlice';
+import { InvokeTabName } from 'features/ui/store/tabMap';
+import { shouldTransformUrlsChanged } from 'features/system/store/systemSlice';
+import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
 
 keepGUIAlive();
 
-const App = (props: PropsWithChildren) => {
+interface Props extends PropsWithChildren {
+  options: {
+    disabledPanels: string[];
+    disabledTabs: InvokeTabName[];
+    shouldTransformUrls?: boolean;
+    shouldFetchImages: boolean;
+  };
+}
+
+const App = (props: Props) => {
   useToastWatcher();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
   const { setColorMode } = useColorMode();
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(setDisabledPanels(props.options.disabledPanels));
+  }, [dispatch, props.options.disabledPanels]);
+
+  useEffect(() => {
+    dispatch(setDisabledTabs(props.options.disabledTabs));
+  }, [dispatch, props.options.disabledTabs]);
+
+  useEffect(() => {
+    dispatch(
+      shouldTransformUrlsChanged(Boolean(props.options.shouldTransformUrls))
+    );
+  }, [dispatch, props.options.shouldTransformUrls]);
+
+  useEffect(() => {
+    dispatch(setShouldFetchImages(props.options.shouldFetchImages));
+  }, [dispatch, props.options.shouldFetchImages]);
 
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
@@ -41,7 +73,12 @@ const App = (props: PropsWithChildren) => {
           h={APP_HEIGHT}
         >
           {props.children || <SiteHeader />}
-          <Flex gap={4} w="full" h="full">
+          <Flex
+            gap={4}
+            w={{ base: '100vw', xl: 'full' }}
+            h="full"
+            flexDir={{ base: 'column', xl: 'row' }}
+          >
             <InvokeTabs />
             <ImageGalleryPanel />
           </Flex>

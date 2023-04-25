@@ -481,5 +481,22 @@
         "betaDarkenOutside": "暗化外部区域",
         "betaLimitToBox": "限制在框内",
         "betaPreserveMasked": "保留遮罩层"
+    },
+    "accessibility": {
+        "modelSelect": "模型选择",
+        "invokeProgressBar": "Invoke 进度条",
+        "reset": "重置",
+        "nextImage": "下一张图片",
+        "useThisParameter": "使用此参数",
+        "uploadImage": "上传图片",
+        "previousImage": "上一张图片",
+        "copyMetadataJson": "复制JSON元数据",
+        "exitViewer": "退出视口（ExitViewer）",
+        "zoomIn": "放大",
+        "zoomOut": "缩小",
+        "rotateCounterClockwise": "逆时针旋转",
+        "rotateClockwise": "顺时针旋转",
+        "flipHorizontally": "水平翻转",
+        "flipVertically": "垂直翻转"
     }
 }
