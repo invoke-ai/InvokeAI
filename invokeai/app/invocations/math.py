@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
-from .params import IntOutput
+from .values import IntOutput
 
 
 class MathInvocationConfig(BaseModel):

@@ -16,17 +16,17 @@ class IntOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class ParamIntInvocation(BaseInvocation):
+class IntegerValueInvocation(BaseInvocation):
     """An integer parameter"""
     #fmt: off
-    type: Literal["param_int"] = "param_int"
+    type: Literal["value_int"] = "value_int"
     a: int = Field(default=0, description="An integer value")
     #fmt: on
 
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["parameters", "integer"],
+                "tags": ["values", "integer"],
                 "title": "Integer Value"
             }
         }
@@ -43,17 +43,17 @@ class FloatOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class ParamFloatInvocation(BaseInvocation):
+class FloatValueInvocation(BaseInvocation):
     """A float parameter"""
     #fmt: off
-    type: Literal["param_float"] = "param_float"
+    type: Literal["value_float"] = "value_float"
     a: float = Field(default=0, description="A float value")
     #fmt: on
 
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["parameters", "float"],
+                "tags": ["values", "float"],
                 "title": "Float Value"
             }
         }
@@ -70,17 +70,17 @@ class StringOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class ParamStringInvocation(BaseInvocation):
+class StringValueInvocation(BaseInvocation):
     """A string parameter"""
     #fmt: off
-    type: Literal["param_string"] = "param_string"
+    type: Literal["value_string"] = "value_string"
     a: str = Field(default='', description="A string value")
     #fmt: on
 
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["parameters", "string"],
+                "tags": ["values", "string"],
                 "title": "String Value"
             }
         }
@@ -97,17 +97,17 @@ class BooleanOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class ParamBooleanInvocation(BaseInvocation):
+class BooleanValueInvocation(BaseInvocation):
     """A boolean parameter"""
     #fmt: off
-    type: Literal["param_boolean"] = "param_boolean"
+    type: Literal["value_boolean"] = "value_boolean"
     a: bool = Field(default=False, description="A boolean value")
     #fmt: on
 
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["parameters", "boolean"],
+                "tags": ["values", "boolean"],
                 "title": "Boolean Value"
             }
         }
@@ -115,11 +115,12 @@ class ParamBooleanInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> BooleanOutput:
         return BooleanOutput(a=self.a)
 
-class ParamImageInvocation(BaseInvocation):
+
+class ImageValueInvocation(BaseInvocation):
     """Load an image and provide it as output."""
 
     # fmt: off
-    type: Literal["param_image"] = "param_image"
+    type: Literal["value_image"] = "value_image"
     # Inputs
     image: ImageField = Field(description="The input image")
     # fmt: on
@@ -127,7 +128,7 @@ class ParamImageInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["parameters", "image"],
+                "tags": ["values", "image"],
                 "title": "Image"
             }
         }

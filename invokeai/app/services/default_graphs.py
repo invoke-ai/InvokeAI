@@ -1,5 +1,5 @@
 from ..invocations.latent import LatentsToImageInvocation, NoiseInvocation, TextToLatentsInvocation
-from ..invocations.params import ParamIntInvocation
+from ..invocations.values import IntegerValueInvocation
 from .graph import Edge, EdgeConnection, ExposedNodeInput, ExposedNodeOutput, Graph, LibraryGraph
 from .item_storage import ItemStorageABC
 
@@ -14,8 +14,8 @@ def create_text_to_image() -> LibraryGraph:
         description='Converts text to an image',
         graph=Graph(
             nodes={
-                'width': ParamIntInvocation(id='width', a=512),
-                'height': ParamIntInvocation(id='height', a=512),
+                'width': IntegerValueInvocation(id='width', a=512),
+                'height': IntegerValueInvocation(id='height', a=512),
                 '3': NoiseInvocation(id='3'),
                 '4': TextToLatentsInvocation(id='4'),
                 '5': LatentsToImageInvocation(id='5')
