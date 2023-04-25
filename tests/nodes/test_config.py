@@ -86,8 +86,8 @@ def test_invocation():
 
 def test_type_coercion():
     conf = InvokeAIAppConfig(argv=['--root=/tmp/foobar'])
-    assert str(conf.root)=='/tmp/foobar'
+    assert conf.root==Path('/tmp/foobar')
     assert isinstance(conf.root,Path)
     conf = InvokeAIAppConfig(argv=['--root=/tmp/foobar'],root='/tmp/different')
-    assert str(conf.root)=='/tmp/different'
+    assert conf.root==Path('/tmp/different')
     assert isinstance(conf.root,Path)
