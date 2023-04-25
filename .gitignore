@@ -233,5 +233,3 @@ installer/install.sh
 installer/update.bat
 installer/update.sh
 
-# no longer stored in source directory
-models

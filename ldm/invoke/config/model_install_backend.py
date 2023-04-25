@@ -388,7 +388,19 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     if config_file is default_config_file() and not config_file.parent.exists():
         configs_src = Dataset_path.parent
         configs_dest = default_config_file().parent
-        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
+        shutil.copytree(configs_src,
+                        configs_dest,
+                        dirs_exist_ok=True,
+                        copy_function=shutil.copyfile,
+                        )
+    # Fix up directory permissions so that they are writable
+    # This can happen when running under Nix environment which
+    # makes the runtime directory template immutable.
+    for root,dirs,files in os.walk(default_config_file().parent):
+        for d in dirs:
+            Path(root,d).chmod(0o775)
+        for f in files:
+            Path(root,d).chmod(0o644)
 
     yaml = new_config_file_contents(successfully_downloaded, config_file)
 

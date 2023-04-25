@@ -6,13 +6,13 @@ from typing import Callable, Optional, Union, Any, Dict
 import numpy as np
 import torch
 from diffusers.models.attention_processor import AttentionProcessor
+from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.cross_attention_control import (
     Arguments,
-    restore_default_cross_attention,
-    override_cross_attention,
+    setup_cross_attention_control_attention_processors,
     Context,
     get_cross_attention_modules,
     CrossAttentionType,
@@ -84,24 +84,39 @@ class InvokeAIDiffuserComponent:
         self.cross_attention_control_context = None
         self.sequential_guidance = Globals.sequential_guidance
 
+    @classmethod
     @contextmanager
     def custom_attention_context(
-        self, extra_conditioning_info: Optional[ExtraConditioningInfo], step_count: int
+        clss,
+        unet: UNet2DConditionModel, # note: also may futz with the text encoder depending on requested LoRAs
+        extra_conditioning_info: Optional[ExtraConditioningInfo],
+        step_count: int
     ):
-        old_attn_processor = None
+        old_attn_processors = None
         if extra_conditioning_info and (
             extra_conditioning_info.wants_cross_attention_control
             | extra_conditioning_info.has_lora_conditions
         ):
-            old_attn_processor = self.override_attention_processors(
-                extra_conditioning_info, step_count=step_count
-            )
+            old_attn_processors = unet.attn_processors
+            # Load lora conditions into the model
+            if extra_conditioning_info.has_lora_conditions:
+                for condition in extra_conditioning_info.lora_conditions:
+                    condition() # target model is stored in condition state for some reason
+            if extra_conditioning_info.wants_cross_attention_control:
+                cross_attention_control_context = Context(
+                    arguments=extra_conditioning_info.cross_attention_control_args,
+                    step_count=step_count,
+                )
+                setup_cross_attention_control_attention_processors(
+                    unet,
+                    cross_attention_control_context,
+                )
 
         try:
             yield None
         finally:
-            if old_attn_processor is not None:
-                self.restore_default_cross_attention(old_attn_processor)
+            if old_attn_processors is not None:
+                unet.set_attn_processor(old_attn_processors)
             if extra_conditioning_info and extra_conditioning_info.has_lora_conditions:
                 for lora_condition in extra_conditioning_info.lora_conditions:
                     lora_condition.unload()

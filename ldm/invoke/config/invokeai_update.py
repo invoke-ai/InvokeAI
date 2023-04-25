@@ -42,8 +42,18 @@ def invokeai_is_running()->bool:
         except psutil.AccessDenied:
             continue
     return False
+
+def do_post_install():
+    '''
+    Run postinstallation script.
+    '''
+    print("Looking for postinstallation script to run on this version...")
+    try:
+        from ldm.invoke.config.post_install.py import post_install
+        post_install()
+    except:
+        print("Postinstallation script not available for this version of InvokeAI")
         
-    
 def welcome(versions: dict):
     
     @group()
@@ -107,6 +117,7 @@ def main():
         print(f':heavy_check_mark: Upgrade successful')
     else:
         print(f':exclamation: [bold red]Upgrade failed[/red bold]')
+    do_post_install()
     
 if __name__ == "__main__":
     try:
