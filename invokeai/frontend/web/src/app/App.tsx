@@ -14,7 +14,7 @@ import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from './storeHooks';
-import { PropsWithChildren, useEffect } from 'react';
+import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { shouldTransformUrlsChanged } from 'features/system/store/systemSlice';
 import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
@@ -47,6 +47,7 @@ const App = (props: Props) => {
   );
 
   const isApplicationReady = useIsApplicationReady();
+  const [loadingOverridden, setLoadingOverridden] = useState(false);
 
   const { setColorMode } = useColorMode();
   const dispatch = useAppDispatch();
@@ -72,6 +73,10 @@ const App = (props: Props) => {
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
   }, [setColorMode, currentTheme]);
+
+  const handleOverrideClicked = useCallback(() => {
+    setLoadingOverridden(true);
+  }, []);
 
   return (
     <Grid w="100vw" h="100vh" position="relative">
@@ -99,7 +104,7 @@ const App = (props: Props) => {
       </ImageUploader>
 
       <AnimatePresence>
-        {!isApplicationReady && (
+        {!isApplicationReady && !loadingOverridden && (
           <motion.div
             key="loading"
             initial={{ opacity: 1 }}
@@ -111,6 +116,15 @@ const App = (props: Props) => {
             <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
               <Loading />
             </Box>
+            <Box
+              onClick={handleOverrideClicked}
+              position="absolute"
+              top={0}
+              right={0}
+              cursor="pointer"
+              w="2rem"
+              h="2rem"
+            />
           </motion.div>
         )}
       </AnimatePresence>
