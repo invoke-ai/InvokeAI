@@ -33,6 +33,7 @@ const PinParametersPanelButton = (props: PinParametersPanelButtonProps) => {
         icon={shouldPinParametersPanel ? <BsPinAngleFill /> : <BsPinAngle />}
         variant="ghost"
         size="sm"
+        px={{ base: 10, xl: 0 }}
         sx={{
           color: 'base.700',
           _hover: {

@@ -9,7 +9,7 @@
         "lightTheme": "Светлая",
         "greenTheme": "Зеленая",
         "img2img": "Изображение в изображение (img2img)",
-        "unifiedCanvas": "Универсальный холст",
+        "unifiedCanvas": "Единый холст",
         "nodes": "Ноды",
         "langRussian": "Русский",
         "nodesDesc": "Cистема генерации изображений на основе нодов (узлов) уже разрабатывается. Следите за новостями об этой замечательной функции.",
@@ -53,7 +53,28 @@
         "loading": "Загрузка",
         "loadingInvokeAI": "Загрузка Invoke AI",
         "back": "Назад",
-        "statusConvertingModel": "Конвертация модели"
+        "statusConvertingModel": "Конвертация модели",
+        "cancel": "Отменить",
+        "accept": "Принять",
+        "oceanTheme": "Океан",
+        "langUkranian": "Украинский",
+        "langEnglish": "Английский",
+        "postprocessing": "Постобработка",
+        "langArabic": "Арабский",
+        "langSpanish": "Испанский",
+        "langSimplifiedChinese": "Китайский (упрощенный)",
+        "langDutch": "Нидерландский",
+        "langFrench": "Французский",
+        "langGerman": "Немецкий",
+        "langHebrew": "Иврит",
+        "langItalian": "Итальянский",
+        "langJapanese": "Японский",
+        "langKorean": "Корейский",
+        "langPolish": "Польский",
+        "langPortuguese": "Португальский",
+        "txt2img": "Текст в изображение (txt2img)",
+        "langBrPortuguese": "Португальский (Бразилия)",
+        "linear": "Линейная обработка"
     },
     "gallery": {
         "generations": "Генерации",
@@ -72,11 +93,11 @@
         "noImagesInGallery": "Изображений нет"
     },
     "hotkeys": {
-        "keyboardShortcuts": "Клавиатурные сокращения",
+        "keyboardShortcuts": "Горячие клавиши",
         "appHotkeys": "Горячие клавиши приложения",
         "generalHotkeys": "Общие горячие клавиши",
         "galleryHotkeys": "Горячие клавиши галереи",
-        "unifiedCanvasHotkeys": "Горячие клавиши универсального холста",
+        "unifiedCanvasHotkeys": "Горячие клавиши Единого холста",
         "invoke": {
             "title": "Invoke",
             "desc": "Сгенерировать изображение"
@@ -266,12 +287,12 @@
             "desc": "Сбросить вид холста"
         },
         "previousStagingImage": {
-            "title": "Previous Staging Image",
-            "desc": "Предыдущее изображение"
+            "title": "Предыдущее изображение",
+            "desc": "Предыдущая область изображения"
         },
         "nextStagingImage": {
-            "title": "Next Staging Image",
-            "desc": "Следующее изображение"
+            "title": "Следующее изображение",
+            "desc": "Следующая область изображения"
         },
         "acceptStagingImage": {
             "title": "Принять изображение",
@@ -353,7 +374,42 @@
         "modelConverted": "Модель преобразована",
         "invokeRoot": "Каталог InvokeAI",
         "modelsMerged": "Модели объединены",
-        "mergeModels": "Объединить модели"
+        "mergeModels": "Объединить модели",
+        "scanForModels": "Просканировать модели",
+        "sigmoid": "Сигмоид",
+        "formMessageDiffusersModelLocation": "Расположение Diffusers-модели",
+        "modelThree": "Модель 3",
+        "modelMergeHeaderHelp2": "Только Diffusers-модели доступны для объединения. Если вы хотите объединить checkpoint-модели, сначала преобразуйте их в Diffusers.",
+        "pickModelType": "Выбрать тип модели",
+        "formMessageDiffusersVAELocation": "Расположение VAE",
+        "v1": "v1",
+        "convertToDiffusersSaveLocation": "Путь сохранения",
+        "customSaveLocation": "Пользовательский путь сохранения",
+        "alpha": "Альфа",
+        "diffusersModels": "Diffusers",
+        "customConfig": "Пользовательский конфиг",
+        "pathToCustomConfig": "Путь к пользовательскому конфигу",
+        "inpainting": "v1 Inpainting",
+        "sameFolder": "В ту же папку",
+        "modelOne": "Модель 1",
+        "mergedModelCustomSaveLocation": "Пользовательский путь",
+        "none": "пусто",
+        "addDifference": "Добавить разницу",
+        "vaeRepoIDValidationMsg": "Онлайн репозиторий VAE",
+        "convertToDiffusersHelpText2": "Этот процесс заменит вашу запись в Model Manager на версию той же модели в Diffusers.",
+        "custom": "Пользовательский",
+        "modelTwo": "Модель 2",
+        "mergedModelSaveLocation": "Путь сохранения",
+        "merge": "Объединить",
+        "interpolationType": "Тип интерполяции",
+        "modelMergeInterpAddDifferenceHelp": "В этом режиме Модель 3 сначала вычитается из Модели 2. Результирующая версия смешивается с Моделью 1 с установленным выше коэффициентом Альфа.",
+        "modelMergeHeaderHelp1": "Вы можете объединить до трех разных моделей, чтобы создать смешанную, соответствующую вашим потребностям.",
+        "modelMergeAlphaHelp": "Альфа влияет на силу смешивания моделей. Более низкие значения альфа приводят к меньшему влиянию второй модели.",
+        "inverseSigmoid": "Обратный Сигмоид",
+        "weightedSum": "Взвешенная сумма",
+        "safetensorModels": "SafeTensors",
+        "v2_768": "v2 (768px)",
+        "v2_base": "v2 (512px)"
     },
     "parameters": {
         "images": "Изображения",
@@ -380,7 +436,7 @@
         "scale": "Масштаб",
         "otherOptions": "Другие параметры",
         "seamlessTiling": "Бесшовный узор",
-        "hiresOptim": "Высокое разрешение",
+        "hiresOptim": "Оптимизация High Res",
         "imageFit": "Уместить изображение",
         "codeformerFidelity": "Точность",
         "seamSize": "Размер шва",
@@ -397,11 +453,11 @@
         "infillScalingHeader": "Заполнение и масштабирование",
         "img2imgStrength": "Сила обработки img2img",
         "toggleLoopback": "Зациклить обработку",
-        "invoke": "Вызвать",
+        "invoke": "Invoke",
         "promptPlaceholder": "Введите запрос здесь (на английском). [исключенные токены], (более значимые)++, (менее значимые)--, swap и blend тоже доступны (смотрите Github)",
         "sendTo": "Отправить",
         "sendToImg2Img": "Отправить в img2img",
-        "sendToUnifiedCanvas": "Отправить на холст",
+        "sendToUnifiedCanvas": "Отправить на Единый холст",
         "copyImageToLink": "Скопировать ссылку",
         "downloadImage": "Скачать",
         "openInViewer": "Открыть в просмотрщике",
@@ -413,7 +469,24 @@
         "info": "Метаданные",
         "deleteImage": "Удалить изображение",
         "initialImage": "Исходное изображение",
-        "showOptionsPanel": "Показать панель настроек"
+        "showOptionsPanel": "Показать панель настроек",
+        "vSymmetryStep": "Шаг верт. симметрии",
+        "cancel": {
+            "immediate": "Отменить немедленно",
+            "schedule": "Отменить после текущей итерации",
+            "isScheduled": "Отмена",
+            "setType": "Установить тип отмены"
+        },
+        "general": "Основное",
+        "hiresStrength": "Сила High Res",
+        "symmetry": "Симметрия",
+        "hSymmetryStep": "Шаг гор. симметрии",
+        "hidePreview": "Скрыть предпросмотр",
+        "imageToImage": "Изображение в изображение",
+        "denoisingStrength": "Сила шумоподавления",
+        "copyImage": "Скопировать изображение",
+        "negativePrompts": "Исключающий запрос",
+        "showPreview": "Показать предпросмотр"
     },
     "settings": {
         "models": "Модели",
@@ -423,10 +496,11 @@
         "displayHelpIcons": "Показывать значки подсказок",
         "useCanvasBeta": "Показывать инструменты слева (Beta UI)",
         "enableImageDebugging": "Включить отладку",
-        "resetWebUI": "Вернуть умолчания",
+        "resetWebUI": "Сброс настроек Web UI",
         "resetWebUIDesc1": "Сброс настроек веб-интерфейса удаляет только локальный кэш браузера с вашими изображениями и настройками. Он не удаляет изображения с диска.",
         "resetWebUIDesc2": "Если изображения не отображаются в галерее или не работает что-то еще, пожалуйста, попробуйте сбросить настройки, прежде чем сообщать о проблеме на GitHub.",
-        "resetComplete": "Интерфейс сброшен. Обновите эту страницу."
+        "resetComplete": "Интерфейс сброшен. Обновите эту страницу.",
+        "useSlidersForAll": "Использовать ползунки для всех параметров"
     },
     "toast": {
         "tempFoldersEmptied": "Временная папка очищена",
@@ -441,7 +515,7 @@
         "imageSavedToGallery": "Изображение сохранено в галерею",
         "canvasMerged": "Холст объединен",
         "sentToImageToImage": "Отправить в img2img",
-        "sentToUnifiedCanvas": "Отправить на холст",
+        "sentToUnifiedCanvas": "Отправлено на Единый холст",
         "parametersSet": "Параметры заданы",
         "parametersNotSet": "Параметры не заданы",
         "parametersNotSetDesc": "Не найдены метаданные изображения.",
@@ -458,7 +532,11 @@
         "metadataLoadFailed": "Не удалось загрузить метаданные",
         "initialImageSet": "Исходное изображение задано",
         "initialImageNotSet": "Исходное изображение не задано",
-        "initialImageNotSetDesc": "Не получилось загрузить исходное изображение"
+        "initialImageNotSetDesc": "Не получилось загрузить исходное изображение",
+        "serverError": "Ошибка сервера",
+        "disconnected": "Отключено от сервера",
+        "connected": "Подключено к серверу",
+        "canceled": "Обработка отменена"
     },
     "tooltip": {
         "feature": {
@@ -507,7 +585,7 @@
         "autoSaveToGallery": "Автосохранение в галерее",
         "saveBoxRegionOnly": "Сохранять только выделение",
         "limitStrokesToBox": "Ограничить штрихи выделением",
-        "showCanvasDebugInfo": "Показать отладку холста",
+        "showCanvasDebugInfo": "Показать доп. информацию о холсте",
         "clearCanvasHistory": "Очистить историю холста",
         "clearHistory": "Очистить историю",
         "clearCanvasHistoryMessage": "Очистка истории холста оставляет текущий холст нетронутым, но удаляет историю отмен и повторов.",
@@ -535,6 +613,26 @@
         "betaPreserveMasked": "Сохранять маскируемую область"
     },
     "accessibility": {
-        "modelSelect": "Выбор модели"
+        "modelSelect": "Выбор модели",
+        "uploadImage": "Загрузить изображение",
+        "nextImage": "Следующее изображение",
+        "previousImage": "Предыдущее изображение",
+        "zoomIn": "Приблизить",
+        "zoomOut": "Отдалить",
+        "rotateClockwise": "Повернуть по часовой стрелке",
+        "rotateCounterClockwise": "Повернуть против часовой стрелки",
+        "flipVertically": "Перевернуть вертикально",
+        "flipHorizontally": "Отразить горизонтально",
+        "toggleAutoscroll": "Включить автопрокрутку",
+        "toggleLogViewer": "Показать или скрыть просмотрщик логов",
+        "showOptionsPanel": "Показать опции",
+        "showGallery": "Показать галерею",
+        "invokeProgressBar": "Индикатор выполнения",
+        "reset": "Сброс",
+        "modifyConfig": "Изменить конфиг",
+        "useThisParameter": "Использовать этот параметр",
+        "copyMetadataJson": "Скопировать метаданные JSON",
+        "exitViewer": "Закрыть просмотрщик",
+        "menu": "Меню"
     }
 }

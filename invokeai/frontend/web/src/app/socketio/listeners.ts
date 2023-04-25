@@ -34,8 +34,9 @@ import type { RootState } from 'app/store';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   clearInitialImage,
+  initialImageSelected,
   setInfillMethod,
-  setInitialImage,
+  // setInitialImage,
   setMaskPath,
 } from 'features/parameters/store/generationSlice';
 import { tabMap } from 'features/ui/store/tabMap';
@@ -142,15 +143,17 @@ const makeSocketIOListeners = (
           }
         }
 
-        if (shouldLoopback) {
-          const activeTabName = tabMap[activeTab];
-          switch (activeTabName) {
-            case 'img2img': {
-              dispatch(setInitialImage(newImage));
-              break;
-            }
-          }
-        }
+        // TODO: fix
+        // if (shouldLoopback) {
+        //   const activeTabName = tabMap[activeTab];
+        //   switch (activeTabName) {
+        //     case 'img2img': {
+        //       dispatch(initialImageSelected(newImage.uuid));
+        //       // dispatch(setInitialImage(newImage));
+        //       break;
+        //     }
+        //   }
+        // }
 
         dispatch(clearIntermediateImage());
 
@@ -262,7 +265,7 @@ const makeSocketIOListeners = (
        */
 
       // Generate a UUID for each image
-      const preparedImages = images.map((image): InvokeAI.Image => {
+      const preparedImages = images.map((image): InvokeAI._Image => {
         return {
           uuid: uuidv4(),
           ...image,
@@ -334,7 +337,7 @@ const makeSocketIOListeners = (
 
       if (
         initialImage === url ||
-        (initialImage as InvokeAI.Image)?.url === url
+        (initialImage as InvokeAI._Image)?.url === url
       ) {
         dispatch(clearInitialImage());
       }

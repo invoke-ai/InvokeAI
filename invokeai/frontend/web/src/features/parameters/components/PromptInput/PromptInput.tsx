@@ -76,7 +76,7 @@ const PromptInput = () => {
           onKeyDown={handleKeyDown}
           resize="vertical"
           ref={promptRef}
-          minH={40}
+          minH={{ base: 20, lg: 40 }}
         />
       </FormControl>
     </Box>

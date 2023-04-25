@@ -31,13 +31,13 @@ export const DIFFUSERS_SAMPLERS: Array<string> = [
 ];
 
 // Valid image widths
-export const WIDTHS: Array<number> = Array.from(Array(65)).map(
-  (_x, i) => i * 64
+export const WIDTHS: Array<number> = Array.from(Array(64)).map(
+  (_x, i) => (i + 1) * 64
 );
 
 // Valid image heights
-export const HEIGHTS: Array<number> = Array.from(Array(65)).map(
-  (_x, i) => i * 64
+export const HEIGHTS: Array<number> = Array.from(Array(64)).map(
+  (_x, i) => (i + 1) * 64
 );
 
 // Valid upscaling levels
@@ -60,3 +60,5 @@ export const IN_PROGRESS_IMAGE_TYPES: Array<{
   { key: 'Fast', value: 'latents' },
   { key: 'Accurate', value: 'full-res' },
 ];
+
+export const NODE_MIN_WIDTH = 250;

@@ -84,7 +84,7 @@ installing lots of models.
 
 6. Wait while the installer does its thing. After installing the software,
 the installer will launch a script that lets you configure InvokeAI and
-select a set of starting image generaiton models.
+select a set of starting image generation models.
 
 7. Find the folder that InvokeAI was installed into (it is not the
 same as the unpacked zip file directory!) The default location of this
@@ -147,6 +147,11 @@ not supported.
     ```sh
     pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
     ```
+
+    _For non-GPU systems:_
+    ```terminal
+    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
+    ``` 
 
     _For Macintoshes, either Intel or M1/M2:_
 
