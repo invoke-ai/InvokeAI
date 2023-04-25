@@ -68,7 +68,6 @@ def install_requested_models(
         scan_directory: Path = None,
         external_models: List[str] = None,
         scan_at_startup: bool = False,
-        convert_to_diffusers: bool = False,
         precision: str = "float16",
         purge_deleted: bool = False,
         config_file_path: Path = None,
@@ -111,20 +110,20 @@ def install_requested_models(
     if len(external_models)>0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
+            print(f'DEBUG: path_url_or_repo = {path_url_or_repo}')
             try:
                 model_manager.heuristic_import(
                     path_url_or_repo,
-                    convert=convert_to_diffusers,
                     config_file_callback=_pick_configuration_file,
                     commit_to_conf=config_file_path
                 )
             except KeyboardInterrupt:
                 sys.exit(-1)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f'An exception has occurred: {str(e)}')
 
     if scan_at_startup and scan_directory.is_dir():
-        argument = '--autoconvert' if convert_to_diffusers else '--autoimport'
+        argument = '--autoconvert'
         initfile = Path(Globals.root, Globals.initfile)
         replacement = Path(Globals.root, f'{Globals.initfile}.new')
         directory = str(scan_directory).replace('\\','/')
@@ -389,7 +388,19 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     if config_file is default_config_file() and not config_file.parent.exists():
         configs_src = Dataset_path.parent
         configs_dest = default_config_file().parent
-        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
+        shutil.copytree(configs_src,
+                        configs_dest,
+                        dirs_exist_ok=True,
+                        copy_function=shutil.copyfile,
+                        )
+    # Fix up directory permissions so that they are writable
+    # This can happen when running under Nix environment which
+    # makes the runtime directory template immutable.
+    for root,dirs,files in os.walk(default_config_file().parent):
+        for d in dirs:
+            Path(root,d).chmod(0o775)
+        for f in files:
+            Path(root,d).chmod(0o644)
 
     yaml = new_config_file_contents(successfully_downloaded, config_file)
 
