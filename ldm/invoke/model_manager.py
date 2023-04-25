@@ -1007,6 +1007,81 @@ class ModelManager(object):
         """
         )
 
+    @classmethod
+    def migrate_models(cls):
+        """
+        Migrate the ~/invokeai/models directory from the legacy format used through 2.2.5
+        to the 2.3.0 "diffusers" version. This should be a one-time operation, called at
+        script startup time.
+        """
+        # Three transformer models to check: bert, clip and safety checker, and
+        # the diffusers as well
+        models_dir = Path(Globals.root, "models")
+        legacy_locations = [
+            Path(
+                models_dir,
+                "CompVis/stable-diffusion-safety-checker/models--CompVis--stable-diffusion-safety-checker",
+            ),
+            Path("bert-base-uncased/models--bert-base-uncased"),
+            Path(
+                "openai/clip-vit-large-patch14/models--openai--clip-vit-large-patch14"
+            ),
+        ]
+        legacy_locations.extend(list(global_cache_dir("diffusers").glob("*")))
+        legacy_layout = False
+        for model in legacy_locations:
+            legacy_layout = legacy_layout or model.exists()
+        if not legacy_layout:
+            return
+
+        print(
+            """
+>> ALERT:
+>> The location of your previously-installed diffusers models needs to move from
+>> invokeai/models/diffusers to invokeai/models/hub due to a change introduced by
+>> diffusers version 0.14. InvokeAI will now move all models from the "diffusers" directory
+>> into "hub" and then remove the diffusers directory. This is a quick, safe, one-time
+>> operation. However if you have customized either of these directories and need to
+>> make adjustments, please press ctrl-C now to abort and relaunch InvokeAI when you are ready.
+>> Otherwise press <enter> to continue."""
+        )
+        print("** This is a quick one-time operation.")
+        input("continue> ")
+
+        # transformer files get moved into the hub directory
+        if cls._is_huggingface_hub_directory_present():
+            hub = global_cache_dir("hub")
+        else:
+            hub = models_dir / "hub"
+
+        os.makedirs(hub, exist_ok=True)
+        for model in legacy_locations:
+            source = models_dir / model
+            dest = hub / model.stem
+            if dest.exists() and not source.exists():
+                continue
+            print(f"** {source} => {dest}")
+            if source.exists():
+                if dest.is_symlink():
+                    print(f"** Found symlink at {dest.name}. Not migrating.")
+                elif dest.exists():
+                    if source.is_dir():
+                        rmtree(source)
+                    else:
+                        source.unlink()
+                else:
+                    move(source, dest)
+
+        # now clean up by removing any empty directories
+        empty = [
+            root
+            for root, dirs, files, in os.walk(models_dir)
+            if not len(dirs) and not len(files)
+        ]
+        for d in empty:
+            os.rmdir(d)
+        print("** Migration is done. Continuing...")
+
     def _resolve_path(
         self, source: Union[str, Path], dest_directory: str
     ) -> Optional[Path]:
@@ -1231,3 +1306,8 @@ class ModelManager(object):
             return path
         return Path(Globals.root, path).resolve()
 
+    @staticmethod
+    def _is_huggingface_hub_directory_present() -> bool:
+        return (
+            os.getenv("HF_HOME") is not None or os.getenv("XDG_CACHE_HOME") is not None
+        )
