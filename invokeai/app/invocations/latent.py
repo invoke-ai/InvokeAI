@@ -13,13 +13,13 @@ from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
-from ...backend.prompting.conditioning import get_uc_and_c_and_ec
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
 from ..services.image_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput, build_image_output
+from .compel import ConditioningField
 from ...backend.stable_diffusion import PipelineIntermediateState
 from diffusers.schedulers import SchedulerMixin as Scheduler
 import diffusers
@@ -143,9 +143,9 @@ class TextToLatentsInvocation(BaseInvocation):
     type: Literal["t2l"] = "t2l"
 
     # Inputs
-    # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
-    prompt: Optional[str] = Field(description="The prompt to generate an image from")
+    positive: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
+    negative: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
@@ -206,8 +206,10 @@ class TextToLatentsInvocation(BaseInvocation):
         return model
 
 
-    def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
+    def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
+        c, extra_conditioning_info = context.services.latents.get(self.positive.conditioning_name)
+        uc, _ = context.services.latents.get(self.negative.conditioning_name)
+
         conditioning_data = ConditioningData(
             uc,
             c,
@@ -234,7 +236,7 @@ class TextToLatentsInvocation(BaseInvocation):
             self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        conditioning_data = self.get_conditioning_data(context, model)
 
         # TODO: Verify the noise is the right size
 
