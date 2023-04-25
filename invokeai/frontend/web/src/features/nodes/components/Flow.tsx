@@ -18,11 +18,11 @@ import {
 } from '../store/nodesSlice';
 import { useCallback } from 'react';
 import { InvocationComponent } from './InvocationComponent';
+import TopLeftPanel from './panels/TopLeftPanel';
 import TopRightPanel from './panels/TopRightPanel';
 import TopCenterPanel from './panels/TopCenterPanel';
 import BottomLeftPanel from './panels/BottomLeftPanel.tsx';
 import MinimapPanel from './panels/MinimapPanel';
-import NodeSearch from './search/NodeSearch';
 
 const nodeTypes = { invocation: InvocationComponent };
 
@@ -77,7 +77,7 @@ export const Flow = () => {
         style: { strokeWidth: 2 },
       }}
     >
-      <NodeSearch />
+      <TopLeftPanel />
       <TopCenterPanel />
       <TopRightPanel />
       <BottomLeftPanel />

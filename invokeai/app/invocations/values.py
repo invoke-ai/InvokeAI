@@ -5,19 +5,19 @@ from pydantic import Field
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 from .image import ImageOutput, ImageField, build_image_output
 
-# Pass-through parameter nodes - used by subgraphs
+# Pass-through value nodes - used by subgraphs
 
 
 class IntOutput(BaseInvocationOutput):
     """An integer output"""
     #fmt: off
     type: Literal["int_output"] = "int_output"
-    a: int = Field(default=None, description="The output integer")
+    a: int = Field(default=None, description="The output integer value")
     #fmt: on
 
 
 class IntegerValueInvocation(BaseInvocation):
-    """An integer parameter"""
+    """An integer value"""
     #fmt: off
     type: Literal["value_int"] = "value_int"
     a: int = Field(default=0, description="An integer value")
@@ -44,7 +44,7 @@ class FloatOutput(BaseInvocationOutput):
 
 
 class FloatValueInvocation(BaseInvocation):
-    """A float parameter"""
+    """A float value"""
     #fmt: off
     type: Literal["value_float"] = "value_float"
     a: float = Field(default=0, description="A float value")
@@ -71,7 +71,7 @@ class StringOutput(BaseInvocationOutput):
 
 
 class StringValueInvocation(BaseInvocation):
-    """A string parameter"""
+    """A string value"""
     #fmt: off
     type: Literal["value_string"] = "value_string"
     a: str = Field(default='', description="A string value")
@@ -98,7 +98,7 @@ class BooleanOutput(BaseInvocationOutput):
 
 
 class BooleanValueInvocation(BaseInvocation):
-    """A boolean parameter"""
+    """A boolean value"""
     #fmt: off
     type: Literal["value_boolean"] = "value_boolean"
     a: bool = Field(default=False, description="A boolean value")
@@ -117,12 +117,12 @@ class BooleanValueInvocation(BaseInvocation):
 
 
 class ImageValueInvocation(BaseInvocation):
-    """Load an image and provide it as output."""
+    """An image field"""
 
     # fmt: off
     type: Literal["value_image"] = "value_image"
     # Inputs
-    image: ImageField = Field(description="The input image")
+    image: ImageField = Field(description="The output image field")
     # fmt: on
 
     class Config(InvocationConfig):
