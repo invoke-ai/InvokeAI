@@ -60,3 +60,5 @@ export const IN_PROGRESS_IMAGE_TYPES: Array<{
   { key: 'Fast', value: 'latents' },
   { key: 'Accurate', value: 'full-res' },
 ];
+
+export const NODE_MIN_WIDTH = 250;

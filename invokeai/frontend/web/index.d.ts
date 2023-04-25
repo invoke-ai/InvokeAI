@@ -81,6 +81,7 @@ interface InvokeProps extends PropsWithChildren {
   disabledTabs?: InvokeTabName[];
   token?: string;
   shouldTransformUrls?: boolean;
+  shouldFetchImages?: boolean;
 }
 
 declare function Invoke(props: InvokeProps): JSX.Element;
