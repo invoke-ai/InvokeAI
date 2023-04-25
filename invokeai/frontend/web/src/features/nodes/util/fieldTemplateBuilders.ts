@@ -9,6 +9,7 @@ import {
   ImageInputFieldTemplate,
   IntegerInputFieldTemplate,
   LatentsInputFieldTemplate,
+  ConditioningInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
   InputFieldTemplateBase,
@@ -196,6 +197,21 @@ const buildLatentsInputFieldTemplate = ({
   return template;
 };
 
+const buildConditioningInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ConditioningInputFieldTemplate => {
+  const template: ConditioningInputFieldTemplate = {
+    ...baseField,
+    type: 'conditioning',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -265,6 +281,9 @@ export const buildInputFieldTemplate = (
   }
   if (['latents'].includes(fieldType)) {
     return buildLatentsInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['conditioning'].includes(fieldType)) {
+    return buildConditioningInputFieldTemplate({ schemaObject, baseField });
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
