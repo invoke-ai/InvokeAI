@@ -4,6 +4,7 @@ import shlex
 import sys
 import traceback
 from argparse import Namespace
+from packaging import version
 from pathlib import Path
 from typing import Union
 
@@ -25,6 +26,7 @@ from .generator.diffusers_pipeline import PipelineIntermediateState
 from .globals import Globals, global_config_dir
 from .image_util import make_grid
 from .log import write_log
+from .model_manager import ModelManager
 from .pngwriter import PngWriter, retrieve_metadata, write_metadata
 from .readline import Completer, get_completer
 from ..util import url_attachment_name
@@ -63,6 +65,9 @@ def main():
     Globals.disable_xformers = not args.xformers
     Globals.sequential_guidance = args.sequential_guidance
     Globals.ckpt_convert = True  # always true as of 2.3.4 for LoRA support
+
+    # run any post-install patches needed
+    run_patches()
 
     print(f">> Internet connectivity is {Globals.internet_available}")
 
@@ -107,6 +112,9 @@ def main():
 
     if opt.lora_path:
         Globals.lora_models_dir = opt.lora_path
+
+    # migrate legacy models
+    ModelManager.migrate_models()
 
     # load the infile as a list of lines
     if opt.infile:
@@ -1291,6 +1299,62 @@ def retrieve_last_used_model()->str:
     with open(model_file_path,'r') as f:
         return f.readline()
 
+# This routine performs any patch-ups needed after installation
+def run_patches():
+    install_missing_config_files()
+    version_file = Path(Globals.root,'.version')
+    if version_file.exists():
+        with open(version_file,'r') as f:
+            root_version = version.parse(f.readline() or 'v2.3.2')
+    else:
+        root_version = version.parse('v2.3.2')
+    app_version = version.parse(ldm.invoke.__version__)
+    if root_version < app_version:
+        try:
+            do_version_update(root_version, ldm.invoke.__version__)
+            with open(version_file,'w') as f:
+                f.write(ldm.invoke.__version__)
+        except:
+            print("** Update failed. Will try again on next launch")
+
+def install_missing_config_files():
+    """
+    install ckpt configuration files that may have been added to the
+    distro after original root directory configuration
+    """
+    import invokeai.configs as conf
+    from shutil import copyfile
+    
+    root_configs = Path(global_config_dir(), 'stable-diffusion')
+    repo_configs = Path(conf.__path__[0], 'stable-diffusion')
+    for src in repo_configs.iterdir():
+        dest = root_configs / src.name
+        if not dest.exists():
+            copyfile(src,dest)
+    
+def do_version_update(root_version: version.Version, app_version: Union[str, version.Version]):
+    """
+    Make any updates to the launcher .sh and .bat scripts that may be needed
+    from release to release. This is not an elegant solution. Instead, the 
+    launcher should be moved into the source tree and installed using pip.
+    """
+    if root_version < version.Version('v2.3.4'):
+        dest = Path(Globals.root,'loras')
+        dest.mkdir(exist_ok=True)
+    if root_version < version.Version('v2.3.3'):
+        if sys.platform == "linux":
+            print('>> Downloading new version of launcher script and its config file')
+            from ldm.util import download_with_progress_bar
+            url_base = f'https://raw.githubusercontent.com/invoke-ai/InvokeAI/v{str(app_version)}/installer/templates/'
+
+            dest = Path(Globals.root,'invoke.sh.in')
+            assert download_with_progress_bar(url_base+'invoke.sh.in',dest)
+            dest.replace(Path(Globals.root,'invoke.sh'))
+            os.chmod(Path(Globals.root,'invoke.sh'), 0o0755)
+
+            dest = Path(Globals.root,'dialogrc')
+            assert download_with_progress_bar(url_base+'dialogrc',dest)
+            dest.replace(Path(Globals.root,'.dialogrc'))
 
 if __name__ == '__main__':
     main()

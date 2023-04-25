@@ -11,6 +11,7 @@ from tempfile import TemporaryFile
 
 import requests
 from diffusers import AutoencoderKL
+from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -295,13 +296,21 @@ def _download_diffusion_weights(
     mconfig: DictConfig, access_token: str, precision: str = "float32"
 ):
     repo_id = mconfig["repo_id"]
+    revision = mconfig.get('revision',None)
     model_class = (
         StableDiffusionGeneratorPipeline
         if mconfig.get("format", None) == "diffusers"
         else AutoencoderKL
     )
-    extra_arg_list = [{"revision": "fp16"}, {}] if precision == "float16" else [{}]
+    extra_arg_list = [{"revision": revision}] if revision \
+        else [{"revision": "fp16"}, {}] if precision == "float16" \
+             else [{}]
     path = None
+
+    # quench safety checker warnings
+    verbosity = dlogging.get_verbosity()
+    dlogging.set_verbosity_error()
+    
     for extra_args in extra_arg_list:
         try:
             path = download_from_hf(
@@ -317,6 +326,7 @@ def _download_diffusion_weights(
                 print(f"An unexpected error occurred while downloading the model: {e})")
         if path:
             break
+    dlogging.set_verbosity(verbosity)
     return path
 
 
@@ -388,19 +398,7 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     if config_file is default_config_file() and not config_file.parent.exists():
         configs_src = Dataset_path.parent
         configs_dest = default_config_file().parent
-        shutil.copytree(configs_src,
-                        configs_dest,
-                        dirs_exist_ok=True,
-                        copy_function=shutil.copyfile,
-                        )
-    # Fix up directory permissions so that they are writable
-    # This can happen when running under Nix environment which
-    # makes the runtime directory template immutable.
-    for root,dirs,files in os.walk(default_config_file().parent):
-        for d in dirs:
-            Path(root,d).chmod(0o775)
-        for f in files:
-            Path(root,d).chmod(0o644)
+        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
     yaml = new_config_file_contents(successfully_downloaded, config_file)
 
@@ -459,6 +457,8 @@ def new_config_file_contents(
         stanza["description"] = mod["description"]
         stanza["repo_id"] = mod["repo_id"]
         stanza["format"] = mod["format"]
+        if "revision" in mod:
+            stanza["revision"] = mod["revision"]
         # diffusers don't need width and height (probably .ckpt doesn't either)
         # so we no longer require these in INITIAL_MODELS.yaml
         if "width" in mod:
@@ -483,10 +483,9 @@ def new_config_file_contents(
 
         conf[model] = stanza
 
-    # if no default model was chosen, then we select the first
-    # one in the list
+    # if no default model was chosen, then we select the first one in the list
     if not default_selected:
-        conf[list(successfully_downloaded.keys())[0]]["default"] = True
+        conf[list(conf.keys())[0]]["default"] = True
 
     return OmegaConf.to_yaml(conf)
 
