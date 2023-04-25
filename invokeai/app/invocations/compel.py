@@ -103,7 +103,7 @@ class CompelInvocation(BaseInvocation):
         positive_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.positive_prompt)
         negative_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.negative_prompt)
 
-        if True: #getattr(Globals, "log_tokenization", False):
+        if getattr(Globals, "log_tokenization", False):
             log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
 
         # TODO: add lora(with model and clip field types)
