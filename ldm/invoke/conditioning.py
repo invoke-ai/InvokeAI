@@ -15,18 +15,9 @@ from compel import Compel
 from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser, \
     Conjunction
 from .devices import torch_dtype
+from .generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
-
-def get_tokenizer(model) -> CLIPTokenizer:
-    # TODO remove legacy ckpt fallback handling
-    return (getattr(model, 'tokenizer', None) # diffusers
-            or model.cond_stage_model.tokenizer) # ldm
-
-def get_text_encoder(model) -> Any:
-    # TODO remove legacy ckpt fallback handling
-    return (getattr(model, 'text_encoder', None)  # diffusers
-            or UnsqueezingLDMTransformer(model.cond_stage_model.transformer)) # ldm
 
 class UnsqueezingLDMTransformer:
     def __init__(self, ldm_transformer):
@@ -41,15 +32,15 @@ class UnsqueezingLDMTransformer:
         return insufficiently_unsqueezed_tensor.unsqueeze(0)
 
 
-def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
+def get_uc_and_c_and_ec(prompt_string,
+                        model: StableDiffusionGeneratorPipeline,
+                        log_tokens=False, skip_normalize_legacy_blend=False):
     # lazy-load any deferred textual inversions.
     # this might take a couple of seconds the first time a textual inversion is used.
     model.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(prompt_string)
 
-    tokenizer = get_tokenizer(model)
-    text_encoder = get_text_encoder(model)
-    compel = Compel(tokenizer=tokenizer,
-                    text_encoder=text_encoder,
+    compel = Compel(tokenizer=model.tokenizer,
+                    text_encoder=model.text_encoder,
                     textual_inversion_manager=model.textual_inversion_manager,
                     dtype_for_device_getter=torch_dtype)
 
@@ -78,14 +69,20 @@ def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_l
     negative_conjunction = Compel.parse_prompt_string(negative_prompt_string)
     negative_prompt: FlattenedPrompt | Blend = negative_conjunction.prompts[0]
 
+    tokens_count = get_max_token_count(model.tokenizer, positive_prompt)
     if log_tokens or getattr(Globals, "log_tokenization", False):
-        log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
+        log_tokenization(positive_prompt, negative_prompt, tokenizer=model.tokenizer)
 
-    c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
-    uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+    # some LoRA models also mess with the text encoder, so they must be active while compel builds conditioning tensors
+    lora_conditioning_ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
+                                                                                            lora_conditions=lora_conditions)
+    with InvokeAIDiffuserComponent.custom_attention_context(model.unet,
+                                                            extra_conditioning_info=lora_conditioning_ec,
+                                                            step_count=-1):
+        c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
+        uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
 
-    tokens_count = get_max_token_count(tokenizer, positive_prompt)
-
+    # now build the "real" ec
     ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
                                                          cross_attention_control_args=options.get(
                                                              'cross_attention_control', None),

@@ -467,8 +467,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if additional_guidance is None:
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
-        with self.invokeai_diffuser.custom_attention_context(extra_conditioning_info=extra_conditioning_info,
-                                                             step_count=len(self.scheduler.timesteps)
+        with InvokeAIDiffuserComponent.custom_attention_context(self.invokeai_diffuser.model,
+                                                                extra_conditioning_info=extra_conditioning_info,
+                                                                step_count=len(self.scheduler.timesteps)
                                                              ):
 
             yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
