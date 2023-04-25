@@ -358,8 +358,10 @@ class InvokeAIWebConfig(InvokeAIAppConfig):
     '''
     #fmt: off
     type               : Literal["web"] = "web"
-    allow_origins      : List = Field(default=[], description='Allowed CORS origins')
-    allow_credentials  : bool = Field(default=True, description='Allow CORS credentials')
-    allow_methods      : List = Field(default=["*"], description='Methods allowed for CORS')
-    allow_headers      : List = Field(default=["*"], description='Headers allowed for CORS')
+    allow_origins      : List = Field(default=[], description="Allowed CORS origins")
+    allow_credentials  : bool = Field(default=True, description="Allow CORS credentials")
+    allow_methods      : List = Field(default=["*"], description="Methods allowed for CORS")
+    allow_headers      : List = Field(default=["*"], description="Headers allowed for CORS")
+    host               : str = Field(default="127.0.0.1", description="IP address to bind to")
+    port               : int = Field(default=9090, description="Port to bind to")
     #fmt: on
