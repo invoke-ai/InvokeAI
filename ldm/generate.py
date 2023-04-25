@@ -633,9 +633,8 @@ class Generate:
         except RuntimeError:
             # Clear the CUDA cache on an exception
             self.clear_cuda_cache()
-
-            print(traceback.format_exc(), file=sys.stderr)
-            print(">> Could not generate image.")
+            print("** Could not generate image.")
+            raise
 
         toc = time.time()
         print("\n>> Usage stats:")
