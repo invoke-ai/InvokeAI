@@ -80,7 +80,8 @@ trinart-2.0:
      repo_id: stabilityai/sd-vae-ft-mse
    recommended: False
 waifu-diffusion-1.4:
-   description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
+   description: An SD-2.1 model trained on 5.4M anime/manga-style images (4.27 GB)
+   revision: main
    repo_id: hakurei/waifu-diffusion
    format: diffusers
    vae:
