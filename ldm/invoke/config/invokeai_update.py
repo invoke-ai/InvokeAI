@@ -4,14 +4,13 @@ pip install <path_to_git_source>.
 '''
 import os
 import platform
+import psutil
 import requests
 from rich import box, print
-from rich.console import Console, Group, group
+from rich.console import Console, group
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.style import Style
-from rich.syntax import Syntax
-from rich.text import Text
 
 from ldm.invoke import __version__
 
@@ -32,6 +31,29 @@ else:
 def get_versions()->dict:
     return requests.get(url=INVOKE_AI_REL).json()
 
+def invokeai_is_running()->bool:
+    for p in psutil.process_iter():
+        try:
+            cmdline = p.cmdline()
+            matches = [x for x in cmdline if x.endswith(('invokeai','invokeai.exe'))]
+            if matches:
+                print(f':exclamation: [bold red]An InvokeAI instance appears to be running as process {p.pid}[/red bold]')
+                return True
+        except psutil.AccessDenied:
+            continue
+    return False
+
+def do_post_install():
+    '''
+    Run postinstallation script.
+    '''
+    print("Looking for postinstallation script to run on this version...")
+    try:
+        from ldm.invoke.config.post_install.py import post_install
+        post_install()
+    except:
+        print("Postinstallation script not available for this version of InvokeAI")
+        
 def welcome(versions: dict):
     
     @group()
@@ -62,6 +84,10 @@ def welcome(versions: dict):
 
 def main():
     versions = get_versions()
+    if invokeai_is_running():
+        print(f':exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]')
+        return
+
     welcome(versions)
 
     tag = None
@@ -91,6 +117,7 @@ def main():
         print(f':heavy_check_mark: Upgrade successful')
     else:
         print(f':exclamation: [bold red]Upgrade failed[/red bold]')
+    do_post_install()
     
 if __name__ == "__main__":
     try:

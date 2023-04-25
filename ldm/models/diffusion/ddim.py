@@ -12,17 +12,6 @@ class DDIMSampler(Sampler):
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.model,
                                                            model_forward_callback = lambda x, sigma, cond: self.model.apply_model(x, sigma, cond))
 
-    def prepare_to_sample(self, t_enc, **kwargs):
-        super().prepare_to_sample(t_enc, **kwargs)
-
-        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
-        all_timesteps_count = kwargs.get('all_timesteps_count', t_enc)
-
-        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.override_attention_processors(extra_conditioning_info, step_count = all_timesteps_count)
-        else:
-            self.invokeai_diffuser.restore_default_cross_attention()
-
 
     # This is the central routine
     @torch.no_grad()
