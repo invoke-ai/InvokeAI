@@ -18,9 +18,7 @@ export default function FaceRestoreStrength() {
 
   return (
     <IAISlider
-      isSliderDisabled={!isGFPGANAvailable}
-      isInputDisabled={!isGFPGANAvailable}
-      isResetDisabled={!isGFPGANAvailable}
+      isDisabled={!isGFPGANAvailable}
       label={t('parameters.strength')}
       step={0.05}
       min={0}

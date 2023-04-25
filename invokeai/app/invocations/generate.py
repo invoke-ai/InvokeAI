@@ -6,21 +6,36 @@ from typing import Literal, Optional, Union
 import numpy as np
 from torch import Tensor
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from ..services.image_storage import ImageType
-from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from invokeai.app.models.image import ImageField, ImageType
+from invokeai.app.invocations.util.choose_model import choose_model
+from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
+from .image import ImageOutput, build_image_output
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
 from ...backend.stable_diffusion import PipelineIntermediateState
-from ..util.util import diffusers_step_callback_adapter, CanceledException
+from ..util.step_callback import stable_diffusion_step_callback
 
-SAMPLER_NAME_VALUES = Literal[
-    tuple(InvokeAIGenerator.schedulers())
-]
+SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
+
+
+class SDImageInvocation(BaseModel):
+    """Helper class to provide all Stable Diffusion raster image invocations with additional config"""
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["stable-diffusion", "image"],
+                "type_hints": {
+                    "model": "model",
+                },
+            },
+        }
+
 
 # Text to image
-class TextToImageInvocation(BaseInvocation):
+class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     """Generates an image using text2img."""
 
     type: Literal["txt2img"] = "txt2img"
@@ -34,7 +49,7 @@ class TextToImageInvocation(BaseInvocation):
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    sampler_name: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The sampler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     model:       str = Field(default="", description="The model to use (currently ignored)")
     progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
@@ -42,35 +57,31 @@ class TextToImageInvocation(BaseInvocation):
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        intermediate_state: PipelineIntermediateState,
     ) -> None:
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-        
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            node=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        # def step_callback(state: PipelineIntermediateState):
-        #     if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-        #         raise CanceledException
-        #     self.dispatch_progress(context, state.latents, state.step)
-
         # Handle invalid model parameter
-        # TODO: figure out if this can be done via a validator that uses the model_cache
-        # TODO: How to get the default model name now?
-        #       (right now uses whatever current model is set in model manager)
-        model= context.services.model_manager.get_model()
+        model = choose_model(context.services.model_manager, self.model)
+
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         outputs = Txt2Img(model).generate(
             prompt=self.prompt,
-            step_callback=partial(self.dispatch_progress, context),
+            step_callback=partial(self.dispatch_progress, context, source_node_id),
             **self.dict(
                 exclude={"prompt"}
             ),  # Shorthand for passing all of the parameters above manually
@@ -86,9 +97,18 @@ class TextToImageInvocation(BaseInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, generate_output.image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
+        )
+
+        context.services.images.save(
+            image_type, image_name, generate_output.image, metadata
+        )
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=generate_output.image,
         )
 
 
@@ -108,20 +128,17 @@ class ImageToImageInvocation(TextToImageInvocation):
     )
 
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
-    ) -> None:  
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        intermediate_state: PipelineIntermediateState,
+    ) -> None:
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            node=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = (
@@ -134,18 +151,23 @@ class ImageToImageInvocation(TextToImageInvocation):
         mask = None
 
         # Handle invalid model parameter
-        # TODO: figure out if this can be done via a validator that uses the model_cache
-        # TODO: How to get the default model name now?
-        model = context.services.model_manager.get_model()
+        model = choose_model(context.services.model_manager, self.model)
+
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         outputs = Img2Img(model).generate(
-                prompt=self.prompt,
-                init_image=image,
-                init_mask=mask,
-                step_callback=partial(self.dispatch_progress, context),
-                **self.dict(
-                    exclude={"prompt", "image", "mask"}
-                ),  # Shorthand for passing all of the parameters above manually
-            )
+            prompt=self.prompt,
+            init_image=image,
+            init_mask=mask,
+            step_callback=partial(self.dispatch_progress, context, source_node_id),
+            **self.dict(
+                exclude={"prompt", "image", "mask"}
+            ),  # Shorthand for passing all of the parameters above manually
+        )
 
         # Outputs is an infinite iterator that will return a new InvokeAIGeneratorOutput object
         # each time it is called. We only need the first one.
@@ -160,10 +182,18 @@ class ImageToImageInvocation(TextToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, result_image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
         )
+
+        context.services.images.save(image_type, image_name, result_image, metadata)
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=result_image,
+        )
+
 
 class InpaintInvocation(ImageToImageInvocation):
     """Generates an image using inpaint."""
@@ -180,20 +210,17 @@ class InpaintInvocation(ImageToImageInvocation):
     )
 
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
-    ) -> None:  
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        intermediate_state: PipelineIntermediateState,
+    ) -> None:
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            node=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = (
@@ -210,18 +237,23 @@ class InpaintInvocation(ImageToImageInvocation):
         )
 
         # Handle invalid model parameter
-        # TODO: figure out if this can be done via a validator that uses the model_cache
-        # TODO: How to get the default model name now?
-        model = context.services.model_manager.get_model()
+        model = choose_model(context.services.model_manager, self.model)
+
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         outputs = Inpaint(model).generate(
-                prompt=self.prompt,
-                init_img=image,
-                init_mask=mask,
-                step_callback=partial(self.dispatch_progress, context),
-                **self.dict(
-                    exclude={"prompt", "image", "mask"}
-                ),  # Shorthand for passing all of the parameters above manually
-            )
+            prompt=self.prompt,
+            init_img=image,
+            init_mask=mask,
+            step_callback=partial(self.dispatch_progress, context, source_node_id),
+            **self.dict(
+                exclude={"prompt", "image", "mask"}
+            ),  # Shorthand for passing all of the parameters above manually
+        )
 
         # Outputs is an infinite iterator that will return a new InvokeAIGeneratorOutput object
         # each time it is called. We only need the first one.
@@ -236,7 +268,14 @@ class InpaintInvocation(ImageToImageInvocation):
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
-        context.services.images.save(image_type, image_name, result_image)
-        return ImageOutput(
-            image=ImageField(image_type=image_type, image_name=image_name)
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
+        )
+
+        context.services.images.save(image_type, image_name, result_image, metadata)
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=result_image,
         )

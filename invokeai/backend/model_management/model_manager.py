@@ -1204,7 +1204,7 @@ class ModelManager(object):
         return self.device.type == "cuda"
 
     def _diffuser_sha256(
-        self, name_or_path: Union[str, Path], chunksize=4096
+        self, name_or_path: Union[str, Path], chunksize=16777216
     ) -> Union[str, bytes]:
         path = None
         if isinstance(name_or_path, Path):

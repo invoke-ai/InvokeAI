@@ -4,7 +4,7 @@ from threading import Event, Thread
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
-from ..util.util import CanceledException
+from ..models.exceptions import CanceledException
 
 class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker_thread: Thread
@@ -43,10 +43,14 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     queue_item.invocation_id
                 )
 
+                # get the source node id to provide to clients (the prepared node id is not as useful)
+                source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
+
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
                     graph_execution_state_id=graph_execution_state.id,
-                    invocation_id=invocation.id,
+                    node=invocation.dict(),
+                    source_node_id=source_node_id
                 )
 
                 # Invoke
@@ -75,7 +79,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send complete event
                     self.__invoker.services.events.emit_invocation_complete(
                         graph_execution_state_id=graph_execution_state.id,
-                        invocation_id=invocation.id,
+                        node=invocation.dict(),
+                        source_node_id=source_node_id,
                         result=outputs.dict(),
                     )
 
@@ -99,7 +104,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
                         graph_execution_state_id=graph_execution_state.id,
-                        invocation_id=invocation.id,
+                        node=invocation.dict(),
+                        source_node_id=source_node_id,
                         error=error,
                     )
 

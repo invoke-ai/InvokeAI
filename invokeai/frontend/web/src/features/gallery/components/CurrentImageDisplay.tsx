@@ -4,17 +4,20 @@ import { useAppSelector } from 'app/storeHooks';
 import { isEqual } from 'lodash';
 
 import { MdPhoto } from 'react-icons/md';
-import { gallerySelector } from '../store/gallerySelectors';
+import {
+  gallerySelector,
+  selectedImageSelector,
+} from '../store/gallerySelectors';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
 
 export const currentImageDisplaySelector = createSelector(
-  [gallerySelector],
-  (gallery) => {
+  [gallerySelector, selectedImageSelector],
+  (gallery, selectedImage) => {
     const { currentImage, intermediateImage } = gallery;
 
     return {
-      hasAnImageToDisplay: currentImage || intermediateImage,
+      hasAnImageToDisplay: selectedImage || intermediateImage,
     };
   },
   {

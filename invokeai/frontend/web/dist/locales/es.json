@@ -8,7 +8,6 @@
         "darkTheme": "Oscuro",
         "lightTheme": "Claro",
         "greenTheme": "Verde",
-        "text2img": "Texto a Imagen",
         "img2img": "Imagen a Imagen",
         "unifiedCanvas": "Lienzo Unificado",
         "nodes": "Nodos",
@@ -70,7 +69,11 @@
         "langHebrew": "Hebreo",
         "pinOptionsPanel": "Pin del panel de opciones",
         "loading": "Cargando",
-        "loadingInvokeAI": "Cargando invocar a la IA"
+        "loadingInvokeAI": "Cargando invocar a la IA",
+        "postprocessing": "Tratamiento posterior",
+        "txt2img": "De texto a imagen",
+        "accept": "Aceptar",
+        "cancel": "Cancelar"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -404,7 +407,8 @@
         "none": "ninguno",
         "pickModelType": "Elige el tipo de modelo",
         "v2_768": "v2 (768px)",
-        "addDifference": "Añadir una diferencia"
+        "addDifference": "Añadir una diferencia",
+        "scanForModels": "Buscar modelos"
     },
     "parameters": {
         "images": "Imágenes",
@@ -574,7 +578,7 @@
         "autoSaveToGallery": "Guardar automáticamente en galería",
         "saveBoxRegionOnly": "Guardar solo región dentro de la caja",
         "limitStrokesToBox": "Limitar trazos a la caja",
-        "showCanvasDebugInfo": "Mostrar información de depuración de lienzo",
+        "showCanvasDebugInfo": "Mostrar la información adicional del lienzo",
         "clearCanvasHistory": "Limpiar historial de lienzo",
         "clearHistory": "Limpiar historial",
         "clearCanvasHistoryMessage": "Limpiar el historial de lienzo también restablece completamente el lienzo unificado. Esto incluye todo el historial de deshacer/rehacer, las imágenes en el área de preparación y la capa base del lienzo.",
