@@ -126,9 +126,7 @@ async def upload_image(
     )
 
     response.status_code = 201
-    response.headers["Location"] = request.url_for(
-        "get_image", image_type=ImageType.UPLOAD.value, image_name=filename
-    )
+    response.headers["Location"] = image_url
 
     return res
 
