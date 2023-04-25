@@ -53,7 +53,7 @@ dependencies = [
   "imageio-ffmpeg",
   "k-diffusion",
   "kornia",
-  "npyscreen~=4.10.5",
+  "npyscreen",
   "numpy<1.24",
   "omegaconf",
   "opencv-python",
@@ -128,7 +128,6 @@ requires-python = ">=3.9, <3.11"
 "invokeai-update" = "ldm.invoke.config.invokeai_update:main"
 "invokeai-batch" = "ldm.invoke.dynamic_prompts:main"
 "invokeai-metadata" = "ldm.invoke.invokeai_metadata:main"
-"invokeai-postinstall" = "ldm.invoke.config.post_install:post_install"
 
 [project.urls]
 "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
