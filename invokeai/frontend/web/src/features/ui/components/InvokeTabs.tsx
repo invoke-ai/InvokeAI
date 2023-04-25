@@ -64,8 +64,13 @@ export default function InvokeTabs() {
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const { shouldPinGallery, disabledTabs, shouldPinParametersPanel } =
-    useAppSelector((state: RootState) => state.ui);
+  const { shouldPinGallery, shouldPinParametersPanel } = useAppSelector(
+    (state: RootState) => state.ui
+  );
+
+  const disabledTabs = useAppSelector(
+    (state: RootState) => state.system.disabledTabs
+  );
 
   const activeTabs = buildTabs(disabledTabs);
 
