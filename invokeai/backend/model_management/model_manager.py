@@ -1191,6 +1191,8 @@ class ModelManager(object):
         if self.embedding_path is not None:
             print(f">> Loading embeddings from {self.embedding_path}")
             for root, _, files in os.walk(self.embedding_path):
+                print(root)
+                print(files)
                 for name in files:
                     ti_path = os.path.join(root, name)
                     model.textual_inversion_manager.load_textual_inversion(

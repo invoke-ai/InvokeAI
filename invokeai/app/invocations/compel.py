@@ -75,52 +75,63 @@ class CompelInvocation(BaseInvocation):
 
         # TODO: global? input?
         #use_full_precision = precision == "float32" or precision == "autocast"
-        use_full_precision = False
+        #use_full_precision = False
 
-        textual_inversion_manager = TextualInversionManager(
-            tokenizer=tokenizer,
-            text_encoder=text_encoder,
-            full_precision=use_full_precision,
+        # TODO: redo TI when separate model loding implemented
+        #textual_inversion_manager = TextualInversionManager(
+        #    tokenizer=tokenizer,
+        #    text_encoder=text_encoder,
+        #    full_precision=use_full_precision,
+        #)
+
+        def load_huggingface_concepts(concepts: list[str]):
+            pipeline.textual_inversion_manager.load_huggingface_concepts(concepts)
+
+        # apply the concepts library to the prompt
+        positive_prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
+            self.positive_prompt,
+            lambda concepts: load_huggingface_concepts(concepts),
+            pipeline.textual_inversion_manager.get_all_trigger_strings(),
+        )
+
+        negative_prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
+            self.negative_prompt,
+            lambda concepts: load_huggingface_concepts(concepts),
+            pipeline.textual_inversion_manager.get_all_trigger_strings(),
         )
 
         # lazy-load any deferred textual inversions.
         # this might take a couple of seconds the first time a textual inversion is used.
-        textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(
-            self.positive_prompt + "[" + self.negative_prompt + "]"
+        pipeline.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(
+            positive_prompt_str + "[" + negative_prompt_str + "]"
         )
 
         compel = Compel(
             tokenizer=tokenizer,
             text_encoder=text_encoder,
-            textual_inversion_manager=textual_inversion_manager,
+            textual_inversion_manager=pipeline.textual_inversion_manager,
             dtype_for_device_getter=torch_dtype,
             truncate_long_prompts=self.truncate_long_prompts,
         )
 
-
         # TODO: support legacy blend?
 
-        positive_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.positive_prompt)
-        negative_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.negative_prompt)
+        positive_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(positive_prompt_str)
+        negative_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(negative_prompt_str)
 
         if getattr(Globals, "log_tokenization", False):
             log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
 
         # TODO: add lora(with model and clip field types)
-        c, c_options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
-        uc, uc_options = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+        c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
+        uc, _      = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
 
         if not self.truncate_long_prompts:
             [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
-        c_ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+        ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
             tokens_count_including_eos_bos=get_max_token_count(tokenizer, positive_prompt),
-            cross_attention_control_args=c_options.get("cross_attention_control", None),
-        )
-
-        uc_ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-            tokens_count_including_eos_bos=get_max_token_count(tokenizer, negative_prompt),
-            cross_attention_control_args=uc_options.get("cross_attention_control", None),
+            cross_attention_control_args=options.get("cross_attention_control", None),
         )
 
         name_prefix = f'{context.graph_execution_state_id}__{self.id}'
@@ -128,8 +139,8 @@ class CompelInvocation(BaseInvocation):
         name_negative = f"{name_prefix}_negative"
 
         # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.set(name_positive, (c, c_ec))
-        context.services.latents.set(name_negative, (uc, uc_ec))
+        context.services.latents.set(name_positive, (c, ec))
+        context.services.latents.set(name_negative, (uc, None))
 
         return CompelOutput(
             positive=ConditioningField(
