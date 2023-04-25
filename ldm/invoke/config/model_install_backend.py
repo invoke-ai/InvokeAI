@@ -68,7 +68,6 @@ def install_requested_models(
         scan_directory: Path = None,
         external_models: List[str] = None,
         scan_at_startup: bool = False,
-        convert_to_diffusers: bool = False,
         precision: str = "float16",
         purge_deleted: bool = False,
         config_file_path: Path = None,
@@ -111,20 +110,20 @@ def install_requested_models(
     if len(external_models)>0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
+            print(f'DEBUG: path_url_or_repo = {path_url_or_repo}')
             try:
                 model_manager.heuristic_import(
                     path_url_or_repo,
-                    convert=convert_to_diffusers,
                     config_file_callback=_pick_configuration_file,
                     commit_to_conf=config_file_path
                 )
             except KeyboardInterrupt:
                 sys.exit(-1)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f'An exception has occurred: {str(e)}')
 
     if scan_at_startup and scan_directory.is_dir():
-        argument = '--autoconvert' if convert_to_diffusers else '--autoimport'
+        argument = '--autoconvert'
         initfile = Path(Globals.root, Globals.initfile)
         replacement = Path(Globals.root, f'{Globals.initfile}.new')
         directory = str(scan_directory).replace('\\','/')
