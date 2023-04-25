@@ -17,6 +17,7 @@ def create_text_to_image() -> LibraryGraph:
             nodes={
                 'width': ParamIntInvocation(id='width', a=512),
                 'height': ParamIntInvocation(id='height', a=512),
+                'seed': ParamIntInvocation(id='seed', a=-1),
                 '3': NoiseInvocation(id='3'),
                 '4': CompelInvocation(id='4'),
                 '5': TextToLatentsInvocation(id='5'),
@@ -25,8 +26,11 @@ def create_text_to_image() -> LibraryGraph:
             edges=[
                 Edge(source=EdgeConnection(node_id='width', field='a'), destination=EdgeConnection(node_id='3', field='width')),
                 Edge(source=EdgeConnection(node_id='height', field='a'), destination=EdgeConnection(node_id='3', field='height')),
+                Edge(source=EdgeConnection(node_id='seed', field='a'), destination=EdgeConnection(node_id='3', field='seed')),
+                # TODO: remove, when updated TextToLatents merged
                 Edge(source=EdgeConnection(node_id='width', field='a'), destination=EdgeConnection(node_id='5', field='width')),
                 Edge(source=EdgeConnection(node_id='height', field='a'), destination=EdgeConnection(node_id='5', field='height')),
+                Edge(source=EdgeConnection(node_id='seed', field='a'), destination=EdgeConnection(node_id='5', field='seed')),
                 Edge(source=EdgeConnection(node_id='3', field='noise'), destination=EdgeConnection(node_id='5', field='noise')),
                 Edge(source=EdgeConnection(node_id='5', field='latents'), destination=EdgeConnection(node_id='6', field='latents')),
                 Edge(source=EdgeConnection(node_id='4', field='positive'), destination=EdgeConnection(node_id='5', field='positive')),
@@ -34,9 +38,11 @@ def create_text_to_image() -> LibraryGraph:
             ]
         ),
         exposed_inputs=[
-            ExposedNodeInput(node_path='4', field='positive_prompt', alias='prompt'), # TODO: cli uses concatenated prompt
+            ExposedNodeInput(node_path='4', field='positive_prompt', alias='positive_prompt'),
+            ExposedNodeInput(node_path='4', field='negative_prompt', alias='negative_prompt'),
             ExposedNodeInput(node_path='width', field='a', alias='width'),
-            ExposedNodeInput(node_path='height', field='a', alias='height')
+            ExposedNodeInput(node_path='height', field='a', alias='height'),
+            ExposedNodeInput(node_path='seed', field='a', alias='seed'),
         ],
         exposed_outputs=[
             ExposedNodeOutput(node_path='6', field='image', alias='image')
