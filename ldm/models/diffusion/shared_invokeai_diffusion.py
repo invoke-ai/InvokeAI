@@ -149,16 +149,6 @@ class InvokeAIDiffuserComponent:
             )
         return old_attn_processors
 
-    def restore_default_cross_attention(
-        self, processors_to_restore: Optional[dict[str, "AttentionProcessor"]] = None
-    ):
-        self.cross_attention_control_context = None
-        restore_default_cross_attention(
-            self.model,
-            is_running_diffusers=self.is_running_diffusers,
-            processors_to_restore=processors_to_restore,
-        )
-
     def setup_attention_map_saving(self, saver: AttentionMapSaver):
         def callback(slice, dim, offset, slice_size, key):
             if dim is not None:
