@@ -119,7 +119,9 @@ const IAINodeInputs = (props: IAINodeInputsProps) => {
       );
 
       if (index < inputSockets.length) {
-        IAINodeInputsToRender.push(<Divider />);
+        IAINodeInputsToRender.push(
+          <Divider key={`${inputSocket.id}.divider`} />
+        );
       }
 
       IAINodeInputsToRender.push(

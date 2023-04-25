@@ -12,6 +12,7 @@ import { RootState } from 'app/store';
 import { AnyInvocationType } from 'services/events/types';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { NODE_MIN_WIDTH } from 'app/constants';
 
 type InvocationComponentWrapperProps = PropsWithChildren & {
   selected: boolean;
@@ -28,6 +29,7 @@ const InvocationComponentWrapper = (props: InvocationComponentWrapperProps) => {
       sx={{
         position: 'relative',
         borderRadius: 'md',
+        minWidth: NODE_MIN_WIDTH,
         boxShadow: props.selected
           ? `${nodeSelectedOutline}, ${nodeShadow}`
           : `${nodeShadow}`,
