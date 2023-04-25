@@ -146,6 +146,7 @@ class TextToLatentsInvocation(BaseInvocation):
     # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
+    negative_prompt: Optional[str] = Field(description="The negative prompts to exclude during generation")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
@@ -207,7 +208,7 @@ class TextToLatentsInvocation(BaseInvocation):
 
 
     def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
+        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(f'{self.prompt}[{self.negative_prompt}]', model=model)
         conditioning_data = ConditioningData(
             uc,
             c,

@@ -44,6 +44,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
+    negative_prompt: Optional[str] = Field(description="The negative prompts to exclude during generation")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
@@ -80,7 +81,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
         outputs = Txt2Img(model).generate(
-            prompt=self.prompt,
+            prompt=f'{self.prompt}[{self.negative_prompt}]',
             step_callback=partial(self.dispatch_progress, context, source_node_id),
             **self.dict(
                 exclude={"prompt"}
@@ -160,7 +161,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
         outputs = Img2Img(model).generate(
-            prompt=self.prompt,
+            prompt=f'{self.prompt}[{self.negative_prompt}]',
             init_image=image,
             init_mask=mask,
             step_callback=partial(self.dispatch_progress, context, source_node_id),
@@ -246,7 +247,7 @@ class InpaintInvocation(ImageToImageInvocation):
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
         outputs = Inpaint(model).generate(
-            prompt=self.prompt,
+            prompt=f'{self.prompt}[{self.negative_prompt}]',
             init_img=image,
             init_mask=mask,
             step_callback=partial(self.dispatch_progress, context, source_node_id),
