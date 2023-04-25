@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
-from diffusers.models.cross_attention import AttnProcessor
+from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
 from invokeai.backend.globals import Globals
@@ -101,7 +101,7 @@ class InvokeAIDiffuserComponent:
 
     def override_cross_attention(
         self, conditioning: ExtraConditioningInfo, step_count: int
-    ) -> Dict[str, AttnProcessor]:
+    ) -> Dict[str, AttentionProcessor]:
         """
         setup cross attention .swap control. for diffusers this replaces the attention processor, so
         the previous attention processor is returned so that the caller can restore it later.
@@ -118,7 +118,7 @@ class InvokeAIDiffuserComponent:
         )
 
     def restore_default_cross_attention(
-        self, restore_attention_processor: Optional["AttnProcessor"] = None
+        self, restore_attention_processor: Optional["AttentionProcessor"] = None
     ):
         self.conditioning = None
         self.cross_attention_control_context = None
@@ -262,7 +262,7 @@ class InvokeAIDiffuserComponent:
             # TODO remove when compvis codepath support is dropped
             if step_index is None and sigma is None:
                 raise ValueError(
-                    f"Either step_index or sigma is required when doing cross attention control, but both are None."
+                    "Either step_index or sigma is required when doing cross attention control, but both are None."
                 )
             percent_through = self.estimate_percent_through(step_index, sigma)
         return percent_through
@@ -599,7 +599,6 @@ class InvokeAIDiffuserComponent:
         )
 
         # below is fugly omg
-        num_actual_conditionings = len(c_or_weighted_c_list)
         conditionings = [uc] + [c for c, weight in weighted_cond_list]
         weights = [1] + [weight for c, weight in weighted_cond_list]
         chunk_count = ceil(len(conditionings) / 2)
