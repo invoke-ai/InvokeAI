@@ -92,7 +92,9 @@ export const socketMiddleware = () => {
         socket.on('connect', () => {
           dispatch(socketConnected({ timestamp: getTimestamp() }));
 
-          const { results, uploads, models, nodes } = getState();
+          const { results, uploads, models, nodes, system } = getState();
+
+          const { disabledTabs } = system;
 
           // These thunks need to be dispatch in middleware; cannot handle in a reducer
           if (!results.ids.length) {
@@ -107,7 +109,7 @@ export const socketMiddleware = () => {
             dispatch(receivedModels());
           }
 
-          if (!nodes.schema) {
+          if (!nodes.schema && !disabledTabs.includes('nodes')) {
             dispatch(receivedOpenAPISchema());
           }
         });

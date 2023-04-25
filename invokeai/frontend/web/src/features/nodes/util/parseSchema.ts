@@ -114,7 +114,5 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
     return acc;
   }, {});
 
-  console.debug('Generated invocations: ', invocations);
-
   return invocations;
 };

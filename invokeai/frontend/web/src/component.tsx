@@ -15,11 +15,12 @@ import '@fontsource/inter/700.css';
 import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
 
-import Loading from './Loading';
+import Loading from './common/components/Loading/Loading';
 
 // Localization
 import './i18n';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
+import { ApplicationFeature } from 'features/system/store/systemSlice';
 
 const App = lazy(() => import('./app/App'));
 const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
@@ -28,6 +29,7 @@ interface Props extends PropsWithChildren {
   apiUrl?: string;
   disabledPanels?: string[];
   disabledTabs?: InvokeTabName[];
+  disabledFeatures?: ApplicationFeature[];
   token?: string;
   shouldTransformUrls?: boolean;
   shouldFetchImages?: boolean;
@@ -35,8 +37,15 @@ interface Props extends PropsWithChildren {
 
 export default function Component({
   apiUrl,
-  disabledPanels = [],
   disabledTabs = [],
+  disabledFeatures = [
+    'lightbox',
+    'bugLink',
+    'discordLink',
+    'githubLink',
+    'localization',
+    'modelManager',
+  ],
   token,
   children,
   shouldTransformUrls,
@@ -69,12 +78,12 @@ export default function Component({
     <React.StrictMode>
       <Provider store={store}>
         <PersistGate loading={<Loading />} persistor={persistor}>
-          <React.Suspense fallback={<Loading showText />}>
+          <React.Suspense fallback={<Loading />}>
             <ThemeLocaleProvider>
               <App
                 options={{
-                  disabledPanels,
                   disabledTabs,
+                  disabledFeatures,
                   shouldTransformUrls,
                   shouldFetchImages,
                 }}

@@ -8,8 +8,13 @@ import ModelManagerModal from './ModelManager/ModelManagerModal';
 import SettingsModal from './SettingsModal/SettingsModal';
 import ThemeChanger from './ThemeChanger';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store';
 
 const SiteHeaderMenu = () => {
+  const disabledFeatures = useAppSelector(
+    (state: RootState) => state.system.disabledFeatures
+  );
   const { t } = useTranslation();
 
   return (
@@ -18,17 +23,19 @@ const SiteHeaderMenu = () => {
       flexDirection={{ base: 'column', xl: 'row' }}
       gap={{ base: 4, xl: 1 }}
     >
-      <ModelManagerModal>
-        <IAIIconButton
-          aria-label={t('modelManager.modelManager')}
-          tooltip={t('modelManager.modelManager')}
-          size="sm"
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          icon={<FaCube />}
-        />
-      </ModelManagerModal>
+      {!disabledFeatures.includes('modelManager') && (
+        <ModelManagerModal>
+          <IAIIconButton
+            aria-label={t('modelManager.modelManager')}
+            tooltip={t('modelManager.modelManager')}
+            size="sm"
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            icon={<FaCube />}
+          />
+        </ModelManagerModal>
+      )}
 
       <HotkeysModal>
         <IAIIconButton
@@ -44,55 +51,61 @@ const SiteHeaderMenu = () => {
 
       <ThemeChanger />
 
-      <LanguagePicker />
+      {!disabledFeatures.includes('localization') && <LanguagePicker />}
 
-      <Link
-        isExternal
-        href="http://github.com/invoke-ai/InvokeAI/issues"
-        marginBottom="-0.25rem"
-      >
-        <IAIIconButton
-          aria-label={t('common.reportBugLabel')}
-          tooltip={t('common.reportBugLabel')}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size="sm"
-          icon={<FaBug />}
-        />
-      </Link>
+      {!disabledFeatures.includes('bugLink') && (
+        <Link
+          isExternal
+          href="http://github.com/invoke-ai/InvokeAI/issues"
+          marginBottom="-0.25rem"
+        >
+          <IAIIconButton
+            aria-label={t('common.reportBugLabel')}
+            tooltip={t('common.reportBugLabel')}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            size="sm"
+            icon={<FaBug />}
+          />
+        </Link>
+      )}
 
-      <Link
-        isExternal
-        href="http://github.com/invoke-ai/InvokeAI"
-        marginBottom="-0.25rem"
-      >
-        <IAIIconButton
-          aria-label={t('common.githubLabel')}
-          tooltip={t('common.githubLabel')}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size="sm"
-          icon={<FaGithub />}
-        />
-      </Link>
+      {!disabledFeatures.includes('githubLink') && (
+        <Link
+          isExternal
+          href="http://github.com/invoke-ai/InvokeAI"
+          marginBottom="-0.25rem"
+        >
+          <IAIIconButton
+            aria-label={t('common.githubLabel')}
+            tooltip={t('common.githubLabel')}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            size="sm"
+            icon={<FaGithub />}
+          />
+        </Link>
+      )}
 
-      <Link
-        isExternal
-        href="https://discord.gg/ZmtBAhwWhy"
-        marginBottom="-0.25rem"
-      >
-        <IAIIconButton
-          aria-label={t('common.discordLabel')}
-          tooltip={t('common.discordLabel')}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size="sm"
-          icon={<FaDiscord />}
-        />
-      </Link>
+      {!disabledFeatures.includes('discordLink') && (
+        <Link
+          isExternal
+          href="https://discord.gg/ZmtBAhwWhy"
+          marginBottom="-0.25rem"
+        >
+          <IAIIconButton
+            aria-label={t('common.discordLabel')}
+            tooltip={t('common.discordLabel')}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            size="sm"
+            icon={<FaDiscord />}
+          />
+        </Link>
+      )}
 
       <SettingsModal>
         <IAIIconButton

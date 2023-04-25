@@ -70,8 +70,8 @@ const currentImageButtonsSelector = createSelector(
     selectedImageSelector,
   ],
   (
-    system: SystemState,
-    gallery: GalleryState,
+    system,
+    gallery,
     postprocessing,
     ui,
     lightbox,
@@ -80,6 +80,8 @@ const currentImageButtonsSelector = createSelector(
   ) => {
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
+
+    const { disabledFeatures } = system;
 
     const { upscalingLevel, facetoolStrength } = postprocessing;
 
@@ -90,6 +92,7 @@ const currentImageButtonsSelector = createSelector(
     const { intermediateImage, currentImage } = gallery;
 
     return {
+      disabledFeatures,
       isProcessing,
       isConnected,
       isGFPGANAvailable,
@@ -134,7 +137,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     activeTabName,
     shouldHidePreview,
     selectedImage,
+    disabledFeatures,
   } = useAppSelector(currentImageButtonsSelector);
+
   const { getUrl, shouldTransformUrls } = useGetUrl();
 
   const toast = useToast();
@@ -328,24 +333,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'Shift+U',
     () => {
-      if (
-        isESRGANAvailable &&
-        !shouldDisableToolbarButtons &&
-        isConnected &&
-        !isProcessing &&
-        upscalingLevel
-      ) {
-        handleClickUpscale();
-      } else {
-        toast({
-          title: t('toast.upscalingFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickUpscale();
+    },
+    {
+      enabled: () =>
+        disabledFeatures.includes('upscaling') ||
+        !isESRGANAvailable ||
+        shouldDisableToolbarButtons ||
+        !isConnected ||
+        isProcessing ||
+        !upscalingLevel,
     },
     [
+      disabledFeatures,
       selectedImage,
       isESRGANAvailable,
       shouldDisableToolbarButtons,
@@ -362,24 +362,20 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'Shift+R',
     () => {
-      if (
-        isGFPGANAvailable &&
-        !shouldDisableToolbarButtons &&
-        isConnected &&
-        !isProcessing &&
-        facetoolStrength
-      ) {
-        handleClickFixFaces();
-      } else {
-        toast({
-          title: t('toast.faceRestoreFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickFixFaces();
     },
+    {
+      enabled: () =>
+        disabledFeatures.includes('faceRestore') ||
+        !isGFPGANAvailable ||
+        shouldDisableToolbarButtons ||
+        !isConnected ||
+        isProcessing ||
+        !facetoolStrength,
+    },
+
     [
+      disabledFeatures,
       selectedImage,
       isGFPGANAvailable,
       shouldDisableToolbarButtons,
@@ -509,21 +505,23 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           isChecked={shouldHidePreview}
           onClick={handlePreviewVisibility}
         />
-        <IAIIconButton
-          icon={<FaExpand />}
-          tooltip={
-            !isLightboxOpen
-              ? `${t('parameters.openInViewer')} (Z)`
-              : `${t('parameters.closeViewer')} (Z)`
-          }
-          aria-label={
-            !isLightboxOpen
-              ? `${t('parameters.openInViewer')} (Z)`
-              : `${t('parameters.closeViewer')} (Z)`
-          }
-          isChecked={isLightboxOpen}
-          onClick={handleLightBox}
-        />
+        {!disabledFeatures.includes('lightbox') && (
+          <IAIIconButton
+            icon={<FaExpand />}
+            tooltip={
+              !isLightboxOpen
+                ? `${t('parameters.openInViewer')} (Z)`
+                : `${t('parameters.closeViewer')} (Z)`
+            }
+            aria-label={
+              !isLightboxOpen
+                ? `${t('parameters.openInViewer')} (Z)`
+                : `${t('parameters.closeViewer')} (Z)`
+            }
+            isChecked={isLightboxOpen}
+            onClick={handleLightBox}
+          />
+        )}
       </ButtonGroup>
 
       <ButtonGroup isAttached={true}>
@@ -556,65 +554,74 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         />
       </ButtonGroup>
 
-      <ButtonGroup isAttached={true}>
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              icon={<FaGrinStars />}
-              aria-label={t('parameters.restoreFaces')}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              rowGap: 4,
-            }}
-          >
-            <FaceRestoreSettings />
-            <IAIButton
-              isDisabled={
-                !isGFPGANAvailable ||
-                !selectedImage ||
-                !(isConnected && !isProcessing) ||
-                !facetoolStrength
+      {!(
+        disabledFeatures.includes('faceRestore') &&
+        disabledFeatures.includes('upscaling')
+      ) && (
+        <ButtonGroup isAttached={true}>
+          {!disabledFeatures.includes('faceRestore') && (
+            <IAIPopover
+              triggerComponent={
+                <IAIIconButton
+                  icon={<FaGrinStars />}
+                  aria-label={t('parameters.restoreFaces')}
+                />
               }
-              onClick={handleClickFixFaces}
             >
-              {t('parameters.restoreFaces')}
-            </IAIButton>
-          </Flex>
-        </IAIPopover>
+              <Flex
+                sx={{
+                  flexDirection: 'column',
+                  rowGap: 4,
+                }}
+              >
+                <FaceRestoreSettings />
+                <IAIButton
+                  isDisabled={
+                    !isGFPGANAvailable ||
+                    !selectedImage ||
+                    !(isConnected && !isProcessing) ||
+                    !facetoolStrength
+                  }
+                  onClick={handleClickFixFaces}
+                >
+                  {t('parameters.restoreFaces')}
+                </IAIButton>
+              </Flex>
+            </IAIPopover>
+          )}
 
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              icon={<FaExpandArrowsAlt />}
-              aria-label={t('parameters.upscale')}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <UpscaleSettings />
-            <IAIButton
-              isDisabled={
-                !isESRGANAvailable ||
-                !selectedImage ||
-                !(isConnected && !isProcessing) ||
-                !upscalingLevel
+          {!disabledFeatures.includes('upscaling') && (
+            <IAIPopover
+              triggerComponent={
+                <IAIIconButton
+                  icon={<FaExpandArrowsAlt />}
+                  aria-label={t('parameters.upscale')}
+                />
               }
-              onClick={handleClickUpscale}
             >
-              {t('parameters.upscaleImage')}
-            </IAIButton>
-          </Flex>
-        </IAIPopover>
-      </ButtonGroup>
+              <Flex
+                sx={{
+                  flexDirection: 'column',
+                  gap: 4,
+                }}
+              >
+                <UpscaleSettings />
+                <IAIButton
+                  isDisabled={
+                    !isESRGANAvailable ||
+                    !selectedImage ||
+                    !(isConnected && !isProcessing) ||
+                    !upscalingLevel
+                  }
+                  onClick={handleClickUpscale}
+                >
+                  {t('parameters.upscaleImage')}
+                </IAIButton>
+              </Flex>
+            </IAIPopover>
+          )}
+        </ButtonGroup>
+      )}
 
       <ButtonGroup isAttached={true}>
         <IAIIconButton

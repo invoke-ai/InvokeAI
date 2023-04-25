@@ -1,5 +1,3 @@
-import { InvokeTabName } from './tabMap';
-
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
 export interface UIState {
@@ -16,8 +14,6 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
-  disabledParameterPanels: string[];
-  disabledTabs: InvokeTabName[];
   openLinearAccordionItems: number[];
   openUnifiedCanvasAccordionItems: number[];
 }
