@@ -72,8 +72,6 @@ class ONNX(inferencePipeline) :
         print("Output directory: ", outdir)
         tic = time.time()
         try:
-            #txt2img_onnx = txt2img(width, height, iterations, steps)
-            #txt2img_onnx.onnx_txt2img(prompt, self.model, self.precision, self.outdir)
             if precision == "cpu":
                 onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="CPUExecutionProvider")
             else:

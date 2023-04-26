@@ -75,8 +75,13 @@ def main():
         opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
 
     if opt.modelType == "Pytorch":
+        #pytorch = Pytorch()
         #invocation of pytorch model
         opt = Pytorch.start(opt, args)
+
+        # Loading Face Restoration and ESRGAN Modules
+        gfpgan, codeformer, esrgan = load_face_restoration(opt)
+
         if opt.embeddings:
             if not os.path.isabs(opt.embedding_path):
                 embedding_path = os.path.normpath(

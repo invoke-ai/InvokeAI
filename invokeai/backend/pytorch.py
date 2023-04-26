@@ -319,6 +319,7 @@ class Pytorch(inferencePipeline):
             if not dest.exists():
                 copyfile(src, dest)
 
+    @classmethod
     def start(self, opt, args):
         if args.laion400m:
             print(
