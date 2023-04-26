@@ -18,6 +18,8 @@ const globalHotkeysSelector = createSelector(
   }
 );
 
+// TODO: Does not catch keypresses while focused in an input. Maybe there is a way?
+
 export const useGlobalHotkeys = () => {
   const dispatch = useAppDispatch();
   const { shift } = useAppSelector(globalHotkeysSelector);

@@ -65,6 +65,7 @@ import { useCallback } from 'react';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -88,8 +89,6 @@ const currentImageButtonsSelector = createSelector(
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
 
-    const { disabledFeatures } = system;
-
     const { upscalingLevel, facetoolStrength } = postprocessing;
 
     const { isLightboxOpen } = lightbox;
@@ -99,7 +98,6 @@ const currentImageButtonsSelector = createSelector(
     const { intermediateImage, currentImage } = gallery;
 
     return {
-      disabledFeatures,
       isProcessing,
       isConnected,
       isGFPGANAvailable,
@@ -144,8 +142,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     activeTabName,
     shouldHidePreview,
     selectedImage,
-    disabledFeatures,
   } = useAppSelector(currentImageButtonsSelector);
+
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
+  const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
+  const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
 
   const { getUrl, shouldTransformUrls } = useGetUrl();
 
@@ -345,7 +346,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     {
       enabled: () =>
         Boolean(
-          !disabledFeatures.includes('upscaling') &&
+          isUpscalingEnabled &&
             isESRGANAvailable &&
             !shouldDisableToolbarButtons &&
             isConnected &&
@@ -354,7 +355,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         ),
     },
     [
-      disabledFeatures,
+      isUpscalingEnabled,
       selectedImage,
       isESRGANAvailable,
       shouldDisableToolbarButtons,
@@ -376,7 +377,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     {
       enabled: () =>
         Boolean(
-          !disabledFeatures.includes('faceRestore') &&
+          isFaceRestoreEnabled &&
             isGFPGANAvailable &&
             !shouldDisableToolbarButtons &&
             isConnected &&
@@ -386,7 +387,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     },
 
     [
-      disabledFeatures,
+      isFaceRestoreEnabled,
       selectedImage,
       isGFPGANAvailable,
       shouldDisableToolbarButtons,
@@ -517,7 +518,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           isChecked={shouldHidePreview}
           onClick={handlePreviewVisibility}
         />
-        {!disabledFeatures.includes('lightbox') && (
+        {isLightboxEnabled && (
           <IAIIconButton
             icon={<FaExpand />}
             tooltip={
@@ -566,12 +567,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         />
       </ButtonGroup>
 
-      {!(
-        disabledFeatures.includes('faceRestore') &&
-        disabledFeatures.includes('upscaling')
-      ) && (
+      {(isUpscalingEnabled || isFaceRestoreEnabled) && (
         <ButtonGroup isAttached={true}>
-          {!disabledFeatures.includes('faceRestore') && (
+          {isFaceRestoreEnabled && (
             <IAIPopover
               triggerComponent={
                 <IAIIconButton
@@ -602,7 +600,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             </IAIPopover>
           )}
 
-          {!disabledFeatures.includes('upscaling') && (
+          {isUpscalingEnabled && (
             <IAIPopover
               triggerComponent={
                 <IAIIconButton

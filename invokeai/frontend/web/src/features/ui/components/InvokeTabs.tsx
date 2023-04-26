@@ -27,6 +27,7 @@ import GenerateWorkspace from './tabs/Generate/GenerateWorkspace';
 import { FaImage } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
 import { BsLightningChargeFill, BsLightningFill } from 'react-icons/bs';
+import { configSelector } from 'features/system/store/configSelectors';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -56,14 +57,11 @@ const tabs: InvokeTabInfo[] = [
   },
 ];
 
-const enabledTabsSelector = createSelector(
-  (state: RootState) => state.ui,
-  (ui) => {
-    const { disabledTabs } = ui;
+const enabledTabsSelector = createSelector(configSelector, (config) => {
+  const { disabledTabs } = config;
 
-    return tabs.filter((tab) => !disabledTabs.includes(tab.id));
-  }
-);
+  return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+});
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -74,10 +72,6 @@ export default function InvokeTabs() {
 
   const { shouldPinGallery, shouldPinParametersPanel } = useAppSelector(
     (state: RootState) => state.ui
-  );
-
-  const disabledTabs = useAppSelector(
-    (state: RootState) => state.system.disabledTabs
   );
 
   const { t } = useTranslation();

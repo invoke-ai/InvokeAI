@@ -13,6 +13,7 @@ import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
+import configReducer from 'features/system/store/configSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import modelsReducer from 'features/system/store/modelSlice';
@@ -54,6 +55,7 @@ const rootReducer = combineReducers({
   postprocessing: postprocessingReducer,
   results: resultsReducer,
   system: systemReducer,
+  config: configReducer,
   ui: uiReducer,
   uploads: uploadsReducer,
   hotkeys: hotkeysReducer,
@@ -78,6 +80,7 @@ const rootPersistConfig = getPersistConfig({
     // ...uploadsBlacklist,
     'uploads',
     'hotkeys',
+    'config',
   ],
   debounce: 300,
 });
