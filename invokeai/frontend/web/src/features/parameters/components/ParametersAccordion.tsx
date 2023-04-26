@@ -2,36 +2,44 @@ import { Accordion } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { Feature } from 'app/features';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { tabMap } from 'features/ui/store/tabMap';
-import { uiSelector } from 'features/ui/store/uiSelectors';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
 import { openAccordionItemsChanged } from 'features/ui/store/uiSlice';
-import { filter } from 'lodash';
+import { filter, map } from 'lodash';
 import { ReactNode, useCallback } from 'react';
 import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 
-const parametersAccordionSelector = createSelector([uiSelector], (uiSlice) => {
-  const {
-    activeTab,
-    openLinearAccordionItems,
-    openUnifiedCanvasAccordionItems,
-    disabledParameterPanels,
-  } = uiSlice;
+const parametersAccordionSelector = createSelector(
+  [uiSelector, systemSelector],
+  (uiSlice, system) => {
+    const {
+      activeTab,
+      openLinearAccordionItems,
+      openUnifiedCanvasAccordionItems,
+    } = uiSlice;
 
-  let openAccordions: number[] = [];
+    const { disabledFeatures } = system;
 
-  if (tabMap[activeTab] === 'linear') {
-    openAccordions = openLinearAccordionItems;
+    let openAccordions: number[] = [];
+
+    if (tabMap[activeTab] === 'generate') {
+      openAccordions = openLinearAccordionItems;
+    }
+
+    if (tabMap[activeTab] === 'unifiedCanvas') {
+      openAccordions = openUnifiedCanvasAccordionItems;
+    }
+
+    return {
+      openAccordions,
+      disabledFeatures,
+    };
   }
-
-  if (tabMap[activeTab] === 'unifiedCanvas') {
-    openAccordions = openUnifiedCanvasAccordionItems;
-  }
-
-  return {
-    openAccordions,
-    disabledParameterPanels,
-  };
-});
+);
 
 export type ParametersAccordionItem = {
   name: string;
@@ -53,7 +61,7 @@ type ParametersAccordionProps = {
  * Main container for generation and processing parameters.
  */
 const ParametersAccordion = ({ accordionItems }: ParametersAccordionProps) => {
-  const { openAccordions, disabledParameterPanels } = useAppSelector(
+  const { openAccordions, disabledFeatures } = useAppSelector(
     parametersAccordionSelector
   );
 
@@ -68,20 +76,16 @@ const ParametersAccordion = ({ accordionItems }: ParametersAccordionProps) => {
   };
 
   // Render function for accordion items
-  const renderAccordionItems = useCallback(() => {
-    // Filter out disabled accordions
-    const filteredAccordionItems = filter(
-      accordionItems,
-      (item) => disabledParameterPanels.indexOf(item.name) === -1
-    );
-
-    return filteredAccordionItems.map((accordionItem) => (
-      <InvokeAccordionItem
-        key={accordionItem.name}
-        accordionItem={accordionItem}
-      />
-    ));
-  }, [disabledParameterPanels, accordionItems]);
+  const renderAccordionItems = useCallback(
+    () =>
+      map(accordionItems, (accordionItem) => (
+        <InvokeAccordionItem
+          key={accordionItem.name}
+          accordionItem={accordionItem}
+        />
+      )),
+    [accordionItems]
+  );
 
   return (
     <Accordion

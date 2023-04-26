@@ -57,6 +57,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     galleryImageMinimumWidth,
     mayDeleteImage,
     shouldUseSingleGalleryColumn,
+    disabledFeatures,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, thumbnail, name, metadata } = image;
@@ -133,7 +134,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         metadata.sd_metadata?.image?.init_image_path
       );
       if (response.ok) {
-        dispatch(setActiveTab('img2img'));
         dispatch(setAllImageToImageParameters(metadata?.sd_metadata));
         toast({
           title: t('toast.initialImageSet'),
@@ -169,14 +169,23 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     // dispatch(setIsLightboxOpen(true));
   };
 
+  const handleOpenInNewTab = () => {
+    window.open(getUrl(image.url), '_blank');
+  };
+
   return (
     <ContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
       renderMenu={() => (
         <MenuList>
-          <MenuItem onClickCapture={handleLightBox}>
-            {t('parameters.openInViewer')}
+          <MenuItem onClickCapture={handleOpenInNewTab}>
+            {t('common.openInNewTab')}
           </MenuItem>
+          {!disabledFeatures.includes('lightbox') && (
+            <MenuItem onClickCapture={handleLightBox}>
+              {t('parameters.openInViewer')}
+            </MenuItem>
+          )}
           <MenuItem
             onClickCapture={handleUsePrompt}
             isDisabled={image?.metadata?.sd_metadata?.prompt === undefined}

@@ -32,3 +32,9 @@ class ProgressImage(BaseModel):
     width: int = Field(description="The effective width of the image in pixels")
     height: int = Field(description="The effective height of the image in pixels")
     dataURL: str = Field(description="The image data as a b64 data URL")
+
+
+class SavedImage(BaseModel):
+    image_name: str = Field(description="The name of the saved image")
+    thumbnail_name: str = Field(description="The name of the saved thumbnail")
+    created: int = Field(description="The created timestamp of the saved image")

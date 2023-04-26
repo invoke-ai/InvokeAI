@@ -85,8 +85,7 @@ const nodesSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
-      state.schema = action.payload;
-      state.invocationTemplates = parseSchema(action.payload);
+      state.invocationTemplates = action.payload;
     });
 
     builder.addMatcher(isFulfilledAnyGraphBuilt, (state, action) => {

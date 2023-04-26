@@ -77,6 +77,7 @@ export const hoverableImageSelector = createSelector(
       shouldUseSingleGalleryColumn: gallery.shouldUseSingleGalleryColumn,
       activeTabName,
       isLightboxOpen: lightbox.isLightboxOpen,
+      disabledFeatures: system.disabledFeatures,
     };
   },
   {

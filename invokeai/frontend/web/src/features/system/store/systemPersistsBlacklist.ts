@@ -19,6 +19,8 @@ const itemsToBlacklist: (keyof SystemState)[] = [
   'isCancelScheduled',
   'sessionId',
   'progressImage',
+  'wereModelsReceived',
+  'wasSchemaParsed',
 ];
 
 export const systemBlacklist = itemsToBlacklist.map(

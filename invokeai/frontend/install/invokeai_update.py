@@ -1,10 +1,9 @@
-"""
+'''
 Minimalist updater script. Prompts user for the tag or branch to update to and runs
 pip install <path_to_git_source>.
-"""
+'''
 import os
 import platform
-
 import requests
 from rich import box, print
 from rich.console import Console, Group, group
@@ -16,8 +15,10 @@ from rich.text import Text
 
 from invokeai.version import __version__
 
-INVOKE_AI_SRC = "https://github.com/invoke-ai/InvokeAI/archive"
-INVOKE_AI_REL = "https://api.github.com/repos/invoke-ai/InvokeAI/releases"
+INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive"
+INVOKE_AI_TAG="https://github.com/invoke-ai/InvokeAI/archive/refs/tags"
+INVOKE_AI_BRANCH="https://github.com/invoke-ai/InvokeAI/archive/refs/heads"
+INVOKE_AI_REL="https://api.github.com/repos/invoke-ai/InvokeAI/releases"
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -28,22 +29,22 @@ if OS == "Windows":
 else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
-
-def get_versions() -> dict:
+def get_versions()->dict:
     return requests.get(url=INVOKE_AI_REL).json()
 
-
 def welcome(versions: dict):
+    
     @group()
     def text():
-        yield f"InvokeAI Version: [bold yellow]{__version__}"
-        yield ""
-        yield "This script will update InvokeAI to the latest release, or to a development version of your choice."
-        yield ""
-        yield "[bold yellow]Options:"
-        yield f"""[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
+        yield f'InvokeAI Version: [bold yellow]{__version__}'
+        yield ''
+        yield 'This script will update InvokeAI to the latest release, or to a development version of your choice.'
+        yield ''
+        yield '[bold yellow]Options:'
+        yield f'''[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
 [2] Update to the bleeding-edge development version ([italic]main[/italic])
-[3] Manually enter the tag or branch name you wish to update"""
+[3] Manually enter the [bold]tag name[/bold] for the version you wish to update to
+[4] Manually enter the [bold]branch name[/bold] for the version you wish to update to'''        
 
     console.rule()
     print(
@@ -59,33 +60,41 @@ def welcome(versions: dict):
     )
     console.line()
 
-
 def main():
     versions = get_versions()
     welcome(versions)
 
     tag = None
-    choice = Prompt.ask("Choice:", choices=["1", "2", "3"], default="1")
+    branch = None
+    release = None
+    choice = Prompt.ask('Choice:',choices=['1','2','3','4'],default='1')
+    
+    if choice=='1':
+        release = versions[0]['tag_name']
+    elif choice=='2':
+        release = 'main'
+    elif choice=='3':
+        tag = Prompt.ask('Enter an InvokeAI tag name')
+    elif choice=='4':
+        branch = Prompt.ask('Enter an InvokeAI branch name')
 
-    if choice == "1":
-        tag = versions[0]["tag_name"]
-    elif choice == "2":
-        tag = "main"
-    elif choice == "3":
-        tag = Prompt.ask("Enter an InvokeAI tag or branch name")
-
-    print(f":crossed_fingers: Upgrading to [yellow]{tag}[/yellow]")
-    cmd = f"pip install {INVOKE_AI_SRC}/{tag}.zip --use-pep517"
-    print("")
-    print("")
-    if os.system(cmd) == 0:
-        print(f":heavy_check_mark: Upgrade successful")
+    print(f':crossed_fingers: Upgrading to [yellow]{tag if tag else release}[/yellow]')
+    if release:
+        cmd = f'pip install {INVOKE_AI_SRC}/{release}.zip --use-pep517 --upgrade'
+    elif tag:
+        cmd = f'pip install {INVOKE_AI_TAG}/{tag}.zip --use-pep517 --upgrade'
     else:
-        print(f":exclamation: [bold red]Upgrade failed[/red bold]")
-
-
+        cmd = f'pip install {INVOKE_AI_BRANCH}/{branch}.zip --use-pep517 --upgrade'
+    print('')
+    print('')
+    if os.system(cmd)==0:
+        print(f':heavy_check_mark: Upgrade successful')
+    else:
+        print(f':exclamation: [bold red]Upgrade failed[/red bold]')
+    
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
         pass
+

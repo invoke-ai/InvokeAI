@@ -6,12 +6,14 @@ import os
 from typing import Any
 import uuid
 
-from fastapi import HTTPException, Path, Query, Request, UploadFile
+from fastapi import Body, HTTPException, Path, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRouter
 from PIL import Image
-from invokeai.app.api.models.images import ImageResponse, ImageResponseMetadata
-from invokeai.app.services.metadata import InvokeAIMetadata
+from invokeai.app.api.models.images import (
+    ImageResponse,
+    ImageResponseMetadata,
+)
 from invokeai.app.services.item_storage import PaginatedResults
 
 from ...services.image_storage import ImageType
@@ -24,8 +26,8 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 async def get_image(
     image_type: ImageType = Path(description="The type of image to get"),
     image_name: str = Path(description="The name of the image to get"),
-) -> FileResponse | Response:
-    """Gets a result"""
+) -> FileResponse:
+    """Gets an image"""
 
     path = ApiDependencies.invoker.services.images.get_path(
         image_type=image_type, image_name=image_name
@@ -37,17 +39,29 @@ async def get_image(
         raise HTTPException(status_code=404)
 
 
+@images_router.delete("/{image_type}/{image_name}", operation_id="delete_image")
+async def delete_image(
+    image_type: ImageType = Path(description="The type of image to delete"),
+    image_name: str = Path(description="The name of the image to delete"),
+) -> None:
+    """Deletes an image and its thumbnail"""
+
+    ApiDependencies.invoker.services.images.delete(
+        image_type=image_type, image_name=image_name
+    )
+
+
 @images_router.get(
-    "/{image_type}/thumbnails/{image_name}", operation_id="get_thumbnail"
+    "/{thumbnail_type}/thumbnails/{thumbnail_name}", operation_id="get_thumbnail"
 )
 async def get_thumbnail(
-    image_type: ImageType = Path(description="The type of image to get"),
-    image_name: str = Path(description="The name of the image to get"),
+    thumbnail_type: ImageType = Path(description="The type of thumbnail to get"),
+    thumbnail_name: str = Path(description="The name of the thumbnail to get"),
 ) -> FileResponse | Response:
     """Gets a thumbnail"""
 
     path = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_name=image_name, is_thumbnail=True
+        image_type=thumbnail_type, image_name=thumbnail_name, is_thumbnail=True
     )
 
     if ApiDependencies.invoker.services.images.validate_path(path):
@@ -84,19 +98,27 @@ async def upload_image(
 
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
 
-    (image_path, thumbnail_path, ctime) = ApiDependencies.invoker.services.images.save(
+    saved_image = ApiDependencies.invoker.services.images.save(
         ImageType.UPLOAD, filename, img
     )
 
     invokeai_metadata = ApiDependencies.invoker.services.metadata.get_metadata(img)
 
+    image_url = ApiDependencies.invoker.services.images.get_uri(
+        ImageType.UPLOAD, saved_image.image_name
+    )
+
+    thumbnail_url = ApiDependencies.invoker.services.images.get_uri(
+        ImageType.UPLOAD, saved_image.image_name, True
+    )
+
     res = ImageResponse(
         image_type=ImageType.UPLOAD,
-        image_name=filename,
-        image_url=f"api/v1/images/{ImageType.UPLOAD.value}/{filename}",
-        thumbnail_url=f"api/v1/images/{ImageType.UPLOAD.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
+        image_name=saved_image.image_name,
+        image_url=image_url,
+        thumbnail_url=thumbnail_url,
         metadata=ImageResponseMetadata(
-            created=ctime,
+            created=saved_image.created,
             width=img.width,
             height=img.height,
             invokeai=invokeai_metadata,
@@ -104,9 +126,7 @@ async def upload_image(
     )
 
     response.status_code = 201
-    response.headers["Location"] = request.url_for(
-        "get_image", image_type=ImageType.UPLOAD.value, image_name=filename
-    )
+    response.headers["Location"] = image_url
 
     return res
 

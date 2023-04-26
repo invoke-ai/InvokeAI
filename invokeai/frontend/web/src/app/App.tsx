@@ -14,18 +14,26 @@ import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from './storeHooks';
-import { PropsWithChildren, useEffect } from 'react';
-import { setDisabledPanels, setDisabledTabs } from 'features/ui/store/uiSlice';
+import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { shouldTransformUrlsChanged } from 'features/system/store/systemSlice';
 import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
+import { motion, AnimatePresence } from 'framer-motion';
+import Loading from 'common/components/Loading/Loading';
+import {
+  disabledFeaturesChanged,
+  disabledTabsChanged,
+} from 'features/system/store/systemSlice';
+import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
+import { ApplicationFeature } from './invokeai';
+import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 
 keepGUIAlive();
 
 interface Props extends PropsWithChildren {
   options: {
-    disabledPanels: string[];
     disabledTabs: InvokeTabName[];
+    disabledFeatures: ApplicationFeature[];
     shouldTransformUrls?: boolean;
     shouldFetchImages: boolean;
   };
@@ -33,17 +41,25 @@ interface Props extends PropsWithChildren {
 
 const App = (props: Props) => {
   useToastWatcher();
+  useGlobalHotkeys();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
+  const disabledFeatures = useAppSelector(
+    (state) => state.system.disabledFeatures
+  );
+
+  const isApplicationReady = useIsApplicationReady();
+  const [loadingOverridden, setLoadingOverridden] = useState(false);
+
   const { setColorMode } = useColorMode();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    dispatch(setDisabledPanels(props.options.disabledPanels));
-  }, [dispatch, props.options.disabledPanels]);
+    dispatch(disabledFeaturesChanged(props.options.disabledFeatures));
+  }, [dispatch, props.options.disabledFeatures]);
 
   useEffect(() => {
-    dispatch(setDisabledTabs(props.options.disabledTabs));
+    dispatch(disabledTabsChanged(props.options.disabledTabs));
   }, [dispatch, props.options.disabledTabs]);
 
   useEffect(() => {
@@ -60,9 +76,13 @@ const App = (props: Props) => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
   }, [setColorMode, currentTheme]);
 
+  const handleOverrideClicked = useCallback(() => {
+    setLoadingOverridden(true);
+  }, []);
+
   return (
-    <Grid w="100vw" h="100vh">
-      <Lightbox />
+    <Grid w="100vw" h="100vh" position="relative">
+      {!disabledFeatures.includes('lightbox') && <Lightbox />}
       <ImageUploader>
         <ProgressBar />
         <Grid
@@ -83,15 +103,42 @@ const App = (props: Props) => {
             <ImageGalleryPanel />
           </Flex>
         </Grid>
-        <Box>
-          <Console />
-        </Box>
       </ImageUploader>
+
+      <AnimatePresence>
+        {!isApplicationReady && !loadingOverridden && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{ zIndex: 3 }}
+          >
+            <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
+              <Loading />
+            </Box>
+            <Box
+              onClick={handleOverrideClicked}
+              position="absolute"
+              top={0}
+              right={0}
+              cursor="pointer"
+              w="2rem"
+              h="2rem"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Portal>
         <FloatingParametersPanelButtons />
       </Portal>
       <Portal>
         <FloatingGalleryButton />
+      </Portal>
+      <Portal>
+        <Console />
       </Portal>
     </Grid>
   );

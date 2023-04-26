@@ -1,7 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { ButtonGroup, Flex, FlexProps, Link, useToast } from '@chakra-ui/react';
+import {
+  ButtonGroup,
+  Flex,
+  FlexProps,
+  FormControl,
+  Link,
+  useToast,
+} from '@chakra-ui/react';
 import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -70,8 +77,8 @@ const currentImageButtonsSelector = createSelector(
     selectedImageSelector,
   ],
   (
-    system: SystemState,
-    gallery: GalleryState,
+    system,
+    gallery,
     postprocessing,
     ui,
     lightbox,
@@ -80,6 +87,8 @@ const currentImageButtonsSelector = createSelector(
   ) => {
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
+
+    const { disabledFeatures } = system;
 
     const { upscalingLevel, facetoolStrength } = postprocessing;
 
@@ -90,6 +99,7 @@ const currentImageButtonsSelector = createSelector(
     const { intermediateImage, currentImage } = gallery;
 
     return {
+      disabledFeatures,
       isProcessing,
       isConnected,
       isGFPGANAvailable,
@@ -134,7 +144,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     activeTabName,
     shouldHidePreview,
     selectedImage,
+    disabledFeatures,
   } = useAppSelector(currentImageButtonsSelector);
+
   const { getUrl, shouldTransformUrls } = useGetUrl();
 
   const toast = useToast();
@@ -151,11 +163,17 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleCopyImage = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage?.url) {
+      return;
+    }
 
-    const blob = await fetch(getUrl(selectedImage.url)).then((res) =>
-      res.blob()
-    );
+    const url = getUrl(selectedImage.url);
+
+    if (!url) {
+      return;
+    }
+
+    const blob = await fetch(url).then((res) => res.blob());
     const data = [new ClipboardItem({ [blob.type]: blob })];
 
     await navigator.clipboard.write(data);
@@ -174,6 +192,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         ? getUrl(selectedImage.url)
         : window.location.toString() + selectedImage.url
       : '';
+
+    if (!url) {
+      return;
+    }
 
     navigator.clipboard.writeText(url).then(() => {
       toast({
@@ -318,24 +340,21 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'Shift+U',
     () => {
-      if (
-        isESRGANAvailable &&
-        !shouldDisableToolbarButtons &&
-        isConnected &&
-        !isProcessing &&
-        upscalingLevel
-      ) {
-        handleClickUpscale();
-      } else {
-        toast({
-          title: t('toast.upscalingFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickUpscale();
+    },
+    {
+      enabled: () =>
+        Boolean(
+          !disabledFeatures.includes('upscaling') &&
+            isESRGANAvailable &&
+            !shouldDisableToolbarButtons &&
+            isConnected &&
+            !isProcessing &&
+            upscalingLevel
+        ),
     },
     [
+      disabledFeatures,
       selectedImage,
       isESRGANAvailable,
       shouldDisableToolbarButtons,
@@ -352,24 +371,22 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'Shift+R',
     () => {
-      if (
-        isGFPGANAvailable &&
-        !shouldDisableToolbarButtons &&
-        isConnected &&
-        !isProcessing &&
-        facetoolStrength
-      ) {
-        handleClickFixFaces();
-      } else {
-        toast({
-          title: t('toast.faceRestoreFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickFixFaces();
     },
+    {
+      enabled: () =>
+        Boolean(
+          !disabledFeatures.includes('faceRestore') &&
+            isGFPGANAvailable &&
+            !shouldDisableToolbarButtons &&
+            isConnected &&
+            !isProcessing &&
+            facetoolStrength
+        ),
+    },
+
     [
+      disabledFeatures,
       selectedImage,
       isGFPGANAvailable,
       shouldDisableToolbarButtons,
@@ -436,6 +453,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         <IAIPopover
           triggerComponent={
             <IAIIconButton
+              isDisabled={!selectedImage}
               aria-label={`${t('parameters.sendTo')}...`}
               icon={<FaShareAlt />}
             />
@@ -477,7 +495,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               {t('parameters.copyImageToLink')}
             </IAIButton>
 
-            <Link download={true} href={getUrl(selectedImage!.url)}>
+            <Link download={true} href={getUrl(selectedImage?.url ?? '')}>
               <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                 {t('parameters.downloadImage')}
               </IAIButton>
@@ -499,21 +517,23 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           isChecked={shouldHidePreview}
           onClick={handlePreviewVisibility}
         />
-        <IAIIconButton
-          icon={<FaExpand />}
-          tooltip={
-            !isLightboxOpen
-              ? `${t('parameters.openInViewer')} (Z)`
-              : `${t('parameters.closeViewer')} (Z)`
-          }
-          aria-label={
-            !isLightboxOpen
-              ? `${t('parameters.openInViewer')} (Z)`
-              : `${t('parameters.closeViewer')} (Z)`
-          }
-          isChecked={isLightboxOpen}
-          onClick={handleLightBox}
-        />
+        {!disabledFeatures.includes('lightbox') && (
+          <IAIIconButton
+            icon={<FaExpand />}
+            tooltip={
+              !isLightboxOpen
+                ? `${t('parameters.openInViewer')} (Z)`
+                : `${t('parameters.closeViewer')} (Z)`
+            }
+            aria-label={
+              !isLightboxOpen
+                ? `${t('parameters.openInViewer')} (Z)`
+                : `${t('parameters.closeViewer')} (Z)`
+            }
+            isChecked={isLightboxOpen}
+            onClick={handleLightBox}
+          />
+        )}
       </ButtonGroup>
 
       <ButtonGroup isAttached={true}>
@@ -546,65 +566,74 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         />
       </ButtonGroup>
 
-      <ButtonGroup isAttached={true}>
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              icon={<FaGrinStars />}
-              aria-label={t('parameters.restoreFaces')}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              rowGap: 4,
-            }}
-          >
-            <FaceRestoreSettings />
-            <IAIButton
-              isDisabled={
-                !isGFPGANAvailable ||
-                !selectedImage ||
-                !(isConnected && !isProcessing) ||
-                !facetoolStrength
+      {!(
+        disabledFeatures.includes('faceRestore') &&
+        disabledFeatures.includes('upscaling')
+      ) && (
+        <ButtonGroup isAttached={true}>
+          {!disabledFeatures.includes('faceRestore') && (
+            <IAIPopover
+              triggerComponent={
+                <IAIIconButton
+                  icon={<FaGrinStars />}
+                  aria-label={t('parameters.restoreFaces')}
+                />
               }
-              onClick={handleClickFixFaces}
             >
-              {t('parameters.restoreFaces')}
-            </IAIButton>
-          </Flex>
-        </IAIPopover>
+              <Flex
+                sx={{
+                  flexDirection: 'column',
+                  rowGap: 4,
+                }}
+              >
+                <FaceRestoreSettings />
+                <IAIButton
+                  isDisabled={
+                    !isGFPGANAvailable ||
+                    !selectedImage ||
+                    !(isConnected && !isProcessing) ||
+                    !facetoolStrength
+                  }
+                  onClick={handleClickFixFaces}
+                >
+                  {t('parameters.restoreFaces')}
+                </IAIButton>
+              </Flex>
+            </IAIPopover>
+          )}
 
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              icon={<FaExpandArrowsAlt />}
-              aria-label={t('parameters.upscale')}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <UpscaleSettings />
-            <IAIButton
-              isDisabled={
-                !isESRGANAvailable ||
-                !selectedImage ||
-                !(isConnected && !isProcessing) ||
-                !upscalingLevel
+          {!disabledFeatures.includes('upscaling') && (
+            <IAIPopover
+              triggerComponent={
+                <IAIIconButton
+                  icon={<FaExpandArrowsAlt />}
+                  aria-label={t('parameters.upscale')}
+                />
               }
-              onClick={handleClickUpscale}
             >
-              {t('parameters.upscaleImage')}
-            </IAIButton>
-          </Flex>
-        </IAIPopover>
-      </ButtonGroup>
+              <Flex
+                sx={{
+                  flexDirection: 'column',
+                  gap: 4,
+                }}
+              >
+                <UpscaleSettings />
+                <IAIButton
+                  isDisabled={
+                    !isESRGANAvailable ||
+                    !selectedImage ||
+                    !(isConnected && !isProcessing) ||
+                    !upscalingLevel
+                  }
+                  onClick={handleClickUpscale}
+                >
+                  {t('parameters.upscaleImage')}
+                </IAIButton>
+              </Flex>
+            </IAIPopover>
+          )}
+        </ButtonGroup>
+      )}
 
       <ButtonGroup isAttached={true}>
         <IAIIconButton

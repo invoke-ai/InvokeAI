@@ -97,7 +97,10 @@
         "statusMergedModels": "Models Merged",
         "pinOptionsPanel": "Pin Options Panel",
         "loading": "Loading",
-        "loadingInvokeAI": "Loading Invoke AI"
+        "loadingInvokeAI": "Loading Invoke AI",
+        "random": "Random",
+        "generate": "Generate",
+        "openInNewTab": "Open in New Tab"
     },
     "gallery": {
         "generations": "Generations",
