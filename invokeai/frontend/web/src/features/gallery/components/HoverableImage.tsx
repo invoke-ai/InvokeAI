@@ -5,6 +5,7 @@ import {
   Image,
   MenuItem,
   MenuList,
+  Text,
   useTheme,
   useToast,
 } from '@chakra-ui/react';
@@ -20,7 +21,14 @@ import {
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { DragEvent, memo, useState } from 'react';
-import { FaCheck, FaTrashAlt } from 'react-icons/fa';
+import {
+  FaCheck,
+  FaExpand,
+  FaLink,
+  FaShare,
+  FaTrash,
+  FaTrashAlt,
+} from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import * as InvokeAI from 'app/invokeai';
@@ -35,6 +43,9 @@ import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useGetUrl } from 'common/util/getUrl';
+import { ExternalLinkIcon } from '@chakra-ui/icons';
+import { BiZoomIn } from 'react-icons/bi';
+import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -177,15 +188,19 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       menuProps={{ size: 'sm', isLazy: true }}
       renderMenu={() => (
         <MenuList>
-          <MenuItem onClickCapture={handleOpenInNewTab}>
+          <MenuItem
+            icon={<ExternalLinkIcon />}
+            onClickCapture={handleOpenInNewTab}
+          >
             {t('common.openInNewTab')}
           </MenuItem>
           {!disabledFeatures.includes('lightbox') && (
-            <MenuItem onClickCapture={handleLightBox}>
+            <MenuItem icon={<FaExpand />} onClickCapture={handleLightBox}>
               {t('parameters.openInViewer')}
             </MenuItem>
           )}
           <MenuItem
+            icon={<IoArrowUndoCircleOutline />}
             onClickCapture={handleUsePrompt}
             isDisabled={image?.metadata?.sd_metadata?.prompt === undefined}
           >
@@ -193,12 +208,21 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           </MenuItem>
 
           <MenuItem
+            icon={<IoArrowUndoCircleOutline />}
             onClickCapture={handleUseSeed}
             isDisabled={image?.metadata?.sd_metadata?.seed === undefined}
           >
             {t('parameters.useSeed')}
           </MenuItem>
           <MenuItem
+            icon={<IoArrowUndoCircleOutline />}
+            onClickCapture={handleUseInitialImage}
+            isDisabled={image?.metadata?.sd_metadata?.type !== 'img2img'}
+          >
+            {t('parameters.useInitImg')}
+          </MenuItem>
+          <MenuItem
+            icon={<IoArrowUndoCircleOutline />}
             onClickCapture={handleUseAllParameters}
             isDisabled={
               !['txt2img', 'img2img'].includes(
@@ -209,21 +233,18 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             {t('parameters.useAll')}
           </MenuItem>
           <MenuItem
-            onClickCapture={handleUseInitialImage}
-            isDisabled={image?.metadata?.sd_metadata?.type !== 'img2img'}
+            icon={<FaShare />}
+            onClickCapture={handleSendToImageToImage}
           >
-            {t('parameters.useInitImg')}
-          </MenuItem>
-          <MenuItem onClickCapture={handleSendToImageToImage}>
             {t('parameters.sendToImg2Img')}
           </MenuItem>
-          <MenuItem onClickCapture={handleSendToCanvas}>
+          <MenuItem icon={<FaShare />} onClickCapture={handleSendToCanvas}>
             {t('parameters.sendToUnifiedCanvas')}
           </MenuItem>
-          <MenuItem data-warning>
-            {/* <DeleteImageModal image={image}>
-              <p>{t('parameters.deleteImage')}</p>
-            </DeleteImageModal> */}
+          <MenuItem icon={<FaTrash />}>
+            <DeleteImageModal image={image}>
+              <Text>{t('parameters.deleteImage')}</Text>
+            </DeleteImageModal>
           </MenuItem>
         </MenuList>
       )}
@@ -302,15 +323,15 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 insetInlineEnd: 1,
               }}
             >
-              {/* <DeleteImageModal image={image}>
+              <DeleteImageModal image={image}>
                 <IAIIconButton
                   aria-label={t('parameters.deleteImage')}
-                  icon={<FaTrashAlt />}
+                  icon={<FaTrash />}
                   size="xs"
                   fontSize={14}
                   isDisabled={!mayDeleteImage}
                 />
-              </DeleteImageModal> */}
+              </DeleteImageModal>
             </Box>
           )}
         </Box>

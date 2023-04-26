@@ -6,8 +6,8 @@ import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash';
 import { isImageOutput } from 'services/types/guards';
-import { imageUploaded } from 'services/thunks/image';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
+import { imageUploaded } from 'services/thunks/image';
 
 export type GalleryCategory = 'user' | 'result';
 

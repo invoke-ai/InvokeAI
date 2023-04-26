@@ -31,6 +31,7 @@ import {
   useRef,
 } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { imageDeleted } from 'services/thunks/image';
 
 const deleteImageModalSelector = createSelector(
   systemSelector,
@@ -52,7 +53,7 @@ interface DeleteImageModalProps {
   /**
    * The image to delete.
    */
-  image?: InvokeAI._Image;
+  image?: InvokeAI.Image;
 }
 
 /**
@@ -77,7 +78,9 @@ const DeleteImageModal = forwardRef(
 
     const handleDelete = () => {
       if (isConnected && !isProcessing && image) {
-        dispatch(deleteImage(image));
+        dispatch(
+          imageDeleted({ imageType: image.type, imageName: image.name })
+        );
       }
       onClose();
     };
