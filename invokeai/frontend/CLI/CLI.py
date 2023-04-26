@@ -196,8 +196,8 @@ def main_loop(gen, opt):
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
     set_default_output_dir(opt, completer)
-    # if gen.model:
-    #     add_embedding_terms(gen, completer)
+    if gen.model:
+        add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length() + 1
 
     # os.pathconf is not available on Windows
@@ -212,7 +212,7 @@ def main_loop(gen, opt):
         operation = "generate"
 
         try:
-            command = get_next_command(infile, gen.model)
+            command = get_next_command(infile, gen.model_name)
         except EOFError:
             done = infile is None or doneAfterInFile
             infile = None
