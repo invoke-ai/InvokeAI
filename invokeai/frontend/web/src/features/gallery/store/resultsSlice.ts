@@ -13,7 +13,11 @@ import {
   extractTimestampFromImageName,
 } from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
-import { imageReceived, thumbnailReceived } from 'services/thunks/image';
+import {
+  imageDeleted,
+  imageReceived,
+  thumbnailReceived,
+} from 'services/thunks/image';
 
 export const resultsAdapter = createEntityAdapter<Image>({
   selectId: (image) => image.name,
@@ -107,6 +111,9 @@ const resultsSlice = createSlice({
       }
     });
 
+    /**
+     * Image Received - FULFILLED
+     */
     builder.addCase(imageReceived.fulfilled, (state, action) => {
       const { imagePath } = action.payload;
       const { imageName } = action.meta.arg;
@@ -119,16 +126,30 @@ const resultsSlice = createSlice({
       });
     });
 
+    /**
+     * Thumbnail Received - FULFILLED
+     */
     builder.addCase(thumbnailReceived.fulfilled, (state, action) => {
       const { thumbnailPath } = action.payload;
-      const { imageName } = action.meta.arg;
+      const { thumbnailName } = action.meta.arg;
 
       resultsAdapter.updateOne(state, {
-        id: imageName,
+        id: thumbnailName,
         changes: {
           thumbnail: thumbnailPath,
         },
       });
+    });
+
+    /**
+     * Delete Image - FULFILLED
+     */
+    builder.addCase(imageDeleted.fulfilled, (state, action) => {
+      const { imageType, imageName } = action.meta.arg;
+
+      if (imageType === 'results') {
+        resultsAdapter.removeOne(state, imageName);
+      }
     });
   },
 });

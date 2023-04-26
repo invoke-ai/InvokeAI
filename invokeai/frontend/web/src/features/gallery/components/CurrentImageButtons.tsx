@@ -643,15 +643,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         />
       </ButtonGroup>
 
-      {/* <DeleteImageModal image={selectedImage}>
+      <DeleteImageModal image={selectedImage}>
         <IAIIconButton
           icon={<FaTrash />}
           tooltip={`${t('parameters.deleteImage')} (Del)`}
           aria-label={`${t('parameters.deleteImage')} (Del)`}
-          isDisabled={!selectedImage || !isConnected || isProcessing}
+          isDisabled={!selectedImage || !isConnected}
           colorScheme="error"
         />
-      </DeleteImageModal> */}
+      </DeleteImageModal>
     </Flex>
   );
 };
