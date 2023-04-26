@@ -18,7 +18,7 @@ import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Loading from 'common/components/Loading/Loading';
 import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
-import { AppConfig } from './invokeai';
+import { PartialAppConfig } from './invokeai';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -26,7 +26,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 keepGUIAlive();
 
 interface Props extends PropsWithChildren {
-  config?: Partial<AppConfig>;
+  config?: PartialAppConfig;
 }
 
 const App = ({ config = {}, children }: Props) => {
