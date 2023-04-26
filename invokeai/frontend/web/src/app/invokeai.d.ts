@@ -17,6 +17,7 @@ import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { ImageMetadata, ImageType } from 'services/api';
 import { AnyInvocation } from 'services/events/types';
+import { O } from 'ts-toolbelt';
 
 /**
  * TODO:
@@ -425,3 +426,5 @@ export declare type AppConfig = {
     };
   };
 };
+
+export declare type PartialAppConfig = O.Partial<AppConfig, 'deep'>;

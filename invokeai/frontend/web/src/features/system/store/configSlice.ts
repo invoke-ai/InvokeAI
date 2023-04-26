@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { AppConfig } from 'app/invokeai';
-import { cloneDeep, defaultsDeep } from 'lodash';
+import { AppConfig, PartialAppConfig } from 'app/invokeai';
+import { merge } from 'lodash';
 
 const initialConfigState: AppConfig = {
   shouldTransformUrls: false,
@@ -64,8 +64,8 @@ export const configSlice = createSlice({
   name: 'config',
   initialState: initialConfigState,
   reducers: {
-    configChanged: (state, action: PayloadAction<Partial<AppConfig>>) => {
-      defaultsDeep(state, cloneDeep(action.payload));
+    configChanged: (state, action: PayloadAction<PartialAppConfig>) => {
+      merge(state, action.payload);
     },
   },
 });

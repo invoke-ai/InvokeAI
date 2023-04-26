@@ -16,7 +16,7 @@ import '@fontsource/inter/900.css';
 
 import Loading from './common/components/Loading/Loading';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { AppConfig } from 'app/invokeai';
+import { PartialAppConfig } from 'app/invokeai';
 
 import './i18n';
 
@@ -26,7 +26,7 @@ const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
 interface Props extends PropsWithChildren {
   apiUrl?: string;
   token?: string;
-  config?: Partial<AppConfig>;
+  config?: PartialAppConfig;
 }
 
 export default function Component({ apiUrl, token, config, children }: Props) {
