@@ -195,7 +195,7 @@ def main_loop(gen, opt):
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
     set_default_output_dir(opt, completer)
-    if gen.model:
+    if gen.model and isinstance(gen, Pytorch):
         add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length() + 1
 

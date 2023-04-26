@@ -29,8 +29,8 @@ class ONNX(inferencePipeline) :
         num_images=1,
         steps=50,
     ):
-        self.height = None
-        self.width = None
+        self.height = 512
+        self.width = 512
         self.iterations = 1
         self.steps = 50
         self.sampler_name = sampler_name
@@ -75,7 +75,6 @@ class ONNX(inferencePipeline) :
             if precision == "cpu":
                 onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="CPUExecutionProvider")
             else:
-                print(f"Model used: {model}")
                 onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="OpenVINOExecutionProvider")
 
             image = onnx_pipe(prompt, height=height, width=width, num_images_per_prompt=iterations, num_inference_steps=steps).images[0]
