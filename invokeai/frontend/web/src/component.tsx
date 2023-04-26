@@ -20,7 +20,7 @@ import Loading from './common/components/Loading/Loading';
 // Localization
 import './i18n';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { ApplicationFeature } from 'features/system/store/systemSlice';
+import { ApplicationFeature } from 'app/invokeai';
 
 const App = lazy(() => import('./app/App'));
 const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));

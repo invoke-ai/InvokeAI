@@ -21,11 +21,11 @@ import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
 import { motion, AnimatePresence } from 'framer-motion';
 import Loading from 'common/components/Loading/Loading';
 import {
-  ApplicationFeature,
   disabledFeaturesChanged,
   disabledTabsChanged,
 } from 'features/system/store/systemSlice';
 import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
+import { ApplicationFeature } from './invokeai';
 
 keepGUIAlive();
 

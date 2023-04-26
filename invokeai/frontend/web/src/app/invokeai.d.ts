@@ -18,6 +18,19 @@ import { ImageMetadata, ImageType } from 'services/api';
 import { AnyInvocation } from 'services/events/types';
 
 /**
+ * A disable-able application feature
+ */
+export declare type ApplicationFeature =
+  | 'faceRestore'
+  | 'upscaling'
+  | 'lightbox'
+  | 'modelManager'
+  | 'githubLink'
+  | 'discordLink'
+  | 'bugLink'
+  | 'localization';
+
+/**
  * TODO:
  * Once an image has been generated, if it is postprocessed again,
  * additional postprocessing steps are added to its postprocessing

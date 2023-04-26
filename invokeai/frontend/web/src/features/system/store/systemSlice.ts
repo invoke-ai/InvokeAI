@@ -35,19 +35,6 @@ export interface Log {
   [index: number]: LogEntry;
 }
 
-/**
- * A disable-able application feature
- */
-export type ApplicationFeature =
-  | 'faceRestore'
-  | 'upscaling'
-  | 'lightbox'
-  | 'modelManager'
-  | 'githubLink'
-  | 'discordLink'
-  | 'bugLink'
-  | 'localization';
-
 export type InProgressImageType = 'none' | 'full-res' | 'latents';
 
 export type CancelType = 'immediate' | 'scheduled';
@@ -114,7 +101,7 @@ export interface SystemState
   /**
    * Array of disabled features
    */
-  disabledFeatures: ApplicationFeature[];
+  disabledFeatures: InvokeAI.ApplicationFeature[];
   /**
    * Whether or not the available models were received
    */
@@ -389,7 +376,7 @@ export const systemSlice = createSlice({
      */
     disabledFeaturesChanged: (
       state,
-      action: PayloadAction<ApplicationFeature[]>
+      action: PayloadAction<InvokeAI.ApplicationFeature[]>
     ) => {
       state.disabledFeatures = action.payload;
     },
