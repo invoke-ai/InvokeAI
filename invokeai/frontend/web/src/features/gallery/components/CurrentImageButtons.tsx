@@ -337,12 +337,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     },
     {
       enabled: () =>
-        disabledFeatures.includes('upscaling') ||
-        !isESRGANAvailable ||
-        shouldDisableToolbarButtons ||
-        !isConnected ||
-        isProcessing ||
-        !upscalingLevel,
+        Boolean(
+          !disabledFeatures.includes('upscaling') &&
+            isESRGANAvailable &&
+            !shouldDisableToolbarButtons &&
+            isConnected &&
+            !isProcessing &&
+            upscalingLevel
+        ),
     },
     [
       disabledFeatures,
@@ -366,12 +368,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     },
     {
       enabled: () =>
-        disabledFeatures.includes('faceRestore') ||
-        !isGFPGANAvailable ||
-        shouldDisableToolbarButtons ||
-        !isConnected ||
-        isProcessing ||
-        !facetoolStrength,
+        Boolean(
+          !disabledFeatures.includes('faceRestore') &&
+            isGFPGANAvailable &&
+            !shouldDisableToolbarButtons &&
+            isConnected &&
+            !isProcessing &&
+            facetoolStrength
+        ),
     },
 
     [
