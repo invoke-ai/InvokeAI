@@ -105,9 +105,6 @@ was left off in the case of an interruption. This checkbox will be
 automatically selected if you provide a previously used trigger term
 and at least one checkpoint file is found on disk.
 
-Note that as of 20 January 2023, resume does not seem to be working
-properly due to an issue with the upstream code.
-
 ### Data Training Directory
 
 This is the location of the images to be used for training. When you
