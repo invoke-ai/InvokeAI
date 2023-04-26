@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { configSelector } from 'features/system/store/configSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   activeTabNameSelector,
@@ -68,8 +69,14 @@ export const imageGallerySelector = createSelector(
 );
 
 export const hoverableImageSelector = createSelector(
-  [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
-  (gallery, system, lightbox, activeTabName) => {
+  [
+    gallerySelector,
+    systemSelector,
+    configSelector,
+    lightboxSelector,
+    activeTabNameSelector,
+  ],
+  (gallery, system, config, lightbox, activeTabName) => {
     return {
       mayDeleteImage: system.isConnected && !system.isProcessing,
       galleryImageObjectFit: gallery.galleryImageObjectFit,
@@ -77,7 +84,7 @@ export const hoverableImageSelector = createSelector(
       shouldUseSingleGalleryColumn: gallery.shouldUseSingleGalleryColumn,
       activeTabName,
       isLightboxOpen: lightbox.isLightboxOpen,
-      disabledFeatures: system.disabledFeatures,
+      disabledFeatures: config.disabledFeatures,
     };
   },
   {

@@ -1,46 +1,73 @@
-import { RootState } from 'app/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setImg2imgStrength } from 'features/parameters/store/generationSlice';
+import { configSelector } from 'features/system/store/configSelectors';
+import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-interface ImageToImageStrengthProps {
-  label?: string;
-}
+const selector = createSelector(
+  [generationSelector, hotkeysSelector, configSelector],
+  (generation, hotkeys, config) => {
+    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
+      config.sd.img2imgStrength;
+    const { img2imgStrength, isImageToImageEnabled } = generation;
 
-export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
-  const { t } = useTranslation();
-  const { label = `${t('parameters.strength')}` } = props;
-  const img2imgStrength = useAppSelector(
-    (state: RootState) => state.generation.img2imgStrength
-  );
-  const isImageToImageEnabled = useAppSelector(
-    (state: RootState) => state.generation.isImageToImageEnabled
-  );
+    const step = hotkeys.shift ? fineStep : coarseStep;
 
+    return {
+      img2imgStrength,
+      isImageToImageEnabled,
+      initial,
+      min,
+      sliderMax,
+      inputMax,
+      step,
+    };
+  }
+);
+
+const ImageToImageStrength = () => {
+  const {
+    img2imgStrength,
+    isImageToImageEnabled,
+    initial,
+    min,
+    sliderMax,
+    inputMax,
+    step,
+  } = useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
-  const handleChangeStrength = (v: number) => dispatch(setImg2imgStrength(v));
+  const handleChange = useCallback(
+    (v: number) => dispatch(setImg2imgStrength(v)),
+    [dispatch]
+  );
 
-  const handleImg2ImgStrengthReset = () => {
-    dispatch(setImg2imgStrength(0.75));
-  };
+  const handleReset = useCallback(() => {
+    dispatch(setImg2imgStrength(initial));
+  }, [dispatch, initial]);
 
   return (
     <IAISlider
-      label={label}
-      step={0.01}
-      min={0.01}
-      max={1}
-      onChange={handleChangeStrength}
+      label={`${t('parameters.strength')}`}
+      step={step}
+      min={min}
+      max={sliderMax}
+      onChange={handleChange}
+      handleReset={handleReset}
       value={img2imgStrength}
       isInteger={false}
       withInput
       withSliderMarks
-      inputWidth={22}
       withReset
-      handleReset={handleImg2ImgStrengthReset}
       isDisabled={!isImageToImageEnabled}
+      sliderNumberInputProps={{ max: inputMax }}
     />
   );
-}
+};
+
+export default memo(ImageToImageStrength);

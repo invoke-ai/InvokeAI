@@ -15,62 +15,39 @@ import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from './storeHooks';
 import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
-import { InvokeTabName } from 'features/ui/store/tabMap';
-import { shouldTransformUrlsChanged } from 'features/system/store/systemSlice';
-import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
 import { motion, AnimatePresence } from 'framer-motion';
 import Loading from 'common/components/Loading/Loading';
-import {
-  disabledFeaturesChanged,
-  disabledTabsChanged,
-} from 'features/system/store/systemSlice';
 import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
-import { ApplicationFeature } from './invokeai';
+import { AppConfig } from './invokeai';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { configChanged } from 'features/system/store/configSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 keepGUIAlive();
 
 interface Props extends PropsWithChildren {
-  options: {
-    disabledTabs: InvokeTabName[];
-    disabledFeatures: ApplicationFeature[];
-    shouldTransformUrls?: boolean;
-    shouldFetchImages: boolean;
-  };
+  config?: Partial<AppConfig>;
 }
 
-const App = (props: Props) => {
+const App = ({ config = {}, children }: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
-  const disabledFeatures = useAppSelector(
-    (state) => state.system.disabledFeatures
-  );
+
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
   const isApplicationReady = useIsApplicationReady();
+
   const [loadingOverridden, setLoadingOverridden] = useState(false);
 
   const { setColorMode } = useColorMode();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    dispatch(disabledFeaturesChanged(props.options.disabledFeatures));
-  }, [dispatch, props.options.disabledFeatures]);
-
-  useEffect(() => {
-    dispatch(disabledTabsChanged(props.options.disabledTabs));
-  }, [dispatch, props.options.disabledTabs]);
-
-  useEffect(() => {
-    dispatch(
-      shouldTransformUrlsChanged(Boolean(props.options.shouldTransformUrls))
-    );
-  }, [dispatch, props.options.shouldTransformUrls]);
-
-  useEffect(() => {
-    dispatch(setShouldFetchImages(props.options.shouldFetchImages));
-  }, [dispatch, props.options.shouldFetchImages]);
+    console.log('Received config: ', config);
+    dispatch(configChanged(config));
+  }, [dispatch, config]);
 
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
@@ -82,7 +59,7 @@ const App = (props: Props) => {
 
   return (
     <Grid w="100vw" h="100vh" position="relative">
-      {!disabledFeatures.includes('lightbox') && <Lightbox />}
+      {isLightboxEnabled && <Lightbox />}
       <ImageUploader>
         <ProgressBar />
         <Grid
@@ -92,7 +69,7 @@ const App = (props: Props) => {
           w={APP_WIDTH}
           h={APP_HEIGHT}
         >
-          {props.children || <SiteHeader />}
+          {children || <SiteHeader />}
           <Flex
             gap={4}
             w={{ base: '100vw', xl: 'full' }}

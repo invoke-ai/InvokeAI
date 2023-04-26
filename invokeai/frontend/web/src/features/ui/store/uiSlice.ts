@@ -19,8 +19,6 @@ const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   openLinearAccordionItems: [],
-  disabledParameterPanels: [],
-  disabledTabs: [],
   openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
 };
