@@ -1,9 +1,9 @@
 import { SystemState } from './systemSlice';
 
 /**
- * System slice persist blacklist
+ * System slice persist denylist
  */
-const itemsToBlacklist: (keyof SystemState)[] = [
+const itemsToDenylist: (keyof SystemState)[] = [
   'currentIteration',
   'currentStatus',
   'currentStep',
@@ -23,6 +23,6 @@ const itemsToBlacklist: (keyof SystemState)[] = [
   'wasSchemaParsed',
 ];
 
-export const systemBlacklist = itemsToBlacklist.map(
-  (blacklistItem) => `system.${blacklistItem}`
+export const systemDenylist = itemsToDenylist.map(
+  (denylistItem) => `system.${denylistItem}`
 );
