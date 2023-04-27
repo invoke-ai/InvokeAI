@@ -68,32 +68,6 @@ export const imageGallerySelector = createSelector(
   }
 );
 
-export const hoverableImageSelector = createSelector(
-  [
-    gallerySelector,
-    systemSelector,
-    configSelector,
-    lightboxSelector,
-    activeTabNameSelector,
-  ],
-  (gallery, system, config, lightbox, activeTabName) => {
-    return {
-      mayDeleteImage: system.isConnected && !system.isProcessing,
-      galleryImageObjectFit: gallery.galleryImageObjectFit,
-      galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
-      shouldUseSingleGalleryColumn: gallery.shouldUseSingleGalleryColumn,
-      activeTabName,
-      isLightboxOpen: lightbox.isLightboxOpen,
-      disabledFeatures: config.disabledFeatures,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
 export const selectedImageSelector = createSelector(
   [gallerySelector, selectResultsEntities, selectUploadsEntities],
   (gallery, allResults, allUploads) => {
