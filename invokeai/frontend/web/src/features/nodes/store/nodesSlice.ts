@@ -82,10 +82,19 @@ const nodesSlice = createSlice({
     shouldShowGraphOverlayChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGraphOverlay = action.payload;
     },
+    parsedOpenAPISchema: (state, action: PayloadAction<OpenAPIV3.Document>) => {
+      try {
+        const parsedSchema = parseSchema(action.payload);
+        console.debug('Parsed schema: ', parsedSchema);
+        state.invocationTemplates = parsedSchema;
+      } catch (err) {
+        console.error(err);
+      }
+    },
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
-      state.invocationTemplates = action.payload;
+      state.schema = action.payload;
     });
 
     builder.addMatcher(isFulfilledAnyGraphBuilt, (state, action) => {
@@ -103,6 +112,7 @@ export const {
   connectionStarted,
   connectionEnded,
   shouldShowGraphOverlayChanged,
+  parsedOpenAPISchema,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
