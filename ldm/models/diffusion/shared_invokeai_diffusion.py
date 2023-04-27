@@ -5,7 +5,6 @@ from typing import Callable, Optional, Union, Any
 
 import numpy as np
 import torch
-
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
