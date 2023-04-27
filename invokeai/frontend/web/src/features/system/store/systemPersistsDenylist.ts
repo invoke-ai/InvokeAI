@@ -17,7 +17,7 @@ const itemsToDenylist: (keyof SystemState)[] = [
   'totalSteps',
   'openModel',
   'isCancelScheduled',
-  'sessionId',
+  // 'sessionId',
   'progressImage',
   'wereModelsReceived',
   'wasSchemaParsed',

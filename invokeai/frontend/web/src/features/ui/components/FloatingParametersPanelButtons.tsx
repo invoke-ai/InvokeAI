@@ -11,6 +11,7 @@ import {
 } from 'features/ui/store/uiSelectors';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FaSlidersH } from 'react-icons/fa';
@@ -94,4 +95,4 @@ const FloatingParametersPanelButtons = () => {
   ) : null;
 };
 
-export default FloatingParametersPanelButtons;
+export default memo(FloatingParametersPanelButtons);

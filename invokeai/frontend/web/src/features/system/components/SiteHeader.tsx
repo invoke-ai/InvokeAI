@@ -1,5 +1,5 @@
 import { Flex, Grid } from '@chakra-ui/react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import ModelSelect from './ModelSelect';
 import StatusIndicator from './StatusIndicator';
 
@@ -65,5 +65,4 @@ const SiteHeader = () => {
   );
 };
 
-SiteHeader.displayName = 'SiteHeader';
-export default SiteHeader;
+export default memo(SiteHeader);
