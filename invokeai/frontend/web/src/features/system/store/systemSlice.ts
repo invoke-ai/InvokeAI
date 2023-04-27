@@ -498,6 +498,7 @@ export const systemSlice = createSlice({
       state.wasErrorSeen = true;
       state.progressImage = null;
       state.isProcessing = false;
+      state.currentStatus = i18n.t('common.statusError');
 
       state.toastQueue.push(
         makeToast({ title: i18n.t('toast.serverError'), status: 'error' })

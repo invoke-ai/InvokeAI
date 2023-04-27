@@ -9,6 +9,7 @@ const initialConfigState: AppConfig = {
   disabledTabs: [],
   disabledFeatures: [],
   canRestoreDeletedImagesFromBin: true,
+  displayToasts: true,
   sd: {
     iterations: {
       initial: 1,

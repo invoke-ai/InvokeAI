@@ -30,7 +30,6 @@ interface Props extends PropsWithChildren {
 }
 
 const App = ({ config = {}, children }: Props) => {
-  useToastWatcher();
   useGlobalHotkeys();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
@@ -56,6 +55,8 @@ const App = ({ config = {}, children }: Props) => {
   const handleOverrideClicked = useCallback(() => {
     setLoadingOverridden(true);
   }, []);
+
+  useToastWatcher(config);
 
   return (
     <Grid w="100vw" h="100vh" position="relative">
