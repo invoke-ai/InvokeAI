@@ -114,6 +114,7 @@ export const store = configureStore({
       'canvas/setBoundingBoxDimensions',
       'canvas/setIsDrawing',
       'canvas/addPointToCurrentLine',
+      'socket/generatorProgress',
     ],
   },
 });

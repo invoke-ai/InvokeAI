@@ -32,6 +32,7 @@ import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { isImageOutput } from 'services/types/guards';
 import { imageReceived, thumbnailReceived } from 'services/thunks/image';
+import { setEventListeners } from './util/setEventListeners';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -66,25 +67,25 @@ export const socketMiddleware = () => {
     (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
       const { dispatch, getState } = store;
 
-      // Nothing dispatches `socketReset` actions yet, so this is a noop, but including anyways
-      if (socketReset.match(action)) {
-        const { sessionId } = getState().system;
+      // Nothing dispatches `socketReset` actions yet
+      // if (socketReset.match(action)) {
+      //   const { sessionId } = getState().system;
 
-        if (sessionId) {
-          socket.emit('unsubscribe', { session: sessionId });
-          dispatch(
-            socketUnsubscribed({ sessionId, timestamp: getTimestamp() })
-          );
-        }
+      //   if (sessionId) {
+      //     socket.emit('unsubscribe', { session: sessionId });
+      //     dispatch(
+      //       socketUnsubscribed({ sessionId, timestamp: getTimestamp() })
+      //     );
+      //   }
 
-        if (socket.connected) {
-          socket.disconnect();
-          dispatch(socketDisconnected({ timestamp: getTimestamp() }));
-        }
+      //   if (socket.connected) {
+      //     socket.disconnect();
+      //     dispatch(socketDisconnected({ timestamp: getTimestamp() }));
+      //   }
 
-        socket.removeAllListeners();
-        areListenersSet = false;
-      }
+      //   socket.removeAllListeners();
+      //   areListenersSet = false;
+      // }
 
       // Set listeners for `connect` and `disconnect` events once
       // Must happen in middleware to get access to `dispatch`
@@ -92,7 +93,8 @@ export const socketMiddleware = () => {
         socket.on('connect', () => {
           dispatch(socketConnected({ timestamp: getTimestamp() }));
 
-          const { results, uploads, models, nodes, config } = getState();
+          const { results, uploads, models, nodes, config, system } =
+            getState();
 
           const { disabledTabs } = config;
 
@@ -112,6 +114,18 @@ export const socketMiddleware = () => {
           if (!nodes.schema && !disabledTabs.includes('nodes')) {
             dispatch(receivedOpenAPISchema());
           }
+
+          if (system.sessionId) {
+            console.log(`Re-subscribing to session ${system.sessionId}`);
+            socket.emit('subscribe', { session: system.sessionId });
+            dispatch(
+              socketSubscribed({
+                sessionId: system.sessionId,
+                timestamp: getTimestamp(),
+              })
+            );
+            setEventListeners({ socket, store });
+          }
         });
 
         socket.on('disconnect', () => {
@@ -127,9 +141,6 @@ export const socketMiddleware = () => {
       // Everything else only happens once we have created a session
       if (isFulfilledSessionCreatedAction(action)) {
         const oldSessionId = getState().system.sessionId;
-
-        // temp disable event subscription
-        const shouldHandleEvent = (id: string): boolean => true;
 
         // const subscribedNodeIds = getState().system.subscribedNodeIds;
         // const shouldHandleEvent = (id: string): boolean => {
@@ -152,7 +163,6 @@ export const socketMiddleware = () => {
               timestamp: getTimestamp(),
             })
           );
-
           const listenersToRemove: (keyof ServerToClientEvents)[] = [
             'invocation_started',
             'generator_progress',
@@ -168,57 +178,14 @@ export const socketMiddleware = () => {
 
         const sessionId = action.payload.id;
 
-        // After a session is created, we immediately subscribe to events and then invoke the session
         socket.emit('subscribe', { session: sessionId });
-
-        // Always dispatch the event actions for other consumers who want to know when we subscribed
         dispatch(
           socketSubscribed({
-            sessionId,
+            sessionId: sessionId,
             timestamp: getTimestamp(),
           })
         );
-
-        // Set up listeners for the present subscription
-        socket.on('invocation_started', (data) => {
-          if (shouldHandleEvent(data.node.id)) {
-            dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
-          }
-        });
-
-        socket.on('generator_progress', (data) => {
-          if (shouldHandleEvent(data.node.id)) {
-            dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
-          }
-        });
-
-        socket.on('invocation_error', (data) => {
-          if (shouldHandleEvent(data.node.id)) {
-            dispatch(invocationError({ data, timestamp: getTimestamp() }));
-          }
-        });
-
-        socket.on('invocation_complete', (data) => {
-          if (shouldHandleEvent(data.node.id)) {
-            const sessionId = data.graph_execution_state_id;
-
-            const { cancelType, isCancelScheduled } = getState().system;
-            const { shouldFetchImages } = getState().config;
-
-            // Handle scheduled cancelation
-            if (cancelType === 'scheduled' && isCancelScheduled) {
-              dispatch(sessionCanceled({ sessionId }));
-            }
-
-            dispatch(
-              invocationComplete({
-                data,
-                timestamp: getTimestamp(),
-                shouldFetchImages,
-              })
-            );
-          }
-        });
+        setEventListeners({ socket, store });
 
         // Finally we actually invoke the session, starting processing
         dispatch(sessionInvoked({ sessionId }));
