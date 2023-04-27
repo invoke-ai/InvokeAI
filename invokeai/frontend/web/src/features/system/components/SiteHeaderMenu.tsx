@@ -8,14 +8,18 @@ import ModelManagerModal from './ModelManager/ModelManagerModal';
 import SettingsModal from './SettingsModal/SettingsModal';
 import ThemeChanger from './ThemeChanger';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
+import { useFeatureStatus } from '../hooks/useFeatureStatus';
 
 const SiteHeaderMenu = () => {
-  const disabledFeatures = useAppSelector(
-    (state: RootState) => state.system.disabledFeatures
-  );
   const { t } = useTranslation();
+
+  const isModelManagerEnabled =
+    useFeatureStatus('modelManager').isFeatureEnabled;
+  const isLocalizationEnabled =
+    useFeatureStatus('localization').isFeatureEnabled;
+  const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
+  const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;
+  const isGithubLinkEnabled = useFeatureStatus('githubLink').isFeatureEnabled;
 
   return (
     <Flex
@@ -23,7 +27,7 @@ const SiteHeaderMenu = () => {
       flexDirection={{ base: 'column', xl: 'row' }}
       gap={{ base: 4, xl: 1 }}
     >
-      {!disabledFeatures.includes('modelManager') && (
+      {isModelManagerEnabled && (
         <ModelManagerModal>
           <IAIIconButton
             aria-label={t('modelManager.modelManager')}
@@ -51,9 +55,9 @@ const SiteHeaderMenu = () => {
 
       <ThemeChanger />
 
-      {!disabledFeatures.includes('localization') && <LanguagePicker />}
+      {isLocalizationEnabled && <LanguagePicker />}
 
-      {!disabledFeatures.includes('bugLink') && (
+      {isBugLinkEnabled && (
         <Link
           isExternal
           href="http://github.com/invoke-ai/InvokeAI/issues"
@@ -71,7 +75,7 @@ const SiteHeaderMenu = () => {
         </Link>
       )}
 
-      {!disabledFeatures.includes('githubLink') && (
+      {isGithubLinkEnabled && (
         <Link
           isExternal
           href="http://github.com/invoke-ai/InvokeAI"
@@ -89,7 +93,7 @@ const SiteHeaderMenu = () => {
         </Link>
       )}
 
-      {!disabledFeatures.includes('discordLink') && (
+      {isDiscordLinkEnabled && (
         <Link
           isExternal
           href="https://discord.gg/ZmtBAhwWhy"

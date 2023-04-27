@@ -1,36 +1,57 @@
-import { Box, BoxProps } from '@chakra-ui/react';
-import { RootState } from 'app/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setWidth } from 'features/parameters/store/generationSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
+import { configSelector } from 'features/system/store/configSelectors';
+import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const WidthSlider = (props: BoxProps) => {
-  const width = useAppSelector((state: RootState) => state.generation.width);
-  const shift = useAppSelector((state: RootState) => state.hotkeys.shift);
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const { t } = useTranslation();
+const selector = createSelector(
+  [generationSelector, hotkeysSelector, configSelector],
+  (generation, hotkeys, config) => {
+    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
+      config.sd.width;
+    const { width } = generation;
+
+    const step = hotkeys.shift ? fineStep : coarseStep;
+
+    return { width, initial, min, sliderMax, inputMax, step };
+  }
+);
+
+const WidthSlider = () => {
+  const { width, initial, min, sliderMax, inputMax, step } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
+  const handleChange = useCallback(
+    (v: number) => {
+      dispatch(setWidth(v));
+    },
+    [dispatch]
+  );
+
+  const handleReset = useCallback(() => {
+    dispatch(setWidth(initial));
+  }, [dispatch, initial]);
 
   return (
-    <Box {...props}>
-      <IAISlider
-        isDisabled={activeTabName === 'unifiedCanvas'}
-        label={t('parameters.width')}
-        value={width}
-        min={64}
-        step={shift ? 8 : 64}
-        max={2048}
-        onChange={(v) => dispatch(setWidth(v))}
-        handleReset={() => dispatch(setWidth(512))}
-        withInput
-        withReset
-        withSliderMarks
-        sliderNumberInputProps={{ max: 15360 }}
-      />
-    </Box>
+    <IAISlider
+      label={t('parameters.width')}
+      value={width}
+      min={min}
+      step={step}
+      max={sliderMax}
+      onChange={handleChange}
+      handleReset={handleReset}
+      withInput
+      withReset
+      withSliderMarks
+      sliderNumberInputProps={{ max: inputMax }}
+    />
   );
 };
 

@@ -40,8 +40,8 @@ const ImageToImageOverlay = ({
       <Flex
         sx={{
           position: 'absolute',
-          bottom: 0,
-          left: 0,
+          top: 0,
+          right: 0,
           p: 2,
           alignItems: 'flex-start',
         }}

@@ -1,53 +1,87 @@
-import { RootState } from 'app/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import {
   clampSymmetrySteps,
   setSteps,
 } from 'features/parameters/store/generationSlice';
+import { configSelector } from 'features/system/store/configSelectors';
+import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function MainSteps() {
+const selector = createSelector(
+  [generationSelector, configSelector, uiSelector, hotkeysSelector],
+  (generation, config, ui, hotkeys) => {
+    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
+      config.sd.steps;
+    const { steps } = generation;
+    const { shouldUseSliders } = ui;
+
+    const step = hotkeys.shift ? fineStep : coarseStep;
+
+    return {
+      steps,
+      initial,
+      min,
+      sliderMax,
+      inputMax,
+      step,
+      shouldUseSliders,
+    };
+  }
+);
+
+const MainSteps = () => {
+  const { steps, initial, min, sliderMax, inputMax, step, shouldUseSliders } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
-  const steps = useAppSelector((state: RootState) => state.generation.steps);
-  const shouldUseSliders = useAppSelector(
-    (state: RootState) => state.ui.shouldUseSliders
-  );
   const { t } = useTranslation();
 
-  const handleChangeSteps = (v: number) => {
-    dispatch(setSteps(v));
-  };
+  const handleChange = useCallback(
+    (v: number) => {
+      dispatch(setSteps(v));
+    },
+    [dispatch]
+  );
+  const handleReset = useCallback(() => {
+    dispatch(setSteps(initial));
+  }, [dispatch, initial]);
 
-  const handleBlur = () => {
+  const handleBlur = useCallback(() => {
     dispatch(clampSymmetrySteps());
-  };
+  }, [dispatch]);
 
   return shouldUseSliders ? (
     <IAISlider
       label={t('parameters.steps')}
-      min={1}
-      step={1}
-      onChange={handleChangeSteps}
-      handleReset={() => dispatch(setSteps(20))}
+      min={min}
+      max={sliderMax}
+      step={step}
+      onChange={handleChange}
+      handleReset={handleReset}
       value={steps}
       withInput
       withReset
       withSliderMarks
-      sliderNumberInputProps={{ max: 9999 }}
+      sliderNumberInputProps={{ max: inputMax }}
     />
   ) : (
     <IAINumberInput
       label={t('parameters.steps')}
-      min={1}
-      max={9999}
-      step={1}
-      onChange={handleChangeSteps}
+      min={min}
+      max={inputMax}
+      step={step}
+      onChange={handleChange}
       value={steps}
       numberInputFieldProps={{ textAlign: 'center' }}
       onBlur={handleBlur}
     />
   );
-}
+};
+
+export default memo(MainSteps);

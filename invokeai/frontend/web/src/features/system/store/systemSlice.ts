@@ -90,18 +90,18 @@ export interface SystemState
    * Array of node IDs that we want to handle when events received
    */
   subscribedNodeIds: string[];
-  /**
-   * Whether or not URLs should be transformed to use a different host
-   */
-  shouldTransformUrls: boolean;
-  /**
-   * Array of disabled tabs
-   */
-  disabledTabs: InvokeTabName[];
-  /**
-   * Array of disabled features
-   */
-  disabledFeatures: InvokeAI.ApplicationFeature[];
+  // /**
+  //  * Whether or not URLs should be transformed to use a different host
+  //  */
+  // shouldTransformUrls: boolean;
+  // /**
+  //  * Array of disabled tabs
+  //  */
+  // disabledTabs: InvokeTabName[];
+  // /**
+  //  * Array of disabled features
+  //  */
+  // disabledFeatures: InvokeAI.AppFeature[];
   /**
    * Whether or not the available models were received
    */
@@ -157,9 +157,9 @@ const initialSystemState: SystemState = {
   cancelType: 'immediate',
   isCancelScheduled: false,
   subscribedNodeIds: [],
-  shouldTransformUrls: false,
-  disabledTabs: [],
-  disabledFeatures: [],
+  // shouldTransformUrls: false,
+  // disabledTabs: [],
+  // disabledFeatures: [],
   wereModelsReceived: false,
   wasSchemaParsed: false,
 };
@@ -359,27 +359,27 @@ export const systemSlice = createSlice({
     subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
       state.subscribedNodeIds = action.payload;
     },
-    /**
-     * `shouldTransformUrls` was changed
-     */
-    shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldTransformUrls = action.payload;
-    },
-    /**
-     * `disabledTabs` was changed
-     */
-    disabledTabsChanged: (state, action: PayloadAction<InvokeTabName[]>) => {
-      state.disabledTabs = action.payload;
-    },
-    /**
-     * `disabledFeatures` was changed
-     */
-    disabledFeaturesChanged: (
-      state,
-      action: PayloadAction<InvokeAI.ApplicationFeature[]>
-    ) => {
-      state.disabledFeatures = action.payload;
-    },
+    // /**
+    //  * `shouldTransformUrls` was changed
+    //  */
+    // shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
+    //   state.shouldTransformUrls = action.payload;
+    // },
+    // /**
+    //  * `disabledTabs` was changed
+    //  */
+    // disabledTabsChanged: (state, action: PayloadAction<InvokeTabName[]>) => {
+    //   state.disabledTabs = action.payload;
+    // },
+    // /**
+    //  * `disabledFeatures` was changed
+    //  */
+    // disabledFeaturesChanged: (
+    //   state,
+    //   action: PayloadAction<InvokeAI.AppFeature[]>
+    // ) => {
+    //   state.disabledFeatures = action.payload;
+    // },
   },
   extraReducers(builder) {
     /**
@@ -409,9 +409,6 @@ export const systemSlice = createSlice({
         message: `Connected to server`,
         level: 'info',
       });
-      state.toastQueue.push(
-        makeToast({ title: i18n.t('toast.connected'), status: 'success' })
-      );
     });
 
     /**
@@ -427,9 +424,6 @@ export const systemSlice = createSlice({
         message: `Disconnected from server`,
         level: 'error',
       });
-      state.toastQueue.push(
-        makeToast({ title: i18n.t('toast.disconnected'), status: 'error' })
-      );
     });
 
     /**
@@ -601,9 +595,9 @@ export const {
   scheduledCancelAborted,
   cancelTypeChanged,
   subscribedNodeIdsSet,
-  shouldTransformUrlsChanged,
-  disabledTabsChanged,
-  disabledFeaturesChanged,
+  // shouldTransformUrlsChanged,
+  // disabledTabsChanged,
+  // disabledFeaturesChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

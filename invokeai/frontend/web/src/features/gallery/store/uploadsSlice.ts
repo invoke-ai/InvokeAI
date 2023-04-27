@@ -6,7 +6,7 @@ import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { imageUploaded } from 'services/thunks/image';
+import { imageDeleted, imageUploaded } from 'services/thunks/image';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
 export const uploadsAdapter = createEntityAdapter<Image>({
@@ -70,6 +70,17 @@ const uploadsSlice = createSlice({
       const uploadedImage = deserializeImageResponse(response);
 
       uploadsAdapter.addOne(state, uploadedImage);
+    });
+
+    /**
+     * Delete Image - FULFILLED
+     */
+    builder.addCase(imageDeleted.fulfilled, (state, action) => {
+      const { imageType, imageName } = action.meta.arg;
+
+      if (imageType === 'uploads') {
+        uploadsAdapter.removeOne(state, imageName);
+      }
     });
   },
 });

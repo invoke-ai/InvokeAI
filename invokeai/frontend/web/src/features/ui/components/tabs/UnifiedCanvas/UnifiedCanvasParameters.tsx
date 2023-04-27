@@ -32,7 +32,7 @@ export default function UnifiedCanvasParameters() {
       name: 'unifiedCanvasImg2Img',
       header: `${t('parameters.imageToImage')}`,
       feature: undefined,
-      content: <ImageToImageStrength label={t('parameters.img2imgStrength')} />,
+      content: <ImageToImageStrength />,
     },
     seed: {
       name: 'seed',
