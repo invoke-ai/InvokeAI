@@ -19,9 +19,8 @@ import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
-import { InvokeTabName } from 'features/ui/store/tabMap';
 import { receivedModels } from 'services/thunks/model';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -546,14 +545,14 @@ export const systemSlice = createSlice({
     /**
      * Received available models from the backend
      */
-    builder.addCase(receivedModels.fulfilled, (state, action) => {
+    builder.addCase(receivedModels.fulfilled, (state) => {
       state.wereModelsReceived = true;
     });
 
     /**
-     * OpenAPI schema was received and parsed
+     * OpenAPI schema was parsed
      */
-    builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
+    builder.addCase(parsedOpenAPISchema, (state) => {
       state.wasSchemaParsed = true;
     });
   },
