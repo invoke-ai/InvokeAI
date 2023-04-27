@@ -21,15 +21,15 @@ import nodesReducer from 'features/nodes/store/nodesSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
-import { canvasBlacklist } from 'features/canvas/store/canvasPersistBlacklist';
-import { galleryBlacklist } from 'features/gallery/store/galleryPersistBlacklist';
-import { generationBlacklist } from 'features/parameters/store/generationPersistBlacklist';
-import { lightboxBlacklist } from 'features/lightbox/store/lightboxPersistBlacklist';
-import { modelsBlacklist } from 'features/system/store/modelsPersistBlacklist';
-import { nodesBlacklist } from 'features/nodes/store/nodesPersistBlacklist';
-import { postprocessingBlacklist } from 'features/parameters/store/postprocessingPersistBlacklist';
-import { systemBlacklist } from 'features/system/store/systemPersistsBlacklist';
-import { uiBlacklist } from 'features/ui/store/uiPersistBlacklist';
+import { canvasDenylist } from 'features/canvas/store/canvasPersistDenylist';
+import { galleryDenylist } from 'features/gallery/store/galleryPersistDenylist';
+import { generationDenylist } from 'features/parameters/store/generationPersistDenylist';
+import { lightboxDenylist } from 'features/lightbox/store/lightboxPersistDenylist';
+import { modelsDenylist } from 'features/system/store/modelsPersistDenylist';
+import { nodesDenylist } from 'features/nodes/store/nodesPersistDenylist';
+import { postprocessingDenylist } from 'features/parameters/store/postprocessingPersistDenylist';
+import { systemDenylist } from 'features/system/store/systemPersistsDenylist';
+import { uiDenylist } from 'features/ui/store/uiPersistDenylist';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -40,9 +40,9 @@ import { uiBlacklist } from 'features/ui/store/uiPersistBlacklist';
  *   - Connection/processing status
  *   - Availability of external libraries like ESRGAN/GFPGAN
  *
- * These can be blacklisted in redux-persist.
+ * These can be denylisted in redux-persist.
  *
- * The necesssary nested persistors with blacklists are configured below.
+ * The necesssary nested persistors with denylists are configured below.
  */
 
 const rootReducer = combineReducers({
@@ -66,18 +66,18 @@ const rootPersistConfig = getPersistConfig({
   storage,
   rootReducer,
   blacklist: [
-    ...canvasBlacklist,
-    ...galleryBlacklist,
-    ...generationBlacklist,
-    ...lightboxBlacklist,
-    ...modelsBlacklist,
-    ...nodesBlacklist,
-    ...postprocessingBlacklist,
-    // ...resultsBlacklist,
+    ...canvasDenylist,
+    ...galleryDenylist,
+    ...generationDenylist,
+    ...lightboxDenylist,
+    ...modelsDenylist,
+    ...nodesDenylist,
+    ...postprocessingDenylist,
+    // ...resultsDenylist,
     'results',
-    ...systemBlacklist,
-    ...uiBlacklist,
-    // ...uploadsBlacklist,
+    ...systemDenylist,
+    ...uiDenylist,
+    // ...uploadsDenylist,
     'uploads',
     'hotkeys',
     'config',
