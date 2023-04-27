@@ -60,29 +60,34 @@ const CurrentImageDisplay = () => {
       }}
     >
       <Flex
+        flexDirection="column"
         sx={{
           w: 'full',
           h: 'full',
           alignItems: 'center',
-          justifyContent: 'center',
           gap: 4,
         }}
       >
+        <CurrentImageButtons />
         {hasAnImageToDisplay ? (
           <CurrentImagePreview />
         ) : (
-          <Icon
-            as={MdPhoto}
-            sx={{
-              boxSize: 24,
-              color: 'base.500',
-            }}
-          />
+          <Flex
+            width="full"
+            height="full"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Icon
+              as={MdPhoto}
+              sx={{
+                boxSize: 24,
+                color: 'base.500',
+              }}
+            />
+          </Flex>
         )}
       </Flex>
-      <Box sx={{ position: 'absolute', top: 0 }}>
-        <CurrentImageButtons />
-      </Box>
     </Flex>
   );
 };
