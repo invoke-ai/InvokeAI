@@ -16,6 +16,7 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
 
   const {
     prompt,
+    negativePrompt,
     seed,
     steps,
     width,
@@ -38,7 +39,7 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
   const imageToImageNode: ImageToImageInvocation = {
     id: nodeId,
     type: 'img2img',
-    prompt,
+    prompt: negativePrompt ? `${prompt} [${negativePrompt}]` : prompt,
     steps,
     width,
     height,

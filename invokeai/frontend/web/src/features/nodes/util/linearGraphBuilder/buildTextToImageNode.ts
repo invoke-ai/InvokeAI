@@ -10,6 +10,7 @@ export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
 
   const {
     prompt,
+    negativePrompt,
     seed,
     steps,
     width,
@@ -23,7 +24,7 @@ export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
   const textToImageNode: NonNullable<TextToImageInvocation> = {
     id: nodeId,
     type: 'txt2img',
-    prompt,
+    prompt: negativePrompt ? `${prompt} [${negativePrompt}]` : prompt,
     steps,
     width,
     height,
