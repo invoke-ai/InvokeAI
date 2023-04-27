@@ -7,6 +7,7 @@ import { setShouldShowGallery } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
+import { memo } from 'react';
 
 const floatingGalleryButtonSelector = createSelector(
   [activeTabNameSelector, uiSelector],
@@ -58,4 +59,4 @@ const FloatingGalleryButton = () => {
   ) : null;
 };
 
-export default FloatingGalleryButton;
+export default memo(FloatingGalleryButton);

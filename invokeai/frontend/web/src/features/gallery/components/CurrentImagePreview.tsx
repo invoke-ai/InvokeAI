@@ -11,6 +11,7 @@ import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
+import { memo } from 'react';
 
 export const imagesSelector = createSelector(
   [uiSelector, selectedImageSelector, systemSelector],
@@ -50,7 +51,7 @@ export const imagesSelector = createSelector(
   }
 );
 
-export default function CurrentImagePreview() {
+const CurrentImagePreview = () => {
   const { shouldShowImageDetails, imageToDisplay, shouldHidePreview } =
     useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
@@ -115,4 +116,6 @@ export default function CurrentImagePreview() {
         )}
     </Flex>
   );
-}
+};
+
+export default memo(CurrentImagePreview);

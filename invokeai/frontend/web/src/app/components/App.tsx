@@ -28,11 +28,13 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
+const DEFAULT_CONFIG = {};
+
 interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
 }
 
-const App = ({ config = {}, children }: Props) => {
+const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
 

@@ -28,6 +28,7 @@ import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvas
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import useResolution from 'common/hooks/useResolution';
 import { Flex } from '@chakra-ui/react';
+import { memo } from 'react';
 
 const GALLERY_TAB_WIDTHS: Record<
   InvokeTabName,
@@ -72,7 +73,7 @@ const galleryPanelSelector = createSelector(
   }
 );
 
-export default function ImageGalleryPanel() {
+export const ImageGalleryPanel = () => {
   const dispatch = useAppDispatch();
   const {
     shouldPinGallery,
@@ -232,4 +233,6 @@ export default function ImageGalleryPanel() {
   };
 
   return renderImageGallery();
-}
+};
+
+export default memo(ImageGalleryPanel);

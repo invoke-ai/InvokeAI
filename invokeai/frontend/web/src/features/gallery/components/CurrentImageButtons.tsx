@@ -163,16 +163,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const { t } = useTranslation();
   const setBothPrompts = useSetBothPrompts();
 
-  const handleClickUseAsInitialImage = () => {
+  const handleClickUseAsInitialImage = useCallback(() => {
     if (!image) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
     dispatch(initialImageSelected(image.name));
     // dispatch(setInitialImage(currentImage));
 
     // dispatch(setActiveTab('img2img'));
-  };
+  }, [dispatch, image, isLightboxOpen]);
 
-  const handleCopyImage = async () => {
+  const handleCopyImage = useCallback(async () => {
     if (!image?.url) {
       return;
     }
@@ -194,9 +194,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       duration: 2500,
       isClosable: true,
     });
-  };
+  }, [getUrl, t, image?.url, toast]);
 
-  const handleCopyImageLink = () => {
+  const handleCopyImageLink = useCallback(() => {
     const url = image
       ? shouldTransformUrls
         ? getUrl(image.url)
@@ -215,7 +215,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         isClosable: true,
       });
     });
-  };
+  }, [toast, shouldTransformUrls, getUrl, t, image]);
 
   useHotkeys(
     'shift+i',
@@ -241,11 +241,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [image]
   );
 
-  const handlePreviewVisibility = () => {
+  const handlePreviewVisibility = useCallback(() => {
     dispatch(setShouldHidePreview(!shouldHidePreview));
-  };
+  }, [dispatch, shouldHidePreview]);
 
-  const handleClickUseAllParameters = () => {
+  const handleClickUseAllParameters = useCallback(() => {
     if (!image) return;
     // selectedImage.metadata &&
     //   dispatch(setAllParameters(selectedImage.metadata));
@@ -254,7 +254,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     // } else if (selectedImage.metadata?.image.type === 'txt2img') {
     //   dispatch(setActiveTab('txt2img'));
     // }
-  };
+  }, [image]);
 
   useHotkeys(
     'a',
@@ -338,9 +338,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [image]
   );
 
-  const handleClickUpscale = () => {
+  const handleClickUpscale = useCallback(() => {
     // selectedImage && dispatch(runESRGAN(selectedImage));
-  };
+  }, []);
 
   useHotkeys(
     'Shift+U',
@@ -369,9 +369,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     ]
   );
 
-  const handleClickFixFaces = () => {
+  const handleClickFixFaces = useCallback(() => {
     // selectedImage && dispatch(runFacetool(selectedImage));
-  };
+  }, []);
 
   useHotkeys(
     'Shift+R',
@@ -401,10 +401,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     ]
   );
 
-  const handleClickShowImageDetails = () =>
-    dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
+  const handleClickShowImageDetails = useCallback(
+    () => dispatch(setShouldShowImageDetails(!shouldShowImageDetails)),
+    [dispatch, shouldShowImageDetails]
+  );
 
-  const handleSendToCanvas = () => {
+  const handleSendToCanvas = useCallback(() => {
     if (!image) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
@@ -421,7 +423,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       duration: 2500,
       isClosable: true,
     });
-  };
+  }, [image, isLightboxOpen, dispatch, activeTabName, toast, t]);
 
   useHotkeys(
     'i',
@@ -440,19 +442,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [image, shouldShowImageDetails]
   );
 
-  const handleInitiateDelete = () => {
+  const handleDelete = useCallback(() => {
+    if (canDeleteImage && image) {
+      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+    }
+  }, [image, canDeleteImage, dispatch]);
+
+  const handleInitiateDelete = useCallback(() => {
     if (shouldConfirmOnDelete) {
       onDeleteDialogOpen();
     } else {
       handleDelete();
     }
-  };
-
-  const handleDelete = () => {
-    if (canDeleteImage && image) {
-      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
-    }
-  };
+  }, [shouldConfirmOnDelete, onDeleteDialogOpen, handleDelete]);
 
   useHotkeys('delete', handleInitiateDelete, [
     image,
@@ -461,9 +463,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     isProcessing,
   ]);
 
-  const handleLightBox = () => {
+  const handleLightBox = useCallback(() => {
     dispatch(setIsLightboxOpen(!isLightboxOpen));
-  };
+  }, [dispatch, isLightboxOpen]);
 
   return (
     <>
