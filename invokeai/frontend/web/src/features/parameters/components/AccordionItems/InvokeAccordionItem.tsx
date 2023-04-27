@@ -27,7 +27,7 @@ export default function InvokeAccordionItem({
             {header}
           </Box>
           {additionalHeaderComponents}
-          {feature && <GuideIcon feature={feature} />}
+          {/* {feature && <GuideIcon feature={feature} />} */}
           <AccordionIcon />
         </Flex>
       </AccordionButton>

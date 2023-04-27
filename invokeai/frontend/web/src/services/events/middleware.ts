@@ -92,7 +92,9 @@ export const socketMiddleware = () => {
         socket.on('connect', () => {
           dispatch(socketConnected({ timestamp: getTimestamp() }));
 
-          const { results, uploads, models, nodes } = getState();
+          const { results, uploads, models, nodes, config } = getState();
+
+          const { disabledTabs } = config;
 
           // These thunks need to be dispatch in middleware; cannot handle in a reducer
           if (!results.ids.length) {
@@ -107,7 +109,7 @@ export const socketMiddleware = () => {
             dispatch(receivedModels());
           }
 
-          if (!nodes.schema) {
+          if (!nodes.schema && !disabledTabs.includes('nodes')) {
             dispatch(receivedOpenAPISchema());
           }
         });
@@ -201,13 +203,20 @@ export const socketMiddleware = () => {
             const sessionId = data.graph_execution_state_id;
 
             const { cancelType, isCancelScheduled } = getState().system;
+            const { shouldFetchImages } = getState().config;
 
             // Handle scheduled cancelation
             if (cancelType === 'scheduled' && isCancelScheduled) {
               dispatch(sessionCanceled({ sessionId }));
             }
 
-            dispatch(invocationComplete({ data, timestamp: getTimestamp() }));
+            dispatch(
+              invocationComplete({
+                data,
+                timestamp: getTimestamp(),
+                shouldFetchImages,
+              })
+            );
           }
         });
 
@@ -216,9 +225,9 @@ export const socketMiddleware = () => {
       }
 
       if (invocationComplete.match(action)) {
-        const { results } = getState();
+        const { config } = getState();
 
-        if (results.shouldFetchImages) {
+        if (config.shouldFetchImages) {
           const { result } = action.payload.data;
           if (isImageOutput(result)) {
             const imageName = result.image.image_name;

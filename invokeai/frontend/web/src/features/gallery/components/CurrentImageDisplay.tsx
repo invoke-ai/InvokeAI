@@ -1,23 +1,21 @@
 import { Flex, Icon } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash';
 
 import { MdPhoto } from 'react-icons/md';
-import {
-  gallerySelector,
-  selectedImageSelector,
-} from '../store/gallerySelectors';
+import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
 
 export const currentImageDisplaySelector = createSelector(
-  [gallerySelector, selectedImageSelector],
-  (gallery, selectedImage) => {
-    const { currentImage, intermediateImage } = gallery;
+  [systemSelector, selectedImageSelector],
+  (system, selectedImage) => {
+    const { progressImage } = system;
 
     return {
-      hasAnImageToDisplay: selectedImage || intermediateImage,
+      hasAnImageToDisplay: selectedImage || progressImage,
     };
   },
   {
@@ -36,27 +34,32 @@ const CurrentImageDisplay = () => {
   return (
     <Flex
       sx={{
+        position: 'relative',
         flexDirection: 'column',
         height: '100%',
         width: '100%',
         rowGap: 4,
         borderRadius: 'base',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
-      {hasAnImageToDisplay ? (
-        <>
-          <CurrentImageButtons />
-          <CurrentImagePreview />
-        </>
-      ) : (
-        <Flex
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-            height: '100%',
-          }}
-        >
+      <Flex
+        flexDirection="column"
+        sx={{
+          w: 'full',
+          h: 'full',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 4,
+        }}
+      >
+        {hasAnImageToDisplay ? (
+          <>
+            <CurrentImageButtons />
+            <CurrentImagePreview />
+          </>
+        ) : (
           <Icon
             as={MdPhoto}
             sx={{
@@ -64,8 +67,8 @@ const CurrentImageDisplay = () => {
               color: 'base.500',
             }}
           />
-        </Flex>
-      )}
+        )}
+      </Flex>
     </Flex>
   );
 };

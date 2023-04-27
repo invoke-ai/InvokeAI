@@ -13,7 +13,7 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const invocationBlacklist = ['Graph', 'Collect', 'LoadImage'];
+const invocationDenylist = ['Graph', 'Collect', 'LoadImage'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
@@ -22,7 +22,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
     (schema, key) =>
       key.includes('Invocation') &&
       !key.includes('InvocationOutput') &&
-      !invocationBlacklist.some((blacklistItem) => key.includes(blacklistItem))
+      !invocationDenylist.some((denylistItem) => key.includes(denylistItem))
   ) as (OpenAPIV3.ReferenceObject | InvocationSchemaObject)[];
 
   const invocations = filteredSchemas.reduce<
@@ -113,8 +113,6 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
 
     return acc;
   }, {});
-
-  console.debug('Generated invocations: ', invocations);
 
   return invocations;
 };

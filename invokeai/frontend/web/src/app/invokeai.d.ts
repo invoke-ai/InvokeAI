@@ -12,10 +12,12 @@
  * 'gfpgan'.
  */
 
+import { FacetoolType } from 'features/parameters/store/postprocessingSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { ImageMetadata, ImageType } from 'services/api';
 import { AnyInvocation } from 'services/events/types';
+import { O } from 'ts-toolbelt';
 
 /**
  * TODO:
@@ -334,3 +336,96 @@ export declare type UploadOutpaintingMergeImagePayload = {
   dataURL: string;
   name: string;
 };
+
+/**
+ * A disable-able application feature
+ */
+export declare type AppFeature =
+  | 'faceRestore'
+  | 'upscaling'
+  | 'lightbox'
+  | 'modelManager'
+  | 'githubLink'
+  | 'discordLink'
+  | 'bugLink'
+  | 'localization';
+
+/**
+ * A disable-able Stable Diffusion feature
+ */
+export declare type StableDiffusionFeature =
+  | 'noiseConfig'
+  | 'variations'
+  | 'symmetry'
+  | 'tiling'
+  | 'hires';
+
+/**
+ * Configuration options for the InvokeAI UI.
+ * Distinct from system settings which may be changed inside the app.
+ */
+export declare type AppConfig = {
+  /**
+   * Whether or not URLs should be transformed to use a different host
+   */
+  shouldTransformUrls: boolean;
+  /**
+   * Whether or not we need to re-fetch images
+   */
+  shouldFetchImages: boolean;
+  disabledTabs: InvokeTabName[];
+  disabledFeatures: AppFeature[];
+  canRestoreDeletedImagesFromBin: boolean;
+  sd: {
+    iterations: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    width: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    height: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    steps: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    guidance: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    img2imgStrength: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+  };
+};
+
+export declare type PartialAppConfig = O.Partial<AppConfig, 'deep'>;

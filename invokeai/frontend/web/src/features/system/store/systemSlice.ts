@@ -19,6 +19,9 @@ import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
+import { InvokeTabName } from 'features/ui/store/tabMap';
+import { receivedModels } from 'services/thunks/model';
+import { receivedOpenAPISchema } from 'services/thunks/schema';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -31,11 +34,6 @@ export interface LogEntry {
 export interface Log {
   [index: number]: LogEntry;
 }
-
-export type ReadinessPayload = {
-  isReady: boolean;
-  reasonsWhyNotReady: string[];
-};
 
 export type InProgressImageType = 'none' | 'full-res' | 'latents';
 
@@ -92,10 +90,26 @@ export interface SystemState
    * Array of node IDs that we want to handle when events received
    */
   subscribedNodeIds: string[];
+  // /**
+  //  * Whether or not URLs should be transformed to use a different host
+  //  */
+  // shouldTransformUrls: boolean;
+  // /**
+  //  * Array of disabled tabs
+  //  */
+  // disabledTabs: InvokeTabName[];
+  // /**
+  //  * Array of disabled features
+  //  */
+  // disabledFeatures: InvokeAI.AppFeature[];
   /**
-   * Whether or not URLs should be transformed to use a different host
+   * Whether or not the available models were received
    */
-  shouldTransformUrls: boolean;
+  wereModelsReceived: boolean;
+  /**
+   * Whether or not the OpenAPI schema was received and parsed
+   */
+  wasSchemaParsed: boolean;
 }
 
 const initialSystemState: SystemState = {
@@ -143,7 +157,11 @@ const initialSystemState: SystemState = {
   cancelType: 'immediate',
   isCancelScheduled: false,
   subscribedNodeIds: [],
-  shouldTransformUrls: false,
+  // shouldTransformUrls: false,
+  // disabledTabs: [],
+  // disabledFeatures: [],
+  wereModelsReceived: false,
+  wasSchemaParsed: false,
 };
 
 export const systemSlice = createSlice({
@@ -341,12 +359,27 @@ export const systemSlice = createSlice({
     subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
       state.subscribedNodeIds = action.payload;
     },
-    /**
-     * `shouldTransformUrls` was changed
-     */
-    shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldTransformUrls = action.payload;
-    },
+    // /**
+    //  * `shouldTransformUrls` was changed
+    //  */
+    // shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
+    //   state.shouldTransformUrls = action.payload;
+    // },
+    // /**
+    //  * `disabledTabs` was changed
+    //  */
+    // disabledTabsChanged: (state, action: PayloadAction<InvokeTabName[]>) => {
+    //   state.disabledTabs = action.payload;
+    // },
+    // /**
+    //  * `disabledFeatures` was changed
+    //  */
+    // disabledFeaturesChanged: (
+    //   state,
+    //   action: PayloadAction<InvokeAI.AppFeature[]>
+    // ) => {
+    //   state.disabledFeatures = action.payload;
+    // },
   },
   extraReducers(builder) {
     /**
@@ -417,7 +450,8 @@ export const systemSlice = createSlice({
         step,
         total_steps,
         progress_image,
-        invocation,
+        node,
+        source_node_id,
         graph_execution_state_id,
       } = action.payload.data;
 
@@ -514,6 +548,20 @@ export const systemSlice = createSlice({
     builder.addCase(initialImageSelected, (state) => {
       state.toastQueue.push(makeToast(i18n.t('toast.sentToImageToImage')));
     });
+
+    /**
+     * Received available models from the backend
+     */
+    builder.addCase(receivedModels.fulfilled, (state, action) => {
+      state.wereModelsReceived = true;
+    });
+
+    /**
+     * OpenAPI schema was received and parsed
+     */
+    builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
+      state.wasSchemaParsed = true;
+    });
   },
 });
 
@@ -553,7 +601,9 @@ export const {
   scheduledCancelAborted,
   cancelTypeChanged,
   subscribedNodeIdsSet,
-  shouldTransformUrlsChanged,
+  // shouldTransformUrlsChanged,
+  // disabledTabsChanged,
+  // disabledFeaturesChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

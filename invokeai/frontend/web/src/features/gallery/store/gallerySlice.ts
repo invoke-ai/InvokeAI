@@ -6,6 +6,7 @@ import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash';
 import { isImageOutput } from 'services/types/guards';
+import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 import { imageUploaded } from 'services/thunks/image';
 
 export type GalleryCategory = 'user' | 'result';
@@ -295,9 +296,10 @@ export const gallerySlice = createSlice({
      * Upload Image - FULFILLED
      */
     builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const { location } = action.payload;
-      const imageName = location.split('/').pop() || '';
-      state.selectedImageName = imageName;
+      const { response } = action.payload;
+
+      const uploadedImage = deserializeImageResponse(response);
+      state.selectedImageName = uploadedImage.name;
     });
   },
 });

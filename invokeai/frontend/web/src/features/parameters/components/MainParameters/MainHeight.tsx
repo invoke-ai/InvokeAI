@@ -23,7 +23,7 @@ export default function MainHeight() {
       label={t('parameters.height')}
       value={height}
       min={64}
-      step={64}
+      step={8}
       max={2048}
       onChange={(v) => dispatch(setHeight(v))}
       handleReset={() => dispatch(setHeight(512))}

@@ -5,8 +5,6 @@ import { useGetUrl } from 'common/util/getUrl';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
-import { ReactEventHandler } from 'react';
-import { APP_METADATA_HEIGHT } from 'theme/util/constants';
 
 import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
@@ -110,7 +108,6 @@ export default function CurrentImagePreview() {
               height: '100%',
               borderRadius: 'base',
               overflow: 'scroll',
-              maxHeight: APP_METADATA_HEIGHT,
             }}
           >
             <ImageMetadataViewer image={imageToDisplay.image} />

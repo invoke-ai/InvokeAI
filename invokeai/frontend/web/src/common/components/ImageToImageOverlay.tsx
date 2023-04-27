@@ -37,33 +37,11 @@ const ImageToImageOverlay = ({
         position: 'absolute',
       }}
     >
-      <ButtonGroup
+      <Flex
         sx={{
           position: 'absolute',
           top: 0,
           right: 0,
-          p: 2,
-        }}
-      >
-        <IAIIconButton
-          size="sm"
-          isDisabled={!isImageToImageEnabled}
-          icon={<FaUndo />}
-          aria-label={t('accessibility.reset')}
-          onClick={handleResetInitialImage}
-        />
-        <IAIIconButton
-          size="sm"
-          isDisabled={!isImageToImageEnabled}
-          icon={<FaUpload />}
-          aria-label={t('common.upload')}
-        />
-      </ButtonGroup>
-      <Flex
-        sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
           p: 2,
           alignItems: 'flex-start',
         }}

@@ -87,47 +87,44 @@ const InitialImagePreview = () => {
       }}
       onDrop={handleDrop}
     >
-      <Box
-        sx={{
-          height: 'full',
-          width: 'full',
-          opacity: isImageToImageEnabled ? 1 : 0.5,
-          filter: isImageToImageEnabled ? 'none' : 'auto',
-          blur: '5px',
-          position: 'relative',
-        }}
-      >
-        {initialImage?.url && (
-          <>
-            <Image
-              sx={{
-                fit: 'contain',
-                borderRadius: 'base',
-              }}
-              src={getUrl(initialImage?.url)}
-              onError={onError}
-              onLoad={() => {
-                setIsLoaded(true);
-              }}
-              fallback={
-                <Flex
-                  sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Spinner color="grey" w="5rem" h="5rem" />
-                </Flex>
-              }
+      {initialImage?.url && (
+        <Box
+          sx={{
+            height: 'full',
+            width: 'full',
+            opacity: isImageToImageEnabled ? 1 : 0.5,
+            filter: isImageToImageEnabled ? 'none' : 'auto',
+            blur: '5px',
+            position: 'relative',
+          }}
+        >
+          <Image
+            sx={{
+              fit: 'contain',
+              borderRadius: 'base',
+            }}
+            src={getUrl(initialImage?.url)}
+            onError={onError}
+            onLoad={() => {
+              setIsLoaded(true);
+            }}
+            fallback={
+              <Flex
+                sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Spinner color="grey" w="5rem" h="5rem" />
+              </Flex>
+            }
+          />
+          {isLoaded && (
+            <ImageToImageOverlay
+              setIsLoaded={setIsLoaded}
+              image={initialImage}
             />
-            {isLoaded && (
-              <ImageToImageOverlay
-                setIsLoaded={setIsLoaded}
-                image={initialImage}
-              />
-            )}
-          </>
-        )}
-
-        {!initialImage?.url && <SelectImagePlaceholder />}
-      </Box>
+          )}
+        </Box>
+      )}
+      {!initialImage?.url && <SelectImagePlaceholder />}
       {!isImageToImageEnabled && (
         <Flex
           sx={{

@@ -39,7 +39,7 @@ export const floatingParametersPanelButtonSelector = createSelector(
     const shouldShowParametersPanelButton =
       !canvasBetaLayoutCheck &&
       (!shouldPinParametersPanel || !shouldShowParametersPanel) &&
-      ['linear', 'unifiedCanvas'].includes(activeTabName);
+      ['generate', 'unifiedCanvas'].includes(activeTabName);
 
     return {
       shouldPinParametersPanel,

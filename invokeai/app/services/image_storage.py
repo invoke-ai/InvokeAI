@@ -5,11 +5,16 @@ from glob import glob
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from PIL.Image import Image
 import PIL.Image as PILImage
-from invokeai.app.api.models.images import ImageResponse, ImageResponseMetadata
+from send2trash import send2trash
+from invokeai.app.api.models.images import (
+    ImageResponse,
+    ImageResponseMetadata,
+    SavedImage,
+)
 from invokeai.app.models.image import ImageType
 from invokeai.app.services.metadata import (
     InvokeAIMetadata,
@@ -41,7 +46,15 @@ class ImageStorageBase(ABC):
     def get_path(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
     ) -> str:
-        """Gets the path to an image or its thumbnail."""
+        """Gets the internal path to an image or its thumbnail."""
+        pass
+
+    # TODO: make this a bit more flexible for e.g. cloud storage
+    @abstractmethod
+    def get_uri(
+        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+    ) -> str:
+        """Gets the external URI to an image or its thumbnail."""
         pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
@@ -57,8 +70,8 @@ class ImageStorageBase(ABC):
         image_name: str,
         image: Image,
         metadata: InvokeAIMetadata | None = None,
-    ) -> Tuple[str, str, int]:
-        """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image path, thumbnail path, and created timestamp."""
+    ) -> SavedImage:
+        """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
         pass
 
     @abstractmethod
@@ -126,8 +139,8 @@ class DiskImageStorage(ImageStorageBase):
                     image_type=image_type.value,
                     image_name=filename,
                     # TODO: DiskImageStorage should not be building URLs...?
-                    image_url=f"api/v1/images/{image_type.value}/{filename}",
-                    thumbnail_url=f"api/v1/images/{image_type.value}/thumbnails/{os.path.splitext(filename)[0]}.webp",
+                    image_url=self.get_uri(image_type, filename),
+                    thumbnail_url=self.get_uri(image_type, filename, True),
                     # TODO: Creation of this object should happen elsewhere (?), just making it fit here so it works
                     metadata=ImageResponseMetadata(
                         created=int(os.path.getctime(path)),
@@ -174,7 +187,23 @@ class DiskImageStorage(ImageStorageBase):
         else:
             path = os.path.join(self.__output_folder, image_type, basename)
 
-        return path
+        abspath = os.path.abspath(path)
+
+        return abspath
+
+    def get_uri(
+        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+    ) -> str:
+        # strip out any relative path shenanigans
+        basename = os.path.basename(image_name)
+
+        if is_thumbnail:
+            thumbnail_basename = get_thumbnail_name(basename)
+            uri = f"api/v1/images/{image_type.value}/thumbnails/{thumbnail_basename}"
+        else:
+            uri = f"api/v1/images/{image_type.value}/{basename}"
+
+        return uri
 
     def validate_path(self, path: str) -> bool:
         try:
@@ -189,7 +218,7 @@ class DiskImageStorage(ImageStorageBase):
         image_name: str,
         image: Image,
         metadata: InvokeAIMetadata | None = None,
-    ) -> Tuple[str, str, int]:
+    ) -> SavedImage:
         image_path = self.get_path(image_type, image_name)
 
         # TODO: Reading the image and then saving it strips the metadata...
@@ -197,7 +226,7 @@ class DiskImageStorage(ImageStorageBase):
             pnginfo = build_invokeai_metadata_pnginfo(metadata=metadata)
             image.save(image_path, "PNG", pnginfo=pnginfo)
         else:
-            image.save(image_path) # this saved image has an empty info
+            image.save(image_path)  # this saved image has an empty info
 
         thumbnail_name = get_thumbnail_name(image_name)
         thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)
@@ -207,24 +236,30 @@ class DiskImageStorage(ImageStorageBase):
         self.__set_cache(image_path, image)
         self.__set_cache(thumbnail_path, thumbnail_image)
 
-        return (image_path, thumbnail_path, int(os.path.getctime(image_path)))
+        return SavedImage(
+            image_name=image_name,
+            thumbnail_name=thumbnail_name,
+            created=int(os.path.getctime(image_path)),
+        )
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
-        image_path = self.get_path(image_type, image_name)
-        thumbnail_path = self.get_path(image_type, image_name, True)
-        if os.path.exists(image_path):
-            os.remove(image_path)
+        basename = os.path.basename(image_name)
+        image_path = self.get_path(image_type, basename)
 
+        if os.path.exists(image_path):
+            send2trash(image_path)
         if image_path in self.__cache:
             del self.__cache[image_path]
 
-        if os.path.exists(thumbnail_path):
-            os.remove(thumbnail_path)
+        thumbnail_name = get_thumbnail_name(image_name)
+        thumbnail_path = self.get_path(image_type, thumbnail_name, True)
 
+        if os.path.exists(thumbnail_path):
+            send2trash(thumbnail_path)
         if thumbnail_path in self.__cache:
             del self.__cache[thumbnail_path]
 
-    def __get_cache(self, image_name: str) -> Image:
+    def __get_cache(self, image_name: str) -> Image | None:
         return None if image_name not in self.__cache else self.__cache[image_name]
 
     def __set_cache(self, image_name: str, image: Image):

@@ -5,6 +5,8 @@ import {
   Image,
   MenuItem,
   MenuList,
+  Text,
+  useDisclosure,
   useTheme,
   useToast,
 } from '@chakra-ui/react';
@@ -20,7 +22,14 @@ import {
   setSeed,
 } from 'features/parameters/store/generationSlice';
 import { DragEvent, memo, useState } from 'react';
-import { FaCheck, FaTrashAlt } from 'react-icons/fa';
+import {
+  FaCheck,
+  FaExpand,
+  FaLink,
+  FaShare,
+  FaTrash,
+  FaTrashAlt,
+} from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import * as InvokeAI from 'app/invokeai';
@@ -28,13 +37,60 @@ import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
-import { hoverableImageSelector } from 'features/gallery/store/gallerySelectors';
+import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useGetUrl } from 'common/util/getUrl';
+import { ExternalLinkIcon } from '@chakra-ui/icons';
+import { BiZoomIn } from 'react-icons/bi';
+import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { imageDeleted } from 'services/thunks/image';
+import { createSelector } from '@reduxjs/toolkit';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { configSelector } from 'features/system/store/configSelectors';
+import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
+
+export const selector = createSelector(
+  [
+    gallerySelector,
+    systemSelector,
+    configSelector,
+    lightboxSelector,
+    activeTabNameSelector,
+  ],
+  (gallery, system, config, lightbox, activeTabName) => {
+    const {
+      galleryImageObjectFit,
+      galleryImageMinimumWidth,
+      shouldUseSingleGalleryColumn,
+    } = gallery;
+
+    const { isLightboxOpen } = lightbox;
+    const { disabledFeatures } = config;
+    const { isConnected, isProcessing, shouldConfirmOnDelete } = system;
+
+    return {
+      canDeleteImage: isConnected && !isProcessing,
+      shouldConfirmOnDelete,
+      galleryImageObjectFit,
+      galleryImageMinimumWidth,
+      shouldUseSingleGalleryColumn,
+      activeTabName,
+      isLightboxOpen,
+      disabledFeatures,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: isEqual,
+    },
+  }
+);
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -55,9 +111,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     activeTabName,
     galleryImageObjectFit,
     galleryImageMinimumWidth,
-    mayDeleteImage,
+    canDeleteImage,
     shouldUseSingleGalleryColumn,
-  } = useAppSelector(hoverableImageSelector);
+    disabledFeatures,
+    shouldConfirmOnDelete,
+  } = useAppSelector(selector);
+  const {
+    isOpen: isDeleteDialogOpen,
+    onOpen: onDeleteDialogOpen,
+    onClose: onDeleteDialogClose,
+  } = useDisclosure();
   const { image, isSelected } = props;
   const { url, thumbnail, name, metadata } = image;
   const { getUrl } = useGetUrl();
@@ -72,6 +135,20 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleMouseOver = () => setIsHovered(true);
 
   const handleMouseOut = () => setIsHovered(false);
+
+  const handleInitiateDelete = () => {
+    if (shouldConfirmOnDelete) {
+      onDeleteDialogOpen();
+    } else {
+      handleDelete();
+    }
+  };
+
+  const handleDelete = () => {
+    if (canDeleteImage && image) {
+      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+    }
+  };
 
   const handleUsePrompt = () => {
     if (image.metadata?.sd_metadata?.prompt) {
@@ -133,7 +210,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         metadata.sd_metadata?.image?.init_image_path
       );
       if (response.ok) {
-        dispatch(setActiveTab('img2img'));
         dispatch(setAllImageToImageParameters(metadata?.sd_metadata));
         toast({
           title: t('toast.initialImageSet'),
@@ -158,7 +234,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
-    console.log('drag started');
     e.dataTransfer.setData('invokeai/imageName', image.name);
     e.dataTransfer.setData('invokeai/imageType', image.type);
     e.dataTransfer.effectAllowed = 'move';
@@ -169,145 +244,172 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     // dispatch(setIsLightboxOpen(true));
   };
 
+  const handleOpenInNewTab = () => {
+    window.open(getUrl(image.url), '_blank');
+  };
+
   return (
-    <ContextMenu<HTMLDivElement>
-      menuProps={{ size: 'sm', isLazy: true }}
-      renderMenu={() => (
-        <MenuList>
-          <MenuItem onClickCapture={handleLightBox}>
-            {t('parameters.openInViewer')}
-          </MenuItem>
-          <MenuItem
-            onClickCapture={handleUsePrompt}
-            isDisabled={image?.metadata?.sd_metadata?.prompt === undefined}
-          >
-            {t('parameters.usePrompt')}
-          </MenuItem>
-
-          <MenuItem
-            onClickCapture={handleUseSeed}
-            isDisabled={image?.metadata?.sd_metadata?.seed === undefined}
-          >
-            {t('parameters.useSeed')}
-          </MenuItem>
-          <MenuItem
-            onClickCapture={handleUseAllParameters}
-            isDisabled={
-              !['txt2img', 'img2img'].includes(
-                image?.metadata?.sd_metadata?.type
-              )
-            }
-          >
-            {t('parameters.useAll')}
-          </MenuItem>
-          <MenuItem
-            onClickCapture={handleUseInitialImage}
-            isDisabled={image?.metadata?.sd_metadata?.type !== 'img2img'}
-          >
-            {t('parameters.useInitImg')}
-          </MenuItem>
-          <MenuItem onClickCapture={handleSendToImageToImage}>
-            {t('parameters.sendToImg2Img')}
-          </MenuItem>
-          <MenuItem onClickCapture={handleSendToCanvas}>
-            {t('parameters.sendToUnifiedCanvas')}
-          </MenuItem>
-          <MenuItem data-warning>
-            {/* <DeleteImageModal image={image}>
-              <p>{t('parameters.deleteImage')}</p>
-            </DeleteImageModal> */}
-          </MenuItem>
-        </MenuList>
-      )}
-    >
-      {(ref) => (
-        <Box
-          position="relative"
-          key={name}
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
-          userSelect="none"
-          draggable={true}
-          onDragStart={handleDragStart}
-          ref={ref}
-          sx={{
-            padding: 2,
-            display: 'flex',
-            justifyContent: 'center',
-            transition: 'transform 0.2s ease-out',
-            _hover: {
-              cursor: 'pointer',
-
-              zIndex: 2,
-            },
-            _before: { content: '""', display: 'block', paddingBottom: '100%' },
-          }}
-        >
-          <Image
-            objectFit={
-              shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
-            }
-            rounded="md"
-            src={getUrl(thumbnail || url)}
-            loading="lazy"
-            sx={{
-              position: 'absolute',
-              width: '100%',
-              height: '100%',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              top: '50%',
-              transform: 'translate(-50%,-50%)',
-              ...(direction === 'rtl'
-                ? { insetInlineEnd: '50%' }
-                : { insetInlineStart: '50%' }),
-            }}
-          />
-          <Flex
-            onClick={handleSelectImage}
-            sx={{
-              position: 'absolute',
-              top: '0',
-              insetInlineStart: '0',
-              width: '100%',
-              height: '100%',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {isSelected && (
-              <Icon
-                as={FaCheck}
-                sx={{
-                  width: '50%',
-                  height: '50%',
-                  fill: 'ok.500',
-                }}
-              />
+    <>
+      <ContextMenu<HTMLDivElement>
+        menuProps={{ size: 'sm', isLazy: true }}
+        renderMenu={() => (
+          <MenuList>
+            <MenuItem
+              icon={<ExternalLinkIcon />}
+              onClickCapture={handleOpenInNewTab}
+            >
+              {t('common.openInNewTab')}
+            </MenuItem>
+            {!disabledFeatures.includes('lightbox') && (
+              <MenuItem icon={<FaExpand />} onClickCapture={handleLightBox}>
+                {t('parameters.openInViewer')}
+              </MenuItem>
             )}
-          </Flex>
-          {isHovered && galleryImageMinimumWidth >= 64 && (
-            <Box
+            <MenuItem
+              icon={<IoArrowUndoCircleOutline />}
+              onClickCapture={handleUsePrompt}
+              isDisabled={image?.metadata?.sd_metadata?.prompt === undefined}
+            >
+              {t('parameters.usePrompt')}
+            </MenuItem>
+
+            <MenuItem
+              icon={<IoArrowUndoCircleOutline />}
+              onClickCapture={handleUseSeed}
+              isDisabled={image?.metadata?.sd_metadata?.seed === undefined}
+            >
+              {t('parameters.useSeed')}
+            </MenuItem>
+            <MenuItem
+              icon={<IoArrowUndoCircleOutline />}
+              onClickCapture={handleUseInitialImage}
+              isDisabled={image?.metadata?.sd_metadata?.type !== 'img2img'}
+            >
+              {t('parameters.useInitImg')}
+            </MenuItem>
+            <MenuItem
+              icon={<IoArrowUndoCircleOutline />}
+              onClickCapture={handleUseAllParameters}
+              isDisabled={
+                !['txt2img', 'img2img'].includes(
+                  image?.metadata?.sd_metadata?.type
+                )
+              }
+            >
+              {t('parameters.useAll')}
+            </MenuItem>
+            <MenuItem
+              icon={<FaShare />}
+              onClickCapture={handleSendToImageToImage}
+            >
+              {t('parameters.sendToImg2Img')}
+            </MenuItem>
+            <MenuItem icon={<FaShare />} onClickCapture={handleSendToCanvas}>
+              {t('parameters.sendToUnifiedCanvas')}
+            </MenuItem>
+            <MenuItem icon={<FaTrash />} onClickCapture={onDeleteDialogOpen}>
+              {t('gallery.deleteImage')}
+            </MenuItem>
+          </MenuList>
+        )}
+      >
+        {(ref) => (
+          <Box
+            position="relative"
+            key={name}
+            onMouseOver={handleMouseOver}
+            onMouseOut={handleMouseOut}
+            userSelect="none"
+            draggable={true}
+            onDragStart={handleDragStart}
+            ref={ref}
+            sx={{
+              padding: 2,
+              display: 'flex',
+              justifyContent: 'center',
+              transition: 'transform 0.2s ease-out',
+              _hover: {
+                cursor: 'pointer',
+
+                zIndex: 2,
+              },
+              _before: {
+                content: '""',
+                display: 'block',
+                paddingBottom: '100%',
+              },
+            }}
+          >
+            <Image
+              objectFit={
+                shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
+              }
+              rounded="md"
+              src={getUrl(thumbnail || url)}
+              loading="lazy"
               sx={{
                 position: 'absolute',
-                top: 1,
-                insetInlineEnd: 1,
+                width: '100%',
+                height: '100%',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                top: '50%',
+                transform: 'translate(-50%,-50%)',
+                ...(direction === 'rtl'
+                  ? { insetInlineEnd: '50%' }
+                  : { insetInlineStart: '50%' }),
+              }}
+            />
+            <Flex
+              onClick={handleSelectImage}
+              sx={{
+                position: 'absolute',
+                top: '0',
+                insetInlineStart: '0',
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {/* <DeleteImageModal image={image}>
+              {isSelected && (
+                <Icon
+                  as={FaCheck}
+                  sx={{
+                    width: '50%',
+                    height: '50%',
+                    fill: 'ok.500',
+                  }}
+                />
+              )}
+            </Flex>
+            {isHovered && galleryImageMinimumWidth >= 64 && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 1,
+                  insetInlineEnd: 1,
+                }}
+              >
                 <IAIIconButton
-                  aria-label={t('parameters.deleteImage')}
-                  icon={<FaTrashAlt />}
+                  onClickCapture={handleInitiateDelete}
+                  aria-label={t('gallery.deleteImage')}
+                  icon={<FaTrash />}
                   size="xs"
                   fontSize={14}
-                  isDisabled={!mayDeleteImage}
+                  isDisabled={!canDeleteImage}
                 />
-              </DeleteImageModal> */}
-            </Box>
-          )}
-        </Box>
-      )}
-    </ContextMenu>
+              </Box>
+            )}
+          </Box>
+        )}
+      </ContextMenu>
+      <DeleteImageModal
+        isOpen={isDeleteDialogOpen}
+        onClose={onDeleteDialogClose}
+        handleDelete={handleDelete}
+      />
+    </>
   );
 }, memoEqualityCheck);
 
