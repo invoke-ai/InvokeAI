@@ -375,6 +375,7 @@ export declare type AppConfig = {
   shouldFetchImages: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
+  canRestoreDeletedImagesFromBin: boolean;
   sd: {
     iterations: {
       initial: number;
