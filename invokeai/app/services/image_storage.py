@@ -187,7 +187,9 @@ class DiskImageStorage(ImageStorageBase):
         else:
             path = os.path.join(self.__output_folder, image_type, basename)
 
-        return path
+        abspath = os.path.abspath(path)
+
+        return abspath
 
     def get_uri(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
