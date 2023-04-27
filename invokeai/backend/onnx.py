@@ -73,25 +73,21 @@ class ONNX(inferencePipeline) :
         tic = time.time()
         try:
             if precision == "cpu":
-                onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="CPUExecutionProvider")
+                onnxPipeline = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="CPUExecutionProvider")
             else:
-                onnx_pipe = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="OpenVINOExecutionProvider")
+                onnxPipeline = OnnxStableDiffusionPipeline.from_pretrained(self.model, revision="onnx", provider="OpenVINOExecutionProvider")
 
-            image = onnx_pipe(prompt, height=height, width=width, num_images_per_prompt=iterations, num_inference_steps=steps).images[0]
+            image = onnxPipeline(prompt, height=height, width=width, num_images_per_prompt=iterations, num_inference_steps=steps).images[0]
             timestamp = int(time.time())
             image.save(f"{outdir}/Inference_{timestamp}.png")
 
         except KeyboardInterrupt:
-            # Clear the CUDA cache on an exception
-            self.clear_cuda_cache()
 
             if catch_interrupts:
                 print("**Interrupted** Partial results will be returned.")
             else:
                 raise KeyboardInterrupt
         except RuntimeError:
-            # Clear the CUDA cache on an exception
-            self.clear_cuda_cache()
 
             print(traceback.format_exc(), file=sys.stderr)
             print(">> Could not generate image.")

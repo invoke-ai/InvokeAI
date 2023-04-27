@@ -62,6 +62,9 @@ def main():
     print(f">> {invokeai.__app_name__}, version {invokeai.__version__}")
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
+    Globals.internet_available = args.internet_available and check_internet()
+    print(f">> Internet connectivity is {Globals.internet_available}")
+
     if not args.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
         if not os.path.exists(config_file):
@@ -74,7 +77,6 @@ def main():
         opt.conf = os.path.normpath(os.path.join(Globals.root, opt.conf))
 
     if opt.modelType == "Pytorch":
-        #pytorch = Pytorch()
         #invocation of pytorch model
         opt = Pytorch.start(opt, args)
 
@@ -485,6 +487,19 @@ def main_loop(gen, opt):
         f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}'
     )
 
+def check_internet() -> bool:
+        """
+        Return true if the internet is reachable.
+        It does this by pinging huggingface.co.
+        """
+        import urllib.request
+
+        host = "http://huggingface.co"
+        try:
+            urllib.request.urlopen(host, timeout=1)
+            return True
+        except:
+            return False
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
 # Just do a simple parse of the command!
