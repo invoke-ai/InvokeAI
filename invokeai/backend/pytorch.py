@@ -289,20 +289,6 @@ class Pytorch(inferencePipeline):
         ), "call to img2img() must include the init_img argument"
         return self.prompt2png(prompt, outdir, **kwargs)
 
-    def check_internet() -> bool:
-        """
-        Return true if the internet is reachable.
-        It does this by pinging huggingface.co.
-        """
-        import urllib.request
-
-        host = "http://huggingface.co"
-        try:
-            urllib.request.urlopen(host, timeout=1)
-            return True
-        except:
-            return False
-
     # This routine performs any patch-ups needed after installation
     def run_patches():
         # install ckpt configuration files that may have been added to the
@@ -339,15 +325,12 @@ class Pytorch(inferencePipeline):
         # alert - setting a few globals here
         Globals.try_patchmatch = args.patchmatch
         Globals.always_use_cpu = args.always_use_cpu
-        Globals.internet_available = args.internet_available and self.check_internet()
         Globals.disable_xformers = not args.xformers
         Globals.sequential_guidance = args.sequential_guidance
         Globals.ckpt_convert = True  # always true now
 
         # run any post-install patches needed
         self.run_patches()
-
-        print(f">> Internet connectivity is {Globals.internet_available}")
 
         if opt.seamless:
             print(">> changed to seamless tiling mode")

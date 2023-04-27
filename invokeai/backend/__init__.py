@@ -1,6 +1,8 @@
 """
 Initialization file for invokeai.backend
 """
+from .pytorch import Pytorch
+from .onnx import ONNX
 from .generator import (
     InvokeAIGeneratorBasicParams,
     InvokeAIGenerator,
