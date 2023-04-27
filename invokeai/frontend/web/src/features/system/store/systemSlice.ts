@@ -409,9 +409,6 @@ export const systemSlice = createSlice({
         message: `Connected to server`,
         level: 'info',
       });
-      state.toastQueue.push(
-        makeToast({ title: i18n.t('toast.connected'), status: 'success' })
-      );
     });
 
     /**
@@ -427,9 +424,6 @@ export const systemSlice = createSlice({
         message: `Disconnected from server`,
         level: 'error',
       });
-      state.toastQueue.push(
-        makeToast({ title: i18n.t('toast.disconnected'), status: 'error' })
-      );
     });
 
     /**
