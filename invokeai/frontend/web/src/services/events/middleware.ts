@@ -234,7 +234,12 @@ export const socketMiddleware = () => {
             const imageType = result.image.image_type;
 
             dispatch(imageReceived({ imageName, imageType }));
-            dispatch(thumbnailReceived({ imageName, imageType }));
+            dispatch(
+              thumbnailReceived({
+                thumbnailName: imageName,
+                thumbnailType: imageType,
+              })
+            );
           }
         }
       }
