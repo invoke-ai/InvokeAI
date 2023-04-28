@@ -22,7 +22,7 @@ import torch
 from npyscreen import widget
 from omegaconf import OmegaConf
 
-import invokeai.backend.logging as log
+import invokeai.backend.util.logging as log
 from invokeai.backend.globals import Globals, global_config_dir
 
 from ...backend.config.model_install_backend import (
