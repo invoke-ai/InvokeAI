@@ -15,7 +15,6 @@ from pydantic.schema import schema
 from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
-from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.config import InvokeAIWebConfig
 
@@ -33,29 +32,15 @@ app.add_middleware(
     middleware_id=event_handler_id,
 )
 
-# Add CORS, using the web configuration stanza in `invokeai.yaml`
-# Shouldn't  this be in startup_event()?
-web_conf = InvokeAIWebConfig()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=web_conf.allow_origins,
-    allow_credentials=web_conf.allow_credentials,
-    allow_methods=web_conf.allow_methods,
-    allow_headers=web_conf.allow_headers,
-)
-
 socket_io = SocketIO(app)
 
-config = {}
-
+web_config = {}
 
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    config = InvokeAIWebConfig()
-
     ApiDependencies.initialize(
-        config=config, event_handler_id=event_handler_id
+        config=web_config, event_handler_id=event_handler_id
     )
 
 
@@ -145,12 +130,21 @@ def overridden_redoc():
 
 
 def invoke_api():
+    # parse command-line settings, environment and the init file
+    # (this is a module global)
+    global web_config
+    web_config = InvokeAIWebConfig()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=web_config.allow_origins,
+        allow_credentials=web_config.allow_credentials,
+        allow_methods=web_config.allow_methods,
+        allow_headers=web_config.allow_headers,
+    )
     # Start our own event loop for eventing usage
-    # TODO: determine if there's a better way to do this
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host="0.0.0.0", port=9090, loop=loop)
+    config = uvicorn.Config(app=app, host=web_config.host, port=web_config.port, loop=loop)
     # Use access_log to turn off logging
-
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
 

@@ -20,7 +20,7 @@ class InvocationServices:
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
-    configuration: InvokeAISettings=None
+    configuration: InvokeAISettings
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: ItemStorageABC["LibraryGraph"]
