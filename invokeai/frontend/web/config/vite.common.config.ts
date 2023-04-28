@@ -1,8 +1,4 @@
-import react from '@vitejs/plugin-react-swc';
-import { visualizer } from 'rollup-plugin-visualizer';
-import { PluginOption, UserConfig } from 'vite';
-import eslint from 'vite-plugin-eslint';
-import tsconfigPaths from 'vite-tsconfig-paths';
+import { UserConfig } from 'vite';
 
 export const commonConfig: UserConfig = {
   base: './',

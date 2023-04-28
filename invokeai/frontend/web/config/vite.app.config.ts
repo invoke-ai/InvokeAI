@@ -11,7 +11,4 @@ export const appConfig: UserConfig = {
     tsconfigPaths(),
     visualizer() as unknown as PluginOption,
   ],
-  build: {
-    chunkSizeWarningLimit: 1500,
-  },
 };

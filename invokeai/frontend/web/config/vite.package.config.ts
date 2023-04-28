@@ -17,19 +17,29 @@ export const packageConfig: UserConfig = {
     }),
   ],
   build: {
-    chunkSizeWarningLimit: 1500,
     lib: {
       entry: path.resolve(__dirname, '../src/index.ts'),
       name: 'InvokeAIUI',
       fileName: (format) => `invoke-ai-ui.${format}.js`,
     },
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: ['react', 'react-dom', '@emotion/react'],
       output: {
         globals: {
           react: 'React',
+          'react-dom': 'ReactDOM',
         },
       },
+    },
+  },
+  resolve: {
+    alias: {
+      app: path.resolve(__dirname, '../src/app'),
+      assets: path.resolve(__dirname, '../src/assets'),
+      common: path.resolve(__dirname, '../src/common'),
+      features: path.resolve(__dirname, '../src/features'),
+      services: path.resolve(__dirname, '../src/services'),
+      theme: path.resolve(__dirname, '../src/theme'),
     },
   },
 };
