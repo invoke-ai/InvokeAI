@@ -81,12 +81,13 @@ def test_env_override():
     # assert conf.root==Path('/tmp')
     
 def test_invocation():
-    invocation = TextToImageInvocation(conf=init1,id='foobar')
+    InvokeAISettings.initconf=init1
+    invocation = TextToImageInvocation(id='foobar')
     assert invocation.steps==18
     assert invocation.scheduler=='k_heun'
     assert invocation.height==512 # default
 
-    invocation = TextToImageInvocation(conf=init1,id='foobar2',steps=30)
+    invocation = TextToImageInvocation(id='foobar2',steps=30)
     assert invocation.steps==30
 
 def test_type_coercion():

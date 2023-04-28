@@ -316,7 +316,7 @@ def test_graph_iterator_invalid_if_multiple_inputs():
 
 def test_graph_iterator_invalid_if_input_not_list():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", promopt = "Banana sushi")
+    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
     n2 = IterateInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
