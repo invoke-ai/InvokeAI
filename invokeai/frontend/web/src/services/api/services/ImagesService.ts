@@ -14,7 +14,7 @@ export class ImagesService {
 
   /**
    * Get Image
-   * Gets a result
+   * Gets an image
    * @returns any Successful Response
    * @throws ApiError
    */
@@ -45,30 +45,62 @@ export class ImagesService {
   }
 
   /**
+   * Delete Image
+   * Deletes an image and its thumbnail
+   * @returns any Successful Response
+   * @throws ApiError
+   */
+  public static deleteImage({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of image to delete
+     */
+    imageType: ImageType,
+    /**
+     * The name of the image to delete
+     */
+    imageName: string,
+  }): CancelablePromise<any> {
+    return __request(OpenAPI, {
+      method: 'DELETE',
+      url: '/api/v1/images/{image_type}/{image_name}',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
    * Get Thumbnail
    * Gets a thumbnail
    * @returns any Successful Response
    * @throws ApiError
    */
   public static getThumbnail({
-    imageType,
-    imageName,
+    thumbnailType,
+    thumbnailName,
   }: {
     /**
-     * The type of image to get
+     * The type of thumbnail to get
      */
-    imageType: ImageType,
+    thumbnailType: ImageType,
     /**
-     * The name of the image to get
+     * The name of the thumbnail to get
      */
-    imageName: string,
+    thumbnailName: string,
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/thumbnails/{image_name}',
+      url: '/api/v1/images/{thumbnail_type}/thumbnails/{thumbnail_name}',
       path: {
-        'image_type': imageType,
-        'image_name': imageName,
+        'thumbnail_type': thumbnailType,
+        'thumbnail_name': thumbnailName,
       },
       errors: {
         422: `Validation Error`,

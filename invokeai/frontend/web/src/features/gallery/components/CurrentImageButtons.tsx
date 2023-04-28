@@ -1,7 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { ButtonGroup, Flex, FlexProps, Link, useToast } from '@chakra-ui/react';
+import {
+  ButtonGroup,
+  Flex,
+  FlexProps,
+  FormControl,
+  Link,
+  useDisclosure,
+  useToast,
+} from '@chakra-ui/react';
 import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -58,6 +66,8 @@ import { useCallback } from 'react';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { imageDeleted } from 'services/thunks/image';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -69,17 +79,14 @@ const currentImageButtonsSelector = createSelector(
     activeTabNameSelector,
     selectedImageSelector,
   ],
-  (
-    system: SystemState,
-    gallery: GalleryState,
-    postprocessing,
-    ui,
-    lightbox,
-    activeTabName,
-    selectedImage
-  ) => {
-    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-      system;
+  (system, gallery, postprocessing, ui, lightbox, activeTabName, image) => {
+    const {
+      isProcessing,
+      isConnected,
+      isGFPGANAvailable,
+      isESRGANAvailable,
+      shouldConfirmOnDelete,
+    } = system;
 
     const { upscalingLevel, facetoolStrength } = postprocessing;
 
@@ -90,6 +97,8 @@ const currentImageButtonsSelector = createSelector(
     const { intermediateImage, currentImage } = gallery;
 
     return {
+      canDeleteImage: isConnected && !isProcessing,
+      shouldConfirmOnDelete,
       isProcessing,
       isConnected,
       isGFPGANAvailable,
@@ -102,7 +111,7 @@ const currentImageButtonsSelector = createSelector(
       activeTabName,
       isLightboxOpen,
       shouldHidePreview,
-      selectedImage,
+      image,
     };
   },
   {
@@ -133,29 +142,48 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     isLightboxOpen,
     activeTabName,
     shouldHidePreview,
-    selectedImage,
+    image,
+    canDeleteImage,
+    shouldConfirmOnDelete,
   } = useAppSelector(currentImageButtonsSelector);
+
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
+  const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
+  const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
+
   const { getUrl, shouldTransformUrls } = useGetUrl();
+
+  const {
+    isOpen: isDeleteDialogOpen,
+    onOpen: onDeleteDialogOpen,
+    onClose: onDeleteDialogClose,
+  } = useDisclosure();
 
   const toast = useToast();
   const { t } = useTranslation();
   const setBothPrompts = useSetBothPrompts();
 
   const handleClickUseAsInitialImage = () => {
-    if (!selectedImage) return;
+    if (!image) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
-    dispatch(initialImageSelected(selectedImage.name));
+    dispatch(initialImageSelected(image.name));
     // dispatch(setInitialImage(currentImage));
 
     // dispatch(setActiveTab('img2img'));
   };
 
   const handleCopyImage = async () => {
-    if (!selectedImage) return;
+    if (!image?.url) {
+      return;
+    }
 
-    const blob = await fetch(getUrl(selectedImage.url)).then((res) =>
-      res.blob()
-    );
+    const url = getUrl(image.url);
+
+    if (!url) {
+      return;
+    }
+
+    const blob = await fetch(url).then((res) => res.blob());
     const data = [new ClipboardItem({ [blob.type]: blob })];
 
     await navigator.clipboard.write(data);
@@ -169,11 +197,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleCopyImageLink = () => {
-    const url = selectedImage
+    const url = image
       ? shouldTransformUrls
-        ? getUrl(selectedImage.url)
-        : window.location.toString() + selectedImage.url
+        ? getUrl(image.url)
+        : window.location.toString() + image.url
       : '';
+
+    if (!url) {
+      return;
+    }
 
     navigator.clipboard.writeText(url).then(() => {
       toast({
@@ -188,7 +220,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'shift+i',
     () => {
-      if (selectedImage) {
+      if (image) {
         handleClickUseAsInitialImage();
         toast({
           title: t('toast.sentToImageToImage'),
@@ -206,7 +238,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [selectedImage]
+    [image]
   );
 
   const handlePreviewVisibility = () => {
@@ -214,7 +246,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   };
 
   const handleClickUseAllParameters = () => {
-    if (!selectedImage) return;
+    if (!image) return;
     // selectedImage.metadata &&
     //   dispatch(setAllParameters(selectedImage.metadata));
     // if (selectedImage.metadata?.image.type === 'img2img') {
@@ -227,11 +259,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'a',
     () => {
-      if (
-        ['txt2img', 'img2img'].includes(
-          selectedImage?.metadata?.sd_metadata?.type
-        )
-      ) {
+      if (['txt2img', 'img2img'].includes(image?.metadata?.sd_metadata?.type)) {
         handleClickUseAllParameters();
         toast({
           title: t('toast.parametersSet'),
@@ -249,18 +277,17 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [selectedImage]
+    [image]
   );
 
   const handleClickUseSeed = () => {
-    selectedImage?.metadata &&
-      dispatch(setSeed(selectedImage.metadata.sd_metadata.seed));
+    image?.metadata && dispatch(setSeed(image.metadata.sd_metadata.seed));
   };
 
   useHotkeys(
     's',
     () => {
-      if (selectedImage?.metadata?.sd_metadata?.seed) {
+      if (image?.metadata?.sd_metadata?.seed) {
         handleClickUseSeed();
         toast({
           title: t('toast.seedSet'),
@@ -278,19 +305,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [selectedImage]
+    [image]
   );
 
   const handleClickUsePrompt = useCallback(() => {
-    if (selectedImage?.metadata?.sd_metadata?.prompt) {
-      setBothPrompts(selectedImage?.metadata?.sd_metadata?.prompt);
+    if (image?.metadata?.sd_metadata?.prompt) {
+      setBothPrompts(image?.metadata?.sd_metadata?.prompt);
     }
-  }, [selectedImage?.metadata?.sd_metadata?.prompt, setBothPrompts]);
+  }, [image?.metadata?.sd_metadata?.prompt, setBothPrompts]);
 
   useHotkeys(
     'p',
     () => {
-      if (selectedImage?.metadata?.sd_metadata?.prompt) {
+      if (image?.metadata?.sd_metadata?.prompt) {
         handleClickUsePrompt();
         toast({
           title: t('toast.promptSet'),
@@ -308,7 +335,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [selectedImage]
+    [image]
   );
 
   const handleClickUpscale = () => {
@@ -318,25 +345,22 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'Shift+U',
     () => {
-      if (
-        isESRGANAvailable &&
-        !shouldDisableToolbarButtons &&
-        isConnected &&
-        !isProcessing &&
-        upscalingLevel
-      ) {
-        handleClickUpscale();
-      } else {
-        toast({
-          title: t('toast.upscalingFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickUpscale();
+    },
+    {
+      enabled: () =>
+        Boolean(
+          isUpscalingEnabled &&
+            isESRGANAvailable &&
+            !shouldDisableToolbarButtons &&
+            isConnected &&
+            !isProcessing &&
+            upscalingLevel
+        ),
     },
     [
-      selectedImage,
+      isUpscalingEnabled,
+      image,
       isESRGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
@@ -352,25 +376,23 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'Shift+R',
     () => {
-      if (
-        isGFPGANAvailable &&
-        !shouldDisableToolbarButtons &&
-        isConnected &&
-        !isProcessing &&
-        facetoolStrength
-      ) {
-        handleClickFixFaces();
-      } else {
-        toast({
-          title: t('toast.faceRestoreFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickFixFaces();
     },
+    {
+      enabled: () =>
+        Boolean(
+          isFaceRestoreEnabled &&
+            isGFPGANAvailable &&
+            !shouldDisableToolbarButtons &&
+            isConnected &&
+            !isProcessing &&
+            facetoolStrength
+        ),
+    },
+
     [
-      selectedImage,
+      isFaceRestoreEnabled,
+      image,
       isGFPGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
@@ -383,7 +405,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
 
   const handleSendToCanvas = () => {
-    if (!selectedImage) return;
+    if (!image) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
     // dispatch(setInitialCanvasImage(selectedImage));
@@ -404,7 +426,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'i',
     () => {
-      if (selectedImage) {
+      if (image) {
         handleClickShowImageDetails();
       } else {
         toast({
@@ -415,217 +437,255 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [selectedImage, shouldShowImageDetails]
+    [image, shouldShowImageDetails]
   );
+
+  const handleInitiateDelete = () => {
+    if (shouldConfirmOnDelete) {
+      onDeleteDialogOpen();
+    } else {
+      handleDelete();
+    }
+  };
+
+  const handleDelete = () => {
+    if (canDeleteImage && image) {
+      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+    }
+  };
+
+  useHotkeys('delete', handleInitiateDelete, [
+    image,
+    shouldConfirmOnDelete,
+    isConnected,
+    isProcessing,
+  ]);
 
   const handleLightBox = () => {
     dispatch(setIsLightboxOpen(!isLightboxOpen));
   };
 
   return (
-    <Flex
-      sx={{
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 2,
-      }}
-      {...props}
-    >
-      <ButtonGroup isAttached={true}>
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              aria-label={`${t('parameters.sendTo')}...`}
-              icon={<FaShareAlt />}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              rowGap: 2,
-            }}
+    <>
+      <Flex
+        sx={{
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 2,
+        }}
+        {...props}
+      >
+        <ButtonGroup isAttached={true}>
+          <IAIPopover
+            triggerComponent={
+              <IAIIconButton
+                isDisabled={!image}
+                aria-label={`${t('parameters.sendTo')}...`}
+                icon={<FaShareAlt />}
+              />
+            }
           >
-            <IAIButton
-              size="sm"
-              onClick={handleClickUseAsInitialImage}
-              leftIcon={<FaShare />}
+            <Flex
+              sx={{
+                flexDirection: 'column',
+                rowGap: 2,
+              }}
             >
-              {t('parameters.sendToImg2Img')}
-            </IAIButton>
-            <IAIButton
-              size="sm"
-              onClick={handleSendToCanvas}
-              leftIcon={<FaShare />}
-            >
-              {t('parameters.sendToUnifiedCanvas')}
-            </IAIButton>
-
-            <IAIButton
-              size="sm"
-              onClick={handleCopyImage}
-              leftIcon={<FaCopy />}
-            >
-              {t('parameters.copyImage')}
-            </IAIButton>
-            <IAIButton
-              size="sm"
-              onClick={handleCopyImageLink}
-              leftIcon={<FaCopy />}
-            >
-              {t('parameters.copyImageToLink')}
-            </IAIButton>
-
-            <Link download={true} href={getUrl(selectedImage!.url)}>
-              <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
-                {t('parameters.downloadImage')}
+              <IAIButton
+                size="sm"
+                onClick={handleClickUseAsInitialImage}
+                leftIcon={<FaShare />}
+              >
+                {t('parameters.sendToImg2Img')}
               </IAIButton>
-            </Link>
-          </Flex>
-        </IAIPopover>
-        <IAIIconButton
-          icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
-          tooltip={
-            !shouldHidePreview
-              ? t('parameters.hidePreview')
-              : t('parameters.showPreview')
-          }
-          aria-label={
-            !shouldHidePreview
-              ? t('parameters.hidePreview')
-              : t('parameters.showPreview')
-          }
-          isChecked={shouldHidePreview}
-          onClick={handlePreviewVisibility}
-        />
-        <IAIIconButton
-          icon={<FaExpand />}
-          tooltip={
-            !isLightboxOpen
-              ? `${t('parameters.openInViewer')} (Z)`
-              : `${t('parameters.closeViewer')} (Z)`
-          }
-          aria-label={
-            !isLightboxOpen
-              ? `${t('parameters.openInViewer')} (Z)`
-              : `${t('parameters.closeViewer')} (Z)`
-          }
-          isChecked={isLightboxOpen}
-          onClick={handleLightBox}
-        />
-      </ButtonGroup>
+              <IAIButton
+                size="sm"
+                onClick={handleSendToCanvas}
+                leftIcon={<FaShare />}
+              >
+                {t('parameters.sendToUnifiedCanvas')}
+              </IAIButton>
 
-      <ButtonGroup isAttached={true}>
-        <IAIIconButton
-          icon={<FaQuoteRight />}
-          tooltip={`${t('parameters.usePrompt')} (P)`}
-          aria-label={`${t('parameters.usePrompt')} (P)`}
-          isDisabled={!selectedImage?.metadata?.sd_metadata?.prompt}
-          onClick={handleClickUsePrompt}
-        />
+              <IAIButton
+                size="sm"
+                onClick={handleCopyImage}
+                leftIcon={<FaCopy />}
+              >
+                {t('parameters.copyImage')}
+              </IAIButton>
+              <IAIButton
+                size="sm"
+                onClick={handleCopyImageLink}
+                leftIcon={<FaCopy />}
+              >
+                {t('parameters.copyImageToLink')}
+              </IAIButton>
 
-        <IAIIconButton
-          icon={<FaSeedling />}
-          tooltip={`${t('parameters.useSeed')} (S)`}
-          aria-label={`${t('parameters.useSeed')} (S)`}
-          isDisabled={!selectedImage?.metadata?.sd_metadata?.seed}
-          onClick={handleClickUseSeed}
-        />
-
-        <IAIIconButton
-          icon={<FaAsterisk />}
-          tooltip={`${t('parameters.useAll')} (A)`}
-          aria-label={`${t('parameters.useAll')} (A)`}
-          isDisabled={
-            !['txt2img', 'img2img'].includes(
-              selectedImage?.metadata?.sd_metadata?.type
-            )
-          }
-          onClick={handleClickUseAllParameters}
-        />
-      </ButtonGroup>
-
-      <ButtonGroup isAttached={true}>
-        <IAIPopover
-          triggerComponent={
+              <Link download={true} href={getUrl(image?.url ?? '')}>
+                <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
+                  {t('parameters.downloadImage')}
+                </IAIButton>
+              </Link>
+            </Flex>
+          </IAIPopover>
+          <IAIIconButton
+            icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
+            tooltip={
+              !shouldHidePreview
+                ? t('parameters.hidePreview')
+                : t('parameters.showPreview')
+            }
+            aria-label={
+              !shouldHidePreview
+                ? t('parameters.hidePreview')
+                : t('parameters.showPreview')
+            }
+            isChecked={shouldHidePreview}
+            onClick={handlePreviewVisibility}
+          />
+          {isLightboxEnabled && (
             <IAIIconButton
-              icon={<FaGrinStars />}
-              aria-label={t('parameters.restoreFaces')}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              rowGap: 4,
-            }}
-          >
-            <FaceRestoreSettings />
-            <IAIButton
-              isDisabled={
-                !isGFPGANAvailable ||
-                !selectedImage ||
-                !(isConnected && !isProcessing) ||
-                !facetoolStrength
+              icon={<FaExpand />}
+              tooltip={
+                !isLightboxOpen
+                  ? `${t('parameters.openInViewer')} (Z)`
+                  : `${t('parameters.closeViewer')} (Z)`
               }
-              onClick={handleClickFixFaces}
-            >
-              {t('parameters.restoreFaces')}
-            </IAIButton>
-          </Flex>
-        </IAIPopover>
-
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              icon={<FaExpandArrowsAlt />}
-              aria-label={t('parameters.upscale')}
-            />
-          }
-        >
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <UpscaleSettings />
-            <IAIButton
-              isDisabled={
-                !isESRGANAvailable ||
-                !selectedImage ||
-                !(isConnected && !isProcessing) ||
-                !upscalingLevel
+              aria-label={
+                !isLightboxOpen
+                  ? `${t('parameters.openInViewer')} (Z)`
+                  : `${t('parameters.closeViewer')} (Z)`
               }
-              onClick={handleClickUpscale}
-            >
-              {t('parameters.upscaleImage')}
-            </IAIButton>
-          </Flex>
-        </IAIPopover>
-      </ButtonGroup>
+              isChecked={isLightboxOpen}
+              onClick={handleLightBox}
+            />
+          )}
+        </ButtonGroup>
 
-      <ButtonGroup isAttached={true}>
-        <IAIIconButton
-          icon={<FaCode />}
-          tooltip={`${t('parameters.info')} (I)`}
-          aria-label={`${t('parameters.info')} (I)`}
-          isChecked={shouldShowImageDetails}
-          onClick={handleClickShowImageDetails}
-        />
-      </ButtonGroup>
+        <ButtonGroup isAttached={true}>
+          <IAIIconButton
+            icon={<FaQuoteRight />}
+            tooltip={`${t('parameters.usePrompt')} (P)`}
+            aria-label={`${t('parameters.usePrompt')} (P)`}
+            isDisabled={!image?.metadata?.sd_metadata?.prompt}
+            onClick={handleClickUsePrompt}
+          />
 
-      {/* <DeleteImageModal image={selectedImage}>
+          <IAIIconButton
+            icon={<FaSeedling />}
+            tooltip={`${t('parameters.useSeed')} (S)`}
+            aria-label={`${t('parameters.useSeed')} (S)`}
+            isDisabled={!image?.metadata?.sd_metadata?.seed}
+            onClick={handleClickUseSeed}
+          />
+
+          <IAIIconButton
+            icon={<FaAsterisk />}
+            tooltip={`${t('parameters.useAll')} (A)`}
+            aria-label={`${t('parameters.useAll')} (A)`}
+            isDisabled={
+              !['txt2img', 'img2img'].includes(
+                image?.metadata?.sd_metadata?.type
+              )
+            }
+            onClick={handleClickUseAllParameters}
+          />
+        </ButtonGroup>
+
+        {(isUpscalingEnabled || isFaceRestoreEnabled) && (
+          <ButtonGroup isAttached={true}>
+            {isFaceRestoreEnabled && (
+              <IAIPopover
+                triggerComponent={
+                  <IAIIconButton
+                    icon={<FaGrinStars />}
+                    aria-label={t('parameters.restoreFaces')}
+                  />
+                }
+              >
+                <Flex
+                  sx={{
+                    flexDirection: 'column',
+                    rowGap: 4,
+                  }}
+                >
+                  <FaceRestoreSettings />
+                  <IAIButton
+                    isDisabled={
+                      !isGFPGANAvailable ||
+                      !image ||
+                      !(isConnected && !isProcessing) ||
+                      !facetoolStrength
+                    }
+                    onClick={handleClickFixFaces}
+                  >
+                    {t('parameters.restoreFaces')}
+                  </IAIButton>
+                </Flex>
+              </IAIPopover>
+            )}
+
+            {isUpscalingEnabled && (
+              <IAIPopover
+                triggerComponent={
+                  <IAIIconButton
+                    icon={<FaExpandArrowsAlt />}
+                    aria-label={t('parameters.upscale')}
+                  />
+                }
+              >
+                <Flex
+                  sx={{
+                    flexDirection: 'column',
+                    gap: 4,
+                  }}
+                >
+                  <UpscaleSettings />
+                  <IAIButton
+                    isDisabled={
+                      !isESRGANAvailable ||
+                      !image ||
+                      !(isConnected && !isProcessing) ||
+                      !upscalingLevel
+                    }
+                    onClick={handleClickUpscale}
+                  >
+                    {t('parameters.upscaleImage')}
+                  </IAIButton>
+                </Flex>
+              </IAIPopover>
+            )}
+          </ButtonGroup>
+        )}
+
+        <ButtonGroup isAttached={true}>
+          <IAIIconButton
+            icon={<FaCode />}
+            tooltip={`${t('parameters.info')} (I)`}
+            aria-label={`${t('parameters.info')} (I)`}
+            isChecked={shouldShowImageDetails}
+            onClick={handleClickShowImageDetails}
+          />
+        </ButtonGroup>
+
         <IAIIconButton
+          onClick={handleInitiateDelete}
           icon={<FaTrash />}
-          tooltip={`${t('parameters.deleteImage')} (Del)`}
-          aria-label={`${t('parameters.deleteImage')} (Del)`}
-          isDisabled={!selectedImage || !isConnected || isProcessing}
+          tooltip={`${t('gallery.deleteImage')} (Del)`}
+          aria-label={`${t('gallery.deleteImage')} (Del)`}
+          isDisabled={!image || !isConnected}
           colorScheme="error"
         />
-      </DeleteImageModal> */}
-    </Flex>
+      </Flex>
+      {image && (
+        <DeleteImageModal
+          isOpen={isDeleteDialogOpen}
+          onClose={onDeleteDialogClose}
+          handleDelete={handleDelete}
+        />
+      )}
+    </>
   );
 };
 

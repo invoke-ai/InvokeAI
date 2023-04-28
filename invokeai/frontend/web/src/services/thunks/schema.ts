@@ -1,4 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { parseSchema } from 'features/nodes/util/parseSchema';
 import { OpenAPIV3 } from 'openapi-types';
 
 export const receivedOpenAPISchema = createAsyncThunk(
@@ -9,6 +10,10 @@ export const receivedOpenAPISchema = createAsyncThunk(
 
     console.debug('OpenAPI schema: ', jsonData);
 
-    return jsonData;
+    const parsedSchema = parseSchema(jsonData);
+
+    console.debug('Parsed schema: ', parsedSchema);
+
+    return parsedSchema;
   }
 );

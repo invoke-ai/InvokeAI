@@ -12,7 +12,7 @@ export const getUrlAlt = (url: string, shouldTransformUrls: boolean) => {
 
 export const useGetUrl = () => {
   const shouldTransformUrls = useAppSelector(
-    (state: RootState) => state.system.shouldTransformUrls
+    (state: RootState) => state.config.shouldTransformUrls
   );
 
   return {

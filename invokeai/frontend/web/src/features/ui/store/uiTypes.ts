@@ -16,8 +16,7 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
-  disabledParameterPanels: string[];
-  disabledTabs: InvokeTabName[];
   openLinearAccordionItems: number[];
+  openGenerateAccordionItems: number[];
   openUnifiedCanvasAccordionItems: number[];
 }

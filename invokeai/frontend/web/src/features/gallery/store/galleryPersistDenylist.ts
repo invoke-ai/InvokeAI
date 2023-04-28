@@ -1,9 +1,9 @@
 import { GalleryState } from './gallerySlice';
 
 /**
- * Gallery slice persist blacklist
+ * Gallery slice persist denylist
  */
-const itemsToBlacklist: (keyof GalleryState)[] = [
+const itemsToDenylist: (keyof GalleryState)[] = [
   'categories',
   'currentCategory',
   'currentImage',
@@ -12,6 +12,6 @@ const itemsToBlacklist: (keyof GalleryState)[] = [
   'intermediateImage',
 ];
 
-export const galleryBlacklist = itemsToBlacklist.map(
-  (blacklistItem) => `gallery.${blacklistItem}`
+export const galleryDenylist = itemsToDenylist.map(
+  (denylistItem) => `gallery.${denylistItem}`
 );

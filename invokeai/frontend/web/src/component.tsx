@@ -1,10 +1,9 @@
-import React, { lazy, PropsWithChildren, useEffect, useState } from 'react';
+import React, { lazy, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { buildMiddleware, store } from './app/store';
 import { persistor } from './persistor';
 import { OpenAPI } from 'services/api';
-import { InvokeTabName } from 'features/ui/store/tabMap';
 import '@fontsource/inter/100.css';
 import '@fontsource/inter/200.css';
 import '@fontsource/inter/300.css';
@@ -15,33 +14,22 @@ import '@fontsource/inter/700.css';
 import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
 
-import Loading from './Loading';
-
-// Localization
-import './i18n';
+import Loading from './common/components/Loading/Loading';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
+import { PartialAppConfig } from 'app/invokeai';
+
+import './i18n';
 
 const App = lazy(() => import('./app/App'));
 const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
-  disabledPanels?: string[];
-  disabledTabs?: InvokeTabName[];
   token?: string;
-  shouldTransformUrls?: boolean;
-  shouldFetchImages?: boolean;
+  config?: PartialAppConfig;
 }
 
-export default function Component({
-  apiUrl,
-  disabledPanels = [],
-  disabledTabs = [],
-  token,
-  children,
-  shouldTransformUrls,
-  shouldFetchImages = false,
-}: Props) {
+export default function Component({ apiUrl, token, config, children }: Props) {
   useEffect(() => {
     // configure API client token
     if (token) {
@@ -69,18 +57,9 @@ export default function Component({
     <React.StrictMode>
       <Provider store={store}>
         <PersistGate loading={<Loading />} persistor={persistor}>
-          <React.Suspense fallback={<Loading showText />}>
+          <React.Suspense fallback={<Loading />}>
             <ThemeLocaleProvider>
-              <App
-                options={{
-                  disabledPanels,
-                  disabledTabs,
-                  shouldTransformUrls,
-                  shouldFetchImages,
-                }}
-              >
-                {children}
-              </App>
+              <App config={config}>{children}</App>
             </ThemeLocaleProvider>
           </React.Suspense>
         </PersistGate>

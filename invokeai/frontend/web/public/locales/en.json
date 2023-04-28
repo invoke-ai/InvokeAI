@@ -8,7 +8,7 @@
         "nextImage": "Next Image",
         "useThisParameter": "Use this parameter",
         "copyMetadataJson": "Copy metadata JSON",
-        "exitViewer": "ExitViewer",
+        "exitViewer": "Exit Viewer",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "rotateCounterClockwise": "Rotate Counter-Clockwise",
@@ -63,7 +63,7 @@
         "postProcessDesc3": "The Invoke AI Command Line Interface offers various other features including Embiggen.",
         "training": "Training",
         "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
-        "trainingDesc2": "InvokeAI already supports training custom embeddings using Textual Inversion using the main script.",
+        "trainingDesc2": "InvokeAI already supports training custom embeddourings using Textual Inversion using the main script.",
         "upload": "Upload",
         "close": "Close",
         "cancel": "Cancel",
@@ -97,7 +97,12 @@
         "statusMergedModels": "Models Merged",
         "pinOptionsPanel": "Pin Options Panel",
         "loading": "Loading",
-        "loadingInvokeAI": "Loading Invoke AI"
+        "loadingInvokeAI": "Loading Invoke AI",
+        "random": "Random",
+        "generate": "Generate",
+        "openInNewTab": "Open in New Tab",
+        "dontAskMeAgain": "Don't ask me again",
+        "areYouSure": "Are you sure?"
     },
     "gallery": {
         "generations": "Generations",
@@ -113,7 +118,10 @@
         "pinGallery": "Pin Gallery",
         "allImagesLoaded": "All Images Loaded",
         "loadMore": "Load More",
-        "noImagesInGallery": "No Images In Gallery"
+        "noImagesInGallery": "No Images In Gallery",
+        "deleteImage": "Delete Image",
+        "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
+        "deleteImagePermanent": "Deleted images cannot be restored."
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",
@@ -505,7 +513,6 @@
         "useAll": "Use All",
         "useInitImg": "Use Initial Image",
         "info": "Info",
-        "deleteImage": "Delete Image",
         "initialImage": "Initial Image",
         "showOptionsPanel": "Show Options Panel",
         "hidePreview": "Hide Preview",

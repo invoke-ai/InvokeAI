@@ -1,11 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
 
-const initialtabsState: UIState = {
+const initialUIState: UIState = {
   activeTab: 0,
   currentTheme: 'dark',
   parametersPanelScrollPosition: 0,
@@ -19,13 +18,12 @@ const initialtabsState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
-  disabledParameterPanels: [],
-  disabledTabs: [],
   openLinearAccordionItems: [],
+  openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
 };
 
-const initialState: UIState = initialtabsState;
+const initialState: UIState = initialUIState;
 
 export const uiSlice = createSlice({
   name: 'ui',
@@ -98,15 +96,9 @@ export const uiSlice = createSlice({
         state.shouldShowParametersPanel = true;
       }
     },
-    setDisabledPanels: (state, action: PayloadAction<string[]>) => {
-      state.disabledParameterPanels = action.payload;
-    },
-    setDisabledTabs: (state, action: PayloadAction<InvokeTabName[]>) => {
-      state.disabledTabs = action.payload;
-    },
     openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
-      if (tabMap[state.activeTab] === 'linear') {
-        state.openLinearAccordionItems = action.payload;
+      if (tabMap[state.activeTab] === 'generate') {
+        state.openGenerateAccordionItems = action.payload;
       }
 
       if (tabMap[state.activeTab] === 'unifiedCanvas') {
@@ -135,8 +127,6 @@ export const {
   togglePinParametersPanel,
   toggleParametersPanel,
   toggleGalleryPanel,
-  setDisabledPanels,
-  setDisabledTabs,
   openAccordionItemsChanged,
 } = uiSlice.actions;
 

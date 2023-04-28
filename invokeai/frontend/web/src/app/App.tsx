@@ -14,55 +14,52 @@ import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from './storeHooks';
-import { PropsWithChildren, useEffect } from 'react';
-import { setDisabledPanels, setDisabledTabs } from 'features/ui/store/uiSlice';
-import { InvokeTabName } from 'features/ui/store/tabMap';
-import { shouldTransformUrlsChanged } from 'features/system/store/systemSlice';
-import { setShouldFetchImages } from 'features/gallery/store/resultsSlice';
+import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Loading from 'common/components/Loading/Loading';
+import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
+import { PartialAppConfig } from './invokeai';
+import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { configChanged } from 'features/system/store/configSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 keepGUIAlive();
 
 interface Props extends PropsWithChildren {
-  options: {
-    disabledPanels: string[];
-    disabledTabs: InvokeTabName[];
-    shouldTransformUrls?: boolean;
-    shouldFetchImages: boolean;
-  };
+  config?: PartialAppConfig;
 }
 
-const App = (props: Props) => {
+const App = ({ config = {}, children }: Props) => {
   useToastWatcher();
+  useGlobalHotkeys();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
+
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
+
+  const isApplicationReady = useIsApplicationReady();
+
+  const [loadingOverridden, setLoadingOverridden] = useState(false);
+
   const { setColorMode } = useColorMode();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    dispatch(setDisabledPanels(props.options.disabledPanels));
-  }, [dispatch, props.options.disabledPanels]);
-
-  useEffect(() => {
-    dispatch(setDisabledTabs(props.options.disabledTabs));
-  }, [dispatch, props.options.disabledTabs]);
-
-  useEffect(() => {
-    dispatch(
-      shouldTransformUrlsChanged(Boolean(props.options.shouldTransformUrls))
-    );
-  }, [dispatch, props.options.shouldTransformUrls]);
-
-  useEffect(() => {
-    dispatch(setShouldFetchImages(props.options.shouldFetchImages));
-  }, [dispatch, props.options.shouldFetchImages]);
+    console.log('Received config: ', config);
+    dispatch(configChanged(config));
+  }, [dispatch, config]);
 
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
   }, [setColorMode, currentTheme]);
 
+  const handleOverrideClicked = useCallback(() => {
+    setLoadingOverridden(true);
+  }, []);
+
   return (
-    <Grid w="100vw" h="100vh">
-      <Lightbox />
+    <Grid w="100vw" h="100vh" position="relative">
+      {isLightboxEnabled && <Lightbox />}
       <ImageUploader>
         <ProgressBar />
         <Grid
@@ -72,7 +69,7 @@ const App = (props: Props) => {
           w={APP_WIDTH}
           h={APP_HEIGHT}
         >
-          {props.children || <SiteHeader />}
+          {children || <SiteHeader />}
           <Flex
             gap={4}
             w={{ base: '100vw', xl: 'full' }}
@@ -83,15 +80,42 @@ const App = (props: Props) => {
             <ImageGalleryPanel />
           </Flex>
         </Grid>
-        <Box>
-          <Console />
-        </Box>
       </ImageUploader>
+
+      <AnimatePresence>
+        {!isApplicationReady && !loadingOverridden && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{ zIndex: 3 }}
+          >
+            <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
+              <Loading />
+            </Box>
+            <Box
+              onClick={handleOverrideClicked}
+              position="absolute"
+              top={0}
+              right={0}
+              cursor="pointer"
+              w="2rem"
+              h="2rem"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Portal>
         <FloatingParametersPanelButtons />
       </Portal>
       <Portal>
         <FloatingGalleryButton />
+      </Portal>
+      <Portal>
+        <Console />
       </Portal>
     </Grid>
   );

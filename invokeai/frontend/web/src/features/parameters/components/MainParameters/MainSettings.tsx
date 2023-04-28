@@ -1,14 +1,16 @@
-import { Flex, VStack } from '@chakra-ui/react';
+import { Box, Flex, VStack } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
+import { ModelSelect } from 'exports';
+import { memo } from 'react';
+import HeightSlider from './HeightSlider';
 import MainCFGScale from './MainCFGScale';
-import MainHeight from './MainHeight';
 import MainIterations from './MainIterations';
 import MainSampler from './MainSampler';
 import MainSteps from './MainSteps';
-import MainWidth from './MainWidth';
+import WidthSlider from './WidthSlider';
 
-export default function MainSettings() {
+const MainSettings = () => {
   const shouldUseSliders = useAppSelector(
     (state: RootState) => state.ui.shouldUseSliders
   );
@@ -18,22 +20,36 @@ export default function MainSettings() {
       <MainIterations />
       <MainSteps />
       <MainCFGScale />
-      <MainWidth />
-      <MainHeight />
-      <MainSampler />
+      <WidthSlider />
+      <HeightSlider />
+      <Flex gap={3} w="full">
+        <Box flexGrow={2}>
+          <MainSampler />
+        </Box>
+        <Box flexGrow={3}>
+          <ModelSelect />
+        </Box>
+      </Flex>
     </VStack>
   ) : (
-    <Flex rowGap={2} flexDirection="column">
-      <Flex columnGap={1}>
+    <Flex gap={3} flexDirection="column">
+      <Flex gap={3}>
         <MainIterations />
         <MainSteps />
         <MainCFGScale />
       </Flex>
-      <Flex columnGap={1}>
-        <MainWidth />
-        <MainHeight />
-        <MainSampler />
+      <WidthSlider />
+      <HeightSlider />
+      <Flex gap={3} w="full">
+        <Box flexGrow={2}>
+          <MainSampler />
+        </Box>
+        <Box flexGrow={3}>
+          <ModelSelect />
+        </Box>
       </Flex>
     </Flex>
   );
-}
+};
+
+export default memo(MainSettings);

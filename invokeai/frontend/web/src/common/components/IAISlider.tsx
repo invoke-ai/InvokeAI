@@ -26,9 +26,18 @@ import {
 import { clamp } from 'lodash';
 
 import { useTranslation } from 'react-i18next';
-import { FocusEvent, memo, useEffect, useMemo, useState } from 'react';
+import {
+  FocusEvent,
+  memo,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 
 export type IAIFullSliderProps = {
   label: string;
@@ -108,31 +117,52 @@ const IAISlider = (props: IAIFullSliderProps) => {
     [max, sliderNumberInputProps?.max]
   );
 
-  const handleSliderChange = (v: number) => {
-    onChange(v);
-  };
+  const handleSliderChange = useCallback(
+    (v: number) => {
+      onChange(v);
+    },
+    [onChange]
+  );
 
-  const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
-    if (e.target.value === '') e.target.value = String(min);
-    const clamped = clamp(
-      isInteger ? Math.floor(Number(e.target.value)) : Number(localInputValue),
-      min,
-      numberInputMax
-    );
-    onChange(clamped);
-  };
+  const handleInputBlur = useCallback(
+    (e: FocusEvent<HTMLInputElement>) => {
+      if (e.target.value === '') {
+        e.target.value = String(min);
+      }
+      const clamped = clamp(
+        isInteger
+          ? Math.floor(Number(e.target.value))
+          : Number(localInputValue),
+        min,
+        numberInputMax
+      );
+      const quantized = roundDownToMultiple(clamped, step);
+      onChange(quantized);
+      setLocalInputValue(quantized);
+    },
+    [isInteger, localInputValue, min, numberInputMax, onChange, step]
+  );
 
-  const handleInputChange = (v: number | string) => {
+  const handleInputChange = useCallback((v: number | string) => {
     setLocalInputValue(v);
-  };
+  }, []);
 
-  const handleResetDisable = () => {
-    if (!handleReset) return;
+  const handleResetDisable = useCallback(() => {
+    if (!handleReset) {
+      return;
+    }
     handleReset();
-  };
+  }, [handleReset]);
+
+  const forceInputBlur = useCallback((e: MouseEvent) => {
+    if (e.target instanceof HTMLDivElement) {
+      e.target.focus();
+    }
+  }, []);
 
   return (
     <FormControl
+      onClick={forceInputBlur}
       sx={
         isCompact
           ? {
@@ -215,6 +245,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             value={localInputValue}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
+            focusInputOnChange={false}
             {...sliderNumberInputProps}
           >
             <NumberInputField
@@ -237,7 +268,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
           <IAIIconButton
             size="sm"
             aria-label={t('accessibility.reset')}
-            tooltip="Reset"
+            tooltip={t('accessibility.reset')}
             icon={<BiReset />}
             isDisabled={isDisabled}
             onClick={handleResetDisable}

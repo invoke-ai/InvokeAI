@@ -15,8 +15,7 @@ import { buildInputFieldValue } from '../util/fieldValueBuilders';
 
 const templatesSelector = createSelector(
   [(state: RootState) => state.nodes],
-  (nodes) => nodes.invocationTemplates,
-  { memoizeOptions: { resultEqualityCheck: (a, b) => true } }
+  (nodes) => nodes.invocationTemplates
 );
 
 export const useBuildInvocation = () => {

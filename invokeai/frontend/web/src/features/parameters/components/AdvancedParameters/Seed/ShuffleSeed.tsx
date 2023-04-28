@@ -3,8 +3,10 @@ import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import randomInt from 'common/util/randomInt';
+import { IAIIconButton } from 'exports';
 import { setSeed } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
+import { FaRandom } from 'react-icons/fa';
 
 export default function ShuffleSeed() {
   const dispatch = useAppDispatch();
@@ -17,13 +19,20 @@ export default function ShuffleSeed() {
     dispatch(setSeed(randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)));
 
   return (
-    <Button
+    <IAIIconButton
       size="sm"
       isDisabled={shouldRandomizeSeed}
+      aria-label={t('parameters.shuffle')}
+      tooltip={t('parameters.shuffle')}
+      icon={<FaRandom />}
       onClick={handleClickRandomizeSeed}
-      padding="0 1.5rem"
-    >
-      <p>{t('parameters.shuffle')}</p>
-    </Button>
+    />
+    // <Button
+    //   size="sm"
+    //   onClick={handleClickRandomizeSeed}
+    //   padding="0 1.5rem"
+    // >
+    //   <p>{t('parameters.shuffle')}</p>
+    // </Button>
   );
 }

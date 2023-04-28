@@ -1,6 +1,5 @@
-import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { ChangeEvent } from 'react';
+import { ChangeEvent, memo } from 'react';
 import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 
@@ -39,21 +38,16 @@ const ModelSelect = () => {
   };
 
   return (
-    <Flex
-      style={{
-        paddingInlineStart: 1.5,
-      }}
-    >
-      <IAISelect
-        style={{ fontSize: 'sm' }}
-        aria-label={t('accessibility.modelSelect')}
-        tooltip={selectedModel?.description || ''}
-        value={selectedModel?.name || undefined}
-        validValues={allModelNames}
-        onChange={handleChangeModel}
-      />
-    </Flex>
+    <IAISelect
+      label={t('modelManager.model')}
+      style={{ fontSize: 'sm' }}
+      aria-label={t('accessibility.modelSelect')}
+      tooltip={selectedModel?.description || ''}
+      value={selectedModel?.name || undefined}
+      validValues={allModelNames}
+      onChange={handleChangeModel}
+    />
   );
 };
 
-export default ModelSelect;
+export default memo(ModelSelect);

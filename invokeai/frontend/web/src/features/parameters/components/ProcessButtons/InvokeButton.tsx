@@ -11,7 +11,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
-import { linearGraphBuilt, sessionCreated } from 'services/thunks/session';
+import { generateGraphBuilt, sessionCreated } from 'services/thunks/session';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -26,7 +26,7 @@ export default function InvokeButton(props: InvokeButton) {
 
   const handleClickGenerate = () => {
     // dispatch(generateImage(activeTabName));
-    dispatch(linearGraphBuilt());
+    dispatch(generateGraphBuilt());
   };
 
   const { t } = useTranslation();

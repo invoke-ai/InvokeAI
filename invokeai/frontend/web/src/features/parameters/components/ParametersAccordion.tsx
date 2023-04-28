@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { tabMap } from 'features/ui/store/tabMap';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { openAccordionItemsChanged } from 'features/ui/store/uiSlice';
-import { filter } from 'lodash';
+import { map } from 'lodash';
 import { ReactNode, useCallback } from 'react';
 import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 
@@ -14,12 +14,11 @@ const parametersAccordionSelector = createSelector([uiSelector], (uiSlice) => {
     activeTab,
     openLinearAccordionItems,
     openUnifiedCanvasAccordionItems,
-    disabledParameterPanels,
   } = uiSlice;
 
   let openAccordions: number[] = [];
 
-  if (tabMap[activeTab] === 'linear') {
+  if (tabMap[activeTab] === 'generate') {
     openAccordions = openLinearAccordionItems;
   }
 
@@ -29,7 +28,6 @@ const parametersAccordionSelector = createSelector([uiSelector], (uiSlice) => {
 
   return {
     openAccordions,
-    disabledParameterPanels,
   };
 });
 
@@ -53,9 +51,7 @@ type ParametersAccordionProps = {
  * Main container for generation and processing parameters.
  */
 const ParametersAccordion = ({ accordionItems }: ParametersAccordionProps) => {
-  const { openAccordions, disabledParameterPanels } = useAppSelector(
-    parametersAccordionSelector
-  );
+  const { openAccordions } = useAppSelector(parametersAccordionSelector);
 
   const dispatch = useAppDispatch();
 
@@ -68,20 +64,16 @@ const ParametersAccordion = ({ accordionItems }: ParametersAccordionProps) => {
   };
 
   // Render function for accordion items
-  const renderAccordionItems = useCallback(() => {
-    // Filter out disabled accordions
-    const filteredAccordionItems = filter(
-      accordionItems,
-      (item) => disabledParameterPanels.indexOf(item.name) === -1
-    );
-
-    return filteredAccordionItems.map((accordionItem) => (
-      <InvokeAccordionItem
-        key={accordionItem.name}
-        accordionItem={accordionItem}
-      />
-    ));
-  }, [disabledParameterPanels, accordionItems]);
+  const renderAccordionItems = useCallback(
+    () =>
+      map(accordionItems, (accordionItem) => (
+        <InvokeAccordionItem
+          key={accordionItem.name}
+          accordionItem={accordionItem}
+        />
+      )),
+    [accordionItems]
+  );
 
   return (
     <Accordion
