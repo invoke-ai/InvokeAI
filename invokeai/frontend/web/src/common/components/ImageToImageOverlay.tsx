@@ -1,12 +1,12 @@
 import { Badge, Box, ButtonGroup, Flex } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { useCallback } from 'react';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaUndo, FaUpload } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
-import { Image } from 'app/invokeai';
+import { Image } from 'app/types/invokeai';
 
 type ImageToImageOverlayProps = {
   setIsLoaded: (isLoaded: boolean) => void;

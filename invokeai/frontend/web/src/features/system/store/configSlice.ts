@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { AppConfig, PartialAppConfig } from 'app/invokeai';
+import { AppConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash';
 
 const initialConfigState: AppConfig = {

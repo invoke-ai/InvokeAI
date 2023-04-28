@@ -3,7 +3,6 @@ import Console from 'features/system/components/Console';
 import ProgressBar from 'features/system/components/ProgressBar';
 import SiteHeader from 'features/system/components/SiteHeader';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
-import { keepGUIAlive } from './utils';
 
 import useToastWatcher from 'features/system/hooks/useToastWatcher';
 
@@ -13,23 +12,27 @@ import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
-import { useAppDispatch, useAppSelector } from './storeHooks';
-import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import {
+  memo,
+  PropsWithChildren,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Loading from 'common/components/Loading/Loading';
 import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
-import { PartialAppConfig } from './invokeai';
+import { PartialAppConfig } from 'app/types/invokeai';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-
-keepGUIAlive();
 
 interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
 }
 
-const App = ({ config = {}, children }: Props) => {
+const InvokeAIUI = ({ config = {}, children }: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
 
@@ -121,4 +124,4 @@ const App = ({ config = {}, children }: Props) => {
   );
 };
 
-export default App;
+export default memo(InvokeAIUI);

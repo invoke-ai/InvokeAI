@@ -1,4 +1,4 @@
-import { AppDispatch, AppGetState } from 'app/store';
+import { AppDispatch, AppGetState } from 'app/store/store';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { debounce } from 'lodash';
 import { setDoesCanvasNeedScaling } from '../canvasSlice';

@@ -2,22 +2,7 @@
 
 import { InProgressImageType } from 'features/system/store/systemSlice';
 
-// Valid samplers
-export const SAMPLERS: Array<string> = [
-  'ddim',
-  'plms',
-  'k_lms',
-  'k_dpm_2',
-  'k_dpm_2_a',
-  'k_dpmpp_2',
-  'k_dpmpp_2_a',
-  'k_euler',
-  'k_euler_a',
-  'k_heun',
-];
-
-// Valid Diffusers Samplers
-export const DIFFUSERS_SAMPLERS: Array<string> = [
+export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'ddim',
   'plms',
   'k_lms',

@@ -7,8 +7,8 @@ import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SiteHeaderMenu from './SiteHeaderMenu';
 import useResolution from 'common/hooks/useResolution';
 import { FaBars } from 'react-icons/fa';
-import { IAIIconButton } from 'exports';
 import { useTranslation } from 'react-i18next';
+import IAIIconButton from 'common/components/IAIIconButton';
 
 /**
  * Header, includes color mode toggle, settings button, status message.

@@ -3,14 +3,14 @@ import { ChangeEvent, memo } from 'react';
 import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import {
   modelSelected,
   selectedModelSelector,
   selectModelsIds,
 } from '../store/modelSlice';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 
 const selector = createSelector(
   [(state: RootState) => state],

@@ -1,6 +1,6 @@
 import { createEntityAdapter, PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { keys, sample } from 'lodash';
 import { CkptModelInfo, DiffusersModelInfo } from 'services/api';
 import { receivedModels } from 'services/thunks/model';

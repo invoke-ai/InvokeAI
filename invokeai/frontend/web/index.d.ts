@@ -2,7 +2,7 @@ import React, { PropsWithChildren } from 'react';
 import { IAIPopoverProps } from '../web/src/common/components/IAIPopover';
 import { IAIIconButtonProps } from '../web/src/common/components/IAIIconButton';
 import { InvokeTabName } from 'features/ui/store/tabMap';
-import { PartialAppConfig } from 'app/invokeai';
+import { PartialAppConfig } from 'app/types/invokeai';
 
 export {};
 

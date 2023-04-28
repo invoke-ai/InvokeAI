@@ -19,7 +19,7 @@ import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import modelsReducer from 'features/system/store/modelSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 
-import { socketioMiddleware } from './socketio/middleware';
+import { socketioMiddleware } from '../socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
 import { canvasDenylist } from 'features/canvas/store/canvasPersistDenylist';
 import { galleryDenylist } from 'features/gallery/store/galleryPersistDenylist';

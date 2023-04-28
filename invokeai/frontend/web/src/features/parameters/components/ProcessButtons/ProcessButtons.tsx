@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import CancelButton from './CancelButton';
 import InvokeButton from './InvokeButton';

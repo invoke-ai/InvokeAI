@@ -1,7 +1,7 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/invokeai';
+import { Image } from 'app/types/invokeai';
 
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,

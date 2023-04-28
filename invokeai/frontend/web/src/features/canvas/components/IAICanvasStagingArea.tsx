@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { GroupConfig } from 'konva/lib/Group';

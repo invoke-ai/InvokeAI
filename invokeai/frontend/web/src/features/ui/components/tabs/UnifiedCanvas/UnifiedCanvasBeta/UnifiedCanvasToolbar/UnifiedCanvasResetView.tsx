@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 import { resetCanvasView } from 'features/canvas/store/canvasSlice';

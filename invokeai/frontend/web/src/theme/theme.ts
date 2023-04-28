@@ -1,7 +1,7 @@
 import { ThemeOverride } from '@chakra-ui/react';
 import type { StyleFunctionProps } from '@chakra-ui/styled-system';
 
-import { invokeAIThemeColors } from './colors/invokeAI';
+import { invokeAIThemeColors } from 'theme/colors/invokeAI';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
 import { checkboxTheme } from './components/checkbox';

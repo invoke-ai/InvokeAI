@@ -1,4 +1,4 @@
-import { createAppAsyncThunk } from 'app/storeUtils';
+import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { Model } from 'features/system/store/modelSlice';
 import { reduce } from 'lodash';
 import { ModelsService } from 'services/api';

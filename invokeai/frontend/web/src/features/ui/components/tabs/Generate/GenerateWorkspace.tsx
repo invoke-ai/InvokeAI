@@ -1,10 +1,10 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import GenerateContent from './GenerateContent';
 import GenerateParameters from './GenerateParameters';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import Scrollable from '../../common/Scrollable';
 import ParametersSlide from '../../common/ParametersSlide';
 import AnimatedImageToImagePanel from 'features/parameters/components/AnimatedImageToImagePanel';
