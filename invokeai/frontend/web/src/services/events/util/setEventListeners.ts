@@ -1,5 +1,5 @@
 import { MiddlewareAPI } from '@reduxjs/toolkit';
-import { AppDispatch, RootState } from 'app/store';
+import { AppDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
 import { sessionCanceled } from 'services/thunks/session';
 import { Socket } from 'socket.io-client';

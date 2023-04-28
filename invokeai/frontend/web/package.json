@@ -15,6 +15,9 @@
     }
   },
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
@@ -53,7 +56,6 @@
   },
   "dependencies": {
     "@chakra-ui/anatomy": "^2.1.1",
-    "@chakra-ui/cli": "^2.4.0",
     "@chakra-ui/icons": "^2.0.19",
     "@chakra-ui/react": "^2.6.0",
     "@chakra-ui/styled-system": "^2.9.0",
@@ -97,7 +99,9 @@
   },
   "peerDependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "ts-toolbelt": "^9.6.0",
+    "@chakra-ui/cli": "^2.4.0"
   },
   "devDependencies": {
     "@types/dateformat": "^5.0.0",

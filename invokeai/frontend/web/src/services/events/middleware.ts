@@ -32,7 +32,7 @@ import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { isImageOutput } from 'services/types/guards';
 import { imageReceived, thumbnailReceived } from 'services/thunks/image';
-import { setEventListeners } from './util/setEventListeners';
+import { setEventListeners } from 'services/events/util/setEventListeners';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
