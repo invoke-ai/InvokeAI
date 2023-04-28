@@ -1,7 +1,20 @@
 {
-  "name": "invoke-ai-ui",
+  "name": "@invoke-ai/invoke-ai-ui",
   "private": true,
   "version": "0.0.1",
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  },
+  "main": "./dist/invoke-ai-ui.umd.js",
+  "module": "./dist/invoke-ai-ui.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/invoke-ai-ui.es.js",
+      "require": "./dist/invoke-ai-ui.umd.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
   "scripts": {
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
@@ -85,6 +98,7 @@
   "devDependencies": {
     "@types/dateformat": "^5.0.0",
     "@types/lodash": "^4.14.194",
+    "@types/node": "^18.16.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.1",
     "@types/react-transition-group": "^4.4.5",
@@ -112,6 +126,7 @@
     "terser": "^5.17.1",
     "ts-toolbelt": "^9.6.0",
     "vite": "^4.3.3",
+    "vite-plugin-dts": "^2.3.0",
     "vite-plugin-eslint": "^1.8.1",
     "vite-tsconfig-paths": "^4.2.0",
     "yarn": "^1.22.19"
