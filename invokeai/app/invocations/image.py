@@ -12,7 +12,7 @@ from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
 from ..models.image import ImageField, ImageType
-from ..util.thumbnails import create_thumbnail
+from ..util.thumbnails import make_thumbnail
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
