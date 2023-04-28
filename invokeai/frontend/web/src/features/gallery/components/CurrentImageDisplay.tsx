@@ -1,8 +1,8 @@
 import { Flex, Icon } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { MdPhoto } from 'react-icons/md';
 import { selectedImageSelector } from '../store/gallerySelectors';

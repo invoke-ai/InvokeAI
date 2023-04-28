@@ -29,7 +29,7 @@ import ParametersAccordion, {
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
-import { findIndex } from 'lodash';
+import { findIndex } from 'lodash-es';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';

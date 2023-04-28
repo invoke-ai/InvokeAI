@@ -1,6 +1,6 @@
-import { AppFeature } from 'app/invokeai';
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { AppFeature } from 'app/types/invokeai';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
 
 export const useFeatureStatus = (feature: AppFeature) => {

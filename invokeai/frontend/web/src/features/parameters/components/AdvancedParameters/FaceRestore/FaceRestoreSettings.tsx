@@ -1,6 +1,6 @@
 import { VStack } from '@chakra-ui/react';
-import { useAppSelector } from 'app/storeHooks';
-import type { RootState } from 'app/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import type { RootState } from 'app/store/store';
 import FaceRestoreType from './FaceRestoreType';
 import FaceRestoreStrength from './FaceRestoreStrength';
 import CodeformerFidelity from './CodeformerFidelity';

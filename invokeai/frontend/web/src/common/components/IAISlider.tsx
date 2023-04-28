@@ -23,7 +23,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
 
 import { useTranslation } from 'react-i18next';
 import {

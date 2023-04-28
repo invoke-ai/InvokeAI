@@ -1,8 +1,8 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useTranslation } from 'react-i18next';
 import roundToHundreth from '../util/roundToHundreth';

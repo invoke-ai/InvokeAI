@@ -9,13 +9,13 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { configSelector } from 'features/system/store/configSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent, memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

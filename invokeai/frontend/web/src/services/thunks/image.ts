@@ -1,7 +1,7 @@
 import { isFulfilled, isRejected } from '@reduxjs/toolkit';
-import { createAppAsyncThunk } from 'app/storeUtils';
+import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
 import { ImagesService } from 'services/api';
 import { getHeaders } from 'services/util/getHeaders';
 

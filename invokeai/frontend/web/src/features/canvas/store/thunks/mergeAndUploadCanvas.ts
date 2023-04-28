@@ -1,6 +1,6 @@
 import { AnyAction, ThunkAction } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
-import { RootState } from 'app/store';
+import * as InvokeAI from 'app/types/invokeai';
+import { RootState } from 'app/store/store';
 import { addImage } from 'features/gallery/store/gallerySlice';
 import {
   addToast,

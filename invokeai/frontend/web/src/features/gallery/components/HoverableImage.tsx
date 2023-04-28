@@ -10,7 +10,7 @@ import {
   useTheme,
   useToast,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imageSelected,
   setCurrentImage,
@@ -32,7 +32,7 @@ import {
 } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
@@ -53,7 +53,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import { configSelector } from 'features/system/store/configSelectors';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 export const selector = createSelector(
   [
@@ -151,8 +151,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUsePrompt = () => {
-    if (image.metadata?.sd_metadata?.prompt) {
-      setBothPrompts(image.metadata?.sd_metadata?.prompt);
+    if (typeof image.metadata?.invokeai?.node?.prompt === 'string') {
+      setBothPrompts(image.metadata?.invokeai?.node?.prompt);
     }
     toast({
       title: t('toast.promptSet'),
@@ -163,8 +163,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseSeed = () => {
-    image.metadata.sd_metadata &&
-      dispatch(setSeed(image.metadata.sd_metadata.image.seed));
+    typeof image.metadata.invokeai?.node?.seed === 'number' &&
+      dispatch(setSeed(image.metadata.invokeai?.node?.seed));
     toast({
       title: t('toast.seedSet'),
       status: 'success',
@@ -195,38 +195,39 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseAllParameters = () => {
-    metadata.sd_metadata && dispatch(setAllParameters(metadata.sd_metadata));
-    toast({
-      title: t('toast.parametersSet'),
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
+    // metadata.invokeai?.node &&
+    //   dispatch(setAllParameters(metadata.invokeai?.node));
+    // toast({
+    //   title: t('toast.parametersSet'),
+    //   status: 'success',
+    //   duration: 2500,
+    //   isClosable: true,
+    // });
   };
 
   const handleUseInitialImage = async () => {
-    if (metadata.sd_metadata?.image?.init_image_path) {
-      const response = await fetch(
-        metadata.sd_metadata?.image?.init_image_path
-      );
-      if (response.ok) {
-        dispatch(setAllImageToImageParameters(metadata?.sd_metadata));
-        toast({
-          title: t('toast.initialImageSet'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
-        return;
-      }
-    }
-    toast({
-      title: t('toast.initialImageNotSet'),
-      description: t('toast.initialImageNotSetDesc'),
-      status: 'error',
-      duration: 2500,
-      isClosable: true,
-    });
+    // if (metadata.invokeai?.node?.image?.init_image_path) {
+    //   const response = await fetch(
+    //     metadata.invokeai?.node?.image?.init_image_path
+    //   );
+    //   if (response.ok) {
+    //     dispatch(setAllImageToImageParameters(metadata?.invokeai?.node));
+    //     toast({
+    //       title: t('toast.initialImageSet'),
+    //       status: 'success',
+    //       duration: 2500,
+    //       isClosable: true,
+    //     });
+    //     return;
+    //   }
+    // }
+    // toast({
+    //   title: t('toast.initialImageNotSet'),
+    //   description: t('toast.initialImageNotSetDesc'),
+    //   status: 'error',
+    //   duration: 2500,
+    //   isClosable: true,
+    // });
   };
 
   const handleSelectImage = () => {
@@ -268,7 +269,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUsePrompt}
-              isDisabled={image?.metadata?.sd_metadata?.prompt === undefined}
+              isDisabled={image?.metadata?.invokeai?.node?.prompt === undefined}
             >
               {t('parameters.usePrompt')}
             </MenuItem>
@@ -276,14 +277,14 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseSeed}
-              isDisabled={image?.metadata?.sd_metadata?.seed === undefined}
+              isDisabled={image?.metadata?.invokeai?.node?.seed === undefined}
             >
               {t('parameters.useSeed')}
             </MenuItem>
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseInitialImage}
-              isDisabled={image?.metadata?.sd_metadata?.type !== 'img2img'}
+              isDisabled={image?.metadata?.invokeai?.node?.type !== 'img2img'}
             >
               {t('parameters.useInitImg')}
             </MenuItem>
@@ -292,7 +293,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               onClickCapture={handleUseAllParameters}
               isDisabled={
                 !['txt2img', 'img2img'].includes(
-                  image?.metadata?.sd_metadata?.type
+                  String(image?.metadata?.invokeai?.node?.type)
                 )
               }
             >

@@ -1,4 +1,4 @@
-import { createAppAsyncThunk } from 'app/storeUtils';
+import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { SessionsService } from 'services/api';
 import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';

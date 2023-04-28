@@ -1,5 +1,5 @@
 import { Flex, Grid } from '@chakra-ui/react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import ModelSelect from './ModelSelect';
 import StatusIndicator from './StatusIndicator';
 
@@ -7,8 +7,8 @@ import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SiteHeaderMenu from './SiteHeaderMenu';
 import useResolution from 'common/hooks/useResolution';
 import { FaBars } from 'react-icons/fa';
-import { IAIIconButton } from 'exports';
 import { useTranslation } from 'react-i18next';
+import IAIIconButton from 'common/components/IAIIconButton';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
@@ -65,5 +65,4 @@ const SiteHeader = () => {
   );
 };
 
-SiteHeader.displayName = 'SiteHeader';
-export default SiteHeader;
+export default memo(SiteHeader);

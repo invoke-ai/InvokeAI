@@ -1,6 +1,6 @@
 import { Flex, Text, Image } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import InvokeAILogoImage from 'assets/images/logo.png';
 
 const InvokeAILogoComponent = () => {
