@@ -258,8 +258,6 @@ class InvokeAIAppConfig(InvokeAISettings):
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
         self.parse_args(argv)
-        if not self.root:
-            self.root = self.find_root()
         if not conf:
             try:
                 conf = OmegaConf.load(self.root_dir / INIT_FILE)

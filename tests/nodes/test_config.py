@@ -4,6 +4,7 @@ import pytest
 from omegaconf import OmegaConf
 from pathlib import Path
 
+os.environ['INVOKEAI_ROOT']='/tmp'
 from invokeai.app.services.config import InvokeAIAppConfig, InvokeAISettings
 from invokeai.app.invocations.generate import TextToImageInvocation
 
@@ -74,6 +75,8 @@ def test_env_override():
 
     conf = InvokeAIAppConfig(conf=init1,argv=[],max_loaded_models=20)
     assert conf.max_loaded_models==20
+
+    assert conf.root==Path('/tmp')
     
 def test_invocation():
     invocation = TextToImageInvocation(conf=init1,id='foobar')
