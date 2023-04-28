@@ -1,4 +1,4 @@
-"""enum
+"""
 Manage a cache of Stable Diffusion model files for fast switching.
 They are moved between GPU and CPU as necessary. If CPU memory falls
 below a preset minimum, the least recently used model will be
@@ -1108,11 +1108,8 @@ class ModelManager(object):
 >> invokeai/models/diffusers to invokeai/models/hub due to a change introduced by
 >> diffusers version 0.14. InvokeAI will now move all models from the "diffusers" directory
 >> into "hub" and then remove the diffusers directory. This is a quick, safe, one-time
->> operation. However if you have customized either of these directories and need to
->> make adjustments, please press ctrl-C now to abort and relaunch InvokeAI when you are ready.
->> Otherwise press <enter> to continue."""
+>> operation."""
         )
-        input("continue> ")
 
         # transformer files get moved into the hub directory
         if cls._is_huggingface_hub_directory_present():

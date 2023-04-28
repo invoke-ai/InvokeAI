@@ -61,6 +61,7 @@ dependencies = [
   "picklescan",
   "pillow",
   "prompt-toolkit",
+  "pympler==1.0.1",
   "pypatchmatch",
   "pyreadline3",
   "python-multipart==0.0.6",
