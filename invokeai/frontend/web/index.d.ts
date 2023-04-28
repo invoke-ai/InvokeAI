@@ -1,6 +1,8 @@
 import React, { PropsWithChildren } from 'react';
 import { IAIPopoverProps } from '../web/src/common/components/IAIPopover';
 import { IAIIconButtonProps } from '../web/src/common/components/IAIIconButton';
+import { InvokeTabName } from 'features/ui/store/tabMap';
+import { PartialAppConfig } from 'app/invokeai';
 
 export {};
 
@@ -64,9 +66,23 @@ declare module '@invoke-ai/invoke-ai-ui' {
   declare class SettingsModal extends React.Component<SettingsModalProps> {
     public constructor(props: SettingsModalProps);
   }
+
+  declare class StatusIndicator extends React.Component<StatusIndicatorProps> {
+    public constructor(props: StatusIndicatorProps);
+  }
+
+  declare class ModelSelect extends React.Component<ModelSelectProps> {
+    public constructor(props: ModelSelectProps);
+  }
 }
 
-declare function Invoke(props: PropsWithChildren): JSX.Element;
+interface InvokeProps extends PropsWithChildren {
+  apiUrl?: string;
+  token?: string;
+  config?: PartialAppConfig;
+}
+
+declare function Invoke(props: InvokeProps): JSX.Element;
 
 export {
   ThemeChanger,
@@ -74,5 +90,7 @@ export {
   IAIPopover,
   IAIIconButton,
   SettingsModal,
+  StatusIndicator,
+  ModelSelect,
 };
 export = Invoke;

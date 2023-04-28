@@ -1,21 +1,22 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
-from argparse import Namespace
 
 import invokeai.backend.util.logging as log
 
+from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
-from ..services.graph import GraphExecutionState
+from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_storage import DiskImageStorage
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
+from ..services.metadata import PngMetadataService
 from .events import FastAPIEventService
 
 
@@ -58,7 +59,9 @@ class ApiDependencies:
 
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
 
-        images = DiskImageStorage(f'{output_folder}/images')
+        metadata = PngMetadataService()
+
+        images = DiskImageStorage(f'{output_folder}/images', metadata_service=metadata)
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
@@ -68,13 +71,19 @@ class ApiDependencies:
             events=events,
             latents=latents,
             images=images,
+            metadata=metadata,
             queue=MemoryInvocationQueue(),
+            graph_library=SqliteItemStorage[LibraryGraph](
+                filename=db_location, table_name="graphs"
+            ),
             graph_execution_manager=SqliteItemStorage[GraphExecutionState](
                 filename=db_location, table_name="graph_executions"
             ),
             processor=DefaultInvocationProcessor(),
             restoration=RestorationServices(config),
         )
+
+        create_system_graphs(services.graph_library)
 
         ApiDependencies.invoker = Invoker(services)
 

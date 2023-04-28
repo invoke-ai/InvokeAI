@@ -1,46 +1,85 @@
-import { RootState } from 'app/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setCfgScale } from 'features/parameters/store/generationSlice';
+import { configSelector } from 'features/system/store/configSelectors';
+import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function MainCFGScale() {
+const selector = createSelector(
+  [generationSelector, configSelector, uiSelector, hotkeysSelector],
+  (generation, config, ui, hotkeys) => {
+    const { initial, min, sliderMax, inputMax } = config.sd.guidance;
+    const { cfgScale } = generation;
+    const { shouldUseSliders } = ui;
+    const { shift } = hotkeys;
+
+    return {
+      cfgScale,
+      initial,
+      min,
+      sliderMax,
+      inputMax,
+      shouldUseSliders,
+      shift,
+    };
+  }
+);
+
+const GuidanceScale = () => {
+  const {
+    cfgScale,
+    initial,
+    min,
+    sliderMax,
+    inputMax,
+    shouldUseSliders,
+    shift,
+  } = useAppSelector(selector);
   const dispatch = useAppDispatch();
-  const cfgScale = useAppSelector(
-    (state: RootState) => state.generation.cfgScale
-  );
-  const shouldUseSliders = useAppSelector(
-    (state: RootState) => state.ui.shouldUseSliders
-  );
   const { t } = useTranslation();
 
-  const handleChangeCfgScale = (v: number) => dispatch(setCfgScale(v));
+  const handleChange = useCallback(
+    (v: number) => dispatch(setCfgScale(v)),
+    [dispatch]
+  );
+
+  const handleReset = useCallback(
+    () => dispatch(setCfgScale(initial)),
+    [dispatch, initial]
+  );
 
   return shouldUseSliders ? (
     <IAISlider
       label={t('parameters.cfgScale')}
-      step={0.5}
-      min={1.01}
-      max={30}
-      onChange={handleChangeCfgScale}
-      handleReset={() => dispatch(setCfgScale(7.5))}
+      step={shift ? 0.1 : 0.5}
+      min={min}
+      max={sliderMax}
+      onChange={handleChange}
+      handleReset={handleReset}
       value={cfgScale}
-      sliderNumberInputProps={{ max: 200 }}
+      sliderNumberInputProps={{ max: inputMax }}
       withInput
       withReset
       withSliderMarks
+      isInteger={false}
     />
   ) : (
     <IAINumberInput
       label={t('parameters.cfgScale')}
       step={0.5}
-      min={1.01}
-      max={200}
-      onChange={handleChangeCfgScale}
+      min={min}
+      max={inputMax}
+      onChange={handleChange}
       value={cfgScale}
       isInteger={false}
       numberInputFieldProps={{ textAlign: 'center' }}
     />
   );
-}
+};
+
+export default memo(GuidanceScale);

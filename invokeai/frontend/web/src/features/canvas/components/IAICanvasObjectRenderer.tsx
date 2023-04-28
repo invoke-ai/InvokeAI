@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { isEqual } from 'lodash';
@@ -32,6 +33,7 @@ const selector = createSelector(
 
 const IAICanvasObjectRenderer = () => {
   const { objects } = useAppSelector(selector);
+  const { getUrl } = useGetUrl();
 
   if (!objects) return null;
 
@@ -40,7 +42,12 @@ const IAICanvasObjectRenderer = () => {
       {objects.map((obj, i) => {
         if (isCanvasBaseImage(obj)) {
           return (
-            <IAICanvasImage key={i} x={obj.x} y={obj.y} url={obj.image.url} />
+            <IAICanvasImage
+              key={i}
+              x={obj.x}
+              y={obj.y}
+              url={getUrl(obj.image.url)}
+            />
           );
         } else if (isCanvasBaseLine(obj)) {
           const line = (

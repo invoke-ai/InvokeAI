@@ -105,7 +105,7 @@ export const mergeAndUploadCanvas =
 
     const { url, width, height } = image;
 
-    const newImage: InvokeAI.Image = {
+    const newImage: InvokeAI._Image = {
       uuid: uuidv4(),
       category: shouldSaveToGallery ? 'result' : 'user',
       ...image,

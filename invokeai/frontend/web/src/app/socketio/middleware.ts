@@ -29,6 +29,8 @@ export const socketioMiddleware = () => {
     path: `${window.location.pathname}socket.io`,
   });
 
+  socketio.disconnect();
+
   let areListenersSet = false;
 
   const middleware: Middleware = (store) => (next) => (action) => {

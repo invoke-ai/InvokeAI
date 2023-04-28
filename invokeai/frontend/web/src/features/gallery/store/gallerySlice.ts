@@ -1,14 +1,18 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
+import { invocationComplete } from 'services/events/actions';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash';
+import { isImageOutput } from 'services/types/guards';
+import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
+import { imageUploaded } from 'services/thunks/image';
 
 export type GalleryCategory = 'user' | 'result';
 
 export type AddImagesPayload = {
-  images: Array<InvokeAI.Image>;
+  images: Array<InvokeAI._Image>;
   areMoreImagesAvailable: boolean;
   category: GalleryCategory;
 };
@@ -16,16 +20,33 @@ export type AddImagesPayload = {
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export type Gallery = {
-  images: InvokeAI.Image[];
+  images: InvokeAI._Image[];
   latest_mtime?: number;
   earliest_mtime?: number;
   areMoreImagesAvailable: boolean;
 };
 
 export interface GalleryState {
-  currentImage?: InvokeAI.Image;
+  /**
+   * The selected image's unique name
+   * Use `selectedImageSelector` to access the image
+   */
+  selectedImageName: string;
+  /**
+   * The currently selected image
+   * @deprecated See `state.gallery.selectedImageName`
+   */
+  currentImage?: InvokeAI._Image;
+  /**
+   * The currently selected image's uuid.
+   * @deprecated See `state.gallery.selectedImageName`, use `selectedImageSelector` to access the image
+   */
   currentImageUuid: string;
-  intermediateImage?: InvokeAI.Image & {
+  /**
+   * The current progress image
+   * @deprecated See `state.system.progressImage`
+   */
+  intermediateImage?: InvokeAI._Image & {
     boundingBox?: IRect;
     generationMode?: InvokeTabName;
   };
@@ -42,6 +63,7 @@ export interface GalleryState {
 }
 
 const initialState: GalleryState = {
+  selectedImageName: '',
   currentImageUuid: '',
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
@@ -69,7 +91,10 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState,
   reducers: {
-    setCurrentImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+    imageSelected: (state, action: PayloadAction<string>) => {
+      state.selectedImageName = action.payload;
+    },
+    setCurrentImage: (state, action: PayloadAction<InvokeAI._Image>) => {
       state.currentImage = action.payload;
       state.currentImageUuid = action.payload.uuid;
     },
@@ -124,7 +149,7 @@ export const gallerySlice = createSlice({
     addImage: (
       state,
       action: PayloadAction<{
-        image: InvokeAI.Image;
+        image: InvokeAI._Image;
         category: GalleryCategory;
       }>
     ) => {
@@ -150,7 +175,10 @@ export const gallerySlice = createSlice({
     setIntermediateImage: (
       state,
       action: PayloadAction<
-        InvokeAI.Image & { boundingBox?: IRect; generationMode?: InvokeTabName }
+        InvokeAI._Image & {
+          boundingBox?: IRect;
+          generationMode?: InvokeTabName;
+        }
       >
     ) => {
       state.intermediateImage = action.payload;
@@ -252,9 +280,32 @@ export const gallerySlice = createSlice({
       state.shouldUseSingleGalleryColumn = action.payload;
     },
   },
+  extraReducers(builder) {
+    /**
+     * Invocation Complete
+     */
+    builder.addCase(invocationComplete, (state, action) => {
+      const { data } = action.payload;
+      if (isImageOutput(data.result)) {
+        state.selectedImageName = data.result.image.image_name;
+        state.intermediateImage = undefined;
+      }
+    });
+
+    /**
+     * Upload Image - FULFILLED
+     */
+    builder.addCase(imageUploaded.fulfilled, (state, action) => {
+      const { response } = action.payload;
+
+      const uploadedImage = deserializeImageResponse(response);
+      state.selectedImageName = uploadedImage.name;
+    });
+  },
 });
 
 export const {
+  imageSelected,
   addImage,
   clearIntermediateImage,
   removeImage,

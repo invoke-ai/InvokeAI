@@ -110,7 +110,7 @@ const Console = () => {
             position: 'fixed',
             insetInlineStart: 0,
             bottom: 0,
-            zIndex: 9999,
+            zIndex: 1,
           }}
           maxHeight="90vh"
         >
@@ -128,6 +128,7 @@ const Console = () => {
               borderTopWidth: 5,
               bg: 'base.850',
               borderColor: 'base.700',
+              zIndex: 2,
             }}
             ref={viewerRef}
             onScroll={handleOnScroll}
@@ -166,7 +167,7 @@ const Console = () => {
               position: 'fixed',
               insetInlineStart: 2,
               bottom: 12,
-              zIndex: '10000',
+              zIndex: 1,
             }}
           />
         </Tooltip>
@@ -184,7 +185,7 @@ const Console = () => {
             position: 'fixed',
             insetInlineStart: 2,
             bottom: 2,
-            zIndex: '10000',
+            zIndex: 1,
           }}
           colorScheme={hasError || !wasErrorSeen ? 'error' : 'base'}
         />

@@ -18,9 +18,7 @@ export default function CodeformerFidelity() {
 
   return (
     <IAISlider
-      isSliderDisabled={!isGFPGANAvailable}
-      isInputDisabled={!isGFPGANAvailable}
-      isResetDisabled={!isGFPGANAvailable}
+      isDisabled={!isGFPGANAvailable}
       label={t('parameters.codeformerFidelity')}
       step={0.05}
       min={0}

@@ -2,7 +2,26 @@ import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
+import {
+  generatorProgress,
+  invocationComplete,
+  invocationError,
+  invocationStarted,
+  socketConnected,
+  socketDisconnected,
+  socketSubscribed,
+  socketUnsubscribed,
+} from 'services/events/actions';
+
 import i18n from 'i18n';
+import { isImageOutput } from 'services/types/guards';
+import { ProgressImage } from 'services/events/types';
+import { initialImageSelected } from 'features/parameters/store/generationSlice';
+import { makeToast } from '../hooks/useToastWatcher';
+import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
+import { InvokeTabName } from 'features/ui/store/tabMap';
+import { receivedModels } from 'services/thunks/model';
+import { receivedOpenAPISchema } from 'services/thunks/schema';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -15,11 +34,6 @@ export interface LogEntry {
 export interface Log {
   [index: number]: LogEntry;
 }
-
-export type ReadinessPayload = {
-  isReady: boolean;
-  reasonsWhyNotReady: string[];
-};
 
 export type InProgressImageType = 'none' | 'full-res' | 'latents';
 
@@ -56,6 +70,46 @@ export interface SystemState
     cancelType: CancelType;
     cancelAfter: number | null;
   };
+  /**
+   * The current progress image
+   */
+  progressImage: ProgressImage | null;
+  /**
+   * The current socket session id
+   */
+  sessionId: string | null;
+  /**
+   * Cancel strategy
+   */
+  cancelType: CancelType;
+  /**
+   * Whether or not a scheduled cancelation is pending
+   */
+  isCancelScheduled: boolean;
+  /**
+   * Array of node IDs that we want to handle when events received
+   */
+  subscribedNodeIds: string[];
+  // /**
+  //  * Whether or not URLs should be transformed to use a different host
+  //  */
+  // shouldTransformUrls: boolean;
+  // /**
+  //  * Array of disabled tabs
+  //  */
+  // disabledTabs: InvokeTabName[];
+  // /**
+  //  * Array of disabled features
+  //  */
+  // disabledFeatures: InvokeAI.AppFeature[];
+  /**
+   * Whether or not the available models were received
+   */
+  wereModelsReceived: boolean;
+  /**
+   * Whether or not the OpenAPI schema was received and parsed
+   */
+  wasSchemaParsed: boolean;
 }
 
 const initialSystemState: SystemState = {
@@ -98,6 +152,16 @@ const initialSystemState: SystemState = {
     cancelType: 'immediate',
     cancelAfter: null,
   },
+  progressImage: null,
+  sessionId: null,
+  cancelType: 'immediate',
+  isCancelScheduled: false,
+  subscribedNodeIds: [],
+  // shouldTransformUrls: false,
+  // disabledTabs: [],
+  // disabledFeatures: [],
+  wereModelsReceived: false,
+  wasSchemaParsed: false,
 };
 
 export const systemSlice = createSlice({
@@ -271,6 +335,227 @@ export const systemSlice = createSlice({
     setCancelAfter: (state, action: PayloadAction<number | null>) => {
       state.cancelOptions.cancelAfter = action.payload;
     },
+    /**
+     * A cancel was scheduled
+     */
+    cancelScheduled: (state) => {
+      state.isCancelScheduled = true;
+    },
+    /**
+     * The scheduled cancel was aborted
+     */
+    scheduledCancelAborted: (state) => {
+      state.isCancelScheduled = false;
+    },
+    /**
+     * The cancel type was changed
+     */
+    cancelTypeChanged: (state, action: PayloadAction<CancelType>) => {
+      state.cancelType = action.payload;
+    },
+    /**
+     * The array of subscribed node ids was changed
+     */
+    subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
+      state.subscribedNodeIds = action.payload;
+    },
+    // /**
+    //  * `shouldTransformUrls` was changed
+    //  */
+    // shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
+    //   state.shouldTransformUrls = action.payload;
+    // },
+    // /**
+    //  * `disabledTabs` was changed
+    //  */
+    // disabledTabsChanged: (state, action: PayloadAction<InvokeTabName[]>) => {
+    //   state.disabledTabs = action.payload;
+    // },
+    // /**
+    //  * `disabledFeatures` was changed
+    //  */
+    // disabledFeaturesChanged: (
+    //   state,
+    //   action: PayloadAction<InvokeAI.AppFeature[]>
+    // ) => {
+    //   state.disabledFeatures = action.payload;
+    // },
+  },
+  extraReducers(builder) {
+    /**
+     * Socket Subscribed
+     */
+    builder.addCase(socketSubscribed, (state, action) => {
+      state.sessionId = action.payload.sessionId;
+    });
+
+    /**
+     * Socket Unsubscribed
+     */
+    builder.addCase(socketUnsubscribed, (state) => {
+      state.sessionId = null;
+    });
+
+    /**
+     * Socket Connected
+     */
+    builder.addCase(socketConnected, (state, action) => {
+      const { timestamp } = action.payload;
+
+      state.isConnected = true;
+      state.currentStatus = i18n.t('common.statusConnected');
+      state.log.push({
+        timestamp,
+        message: `Connected to server`,
+        level: 'info',
+      });
+    });
+
+    /**
+     * Socket Disconnected
+     */
+    builder.addCase(socketDisconnected, (state, action) => {
+      const { timestamp } = action.payload;
+
+      state.isConnected = false;
+      state.currentStatus = i18n.t('common.statusDisconnected');
+      state.log.push({
+        timestamp,
+        message: `Disconnected from server`,
+        level: 'error',
+      });
+    });
+
+    /**
+     * Invocation Started
+     */
+    builder.addCase(invocationStarted, (state) => {
+      state.isProcessing = true;
+      state.isCancelable = true;
+      state.currentStatusHasSteps = false;
+      state.currentStatus = i18n.t('common.statusGenerating');
+    });
+
+    /**
+     * Generator Progress
+     */
+    builder.addCase(generatorProgress, (state, action) => {
+      const {
+        step,
+        total_steps,
+        progress_image,
+        node,
+        source_node_id,
+        graph_execution_state_id,
+      } = action.payload.data;
+
+      state.currentStatusHasSteps = true;
+      state.currentStep = step + 1; // TODO: step starts at -1, think this is a bug
+      state.totalSteps = total_steps;
+      state.progressImage = progress_image ?? null;
+    });
+
+    /**
+     * Invocation Complete
+     */
+    builder.addCase(invocationComplete, (state, action) => {
+      const { data, timestamp } = action.payload;
+
+      state.isProcessing = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.progressImage = null;
+      state.currentStatus = i18n.t('common.statusProcessingComplete');
+
+      // TODO: handle logging for other invocation types
+      if (isImageOutput(data.result)) {
+        state.log.push({
+          timestamp,
+          message: `Generated: ${data.result.image.image_name}`,
+          level: 'info',
+        });
+      }
+    });
+
+    /**
+     * Invocation Error
+     */
+    builder.addCase(invocationError, (state, action) => {
+      const { data, timestamp } = action.payload;
+
+      state.log.push({
+        timestamp,
+        message: `Server error: ${data.error}`,
+        level: 'error',
+      });
+
+      state.wasErrorSeen = true;
+      state.progressImage = null;
+      state.isProcessing = false;
+
+      state.toastQueue.push(
+        makeToast({ title: i18n.t('toast.serverError'), status: 'error' })
+      );
+
+      state.log.push({
+        timestamp,
+        message: `Server error: ${data.error}`,
+        level: 'error',
+      });
+    });
+
+    /**
+     * Session Invoked - PENDING
+     */
+
+    builder.addCase(sessionInvoked.pending, (state) => {
+      state.currentStatus = i18n.t('common.statusPreparing');
+    });
+
+    /**
+     * Session Canceled
+     */
+    builder.addCase(sessionCanceled.fulfilled, (state, action) => {
+      const { timestamp } = action.payload;
+
+      state.isProcessing = false;
+      state.isCancelable = false;
+      state.isCancelScheduled = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.progressImage = null;
+
+      state.toastQueue.push(
+        makeToast({ title: i18n.t('toast.canceled'), status: 'warning' })
+      );
+
+      state.log.push({
+        timestamp,
+        message: `Processing canceled`,
+        level: 'warning',
+      });
+    });
+
+    /**
+     * Initial Image Selected
+     */
+    builder.addCase(initialImageSelected, (state) => {
+      state.toastQueue.push(makeToast(i18n.t('toast.sentToImageToImage')));
+    });
+
+    /**
+     * Received available models from the backend
+     */
+    builder.addCase(receivedModels.fulfilled, (state, action) => {
+      state.wereModelsReceived = true;
+    });
+
+    /**
+     * OpenAPI schema was received and parsed
+     */
+    builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
+      state.wasSchemaParsed = true;
+    });
   },
 });
 
@@ -306,6 +591,13 @@ export const {
   setOpenModel,
   setCancelType,
   setCancelAfter,
+  cancelScheduled,
+  scheduledCancelAborted,
+  cancelTypeChanged,
+  subscribedNodeIdsSet,
+  // shouldTransformUrlsChanged,
+  // disabledTabsChanged,
+  // disabledFeaturesChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

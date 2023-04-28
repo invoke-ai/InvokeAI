@@ -20,6 +20,7 @@ export const readinessSelector = createSelector(
       seedWeights,
       initialImage,
       seed,
+      isImageToImageEnabled,
     } = generation;
 
     const { isProcessing, isConnected } = system;
@@ -33,7 +34,7 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('Missing prompt');
     }
 
-    if (activeTabName === 'img2img' && !initialImage) {
+    if (isImageToImageEnabled && !initialImage) {
       isReady = false;
       reasonsWhyNotReady.push('No initial image selected');
     }

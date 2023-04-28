@@ -12,8 +12,12 @@
  * 'gfpgan'.
  */
 
+import { FacetoolType } from 'features/parameters/store/postprocessingSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
+import { ImageMetadata, ImageType } from 'services/api';
+import { AnyInvocation } from 'services/events/types';
+import { O } from 'ts-toolbelt';
 
 /**
  * TODO:
@@ -113,7 +117,7 @@ export declare type Metadata = SystemGenerationMetadata & {
 };
 
 // An Image has a UUID, url, modified timestamp, width, height and maybe metadata
-export declare type Image = {
+export declare type _Image = {
   uuid: string;
   url: string;
   thumbnail: string;
@@ -124,11 +128,23 @@ export declare type Image = {
   category: GalleryCategory;
   isBase64?: boolean;
   dreamPrompt?: 'string';
+  name?: string;
+};
+
+/**
+ * ResultImage
+ */
+export declare type Image = {
+  name: string;
+  type: ImageType;
+  url: string;
+  thumbnail: string;
+  metadata: ImageMetadata;
 };
 
 // GalleryImages is an array of Image.
 export declare type GalleryImages = {
-  images: Array<Image>;
+  images: Array<_Image>;
 };
 
 /**
@@ -275,7 +291,7 @@ export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
+export declare type ImageResultResponse = Omit<_Image, 'uuid'> & {
   boundingBox?: IRect;
   generationMode: InvokeTabName;
 };
@@ -296,7 +312,7 @@ export declare type ErrorResponse = {
 };
 
 export declare type GalleryImagesResponse = {
-  images: Array<Omit<Image, 'uuid'>>;
+  images: Array<Omit<_Image, 'uuid'>>;
   areMoreImagesAvailable: boolean;
   category: GalleryCategory;
 };
@@ -320,3 +336,96 @@ export declare type UploadOutpaintingMergeImagePayload = {
   dataURL: string;
   name: string;
 };
+
+/**
+ * A disable-able application feature
+ */
+export declare type AppFeature =
+  | 'faceRestore'
+  | 'upscaling'
+  | 'lightbox'
+  | 'modelManager'
+  | 'githubLink'
+  | 'discordLink'
+  | 'bugLink'
+  | 'localization';
+
+/**
+ * A disable-able Stable Diffusion feature
+ */
+export declare type StableDiffusionFeature =
+  | 'noiseConfig'
+  | 'variations'
+  | 'symmetry'
+  | 'tiling'
+  | 'hires';
+
+/**
+ * Configuration options for the InvokeAI UI.
+ * Distinct from system settings which may be changed inside the app.
+ */
+export declare type AppConfig = {
+  /**
+   * Whether or not URLs should be transformed to use a different host
+   */
+  shouldTransformUrls: boolean;
+  /**
+   * Whether or not we need to re-fetch images
+   */
+  shouldFetchImages: boolean;
+  disabledTabs: InvokeTabName[];
+  disabledFeatures: AppFeature[];
+  canRestoreDeletedImagesFromBin: boolean;
+  sd: {
+    iterations: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    width: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    height: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    steps: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    guidance: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    img2imgStrength: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+  };
+};
+
+export declare type PartialAppConfig = O.Partial<AppConfig, 'deep'>;

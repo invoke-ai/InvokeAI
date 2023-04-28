@@ -58,7 +58,7 @@ class HuggingFaceConceptsLibrary(object):
                 self.concept_list.extend(list(local_concepts_to_add))
                 return self.concept_list
             return self.concept_list
-        else:
+        elif Globals.internet_available is True:
             try:
                 models = self.hf_api.list_models(
                     filter=ModelFilter(model_name="sd-concepts-library/")
@@ -73,6 +73,8 @@ class HuggingFaceConceptsLibrary(object):
                 log.warning(
                     "You may load .bin and .pt file(s) manually using the --embedding_directory argument."
                 )
+            return self.concept_list
+        else: 
             return self.concept_list
 
     def get_concept_model_path(self, concept_name: str) -> str:
