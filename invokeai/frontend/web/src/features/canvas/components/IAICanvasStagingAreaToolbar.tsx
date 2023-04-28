@@ -12,7 +12,7 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

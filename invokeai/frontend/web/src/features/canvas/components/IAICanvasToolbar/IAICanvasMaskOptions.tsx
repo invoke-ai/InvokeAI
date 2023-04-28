@@ -18,7 +18,7 @@ import {
   setShouldPreserveMaskedArea,
 } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';

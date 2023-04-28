@@ -12,7 +12,7 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 

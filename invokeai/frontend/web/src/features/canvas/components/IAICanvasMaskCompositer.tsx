@@ -6,7 +6,7 @@ import { Rect } from 'react-konva';
 
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import Konva from 'konva';
-import { isNumber } from 'lodash';
+import { isNumber } from 'lodash-es';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const canvasMaskCompositerSelector = createSelector(

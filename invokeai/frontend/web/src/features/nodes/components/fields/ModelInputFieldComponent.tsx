@@ -11,7 +11,7 @@ import {
   selectModelsById,
   selectModelsIds,
 } from 'features/system/store/modelSlice';
-import { isEqual, map } from 'lodash';
+import { isEqual, map } from 'lodash-es';
 import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 

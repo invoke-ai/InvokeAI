@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import {
   ButtonGroup,

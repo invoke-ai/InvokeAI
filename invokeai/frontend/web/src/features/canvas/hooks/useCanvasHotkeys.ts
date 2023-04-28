@@ -13,7 +13,7 @@ import {
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

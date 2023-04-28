@@ -72,7 +72,7 @@
     "i18next-browser-languagedetector": "^7.0.1",
     "i18next-http-backend": "^2.2.0",
     "konva": "^9.0.1",
-    "lodash": "^4.17.21",
+    "lodash-es": "^4.17.21",
     "patch-package": "^7.0.0",
     "re-resizable": "^6.9.9",
     "react": "^18.2.0",
@@ -101,7 +101,7 @@
   },
   "devDependencies": {
     "@types/dateformat": "^5.0.0",
-    "@types/lodash": "^4.14.194",
+    "@types/lodash-es": "^4.14.194",
     "@types/node": "^18.16.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.1",

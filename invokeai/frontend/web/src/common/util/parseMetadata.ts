@@ -1,4 +1,4 @@
-import { forEach, size } from 'lodash';
+import { forEach, size } from 'lodash-es';
 import { ImageField, LatentsField } from 'services/api';
 
 const OBJECT_TYPESTRING = '[object Object]';

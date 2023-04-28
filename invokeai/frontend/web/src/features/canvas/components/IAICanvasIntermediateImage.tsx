@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { ImageConfig } from 'konva/lib/shapes/Image';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';

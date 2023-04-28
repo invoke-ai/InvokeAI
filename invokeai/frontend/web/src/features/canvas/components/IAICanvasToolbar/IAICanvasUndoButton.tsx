@@ -9,7 +9,7 @@ import { undo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 const canvasUndoSelector = createSelector(

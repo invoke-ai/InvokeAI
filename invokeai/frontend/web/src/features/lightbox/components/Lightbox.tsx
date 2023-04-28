@@ -10,7 +10,7 @@ import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { AnimatePresence, motion } from 'framer-motion';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BiExit } from 'react-icons/bi';
 import { TransformWrapper } from 'react-zoom-pan-pinch';

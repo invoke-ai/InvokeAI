@@ -11,7 +11,7 @@ import {
   initialImageSelected,
 } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';

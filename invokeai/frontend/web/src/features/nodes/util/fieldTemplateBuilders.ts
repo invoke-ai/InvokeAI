@@ -1,4 +1,4 @@
-import { reduce } from 'lodash';
+import { reduce } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { FIELD_TYPE_MAP } from '../types/constants';
 import { isSchemaObject } from '../types/typeGuards';

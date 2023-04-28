@@ -5,7 +5,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { isEqual, range } from 'lodash';
+import { isEqual, range } from 'lodash-es';
 
 import { ReactNode, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';

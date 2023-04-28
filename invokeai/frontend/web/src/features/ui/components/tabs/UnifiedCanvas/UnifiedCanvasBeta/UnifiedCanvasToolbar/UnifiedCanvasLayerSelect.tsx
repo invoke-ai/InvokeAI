@@ -10,7 +10,7 @@ import {
   CanvasLayer,
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

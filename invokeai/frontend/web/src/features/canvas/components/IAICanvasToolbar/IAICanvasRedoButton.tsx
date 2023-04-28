@@ -9,7 +9,7 @@ import { FaRedo } from 'react-icons/fa';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 const canvasRedoSelector = createSelector(

@@ -3,7 +3,7 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInput from 'common/components/IAIInput';
 import { Panel } from 'reactflow';
-import { map } from 'lodash';
+import { map } from 'lodash-es';
 import {
   ChangeEvent,
   FocusEvent,

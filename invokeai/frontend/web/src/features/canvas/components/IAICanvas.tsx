@@ -8,7 +8,7 @@ import {
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useCallback, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';

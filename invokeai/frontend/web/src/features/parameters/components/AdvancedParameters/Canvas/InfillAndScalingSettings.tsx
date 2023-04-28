@@ -18,7 +18,7 @@ import {
   setTileSize,
 } from 'features/parameters/store/generationSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';

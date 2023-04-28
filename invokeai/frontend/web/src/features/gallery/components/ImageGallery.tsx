@@ -35,7 +35,7 @@
 // } from 'features/ui/store/uiSlice';
 // import { InvokeTabName } from 'features/ui/store/tabMap';
 
-// import { clamp } from 'lodash';
+// import { clamp } from 'lodash-es';
 // import { Direction } from 're-resizable/lib/resizer';
 // import React, {
 //   ChangeEvent,

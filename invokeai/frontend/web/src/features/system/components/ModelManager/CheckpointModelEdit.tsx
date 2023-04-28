@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import type { InvokeModelConfigProps } from 'app/types/invokeai';
 import type { RootState } from 'app/store/store';
 import type { FieldInputProps, FormikProps } from 'formik';
-import { isEqual, pickBy } from 'lodash';
+import { isEqual, pickBy } from 'lodash-es';
 import ModelConvert from './ModelConvert';
 import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
 import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';

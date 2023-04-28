@@ -29,7 +29,7 @@ export default function ImageToImageSettings() {
     <VStack gap={2} w="full" alignItems="stretch">
       <ImageToImageSettingsHeader />
       <InitialImagePreview />
-      <ImageToImageStrength label={t('parameters.img2imgStrength')} />
+      <ImageToImageStrength />
       <ImageFit />
     </VStack>
   );

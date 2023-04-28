@@ -24,7 +24,7 @@ import {
 import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
