@@ -116,6 +116,7 @@
     "@vitejs/plugin-react-swc": "^3.3.0",
     "axios": "^1.4.0",
     "babel-plugin-transform-imports": "^2.0.0",
+    "@chakra-ui/cli": "^2.4.0",
     "concurrently": "^8.0.1",
     "eslint": "^8.39.0",
     "eslint-config-prettier": "^8.8.0",
