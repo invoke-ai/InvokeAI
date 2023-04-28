@@ -165,7 +165,7 @@ class ResizeImageInvocation(BaseInvocation, PILInvocationConfig):
         )
 
         # TODO: We should offer the PIL resampling options here, but how to represent that enum class?
-        resize_image = create_thumbnail(image, self.size)
+        resize_image = make_thumbnail(image, self.size)
 
         image_type = ImageType.INTERMEDIATE
         image_name = context.services.images.create_name(
