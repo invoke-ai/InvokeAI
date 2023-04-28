@@ -4,7 +4,7 @@ import {
   InvocationTemplate,
 } from 'features/nodes/types/types';
 import { memo, ReactNode, useCallback } from 'react';
-import { map } from 'lodash';
+import { map } from 'lodash-es';
 import { useAppSelector } from 'app/store/storeHooks';
 import { RootState } from 'app/store/store';
 import {

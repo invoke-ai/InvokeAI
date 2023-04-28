@@ -1,6 +1,6 @@
 import 'reactflow/dist/style.css';
 import { Tooltip, Badge, Flex } from '@chakra-ui/react';
-import { map } from 'lodash';
+import { map } from 'lodash-es';
 import { FIELDS } from '../types/constants';
 import { memo } from 'react';
 

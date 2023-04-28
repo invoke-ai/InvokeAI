@@ -12,7 +12,7 @@ import {
   cancelTypeChanged,
   CancelType,
 } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useEffect, useCallback, memo } from 'react';
 import {
   ButtonSpinner,
@@ -170,7 +170,7 @@ const CancelButton = (
 
       <Menu closeOnSelect={false}>
         <MenuButton
-          as={IconButton}
+          as={IAIIconButton}
           tooltip={t('parameters.cancel.setType')}
           aria-label={t('parameters.cancel.setType')}
           icon={<BiChevronDown />}

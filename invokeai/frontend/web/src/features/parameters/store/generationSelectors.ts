@@ -6,7 +6,7 @@ import {
   selectResultsEntities,
 } from 'features/gallery/store/resultsSlice';
 import { selectUploadsById } from 'features/gallery/store/uploadsSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 export const generationSelector = (state: RootState) => state.generation;
 

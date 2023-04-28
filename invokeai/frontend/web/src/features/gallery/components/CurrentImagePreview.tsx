@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';

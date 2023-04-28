@@ -16,7 +16,7 @@ import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFold
 import { FaWrench } from 'react-icons/fa';
 
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 export const canvasControlsSelector = createSelector(

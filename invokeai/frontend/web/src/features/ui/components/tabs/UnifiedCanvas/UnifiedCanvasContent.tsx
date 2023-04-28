@@ -7,7 +7,7 @@ import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useLayoutEffect } from 'react';
 

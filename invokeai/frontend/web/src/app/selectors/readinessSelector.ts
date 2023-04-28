@@ -4,7 +4,7 @@ import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelector
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 export const readinessSelector = createSelector(
   [

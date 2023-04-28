@@ -37,7 +37,7 @@ import {
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
-import { isEqual, map } from 'lodash';
+import { isEqual, map } from 'lodash-es';
 import { persistor } from 'app/store/persistor';
 import { ChangeEvent, cloneElement, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';

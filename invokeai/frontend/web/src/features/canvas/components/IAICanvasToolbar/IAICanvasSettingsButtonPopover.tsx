@@ -16,7 +16,7 @@ import {
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
 import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

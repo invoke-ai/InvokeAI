@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { InvokeDiffusersModelConfigProps } from 'app/types/invokeai';
 import type { RootState } from 'app/store/store';
-import { isEqual, pickBy } from 'lodash';
+import { isEqual, pickBy } from 'lodash-es';
 import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
 import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
 import IAIForm from 'common/components/IAIForm';

@@ -31,7 +31,7 @@ import type { FoundModel } from 'app/types/invokeai';
 import type { RootState } from 'app/store/store';
 import IAIInput from 'common/components/IAIInput';
 import { Field, Formik } from 'formik';
-import { forEach, remove } from 'lodash';
+import { forEach, remove } from 'lodash-es';
 import type { ChangeEvent, ReactNode } from 'react';
 import IAIForm from 'common/components/IAIForm';
 

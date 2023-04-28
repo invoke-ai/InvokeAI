@@ -8,7 +8,7 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import { setBrushColor, setMaskColor } from 'features/canvas/store/canvasSlice';
-import { clamp, isEqual } from 'lodash';
+import { clamp, isEqual } from 'lodash-es';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 

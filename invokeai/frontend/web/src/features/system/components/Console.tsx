@@ -7,7 +7,7 @@ import {
   setShouldShowLogViewer,
   SystemState,
 } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { Resizable } from 're-resizable';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

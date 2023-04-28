@@ -7,7 +7,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 
-import { clamp, isEqual } from 'lodash';
+import { clamp, isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import './ImageGallery.css';

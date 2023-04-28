@@ -9,7 +9,7 @@ import {
   setStageCoordinates,
 } from 'features/canvas/store/canvasSlice';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useCallback } from 'react';
 

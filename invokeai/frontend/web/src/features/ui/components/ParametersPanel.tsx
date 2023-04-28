@@ -17,7 +17,7 @@ import PinParametersPanelButton from './PinParametersPanelButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import useResolution from 'common/hooks/useResolution';
 

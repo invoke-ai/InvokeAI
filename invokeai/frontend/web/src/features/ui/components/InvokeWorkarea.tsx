@@ -10,7 +10,7 @@ import { DragEvent, ReactNode } from 'react';
 
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import useGetImageByUuid from 'features/gallery/hooks/useGetImageByUuid';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { APP_CONTENT_HEIGHT } from 'theme/util/constants';
 import ParametersPanel from './ParametersPanel';
 

@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { Circle, Group } from 'react-konva';
 import {

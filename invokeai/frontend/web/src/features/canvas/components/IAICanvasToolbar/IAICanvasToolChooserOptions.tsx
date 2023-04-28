@@ -17,7 +17,7 @@ import {
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { clamp, isEqual } from 'lodash';
+import { clamp, isEqual } from 'lodash-es';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';

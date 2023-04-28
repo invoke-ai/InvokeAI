@@ -13,7 +13,7 @@ import {
 import { FaEllipsisV, FaPlus } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeAdded } from '../store/nodesSlice';
-import { cloneDeep, map } from 'lodash';
+import { cloneDeep, map } from 'lodash-es';
 import { RootState } from 'app/store/store';
 import { useBuildInvocation } from '../hooks/useBuildInvocation';
 import { addToast } from 'features/system/store/systemSlice';

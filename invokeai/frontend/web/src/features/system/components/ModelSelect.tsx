@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { ChangeEvent, memo } from 'react';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';

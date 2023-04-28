@@ -6,7 +6,7 @@ import {
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
 import { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash';
+import { clamp, cloneDeep } from 'lodash-es';
 //
 import { RgbaColor } from 'react-colorful';
 import calculateCoordinates from '../util/calculateCoordinates';

@@ -10,7 +10,7 @@ import {
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 import { FaSlidersH } from 'react-icons/fa';

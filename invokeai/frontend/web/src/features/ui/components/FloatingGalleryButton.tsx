@@ -4,7 +4,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { useTranslation } from 'react-i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { setShouldShowGallery } from 'features/ui/store/uiSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 
