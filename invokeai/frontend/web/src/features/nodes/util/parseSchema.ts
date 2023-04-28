@@ -1,4 +1,4 @@
-import { filter, reduce } from 'lodash';
+import { filter, reduce } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { isSchemaObject } from '../types/typeGuards';
 import {

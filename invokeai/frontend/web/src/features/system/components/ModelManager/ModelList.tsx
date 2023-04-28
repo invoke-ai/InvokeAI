@@ -6,13 +6,13 @@ import AddModel from './AddModel';
 import ModelListItem from './ModelListItem';
 import MergeModels from './MergeModels';
 
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import type { SystemState } from 'features/system/store/systemSlice';
-import { isEqual, map } from 'lodash';
+import { isEqual, map } from 'lodash-es';
 
 import React, { useMemo, useState, useTransition } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';

@@ -15,12 +15,6 @@ export type AnyInvocationType = NonNullable<
 
 export type AnyInvocation = NonNullable<Graph['nodes']>[string];
 
-// export type AnyInvocation = {
-//   id: string;
-//   type: AnyInvocationType | string;
-//   [key: string]: any;
-// };
-
 export type AnyResult = GraphExecutionState['results'][string];
 
 /**

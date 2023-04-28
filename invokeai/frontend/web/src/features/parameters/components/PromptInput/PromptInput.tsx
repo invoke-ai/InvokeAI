@@ -1,7 +1,7 @@
 import { Box, FormControl, Textarea } from '@chakra-ui/react';
 import { generateImage } from 'app/socketio/actions';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
@@ -12,7 +12,7 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 

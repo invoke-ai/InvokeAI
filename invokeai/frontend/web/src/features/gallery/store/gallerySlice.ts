@@ -1,10 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import { invocationComplete } from 'services/events/actions';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
 import { isImageOutput } from 'services/types/guards';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 import { imageUploaded } from 'services/thunks/image';

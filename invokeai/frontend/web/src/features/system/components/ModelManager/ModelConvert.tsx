@@ -8,8 +8,8 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { convertToDiffusers } from 'app/socketio/actions';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';

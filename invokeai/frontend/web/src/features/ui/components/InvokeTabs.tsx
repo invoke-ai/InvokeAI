@@ -9,12 +9,12 @@ import {
   Tooltip,
   VisuallyHidden,
 } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import { ReactNode, useMemo } from 'react';
+import { memo, ReactNode, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { activeTabIndexSelector } from '../store/uiSelectors';
@@ -24,20 +24,16 @@ import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import NodeEditor from 'features/nodes/components/NodeEditor';
 import GenerateWorkspace from './tabs/Generate/GenerateWorkspace';
-import { FaImage } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
-import { BsLightningChargeFill, BsLightningFill } from 'react-icons/bs';
+import { BsLightningChargeFill } from 'react-icons/bs';
 import { configSelector } from 'features/system/store/configSelectors';
+import { isEqual } from 'lodash';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
   icon: ReactNode;
   workarea: ReactNode;
 }
-
-const tabIconStyles: ChakraProps['sx'] = {
-  boxSize: 6,
-};
 
 const tabs: InvokeTabInfo[] = [
   {
@@ -57,13 +53,19 @@ const tabs: InvokeTabInfo[] = [
   },
 ];
 
-const enabledTabsSelector = createSelector(configSelector, (config) => {
-  const { disabledTabs } = config;
+const enabledTabsSelector = createSelector(
+  configSelector,
+  (config) => {
+    const { disabledTabs } = config;
 
-  return tabs.filter((tab) => !disabledTabs.includes(tab.id));
-});
+    return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+  },
+  {
+    memoizeOptions: { resultEqualityCheck: isEqual },
+  }
+);
 
-export default function InvokeTabs() {
+const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const isLightBoxOpen = useAppSelector(
@@ -160,4 +162,6 @@ export default function InvokeTabs() {
       <TabPanels>{tabPanels}</TabPanels>
     </Tabs>
   );
-}
+};
+
+export default memo(InvokeTabs);

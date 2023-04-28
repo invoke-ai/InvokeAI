@@ -20,8 +20,8 @@ import IAIIconButton from 'common/components/IAIIconButton';
 
 import { useTranslation } from 'react-i18next';
 import { FaUndo, FaUpload } from 'react-icons/fa';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { RootState } from 'app/store/store';
 import { useCallback } from 'react';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 

@@ -1,15 +1,15 @@
 import { Flex, Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   errorSeen,
   setShouldShowLogViewer,
   SystemState,
 } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { Resizable } from 're-resizable';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { memo, useLayoutEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
@@ -194,4 +194,4 @@ const Console = () => {
   );
 };
 
-export default Console;
+export default memo(Console);

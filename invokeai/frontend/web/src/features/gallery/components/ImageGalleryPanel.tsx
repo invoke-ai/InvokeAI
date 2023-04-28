@@ -1,4 +1,4 @@
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   selectNextImage,
@@ -7,7 +7,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 
-import { clamp, isEqual } from 'lodash';
+import { clamp, isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import './ImageGallery.css';
@@ -28,6 +28,7 @@ import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvas
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import useResolution from 'common/hooks/useResolution';
 import { Flex } from '@chakra-ui/react';
+import { memo } from 'react';
 
 const GALLERY_TAB_WIDTHS: Record<
   InvokeTabName,
@@ -72,7 +73,7 @@ const galleryPanelSelector = createSelector(
   }
 );
 
-export default function ImageGalleryPanel() {
+export const ImageGalleryPanel = () => {
   const dispatch = useAppDispatch();
   const {
     shouldPinGallery,
@@ -232,4 +233,6 @@ export default function ImageGalleryPanel() {
   };
 
   return renderImageGallery();
-}
+};
+
+export default memo(ImageGalleryPanel);

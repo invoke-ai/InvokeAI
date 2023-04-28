@@ -1,6 +1,6 @@
 import { ChakraProps, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
@@ -10,7 +10,8 @@ import {
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FaSlidersH } from 'react-icons/fa';
@@ -94,4 +95,4 @@ const FloatingParametersPanelButtons = () => {
   ) : null;
 };
 
-export default FloatingParametersPanelButtons;
+export default memo(FloatingParametersPanelButtons);

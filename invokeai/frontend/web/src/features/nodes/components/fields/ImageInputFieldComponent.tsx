@@ -1,5 +1,5 @@
 import { Box, Image, Icon, Flex } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
 import useGetImageByNameAndType from 'features/gallery/hooks/useGetImageByName';

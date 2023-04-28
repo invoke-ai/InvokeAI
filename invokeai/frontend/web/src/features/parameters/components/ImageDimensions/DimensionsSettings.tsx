@@ -1,7 +1,7 @@
 import { Box, Flex, FormControl, FormLabel, Select } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setWidth } from 'features/parameters/store/generationSlice';
 import { memo, useState } from 'react';

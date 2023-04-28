@@ -3,7 +3,7 @@ import dateFormat from 'dateformat';
 import i18n from 'i18n';
 import { v4 as uuidv4 } from 'uuid';
 
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 
 import {
   addLogEntry,
@@ -30,7 +30,7 @@ import {
   setIntermediateImage,
 } from 'features/gallery/store/gallerySlice';
 
-import type { RootState } from 'app/store';
+import type { RootState } from 'app/store/store';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   clearInitialImage,

@@ -8,10 +8,10 @@ import IAINodeOutputs from './IAINode/IAINodeOutputs';
 import IAINodeInputs from './IAINode/IAINodeInputs';
 import IAINodeHeader from './IAINode/IAINodeHeader';
 import IAINodeResizer from './IAINode/IAINodeResizer';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { AnyInvocationType } from 'services/events/types';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { NODE_MIN_WIDTH } from 'app/constants';
 
 type InvocationComponentWrapperProps = PropsWithChildren & {

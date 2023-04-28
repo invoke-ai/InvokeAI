@@ -1,6 +1,6 @@
 import { Flex, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   canvasSelector,
   initialCanvasImageSelector,

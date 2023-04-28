@@ -1,7 +1,7 @@
 import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import {
   generatorProgress,
   invocationComplete,
@@ -19,9 +19,8 @@ import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
-import { InvokeTabName } from 'features/ui/store/tabMap';
 import { receivedModels } from 'services/thunks/model';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -90,18 +89,6 @@ export interface SystemState
    * Array of node IDs that we want to handle when events received
    */
   subscribedNodeIds: string[];
-  // /**
-  //  * Whether or not URLs should be transformed to use a different host
-  //  */
-  // shouldTransformUrls: boolean;
-  // /**
-  //  * Array of disabled tabs
-  //  */
-  // disabledTabs: InvokeTabName[];
-  // /**
-  //  * Array of disabled features
-  //  */
-  // disabledFeatures: InvokeAI.AppFeature[];
   /**
    * Whether or not the available models were received
    */
@@ -359,27 +346,6 @@ export const systemSlice = createSlice({
     subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
       state.subscribedNodeIds = action.payload;
     },
-    // /**
-    //  * `shouldTransformUrls` was changed
-    //  */
-    // shouldTransformUrlsChanged: (state, action: PayloadAction<boolean>) => {
-    //   state.shouldTransformUrls = action.payload;
-    // },
-    // /**
-    //  * `disabledTabs` was changed
-    //  */
-    // disabledTabsChanged: (state, action: PayloadAction<InvokeTabName[]>) => {
-    //   state.disabledTabs = action.payload;
-    // },
-    // /**
-    //  * `disabledFeatures` was changed
-    //  */
-    // disabledFeaturesChanged: (
-    //   state,
-    //   action: PayloadAction<InvokeAI.AppFeature[]>
-    // ) => {
-    //   state.disabledFeatures = action.payload;
-    // },
   },
   extraReducers(builder) {
     /**
@@ -387,6 +353,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(socketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
+      console.log(`Subscribed to session ${action.payload.sessionId}`);
     });
 
     /**
@@ -546,14 +513,14 @@ export const systemSlice = createSlice({
     /**
      * Received available models from the backend
      */
-    builder.addCase(receivedModels.fulfilled, (state, action) => {
+    builder.addCase(receivedModels.fulfilled, (state) => {
       state.wereModelsReceived = true;
     });
 
     /**
-     * OpenAPI schema was received and parsed
+     * OpenAPI schema was parsed
      */
-    builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
+    builder.addCase(parsedOpenAPISchema, (state) => {
       state.wasSchemaParsed = true;
     });
   },
@@ -595,9 +562,6 @@ export const {
   scheduledCancelAborted,
   cancelTypeChanged,
   subscribedNodeIdsSet,
-  // shouldTransformUrlsChanged,
-  // disabledTabsChanged,
-  // disabledFeaturesChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

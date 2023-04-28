@@ -1,6 +1,6 @@
-import { createAppAsyncThunk } from 'app/storeUtils';
+import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { Model } from 'features/system/store/modelSlice';
-import { reduce } from 'lodash';
+import { reduce } from 'lodash-es';
 import { ModelsService } from 'services/api';
 
 export const IMAGES_PER_PAGE = 20;

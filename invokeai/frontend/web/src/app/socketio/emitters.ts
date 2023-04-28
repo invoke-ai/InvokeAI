@@ -1,6 +1,6 @@
 import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
-import type { RootState } from 'app/store';
+import * as InvokeAI from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,

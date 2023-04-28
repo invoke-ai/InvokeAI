@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
 import { memo, ReactNode } from 'react';
 
@@ -17,7 +17,7 @@ import PinParametersPanelButton from './PinParametersPanelButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import useResolution from 'common/hooks/useResolution';
 

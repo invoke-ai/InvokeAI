@@ -10,7 +10,7 @@
 //   useTheme,
 // } from '@chakra-ui/react';
 // import { requestImages } from 'app/socketio/actions';
-// import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+// import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 // import IAIButton from 'common/components/IAIButton';
 // import IAICheckbox from 'common/components/IAICheckbox';
 // import IAIIconButton from 'common/components/IAIIconButton';
@@ -35,7 +35,7 @@
 // } from 'features/ui/store/uiSlice';
 // import { InvokeTabName } from 'features/ui/store/tabMap';
 
-// import { clamp } from 'lodash';
+// import { clamp } from 'lodash-es';
 // import { Direction } from 're-resizable/lib/resizer';
 // import React, {
 //   ChangeEvent,
