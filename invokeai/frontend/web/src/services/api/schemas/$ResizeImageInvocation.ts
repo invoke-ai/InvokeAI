@@ -23,5 +23,8 @@ export const $ResizeImageInvocation = {
       type: 'number',
       description: `The size of the resized image's longest side`,
     },
+    resample_mode: {
+      type: 'Enum',
+    },
   },
 } as const;

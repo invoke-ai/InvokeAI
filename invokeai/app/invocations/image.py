@@ -150,6 +150,10 @@ class DownloadImageInvocation(BaseInvocation):
                 image=Image.Image.frombytes(raw_image)
             )
 
+RESIZE_RESAMPLING_MODE = Literal[
+    "nearest", "box", "bilinear", "hamming", "bicubic", "lanczos"
+]
+
 class ResizeImageInvocation(BaseInvocation, PILInvocationConfig):
     """Resizes an image to a specified size."""
 
@@ -158,14 +162,28 @@ class ResizeImageInvocation(BaseInvocation, PILInvocationConfig):
     # Inputs
     image: ImageField = Field(default=None, description="The image to resize")
     size: int = Field(default=512, gt=0, description="The size of the resized image's longest side")
+    resample_mode: Optional[RESIZE_RESAMPLING_MODE] = Field(default="bicubic", description="The resampling mode to use when resizing the image")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get(
             self.image.image_type, self.image.image_name
         )
 
+        resample_mode = Image.Resampling.BICUBIC
+        if self.resample_mode:
+            if self.resample_mode == "nearest":
+                resample_mode = Image.Resampling.NEAREST
+            elif self.resample_mode == "box":
+                resample_mode = Image.Resampling.BOX
+            elif self.resample_mode == "bilinear":
+                resample_mode = Image.Resampling.BILINEAR
+            elif self.resample_mode == "hamming":
+                resample_mode = Image.Resampling.HAMMING
+            elif self.resample_mode == "lanczos":
+                resample_mode = Image.Resampling.LANCZOS
+
         # TODO: We should offer the PIL resampling options here, but how to represent that enum class?
-        resize_image = make_thumbnail(image, self.size)
+        resize_image = make_thumbnail(image, self.size, resampling_mode=resample_mode)
 
         image_type = ImageType.INTERMEDIATE
         image_name = context.services.images.create_name(

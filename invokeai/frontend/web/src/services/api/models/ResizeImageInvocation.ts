@@ -21,5 +21,9 @@ export type ResizeImageInvocation = {
    * The size of the resized images' longest side
    */
   size: number;
+    /**
+   * Resample mode
+   */
+    resample_mode?: 'nearest' | 'box' | 'bilinear' | 'hamming' | 'bicubic' | 'lanczos';
 };
 
