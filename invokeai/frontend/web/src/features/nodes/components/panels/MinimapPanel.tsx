@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { CSSProperties, memo } from 'react';
 import { MiniMap } from 'reactflow';
 

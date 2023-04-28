@@ -1,6 +1,6 @@
-import { DIFFUSERS_SAMPLERS } from 'app/constants';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { DIFFUSERS_SCHEDULERS } from 'app/constants';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import { setSampler } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
@@ -23,7 +23,7 @@ const Scheduler = () => {
       label={t('parameters.sampler')}
       value={sampler}
       onChange={handleChange}
-      validValues={DIFFUSERS_SAMPLERS}
+      validValues={DIFFUSERS_SCHEDULERS}
       minWidth={36}
     />
   );

@@ -1,7 +1,7 @@
 import { Box, FormControl, Textarea } from '@chakra-ui/react';
 import { generateImage } from 'app/socketio/actions';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';

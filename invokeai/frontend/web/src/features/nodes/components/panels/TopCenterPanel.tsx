@@ -1,5 +1,5 @@
 import { HStack } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
 import { Panel } from 'reactflow';

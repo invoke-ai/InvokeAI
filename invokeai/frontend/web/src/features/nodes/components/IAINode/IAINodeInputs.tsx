@@ -5,8 +5,8 @@ import {
 } from 'features/nodes/types/types';
 import { memo, ReactNode, useCallback } from 'react';
 import { map } from 'lodash';
-import { useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { RootState } from 'app/store/store';
 import {
   Box,
   Flex,

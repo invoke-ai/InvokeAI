@@ -1,4 +1,4 @@
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   selectNextImage,

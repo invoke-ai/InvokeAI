@@ -9,7 +9,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { configSelector } from 'features/system/store/configSelectors';

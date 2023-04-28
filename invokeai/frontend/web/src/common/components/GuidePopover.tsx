@@ -8,7 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { Feature, useFeatureHelpInfo } from 'app/features';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { SystemState } from 'features/system/store/systemSlice';
 import { memo, ReactElement } from 'react';

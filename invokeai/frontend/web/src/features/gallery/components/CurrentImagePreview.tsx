@@ -1,6 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';

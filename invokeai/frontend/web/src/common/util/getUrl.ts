@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { OpenAPI } from 'services/api';
 
 export const getUrlAlt = (url: string, shouldTransformUrls: boolean) => {

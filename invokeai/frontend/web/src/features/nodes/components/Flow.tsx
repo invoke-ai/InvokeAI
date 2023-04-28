@@ -7,8 +7,8 @@ import {
   OnConnectStart,
   OnConnectEnd,
 } from 'reactflow';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { RootState } from 'app/store/store';
 import {
   connectionEnded,
   connectionMade,

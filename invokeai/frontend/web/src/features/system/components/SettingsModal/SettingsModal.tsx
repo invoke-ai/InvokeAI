@@ -15,8 +15,8 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
@@ -38,7 +38,7 @@ import {
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual, map } from 'lodash';
-import { persistor } from 'persistor';
+import { persistor } from 'app/store/persistor';
 import { ChangeEvent, cloneElement, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 

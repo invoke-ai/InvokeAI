@@ -6,7 +6,7 @@ import AddModel from './AddModel';
 import ModelListItem from './ModelListItem';
 import MergeModels from './MergeModels';
 
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 import { createSelector } from '@reduxjs/toolkit';

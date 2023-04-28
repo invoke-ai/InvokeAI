@@ -1,4 +1,4 @@
-import { createAppAsyncThunk } from 'app/storeUtils';
+import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { ImagesService } from 'services/api';
 
 export const IMAGES_PER_PAGE = 20;

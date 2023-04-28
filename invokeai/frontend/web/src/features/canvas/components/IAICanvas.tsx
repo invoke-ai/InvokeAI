@@ -1,6 +1,6 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   canvasSelector,
   isStagingSelector,

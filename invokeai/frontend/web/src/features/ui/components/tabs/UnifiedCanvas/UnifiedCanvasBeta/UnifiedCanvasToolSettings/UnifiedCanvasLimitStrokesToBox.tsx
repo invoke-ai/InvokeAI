@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { setShouldRestrictStrokesToBox } from 'features/canvas/store/canvasSlice';
 import { useTranslation } from 'react-i18next';

@@ -1,8 +1,8 @@
 import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import promptToString from 'common/util/promptToString';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { setNegativePrompt, setPrompt } from '../store/generationSlice';
 
 // TECHDEBT: We have two metadata prompt formats and need to handle recalling either of them.

@@ -10,7 +10,7 @@ import {
   useTheme,
   useToast,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imageSelected,
   setCurrentImage,
@@ -32,7 +32,7 @@ import {
 } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,

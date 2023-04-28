@@ -20,7 +20,7 @@ import {
   receivedResultImagesPage,
   receivedUploadImagesPage,
 } from 'services/thunks/gallery';
-import { AppDispatch, RootState } from 'app/store';
+import { AppDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
 import {
   sessionInvoked,

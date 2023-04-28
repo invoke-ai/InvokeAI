@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { useCallback } from 'react';
 

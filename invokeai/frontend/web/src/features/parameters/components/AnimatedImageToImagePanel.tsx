@@ -2,8 +2,8 @@ import { memo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import ImageToImageSettings from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageSettings';
-import { useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { RootState } from 'app/store/store';
 import { Box } from '@chakra-ui/react';
 
 const AnimatedImageToImagePanel = () => {

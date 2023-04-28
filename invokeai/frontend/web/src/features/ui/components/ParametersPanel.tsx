@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
 import { memo, ReactNode } from 'react';
 

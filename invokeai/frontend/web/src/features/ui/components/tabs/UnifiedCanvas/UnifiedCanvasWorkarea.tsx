@@ -1,5 +1,5 @@
-// import { RootState } from 'app/store';
-// import { useAppSelector } from 'app/storeHooks';
+// import { RootState } from 'app/store/store';
+// import { useAppSelector } from 'app/store/storeHooks';
 // import InvokeWorkarea from 'features/ui/components/InvokeWorkarea';
 // import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 // import UnifiedCanvasContentBeta from './UnifiedCanvasBeta/UnifiedCanvasContentBeta';
@@ -25,10 +25,10 @@
 //   );
 // }
 import { Box, Flex } from '@chakra-ui/react';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import Scrollable from '../../common/Scrollable';
 import ParametersSlide from '../../common/ParametersSlide';
 import UnifiedCanvasParameters from './UnifiedCanvasParameters';

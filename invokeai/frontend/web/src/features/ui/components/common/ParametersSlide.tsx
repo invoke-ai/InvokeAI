@@ -1,7 +1,7 @@
 import { Box, Flex, useOutsideClick } from '@chakra-ui/react';
 import { Slide } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash';
 import { memo, PropsWithChildren, useRef } from 'react';

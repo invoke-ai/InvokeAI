@@ -9,8 +9,8 @@ import {
   Text,
   Tooltip,
 } from '@chakra-ui/react';
-import * as InvokeAI from 'app/invokeai';
-import { useAppDispatch } from 'app/storeHooks';
+import * as InvokeAI from 'app/types/invokeai';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';

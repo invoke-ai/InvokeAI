@@ -1,6 +1,6 @@
 import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
 import { isEqual } from 'lodash';

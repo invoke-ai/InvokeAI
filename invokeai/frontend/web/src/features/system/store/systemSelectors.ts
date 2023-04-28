@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { isEqual, reduce, pickBy } from 'lodash';
 
 export const systemSelector = (state: RootState) => state.system;
