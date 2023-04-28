@@ -1,126 +1,70 @@
-import ImageUploader from 'common/components/ImageUploader';
-import Console from 'features/system/components/Console';
-import ProgressBar from 'features/system/components/ProgressBar';
-import SiteHeader from 'features/system/components/SiteHeader';
-import InvokeTabs from 'features/ui/components/InvokeTabs';
+import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { buildMiddleware, store } from 'app/store/store';
+import { persistor } from '../store/persistor';
+import { OpenAPI } from 'services/api';
+import '@fontsource/inter/100.css';
+import '@fontsource/inter/200.css';
+import '@fontsource/inter/300.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+import '@fontsource/inter/800.css';
+import '@fontsource/inter/900.css';
 
-import useToastWatcher from 'features/system/hooks/useToastWatcher';
-
-import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
-import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
-import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
-import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
-import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
-import Lightbox from 'features/lightbox/components/Lightbox';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  memo,
-  PropsWithChildren,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Loading from 'common/components/Loading/Loading';
-import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
+import Loading from '../../common/components/Loading/Loading';
+import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { PartialAppConfig } from 'app/types/invokeai';
-import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
-import { configChanged } from 'features/system/store/configSlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+
+import '../../i18n';
+
+const App = lazy(() => import('./App'));
+const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
+  apiUrl?: string;
+  token?: string;
   config?: PartialAppConfig;
 }
 
-const InvokeAIUI = ({ config = {}, children }: Props) => {
-  useToastWatcher();
-  useGlobalHotkeys();
-
-  const currentTheme = useAppSelector((state) => state.ui.currentTheme);
-
-  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
-
-  const isApplicationReady = useIsApplicationReady();
-
-  const [loadingOverridden, setLoadingOverridden] = useState(false);
-
-  const { setColorMode } = useColorMode();
-  const dispatch = useAppDispatch();
-
+const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
   useEffect(() => {
-    console.log('Received config: ', config);
-    dispatch(configChanged(config));
-  }, [dispatch, config]);
+    // configure API client token
+    if (token) {
+      OpenAPI.TOKEN = token;
+    }
 
-  useEffect(() => {
-    setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
-  }, [setColorMode, currentTheme]);
+    // configure API client base url
+    if (apiUrl) {
+      OpenAPI.BASE = apiUrl;
+    }
 
-  const handleOverrideClicked = useCallback(() => {
-    setLoadingOverridden(true);
-  }, []);
+    // reset dynamically added middlewares
+    resetMiddlewares();
+
+    // TODO: at this point, after resetting the middleware, we really ought to clean up the socket
+    // stuff by calling `dispatch(socketReset())`. but we cannot dispatch from here as we are
+    // outside the provider. it's not needed until there is the possibility that we will change
+    // the `apiUrl`/`token` dynamically.
+
+    // rebuild socket middleware with token and apiUrl
+    addMiddleware(buildMiddleware());
+  }, [apiUrl, token]);
 
   return (
-    <Grid w="100vw" h="100vh" position="relative">
-      {isLightboxEnabled && <Lightbox />}
-      <ImageUploader>
-        <ProgressBar />
-        <Grid
-          gap={4}
-          p={4}
-          gridAutoRows="min-content auto"
-          w={APP_WIDTH}
-          h={APP_HEIGHT}
-        >
-          {children || <SiteHeader />}
-          <Flex
-            gap={4}
-            w={{ base: '100vw', xl: 'full' }}
-            h="full"
-            flexDir={{ base: 'column', xl: 'row' }}
-          >
-            <InvokeTabs />
-            <ImageGalleryPanel />
-          </Flex>
-        </Grid>
-      </ImageUploader>
-
-      <AnimatePresence>
-        {!isApplicationReady && !loadingOverridden && (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{ zIndex: 3 }}
-          >
-            <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
-              <Loading />
-            </Box>
-            <Box
-              onClick={handleOverrideClicked}
-              position="absolute"
-              top={0}
-              right={0}
-              cursor="pointer"
-              w="2rem"
-              h="2rem"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <Portal>
-        <FloatingParametersPanelButtons />
-      </Portal>
-      <Portal>
-        <FloatingGalleryButton />
-      </Portal>
-      <Portal>
-        <Console />
-      </Portal>
-    </Grid>
+    <React.StrictMode>
+      <Provider store={store}>
+        <PersistGate loading={<Loading />} persistor={persistor}>
+          <React.Suspense fallback={<Loading />}>
+            <ThemeLocaleProvider>
+              <App config={config}>{children}</App>
+            </ThemeLocaleProvider>
+          </React.Suspense>
+        </PersistGate>
+      </Provider>
+    </React.StrictMode>
   );
 };
 
