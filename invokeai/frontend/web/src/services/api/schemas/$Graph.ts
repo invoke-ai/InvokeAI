@@ -67,6 +67,10 @@ export const $Graph = {
           type: 'ImageToImageInvocation',
         }, {
           type: 'InpaintInvocation',
+        }, {
+          type: 'DownloadImageInvocation',
+        }, {
+          type: 'ResizeImageInvocation',
         }],
       },
     },

@@ -2,11 +2,17 @@
 
 from typing import Literal, Optional
 
+import io
 import numpy
+import os
+import requests
+from urllib.parse import urlparse
+
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
 from ..models.image import ImageField, ImageType
+from ..util.thumbnails import create_thumbnail
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -118,6 +124,62 @@ class ShowImageInvocation(BaseInvocation):
             image=image,
         )
 
+class DownloadImageInvocation(BaseInvocation):
+    """Fetches an image from a URL and provides it as output."""
+
+    type: Literal["download_image"] = "download_image"
+
+    # Inputs
+    image_url: str = Field(description="The URL of the image to download")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        r = requests.get(self.image_url)
+        a = urlparse(self.image_url)
+
+        # TODO: how to handle failure?
+        if r.ok and r.headers["content-type"].startswith("image/"):
+            raw_image = io.BytesIO()
+            for chunk in r.iter_content(chunk_size=128):
+                raw_image.write(chunk)
+            raw_image.flush()
+            raw_image.seek(0)
+
+            return build_image_output(
+                image_type=ImageType.UPLOAD,
+                image_name=os.path.basename(a.path),
+                image=Image.Image.frombytes(raw_image)
+            )
+
+class ResizeImageInvocation(BaseInvocation, PILInvocationConfig):
+    """Resizes an image to a specified size."""
+
+    type: Literal["resize"] = "resize"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to resize")
+    size: int = Field(default=512, gt=0, description="The size of the resized image's longest side")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+
+        # TODO: We should offer the PIL resampling options here, but how to represent that enum class?
+        resize_image = create_thumbnail(image, self.size)
+
+        image_type = ImageType.INTERMEDIATE
+        image_name = context.services.images.create_name(
+            context.graph_execution_state_id, self.id
+        )
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
+        )
+
+        context.services.images.save(image_type, image_name, resize_image, metadata)
+        return build_image_output(
+            image_type=image_type, image_name=image_name, image=resize_image
+        )
 
 class CropImageInvocation(BaseInvocation, PILInvocationConfig):
     """Crops an image to a specified box. The box can be outside of the image."""
@@ -151,7 +213,7 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
         metadata = context.services.metadata.build_metadata(
             session_id=context.graph_execution_state_id, node=self
         )
-        
+
         context.services.images.save(image_type, image_name, image_crop, metadata)
         return build_image_output(
             image_type=image_type,
@@ -209,7 +271,7 @@ class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
         metadata = context.services.metadata.build_metadata(
             session_id=context.graph_execution_state_id, node=self
         )
-        
+
         context.services.images.save(image_type, image_name, new_image, metadata)
         return build_image_output(
             image_type=image_type,

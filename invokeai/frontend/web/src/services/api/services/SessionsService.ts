@@ -7,6 +7,7 @@ import type { CollectInvocation } from '../models/CollectInvocation';
 import type { CropImageInvocation } from '../models/CropImageInvocation';
 import type { CvInpaintInvocation } from '../models/CvInpaintInvocation';
 import type { DivideInvocation } from '../models/DivideInvocation';
+import type { DownloadImageInvocation } from '../models/DownloadImageInvocation';
 import type { Edge } from '../models/Edge';
 import type { Graph } from '../models/Graph';
 import type { GraphExecutionState } from '../models/GraphExecutionState';
@@ -27,6 +28,7 @@ import type { ParamIntInvocation } from '../models/ParamIntInvocation';
 import type { PasteImageInvocation } from '../models/PasteImageInvocation';
 import type { RandomRangeInvocation } from '../models/RandomRangeInvocation';
 import type { RangeInvocation } from '../models/RangeInvocation';
+import type { ResizeImageInvocation } from '../models/ResizeImageInvocation';
 import type { RestoreFaceInvocation } from '../models/RestoreFaceInvocation';
 import type { ShowImageInvocation } from '../models/ShowImageInvocation';
 import type { SubtractInvocation } from '../models/SubtractInvocation';
@@ -142,7 +144,7 @@ export class SessionsService {
      * The id of the session
      */
     sessionId: string,
-    requestBody: (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
+    requestBody: (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation | DownloadImageInvocation | ResizeImageInvocation),
   }): CancelablePromise<string> {
     return __request(OpenAPI, {
       method: 'POST',
@@ -179,7 +181,7 @@ export class SessionsService {
      * The path to the node in the graph
      */
     nodePath: string,
-    requestBody: (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
+    requestBody: (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation | DownloadImageInvocation | ResizeImageInvocation),
   }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'PUT',

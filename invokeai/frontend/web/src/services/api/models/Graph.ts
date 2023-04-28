@@ -8,6 +8,7 @@ import type { CollectInvocation } from './CollectInvocation';
 import type { CropImageInvocation } from './CropImageInvocation';
 import type { CvInpaintInvocation } from './CvInpaintInvocation';
 import type { DivideInvocation } from './DivideInvocation';
+import type { DownloadImageInvocation } from './DownloadImageInvocation';
 import type { Edge } from './Edge';
 import type { GraphInvocation } from './GraphInvocation';
 import type { ImageToImageInvocation } from './ImageToImageInvocation';
@@ -25,6 +26,7 @@ import type { ParamIntInvocation } from './ParamIntInvocation';
 import type { PasteImageInvocation } from './PasteImageInvocation';
 import type { RandomRangeInvocation } from './RandomRangeInvocation';
 import type { RangeInvocation } from './RangeInvocation';
+import type { ResizeImageInvocation } from './ResizeImageInvocation';
 import type { RestoreFaceInvocation } from './RestoreFaceInvocation';
 import type { ShowImageInvocation } from './ShowImageInvocation';
 import type { SubtractInvocation } from './SubtractInvocation';
@@ -40,7 +42,7 @@ export type Graph = {
   /**
    * The nodes in this graph
    */
-  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
+  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation | DownloadImageInvocation | ResizeImageInvocation)>;
   /**
    * The connections between nodes and their fields in this graph
    */
