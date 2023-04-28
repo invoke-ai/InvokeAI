@@ -150,7 +150,6 @@ class InvokeAISettings(BaseSettings):
         env_file_encoding = 'utf-8'
         arbitrary_types_allowed = True
         env_prefix = 'INVOKEAI_'
-        extra = 'allow'      # FIX: this shouldn't be allowed, but without it graphs fail to validate
         case_sensitive = True
         @classmethod
         def customise_sources(
