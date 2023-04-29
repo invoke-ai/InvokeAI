@@ -23,6 +23,7 @@ import IAISelect from 'common/components/IAISelect';
 import IAISwitch from 'common/components/IAISwitch';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
+  consoleLogLevelChanged,
   InProgressImageType,
   setEnableImageDebugging,
   setSaveIntermediatesInterval,
@@ -39,8 +40,10 @@ import {
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual, map } from 'lodash-es';
 import { persistor } from 'app/store/persistor';
-import { ChangeEvent, cloneElement, ReactElement } from 'react';
+import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { InvokeLogLevel, VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { LogLevelName } from 'roarr';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -52,6 +55,7 @@ const selector = createSelector(
       model_list,
       saveIntermediatesInterval,
       enableImageDebugging,
+      consoleLogLevel,
     } = system;
 
     const { shouldUseCanvasBetaLayout, shouldUseSliders } = ui;
@@ -65,6 +69,7 @@ const selector = createSelector(
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
+      consoleLogLevel,
     };
   },
   {
@@ -116,6 +121,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
+    consoleLogLevel,
   } = useAppSelector(selector);
 
   /**
@@ -134,6 +140,13 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     if (value < 1) value = 1;
     dispatch(setSaveIntermediatesInterval(value));
   };
+
+  const handleLogLevelChanged = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(consoleLogLevelChanged(e.target.value as LogLevelName));
+    },
+    [dispatch]
+  );
 
   return (
     <>
@@ -211,6 +224,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 <Heading size="sm" style={{ fontWeight: 'bold' }}>
                   Developer
                 </Heading>
+                <IAISelect
+                  label={t('settings.consoleLogLevel')}
+                  onChange={handleLogLevelChanged}
+                  value={consoleLogLevel}
+                  validValues={VALID_LOG_LEVELS.concat()}
+                />
                 <IAISwitch
                   label={t('settings.enableImageDebugging')}
                   isChecked={enableImageDebugging}

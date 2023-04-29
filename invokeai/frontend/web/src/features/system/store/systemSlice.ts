@@ -21,6 +21,8 @@ import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
+import { LogLevelName } from 'roarr';
+import { InvokeLogLevel, VALID_LOG_LEVELS } from 'app/logging/useLogger';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -97,6 +99,10 @@ export interface SystemState
    * Whether or not the OpenAPI schema was received and parsed
    */
   wasSchemaParsed: boolean;
+  /**
+   * The console output logging level
+   */
+  consoleLogLevel: InvokeLogLevel;
 }
 
 const initialSystemState: SystemState = {
@@ -149,6 +155,7 @@ const initialSystemState: SystemState = {
   // disabledFeatures: [],
   wereModelsReceived: false,
   wasSchemaParsed: false,
+  consoleLogLevel: 'info',
 };
 
 export const systemSlice = createSlice({
@@ -346,6 +353,9 @@ export const systemSlice = createSlice({
     subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
       state.subscribedNodeIds = action.payload;
     },
+    consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
+      state.consoleLogLevel = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -353,7 +363,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(socketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
-      console.log(`Subscribed to session ${action.payload.sessionId}`);
     });
 
     /**
@@ -374,7 +383,7 @@ export const systemSlice = createSlice({
       state.log.push({
         timestamp,
         message: `Connected to server`,
-        level: 'info',
+        level: 'error',
       });
     });
 
@@ -562,6 +571,7 @@ export const {
   scheduledCancelAborted,
   cancelTypeChanged,
   subscribedNodeIdsSet,
+  consoleLogLevelChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

@@ -6,13 +6,9 @@ import {
   ServerToClientEvents,
 } from 'services/events/types';
 import {
-  generatorProgress,
   invocationComplete,
-  invocationError,
-  invocationStarted,
   socketConnected,
   socketDisconnected,
-  socketReset,
   socketSubscribed,
   socketUnsubscribed,
 } from './actions';
@@ -25,7 +21,6 @@ import { getTimestamp } from 'common/util/getTimestamp';
 import {
   sessionInvoked,
   isFulfilledSessionCreatedAction,
-  sessionCanceled,
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 import { receivedModels } from 'services/thunks/model';
@@ -33,6 +28,9 @@ import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { isImageOutput } from 'services/types/guards';
 import { imageReceived, thumbnailReceived } from 'services/thunks/image';
 import { setEventListeners } from 'services/events/util/setEventListeners';
+import { log } from 'app/logging/useLogger';
+
+const moduleLog = log.child({ namespace: 'socketio' });
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -91,6 +89,8 @@ export const socketMiddleware = () => {
       // Must happen in middleware to get access to `dispatch`
       if (!areListenersSet) {
         socket.on('connect', () => {
+          moduleLog.debug('Connected');
+
           dispatch(socketConnected({ timestamp: getTimestamp() }));
 
           const { results, uploads, models, nodes, config, system } =
@@ -116,7 +116,10 @@ export const socketMiddleware = () => {
           }
 
           if (system.sessionId) {
-            console.log(`Re-subscribing to session ${system.sessionId}`);
+            const sessionLog = moduleLog.child({ sessionId: system.sessionId });
+
+            sessionLog.debug('Re-subscribe');
+
             socket.emit('subscribe', { session: system.sessionId });
             dispatch(
               socketSubscribed({
@@ -124,11 +127,12 @@ export const socketMiddleware = () => {
                 timestamp: getTimestamp(),
               })
             );
-            setEventListeners({ socket, store });
+            setEventListeners({ socket, store, sessionLog });
           }
         });
 
         socket.on('disconnect', () => {
+          moduleLog.debug('Disconnected');
           dispatch(socketDisconnected({ timestamp: getTimestamp() }));
         });
 
@@ -140,6 +144,8 @@ export const socketMiddleware = () => {
 
       // Everything else only happens once we have created a session
       if (isFulfilledSessionCreatedAction(action)) {
+        const sessionId = action.payload.id;
+        const sessionLog = moduleLog.child({ sessionId });
         const oldSessionId = getState().system.sessionId;
 
         // const subscribedNodeIds = getState().system.subscribedNodeIds;
@@ -152,6 +158,9 @@ export const socketMiddleware = () => {
         // };
 
         if (oldSessionId) {
+          sessionLog
+            .child({ oldSessionId })
+            .debug('Unsubscribe from old session');
           // Unsubscribe when invocations complete
           socket.emit('unsubscribe', {
             session: oldSessionId,
@@ -176,8 +185,7 @@ export const socketMiddleware = () => {
           });
         }
 
-        const sessionId = action.payload.id;
-
+        sessionLog.debug('Subscribe');
         socket.emit('subscribe', { session: sessionId });
         dispatch(
           socketSubscribed({
@@ -185,7 +193,7 @@ export const socketMiddleware = () => {
             timestamp: getTimestamp(),
           })
         );
-        setEventListeners({ socket, store });
+        setEventListeners({ socket, store, sessionLog });
 
         // Finally we actually invoke the session, starting processing
         dispatch(sessionInvoked({ sessionId }));

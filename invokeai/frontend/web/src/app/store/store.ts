@@ -28,7 +28,7 @@ import { lightboxDenylist } from 'features/lightbox/store/lightboxPersistDenylis
 import { modelsDenylist } from 'features/system/store/modelsPersistDenylist';
 import { nodesDenylist } from 'features/nodes/store/nodesPersistDenylist';
 import { postprocessingDenylist } from 'features/parameters/store/postprocessingPersistDenylist';
-import { systemDenylist } from 'features/system/store/systemPersistsDenylist';
+import { systemDenylist } from 'features/system/store/systemPersistDenylist';
 import { uiDenylist } from 'features/ui/store/uiPersistDenylist';
 
 /**
@@ -82,7 +82,6 @@ const rootPersistConfig = getPersistConfig({
     'hotkeys',
     'config',
   ],
-  debounce: 300,
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
