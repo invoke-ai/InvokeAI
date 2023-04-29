@@ -32,7 +32,6 @@ export const VALID_LOG_LEVELS = [
   'warn',
   'error',
   'fatal',
-  'none',
 ] as const;
 
 export type InvokeLogLevel = (typeof VALID_LOG_LEVELS)[number];
@@ -40,11 +39,12 @@ export type InvokeLogLevel = (typeof VALID_LOG_LEVELS)[number];
 const selector = createSelector(
   systemSelector,
   (system) => {
-    const { app_version, consoleLogLevel } = system;
+    const { app_version, consoleLogLevel, shouldLogToConsole } = system;
 
     return {
       version: app_version,
       consoleLogLevel,
+      shouldLogToConsole,
     };
   },
   {
@@ -55,14 +55,12 @@ const selector = createSelector(
 );
 
 export const useLogger = () => {
-  const { version, consoleLogLevel } = useAppSelector(selector);
+  const { version, consoleLogLevel, shouldLogToConsole } =
+    useAppSelector(selector);
 
   // The provided Roarr browser log writer uses localStorage to config logging to console
   useEffect(() => {
-    if (consoleLogLevel === 'none') {
-      // Disable console log output
-      localStorage.setItem('ROARR_LOG', 'false');
-    } else {
+    if (shouldLogToConsole) {
       // Enable console log output
       localStorage.setItem('ROARR_LOG', 'true');
 
@@ -71,9 +69,12 @@ export const useLogger = () => {
         'ROARR_FILTER',
         `context.logLevel:>=${LOG_LEVEL_MAP[consoleLogLevel]}`
       );
+    } else {
+      // Disable console log output
+      localStorage.setItem('ROARR_LOG', 'false');
     }
     ROARR.write = createLogWriter();
-  }, [consoleLogLevel]);
+  }, [consoleLogLevel, shouldLogToConsole]);
 
   // Update the module-scoped logger context as needed
   useEffect(() => {

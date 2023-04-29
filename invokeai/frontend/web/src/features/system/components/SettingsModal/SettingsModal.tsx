@@ -30,6 +30,7 @@ import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
+  shouldLogToConsoleChanged,
   SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
@@ -44,6 +45,7 @@ import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InvokeLogLevel, VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
+import { F } from 'ts-toolbelt';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -56,6 +58,7 @@ const selector = createSelector(
       saveIntermediatesInterval,
       enableImageDebugging,
       consoleLogLevel,
+      shouldLogToConsole,
     } = system;
 
     const { shouldUseCanvasBetaLayout, shouldUseSliders } = ui;
@@ -70,6 +73,7 @@ const selector = createSelector(
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       consoleLogLevel,
+      shouldLogToConsole,
     };
   },
   {
@@ -122,6 +126,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
     consoleLogLevel,
+    shouldLogToConsole,
   } = useAppSelector(selector);
 
   /**
@@ -144,6 +149,13 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   const handleLogLevelChanged = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
       dispatch(consoleLogLevelChanged(e.target.value as LogLevelName));
+    },
+    [dispatch]
+  );
+
+  const handleLogToConsoleChanged = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldLogToConsoleChanged(e.target.checked));
     },
     [dispatch]
   );
@@ -224,7 +236,13 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 <Heading size="sm" style={{ fontWeight: 'bold' }}>
                   Developer
                 </Heading>
+                <IAISwitch
+                  label={t('settings.shouldLogToConsole')}
+                  isChecked={shouldLogToConsole}
+                  onChange={handleLogToConsoleChanged}
+                />
                 <IAISelect
+                  isDisabled={!shouldLogToConsole}
                   label={t('settings.consoleLogLevel')}
                   onChange={handleLogLevelChanged}
                   value={consoleLogLevel}
