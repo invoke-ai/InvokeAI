@@ -200,11 +200,11 @@ class InvokeAIDiffuserComponent:
                 cross_attention_control_types_to_do,
             )
 
-        elif "prep_neg" in conditioning_info:
-            combined_next_x = self._apply_prepneg_conditioning(
+        elif "perp_neg" in conditioning_info:
+            combined_next_x = self._apply_perpneg_conditioning(
                 x,
                 sigma,
-                conditioning_info["prep_neg"],
+                conditioning_info["perp_neg"],
                 unconditional_guidance_scale,
             )
 
@@ -253,7 +253,7 @@ class InvokeAIDiffuserComponent:
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
-    def _apply_prepneg_conditioning(
+    def _apply_perpneg_conditioning(
         self,
         x,
         sigma,

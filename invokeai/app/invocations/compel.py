@@ -48,7 +48,7 @@ class CompelInvocation(BaseInvocation):
     positive_prompt: str = Field(default="", description="Positive prompt")
     negative_prompt: str = Field(default="", description="Negative prompt")
 
-    prep_neg: bool = Field(default=False, description="Enable prep-neg conditioning(blend and swap unsupported)")
+    perp_neg: bool = Field(default=False, description="Enable perp-neg conditioning(blend and swap unsupported)")
 
     model: str = Field(default="", description="Model to use")
     truncate_long_prompts: bool = Field(default=False, description="Whether or not to truncate long prompt to 77 tokens")
@@ -126,10 +126,10 @@ class CompelInvocation(BaseInvocation):
         if getattr(Globals, "log_tokenization", False):
             log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
 
-        if self.prep_neg:
+        if self.perp_neg:
             blocks = []
-            blocks.extend(self._prepneg_parse(compel, positive_prompt, tokenizer, negative=False))
-            blocks.extend(self._prepneg_parse(compel, negative_prompt, tokenizer, negative=True))
+            blocks.extend(self._perpneg_parse(compel, positive_prompt, tokenizer, negative=False))
+            blocks.extend(self._perpneg_parse(compel, negative_prompt, tokenizer, negative=True))
 
             #max_length = text_input.input_ids.shape[-1]
         
@@ -141,7 +141,7 @@ class CompelInvocation(BaseInvocation):
             # TODO: pad length for long blocks
 
             cond_info = {
-                "prep_neg": {
+                "perp_neg": {
                     "blocks": blocks,
                     "uncond_embeddings": uncond_embeddings,
                 }
@@ -185,7 +185,7 @@ class CompelInvocation(BaseInvocation):
             ),
         )
 
-    def _prepneg_parse(self, compel, prompt_ast, tokenizer, negative=False):
+    def _perpneg_parse(self, compel, prompt_ast, tokenizer, negative=False):
         if isinstance(prompt_ast, Blend):
             raise NotImplementedError()
 
@@ -230,12 +230,12 @@ class CompelInvocation(BaseInvocation):
                 if negative:
                     block_weight = -block_weight
 
-                block_infos.append((self._prepneg_gen(compel, block), block_weight))
+                block_infos.append((self._perpneg_gen(compel, block), block_weight))
 
             return block_infos
 
 
-    def _prepneg_gen(self, compel, block):
+    def _perpneg_gen(self, compel, block):
 
         prompt = ""
         tokens = list(block.tokens)
