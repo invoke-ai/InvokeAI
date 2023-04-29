@@ -699,7 +699,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                             for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
                         ]
                         mid_block_res_sample += mid_sample
-
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
             latent_model_input,
@@ -1031,7 +1030,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         dtype=torch.float16,
         do_classifier_free_guidance=True,
     ):
-
         if not isinstance(image, torch.Tensor):
             if isinstance(image, PIL.Image.Image):
                 image = [image]
