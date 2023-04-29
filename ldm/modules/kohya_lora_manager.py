@@ -9,7 +9,7 @@ from safetensors.torch import load_file
 from torch.utils.hooks import RemovableHandle
 from transformers import CLIPTextModel
 
-from ..invoke.globals import global_lora_models_dir
+from ..invoke.globals import global_lora_models_dir, Globals
 from ..invoke.devices import choose_torch_device
 
 """
@@ -456,10 +456,12 @@ class LoRA:
 
 
 class KohyaLoraManager:
-    lora_path = Path(global_lora_models_dir())
-    vector_length_cache_path = lora_path / '.vectorlength.cache'
+    lora_path = None
+    vector_length_cache_path = None
     
     def __init__(self, pipe):
+        self.lora_path = Path(global_lora_models_dir())
+        self.vector_length_cache_path = self.lora_path / '.vectorlength.cache'
         self.unet = pipe.unet
         self.wrapper = LoRAModuleWrapper(pipe.unet, pipe.text_encoder)
         self.text_encoder = pipe.text_encoder
@@ -566,6 +568,7 @@ class KohyaLoraManager:
 class LoraVectorLengthCache(object):
     def __init__(self, cache_path: Path):
         self.cache_path = cache_path
+        print(f'DEBUG: lock path = {Path(cache_path.parent, ".cachelock")}')
         self.lock = FileLock(Path(cache_path.parent, ".cachelock"))
         self.cache = {}
 
