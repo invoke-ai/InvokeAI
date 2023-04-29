@@ -4,28 +4,41 @@ import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/line
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
 import { buildNodesGraph } from 'features/nodes/util/nodesGraphBuilder/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
+import { serializeError } from 'serialize-error';
 
 const sessionLog = log.child({ namespace: 'session' });
 
 export const generateGraphBuilt = createAppAsyncThunk(
   'api/generateGraphBuilt',
-  async (_, { dispatch, getState }) => {
-    const graph = buildGenerateGraph(getState());
-
-    dispatch(sessionCreated({ graph }));
-
-    return graph;
+  async (_, { dispatch, getState, rejectWithValue }) => {
+    try {
+      const graph = buildGenerateGraph(getState());
+      dispatch(sessionCreated({ graph }));
+      return graph;
+    } catch (err: any) {
+      sessionLog.error(
+        { error: serializeError(err) },
+        'Problem building graph'
+      );
+      return rejectWithValue(err.message);
+    }
   }
 );
 
 export const nodesGraphBuilt = createAppAsyncThunk(
   'api/nodesGraphBuilt',
-  async (_, { dispatch, getState }) => {
-    const graph = buildNodesGraph(getState());
-
-    dispatch(sessionCreated({ graph }));
-
-    return graph;
+  async (_, { dispatch, getState, rejectWithValue }) => {
+    try {
+      const graph = buildNodesGraph(getState());
+      dispatch(sessionCreated({ graph }));
+      return graph;
+    } catch (err: any) {
+      sessionLog.error(
+        { error: serializeError(err) },
+        'Problem building graph'
+      );
+      return rejectWithValue(err.message);
+    }
   }
 );
 

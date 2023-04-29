@@ -95,6 +95,7 @@
     "redux-dynamic-middlewares": "^2.2.0",
     "redux-persist": "^6.0.0",
     "roarr": "^7.15.0",
+    "serialize-error": "^11.0.0",
     "socket.io-client": "^4.6.0",
     "use-image": "^1.1.0",
     "uuid": "^9.0.0"
