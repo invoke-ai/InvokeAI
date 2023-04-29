@@ -23,33 +23,14 @@ import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 import { LogLevelName } from 'roarr';
 import { InvokeLogLevel } from 'app/logging/useLogger';
 
-export type LogLevel = 'info' | 'warning' | 'error';
-
-export interface LogEntry {
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-}
-
-export interface Log {
-  [index: number]: LogEntry;
-}
-
-export type InProgressImageType = 'none' | 'full-res' | 'latents';
-
 export type CancelType = 'immediate' | 'scheduled';
 
-export interface SystemState
-  extends InvokeAI.SystemStatus,
-    InvokeAI.SystemConfig {
-  shouldDisplayInProgressType: InProgressImageType;
-  shouldShowLogViewer: boolean;
+export interface SystemState {
   isGFPGANAvailable: boolean;
   isESRGANAvailable: boolean;
   isConnected: boolean;
-  socketId: string;
+  isProcessing: boolean;
   shouldConfirmOnDelete: boolean;
-  openAccordions: ExpandedIndex;
   currentStep: number;
   totalSteps: number;
   currentIteration: number;
@@ -57,18 +38,12 @@ export interface SystemState
   currentStatus: string;
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
-  wasErrorSeen: boolean;
   isCancelable: boolean;
-  saveIntermediatesInterval: number;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
   openModel: string | null;
-  cancelOptions: {
-    cancelType: CancelType;
-    cancelAfter: number | null;
-  };
   /**
    * The current progress image
    */
@@ -107,14 +82,10 @@ export interface SystemState
 const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
-  shouldShowLogViewer: false,
-  shouldDisplayInProgressType: 'latents',
   shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
-  socketId: '',
   shouldConfirmOnDelete: true,
-  openAccordions: [0],
   currentStep: 0,
   totalSteps: 0,
   currentIteration: 0,
@@ -123,26 +94,12 @@ const initialSystemState: SystemState = {
     ? i18n.t('common.statusDisconnected')
     : 'Disconnected',
   currentStatusHasSteps: false,
-  model: '',
-  model_id: '',
-  model_hash: '',
-  app_id: '',
-  app_version: '',
-  model_list: {},
-  infill_methods: [],
-  hasError: false,
-  wasErrorSeen: true,
   isCancelable: true,
-  saveIntermediatesInterval: 5,
   enableImageDebugging: false,
   toastQueue: [],
   searchFolder: null,
   foundModels: null,
   openModel: null,
-  cancelOptions: {
-    cancelType: 'immediate',
-    cancelAfter: null,
-  },
   progressImage: null,
   sessionId: null,
   cancelType: 'immediate',
@@ -158,23 +115,13 @@ export const systemSlice = createSlice({
   name: 'system',
   initialState: initialSystemState,
   reducers: {
-    setShouldDisplayInProgressType: (
-      state,
-      action: PayloadAction<InProgressImageType>
-    ) => {
-      state.shouldDisplayInProgressType = action.payload;
-    },
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
     setCurrentStatus: (state, action: PayloadAction<string>) => {
       state.currentStatus = action.payload;
     },
-    setSystemStatus: (state, action: PayloadAction<InvokeAI.SystemStatus>) => {
-      return { ...state, ...action.payload };
-    },
     errorOccurred: (state) => {
-      state.hasError = true;
       state.isProcessing = false;
       state.isCancelable = true;
       state.currentStep = 0;
@@ -183,17 +130,6 @@ export const systemSlice = createSlice({
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
       state.currentStatus = i18n.t('common.statusError');
-      state.wasErrorSeen = false;
-    },
-    errorSeen: (state) => {
-      state.hasError = false;
-      state.wasErrorSeen = true;
-      state.currentStatus = state.isConnected
-        ? i18n.t('common.statusConnected')
-        : i18n.t('common.statusDisconnected');
-    },
-    setShouldShowLogViewer: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowLogViewer = action.payload;
     },
     setIsConnected: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
@@ -204,22 +140,9 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.hasError = false;
-    },
-    setSocketId: (state, action: PayloadAction<string>) => {
-      state.socketId = action.payload;
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
-    },
-    setOpenAccordions: (state, action: PayloadAction<ExpandedIndex>) => {
-      state.openAccordions = action.payload;
-    },
-    setSystemConfig: (state, action: PayloadAction<InvokeAI.SystemConfig>) => {
-      return {
-        ...state,
-        ...action.payload,
-      };
     },
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
@@ -244,12 +167,6 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = false;
       state.currentStatus = i18n.t('common.statusPreparing');
     },
-    setModelList: (
-      state,
-      action: PayloadAction<InvokeAI.ModelList | Record<string, never>>
-    ) => {
-      state.model_list = action.payload;
-    },
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
     },
@@ -270,9 +187,6 @@ export const systemSlice = createSlice({
       state.isCancelable = false;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
-    },
-    setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
-      state.saveIntermediatesInterval = action.payload;
     },
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
@@ -299,12 +213,6 @@ export const systemSlice = createSlice({
     },
     setOpenModel: (state, action: PayloadAction<string | null>) => {
       state.openModel = action.payload;
-    },
-    setCancelType: (state, action: PayloadAction<CancelType>) => {
-      state.cancelOptions.cancelType = action.payload;
-    },
-    setCancelAfter: (state, action: PayloadAction<number | null>) => {
-      state.cancelOptions.cancelAfter = action.payload;
     },
     /**
      * A cancel was scheduled
@@ -420,7 +328,6 @@ export const systemSlice = createSlice({
     builder.addCase(invocationError, (state, action) => {
       const { data, timestamp } = action.payload;
 
-      state.wasErrorSeen = true;
       state.progressImage = null;
       state.isProcessing = false;
 
@@ -479,26 +386,17 @@ export const systemSlice = createSlice({
 });
 
 export const {
-  setShouldDisplayInProgressType,
   setIsProcessing,
-  setShouldShowLogViewer,
   setIsConnected,
-  setSocketId,
   setShouldConfirmOnDelete,
-  setOpenAccordions,
-  setSystemStatus,
   setCurrentStatus,
-  setSystemConfig,
   setShouldDisplayGuides,
   processingCanceled,
   errorOccurred,
-  errorSeen,
-  setModelList,
   setIsCancelable,
   modelChangeRequested,
   modelConvertRequested,
   modelMergingRequested,
-  setSaveIntermediatesInterval,
   setEnableImageDebugging,
   generationRequested,
   addToast,
@@ -507,8 +405,6 @@ export const {
   setSearchFolder,
   setFoundModels,
   setOpenModel,
-  setCancelType,
-  setCancelAfter,
   cancelScheduled,
   scheduledCancelAborted,
   cancelTypeChanged,

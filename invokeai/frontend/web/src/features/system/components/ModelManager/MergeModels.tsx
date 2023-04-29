@@ -13,7 +13,7 @@ import {
   Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
-import { mergeDiffusersModels } from 'app/socketio/actions';
+// import { mergeDiffusersModels } from 'app/socketio/actions';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';

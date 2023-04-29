@@ -1,4 +1,4 @@
-import { emptyTempFolder } from 'app/socketio/actions';
+// import { emptyTempFolder } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
