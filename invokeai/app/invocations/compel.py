@@ -223,7 +223,7 @@ class CompelInvocation(BaseInvocation):
             for block in blocks:
                 # hacky way to do at least something with block weights)
                 #block_weight = sum(block.weights) / len(block.weights)
-                block_weight = math.prod(block.weights) ** (1/len(blocks.weights))
+                block_weight = math.prod(block.weights) ** (1/len(block.weights))
                 for i in range(len(block.weights)):
                     block.weights[i] /= block_weight
 
