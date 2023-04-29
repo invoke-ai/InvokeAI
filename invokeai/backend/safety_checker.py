@@ -14,7 +14,7 @@ from PIL import Image, ImageFilter
 from transformers import AutoFeatureExtractor
 
 import invokeai.assets.web as web_assets
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from .globals import global_cache_dir
 from .util import CPU_DEVICE
 
@@ -41,7 +41,7 @@ class SafetyChecker(object):
                 cache_dir=safety_model_path,
             )
         except Exception:
-            log.error(
+            logger.error(
                 "An error was encountered while installing the safety checker:"
             )
             print(traceback.format_exc())
@@ -66,7 +66,7 @@ class SafetyChecker(object):
         )
         self.safety_checker.to(CPU_DEVICE) # offload
         if has_nsfw_concept[0]:
-            log.warning(
+            logger.warning(
                 "An image with potential non-safe content has been detected. A blurred image will be returned."
             )
             return self.blur(image)

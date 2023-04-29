@@ -96,7 +96,7 @@ from pathlib import Path
 from typing import List
 
 import invokeai.version
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.image_util import retrieve_metadata
 
 from .globals import Globals
@@ -190,7 +190,7 @@ class Args(object):
                 print(f"{APP_NAME} {APP_VERSION}")
                 sys.exit(0)
 
-            log.info("Initializing, be patient...")
+            logger.info("Initializing, be patient...")
             Globals.root = Path(os.path.abspath(switches.root_dir or Globals.root))
             Globals.try_patchmatch = switches.patchmatch
 
@@ -198,12 +198,12 @@ class Args(object):
             initfile = os.path.expanduser(os.path.join(Globals.root, Globals.initfile))
             legacyinit = os.path.expanduser("~/.invokeai")
             if os.path.exists(initfile):
-                log.info(
+                logger.info(
                     f"Initialization file {initfile} found. Loading...",
                 )
                 sysargs.insert(0, f"@{initfile}")
             elif os.path.exists(legacyinit):
-                log.warning(
+                logger.warning(
                     f"Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init."
                 )
                 sysargs.insert(0, f"@{legacyinit}")
@@ -214,7 +214,7 @@ class Args(object):
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
-            log.error(f"An exception has occurred: {e}")
+            logger.error(f"An exception has occurred: {e}")
             return None
 
     def parse_cmd(self, cmd_string):
@@ -1154,7 +1154,7 @@ class Args(object):
 
 
 def format_metadata(**kwargs):
-    log.warning("format_metadata() is deprecated. Please use metadata_dumps()")
+    logger.warning("format_metadata() is deprecated. Please use metadata_dumps()")
     return metadata_dumps(kwargs)
 
 
@@ -1326,7 +1326,7 @@ def metadata_loads(metadata) -> list:
         import sys
         import traceback
 
-        log.error("Could not read metadata")
+        logger.error("Could not read metadata")
         print(traceback.format_exc(), file=sys.stderr)
     return results
 

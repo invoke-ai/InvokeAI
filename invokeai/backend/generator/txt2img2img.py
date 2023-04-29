@@ -14,7 +14,7 @@ from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeli
 from ..stable_diffusion.diffusers_pipeline import ConditioningData
 from ..stable_diffusion.diffusers_pipeline import trim_to_multiple_of
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 
 class Txt2Img2Img(Generator):
     def __init__(self, model, precision):
@@ -79,7 +79,7 @@ class Txt2Img2Img(Generator):
             # the message below is accurate.
             init_width = first_pass_latent_output.size()[3] * self.downsampling_factor
             init_height = first_pass_latent_output.size()[2] * self.downsampling_factor
-            log.info(
+            logger.info(
                 f"Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
             )
 

@@ -2,7 +2,7 @@
 
 import os
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -49,7 +49,7 @@ class ApiDependencies:
         Globals.disable_xformers = not config.xformers
         Globals.ckpt_convert = config.ckpt_convert
 
-        log.info(f"Internet connectivity is {Globals.internet_available}")
+        logger.info(f"Internet connectivity is {Globals.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
 

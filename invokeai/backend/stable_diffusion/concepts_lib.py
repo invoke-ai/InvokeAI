@@ -17,7 +17,7 @@ from huggingface_hub import (
     hf_hub_url,
 )
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals
 
 
@@ -67,10 +67,10 @@ class HuggingFaceConceptsLibrary(object):
                 # when init, add all in dir. when not init, add only concepts added between init and now
                 self.concept_list.extend(list(local_concepts_to_add))
             except Exception as e:
-                log.warning(
+                logger.warning(
                     f"Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}."
                 )
-                log.warning(
+                logger.warning(
                     "You may load .bin and .pt file(s) manually using the --embedding_directory argument."
                 )
             return self.concept_list
@@ -84,7 +84,7 @@ class HuggingFaceConceptsLibrary(object):
         be downloaded.
         """
         if not concept_name in self.list_concepts():
-            log.warning(
+            logger.warning(
                 f"{concept_name} is not a local embedding trigger, nor is it a HuggingFace concept. Generation will continue without the concept."
             )
             return None
@@ -222,7 +222,7 @@ class HuggingFaceConceptsLibrary(object):
             if chunk == 0:
                 bytes += total
 
-        log.info(f"Downloading {repo_id}...", end="")
+        logger.info(f"Downloading {repo_id}...", end="")
         try:
             for file in (
                 "README.md",
@@ -236,22 +236,22 @@ class HuggingFaceConceptsLibrary(object):
                 )
         except ul_error.HTTPError as e:
             if e.code == 404:
-                log.warning(
+                logger.warning(
                     f"Concept {concept_name} is not known to the Hugging Face library. Generation will continue without the concept."
                 )
             else:
-                log.warning(
+                logger.warning(
                     f"Failed to download {concept_name}/{file} ({str(e)}. Generation will continue without the concept.)"
                 )
             os.rmdir(dest)
             return False
         except ul_error.URLError as e:
-            log.error(
+            logger.error(
                 f"an error occurred while downloading {concept_name}: {str(e)}. This may reflect a network issue. Generation will continue without the concept."
             )
             os.rmdir(dest)
             return False
-        log.info("...{:.2f}Kb".format(bytes / 1024))
+        logger.info("...{:.2f}Kb".format(bytes / 1024))
         return succeeded
 
     def _concept_id(self, concept_name: str) -> str:

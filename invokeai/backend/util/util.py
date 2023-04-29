@@ -18,7 +18,7 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from .devices import torch_dtype
 
 
@@ -39,7 +39,7 @@ def log_txt_as_img(wh, xc, size=10):
         try:
             draw.text((0, 0), lines, fill="black", font=font)
         except UnicodeEncodeError:
-            log.warning("Cant encode string for logging. Skipping.")
+            logger.warning("Cant encode string for logging. Skipping.")
 
         txt = np.array(txt).transpose(2, 0, 1) / 127.5 - 1.0
         txts.append(txt)
@@ -81,7 +81,7 @@ def mean_flat(tensor):
 def count_params(model, verbose=False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
-        log.debug(
+        logger.debug(
             f"{model.__class__.__name__} has {total_params * 1.e-6:.2f} M params."
         )
     return total_params
@@ -133,7 +133,7 @@ def parallel_data_prefetch(
         raise ValueError("list expected but function got ndarray.")
     elif isinstance(data, abc.Iterable):
         if isinstance(data, dict):
-            log.warning(
+            logger.warning(
                 '"data" argument passed to parallel_data_prefetch is a dict: Using only its values and disregarding keys.'
             )
             data = list(data.values())
@@ -176,7 +176,7 @@ def parallel_data_prefetch(
         processes += [p]
 
     # start processes
-    log.info("Start prefetching...")
+    logger.info("Start prefetching...")
     import time
 
     start = time.time()
@@ -195,7 +195,7 @@ def parallel_data_prefetch(
                 gather_res[res[0]] = res[1]
 
     except Exception as e:
-        log.error("Exception: ", e)
+        logger.error("Exception: ", e)
         for p in processes:
             p.terminate()
 
@@ -203,7 +203,7 @@ def parallel_data_prefetch(
     finally:
         for p in processes:
             p.join()
-        log.info(f"Prefetching complete. [{time.time() - start} sec.]")
+        logger.info(f"Prefetching complete. [{time.time() - start} sec.]")
 
     if target_data_type == "ndarray":
         if not isinstance(gather_res[0], np.ndarray):
@@ -319,23 +319,23 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         resp = requests.get(url, headers=header, stream=True)  # new request with range
 
     if exist_size > content_length:
-        log.warning("corrupt existing file found. re-downloading")
+        logger.warning("corrupt existing file found. re-downloading")
         os.remove(dest)
         exist_size = 0
 
     if resp.status_code == 416 or exist_size == content_length:
-        log.warning(f"{dest}: complete file found. Skipping.")
+        logger.warning(f"{dest}: complete file found. Skipping.")
         return dest
     elif resp.status_code == 206 or exist_size > 0:
-        log.warning(f"{dest}: partial file found. Resuming...")
+        logger.warning(f"{dest}: partial file found. Resuming...")
     elif resp.status_code != 200:
-        log.error(f"An error occurred during downloading {dest}: {resp.reason}")
+        logger.error(f"An error occurred during downloading {dest}: {resp.reason}")
     else:
-        log.error(f"{dest}: Downloading...")
+        logger.error(f"{dest}: Downloading...")
 
     try:
         if content_length < 2000:
-            log.error(f"ERROR DOWNLOADING {url}: {resp.text}")
+            logger.error(f"ERROR DOWNLOADING {url}: {resp.text}")
             return None
 
         with open(dest, open_mode) as file, tqdm(
@@ -350,7 +350,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
                 size = file.write(data)
                 bar.update(size)
     except Exception as e:
-        log.error(f"An error occurred while downloading {dest}: {str(e)}")
+        logger.error(f"An error occurred while downloading {dest}: {str(e)}")
         return None
 
     return dest

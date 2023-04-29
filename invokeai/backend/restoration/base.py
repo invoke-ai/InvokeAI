@@ -1,4 +1,4 @@
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 
 class Restoration:
     def __init__(self) -> None:
@@ -10,17 +10,17 @@ class Restoration:
         # Load GFPGAN
         gfpgan = self.load_gfpgan(gfpgan_model_path)
         if gfpgan.gfpgan_model_exists:
-            log.info("GFPGAN Initialized")
+            logger.info("GFPGAN Initialized")
         else:
-            log.info("GFPGAN Disabled")
+            logger.info("GFPGAN Disabled")
             gfpgan = None
 
         # Load CodeFormer
         codeformer = self.load_codeformer()
         if codeformer.codeformer_model_exists:
-            log.info("CodeFormer Initialized")
+            logger.info("CodeFormer Initialized")
         else:
-            log.info("CodeFormer Disabled")
+            logger.info("CodeFormer Disabled")
             codeformer = None
 
         return gfpgan, codeformer
@@ -41,5 +41,5 @@ class Restoration:
         from .realesrgan import ESRGAN
 
         esrgan = ESRGAN(esrgan_bg_tile)
-        log.info("ESRGAN Initialized")
+        logger.info("ESRGAN Initialized")
         return esrgan

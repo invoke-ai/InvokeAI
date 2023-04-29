@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from PIL.Image import Image as ImageType
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals
 
 class ESRGAN:
@@ -69,15 +69,15 @@ class ESRGAN:
                 import sys
                 import traceback
 
-                log.error("Error loading Real-ESRGAN:")
+                logger.error("Error loading Real-ESRGAN:")
                 print(traceback.format_exc(), file=sys.stderr)
 
         if upsampler_scale == 0:
-            log.warning("Real-ESRGAN: Invalid scaling option. Image not upscaled.")
+            logger.warning("Real-ESRGAN: Invalid scaling option. Image not upscaled.")
             return image
 
         if seed is not None:
-            log.info(
+            logger.info(
                 f"Real-ESRGAN Upscaling seed:{seed}, scale:{upsampler_scale}x, tile:{self.bg_tile_size}, denoise:{denoise_str}"
             )
         # ESRGAN outputs images with partial transparency if given RGBA images; convert to RGB

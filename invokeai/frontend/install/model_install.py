@@ -22,7 +22,7 @@ import torch
 from npyscreen import widget
 from omegaconf import OmegaConf
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals, global_config_dir
 
 from ...backend.config.model_install_backend import (
@@ -456,7 +456,7 @@ def main():
     Globals.root = os.path.expanduser(get_root(opt.root) or "")
 
     if not global_config_dir().exists():
-        log.info(
+        logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )
         from invokeai.frontend.install import invokeai_configure
@@ -467,17 +467,17 @@ def main():
     try:
         select_and_download_models(opt)
     except AssertionError as e:
-        log.error(e)
+        logger.error(e)
         sys.exit(-1)
     except KeyboardInterrupt:
-        log.info("Goodbye! Come back soon.")
+        logger.info("Goodbye! Come back soon.")
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
-            log.error(
+            logger.error(
                 "Insufficient vertical space for the interface. Please make your window taller and try again"
             )
         elif str(e).startswith("addwstr"):
-            log.error(
+            logger.error(
                 "Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
 

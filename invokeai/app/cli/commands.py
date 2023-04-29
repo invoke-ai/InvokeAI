@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from ..invocations.baseinvocation import BaseInvocation
 from ..invocations.image import ImageField
 from ..services.graph import GraphExecutionState, LibraryGraph, Edge
@@ -230,7 +230,7 @@ class HistoryCommand(BaseCommand):
         for i in range(min(self.count, len(history))):
             entry_id = history[-1 - i]
             entry = context.get_session().graph.get_node(entry_id)
-            log.info(f"{entry_id}: {get_invocation_command(entry)}")
+            logger.info(f"{entry_id}: {get_invocation_command(entry)}")
 
 
 class SetDefaultCommand(BaseCommand):

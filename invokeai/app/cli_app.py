@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from pydantic.fields import Field
 
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.metadata import PngMetadataService
 from .services.default_graphs import create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -181,7 +181,7 @@ def invoke_all(context: CliContext):
     # Print any errors
     if context.session.has_error():
         for n in context.session.errors:
-            log.error(
+            logger.error(
                 f"Error in node {n} (source node {context.session.prepared_source_mapping[n]}): {context.session.errors[n]}"
             )
         
@@ -364,12 +364,12 @@ def invoke_cli():
             invoke_all(context)
 
         except InvalidArgs:
-            log.warning('Invalid command, use "help" to list commands')
+            logger.warning('Invalid command, use "help" to list commands')
             continue
 
         except SessionError:
             # Start a new session
-            log.warning("Session error: creating a new session")
+            logger.warning("Session error: creating a new session")
             context.reset()
 
         except ExitCli:

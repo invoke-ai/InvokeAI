@@ -1,4 +1,4 @@
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.model_management.model_manager import ModelManager
 
 
@@ -8,6 +8,6 @@ def choose_model(model_manager: ModelManager, model_name: str):
         model = model_manager.get_model(model_name)
     else:
         model = model_manager.get_model()
-        log.warning(f"{model_name}' is not a valid model name. Using default model \'{model['model_name']}\' instead.")
+        logger.warning(f"{model_name}' is not a valid model name. Using default model \'{model['model_name']}\' instead.")
 
     return model

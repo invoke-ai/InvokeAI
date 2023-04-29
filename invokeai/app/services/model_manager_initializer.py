@@ -7,7 +7,7 @@ from omegaconf import OmegaConf
 from pathlib import Path
 
 import invokeai.version
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
@@ -21,8 +21,8 @@ def get_model_manager(config: Args) -> ModelManager:
                 config, FileNotFoundError(f"The file {config_file} could not be found.")
             )
 
-    log.info(f"{invokeai.version.__app_name__}, version {invokeai.version.__version__}")
-    log.info(f'InvokeAI runtime directory is "{Globals.root}"')
+    logger.info(f"{invokeai.version.__app_name__}, version {invokeai.version.__version__}")
+    logger.info(f'InvokeAI runtime directory is "{Globals.root}"')
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -67,7 +67,7 @@ def get_model_manager(config: Args) -> ModelManager:
     except (FileNotFoundError, TypeError, AssertionError) as e:
         report_model_error(config, e)
     except (IOError, KeyError) as e:
-        log.error(f"{e}. Aborting.")
+        logger.error(f"{e}. Aborting.")
         sys.exit(-1)
 
     # try to autoconvert new models
@@ -81,13 +81,13 @@ def get_model_manager(config: Args) -> ModelManager:
     return model_manager
 
 def report_model_error(opt: Namespace, e: Exception):
-    log.error(f'An error occurred while attempting to initialize the model: "{str(e)}"')
-    log.error(
+    logger.error(f'An error occurred while attempting to initialize the model: "{str(e)}"')
+    logger.error(
         "This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models."
     )
     yes_to_all = os.environ.get("INVOKE_MODEL_RECONFIGURE")
     if yes_to_all:
-        log.warning
+        logger.warning
             "Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE"
         )
     else:
@@ -97,7 +97,7 @@ def report_model_error(opt: Namespace, e: Exception):
         if response.startswith(("n", "N")):
             return
 
-    log.info("invokeai-configure is launching....\n")
+    logger.info("invokeai-configure is launching....\n")
 
     # Match arguments that were set on the CLI
     # only the arguments accepted by the configuration script are parsed

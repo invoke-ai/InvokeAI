@@ -20,7 +20,7 @@ import npyscreen
 from npyscreen import widget
 from omegaconf import OmegaConf
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals, global_set_root
 
 from ...backend.training import do_textual_inversion_training, parse_args
@@ -369,14 +369,14 @@ def copy_to_embeddings_folder(args: dict):
     dest_dir_name = args["placeholder_token"].strip("<>")
     destination = Path(Globals.root, "embeddings", dest_dir_name)
     os.makedirs(destination, exist_ok=True)
-    log.info(f"Training completed. Copying learned_embeds.bin into {str(destination)}")
+    logger.info(f"Training completed. Copying learned_embeds.bin into {str(destination)}")
     shutil.copy(source, destination)
     if (
         input("Delete training logs and intermediate checkpoints? [y] ") or "y"
     ).startswith(("y", "Y")):
         shutil.rmtree(Path(args["output_dir"]))
     else:
-        log.info(f'Keeping {args["output_dir"]}')
+        logger.info(f'Keeping {args["output_dir"]}')
 
 
 def save_args(args: dict):
@@ -423,10 +423,10 @@ def do_front_end(args: Namespace):
             do_textual_inversion_training(**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
-            log.error("An exception occurred during training. The exception was:")
-            log.error(str(e))
-            log.error("DETAILS:")
-            log.error(traceback.format_exc())
+            logger.error("An exception occurred during training. The exception was:")
+            logger.error(str(e))
+            logger.error("DETAILS:")
+            logger.error(traceback.format_exc())
 
 
 def main():
@@ -438,21 +438,21 @@ def main():
         else:
             do_textual_inversion_training(**vars(args))
     except AssertionError as e:
-        log.error(e)
+        logger.error(e)
         sys.exit(-1)
     except KeyboardInterrupt:
         pass
     except (widget.NotEnoughSpaceForWidget, Exception) as e:
         if str(e).startswith("Height of 1 allocated"):
-            log.error(
+            logger.error(
                 "You need to have at least one diffusers models defined in models.yaml in order to train"
             )
         elif str(e).startswith("addwstr"):
-            log.error(
+            logger.error(
                 "Not enough window space for the interface. Please make your window larger and try again."
             )
         else:
-            log.error(e)
+            logger.error(e)
         sys.exit(-1)
 
 

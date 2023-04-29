@@ -8,7 +8,7 @@ import torch
 from PIL import Image
 from tqdm import trange
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 
 from .base import Generator
 from .img2img import Img2Img
@@ -73,21 +73,21 @@ class Embiggen(Generator):
             embiggen = [1.0]  # If not specified, assume no scaling
         elif embiggen[0] < 0:
             embiggen[0] = 1.0
-            log.warning(
+            logger.warning(
                 "Embiggen scaling factor cannot be negative, fell back to the default of 1.0 !"
             )
         if len(embiggen) < 2:
             embiggen.append(0.75)
         elif embiggen[1] > 1.0 or embiggen[1] < 0:
             embiggen[1] = 0.75
-            log.warning(
+            logger.warning(
                 "Embiggen upscaling strength for ESRGAN must be between 0 and 1, fell back to the default of 0.75 !"
             )
         if len(embiggen) < 3:
             embiggen.append(0.25)
         elif embiggen[2] < 0:
             embiggen[2] = 0.25
-            log.warning(
+            logger.warning(
                 "Overlap size for Embiggen must be a positive ratio between 0 and 1 OR a number of pixels, fell back to the default of 0.25 !"
             )
 
@@ -98,7 +98,7 @@ class Embiggen(Generator):
             embiggen_tiles.sort()
 
         if strength >= 0.5:
-            log.warning(
+            logger.warning(
                 f"Embiggen may produce mirror motifs if the strength (-f) is too high (currently {strength}). Try values between 0.35-0.45."
             )
 
@@ -122,7 +122,7 @@ class Embiggen(Generator):
                 from ..restoration.realesrgan import ESRGAN
 
                 esrgan = ESRGAN()
-                log.info(
+                logger.info(
                     f"ESRGAN upscaling init image prior to cutting with Embiggen with strength {embiggen[1]}"
                 )
                 if embiggen[0] > 2:
@@ -313,9 +313,9 @@ class Embiggen(Generator):
         def make_image():
             # Make main tiles -------------------------------------------------
             if embiggen_tiles:
-                log.info(f"Making {len(embiggen_tiles)} Embiggen tiles...")
+                logger.info(f"Making {len(embiggen_tiles)} Embiggen tiles...")
             else:
-                log.info(
+                logger.info(
                     f"Making {(emb_tiles_x * emb_tiles_y)} Embiggen tiles ({emb_tiles_x}x{emb_tiles_y})..."
                 )
 
@@ -362,11 +362,11 @@ class Embiggen(Generator):
                 # newinitimage.save(newinitimagepath)
 
                 if embiggen_tiles:
-                    log.debug(
+                    logger.debug(
                         f"Making tile #{tile + 1} ({embiggen_tiles.index(tile) + 1} of {len(embiggen_tiles)} requested)"
                     )
                 else:
-                    log.debug(f"Starting {tile + 1} of {(emb_tiles_x * emb_tiles_y)} tiles")
+                    logger.debug(f"Starting {tile + 1} of {(emb_tiles_x * emb_tiles_y)} tiles")
 
                 # create a torch tensor from an Image
                 newinitimage = np.array(newinitimage).astype(np.float32) / 255.0
@@ -548,7 +548,7 @@ class Embiggen(Generator):
                     # Layer tile onto final image
                     outputsuperimage.alpha_composite(intileimage, (left, top))
             else:
-                log.error(
+                logger.error(
                     "Could not find all Embiggen output tiles in memory? Something must have gone wrong with img2img generation."
                 )
 

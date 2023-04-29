@@ -4,7 +4,7 @@ import shutil
 import asyncio
 from typing import Annotated, Any, List, Literal, Optional, Union
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from pathlib import Path
@@ -116,16 +116,16 @@ async def delete_model(model_name: str) -> None:
     model_exists = model_name in model_names
 
     # check if model exists
-    log.info(f"Checking for model {model_name}...")
+    logger.info(f"Checking for model {model_name}...")
            
     if model_exists:
-        log.info(f"Deleting Model: {model_name}")
+        logger.info(f"Deleting Model: {model_name}")
         ApiDependencies.invoker.services.model_manager.del_model(model_name, delete_files=True)
-        log.info(f"Model Deleted: {model_name}")
+        logger.info(f"Model Deleted: {model_name}")
         raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
     else:
-        log.error(f"Model not found")
+        logger.error(f"Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
     
 

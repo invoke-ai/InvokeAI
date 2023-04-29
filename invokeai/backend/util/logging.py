@@ -26,7 +26,7 @@ Console messages:
 
 Another way:
 import invokeai.backend.util.logging as ialog
-ialog.debug('this is a debugging message')
+ialogger.debug('this is a debugging message')
 """
 import logging
 

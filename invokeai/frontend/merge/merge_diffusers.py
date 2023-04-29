@@ -28,7 +28,7 @@ from ...backend.globals import (
     global_set_root,
 )
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from ...backend.model_management import ModelManager
 from ...frontend.install.widgets import FloatTitleSlider
 
@@ -115,7 +115,7 @@ def merge_diffusion_models_and_commit(
         model_name=merged_model_name, description=f'Merge of models {", ".join(models)}'
     )
     if vae := model_manager.config[models[0]].get("vae", None):
-        log.info(f"Using configured VAE assigned to {models[0]}")
+        logger.info(f"Using configured VAE assigned to {models[0]}")
         import_args.update(vae=vae)
     model_manager.import_diffuser_model(dump_path, **import_args)
     model_manager.commit(config_file)
@@ -414,7 +414,7 @@ def run_gui(args: Namespace):
 
     args = mergeapp.merge_arguments
     merge_diffusion_models_and_commit(**args)
-    log.info(f'Models merged into new model: "{args["merged_model_name"]}".')
+    logger.info(f'Models merged into new model: "{args["merged_model_name"]}".')
 
 
 def run_cli(args: Namespace):
@@ -425,7 +425,7 @@ def run_cli(args: Namespace):
 
     if not args.merged_model_name:
         args.merged_model_name = "+".join(args.models)
-        log.info(
+        logger.info(
             f'No --merged_model_name provided. Defaulting to "{args.merged_model_name}"'
         )
 
@@ -435,7 +435,7 @@ def run_cli(args: Namespace):
         ), f'A model named "{args.merged_model_name}" already exists. Use --clobber to overwrite.'
 
         merge_diffusion_models_and_commit(**vars(args))
-        log.info(f'Models merged into new model: "{args.merged_model_name}".')
+        logger.info(f'Models merged into new model: "{args.merged_model_name}".')
 
 
 def main():
@@ -455,16 +455,16 @@ def main():
             run_cli(args)
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
-            log.error(
+            logger.error(
                 "You need to have at least two diffusers models defined in models.yaml in order to merge"
             )
         else:
-            log.error(
+            logger.error(
                 "Not enough room for the user interface. Try making this window larger."
             )
         sys.exit(-1)
     except Exception as e:
-        log.error(e)
+        logger.error(e)
         sys.exit(-1)
     except KeyboardInterrupt:
         sys.exit(-1)

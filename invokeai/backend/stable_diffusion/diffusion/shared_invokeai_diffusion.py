@@ -8,7 +8,7 @@ import torch
 from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals
 
 from .cross_attention_control import (
@@ -467,13 +467,13 @@ class InvokeAIDiffuserComponent:
             outside = torch.count_nonzero(
                 (latents < -current_threshold) | (latents > current_threshold)
             )
-            log.info(
+            logger.info(
                 f"Threshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})"
                 )
-            log.debug(
+            logger.debug(
                 f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}"
             )
-            log.debug(   
+            logger.debug(   
                 f"{outside / latents.numel() * 100:.2f}% values outside threshold"
             )
 
@@ -501,10 +501,10 @@ class InvokeAIDiffuserComponent:
             )
 
         if self.debug_thresholding:
-            log.debug(
+            logger.debug(
                 f"min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})"
             )
-            log.debug(
+            logger.debug(
                 f"{num_altered / latents.numel() * 100:.2f}% values altered"
             )
 

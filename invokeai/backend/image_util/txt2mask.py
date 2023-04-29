@@ -32,7 +32,7 @@ import torch
 from PIL import Image, ImageOps
 from transformers import AutoProcessor, CLIPSegForImageSegmentation
 
-import invokeai.backend.util.logging as log
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import global_cache_dir
 
 CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
@@ -83,7 +83,7 @@ class Txt2Mask(object):
     """
 
     def __init__(self, device="cpu", refined=False):
-        log.info("Initializing clipseg model for text to mask inference")
+        logger.info("Initializing clipseg model for text to mask inference")
 
         # BUG: we are not doing anything with the device option at this time
         self.device = device
