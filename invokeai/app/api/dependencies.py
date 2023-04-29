@@ -67,8 +67,9 @@ class ApiDependencies:
         db_location = os.path.join(output_folder, "invokeai.db")
 
         services = InvocationServices(
-            model_manager=get_model_manager(config),
+            model_manager=get_model_manager(config,logger),
             events=events,
+            logger=logger,
             latents=latents,
             images=images,
             metadata=metadata,
@@ -80,7 +81,7 @@ class ApiDependencies:
                 filename=db_location, table_name="graph_executions"
             ),
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config),
+            restoration=RestorationServices(config,logger),
         )
 
         create_system_graphs(services.graph_library)

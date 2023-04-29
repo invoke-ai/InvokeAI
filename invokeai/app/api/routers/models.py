@@ -4,15 +4,10 @@ import shutil
 import asyncio
 from typing import Annotated, Any, List, Literal, Optional, Union
 
-import invokeai.backend.util.logging as logger
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from pathlib import Path
 from ..dependencies import ApiDependencies
-from invokeai.backend.globals import Globals, global_converted_ckpts_dir
-from invokeai.backend.args import Args
-
-
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -113,6 +108,7 @@ async def update_model(
 async def delete_model(model_name: str) -> None:
     """Delete Model"""
     model_names = ApiDependencies.invoker.services.model_manager.model_names()
+    logger = ApiDependencies.invoker.services.logger
     model_exists = model_name in model_names
 
     # check if model exists

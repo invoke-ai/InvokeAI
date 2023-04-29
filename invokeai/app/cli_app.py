@@ -181,7 +181,7 @@ def invoke_all(context: CliContext):
     # Print any errors
     if context.session.has_error():
         for n in context.session.errors:
-            logger.error(
+            context.invoker.services.logger.error(
                 f"Error in node {n} (source node {context.session.prepared_source_mapping[n]}): {context.session.errors[n]}"
             )
         
@@ -191,7 +191,7 @@ def invoke_all(context: CliContext):
 def invoke_cli():
     config = Args()
     config.parse_args()
-    model_manager = get_model_manager(config)
+    model_manager = get_model_manager(config,logger=logger)
 
     # This initializes the autocompleter and returns it.
     # Currently nothing is done with the returned Completer
@@ -224,7 +224,8 @@ def invoke_cli():
             filename=db_location, table_name="graph_executions"
         ),
         processor=DefaultInvocationProcessor(),
-        restoration=RestorationServices(config),
+        restoration=RestorationServices(config,logger=logger),
+        logger=logger,
     )
 
     system_graphs = create_system_graphs(services.graph_library)
@@ -364,12 +365,12 @@ def invoke_cli():
             invoke_all(context)
 
         except InvalidArgs:
-            logger.warning('Invalid command, use "help" to list commands')
+            invoker.services.logger.warning('Invalid command, use "help" to list commands')
             continue
 
         except SessionError:
             # Start a new session
-            logger.warning("Session error: creating a new session")
+            invoker.services.logger.warning("Session error: creating a new session")
             context.reset()
 
         except ExitCli:
