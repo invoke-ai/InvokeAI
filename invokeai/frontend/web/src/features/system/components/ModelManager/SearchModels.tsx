@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { FaSearch, FaTrash } from 'react-icons/fa';
 
-import { addNewModel, searchForModels } from 'app/socketio/actions';
+// import { addNewModel, searchForModels } from 'app/socketio/actions';
 import {
   setFoundModels,
   setSearchFolder,

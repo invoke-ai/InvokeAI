@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash-es';
+import { get, isEqual, isNumber, isString } from 'lodash-es';
 
 import {
   ButtonGroup,
@@ -10,7 +10,7 @@ import {
   useDisclosure,
   useToast,
 } from '@chakra-ui/react';
-import { runESRGAN, runFacetool } from 'app/socketio/actions';
+// import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -68,6 +68,7 @@ import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvas
 import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { imageDeleted } from 'services/thunks/image';
+import { useParameters } from 'features/parameters/hooks/useParameters';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -112,6 +113,8 @@ const currentImageButtonsSelector = createSelector(
       isLightboxOpen,
       shouldHidePreview,
       image,
+      seed: image?.metadata?.invokeai?.node?.seed,
+      prompt: image?.metadata?.invokeai?.node?.prompt,
     };
   },
   {
@@ -161,16 +164,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
   const toast = useToast();
   const { t } = useTranslation();
-  const setBothPrompts = useSetBothPrompts();
 
-  const handleClickUseAsInitialImage = useCallback(() => {
-    if (!image) return;
-    if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
-    dispatch(initialImageSelected({ name: image.name, type: image.type }));
-    // dispatch(setInitialImage(currentImage));
-
-    // dispatch(setActiveTab('img2img'));
-  }, [dispatch, image, isLightboxOpen]);
+  const { recallPrompt, recallSeed, sendToImageToImage } = useParameters();
 
   const handleCopyImage = useCallback(async () => {
     if (!image?.url) {
@@ -217,30 +212,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     });
   }, [toast, shouldTransformUrls, getUrl, t, image]);
 
-  useHotkeys(
-    'shift+i',
-    () => {
-      if (image) {
-        handleClickUseAsInitialImage();
-        toast({
-          title: t('toast.sentToImageToImage'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: t('toast.imageNotLoaded'),
-          description: t('toast.imageNotLoadedDesc'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
-    },
-    [image]
-  );
-
   const handlePreviewVisibility = useCallback(() => {
     dispatch(setShouldHidePreview(!shouldHidePreview));
   }, [dispatch, shouldHidePreview]);
@@ -259,7 +230,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys(
     'a',
     () => {
-      if (['txt2img', 'img2img'].includes(image?.metadata?.sd_metadata?.type)) {
+      const type = image?.metadata?.invokeai?.node?.types;
+      if (isString(type) && ['txt2img', 'img2img'].includes(type)) {
         handleClickUseAllParameters();
         toast({
           title: t('toast.parametersSet'),
@@ -280,63 +252,23 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [image]
   );
 
-  const handleClickUseSeed = () => {
-    image?.metadata && dispatch(setSeed(image.metadata.sd_metadata.seed));
-  };
+  const handleUseSeed = useCallback(() => {
+    recallSeed(image?.metadata?.invokeai?.node?.seed);
+  }, [image, recallSeed]);
 
-  useHotkeys(
-    's',
-    () => {
-      if (image?.metadata?.sd_metadata?.seed) {
-        handleClickUseSeed();
-        toast({
-          title: t('toast.seedSet'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: t('toast.seedNotSet'),
-          description: t('toast.seedNotSetDesc'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
-    },
-    [image]
-  );
+  useHotkeys('s', handleUseSeed, [image]);
 
-  const handleClickUsePrompt = useCallback(() => {
-    if (image?.metadata?.sd_metadata?.prompt) {
-      setBothPrompts(image?.metadata?.sd_metadata?.prompt);
-    }
-  }, [image?.metadata?.sd_metadata?.prompt, setBothPrompts]);
+  const handleUsePrompt = useCallback(() => {
+    recallPrompt(image?.metadata?.invokeai?.node?.prompt);
+  }, [image, recallPrompt]);
 
-  useHotkeys(
-    'p',
-    () => {
-      if (image?.metadata?.sd_metadata?.prompt) {
-        handleClickUsePrompt();
-        toast({
-          title: t('toast.promptSet'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: t('toast.promptNotSet'),
-          description: t('toast.promptNotSetDesc'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
-    },
-    [image]
-  );
+  useHotkeys('p', handleUsePrompt, [image]);
+
+  const handleSendToImageToImage = useCallback(() => {
+    sendToImageToImage(image);
+  }, [image, sendToImageToImage]);
+
+  useHotkeys('shift+i', handleSendToImageToImage, [image]);
 
   const handleClickUpscale = useCallback(() => {
     // selectedImage && dispatch(runESRGAN(selectedImage));
@@ -496,7 +428,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             >
               <IAIButton
                 size="sm"
-                onClick={handleClickUseAsInitialImage}
+                onClick={handleSendToImageToImage}
                 leftIcon={<FaShare />}
               >
                 {t('parameters.sendToImg2Img')}
@@ -570,8 +502,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
-            isDisabled={!image?.metadata?.sd_metadata?.prompt}
-            onClick={handleClickUsePrompt}
+            isDisabled={!image?.metadata?.invokeai?.node?.prompt}
+            onClick={handleUsePrompt}
           />
 
           <IAIIconButton
@@ -579,7 +511,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={!image?.metadata?.sd_metadata?.seed}
-            onClick={handleClickUseSeed}
+            onClick={handleUseSeed}
           />
 
           <IAIIconButton

@@ -1,5 +1,5 @@
 import { ButtonGroup, Flex, Grid, Icon, Image, Text } from '@chakra-ui/react';
-import { requestImages } from 'app/socketio/actions';
+// import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAICheckbox from 'common/components/IAICheckbox';

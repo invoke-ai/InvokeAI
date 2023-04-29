@@ -19,7 +19,6 @@ import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import modelsReducer from 'features/system/store/modelSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 
-import { socketioMiddleware } from '../socketio/middleware';
 import { socketMiddleware } from 'services/events/middleware';
 import { canvasDenylist } from 'features/canvas/store/canvasPersistDenylist';
 import { galleryDenylist } from 'features/gallery/store/galleryPersistDenylist';
@@ -87,13 +86,13 @@ const rootPersistConfig = getPersistConfig({
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 // TODO: rip the old middleware out when nodes is complete
-export function buildMiddleware() {
-  if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
-    return socketMiddleware();
-  } else {
-    return socketioMiddleware();
-  }
-}
+// export function buildMiddleware() {
+//   if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
+//     return socketMiddleware();
+//   } else {
+//     return socketioMiddleware();
+//   }
+// }
 
 export const store = configureStore({
   reducer: persistedReducer,

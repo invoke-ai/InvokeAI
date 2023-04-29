@@ -9,7 +9,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 
 import { Flex, FormControl, FormLabel, Text, VStack } from '@chakra-ui/react';
 
-import { addNewModel } from 'app/socketio/actions';
+// import { addNewModel } from 'app/socketio/actions';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
