@@ -166,7 +166,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const handleClickUseAsInitialImage = useCallback(() => {
     if (!image) return;
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
-    dispatch(initialImageSelected(image.name));
+    dispatch(initialImageSelected({ name: image.name, type: image.type }));
     // dispatch(setInitialImage(currentImage));
 
     // dispatch(setActiveTab('img2img'));

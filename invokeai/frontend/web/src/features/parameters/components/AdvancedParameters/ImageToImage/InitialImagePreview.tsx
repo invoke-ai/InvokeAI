@@ -5,7 +5,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
 import useGetImageByNameAndType from 'features/gallery/hooks/useGetImageByName';
-import { selectResultsById } from 'features/gallery/store/resultsSlice';
 import {
   clearInitialImage,
   initialImageSelected,
@@ -16,15 +15,13 @@ import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
 import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
+import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 
 const initialImagePreviewSelector = createSelector(
-  [(state: RootState) => state],
-  (state) => {
-    const { initialImage } = state.generation;
-    const image = selectResultsById(state, initialImage as string);
-
+  [initialImageSelector],
+  (initialImage) => {
     return {
-      initialImage: image,
+      initialImage,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }
@@ -71,7 +68,7 @@ const InitialImagePreview = () => {
         return;
       }
 
-      dispatch(initialImageSelected(image.name));
+      dispatch(initialImageSelected({ name, type }));
     },
     [getImageByNameAndType, dispatch]
   );
