@@ -510,7 +510,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!image?.metadata?.sd_metadata?.seed}
+            isDisabled={!image?.metadata?.invokeai?.node?.seed}
             onClick={handleUseSeed}
           />
 

@@ -1,4 +1,4 @@
-import { useToast } from '@chakra-ui/react';
+import { UseToastOptions, useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { isFinite, isString } from 'lodash-es';
 import { useCallback } from 'react';
@@ -51,7 +51,7 @@ export const useParameters = () => {
         toast({
           title: t('toast.seedNotSet'),
           description: t('toast.seedNotSetDesc'),
-          status: 'error',
+          status: 'warning',
           duration: 2500,
           isClosable: true,
         });
@@ -61,7 +61,7 @@ export const useParameters = () => {
       dispatch(setSeed(s));
       toast({
         title: t('toast.seedSet'),
-        status: 'success',
+        status: 'info',
         duration: 2500,
         isClosable: true,
       });
@@ -78,7 +78,7 @@ export const useParameters = () => {
         toast({
           title: t('toast.initialImageNotSet'),
           description: t('toast.initialImageNotSetDesc'),
-          status: 'error',
+          status: 'warning',
           duration: 2500,
           isClosable: true,
         });
@@ -90,7 +90,7 @@ export const useParameters = () => {
       );
       toast({
         title: t('toast.initialImageSet'),
-        status: 'success',
+        status: 'info',
         duration: 2500,
         isClosable: true,
       });
@@ -107,7 +107,7 @@ export const useParameters = () => {
         toast({
           title: t('toast.imageNotLoaded'),
           description: t('toast.imageNotLoadedDesc'),
-          status: 'error',
+          status: 'warning',
           duration: 2500,
           isClosable: true,
         });
@@ -115,10 +115,9 @@ export const useParameters = () => {
       }
 
       dispatch(initialImageSelected({ name: image.name, type: image.type }));
-
       toast({
         title: t('toast.sentToImageToImage'),
-        status: 'success',
+        status: 'info',
         duration: 2500,
         isClosable: true,
       });
