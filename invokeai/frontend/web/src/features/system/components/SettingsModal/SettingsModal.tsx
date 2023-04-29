@@ -23,12 +23,14 @@ import IAISelect from 'common/components/IAISelect';
 import IAISwitch from 'common/components/IAISwitch';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
+  consoleLogLevelChanged,
   InProgressImageType,
   setEnableImageDebugging,
   setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
+  shouldLogToConsoleChanged,
   SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
@@ -39,8 +41,11 @@ import {
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual, map } from 'lodash-es';
 import { persistor } from 'app/store/persistor';
-import { ChangeEvent, cloneElement, ReactElement } from 'react';
+import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { InvokeLogLevel, VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { LogLevelName } from 'roarr';
+import { F } from 'ts-toolbelt';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -52,6 +57,8 @@ const selector = createSelector(
       model_list,
       saveIntermediatesInterval,
       enableImageDebugging,
+      consoleLogLevel,
+      shouldLogToConsole,
     } = system;
 
     const { shouldUseCanvasBetaLayout, shouldUseSliders } = ui;
@@ -65,6 +72,8 @@ const selector = createSelector(
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
+      consoleLogLevel,
+      shouldLogToConsole,
     };
   },
   {
@@ -77,6 +86,7 @@ const modalSectionStyles: ChakraProps['sx'] = {
   gap: 2,
   p: 4,
   bg: 'base.900',
+  borderRadius: 'base',
 };
 
 type SettingsModalProps = {
@@ -116,6 +126,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
+    consoleLogLevel,
+    shouldLogToConsole,
   } = useAppSelector(selector);
 
   /**
@@ -135,6 +147,20 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     dispatch(setSaveIntermediatesInterval(value));
   };
 
+  const handleLogLevelChanged = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(consoleLogLevelChanged(e.target.value as LogLevelName));
+    },
+    [dispatch]
+  );
+
+  const handleLogToConsoleChanged = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldLogToConsoleChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <>
       {cloneElement(children, {
@@ -145,15 +171,20 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
         size="xl"
+        isCentered
       >
         <ModalOverlay />
         <ModalContent paddingInlineEnd={4}>
           <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Grid gap={4}>
+            <Flex sx={{ gap: 4, flexDirection: 'column' }}>
               <Flex sx={modalSectionStyles}>
+                <Heading size="sm">{t('settings.general')}</Heading>
+
                 <IAISelect
+                  horizontal
+                  spaceEvenly
                   label={t('settings.displayInProgress')}
                   validValues={IN_PROGRESS_IMAGE_TYPES}
                   value={shouldDisplayInProgressType}
@@ -208,9 +239,21 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               </Flex>
 
               <Flex sx={modalSectionStyles}>
-                <Heading size="sm" style={{ fontWeight: 'bold' }}>
-                  Developer
-                </Heading>
+                <Heading size="sm">{t('settings.developer')}</Heading>
+                <IAISwitch
+                  label={t('settings.shouldLogToConsole')}
+                  isChecked={shouldLogToConsole}
+                  onChange={handleLogToConsoleChanged}
+                />
+                <IAISelect
+                  horizontal
+                  spaceEvenly
+                  isDisabled={!shouldLogToConsole}
+                  label={t('settings.consoleLogLevel')}
+                  onChange={handleLogLevelChanged}
+                  value={consoleLogLevel}
+                  validValues={VALID_LOG_LEVELS.concat()}
+                />
                 <IAISwitch
                   label={t('settings.enableImageDebugging')}
                   isChecked={enableImageDebugging}
@@ -228,7 +271,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 <Text>{t('settings.resetWebUIDesc1')}</Text>
                 <Text>{t('settings.resetWebUIDesc2')}</Text>
               </Flex>
-            </Grid>
+            </Flex>
           </ModalBody>
 
           <ModalFooter>

@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import * as InvokeAI from 'app/types/invokeai';
 
 import {
-  addLogEntry,
   addToast,
   errorOccurred,
   processingCanceled,
