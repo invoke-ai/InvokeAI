@@ -15,7 +15,7 @@ export const receivedResultImagesPage = createAppAsyncThunk(
       perPage: IMAGES_PER_PAGE,
     });
 
-    galleryLog.info({ response }, 'Received page of results images');
+    galleryLog.info({ response }, `Received ${response.items.length} results`);
 
     return response;
   }
@@ -30,7 +30,7 @@ export const receivedUploadImagesPage = createAppAsyncThunk(
       perPage: IMAGES_PER_PAGE,
     });
 
-    galleryLog.info({ response }, 'Received page of uploads images');
+    galleryLog.info({ response }, `Received ${response.items.length} uploads`);
 
     return response;
   }
