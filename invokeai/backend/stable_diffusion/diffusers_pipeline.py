@@ -212,8 +212,9 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 
 @dataclass(frozen=True)
 class ConditioningData:
-    unconditioned_embeddings: torch.Tensor
-    text_embeddings: torch.Tensor
+    conditioning_info: dict
+    #unconditioned_embeddings: torch.Tensor
+    #text_embeddings: torch.Tensor
     guidance_scale: float
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
@@ -630,8 +631,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
             latent_model_input,
             t,
-            conditioning_data.unconditioned_embeddings,
-            conditioning_data.text_embeddings,
+            conditioning_data.conditioning_info,
             conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
@@ -861,7 +861,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 nsfw_content_detected=[],
                 attention_map_saver=result_attention_maps,
             )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
+            return self.check_for_safety(output, dtype=self.unet.dtype)
 
     def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
         init_image = init_image.to(device=device, dtype=dtype)

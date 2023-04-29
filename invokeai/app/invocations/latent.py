@@ -144,8 +144,9 @@ class TextToLatentsInvocation(BaseInvocation):
 
     # Inputs
     # fmt: off
-    positive: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
-    negative: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
+    #positive: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
+    #negative: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
+    conditioning: Optional[ConditioningField] = Field(description="Conditioning for generation")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
@@ -207,12 +208,11 @@ class TextToLatentsInvocation(BaseInvocation):
 
 
     def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
-        c, extra_conditioning_info = context.services.latents.get(self.positive.conditioning_name)
-        uc, _ = context.services.latents.get(self.negative.conditioning_name)
+        cond_info, extra_conditioning_info = context.services.latents.get(self.conditioning.conditioning_name)
+
 
         conditioning_data = ConditioningData(
-            uc,
-            c,
+            cond_info,
             self.cfg_scale,
             extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(

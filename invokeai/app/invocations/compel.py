@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, List
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.util.choose_model import choose_model
@@ -8,6 +8,7 @@ from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
 
+import math
 from compel import Compel
 from compel.prompt_parser import (
     Blend,
@@ -34,8 +35,9 @@ class CompelOutput(BaseInvocationOutput):
     # model: ModelField           = Field(default=None, description="Model")
     # src? + loras -> tokenizer + text_encoder + loras
     # clip:  ClipField            = Field(default=None, description="Text encoder(clip)")
-    positive: ConditioningField = Field(default=None, description="Positive conditioning")
-    negative: ConditioningField = Field(default=None, description="Negative conditioning")
+    #positive: ConditioningField = Field(default=None, description="Positive conditioning")
+    #negative: ConditioningField = Field(default=None, description="Negative conditioning")
+    conditioning: ConditioningField = Field(default=None, description="Conditioning")
     #fmt: on
 
 
@@ -45,6 +47,8 @@ class CompelInvocation(BaseInvocation):
 
     positive_prompt: str = Field(default="", description="Positive prompt")
     negative_prompt: str = Field(default="", description="Negative prompt")
+
+    prep_neg: bool = Field(default=False, description="Enable prep-neg conditioning(blend and swap unsupported)")
 
     model: str = Field(default="", description="Model to use")
     truncate_long_prompts: bool = Field(default=False, description="Whether or not to truncate long prompt to 77 tokens")
@@ -122,34 +126,153 @@ class CompelInvocation(BaseInvocation):
         if getattr(Globals, "log_tokenization", False):
             log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
 
-        # TODO: add lora(with model and clip field types)
-        c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
-        uc, _      = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+        if self.prep_neg:
+            blocks = []
+            blocks.extend(self._prepneg_parse(compel, positive_prompt, tokenizer, negative=False))
+            blocks.extend(self._prepneg_parse(compel, negative_prompt, tokenizer, negative=True))
 
-        if not self.truncate_long_prompts:
-            [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+            #max_length = text_input.input_ids.shape[-1]
+        
+            #uncond_input = self.tokenizer(
+            #    [""] * 1, padding="max_length", max_length=max_length, return_tensors="pt"
+            #)
+            #uncond_embeddings = self.text_encoder(uncond_input.input_ids.to(self.text_encoder.device))[0]
+            uncond_embeddings, _ = compel.build_conditioning_tensor_for_prompt_object(Compel.parse_prompt_string(""))
+            # TODO: pad length for long blocks
 
-        ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-            tokens_count_including_eos_bos=get_max_token_count(tokenizer, positive_prompt),
-            cross_attention_control_args=options.get("cross_attention_control", None),
-        )
+            cond_info = {
+                "prep_neg": {
+                    "blocks": blocks,
+                    "uncond_embeddings": uncond_embeddings,
+                }
+            }
 
-        name_prefix = f'{context.graph_execution_state_id}__{self.id}'
-        name_positive = f"{name_prefix}_positive"
-        name_negative = f"{name_prefix}_negative"
+            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+                tokens_count_including_eos_bos=get_max_token_count(tokenizer, positive_prompt),
+                cross_attention_control_args=None,
+            )
+
+            pass
+
+        else:
+            # TODO: add lora(with model and clip field types)
+            c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
+            uc, _      = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+
+            if not self.truncate_long_prompts:
+                [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+
+            cond_info = {
+                "default": {
+                    "conditioning": c,
+                    "unconditioning": uc,
+                }
+            }
+
+            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+                tokens_count_including_eos_bos=get_max_token_count(tokenizer, positive_prompt),
+                cross_attention_control_args=options.get("cross_attention_control", None),
+            )
+
+        name_conditioning = f'{context.graph_execution_state_id}_{self.id}_conditioning'
 
         # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.set(name_positive, (c, ec))
-        context.services.latents.set(name_negative, (uc, None))
+        context.services.latents.set(name_conditioning, (cond_info, ec))
 
         return CompelOutput(
-            positive=ConditioningField(
-                conditioning_name=name_positive,
-            ),
-            negative=ConditioningField(
-                conditioning_name=name_negative,
+            conditioning=ConditioningField(
+                conditioning_name=name_conditioning,
             ),
         )
+
+    def _prepneg_parse(self, compel, prompt_ast, tokenizer, negative=False):
+        if isinstance(prompt_ast, Blend):
+            raise NotImplementedError()
+
+        elif isinstance(prompt_ast, FlattenedPrompt):
+            flattened_prompt: FlattenedPrompt = prompt_ast
+            if flattened_prompt.wants_cross_attention_control:
+                raise NotImplementedError()
+
+            # 1. Process prompt to tokens and weights list
+            _tmp = _BlockInfo()
+
+            for fragment in flattened_prompt.children:
+                f_tokens = tokenizer.tokenize(fragment.text)
+                _tmp.tokens.extend(f_tokens)
+                _tmp.weights.extend([fragment.weight] * len(f_tokens))
+
+            # 2. Process tokens and weights to blocks(devided by comma)
+            blocks = []
+            tmp_block = _BlockInfo()
+            for i in range(len(_tmp.tokens)):
+                token = _tmp.tokens[i]
+                
+                if _tmp.tokens[i] == ",</w>":
+                    blocks.append(tmp_block)
+                    tmp_block = _BlockInfo()
+                else:
+                    tmp_block.tokens.append(_tmp.tokens[i])
+                    tmp_block.weights.append(_tmp.weights[i])
+
+            if len(tmp_block.tokens) > 0:
+                blocks.append(tmp_block)
+
+            block_infos = []
+
+            for block in blocks:
+                # hacky way to do at least something with block weights)
+                #block_weight = sum(block.weights) / len(block.weights)
+                block_weight = math.prod(block.weights) ** (1/len(blocks.weights))
+                for i in range(len(block.weights)):
+                    block.weights[i] /= block_weight
+
+                if negative:
+                    block_weight = -block_weight
+
+                block_infos.append((self._prepneg_gen(compel, block), block_weight))
+
+            return block_infos
+
+
+    def _prepneg_gen(self, compel, block):
+
+        prompt = ""
+        tokens = list(block.tokens)
+
+        while len(tokens) > 0:
+            word = tokens.pop(0)
+            while "</w>" not in word:
+                word += tokens.pop(0)
+            word = word.replace("</w>", "")
+            weight = block.weights[-(len(tokens) + 1)]
+
+            if weight != 1:
+                word_formatted = f"({word}){weight}"
+            else:
+                word_formatted = word
+
+            prompt += word_formatted + " "
+
+        prompt = prompt.rstrip(", ")
+        prompt_ast = Compel.parse_prompt_string(prompt)
+        cond, _ = compel.build_conditioning_tensor_for_prompt_object(prompt_ast)
+
+        return cond
+
+
+class _BlockInfo:
+    tokens: List[str]
+    weights: List[float]
+
+    def __init__(self):
+        self.tokens = []
+        self.weights = []
+    
+    def __repr__(self):
+        return self.__str__()
+    def __str__(self):
+        return f"tokens: {self.tokens}, weights:{self.weights}"
 
 
 def get_max_token_count(

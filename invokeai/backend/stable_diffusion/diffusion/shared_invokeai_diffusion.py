@@ -163,8 +163,7 @@ class InvokeAIDiffuserComponent:
         self,
         x: torch.Tensor,
         sigma: torch.Tensor,
-        unconditioning: Union[torch.Tensor, dict],
-        conditioning: Union[torch.Tensor, dict],
+        conditioning_info: dict,
         unconditional_guidance_scale: float,
         step_index: Optional[int] = None,
         total_step_count: Optional[int] = None,
@@ -191,43 +190,28 @@ class InvokeAIDiffuserComponent:
                 )
             )
 
-        wants_cross_attention_control = len(cross_attention_control_types_to_do) > 0
-        wants_hybrid_conditioning = isinstance(conditioning, dict)
-
-        if wants_hybrid_conditioning:
-            unconditioned_next_x, conditioned_next_x = self._apply_hybrid_conditioning(
-                x, sigma, unconditioning, conditioning
-            )
-        elif wants_cross_attention_control:
-            (
-                unconditioned_next_x,
-                conditioned_next_x,
-            ) = self._apply_cross_attention_controlled_conditioning(
+        if "default" in conditioning_info:
+            # TODO: cross_attention
+            combined_next_x = self._apply_standard_conditioning(
                 x,
                 sigma,
-                unconditioning,
-                conditioning,
+                conditioning_info["default"],
+                unconditional_guidance_scale,
                 cross_attention_control_types_to_do,
             )
-        elif self.sequential_guidance:
-            (
-                unconditioned_next_x,
-                conditioned_next_x,
-            ) = self._apply_standard_conditioning_sequentially(
-                x, sigma, unconditioning, conditioning
+
+        elif "prep_neg" in conditioning_info:
+            combined_next_x = self._apply_prepneg_conditioning(
+                x,
+                sigma,
+                conditioning_info["prep_neg"],
+                unconditional_guidance_scale,
             )
 
         else:
-            (
-                unconditioned_next_x,
-                conditioned_next_x,
-            ) = self._apply_standard_conditioning(
-                x, sigma, unconditioning, conditioning
-            )
+            print(conditioning_info)
+            raise NotImplementedError(str(conditioning_info.keys()))
 
-        combined_next_x = self._combine(
-            unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale
-        )
 
         return combined_next_x
 
@@ -269,80 +253,137 @@ class InvokeAIDiffuserComponent:
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
-    def _apply_standard_conditioning(self, x, sigma, unconditioning, conditioning):
-        # fast batched path
-        x_twice = torch.cat([x] * 2)
-        sigma_twice = torch.cat([sigma] * 2)
-        both_conditionings = torch.cat([unconditioning, conditioning])
-        both_results = self.model_forward_callback(
-            x_twice, sigma_twice, both_conditionings
-        )
-        unconditioned_next_x, conditioned_next_x = both_results.chunk(2)
-        if conditioned_next_x.device.type == "mps":
-            # prevent a result filled with zeros. seems to be a torch bug.
-            conditioned_next_x = conditioned_next_x.clone()
-        return unconditioned_next_x, conditioned_next_x
-
-    def _apply_standard_conditioning_sequentially(
+    def _apply_prepneg_conditioning(
         self,
-        x: torch.Tensor,
+        x,
         sigma,
-        unconditioning: torch.Tensor,
-        conditioning: torch.Tensor,
+        conditioning_info,
+        guidance_scale,
     ):
-        # low-memory sequential path
-        unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning)
-        conditioned_next_x = self.model_forward_callback(x, sigma, conditioning)
-        if conditioned_next_x.device.type == "mps":
-            # prevent a result filled with zeros. seems to be a torch bug.
-            conditioned_next_x = conditioned_next_x.clone()
-        return unconditioned_next_x, conditioned_next_x
+        def get_prependicualr_component(x, y):
+            assert x.shape == y.shape
+            return x - ((torch.mul(x, y).sum())/(torch.norm(y)**2)) * y
 
-    def _apply_hybrid_conditioning(self, x, sigma, unconditioning, conditioning):
-        assert isinstance(conditioning, dict)
-        assert isinstance(unconditioning, dict)
-        x_twice = torch.cat([x] * 2)
-        sigma_twice = torch.cat([sigma] * 2)
-        both_conditionings = dict()
-        for k in conditioning:
-            if isinstance(conditioning[k], list):
-                both_conditionings[k] = [
-                    torch.cat([unconditioning[k][i], conditioning[k][i]])
-                    for i in range(len(conditioning[k]))
-                ]
+        def weighted_prependicualr_aggricator(delta_noise_pred_pos, w_pos, delta_noise_pred_neg, w_neg):
+            
+            main_positive = delta_noise_pred_pos[0].unsqueeze(0)
+            accumulated_output = 0
+            for i, complementory_positive in enumerate(delta_noise_pred_pos[1:]):
+                accumulated_output +=  w_pos[i] * get_prependicualr_component(complementory_positive.unsqueeze(0), main_positive)
+                
+            for i, w_n in enumerate(w_neg):
+                accumulated_output -= w_n * get_prependicualr_component(delta_noise_pred_neg[i].unsqueeze(0), main_positive)
+                
+            return accumulated_output + main_positive
+
+        device = x.device
+        blocks = conditioning_info["blocks"]
+        uncond_embeddings = conditioning_info["uncond_embeddings"]
+
+        pos_weights = []
+        neg_weights = []
+        mask = []  # first one is unconditional score
+        for _, b_weight in blocks:
+            if b_weight > 0:
+                pos_weights.append(b_weight)
+                mask.append(True)
             else:
-                both_conditionings[k] = torch.cat([unconditioning[k], conditioning[k]])
-        unconditioned_next_x, conditioned_next_x = self.model_forward_callback(
-            x_twice, sigma_twice, both_conditionings
-        ).chunk(2)
-        return unconditioned_next_x, conditioned_next_x
+                neg_weights.append(abs(b_weight))
+                mask.append(False)
+        # normalize the weights
+        pos_weights = torch.tensor(pos_weights, device=device, dtype=uncond_embeddings.dtype).reshape(-1, 1, 1, 1)
+        neg_weights = torch.tensor(neg_weights, device=device, dtype=uncond_embeddings.dtype).reshape(-1, 1, 1, 1)            
+        mask = torch.tensor(mask, device=device, dtype=torch.bool)
 
-    def _apply_cross_attention_controlled_conditioning(
+        # reduce memory by predicting each score sequentially
+        noise_preds = []
+        # predict the noise residual
+        for b_cond, b_weight in blocks:
+            noise_preds.append(self.model_forward_callback(x, sigma, b_cond))
+        noise_preds = torch.cat(noise_preds, dim=0)
+    
+        noise_pred_uncond = self.model_forward_callback(x, sigma, uncond_embeddings)
+
+                
+        delta_noise_pred_neg = noise_preds[~mask] - noise_pred_uncond
+        delta_noise_pred_pos = noise_preds[mask] - noise_pred_uncond
+        
+        noise_pred = noise_pred_uncond + guidance_scale * weighted_prependicualr_aggricator(delta_noise_pred_pos, pos_weights, delta_noise_pred_neg, neg_weights)
+
+        return noise_pred
+
+    def _apply_standard_conditioning(
         self,
-        x: torch.Tensor,
+        x,
         sigma,
-        unconditioning,
-        conditioning,
+        conditioning_info,
+        unconditional_guidance_scale,
         cross_attention_control_types_to_do,
     ):
-        if self.is_running_diffusers:
-            return self._apply_cross_attention_controlled_conditioning__diffusers(
-                x,
-                sigma,
-                unconditioning,
-                conditioning,
-                cross_attention_control_types_to_do,
+        conditioning = conditioning_info["conditioning"]
+        unconditioning = conditioning_info["unconditioning"]
+
+        # cross attention path(only sequential)
+        if cross_attention_control_types_to_do:
+            context: Context = self.cross_attention_control_context
+
+            cross_attn_processor_context = SwapCrossAttnContext(
+                modified_text_embeddings=context.arguments.edited_conditioning,
+                index_map=context.cross_attention_index_map,
+                mask=context.cross_attention_mask,
+                cross_attention_types_to_do=[],
             )
-        else:
-            return self._apply_cross_attention_controlled_conditioning__compvis(
+            # no cross attention for unconditioning (negative prompt)
+            unconditioned_next_x = self.model_forward_callback(
                 x,
                 sigma,
                 unconditioning,
-                conditioning,
-                cross_attention_control_types_to_do,
+                # TODO: why we pass cross attention processor if no cross attention applied?
+                {"swap_cross_attn_context": cross_attn_processor_context},
             )
 
-    def _apply_cross_attention_controlled_conditioning__diffusers(
+            # do requested cross attention types for conditioning (positive prompt)
+            cross_attn_processor_context.cross_attention_types_to_do = (
+                cross_attention_control_types_to_do
+            )
+            conditioned_next_x = self.model_forward_callback(
+                x,
+                sigma,
+                conditioning,
+                {"swap_cross_attn_context": cross_attn_processor_context},
+            )
+
+        # normal path
+        else:
+
+            # low-memory sequential path
+            if self.sequential_guidance:
+                unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning)
+                conditioned_next_x = self.model_forward_callback(x, sigma, conditioning)
+
+            # fast batched path
+            else:
+                
+                x_twice = torch.cat([x] * 2)
+                sigma_twice = torch.cat([sigma] * 2)
+                both_conditionings = torch.cat([unconditioning, conditioning])
+                both_results = self.model_forward_callback(
+                    x_twice, sigma_twice, both_conditionings
+                )
+                unconditioned_next_x, conditioned_next_x = both_results.chunk(2)
+
+            # TODO: as I can see this should exists for cross attention too?
+            if conditioned_next_x.device.type == "mps":
+                # prevent a result filled with zeros. seems to be a torch bug.
+                conditioned_next_x = conditioned_next_x.clone()
+
+        combined_next_x = self._combine(
+            unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale
+        )
+
+        return combined_next_x
+
+    def _apply_cross_attention_controlled_conditioning(
         self,
         x: torch.Tensor,
         sigma,
@@ -376,53 +417,6 @@ class InvokeAIDiffuserComponent:
             conditioning,
             {"swap_cross_attn_context": cross_attn_processor_context},
         )
-        return unconditioned_next_x, conditioned_next_x
-
-    def _apply_cross_attention_controlled_conditioning__compvis(
-        self,
-        x: torch.Tensor,
-        sigma,
-        unconditioning,
-        conditioning,
-        cross_attention_control_types_to_do,
-    ):
-        # print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)
-        # slower non-batched path (20% slower on mac MPS)
-        # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of
-        # unconditioned_next_x causes attention maps to *also* be saved for the unconditioned_next_x.
-        # This messes app their application later, due to mismatched shape of dim 0 (seems to be 16 for batched vs. 8)
-        # (For the batched invocation the `wrangler` function gets attention tensor with shape[0]=16,
-        # representing batched uncond + cond, but then when it comes to applying the saved attention, the
-        # wrangler gets an attention tensor which only has shape[0]=8, representing just self.edited_conditionings.)
-        # todo: give CrossAttentionControl's `wrangler` function more info so it can work with a batched call as well.
-        context: Context = self.cross_attention_control_context
-
-        try:
-            unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning)
-
-            # process x using the original prompt, saving the attention maps
-            # print("saving attention maps for", cross_attention_control_types_to_do)
-            for ca_type in cross_attention_control_types_to_do:
-                context.request_save_attention_maps(ca_type)
-            _ = self.model_forward_callback(x, sigma, conditioning)
-            context.clear_requests(cleanup=False)
-
-            # process x again, using the saved attention maps to control where self.edited_conditioning will be applied
-            # print("applying saved attention maps for", cross_attention_control_types_to_do)
-            for ca_type in cross_attention_control_types_to_do:
-                context.request_apply_saved_attention_maps(ca_type)
-            edited_conditioning = (
-                self.conditioning.cross_attention_control_args.edited_conditioning
-            )
-            conditioned_next_x = self.model_forward_callback(
-                x, sigma, edited_conditioning
-            )
-            context.clear_requests(cleanup=True)
-
-        except:
-            context.clear_requests(cleanup=True)
-            raise
-
         return unconditioned_next_x, conditioned_next_x
 
     def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale):
