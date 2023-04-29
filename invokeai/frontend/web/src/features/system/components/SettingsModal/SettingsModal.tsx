@@ -86,6 +86,7 @@ const modalSectionStyles: ChakraProps['sx'] = {
   gap: 2,
   p: 4,
   bg: 'base.900',
+  borderRadius: 'base',
 };
 
 type SettingsModalProps = {
@@ -170,15 +171,20 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
         size="xl"
+        isCentered
       >
         <ModalOverlay />
         <ModalContent paddingInlineEnd={4}>
           <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Grid gap={4}>
+            <Flex sx={{ gap: 4, flexDirection: 'column' }}>
               <Flex sx={modalSectionStyles}>
+                <Heading size="sm">{t('settings.general')}</Heading>
+
                 <IAISelect
+                  horizontal
+                  spaceEvenly
                   label={t('settings.displayInProgress')}
                   validValues={IN_PROGRESS_IMAGE_TYPES}
                   value={shouldDisplayInProgressType}
@@ -233,15 +239,15 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               </Flex>
 
               <Flex sx={modalSectionStyles}>
-                <Heading size="sm" style={{ fontWeight: 'bold' }}>
-                  Developer
-                </Heading>
+                <Heading size="sm">{t('settings.developer')}</Heading>
                 <IAISwitch
                   label={t('settings.shouldLogToConsole')}
                   isChecked={shouldLogToConsole}
                   onChange={handleLogToConsoleChanged}
                 />
                 <IAISelect
+                  horizontal
+                  spaceEvenly
                   isDisabled={!shouldLogToConsole}
                   label={t('settings.consoleLogLevel')}
                   onChange={handleLogLevelChanged}
@@ -265,7 +271,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 <Text>{t('settings.resetWebUIDesc1')}</Text>
                 <Text>{t('settings.resetWebUIDesc2')}</Text>
               </Flex>
-            </Grid>
+            </Flex>
           </ModalBody>
 
           <ModalFooter>
