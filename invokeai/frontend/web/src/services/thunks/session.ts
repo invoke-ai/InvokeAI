@@ -50,7 +50,7 @@ export const sessionCreated = createAppAsyncThunk(
       requestBody: arg.graph,
     });
 
-    sessionLog.info({ arg, response }, 'Session created');
+    sessionLog.info({ arg, response }, `Session created (${response.id})`);
 
     return response;
   }
@@ -77,7 +77,7 @@ export const nodeAdded = createAppAsyncThunk(
       sessionId: arg.sessionId,
     });
 
-    sessionLog.info({ arg, response }, 'Node added');
+    sessionLog.info({ arg, response }, `Node added (${response})`);
 
     return response;
   }
@@ -96,7 +96,7 @@ export const sessionInvoked = createAppAsyncThunk(
       all: true,
     });
 
-    sessionLog.info({ arg, response }, 'Session invoked');
+    sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
 
     return response;
   }
@@ -118,7 +118,7 @@ export const sessionCanceled = createAppAsyncThunk(
       sessionId,
     });
 
-    sessionLog.info({ arg, response }, 'Session canceled');
+    sessionLog.info({ arg, response }, `Session canceled (${sessionId})`);
 
     return response;
   }
@@ -136,7 +136,10 @@ export const listedSessions = createAppAsyncThunk(
   async (arg: SessionsListedArg, _thunkApi) => {
     const response = await SessionsService.listSessions(arg);
 
-    sessionLog.info({ arg, response }, 'Sessions listed');
+    sessionLog.info(
+      { arg, response },
+      `Sessions listed (${response.items.length})`
+    );
 
     return response;
   }

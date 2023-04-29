@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { Model } from 'features/system/store/modelSlice';
-import { reduce } from 'lodash-es';
+import { reduce, size } from 'lodash-es';
 import { ModelsService } from 'services/api';
 
 const models = log.child({ namespace: 'model' });
@@ -23,7 +23,7 @@ export const receivedModels = createAppAsyncThunk(
       {} as Record<string, Model>
     );
 
-    models.info({ response }, 'Received models');
+    models.info({ response }, `Received ${size(response.models)} models`);
 
     return deserializedModels;
   }

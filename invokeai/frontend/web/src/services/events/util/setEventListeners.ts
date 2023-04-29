@@ -5,6 +5,7 @@ import { sessionCanceled } from 'services/thunks/session';
 import { Socket } from 'socket.io-client';
 import {
   generatorProgress,
+  graphExecutionStateComplete,
   invocationComplete,
   invocationError,
   invocationStarted,
@@ -24,22 +25,22 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
   const { dispatch, getState } = store;
   // Set up listeners for the present subscription
   socket.on('invocation_started', (data) => {
-    sessionLog.child({ data }).info('Invocation started');
+    sessionLog.child({ data }).info(`Invocation started (${data.node.type})`);
     dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
   });
 
   socket.on('generator_progress', (data) => {
-    sessionLog.child({ data }).trace('Generator progress');
+    sessionLog.child({ data }).trace(`Generator progress (${data.node.type})`);
     dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
   });
 
   socket.on('invocation_error', (data) => {
-    sessionLog.child({ data }).error('Invocation error');
+    sessionLog.child({ data }).error(`Invocation error (${data.node.type})`);
     dispatch(invocationError({ data, timestamp: getTimestamp() }));
   });
 
   socket.on('invocation_complete', (data) => {
-    sessionLog.child({ data }).info('Invocation complete');
+    sessionLog.child({ data }).info(`Invocation complete (${data.node.type})`);
     const sessionId = data.graph_execution_state_id;
 
     const { cancelType, isCancelScheduled } = getState().system;
@@ -57,5 +58,14 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         shouldFetchImages,
       })
     );
+  });
+
+  socket.on('graph_execution_state_complete', (data) => {
+    sessionLog
+      .child({ data })
+      .info(
+        `Graph execution state complete (${data.graph_execution_state_id})`
+      );
+    dispatch(graphExecutionStateComplete({ data, timestamp: getTimestamp() }));
   });
 };

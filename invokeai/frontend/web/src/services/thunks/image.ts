@@ -53,7 +53,10 @@ export const imageUploaded = createAppAsyncThunk(
     const response = await ImagesService.uploadImage(arg);
     const { location } = getHeaders(response);
 
-    imagesLog.info({ arg: '<Blob>', response, location }, 'Image uploaded');
+    imagesLog.info(
+      { arg: '<Blob>', response, location },
+      `Image uploaded (${response.image_name})`
+    );
 
     return { response, location };
   }
@@ -108,7 +111,10 @@ export const imageDeleted = createAppAsyncThunk(
 
     const response = await ImagesService.deleteImage(arg);
 
-    imagesLog.info({ arg, response }, 'Image deleted');
+    imagesLog.info(
+      { arg, response },
+      `Image deleted (${arg.imageType} - ${arg.imageName})`
+    );
 
     return response;
   }

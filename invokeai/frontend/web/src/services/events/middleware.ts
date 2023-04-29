@@ -118,7 +118,9 @@ export const socketMiddleware = () => {
           if (system.sessionId) {
             const sessionLog = moduleLog.child({ sessionId: system.sessionId });
 
-            sessionLog.debug('Re-subscribe');
+            sessionLog.debug(
+              `Subscribed to existing session (${system.sessionId})`
+            );
 
             socket.emit('subscribe', { session: system.sessionId });
             dispatch(
@@ -158,9 +160,10 @@ export const socketMiddleware = () => {
         // };
 
         if (oldSessionId) {
-          sessionLog
-            .child({ oldSessionId })
-            .debug('Unsubscribe from old session');
+          sessionLog.debug(
+            { oldSessionId },
+            `Unsubscribed from old session (${oldSessionId})`
+          );
           // Unsubscribe when invocations complete
           socket.emit('unsubscribe', {
             session: oldSessionId,
@@ -185,7 +188,7 @@ export const socketMiddleware = () => {
           });
         }
 
-        sessionLog.debug('Subscribe');
+        sessionLog.debug(`Subscribe to new session (${sessionId})`);
         socket.emit('subscribe', { session: sessionId });
         dispatch(
           socketSubscribed({
