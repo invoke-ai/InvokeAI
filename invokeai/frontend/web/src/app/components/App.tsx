@@ -1,5 +1,4 @@
 import ImageUploader from 'common/components/ImageUploader';
-import Console from 'features/system/components/Console';
 import ProgressBar from 'features/system/components/ProgressBar';
 import SiteHeader from 'features/system/components/SiteHeader';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
@@ -120,9 +119,6 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
       </Portal>
       <Portal>
         <FloatingGalleryButton />
-      </Portal>
-      <Portal>
-        <Console />
       </Portal>
     </Grid>
   );

@@ -12,7 +12,6 @@ import {
   removeImage,
 } from 'features/gallery/store/gallerySlice';
 import {
-  addLogEntry,
   generationRequested,
   modelChangeRequested,
   modelConvertRequested,
