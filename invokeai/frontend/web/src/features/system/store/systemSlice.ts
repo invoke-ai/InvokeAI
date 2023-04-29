@@ -101,6 +101,7 @@ export interface SystemState
    * The console output logging level
    */
   consoleLogLevel: InvokeLogLevel;
+  shouldLogToConsole: boolean;
 }
 
 const initialSystemState: SystemState = {
@@ -149,7 +150,8 @@ const initialSystemState: SystemState = {
   subscribedNodeIds: [],
   wereModelsReceived: false,
   wasSchemaParsed: false,
-  consoleLogLevel: 'info',
+  consoleLogLevel: 'error',
+  shouldLogToConsole: true,
 };
 
 export const systemSlice = createSlice({
@@ -331,6 +333,9 @@ export const systemSlice = createSlice({
     consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
       state.consoleLogLevel = action.payload;
     },
+    shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldLogToConsole = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -509,6 +514,7 @@ export const {
   cancelTypeChanged,
   subscribedNodeIdsSet,
   consoleLogLevelChanged,
+  shouldLogToConsoleChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
