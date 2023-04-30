@@ -1,4 +1,4 @@
-import { Graph, GraphExecutionState } from '../api';
+import { Graph, GraphExecutionState, InvokeAIMetadata } from '../api';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -17,6 +17,12 @@ export type AnyInvocation = NonNullable<Graph['nodes']>[string];
 
 export type AnyResult = GraphExecutionState['results'][string];
 
+export type BaseNode = {
+  id: string;
+  type: string;
+  [key: string]: NonNullable<InvokeAIMetadata['node']>[string];
+};
+
 /**
  * A `generator_progress` socket.io event.
  *
@@ -24,7 +30,7 @@ export type AnyResult = GraphExecutionState['results'][string];
  */
 export type GeneratorProgressEvent = {
   graph_execution_state_id: string;
-  node: AnyInvocation;
+  node: BaseNode;
   source_node_id: string;
   progress_image?: ProgressImage;
   step: number;
@@ -40,7 +46,7 @@ export type GeneratorProgressEvent = {
  */
 export type InvocationCompleteEvent = {
   graph_execution_state_id: string;
-  node: AnyInvocation;
+  node: BaseNode;
   source_node_id: string;
   result: AnyResult;
 };
@@ -52,7 +58,7 @@ export type InvocationCompleteEvent = {
  */
 export type InvocationErrorEvent = {
   graph_execution_state_id: string;
-  node: AnyInvocation;
+  node: BaseNode;
   source_node_id: string;
   error: string;
 };
@@ -64,7 +70,7 @@ export type InvocationErrorEvent = {
  */
 export type InvocationStartedEvent = {
   graph_execution_state_id: string;
-  node: AnyInvocation;
+  node: BaseNode;
   source_node_id: string;
 };
 
