@@ -65,7 +65,7 @@ const resultsSlice = createSlice({
         deserializeImageResponse(image)
       );
 
-      resultsAdapter.addMany(state, resultImages);
+      resultsAdapter.setMany(state, resultImages);
 
       state.page = page;
       state.pages = pages;
@@ -107,7 +107,7 @@ const resultsSlice = createSlice({
           },
         };
 
-        resultsAdapter.addOne(state, image);
+        resultsAdapter.setOne(state, image);
       }
     });
 
