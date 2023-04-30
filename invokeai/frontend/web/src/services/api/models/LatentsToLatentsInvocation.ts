@@ -18,10 +18,6 @@ export type LatentsToLatentsInvocation = {
    */
   prompt?: string;
   /**
-   * The seed to use (-1 for a random seed)
-   */
-  seed?: number;
-  /**
    * The noise to use
    */
   noise?: LatentsField;
@@ -29,14 +25,6 @@ export type LatentsToLatentsInvocation = {
    * The number of steps to use to generate the image
    */
   steps?: number;
-  /**
-   * The width of the resulting image
-   */
-  width?: number;
-  /**
-   * The height of the resulting image
-   */
-  height?: number;
   /**
    * The Classifier-Free Guidance, higher values may result in a result closer to the prompt
    */
