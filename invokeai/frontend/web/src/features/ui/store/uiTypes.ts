@@ -31,4 +31,5 @@ export interface UIState {
   openUnifiedCanvasAccordionItems: number[];
   floatingProgressImageRect: Rect;
   shouldShowProgressImages: boolean;
+  shouldAutoShowProgressImages: boolean;
 }

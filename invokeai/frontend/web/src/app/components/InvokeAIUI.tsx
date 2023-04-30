@@ -1,11 +1,4 @@
-import React, {
-  lazy,
-  memo,
-  PropsWithChildren,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store } from 'app/store/store';
