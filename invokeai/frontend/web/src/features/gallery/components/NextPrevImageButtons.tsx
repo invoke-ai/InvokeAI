@@ -6,11 +6,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { gallerySelector } from '../store/gallerySelectors';
-import {
-  GalleryCategory,
-  selectNextImage,
-  selectPrevImage,
-} from '../store/gallerySlice';
+import { RootState } from 'app/store/store';
+import { selectResultsEntities } from '../store/resultsSlice';
+// import {
+//   GalleryCategory,
+//   selectNextImage,
+//   selectPrevImage,
+// } from '../store/gallerySlice';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',
@@ -23,19 +25,22 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 };
 
 export const nextPrevImageButtonsSelector = createSelector(
-  gallerySelector,
-  (gallery) => {
-    const { currentImage } = gallery;
+  [(state: RootState) => state, gallerySelector],
+  (state, gallery) => {
+    const { selectedImage, currentCategory } = gallery;
 
-    const tempImages =
-      gallery.categories[
-        currentImage ? (currentImage.category as GalleryCategory) : 'result'
-      ].images;
+    if (!selectedImage) {
+      return {
+        isOnFirstImage: true,
+        isOnLastImage: true,
+      };
+    }
 
-    const currentImageIndex = tempImages.findIndex(
-      (i) => i.uuid === gallery?.currentImage?.uuid
+    const currentImageIndex = state[currentCategory].ids.findIndex(
+      (i) => i === selectedImage.name
     );
-    const imagesLength = tempImages.length;
+
+    const imagesLength = state[currentCategory].ids.length;
 
     return {
       isOnFirstImage: currentImageIndex === 0,
@@ -81,7 +86,6 @@ const NextPrevImageButtons = () => {
     <Flex
       sx={{
         justifyContent: 'space-between',
-        zIndex: 1,
         height: '100%',
         width: '100%',
         pointerEvents: 'none',

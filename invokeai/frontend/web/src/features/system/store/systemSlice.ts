@@ -307,7 +307,7 @@ export const systemSlice = createSlice({
       state.totalSteps = 0;
       // state.currentIteration = 0;
       // state.totalIterations = 0;
-      state.statusTranslationKey = 'common.statusPreparing';
+      state.statusTranslationKey = 'common.statusGenerating';
     });
 
     /**
@@ -347,7 +347,6 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = false;
       state.currentStep = 0;
       state.totalSteps = 0;
-      state.progressImage = null;
       state.statusTranslationKey = 'common.statusProcessingComplete';
     });
 
@@ -364,7 +363,6 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = false;
       state.currentStep = 0;
       state.totalSteps = 0;
-      state.progressImage = null;
       state.statusTranslationKey = 'common.statusError';
 
       state.toastQueue.push(
@@ -391,7 +389,6 @@ export const systemSlice = createSlice({
       state.isCancelScheduled = false;
       state.currentStep = 0;
       state.totalSteps = 0;
-      state.progressImage = null;
       state.statusTranslationKey = 'common.statusConnected';
 
       state.toastQueue.push(
@@ -410,7 +407,6 @@ export const systemSlice = createSlice({
       state.isCancelScheduled = false;
       state.currentStep = 0;
       state.totalSteps = 0;
-      state.progressImage = null;
       state.statusTranslationKey = 'common.statusConnected';
     });
 

@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
+import { Coordinates } from '@dnd-kit/core/dist/types';
 
 const initialUIState: UIState = {
   activeTab: 0,
@@ -21,6 +22,8 @@ const initialUIState: UIState = {
   openLinearAccordionItems: [],
   openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
+  floatingProgressImageCoordinates: { x: 0, y: 0 },
+  shouldShowProgressImage: false,
 };
 
 const initialState: UIState = initialUIState;
@@ -105,6 +108,15 @@ export const uiSlice = createSlice({
         state.openUnifiedCanvasAccordionItems = action.payload;
       }
     },
+    floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {
+      const { x, y } = state.floatingProgressImageCoordinates;
+      const { x: _x, y: _y } = action.payload;
+
+      state.floatingProgressImageCoordinates = { x: x + _x, y: y + _y };
+    },
+    shouldShowProgressImageChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowProgressImage = action.payload;
+    },
   },
 });
 
@@ -128,6 +140,8 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   openAccordionItemsChanged,
+  floatingProgressImageMoved,
+  shouldShowProgressImageChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

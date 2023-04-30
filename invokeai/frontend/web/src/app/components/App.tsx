@@ -27,6 +27,16 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
+import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { floatingProgressImageMoved } from 'features/ui/store/uiSlice';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 
 const DEFAULT_CONFIG = {};
 
@@ -40,6 +50,9 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   const log = useLogger();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
+  const shouldShowProgressImage = useAppSelector(
+    (state) => state.ui.shouldShowProgressImage
+  );
 
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
@@ -63,64 +76,90 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
     setLoadingOverridden(true);
   }, []);
 
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      dispatch(
+        floatingProgressImageMoved({ x: event.delta.x, y: event.delta.y })
+      );
+    },
+    [dispatch]
+  );
+
+  const pointer = useSensor(PointerSensor, {
+    // Delay the drag events (allow clicks on elements)
+    activationConstraint: {
+      delay: 100,
+      tolerance: 5,
+    },
+  });
+
+  const sensors = useSensors(pointer);
+
   return (
-    <Grid w="100vw" h="100vh" position="relative">
-      {isLightboxEnabled && <Lightbox />}
-      <ImageUploader>
-        <ProgressBar />
-        <Grid
-          gap={4}
-          p={4}
-          gridAutoRows="min-content auto"
-          w={APP_WIDTH}
-          h={APP_HEIGHT}
-        >
-          {children || <SiteHeader />}
-          <Flex
+    <DndContext
+      onDragEnd={handleDragEnd}
+      sensors={sensors}
+      modifiers={[restrictToWindowEdges]}
+    >
+      <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
+        {isLightboxEnabled && <Lightbox />}
+        <ImageUploader>
+          <ProgressBar />
+          <Grid
             gap={4}
-            w={{ base: '100vw', xl: 'full' }}
-            h="full"
-            flexDir={{ base: 'column', xl: 'row' }}
+            p={4}
+            gridAutoRows="min-content auto"
+            w={APP_WIDTH}
+            h={APP_HEIGHT}
           >
-            <InvokeTabs />
-            <ImageGalleryPanel />
-          </Flex>
-        </Grid>
-      </ImageUploader>
+            {children || <SiteHeader />}
+            <Flex
+              gap={4}
+              w={{ base: '100vw', xl: 'full' }}
+              h="full"
+              flexDir={{ base: 'column', xl: 'row' }}
+            >
+              <InvokeTabs />
+              <ImageGalleryPanel />
+            </Flex>
+          </Grid>
+        </ImageUploader>
 
-      <AnimatePresence>
-        {!isApplicationReady && !loadingOverridden && (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{ zIndex: 3 }}
-          >
-            <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
-              <Loading />
-            </Box>
-            <Box
-              onClick={handleOverrideClicked}
-              position="absolute"
-              top={0}
-              right={0}
-              cursor="pointer"
-              w="2rem"
-              h="2rem"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <AnimatePresence>
+          {!isApplicationReady && !loadingOverridden && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{ zIndex: 3 }}
+            >
+              <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
+                <Loading />
+              </Box>
+              <Box
+                onClick={handleOverrideClicked}
+                position="absolute"
+                top={0}
+                right={0}
+                cursor="pointer"
+                w="2rem"
+                h="2rem"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <Portal>
-        <FloatingParametersPanelButtons />
-      </Portal>
-      <Portal>
-        <FloatingGalleryButton />
-      </Portal>
-    </Grid>
+        <Portal>
+          <FloatingParametersPanelButtons />
+        </Portal>
+        <Portal>
+          <FloatingGalleryButton />
+        </Portal>
+        <ProgressImagePreview />
+      </Grid>
+    </DndContext>
   );
 };
 

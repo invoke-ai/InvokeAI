@@ -7,7 +7,7 @@ import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { clamp } from 'lodash-es';
 import { ImageField, ImageType } from 'services/api';
 
-export type InitialImage = {
+export type SelectedImage = {
   name: string;
   type: ImageType;
 };
@@ -17,7 +17,7 @@ export interface GenerationState {
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InitialImage; // can be an Image or url
+  initialImage?: SelectedImage; // can be an Image or url
   iterations: number;
   maskPath: string;
   perlin: number;
@@ -351,7 +351,7 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
-    initialImageSelected: (state, action: PayloadAction<InitialImage>) => {
+    initialImageSelected: (state, action: PayloadAction<SelectedImage>) => {
       state.initialImage = action.payload;
       state.isImageToImageEnabled = true;
     },

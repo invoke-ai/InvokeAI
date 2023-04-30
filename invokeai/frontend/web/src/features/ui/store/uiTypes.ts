@@ -1,4 +1,4 @@
-import { InvokeTabName } from './tabMap';
+import { Coordinates } from '@dnd-kit/core/dist/types';
 
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
@@ -19,4 +19,6 @@ export interface UIState {
   openLinearAccordionItems: number[];
   openGenerateAccordionItems: number[];
   openUnifiedCanvasAccordionItems: number[];
+  floatingProgressImageCoordinates: Coordinates;
+  shouldShowProgressImage: boolean;
 }
