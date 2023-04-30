@@ -20,5 +20,5 @@ export interface UIState {
   openGenerateAccordionItems: number[];
   openUnifiedCanvasAccordionItems: number[];
   floatingProgressImageCoordinates: Coordinates;
-  shouldShowProgressImage: boolean;
+  shouldShowProgressImages: boolean;
 }

@@ -23,7 +23,7 @@ const initialUIState: UIState = {
   openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
   floatingProgressImageCoordinates: { x: 0, y: 0 },
-  shouldShowProgressImage: false,
+  shouldShowProgressImages: false,
 };
 
 const initialState: UIState = initialUIState;
@@ -114,8 +114,8 @@ export const uiSlice = createSlice({
 
       state.floatingProgressImageCoordinates = { x: x + _x, y: y + _y };
     },
-    shouldShowProgressImageChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowProgressImage = action.payload;
+    shouldShowProgressImagesToggled: (state) => {
+      state.shouldShowProgressImages = !state.shouldShowProgressImages;
     },
   },
 });
@@ -141,7 +141,7 @@ export const {
   toggleGalleryPanel,
   openAccordionItemsChanged,
   floatingProgressImageMoved,
-  shouldShowProgressImageChanged,
+  shouldShowProgressImagesToggled,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

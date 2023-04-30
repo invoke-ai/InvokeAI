@@ -28,13 +28,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
 import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
-import {
-  DndContext,
-  DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import { floatingProgressImageMoved } from 'features/ui/store/uiSlice';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 
@@ -50,9 +44,6 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   const log = useLogger();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
-  const shouldShowProgressImage = useAppSelector(
-    (state) => state.ui.shouldShowProgressImage
-  );
 
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
@@ -85,22 +76,8 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
     [dispatch]
   );
 
-  const pointer = useSensor(PointerSensor, {
-    // Delay the drag events (allow clicks on elements)
-    activationConstraint: {
-      delay: 100,
-      tolerance: 5,
-    },
-  });
-
-  const sensors = useSensors(pointer);
-
   return (
-    <DndContext
-      onDragEnd={handleDragEnd}
-      sensors={sensors}
-      modifiers={[restrictToWindowEdges]}
-    >
+    <DndContext onDragEnd={handleDragEnd} modifiers={[restrictToWindowEdges]}>
       <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
         {isLightboxEnabled && <Lightbox />}
         <ImageUploader>
