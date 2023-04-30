@@ -1,8 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
-  selectNextImage,
-  selectPrevImage,
+  // selectNextImage,
+  // selectPrevImage,
   setGalleryImageMinimumWidth,
 } from 'features/gallery/store/gallerySlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';

@@ -2,7 +2,7 @@ import { isFulfilled, isRejected } from '@reduxjs/toolkit';
 import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { clamp } from 'lodash-es';
+import { clamp, isString } from 'lodash-es';
 import { ImagesService } from 'services/api';
 import { getHeaders } from 'services/util/getHeaders';
 
@@ -85,7 +85,7 @@ export const imageDeleted = createAppAsyncThunk(
     // Determine which image should replace the deleted image, if the deleted image is the selected image.
     // Unfortunately, we have to do this here, because the resultsSlice and uploadsSlice cannot change
     // the selected image.
-    const selectedImageName = getState().gallery.selectedImageName;
+    const selectedImageName = getState().gallery.selectedImage?.name;
 
     if (selectedImageName === imageName) {
       const allIds = getState()[imageType].ids;
@@ -104,9 +104,13 @@ export const imageDeleted = createAppAsyncThunk(
 
       const newSelectedImageId = filteredIds[newSelectedImageIndex];
 
-      dispatch(
-        imageSelected(newSelectedImageId ? newSelectedImageId.toString() : '')
-      );
+      if (newSelectedImageId) {
+        dispatch(
+          imageSelected({ name: newSelectedImageId as string, type: imageType })
+        );
+      } else {
+        dispatch(imageSelected());
+      }
     }
 
     const response = await ImagesService.deleteImage(arg);

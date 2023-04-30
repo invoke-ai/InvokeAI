@@ -645,5 +645,9 @@
         "betaDarkenOutside": "Darken Outside",
         "betaLimitToBox": "Limit To Box",
         "betaPreserveMasked": "Preserve Masked"
+    },
+    "ui": {
+        "showProgressImages": "Show Progress Images",
+        "hideProgressImages": "Hide Progress Images"
     }
 }

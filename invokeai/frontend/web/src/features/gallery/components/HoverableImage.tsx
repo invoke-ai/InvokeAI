@@ -125,7 +125,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   }, [handleDelete, onDeleteDialogOpen, shouldConfirmOnDelete]);
 
   const handleSelectImage = useCallback(() => {
-    dispatch(imageSelected(image.name));
+    dispatch(imageSelected(image));
   }, [image, dispatch]);
 
   const handleDragStart = useCallback(

@@ -17,31 +17,11 @@ export const imagesSelector = createSelector(
   [uiSelector, selectedImageSelector, systemSelector],
   (ui, selectedImage, system) => {
     const { shouldShowImageDetails, shouldHidePreview } = ui;
-    const { progressImage } = system;
-
-    // TODO: Clean this up, this is really gross
-    const imageToDisplay = progressImage
-      ? {
-          url: progressImage.dataURL,
-          width: progressImage.width,
-          height: progressImage.height,
-          isProgressImage: true,
-          image: progressImage,
-        }
-      : selectedImage
-      ? {
-          url: selectedImage.url,
-          width: selectedImage.metadata.width,
-          height: selectedImage.metadata.height,
-          isProgressImage: false,
-          image: selectedImage,
-        }
-      : null;
 
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      imageToDisplay,
+      image: selectedImage,
     };
   },
   {
@@ -52,7 +32,7 @@ export const imagesSelector = createSelector(
 );
 
 const CurrentImagePreview = () => {
-  const { shouldShowImageDetails, imageToDisplay, shouldHidePreview } =
+  const { shouldShowImageDetails, image, shouldHidePreview } =
     useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
 
@@ -66,54 +46,37 @@ const CurrentImagePreview = () => {
         height: '100%',
       }}
     >
-      {imageToDisplay && (
+      {image && (
         <Image
-          src={
-            shouldHidePreview
-              ? undefined
-              : imageToDisplay.isProgressImage
-              ? imageToDisplay.url
-              : getUrl(imageToDisplay.url)
-          }
-          width={imageToDisplay.width}
-          height={imageToDisplay.height}
-          fallback={
-            shouldHidePreview ? (
-              <CurrentImageHidden />
-            ) : !imageToDisplay.isProgressImage ? (
-              <CurrentImageFallback />
-            ) : undefined
-          }
+          src={shouldHidePreview ? undefined : getUrl(image.url)}
+          width={image.metadata.width}
+          height={image.metadata.height}
+          fallback={shouldHidePreview ? <CurrentImageHidden /> : undefined}
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',
             maxHeight: '100%',
             height: 'auto',
             position: 'absolute',
-            imageRendering: imageToDisplay.isProgressImage
-              ? 'pixelated'
-              : 'initial',
             borderRadius: 'base',
           }}
         />
       )}
       {!shouldShowImageDetails && <NextPrevImageButtons />}
-      {shouldShowImageDetails &&
-        imageToDisplay &&
-        'metadata' in imageToDisplay.image && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '0',
-              width: '100%',
-              height: '100%',
-              borderRadius: 'base',
-              overflow: 'scroll',
-            }}
-          >
-            <ImageMetadataViewer image={imageToDisplay.image} />
-          </Box>
-        )}
+      {shouldShowImageDetails && image && 'metadata' in image && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '0',
+            width: '100%',
+            height: '100%',
+            borderRadius: 'base',
+            overflow: 'scroll',
+          }}
+        >
+          <ImageMetadataViewer image={image} />
+        </Box>
+      )}
     </Flex>
   );
 };
