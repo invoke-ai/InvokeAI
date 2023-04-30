@@ -17,7 +17,7 @@ import { ImageType } from 'services/api';
 import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 
-const initialImagePreviewSelector = createSelector(
+const selector = createSelector(
   [initialImageSelector],
   (initialImage) => {
     return {
@@ -31,7 +31,7 @@ const InitialImagePreview = () => {
   const isImageToImageEnabled = useAppSelector(
     (state: RootState) => state.generation.isImageToImageEnabled
   );
-  const { initialImage } = useAppSelector(initialImagePreviewSelector);
+  const { initialImage } = useAppSelector(selector);
   const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -113,12 +113,7 @@ const InitialImagePreview = () => {
               </Flex>
             }
           />
-          {isLoaded && (
-            <ImageToImageOverlay
-              setIsLoaded={setIsLoaded}
-              image={initialImage}
-            />
-          )}
+          {isLoaded && <ImageToImageOverlay image={initialImage} />}
         </Box>
       )}
       {!initialImage?.url && <SelectImagePlaceholder />}
