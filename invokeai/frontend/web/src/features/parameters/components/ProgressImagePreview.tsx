@@ -2,7 +2,7 @@ import { Flex, Icon, Image, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { FaImage, FaStopwatch } from 'react-icons/fa';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -11,35 +11,49 @@ import { useTranslation } from 'react-i18next';
 import {
   floatingProgressImageMoved,
   floatingProgressImageResized,
-  shouldShowProgressImagesToggled,
+  setShouldShowProgressImages,
 } from 'features/ui/store/uiSlice';
 import { Rnd } from 'react-rnd';
 import { Rect } from 'features/ui/store/uiTypes';
+import { isEqual } from 'lodash';
 
-const selector = createSelector([systemSelector, uiSelector], (system, ui) => {
-  const { progressImage } = system;
-  const { floatingProgressImageRect, shouldShowProgressImages } = ui;
+const selector = createSelector(
+  [systemSelector, uiSelector],
+  (system, ui) => {
+    const { progressImage, isProcessing } = system;
+    const {
+      floatingProgressImageRect,
+      shouldShowProgressImages,
+      shouldAutoShowProgressImages,
+    } = ui;
 
-  return {
-    progressImage,
-    floatingProgressImageRect,
-    shouldShowProgressImages,
-  };
-});
+    const showProgressWindow =
+      shouldAutoShowProgressImages && isProcessing
+        ? true
+        : shouldShowProgressImages;
+
+    return {
+      progressImage,
+      floatingProgressImageRect,
+      showProgressWindow,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: isEqual,
+    },
+  }
+);
 
 const ProgressImagePreview = () => {
   const dispatch = useAppDispatch();
 
-  const { progressImage, floatingProgressImageRect, shouldShowProgressImages } =
+  const { showProgressWindow, progressImage, floatingProgressImageRect } =
     useAppSelector(selector);
 
   const { t } = useTranslation();
 
-  const toggleProgressImages = useCallback(() => {
-    dispatch(shouldShowProgressImagesToggled());
-  }, [dispatch]);
-
-  return shouldShowProgressImages ? (
+  return showProgressWindow ? (
     <Rnd
       bounds="window"
       minHeight={200}
@@ -113,7 +127,7 @@ const ProgressImagePreview = () => {
             </Text>
           </Flex>
           <IAIIconButton
-            onClick={toggleProgressImages}
+            onClick={() => dispatch(setShouldShowProgressImages(false))}
             aria-label={t('ui.hideProgressImages')}
             size="xs"
             icon={<CloseIcon />}
@@ -141,7 +155,6 @@ const ProgressImagePreview = () => {
                 maxWidth: '100%',
                 maxHeight: '100%',
                 height: 'auto',
-                imageRendering: 'pixelated',
                 borderRadius: 'base',
                 p: 2,
               }}
@@ -163,9 +176,13 @@ const ProgressImagePreview = () => {
     </Rnd>
   ) : (
     <IAIIconButton
-      onClick={toggleProgressImages}
+      onClick={() => dispatch(setShouldShowProgressImages(true))}
       tooltip={t('ui.showProgressImages')}
-      sx={{ position: 'absolute', bottom: 4, insetInlineStart: 4 }}
+      sx={{
+        position: 'absolute',
+        bottom: 4,
+        insetInlineStart: 4,
+      }}
       aria-label={t('ui.showProgressImages')}
       icon={<FaStopwatch />}
     />
