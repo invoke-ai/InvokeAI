@@ -179,7 +179,7 @@ class TextToLatentsInvocation(BaseInvocation):
     # control: List[ControlField] = Field(description="The controlnet(s) to use")
     # control: Optional[list[ControlField]] = Field(default=None, description="The controlnet(s) to use")
     # control: Optional[list[ControlField]] = Field(description="The controlnet(s) to use")
-        # fmt: on
+    # fmt: on
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -336,6 +336,63 @@ class TextToLatentsInvocation(BaseInvocation):
                 control_images.append(control_image)
             multi_control = MultiControlNetModel(control_models)
             model.control_model = multi_control
+
+        # loading controlnet model
+        if (self.control_model is None or self.control_model==''):
+            control_model = None
+        else:
+            # FIXME: change this to dropdown menu?
+            # FIXME: generalize so don't have to hardcode torch_dtype and device
+            control_model = ControlNetModel.from_pretrained(self.control_model,
+                                                            torch_dtype=torch.float16).to("cuda")
+        model.control_model = control_model
+
+        # loading controlnet image (currently requires pre-processed image)
+        control_image = (
+            None if self.control_image is None
+            else context.services.images.get(
+                self.control_image.image_type, self.control_image.image_name
+            )
+        )
+
+        # copied from old backend/txt2img.py
+        # FIXME: still need to test with different widths, heights, devices, dtypes
+        #        and add in batch_size, num_images_per_prompt?
+        if control_image is not None:
+            if isinstance(control_model, ControlNetModel):
+                control_image = model.prepare_control_image(
+                    image=control_image,
+                    # do_classifier_free_guidance=do_classifier_free_guidance,
+                    do_classifier_free_guidance=True,
+                    # width=width,
+                    # height=height,
+                    width=512,
+                    height=512,
+                    # batch_size=batch_size * num_images_per_prompt,
+                    # num_images_per_prompt=num_images_per_prompt,
+                    device=control_model.device,
+                    dtype=control_model.dtype,
+                )
+            elif isinstance(control_model, MultiControlNetModel):
+                images = []
+                for image_ in control_image:
+                    image_ = model.prepare_control_image(
+                        image=image_,
+                        # do_classifier_free_guidance=do_classifier_free_guidance,
+                        do_classifier_free_guidance=True,
+                        # width=width,
+                        # height=height,
+                        width=512,
+                        height=512,
+                        # batch_size=batch_size * num_images_per_prompt,
+                        # num_images_per_prompt=num_images_per_prompt,
+                        device=control_model.device,
+                        dtype=control_model.dtype,
+                    )
+                    images.append(image_)
+                control_image = images
+
+
 
         # TODO: Verify the noise is the right size
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
