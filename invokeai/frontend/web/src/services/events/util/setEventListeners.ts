@@ -90,6 +90,14 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    * Invocation started
    */
   socket.on('invocation_started', (data) => {
+    if (getState().system.canceledSession === data.graph_execution_state_id) {
+      log.trace(
+        { data, sessionId: data.graph_execution_state_id },
+        `Ignored invocation started (${data.node.type}) for canceled session (${data.graph_execution_state_id})`
+      );
+      return;
+    }
+
     log.info(
       { data, sessionId: data.graph_execution_state_id },
       `Invocation started (${data.node.type})`
@@ -101,6 +109,14 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    * Generator progress
    */
   socket.on('generator_progress', (data) => {
+    if (getState().system.canceledSession === data.graph_execution_state_id) {
+      log.trace(
+        { data, sessionId: data.graph_execution_state_id },
+        `Ignored generator progress (${data.node.type}) for canceled session (${data.graph_execution_state_id})`
+      );
+      return;
+    }
+
     log.trace(
       { data, sessionId: data.graph_execution_state_id },
       `Generator progress (${data.node.type})`

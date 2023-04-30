@@ -79,6 +79,7 @@ export interface SystemState {
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
   statusTranslationKey: TFuncKey;
+  canceledSession: string;
 }
 
 const initialSystemState: SystemState = {
@@ -109,6 +110,7 @@ const initialSystemState: SystemState = {
   consoleLogLevel: 'error',
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
+  canceledSession: '',
 };
 
 export const systemSlice = createSlice({
@@ -254,6 +256,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(socketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
+      state.canceledSession = '';
     });
 
     /**
@@ -299,7 +302,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(invocationStarted, (state) => {
+    builder.addCase(invocationStarted, (state, action) => {
       state.isCancelable = true;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
@@ -340,14 +343,17 @@ export const systemSlice = createSlice({
     builder.addCase(invocationComplete, (state, action) => {
       const { data, timestamp } = action.payload;
 
-      state.isProcessing = true;
-      state.isCancelable = true;
       // state.currentIteration = 0;
       // state.totalIterations = 0;
       state.currentStatusHasSteps = false;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusProcessingComplete';
+
+      if (state.canceledSession === data.graph_execution_state_id) {
+        state.isProcessing = false;
+        state.isCancelable = true;
+      }
     });
 
     /**
@@ -384,6 +390,7 @@ export const systemSlice = createSlice({
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
       const { timestamp } = action.payload;
 
+      state.canceledSession = action.meta.arg.sessionId;
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;
