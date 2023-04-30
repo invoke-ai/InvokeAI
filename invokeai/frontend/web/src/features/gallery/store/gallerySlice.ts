@@ -41,40 +41,6 @@ export const gallerySlice = createSlice({
     ) => {
       state.selectedImage = action.payload;
     },
-    // selectNextImage: (state) => {
-    //   const { currentImage } = state;
-    //   if (!currentImage) return;
-    //   const tempImages =
-    //     state.categories[currentImage.category as GalleryCategory].images;
-
-    //   if (currentImage) {
-    //     const currentImageIndex = tempImages.findIndex(
-    //       (i) => i.uuid === currentImage.uuid
-    //     );
-    //     if (currentImageIndex < tempImages.length - 1) {
-    //       const newCurrentImage = tempImages[currentImageIndex + 1];
-    //       state.currentImage = newCurrentImage;
-    //       state.currentImageUuid = newCurrentImage.uuid;
-    //     }
-    //   }
-    // },
-    // selectPrevImage: (state) => {
-    //   const { currentImage } = state;
-    //   if (!currentImage) return;
-    //   const tempImages =
-    //     state.categories[currentImage.category as GalleryCategory].images;
-
-    //   if (currentImage) {
-    //     const currentImageIndex = tempImages.findIndex(
-    //       (i) => i.uuid === currentImage.uuid
-    //     );
-    //     if (currentImageIndex > 0) {
-    //       const newCurrentImage = tempImages[currentImageIndex - 1];
-    //       state.currentImage = newCurrentImage;
-    //       state.currentImageUuid = newCurrentImage.uuid;
-    //     }
-    //   }
-    // },
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },

@@ -62,7 +62,6 @@ const CurrentImagePreview = () => {
           }}
         />
       )}
-      {!shouldShowImageDetails && <NextPrevImageButtons />}
       {shouldShowImageDetails && image && 'metadata' in image && (
         <Box
           sx={{
@@ -77,6 +76,7 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
+      {!shouldShowImageDetails && <NextPrevImageButtons />}
     </Flex>
   );
 };
