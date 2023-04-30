@@ -53,88 +53,50 @@ const ProgressImagePreview = () => {
 
   const { t } = useTranslation();
 
-  return showProgressWindow ? (
-    <Rnd
-      bounds="window"
-      minHeight={200}
-      minWidth={200}
-      size={{
-        width: floatingProgressImageRect.width,
-        height: floatingProgressImageRect.height,
-      }}
-      position={{
-        x: floatingProgressImageRect.x,
-        y: floatingProgressImageRect.y,
-      }}
-      onDragStop={(e, d) => {
-        dispatch(floatingProgressImageMoved({ x: d.x, y: d.y }));
-      }}
-      onResizeStop={(e, direction, ref, delta, position) => {
-        const newRect: Partial<Rect> = {};
+  return (
+    <>
+      {showProgressWindow && (
+        <Rnd
+          bounds="window"
+          minHeight={200}
+          minWidth={200}
+          size={{
+            width: floatingProgressImageRect.width,
+            height: floatingProgressImageRect.height,
+          }}
+          position={{
+            x: floatingProgressImageRect.x,
+            y: floatingProgressImageRect.y,
+          }}
+          onDragStop={(e, d) => {
+            dispatch(floatingProgressImageMoved({ x: d.x, y: d.y }));
+          }}
+          onResizeStop={(e, direction, ref, delta, position) => {
+            const newRect: Partial<Rect> = {};
 
-        console.log(ref.style.width, ref.style.height, position.x, position.y);
+            console.log(
+              ref.style.width,
+              ref.style.height,
+              position.x,
+              position.y
+            );
 
-        if (ref.style.width) {
-          newRect.width = ref.style.width;
-        }
-        if (ref.style.height) {
-          newRect.height = ref.style.height;
-        }
-        if (position.x) {
-          newRect.x = position.x;
-        }
-        if (position.x) {
-          newRect.y = position.y;
-        }
+            if (ref.style.width) {
+              newRect.width = ref.style.width;
+            }
+            if (ref.style.height) {
+              newRect.height = ref.style.height;
+            }
+            if (position.x) {
+              newRect.x = position.x;
+            }
+            if (position.x) {
+              newRect.y = position.y;
+            }
 
-        dispatch(floatingProgressImageResized(newRect));
-      }}
-    >
-      <Flex
-        sx={{
-          position: 'relative',
-          w: 'full',
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDir: 'column',
-          boxShadow: 'dark-lg',
-          bg: 'base.800',
-          borderRadius: 'base',
-        }}
-      >
-        <Flex
-          sx={{
-            w: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 1.5,
-            pl: 4,
-            pr: 3,
-            bg: 'base.700',
-            borderTopRadius: 'base',
+            dispatch(floatingProgressImageResized(newRect));
           }}
         >
-          <Flex
-            sx={{
-              flexGrow: 1,
-              userSelect: 'none',
-              cursor: 'move',
-            }}
-          >
-            <Text fontSize="sm" fontWeight={500}>
-              Progress Images
-            </Text>
-          </Flex>
-          <IAIIconButton
-            onClick={() => dispatch(setShouldShowProgressImages(false))}
-            aria-label={t('ui.hideProgressImages')}
-            size="xs"
-            icon={<CloseIcon />}
-            variant="ghost"
-          />
-        </Flex>
-        {progressImage ? (
           <Flex
             sx={{
               position: 'relative',
@@ -142,50 +104,102 @@ const ProgressImagePreview = () => {
               h: 'full',
               alignItems: 'center',
               justifyContent: 'center',
+              flexDir: 'column',
+              boxShadow: 'dark-lg',
+              bg: 'base.800',
+              borderRadius: 'base',
             }}
           >
-            <Image
-              draggable={false}
-              src={progressImage.dataURL}
-              width={progressImage.width}
-              height={progressImage.height}
+            <Flex
               sx={{
-                position: 'absolute',
-                objectFit: 'contain',
-                maxWidth: '100%',
-                maxHeight: '100%',
-                height: 'auto',
-                borderRadius: 'base',
-                p: 2,
+                w: 'full',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 1.5,
+                pl: 4,
+                pr: 3,
+                bg: 'base.700',
+                borderTopRadius: 'base',
               }}
-            />
+            >
+              <Flex
+                sx={{
+                  flexGrow: 1,
+                  userSelect: 'none',
+                  cursor: 'move',
+                }}
+              >
+                <Text fontSize="sm" fontWeight={500}>
+                  Progress Images
+                </Text>
+              </Flex>
+              <IAIIconButton
+                onClick={() => dispatch(setShouldShowProgressImages(false))}
+                aria-label={t('ui.hideProgressImages')}
+                size="xs"
+                icon={<CloseIcon />}
+                variant="ghost"
+              />
+            </Flex>
+            {progressImage ? (
+              <Flex
+                sx={{
+                  position: 'relative',
+                  w: 'full',
+                  h: 'full',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Image
+                  draggable={false}
+                  src={progressImage.dataURL}
+                  width={progressImage.width}
+                  height={progressImage.height}
+                  sx={{
+                    position: 'absolute',
+                    objectFit: 'contain',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    height: 'auto',
+                    borderRadius: 'base',
+                    p: 2,
+                  }}
+                />
+              </Flex>
+            ) : (
+              <Flex
+                sx={{
+                  w: 'full',
+                  h: 'full',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon color="base.400" boxSize={32} as={FaImage}></Icon>
+              </Flex>
+            )}
           </Flex>
-        ) : (
-          <Flex
-            sx={{
-              w: 'full',
-              h: 'full',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon color="base.400" boxSize={32} as={FaImage}></Icon>
-          </Flex>
-        )}
-      </Flex>
-    </Rnd>
-  ) : (
-    <IAIIconButton
-      onClick={() => dispatch(setShouldShowProgressImages(true))}
-      tooltip={t('ui.showProgressImages')}
-      sx={{
-        position: 'absolute',
-        bottom: 4,
-        insetInlineStart: 4,
-      }}
-      aria-label={t('ui.showProgressImages')}
-      icon={<FaStopwatch />}
-    />
+        </Rnd>
+      )}
+      <IAIIconButton
+        onClick={() =>
+          dispatch(setShouldShowProgressImages(!showProgressWindow))
+        }
+        tooltip={t('ui.showProgressImages')}
+        sx={{
+          position: 'absolute',
+          bottom: 4,
+          insetInlineStart: 4,
+          background: showProgressWindow ? 'accent.600' : 'base.700',
+          _hover: {
+            background: showProgressWindow ? 'accent.500' : 'base.600',
+          },
+        }}
+        aria-label={t('ui.showProgressImages')}
+        icon={<FaStopwatch />}
+      />
+    </>
   );
 };
 
