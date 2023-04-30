@@ -2,8 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
-import { AddNewModelType, UIState } from './uiTypes';
-import { Coordinates } from '@dnd-kit/core/dist/types';
+import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
 
 const initialUIState: UIState = {
   activeTab: 0,
@@ -22,7 +21,7 @@ const initialUIState: UIState = {
   openLinearAccordionItems: [],
   openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
-  floatingProgressImageCoordinates: { x: 0, y: 0 },
+  floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
   shouldShowProgressImages: false,
 };
 
@@ -109,10 +108,19 @@ export const uiSlice = createSlice({
       }
     },
     floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {
-      const { x, y } = state.floatingProgressImageCoordinates;
-      const { x: _x, y: _y } = action.payload;
-
-      state.floatingProgressImageCoordinates = { x: x + _x, y: y + _y };
+      state.floatingProgressImageRect = {
+        ...state.floatingProgressImageRect,
+        ...action.payload,
+      };
+    },
+    floatingProgressImageResized: (
+      state,
+      action: PayloadAction<Partial<Rect>>
+    ) => {
+      state.floatingProgressImageRect = {
+        ...state.floatingProgressImageRect,
+        ...action.payload,
+      };
     },
     shouldShowProgressImagesToggled: (state) => {
       state.shouldShowProgressImages = !state.shouldShowProgressImages;
@@ -141,6 +149,7 @@ export const {
   toggleGalleryPanel,
   openAccordionItemsChanged,
   floatingProgressImageMoved,
+  floatingProgressImageResized,
   shouldShowProgressImagesToggled,
 } = uiSlice.actions;
 
