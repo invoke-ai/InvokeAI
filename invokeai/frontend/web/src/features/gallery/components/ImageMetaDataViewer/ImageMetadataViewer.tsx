@@ -159,6 +159,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
         _dark: {
           bg: 'blackAlpha.600',
         },
+        overflow: 'scroll',
       }}
     >
       <Flex gap={2}>
