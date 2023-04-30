@@ -456,17 +456,24 @@ class LoRA:
 
 
 class KohyaLoraManager:
-    lora_path = None
-    vector_length_cache_path = None
     
     def __init__(self, pipe):
-        self.lora_path = Path(global_lora_models_dir())
         self.vector_length_cache_path = self.lora_path / '.vectorlength.cache'
         self.unet = pipe.unet
         self.wrapper = LoRAModuleWrapper(pipe.unet, pipe.text_encoder)
         self.text_encoder = pipe.text_encoder
         self.device = torch.device(choose_torch_device())
         self.dtype = pipe.unet.dtype
+
+    @classmethod
+    @property
+    def lora_path(cls)->Path:
+        return Path(global_lora_models_dir())
+
+    @classmethod
+    @property
+    def vector_length_cache_path(cls)->Path:
+        return cls.lora_path / '.vectorlength.cache'        
 
     def load_lora_module(self, name, path_file, multiplier: float = 1.0):
         print(f"   | Found lora {name} at {path_file}")
@@ -568,7 +575,6 @@ class KohyaLoraManager:
 class LoraVectorLengthCache(object):
     def __init__(self, cache_path: Path):
         self.cache_path = cache_path
-        print(f'DEBUG: lock path = {Path(cache_path.parent, ".cachelock")}')
         self.lock = FileLock(Path(cache_path.parent, ".cachelock"))
         self.cache = {}
 
