@@ -63,7 +63,6 @@ import {
 } from '../store/gallerySelectors';
 import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
-import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';

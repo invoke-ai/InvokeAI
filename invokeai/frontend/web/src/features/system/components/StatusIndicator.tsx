@@ -1,19 +1,34 @@
-import { Text } from '@chakra-ui/react';
+import { Flex, Icon, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 import { systemSelector } from '../store/systemSelectors';
+import { ResourceKey } from 'i18next';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo, useRef } from 'react';
+import { FaCircle } from 'react-icons/fa';
+import { useHoverDirty } from 'react-use';
 
 const statusIndicatorSelector = createSelector(
   systemSelector,
   (system) => {
+    const {
+      isConnected,
+      isProcessing,
+      statusTranslationKey,
+      currentIteration,
+      totalIterations,
+      currentStatusHasSteps,
+    } = system;
+
     return {
-      isConnected: system.isConnected,
-      isProcessing: system.isProcessing,
-      currentIteration: system.currentIteration,
-      totalIterations: system.totalIterations,
-      currentStatus: system.currentStatus,
+      isConnected,
+      isProcessing,
+      currentIteration,
+      totalIterations,
+      statusTranslationKey,
+      currentStatusHasSteps,
     };
   },
   {
@@ -27,43 +42,69 @@ const StatusIndicator = () => {
     isProcessing,
     currentIteration,
     totalIterations,
-    currentStatus,
+    statusTranslationKey,
+    currentStatusHasSteps,
   } = useAppSelector(statusIndicatorSelector);
   const { t } = useTranslation();
+  const ref = useRef(null);
 
-  let statusIdentifier;
-
-  if (isConnected) {
-    statusIdentifier = 'ok';
-  } else {
-    statusIdentifier = 'error';
-  }
-
-  let statusMessage = currentStatus;
-
-  if (isProcessing) {
-    statusIdentifier = 'working';
-  }
-
-  if (statusMessage)
+  const statusColorScheme = useMemo(() => {
     if (isProcessing) {
-      if (totalIterations > 1) {
-        statusMessage = `${t(
-          statusMessage as keyof typeof t
-        )} (${currentIteration}/${totalIterations})`;
-      }
+      return 'working';
     }
 
+    if (isConnected) {
+      return 'ok';
+    }
+
+    return 'error';
+  }, [isProcessing, isConnected]);
+
+  const iterationsText = useMemo(() => {
+    if (!(currentIteration && totalIterations)) {
+      return;
+    }
+
+    return ` (${currentIteration}/${totalIterations})`;
+  }, [currentIteration, totalIterations]);
+
+  const isHovered = useHoverDirty(ref);
+
   return (
-    <Text
-      sx={{
-        fontSize: 'sm',
-        fontWeight: '600',
-        color: `${statusIdentifier}.400`,
-      }}
-    >
-      {t(statusMessage as keyof typeof t)}
-    </Text>
+    <Flex ref={ref} h="full" px={2} alignItems="center" gap={5}>
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div
+            key="statusText"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.15 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { delay: 0.8 },
+            }}
+          >
+            <Text
+              sx={{
+                fontSize: 'sm',
+                fontWeight: '600',
+                color: `${statusColorScheme}.400`,
+                pb: '1px',
+                userSelect: 'none',
+              }}
+            >
+              {t(statusTranslationKey as ResourceKey)}
+              {iterationsText}
+            </Text>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <Icon as={FaCircle} boxSize="0.5rem" color={`${statusColorScheme}.400`} />
+    </Flex>
   );
 };
 
