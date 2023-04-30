@@ -3,6 +3,9 @@ import { SessionsService } from 'services/api';
 import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
 import { buildNodesGraph } from 'features/nodes/util/nodesGraphBuilder/buildNodesGraph';
+import { log } from 'app/logging/useLogger';
+
+const sessionLog = log.child({ namespace: 'session' });
 
 export const generateGraphBuilt = createAppAsyncThunk(
   'api/generateGraphBuilt',
@@ -43,11 +46,11 @@ type SessionCreatedArg = {
 export const sessionCreated = createAppAsyncThunk(
   'api/sessionCreated',
   async (arg: SessionCreatedArg, { dispatch, getState }) => {
-    console.log('Session created, graph: ', arg.graph);
-
     const response = await SessionsService.createSession({
       requestBody: arg.graph,
     });
+
+    sessionLog.info({ arg, response }, `Session created (${response.id})`);
 
     return response;
   }
@@ -74,6 +77,8 @@ export const nodeAdded = createAppAsyncThunk(
       sessionId: arg.sessionId,
     });
 
+    sessionLog.info({ arg, response }, `Node added (${response})`);
+
     return response;
   }
 );
@@ -90,6 +95,8 @@ export const sessionInvoked = createAppAsyncThunk(
       sessionId,
       all: true,
     });
+
+    sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
 
     return response;
   }
@@ -111,6 +118,8 @@ export const sessionCanceled = createAppAsyncThunk(
       sessionId,
     });
 
+    sessionLog.info({ arg, response }, `Session canceled (${sessionId})`);
+
     return response;
   }
 );
@@ -126,6 +135,11 @@ export const listedSessions = createAppAsyncThunk(
   'api/listSessions',
   async (arg: SessionsListedArg, _thunkApi) => {
     const response = await SessionsService.listSessions(arg);
+
+    sessionLog.info(
+      { arg, response },
+      `Sessions listed (${response.items.length})`
+    );
 
     return response;
   }

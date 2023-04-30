@@ -14,13 +14,14 @@ import {
 } from 'services/events/actions';
 
 import i18n from 'i18n';
-import { isImageOutput } from 'services/types/guards';
 import { ProgressImage } from 'services/events/types';
 import { initialImageSelected } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
+import { LogLevelName } from 'roarr';
+import { InvokeLogLevel } from 'app/logging/useLogger';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -42,7 +43,6 @@ export interface SystemState
   extends InvokeAI.SystemStatus,
     InvokeAI.SystemConfig {
   shouldDisplayInProgressType: InProgressImageType;
-  log: Array<LogEntry>;
   shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
   isESRGANAvailable: boolean;
@@ -97,12 +97,16 @@ export interface SystemState
    * Whether or not the OpenAPI schema was received and parsed
    */
   wasSchemaParsed: boolean;
+  /**
+   * The console output logging level
+   */
+  consoleLogLevel: InvokeLogLevel;
+  shouldLogToConsole: boolean;
 }
 
 const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
-  log: [],
   shouldShowLogViewer: false,
   shouldDisplayInProgressType: 'latents',
   shouldDisplayGuides: true,
@@ -144,11 +148,10 @@ const initialSystemState: SystemState = {
   cancelType: 'immediate',
   isCancelScheduled: false,
   subscribedNodeIds: [],
-  // shouldTransformUrls: false,
-  // disabledTabs: [],
-  // disabledFeatures: [],
   wereModelsReceived: false,
   wasSchemaParsed: false,
+  consoleLogLevel: 'error',
+  shouldLogToConsole: true,
 };
 
 export const systemSlice = createSlice({
@@ -188,25 +191,6 @@ export const systemSlice = createSlice({
       state.currentStatus = state.isConnected
         ? i18n.t('common.statusConnected')
         : i18n.t('common.statusDisconnected');
-    },
-    addLogEntry: (
-      state,
-      action: PayloadAction<{
-        timestamp: string;
-        message: string;
-        level?: LogLevel;
-      }>
-    ) => {
-      const { timestamp, message, level } = action.payload;
-      const logLevel = level || 'info';
-
-      const entry: LogEntry = {
-        timestamp,
-        message,
-        level: logLevel,
-      };
-
-      state.log.push(entry);
     },
     setShouldShowLogViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowLogViewer = action.payload;
@@ -346,6 +330,12 @@ export const systemSlice = createSlice({
     subscribedNodeIdsSet: (state, action: PayloadAction<string[]>) => {
       state.subscribedNodeIds = action.payload;
     },
+    consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
+      state.consoleLogLevel = action.payload;
+    },
+    shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldLogToConsole = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -353,7 +343,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(socketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
-      console.log(`Subscribed to session ${action.payload.sessionId}`);
     });
 
     /**
@@ -371,11 +360,6 @@ export const systemSlice = createSlice({
 
       state.isConnected = true;
       state.currentStatus = i18n.t('common.statusConnected');
-      state.log.push({
-        timestamp,
-        message: `Connected to server`,
-        level: 'info',
-      });
     });
 
     /**
@@ -386,11 +370,6 @@ export const systemSlice = createSlice({
 
       state.isConnected = false;
       state.currentStatus = i18n.t('common.statusDisconnected');
-      state.log.push({
-        timestamp,
-        message: `Disconnected from server`,
-        level: 'error',
-      });
     });
 
     /**
@@ -433,15 +412,6 @@ export const systemSlice = createSlice({
       state.totalSteps = 0;
       state.progressImage = null;
       state.currentStatus = i18n.t('common.statusProcessingComplete');
-
-      // TODO: handle logging for other invocation types
-      if (isImageOutput(data.result)) {
-        state.log.push({
-          timestamp,
-          message: `Generated: ${data.result.image.image_name}`,
-          level: 'info',
-        });
-      }
     });
 
     /**
@@ -450,12 +420,6 @@ export const systemSlice = createSlice({
     builder.addCase(invocationError, (state, action) => {
       const { data, timestamp } = action.payload;
 
-      state.log.push({
-        timestamp,
-        message: `Server error: ${data.error}`,
-        level: 'error',
-      });
-
       state.wasErrorSeen = true;
       state.progressImage = null;
       state.isProcessing = false;
@@ -463,12 +427,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: i18n.t('toast.serverError'), status: 'error' })
       );
-
-      state.log.push({
-        timestamp,
-        message: `Server error: ${data.error}`,
-        level: 'error',
-      });
     });
 
     /**
@@ -495,12 +453,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: i18n.t('toast.canceled'), status: 'warning' })
       );
-
-      state.log.push({
-        timestamp,
-        message: `Processing canceled`,
-        level: 'warning',
-      });
     });
 
     /**
@@ -529,7 +481,6 @@ export const systemSlice = createSlice({
 export const {
   setShouldDisplayInProgressType,
   setIsProcessing,
-  addLogEntry,
   setShouldShowLogViewer,
   setIsConnected,
   setSocketId,
@@ -562,6 +513,8 @@ export const {
   scheduledCancelAborted,
   cancelTypeChanged,
   subscribedNodeIdsSet,
+  consoleLogLevelChanged,
+  shouldLogToConsoleChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
