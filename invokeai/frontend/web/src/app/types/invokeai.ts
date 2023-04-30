@@ -115,21 +115,6 @@ export type PostProcessedImageMetadata = ESRGANMetadata | FacetoolMetadata;
 //   image: GeneratedImageMetadata | PostProcessedImageMetadata;
 // };
 
-// An Image has a UUID, url, modified timestamp, width, height and maybe metadata
-export type _Image = {
-  uuid: string;
-  url: string;
-  thumbnail: string;
-  mtime: number;
-  metadata?: Metadata;
-  width: number;
-  height: number;
-  category: GalleryCategory;
-  isBase64?: boolean;
-  dreamPrompt?: 'string';
-  name?: string;
-};
-
 /**
  * ResultImage
  */
@@ -139,11 +124,6 @@ export type Image = {
   url: string;
   thumbnail: string;
   metadata: ImageResponseMetadata;
-};
-
-// GalleryImages is an array of Image.
-export type GalleryImages = {
-  images: Array<_Image>;
 };
 
 /**
@@ -310,26 +290,9 @@ export type ErrorResponse = {
   additionalData?: string;
 };
 
-export type GalleryImagesResponse = {
-  images: Array<Omit<_Image, 'uuid'>>;
-  areMoreImagesAvailable: boolean;
-  category: GalleryCategory;
-};
-
-export type ImageDeletedResponse = {
-  uuid: string;
-  url: string;
-  category: GalleryCategory;
-};
-
 export type ImageUrlResponse = {
   url: string;
 };
-
-// export type UploadImagePayload = {
-//   file: File;
-//   destination?: ImageUploadDestination;
-// };
 
 export type UploadOutpaintingMergeImagePayload = {
   dataURL: string;
