@@ -400,4 +400,3 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
         zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = zoe_depth_processor(image)
         return processed_image
-
