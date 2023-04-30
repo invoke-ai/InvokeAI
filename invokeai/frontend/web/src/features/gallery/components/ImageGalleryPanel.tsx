@@ -111,28 +111,6 @@ export const ImageGalleryPanel = () => {
   );
 
   useHotkeys(
-    'left',
-    () => {
-      dispatch(selectPrevImage());
-    },
-    {
-      enabled: !isStaging || activeTabName !== 'unifiedCanvas',
-    },
-    [isStaging, activeTabName]
-  );
-
-  useHotkeys(
-    'right',
-    () => {
-      dispatch(selectNextImage());
-    },
-    {
-      enabled: !isStaging || activeTabName !== 'unifiedCanvas',
-    },
-    [isStaging, activeTabName]
-  );
-
-  useHotkeys(
     'shift+g',
     () => {
       handleSetShouldPinGallery();
