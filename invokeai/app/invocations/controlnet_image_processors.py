@@ -1,9 +1,10 @@
 # InvokeAI nodes for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
-import numpy as np
 
+import numpy as np
 from typing import Literal, Optional, Union, List
+from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
 from ..models.image import ImageField, ImageType
@@ -125,7 +126,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
             width=processed_image.width,
             height=processed_image.height,
             mode=processed_image.mode,
-    )
+        )
 
 
 class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
@@ -334,3 +335,4 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
         zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = zoe_depth_processor(image)
         return processed_image
+
