@@ -5,7 +5,7 @@ import { ResultsState } from './resultsSlice';
  *
  * Currently denylisting results slice entirely, see persist config in store.ts
  */
-const itemsToDenylist: (keyof ResultsState)[] = [];
+const itemsToDenylist: (keyof ResultsState)[] = ['isLoading'];
 
 export const resultsDenylist = itemsToDenylist.map(
   (denylistItem) => `results.${denylistItem}`

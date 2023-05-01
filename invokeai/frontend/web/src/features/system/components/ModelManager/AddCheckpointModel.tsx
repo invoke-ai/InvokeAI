@@ -17,7 +17,7 @@ import React from 'react';
 
 import SearchModels from './SearchModels';
 
-import { addNewModel } from 'app/socketio/actions';
+// import { addNewModel } from 'app/socketio/actions';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 

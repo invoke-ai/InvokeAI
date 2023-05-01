@@ -19,8 +19,6 @@ import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import modelsReducer from 'features/system/store/modelSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 
-import { socketioMiddleware } from '../socketio/middleware';
-import { socketMiddleware } from 'services/events/middleware';
 import { canvasDenylist } from 'features/canvas/store/canvasPersistDenylist';
 import { galleryDenylist } from 'features/gallery/store/galleryPersistDenylist';
 import { generationDenylist } from 'features/parameters/store/generationPersistDenylist';
@@ -28,8 +26,10 @@ import { lightboxDenylist } from 'features/lightbox/store/lightboxPersistDenylis
 import { modelsDenylist } from 'features/system/store/modelsPersistDenylist';
 import { nodesDenylist } from 'features/nodes/store/nodesPersistDenylist';
 import { postprocessingDenylist } from 'features/parameters/store/postprocessingPersistDenylist';
-import { systemDenylist } from 'features/system/store/systemPersistsDenylist';
+import { systemDenylist } from 'features/system/store/systemPersistDenylist';
 import { uiDenylist } from 'features/ui/store/uiPersistDenylist';
+import { resultsDenylist } from 'features/gallery/store/resultsPersistDenylist';
+import { uploadsDenylist } from 'features/gallery/store/uploadsPersistDenylist';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -73,28 +73,25 @@ const rootPersistConfig = getPersistConfig({
     ...modelsDenylist,
     ...nodesDenylist,
     ...postprocessingDenylist,
-    // ...resultsDenylist,
-    'results',
+    ...resultsDenylist,
     ...systemDenylist,
     ...uiDenylist,
-    // ...uploadsDenylist,
-    'uploads',
+    ...uploadsDenylist,
     'hotkeys',
     'config',
   ],
-  debounce: 300,
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 // TODO: rip the old middleware out when nodes is complete
-export function buildMiddleware() {
-  if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
-    return socketMiddleware();
-  } else {
-    return socketioMiddleware();
-  }
-}
+// export function buildMiddleware() {
+//   if (import.meta.env.MODE === 'nodes' || import.meta.env.MODE === 'package') {
+//     return socketMiddleware();
+//   } else {
+//     return socketioMiddleware();
+//   }
+// }
 
 export const store = configureStore({
   reducer: persistedReducer,

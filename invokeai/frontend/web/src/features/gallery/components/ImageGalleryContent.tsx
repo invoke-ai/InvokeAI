@@ -1,5 +1,5 @@
 import { ButtonGroup, Flex, Grid, Icon, Image, Text } from '@chakra-ui/react';
-import { requestImages } from 'app/socketio/actions';
+// import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAICheckbox from 'common/components/IAICheckbox';
@@ -49,7 +49,7 @@ const gallerySelector = createSelector(
   (uploads, results, gallery) => {
     const { currentCategory } = gallery;
 
-    return currentCategory === 'result'
+    return currentCategory === 'results'
       ? {
           images: resultsAdapter.getSelectors().selectAll(results),
           isLoading: results.isLoading,
@@ -72,7 +72,6 @@ const ImageGalleryContent = () => {
   const {
     // images,
     currentCategory,
-    currentImageUuid,
     shouldPinGallery,
     galleryImageMinimumWidth,
     galleryGridTemplateColumns,
@@ -80,6 +79,7 @@ const ImageGalleryContent = () => {
     shouldAutoSwitchToNewImages,
     // areMoreImagesAvailable,
     shouldUseSingleGalleryColumn,
+    selectedImage,
   } = useAppSelector(imageGallerySelector);
 
   const { images, areMoreImagesAvailable, isLoading } =
@@ -89,11 +89,11 @@ const ImageGalleryContent = () => {
   //   dispatch(requestImages(currentCategory));
   // };
   const handleClickLoadMore = () => {
-    if (currentCategory === 'result') {
+    if (currentCategory === 'results') {
       dispatch(receivedResultImagesPage());
     }
 
-    if (currentCategory === 'user') {
+    if (currentCategory === 'uploads') {
       dispatch(receivedUploadImagesPage());
     }
   };
@@ -147,34 +147,34 @@ const ImageGalleryContent = () => {
               <IAIIconButton
                 aria-label={t('gallery.showGenerations')}
                 tooltip={t('gallery.showGenerations')}
-                isChecked={currentCategory === 'result'}
+                isChecked={currentCategory === 'results'}
                 role="radio"
                 icon={<FaImage />}
-                onClick={() => dispatch(setCurrentCategory('result'))}
+                onClick={() => dispatch(setCurrentCategory('results'))}
               />
               <IAIIconButton
                 aria-label={t('gallery.showUploads')}
                 tooltip={t('gallery.showUploads')}
                 role="radio"
-                isChecked={currentCategory === 'user'}
+                isChecked={currentCategory === 'uploads'}
                 icon={<FaUser />}
-                onClick={() => dispatch(setCurrentCategory('user'))}
+                onClick={() => dispatch(setCurrentCategory('uploads'))}
               />
             </>
           ) : (
             <>
               <IAIButton
                 size="sm"
-                isChecked={currentCategory === 'result'}
-                onClick={() => dispatch(setCurrentCategory('result'))}
+                isChecked={currentCategory === 'results'}
+                onClick={() => dispatch(setCurrentCategory('results'))}
                 flexGrow={1}
               >
                 {t('gallery.generations')}
               </IAIButton>
               <IAIButton
                 size="sm"
-                isChecked={currentCategory === 'user'}
-                onClick={() => dispatch(setCurrentCategory('user'))}
+                isChecked={currentCategory === 'uploads'}
+                onClick={() => dispatch(setCurrentCategory('uploads'))}
                 flexGrow={1}
               >
                 {t('gallery.uploads')}
@@ -251,7 +251,7 @@ const ImageGalleryContent = () => {
               >
                 {images.map((image) => {
                   const { name } = image;
-                  const isSelected = currentImageUuid === name;
+                  const isSelected = selectedImage?.name === name;
                   return (
                     <HoverableImage
                       key={`${name}-${image.thumbnail}`}

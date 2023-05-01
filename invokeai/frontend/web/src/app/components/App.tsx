@@ -1,5 +1,4 @@
 import ImageUploader from 'common/components/ImageUploader';
-import Console from 'features/system/components/Console';
 import ProgressBar from 'features/system/components/ProgressBar';
 import SiteHeader from 'features/system/components/SiteHeader';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
@@ -27,6 +26,8 @@ import { PartialAppConfig } from 'app/types/invokeai';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { useLogger } from 'app/logging/useLogger';
+import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
 
 const DEFAULT_CONFIG = {};
 
@@ -37,6 +38,7 @@ interface Props extends PropsWithChildren {
 const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
+  const log = useLogger();
 
   const currentTheme = useAppSelector((state) => state.ui.currentTheme);
 
@@ -50,9 +52,9 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    console.log('Received config: ', config);
+    log.info({ namespace: 'App', data: config }, 'Received config');
     dispatch(configChanged(config));
-  }, [dispatch, config]);
+  }, [dispatch, config, log]);
 
   useEffect(() => {
     setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
@@ -63,7 +65,7 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   }, []);
 
   return (
-    <Grid w="100vw" h="100vh" position="relative">
+    <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
       {isLightboxEnabled && <Lightbox />}
       <ImageUploader>
         <ProgressBar />
@@ -119,9 +121,7 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
       <Portal>
         <FloatingGalleryButton />
       </Portal>
-      <Portal>
-        <Console />
-      </Portal>
+      <ProgressImagePreview />
     </Grid>
   );
 };

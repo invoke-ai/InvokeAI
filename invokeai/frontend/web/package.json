@@ -65,6 +65,7 @@
     "@emotion/styled": "^11.10.6",
     "@fontsource/inter": "^4.5.15",
     "@reduxjs/toolkit": "^1.9.5",
+    "@roarr/browser-log-writer": "^1.1.5",
     "chakra-ui-contextmenu": "^1.0.5",
     "dateformat": "^5.0.3",
     "formik": "^2.2.9",
@@ -87,23 +88,28 @@
     "react-konva": "^18.2.7",
     "react-konva-utils": "^1.0.4",
     "react-redux": "^8.0.5",
+    "react-rnd": "^10.4.1",
     "react-transition-group": "^4.4.5",
+    "react-use": "^17.4.0",
     "react-zoom-pan-pinch": "^3.0.7",
     "reactflow": "^11.7.0",
     "redux-deep-persist": "^1.0.7",
     "redux-dynamic-middlewares": "^2.2.0",
     "redux-persist": "^6.0.0",
+    "roarr": "^7.15.0",
+    "serialize-error": "^11.0.0",
     "socket.io-client": "^4.6.0",
     "use-image": "^1.1.0",
     "uuid": "^9.0.0"
   },
   "peerDependencies": {
+    "@chakra-ui/cli": "^2.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "ts-toolbelt": "^9.6.0",
-    "@chakra-ui/cli": "^2.4.0"
+    "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
+    "@chakra-ui/cli": "^2.4.0",
     "@types/dateformat": "^5.0.0",
     "@types/lodash-es": "^4.14.194",
     "@types/node": "^18.16.2",

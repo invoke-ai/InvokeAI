@@ -8,7 +8,7 @@ import {
   SystemState,
   cancelScheduled,
   cancelTypeChanged,
-  CancelType,
+  CancelStrategy,
 } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
 import { useCallback, memo } from 'react';
@@ -87,7 +87,7 @@ const CancelButton = (
   const handleCancelTypeChanged = useCallback(
     (value: string | string[]) => {
       const newCancelType = Array.isArray(value) ? value[0] : value;
-      dispatch(cancelTypeChanged(newCancelType as CancelType));
+      dispatch(cancelTypeChanged(newCancelType as CancelStrategy));
     },
     [dispatch]
   );

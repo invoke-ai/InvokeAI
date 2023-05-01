@@ -1,7 +1,7 @@
 import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { buildMiddleware, store } from 'app/store/store';
+import { store } from 'app/store/store';
 import { persistor } from '../store/persistor';
 import { OpenAPI } from 'services/api';
 import '@fontsource/inter/100.css';
@@ -19,6 +19,7 @@ import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { PartialAppConfig } from 'app/types/invokeai';
 
 import '../../i18n';
+import { socketMiddleware } from 'services/events/middleware';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -50,7 +51,7 @@ const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
     // the `apiUrl`/`token` dynamically.
 
     // rebuild socket middleware with token and apiUrl
-    addMiddleware(buildMiddleware());
+    addMiddleware(socketMiddleware());
   }, [apiUrl, token]);
 
   return (

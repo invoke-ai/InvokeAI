@@ -8,7 +8,7 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { InvokeDiffusersModelConfigProps } from 'app/types/invokeai';
-import { addNewModel } from 'app/socketio/actions';
+// import { addNewModel } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';

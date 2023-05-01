@@ -15,9 +15,9 @@ const AnimatedImageToImagePanel = () => {
     <AnimatePresence>
       {isImageToImageEnabled && (
         <motion.div
-          initial={{ opacity: 0, scaleX: 0, width: 0 }}
-          animate={{ opacity: 1, scaleX: 1, width: '28rem' }}
-          exit={{ opacity: 0, scaleX: 0, width: 0 }}
+          initial={{ opacity: 0, scale: 0, width: 0 }}
+          animate={{ opacity: 1, scale: 1, width: '28rem' }}
+          exit={{ opacity: 0, scale: 0, width: 0 }}
           transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
         >
           <Box sx={{ h: 'full', w: 'full', pl: 4 }}>

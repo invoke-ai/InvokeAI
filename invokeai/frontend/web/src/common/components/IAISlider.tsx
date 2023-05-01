@@ -233,7 +233,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             hidden={hideTooltip}
             {...sliderTooltipProps}
           >
-            <SliderThumb {...sliderThumbProps} />
+            <SliderThumb {...sliderThumbProps} zIndex={0} />
           </Tooltip>
         </Slider>
 
