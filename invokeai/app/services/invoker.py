@@ -49,7 +49,7 @@ class Invoker:
         new_state = GraphExecutionState(graph=Graph() if graph is None else graph)
         self.services.graph_execution_manager.set(new_state)
         return new_state
-    
+
     def cancel(self, graph_execution_state_id: str) -> None:
         """Cancels the given execution state"""
         self.services.queue.cancel(graph_execution_state_id)
@@ -71,15 +71,9 @@ class Invoker:
         for service in vars(self.services):
             self.__start_service(getattr(self.services, service))
 
-        for service in vars(self.services):
-            self.__start_service(getattr(self.services, service))
-
     def stop(self) -> None:
         """Stops the invoker. A new invoker will have to be created to execute further."""
         # First stop all services
-        for service in vars(self.services):
-            self.__stop_service(getattr(self.services, service))
-
         for service in vars(self.services):
             self.__stop_service(getattr(self.services, service))
 
