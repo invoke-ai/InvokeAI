@@ -1,9 +1,9 @@
-import { Flex, Icon, Image, Text } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { memo } from 'react';
-import { FaImage, FaStopwatch } from 'react-icons/fa';
+import { FaStopwatch } from 'react-icons/fa';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { CloseIcon } from '@chakra-ui/icons';
@@ -16,11 +16,12 @@ import {
 import { Rnd } from 'react-rnd';
 import { Rect } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash';
+import ProgressImage from './ProgressImage';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
   (system, ui) => {
-    const { progressImage, isProcessing } = system;
+    const { isProcessing } = system;
     const {
       floatingProgressImageRect,
       shouldShowProgressImages,
@@ -33,7 +34,6 @@ const selector = createSelector(
         : shouldShowProgressImages;
 
     return {
-      progressImage,
       floatingProgressImageRect,
       showProgressWindow,
     };
@@ -48,13 +48,28 @@ const selector = createSelector(
 const ProgressImagePreview = () => {
   const dispatch = useAppDispatch();
 
-  const { showProgressWindow, progressImage, floatingProgressImageRect } =
+  const { showProgressWindow, floatingProgressImageRect } =
     useAppSelector(selector);
 
   const { t } = useTranslation();
 
   return (
     <>
+      {' '}
+      <IAIIconButton
+        onClick={() =>
+          dispatch(setShouldShowProgressImages(!showProgressWindow))
+        }
+        tooltip={t('ui.showProgressImages')}
+        isChecked={showProgressWindow}
+        sx={{
+          position: 'absolute',
+          bottom: 4,
+          insetInlineStart: 4,
+        }}
+        aria-label={t('ui.showProgressImages')}
+        icon={<FaStopwatch />}
+      />
       {showProgressWindow && (
         <Rnd
           bounds="window"
@@ -141,64 +156,10 @@ const ProgressImagePreview = () => {
                 variant="ghost"
               />
             </Flex>
-            {progressImage ? (
-              <Flex
-                sx={{
-                  position: 'relative',
-                  w: 'full',
-                  h: 'full',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Image
-                  draggable={false}
-                  src={progressImage.dataURL}
-                  width={progressImage.width}
-                  height={progressImage.height}
-                  sx={{
-                    position: 'absolute',
-                    objectFit: 'contain',
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    height: 'auto',
-                    borderRadius: 'base',
-                    p: 2,
-                  }}
-                />
-              </Flex>
-            ) : (
-              <Flex
-                sx={{
-                  w: 'full',
-                  h: 'full',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon color="base.400" boxSize={32} as={FaImage}></Icon>
-              </Flex>
-            )}
+            <ProgressImage />
           </Flex>
         </Rnd>
       )}
-      <IAIIconButton
-        onClick={() =>
-          dispatch(setShouldShowProgressImages(!showProgressWindow))
-        }
-        tooltip={t('ui.showProgressImages')}
-        sx={{
-          position: 'absolute',
-          bottom: 4,
-          insetInlineStart: 4,
-          background: showProgressWindow ? 'accent.600' : 'base.700',
-          _hover: {
-            background: showProgressWindow ? 'accent.500' : 'base.600',
-          },
-        }}
-        aria-label={t('ui.showProgressImages')}
-        icon={<FaStopwatch />}
-      />
     </>
   );
 };
