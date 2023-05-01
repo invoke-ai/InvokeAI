@@ -284,8 +284,17 @@ def invoke_cli():
                     command = CliCommand(command = invocation)
                     context.graph_nodes[invocation.id] = system_graph.id
                 else:
-                    args["id"] = current_id
-                    command = CliCommand(command=args)
+                    if "id" in args:
+                        args["id"] = args["id"] or current_id
+                        
+                    # remove extraneous fields from initialization
+                    exclude = ['link','link_node']
+                    command_args = dict()
+                    for key,value in args.items():
+                        if key not in exclude:
+                            command_args[key]=value
+                            
+                    command = CliCommand(command=command_args)
 
                 if command is None:
                     continue

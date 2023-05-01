@@ -88,7 +88,7 @@ from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import Any, ClassVar, List, Literal, Union, get_origin, get_type_hints, get_args
+from typing import Any, ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
 LEGACY_INIT_FILE = Path('invokeai.init')
@@ -99,6 +99,7 @@ class InvokeAISettings(BaseSettings):
     read from an omegaconf .yaml file.
     '''
     initconf             : ClassVar[DictConfig] = None
+    argparse_groups      : ClassVar[Dict] = {}
 
     def parse_args(self, argv: list=sys.argv[1:]):
         parser = self.get_parser()
@@ -110,10 +111,14 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def add_parser_arguments(cls, parser):
         env_prefix = cls.Config.env_prefix if hasattr(cls.Config,'env_prefix') else 'INVOKEAI_'
-        default_settings_stanza = get_args(get_type_hints(cls)['type'])[0]
+        if 'type' in get_type_hints(cls):
+            default_settings_stanza = get_args(get_type_hints(cls)['type'])[0]
+        else:
+            default_settings_stanza = 'globals'
         initconf = cls.initconf.get(default_settings_stanza) if cls.initconf and default_settings_stanza in cls.initconf else None
 
         fields = cls.__fields__
+        cls.argparse_groups = {}
         for name, field in fields.items():
             if name not in cls._excluded():
                 env_name = env_prefix+f'{cls.cmd_name()}_{name}'
@@ -127,7 +132,10 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def cmd_name(self, command_field: str='type')->str:
         hints = get_type_hints(self)
-        return get_args(hints[command_field])[0]
+        if command_field in hints:
+            return get_args(hints[command_field])[0]
+        else:
+            return 'globals'
 
     @classmethod
     def get_parser(cls)->ArgumentParser:
@@ -172,9 +180,16 @@ class InvokeAISettings(BaseSettings):
             else:
                 return {}
 
-    @staticmethod
-    def add_field_argument(command_parser, name: str, field, default_override = None):
+    @classmethod
+    def add_field_argument(cls, command_parser, name: str, field, default_override = None):
         default = default_override if default_override is not None else field.default if field.default_factory is None else field.default_factory()
+        if category := field.field_info.extra.get("category"):
+            if category not in cls.argparse_groups:
+                cls.argparse_groups[category] = command_parser.add_argument_group(category)
+            argparse_group = cls.argparse_groups[category]
+        else:
+            argparse_group = command_parser
+        
         if get_origin(field.type_) == Literal:
             allowed_values = get_args(field.type_)
             allowed_types = set()
@@ -183,7 +198,7 @@ class InvokeAISettings(BaseSettings):
             allowed_types_list = list(allowed_types)
             field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
 
-            command_parser.add_argument(
+            argparse_group.add_argument(
                 f"--{name}",
                 dest=name,
                 type=field_type,
@@ -192,7 +207,7 @@ class InvokeAISettings(BaseSettings):
                 help=field.field_info.description,
             )
         else:
-            command_parser.add_argument(
+            argparse_group.add_argument(
                 f"--{name}",
                 dest=name,
                 type=field.type_,
@@ -221,28 +236,28 @@ class InvokeAIAppConfig(InvokeAISettings):
     '''
     #fmt: off
     type: Literal["globals"] = "globals"
-    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory')
-    infile              : Path = Field(default=None, description='Path to a file of prompt commands to bulk generate from')
-    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = 'float16'
-    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file')
-    model               : str = Field(default='stable-diffusion-1.5', description='Initial model name')
-    outdir              : Path = Field(default='outputs', description='Default folder for output images')
-    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory')
-    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory')
-    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.')
-    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.')
-    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory')
-    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention")
-    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements")
-    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching")
-    nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker")
-    restore             : bool = Field(default=True, description="Enable/disable face restoration code")
-    esrgan              : bool = Field(default=True, description="Enable/disable upscaling code")
-    patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code")
-    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models")
-    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.")
-    free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.")
-    log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.")
+    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
+    infile              : Path = Field(default=None, description='Path to a file of prompt commands to bulk generate from', category='Paths')
+    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
+    model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
+    outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
+    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory', category='Paths')
+    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
+    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
+    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
+    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
+    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
+    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
+    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
+    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
+    free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
+    nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
+    restore             : bool = Field(default=True, description="Enable/disable face restoration code", category='Features')
+    esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", category='Features')
+    patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
+    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
+    log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
     #fmt: on
 
     def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
@@ -355,10 +370,10 @@ class InvokeAIWebConfig(InvokeAIAppConfig):
     '''
     #fmt: off
     type               : Literal["web"] = "web"
-    allow_origins      : List = Field(default=[], description="Allowed CORS origins")
-    allow_credentials  : bool = Field(default=True, description="Allow CORS credentials")
-    allow_methods      : List = Field(default=["*"], description="Methods allowed for CORS")
-    allow_headers      : List = Field(default=["*"], description="Headers allowed for CORS")
-    host               : str = Field(default="127.0.0.1", description="IP address to bind to")
-    port               : int = Field(default=9090, description="Port to bind to")
+    allow_origins      : List = Field(default=[], description="Allowed CORS origins", category='Cross-Origin Resource Sharing')
+    allow_credentials  : bool = Field(default=True, description="Allow CORS credentials", category='Cross-Origin Resource Sharing')
+    allow_methods      : List = Field(default=["*"], description="Methods allowed for CORS", category='Cross-Origin Resource Sharing')
+    allow_headers      : List = Field(default=["*"], description="Headers allowed for CORS", category='Cross-Origin Resource Sharing')
+    host               : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
+    port               : int = Field(default=9090, description="Port to bind to", category='Web Server')
     #fmt: on

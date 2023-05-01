@@ -1158,7 +1158,6 @@ class ExposedNodeOutput(BaseModel):
 
 class LibraryGraph(InvokeAISettings):
     id: str = Field(description="The unique identifier for this library graph", default_factory=uuid.uuid4)
-    type: Literal["graph"] = "graph"
     graph: Graph = Field(description="The graph")
     name: str = Field(description="The name of the graph")
     description: str = Field(description="The description of the graph")

@@ -96,7 +96,6 @@ class BaseCommand(ABC, InvokeAISettings):
 
     # All commands must include a type name like this:
     # type: Literal['your_command_name'] = 'your_command_name'
-    id: str = Field(description="The id of this command. Needed to allow the CLI to treat commands & nodes similarly.")
 
     @classmethod
     def get_all_subclasses(cls):
