@@ -34,11 +34,22 @@ app.add_middleware(
 
 socket_io = SocketIO(app)
 
-web_config = {}
+# parse command-line settings, environment and the init file
+# (this is a module global)
+global web_config
+web_config = InvokeAIWebConfig()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=web_config.allow_origins,
+        allow_credentials=web_config.allow_credentials,
+        allow_methods=web_config.allow_methods,
+        allow_headers=web_config.allow_headers,
+    )
+
     ApiDependencies.initialize(
         config=web_config, event_handler_id=event_handler_id
     )
@@ -130,17 +141,6 @@ def overridden_redoc():
 
 
 def invoke_api():
-    # parse command-line settings, environment and the init file
-    # (this is a module global)
-    global web_config
-    web_config = InvokeAIWebConfig()
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=web_config.allow_origins,
-        allow_credentials=web_config.allow_credentials,
-        allow_methods=web_config.allow_methods,
-        allow_headers=web_config.allow_headers,
-    )
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()
     config = uvicorn.Config(app=app, host=web_config.host, port=web_config.port, loop=loop)
