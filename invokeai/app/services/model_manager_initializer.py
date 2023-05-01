@@ -12,7 +12,7 @@ from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 
 # TODO: Replace with an abstract class base ModelManagerBase
-def get_model_manager(config:InvokeAISettings) -> ModelManager:
+def get_model_manager(config: InvokeAISettings) -> ModelManager:
     model_config = config.model_conf_path
     if not model_config.exists():
         report_model_error(
@@ -41,7 +41,7 @@ def get_model_manager(config:InvokeAISettings) -> ModelManager:
         precision = 'float16' if config.precision=='float16' \
         else 'float32' if config.precision=='float32' \
         else choose_precision(device)
-        
+
         model_manager = ModelManager(
             OmegaConf.load(model_config),
             precision=precision,

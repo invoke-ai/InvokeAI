@@ -1,14 +1,11 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from abc import ABC
-from threading import Event, Thread
 from typing import Union
 
-from ..invocations.baseinvocation import InvocationContext
 from .graph import Graph, GraphExecutionState
-from .invocation_queue import InvocationQueueABC, InvocationQueueItem
+from .invocation_queue import InvocationQueueItem
 from .invocation_services import InvocationServices
-from .item_storage import ItemStorageABC
 
 
 class Invoker:
@@ -50,7 +47,7 @@ class Invoker:
         new_state = GraphExecutionState(graph=Graph() if graph is None else graph)
         self.services.graph_execution_manager.set(new_state)
         return new_state
-    
+
     def cancel(self, graph_execution_state_id: str) -> None:
         """Cancels the given execution state"""
         self.services.queue.cancel(graph_execution_state_id)

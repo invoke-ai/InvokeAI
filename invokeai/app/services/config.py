@@ -13,12 +13,12 @@ graphs cannot be configured this way, but their constituents can be.
  globals:
    nsfw_checker: False
    max_loaded_models: 5
- 
+
  txt2img:
    steps: 20
    scheduler: k_heun
    width: 768
- 
+
  img2img:
    width: 1024
    height: 1024
@@ -78,15 +78,16 @@ a Path object:
  conf               - alias for the above
  embedding_path     - path to the embeddings directory
  lora_path          - path to the LoRA directory
- 
+
 
 '''
 import argparse
 import os
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig
+from enum import Enum
 from pathlib import Path
+from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseSettings, Field, parse_obj_as
 from typing import Any, ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
@@ -153,7 +154,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self)->List[str]:
         return ['type','initconf']
-    
+
     class Config:
         env_file_encoding = 'utf-8'
         arbitrary_types_allowed = True
@@ -189,7 +190,7 @@ class InvokeAISettings(BaseSettings):
             argparse_group = cls.argparse_groups[category]
         else:
             argparse_group = command_parser
-        
+
         if get_origin(field.type_) == Literal:
             allowed_values = get_args(field.type_)
             allowed_types = set()
@@ -230,6 +231,12 @@ def _find_root()->Path:
         root = Path("~/invokeai").expanduser().resolve()
     return root
 
+class Precision(Enum):
+    AUTO = 'auto'
+    FLOAT16 = 'float16'
+    FLOAT32 = 'float32'
+    AUTOCAST = 'autocast'
+
 class InvokeAIAppConfig(InvokeAISettings):
     '''
     Application-wide settings.
@@ -248,7 +255,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
-    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
+    precision           : Literal[Precision.AUTO, Precision.FLOAT16, Precision.FLOAT32, Precision.AUTOCAST] = Field(default=Precision.FLOAT16, description='Floating point precision', category='Memory/Performance')
     max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
@@ -268,7 +275,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         :param **kwargs: attributes to initialize with
         '''
         super().__init__(**kwargs)
-        
+
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
         self.parse_args(argv)
@@ -334,7 +341,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         Path to the textual inversion embeddings directory.
         '''
         return self._resolve(self.embedding_dir) if self.embedding_dir else None
-    
+
     @property
     def lora_path(self)->Path:
         '''

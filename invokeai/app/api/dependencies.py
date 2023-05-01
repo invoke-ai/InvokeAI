@@ -1,16 +1,13 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
-from argparse import Namespace
-
-from invokeai.app.services.metadata import PngMetadataService, MetadataServiceBase
+from invokeai.app.services.metadata import PngMetadataService
 
 from ..services.default_graphs import create_system_graphs
 
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
 from ...backend.globals import Globals, copy_conf_to_globals
-from ..services.config import InvokeAIWebConfig
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
