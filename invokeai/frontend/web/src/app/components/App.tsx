@@ -28,9 +28,6 @@ import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
 import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
-// import { DndContext, DragEndEvent } from '@dnd-kit/core';
-import { floatingProgressImageMoved } from 'features/ui/store/uiSlice';
-// import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 
 const DEFAULT_CONFIG = {};
 
