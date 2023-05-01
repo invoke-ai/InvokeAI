@@ -150,6 +150,9 @@ class ImageToImageInvocation(TextToImageInvocation):
         )
         mask = None
 
+        if self.fit:
+            image = image.resize((self.width, self.height))
+
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
