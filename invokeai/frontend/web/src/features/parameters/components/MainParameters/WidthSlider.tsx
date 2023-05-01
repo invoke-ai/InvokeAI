@@ -13,17 +13,34 @@ const selector = createSelector(
   (generation, hotkeys, config) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.width;
-    const { width } = generation;
+    const { width, shouldFitToWidthHeight, isImageToImageEnabled } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
-    return { width, initial, min, sliderMax, inputMax, step };
+    return {
+      width,
+      initial,
+      min,
+      sliderMax,
+      inputMax,
+      step,
+      shouldFitToWidthHeight,
+      isImageToImageEnabled,
+    };
   }
 );
 
 const WidthSlider = () => {
-  const { width, initial, min, sliderMax, inputMax, step } =
-    useAppSelector(selector);
+  const {
+    width,
+    initial,
+    min,
+    sliderMax,
+    inputMax,
+    step,
+    shouldFitToWidthHeight,
+    isImageToImageEnabled,
+  } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -40,6 +57,7 @@ const WidthSlider = () => {
 
   return (
     <IAISlider
+      isDisabled={!shouldFitToWidthHeight && isImageToImageEnabled}
       label={t('parameters.width')}
       value={width}
       min={min}
