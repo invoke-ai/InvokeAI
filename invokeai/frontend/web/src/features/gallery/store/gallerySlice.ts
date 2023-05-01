@@ -40,6 +40,8 @@ export const gallerySlice = createSlice({
       action: PayloadAction<SelectedImage | undefined>
     ) => {
       state.selectedImage = action.payload;
+      // TODO: if the user selects an image, disable the auto switch?
+      // state.shouldAutoSwitchToNewImages = false;
     },
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
