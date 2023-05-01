@@ -111,7 +111,6 @@ def install_requested_models(
     if len(external_models)>0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
-            print(f'DEBUG: path_url_or_repo = {path_url_or_repo}')
             try:
                 model_manager.heuristic_import(
                     path_url_or_repo,
