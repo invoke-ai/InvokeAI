@@ -5100,6 +5100,16 @@ os-tmpdir@~1.0.2:
   resolved "https://registry.yarnpkg.com/os-tmpdir/-/os-tmpdir-1.0.2.tgz#bbe67406c79aa85c5cfec766fe5734555dfa1274"
   integrity sha512-D2FR03Vir7FIu45XBY20mTb+/ZSWB00sjU9jdQXt83gDrI4Ztz5Fs7/yy74g2N5SVQY4xY1qDr4rNddwYRVX0g==
 
+overlayscrollbars-react@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/overlayscrollbars-react/-/overlayscrollbars-react-0.5.0.tgz#0272bdc6304c7228a58d30e5b678e97fd5c5d8dd"
+  integrity sha512-uCNTnkfWW74veoiEv3kSwoLelKt4e8gTNv65D771X3il0x5g5Yo0fUbro7SpQzR9yNgi23cvB2mQHTTdQH96pA==
+
+overlayscrollbars@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/overlayscrollbars/-/overlayscrollbars-2.1.1.tgz#a7414fe9c96cf140dbe4975bbe9312861750388d"
+  integrity sha512-xvs2g8Tcq9+CZDpLEUchN3YUzjJhnTWw9kwqT/qcC53FIkOyP9mqnRMot5sW16tcsPT1KaMyzF0AMXw/7E4a8g==
+
 p-cancelable@^1.0.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/p-cancelable/-/p-cancelable-1.1.0.tgz#d078d15a3af409220c886f1d9a0ca2e441ab26cc"
@@ -5611,6 +5621,11 @@ react-use@^17.4.0:
     throttle-debounce "^3.0.1"
     ts-easing "^0.2.0"
     tslib "^2.1.0"
+
+react-virtuoso@^4.3.3:
+  version "4.3.3"
+  resolved "https://registry.yarnpkg.com/react-virtuoso/-/react-virtuoso-4.3.3.tgz#04b8d105b5d97365223fb13c9a594f7501f7e975"
+  integrity sha512-x0DeGmVAVOVaTXRMG7jzrHBwK7+dkt7n0G3tNmZXphQUBgkVBYuZoaJltQeZGFN42++3XvrgwStKCtmzgMJ0lA==
 
 react-zoom-pan-pinch@^3.0.7:
   version "3.0.7"
