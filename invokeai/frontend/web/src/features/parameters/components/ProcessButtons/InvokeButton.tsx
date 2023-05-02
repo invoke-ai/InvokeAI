@@ -5,13 +5,14 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
+import { usePrepareCanvasState } from 'features/canvas/hooks/usePrepareCanvasState';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
-import { generateGraphBuilt } from 'services/thunks/session';
+import { canvasGraphBuilt, generateGraphBuilt } from 'services/thunks/session';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -23,11 +24,16 @@ export default function InvokeButton(props: InvokeButton) {
   const dispatch = useAppDispatch();
   const { isReady } = useAppSelector(readinessSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
+  // const getGenerationParameters = usePrepareCanvasState();
 
   const handleInvoke = useCallback(() => {
     dispatch(clampSymmetrySteps());
-    dispatch(generateGraphBuilt());
-  }, [dispatch]);
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(canvasGraphBuilt());
+    } else {
+      dispatch(generateGraphBuilt());
+    }
+  }, [dispatch, activeTabName]);
 
   const { t } = useTranslation();
 

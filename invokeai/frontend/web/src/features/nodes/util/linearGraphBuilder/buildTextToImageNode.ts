@@ -1,8 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store/store';
 import { TextToImageInvocation } from 'services/api';
+import { O } from 'ts-toolbelt';
 
-export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
+export const buildTxt2ImgNode = (
+  state: RootState,
+  overrides: O.Partial<TextToImageInvocation, 'deep'> = {}
+): TextToImageInvocation => {
   const nodeId = uuidv4();
   const { generation, models } = state;
 
@@ -38,6 +42,8 @@ export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
   if (!shouldRandomizeSeed) {
     textToImageNode.seed = seed;
   }
+
+  Object.assign(textToImageNode, overrides);
 
   return textToImageNode;
 };

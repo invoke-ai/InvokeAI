@@ -5,10 +5,13 @@ import {
   ImageToImageInvocation,
   TextToImageInvocation,
 } from 'services/api';
-import { _Image } from 'app/types/invokeai';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
+import { O } from 'ts-toolbelt';
 
-export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
+export const buildImg2ImgNode = (
+  state: RootState,
+  overrides: O.Partial<ImageToImageInvocation, 'deep'> = {}
+): ImageToImageInvocation => {
   const nodeId = uuidv4();
   const { generation, system, models } = state;
 
@@ -33,7 +36,7 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
 
   if (!initialImage) {
     // TODO: handle this
-    throw 'no initial image';
+    // throw 'no initial image';
   }
 
   const imageToImageNode: ImageToImageInvocation = {
@@ -48,10 +51,12 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
     seamless,
     model: selectedModelName,
     progress_images: true,
-    image: {
-      image_name: initialImage.name,
-      image_type: initialImage.type,
-    },
+    image: initialImage
+      ? {
+          image_name: initialImage.name,
+          image_type: initialImage.type,
+        }
+      : undefined,
     strength,
     fit,
   };
@@ -59,6 +64,8 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
   if (!shouldRandomizeSeed) {
     imageToImageNode.seed = seed;
   }
+
+  Object.assign(imageToImageNode, overrides);
 
   return imageToImageNode;
 };
