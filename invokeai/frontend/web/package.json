@@ -93,7 +93,7 @@
     "react-rnd": "^10.4.1",
     "react-transition-group": "^4.4.5",
     "react-use": "^17.4.0",
-    "react-virtuoso": "^4.3.3",
+    "react-virtuoso": "^4.3.5",
     "react-zoom-pan-pinch": "^3.0.7",
     "reactflow": "^11.7.0",
     "redux-deep-persist": "^1.0.7",

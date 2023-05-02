@@ -5622,10 +5622,10 @@ react-use@^17.4.0:
     ts-easing "^0.2.0"
     tslib "^2.1.0"
 
-react-virtuoso@^4.3.3:
-  version "4.3.3"
-  resolved "https://registry.yarnpkg.com/react-virtuoso/-/react-virtuoso-4.3.3.tgz#04b8d105b5d97365223fb13c9a594f7501f7e975"
-  integrity sha512-x0DeGmVAVOVaTXRMG7jzrHBwK7+dkt7n0G3tNmZXphQUBgkVBYuZoaJltQeZGFN42++3XvrgwStKCtmzgMJ0lA==
+react-virtuoso@^4.3.5:
+  version "4.3.5"
+  resolved "https://registry.yarnpkg.com/react-virtuoso/-/react-virtuoso-4.3.5.tgz#1e882d435b2d3d8abf7c4b85235199cbfadd935d"
+  integrity sha512-MdWzmM9d8Gt5YGPIgGzRoqnYygTsriWlZrq+SqxphJTiiHs9cffnjf2Beo3SA3wRYzQJD8FI2HXtN5ACWzPFbQ==
 
 react-zoom-pan-pinch@^3.0.7:
   version "3.0.7"
