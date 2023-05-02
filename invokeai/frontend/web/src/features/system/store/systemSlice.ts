@@ -27,6 +27,8 @@ import { t } from 'i18next';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
+export type InfillMethod = 'tile' | 'patchmatch';
+
 export interface SystemState {
   isGFPGANAvailable: boolean;
   isESRGANAvailable: boolean;
@@ -79,7 +81,14 @@ export interface SystemState {
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
   statusTranslationKey: TFuncKey;
+  /**
+   * When a session is canceled, its ID is stored here until a new session is created.
+   */
   canceledSession: string;
+  /**
+   * TODO: get this from backend
+   */
+  infillMethods: InfillMethod[];
 }
 
 const initialSystemState: SystemState = {
@@ -111,6 +120,7 @@ const initialSystemState: SystemState = {
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
+  infillMethods: ['tile'],
 };
 
 export const systemSlice = createSlice({

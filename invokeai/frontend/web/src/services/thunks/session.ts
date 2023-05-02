@@ -1,6 +1,9 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { SessionsService } from 'services/api';
-import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
+import {
+  buildCanvasGraph,
+  buildLinearGraph as buildGenerateGraph,
+} from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
 import { buildNodesGraph } from 'features/nodes/util/nodesGraphBuilder/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
@@ -42,9 +45,27 @@ export const nodesGraphBuilt = createAppAsyncThunk(
   }
 );
 
+export const canvasGraphBuilt = createAppAsyncThunk(
+  'api/canvasGraphBuilt',
+  async (_, { dispatch, getState, rejectWithValue }) => {
+    try {
+      const graph = buildCanvasGraph(getState());
+      dispatch(sessionCreated({ graph }));
+      return graph;
+    } catch (err: any) {
+      sessionLog.error(
+        { error: serializeError(err) },
+        'Problem building graph'
+      );
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 export const isFulfilledAnyGraphBuilt = isAnyOf(
   generateGraphBuilt.fulfilled,
-  nodesGraphBuilt.fulfilled
+  nodesGraphBuilt.fulfilled,
+  canvasGraphBuilt.fulfilled
 );
 
 type SessionCreatedArg = {
@@ -58,14 +79,22 @@ type SessionCreatedArg = {
  */
 export const sessionCreated = createAppAsyncThunk(
   'api/sessionCreated',
-  async (arg: SessionCreatedArg, { dispatch, getState }) => {
-    const response = await SessionsService.createSession({
-      requestBody: arg.graph,
-    });
-
-    sessionLog.info({ arg, response }, `Session created (${response.id})`);
-
-    return response;
+  async (arg: SessionCreatedArg, { rejectWithValue }) => {
+    try {
+      const response = await SessionsService.createSession({
+        requestBody: arg.graph,
+      });
+      sessionLog.info({ arg, response }, `Session created (${response.id})`);
+      return response;
+    } catch (err: any) {
+      sessionLog.error(
+        {
+          error: serializeError(err),
+        },
+        'Problem creating session'
+      );
+      return rejectWithValue(err.message);
+    }
   }
 );
 

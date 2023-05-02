@@ -156,22 +156,20 @@ export const canvasSlice = createSlice({
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
     },
-    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI._Image>) => {
+    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       const image = action.payload;
+      const { width, height } = image.metadata;
       const { stageDimensions } = state;
 
       const newBoundingBoxDimensions = {
-        width: roundDownToMultiple(clamp(image.width, 64, 512), 64),
-        height: roundDownToMultiple(clamp(image.height, 64, 512), 64),
+        width: roundDownToMultiple(clamp(width, 64, 512), 64),
+        height: roundDownToMultiple(clamp(height, 64, 512), 64),
       };
 
       const newBoundingBoxCoordinates = {
-        x: roundToMultiple(
-          image.width / 2 - newBoundingBoxDimensions.width / 2,
-          64
-        ),
+        x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, 64),
         y: roundToMultiple(
-          image.height / 2 - newBoundingBoxDimensions.height / 2,
+          height / 2 - newBoundingBoxDimensions.height / 2,
           64
         ),
       };
@@ -196,8 +194,8 @@ export const canvasSlice = createSlice({
             layer: 'base',
             x: 0,
             y: 0,
-            width: image.width,
-            height: image.height,
+            width: width,
+            height: height,
             image: image,
           },
         ],
@@ -208,8 +206,8 @@ export const canvasSlice = createSlice({
       const newScale = calculateScale(
         stageDimensions.width,
         stageDimensions.height,
-        image.width,
-        image.height,
+        width,
+        height,
         STAGE_PADDING_PERCENTAGE
       );
 
@@ -218,8 +216,8 @@ export const canvasSlice = createSlice({
         stageDimensions.height,
         0,
         0,
-        image.width,
-        image.height,
+        width,
+        height,
         newScale
       );
       state.stageScale = newScale;

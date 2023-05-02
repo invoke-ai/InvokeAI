@@ -12,7 +12,10 @@ import { IRect } from 'konva/lib/types';
  * drawing the mask and compositing everything correctly to output a valid
  * mask image.
  */
-const generateMask = (lines: CanvasMaskLine[], boundingBox: IRect): string => {
+const generateMask = (
+  lines: CanvasMaskLine[],
+  boundingBox: IRect
+): { dataURL: string; imageData: ImageData } => {
   // create an offscreen canvas and add the mask to it
   const { width, height } = boundingBox;
 
@@ -55,10 +58,19 @@ const generateMask = (lines: CanvasMaskLine[], boundingBox: IRect): string => {
   stage.add(maskLayer);
 
   const dataURL = stage.toDataURL({ ...boundingBox });
+  const imageData = stage
+    .toCanvas()
+    .getContext('2d')
+    ?.getImageData(
+      boundingBox.x,
+      boundingBox.y,
+      boundingBox.width,
+      boundingBox.height
+    );
 
   offscreenContainer.remove();
 
-  return dataURL;
+  return { dataURL, imageData };
 };
 
 export default generateMask;

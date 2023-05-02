@@ -19,6 +19,7 @@ import { InvokeTabName } from 'features/ui/store/tabMap';
 import openBase64ImageInTab from './openBase64ImageInTab';
 import randomInt from './randomInt';
 import { stringToSeedWeightsArray } from './seedWeightPairs';
+import { getIsImageDataTransparent, getIsImageDataWhite } from './arrayBuffer';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
@@ -256,7 +257,7 @@ export const frontendToBackendParameters = (
       ...boundingBoxDimensions,
     };
 
-    const maskDataURL = generateMask(
+    const { dataURL: maskDataURL, imageData: maskImageData } = generateMask(
       isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
       boundingBox
     );
@@ -286,6 +287,19 @@ export const frontendToBackendParameters = (
       width: boundingBox.width,
       height: boundingBox.height,
     });
+
+    const ctx = canvasBaseLayer.getContext();
+    const imageData = ctx.getImageData(
+      boundingBox.x + absPos.x,
+      boundingBox.y + absPos.y,
+      boundingBox.width,
+      boundingBox.height
+    );
+
+    const doesBaseHaveTransparency = getIsImageDataTransparent(imageData);
+    const doesMaskHaveTransparency = getIsImageDataWhite(maskImageData);
+
+    console.log(doesBaseHaveTransparency, doesMaskHaveTransparency);
 
     if (enableImageDebugging) {
       openBase64ImageInTab([

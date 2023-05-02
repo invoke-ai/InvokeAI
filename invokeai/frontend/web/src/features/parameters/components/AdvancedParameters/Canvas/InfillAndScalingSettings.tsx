@@ -28,7 +28,7 @@ const selector = createSelector(
   (parameters, system, canvas) => {
     const { tileSize, infillMethod } = parameters;
 
-    const { infill_methods: availableInfillMethods } = system;
+    const { infillMethods } = system;
 
     const {
       boundingBoxScaleMethod: boundingBoxScale,
@@ -40,7 +40,7 @@ const selector = createSelector(
       scaledBoundingBoxDimensions,
       tileSize,
       infillMethod,
-      availableInfillMethods,
+      infillMethods,
       isManual: boundingBoxScale === 'manual',
     };
   },
@@ -56,7 +56,7 @@ const InfillAndScalingSettings = () => {
   const {
     tileSize,
     infillMethod,
-    availableInfillMethods,
+    infillMethods,
     boundingBoxScale,
     isManual,
     scaledBoundingBoxDimensions,
@@ -147,7 +147,7 @@ const InfillAndScalingSettings = () => {
       <IAISelect
         label={t('parameters.infillMethod')}
         value={infillMethod}
-        validValues={availableInfillMethods}
+        validValues={infillMethods}
         onChange={(e) => dispatch(setInfillMethod(e.target.value))}
       />
       <IAISlider

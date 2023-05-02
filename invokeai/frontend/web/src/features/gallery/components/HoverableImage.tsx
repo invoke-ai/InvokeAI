@@ -17,7 +17,10 @@ import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import * as InvokeAI from 'app/types/invokeai';
-import { resizeAndScaleCanvas } from 'features/canvas/store/canvasSlice';
+import {
+  resizeAndScaleCanvas,
+  setInitialCanvasImage,
+} from 'features/canvas/store/canvasSlice';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
@@ -159,7 +162,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
    * TODO: the rest of these
    */
   const handleSendToCanvas = () => {
-    // dispatch(setInitialCanvasImage(image));
+    dispatch(setInitialCanvasImage(image));
 
     dispatch(resizeAndScaleCanvas());
 
@@ -315,6 +318,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                   sx={{
                     width: '50%',
                     height: '50%',
+                    maxWidth: '4rem',
+                    maxHeight: '4rem',
                     fill: 'ok.500',
                   }}
                 />
