@@ -1,18 +1,3 @@
-export const getIsImageDataPartiallyTransparent = (imageData: ImageData) => {
-  let hasTransparency = false;
-  let isFullyTransparent = true;
-  const len = imageData.data.length;
-  let i = 3;
-  for (i; i < len; i += 4) {
-    if (imageData.data[i] !== 0) {
-      isFullyTransparent = false;
-    } else {
-      hasTransparency = true;
-    }
-  }
-  return { hasTransparency, isFullyTransparent };
-};
-
 export const getImageDataTransparency = (imageData: ImageData) => {
   let isFullyTransparent = true;
   let isPartiallyTransparent = false;
@@ -45,15 +30,4 @@ export const areAnyPixelsBlack = (imageData: ImageData) => {
     }
   }
   return false;
-};
-
-export const getIsImageDataWhite = (imageData: ImageData) => {
-  const len = imageData.data.length;
-  let i = 0;
-  for (i; i < len; ) {
-    if (imageData.data[i++] !== 255) {
-      return false;
-    }
-  }
-  return true;
 };

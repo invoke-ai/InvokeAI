@@ -1,24 +1,27 @@
 import { RootState } from 'app/store/store';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { isCanvasMaskLine } from '../store/canvasTypes';
-import generateMask from './generateMask';
+import {
+  buildMaskStage,
+  getStageDataURL,
+  getStageImageData,
+} from './generateMask';
 import { log } from 'app/logging/useLogger';
 import {
   areAnyPixelsBlack,
   getImageDataTransparency,
-  getIsImageDataWhite,
 } from 'common/util/arrayBuffer';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
+import { masks } from 'dateformat';
+
+const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
 
 export const getCanvasDataURLs = (state: RootState) => {
   const canvasBaseLayer = getCanvasBaseLayer();
   const canvasStage = getCanvasStage();
 
   if (!canvasBaseLayer || !canvasStage) {
-    log.error(
-      { namespace: 'getCanvasDataURLs' },
-      'Unable to find canvas / stage'
-    );
+    moduleLog.error('Unable to find canvas / stage');
     return;
   }
 
@@ -55,30 +58,46 @@ export const getCanvasDataURLs = (state: RootState) => {
 
   const absPos = canvasBaseLayer.getAbsolutePosition();
 
-  const { dataURL: maskDataURL, imageData: maskImageData } = generateMask(
-    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
-    {
-      x: boundingBox.x + absPos.x,
-      y: boundingBox.y + absPos.y,
-      width: boundingBox.width,
-      height: boundingBox.height,
-    }
-  );
-
-  const baseDataURL = canvasBaseLayer.toDataURL({
+  const offsetBoundingBox = {
     x: boundingBox.x + absPos.x,
     y: boundingBox.y + absPos.y,
     width: boundingBox.width,
     height: boundingBox.height,
-  });
+  };
+
+  const { stage: maskStage, offscreenContainer } = buildMaskStage(
+    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
+    offsetBoundingBox
+  );
+
+  const maskDataURL = maskStage.toDataURL(offsetBoundingBox);
+
+  const maskImageData = maskStage
+    .toCanvas()
+    .getContext('2d')
+    ?.getImageData(
+      offsetBoundingBox.x,
+      offsetBoundingBox.y,
+      offsetBoundingBox.width,
+      offsetBoundingBox.height
+    );
+
+  offscreenContainer.remove();
+
+  if (!maskImageData) {
+    moduleLog.error('Unable to get mask stage context');
+    return;
+  }
+
+  const baseDataURL = canvasBaseLayer.toDataURL(offsetBoundingBox);
 
   const ctx = canvasBaseLayer.getContext();
 
   const baseImageData = ctx.getImageData(
-    boundingBox.x + absPos.x,
-    boundingBox.y + absPos.y,
-    boundingBox.width,
-    boundingBox.height
+    offsetBoundingBox.x,
+    offsetBoundingBox.y,
+    offsetBoundingBox.width,
+    offsetBoundingBox.height
   );
 
   const {
@@ -86,6 +105,7 @@ export const getCanvasDataURLs = (state: RootState) => {
     isFullyTransparent: baseIsFullyTransparent,
   } = getImageDataTransparency(baseImageData);
 
+  // const doesMaskHaveBlackPixels = false;
   const doesMaskHaveBlackPixels = areAnyPixelsBlack(maskImageData);
 
   if (state.system.enableImageDebugging) {

@@ -34,6 +34,7 @@ import ParametersSlide from '../../common/ParametersSlide';
 import UnifiedCanvasParameters from './UnifiedCanvasParameters';
 import UnifiedCanvasContentBeta from './UnifiedCanvasBeta/UnifiedCanvasContentBeta';
 import UnifiedCanvasContent from './UnifiedCanvasContent';
+import { useGetCanvasNodeType } from 'features/canvas/hooks/useGetCanvasNodeType';
 
 const CanvasWorkspace = () => {
   const shouldPinParametersPanel = useAppSelector(
