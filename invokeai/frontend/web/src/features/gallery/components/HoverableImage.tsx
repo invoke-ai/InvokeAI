@@ -5,6 +5,7 @@ import {
   Image,
   MenuItem,
   MenuList,
+  Skeleton,
   useDisclosure,
   useTheme,
   useToast,
@@ -12,7 +13,7 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { DragEvent, memo, useCallback, useState } from 'react';
-import { FaCheck, FaExpand, FaShare, FaTrash } from 'react-icons/fa';
+import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import * as InvokeAI from 'app/types/invokeai';
@@ -268,58 +269,48 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             userSelect="none"
             draggable={true}
             onDragStart={handleDragStart}
+            onClick={handleSelectImage}
             ref={ref}
             sx={{
-              padding: 2,
               display: 'flex',
               justifyContent: 'center',
+              alignItems: 'center',
+              w: 'full',
+              h: 'full',
               transition: 'transform 0.2s ease-out',
-              _hover: {
-                cursor: 'pointer',
-
-                zIndex: 2,
-              },
-              _before: {
-                content: '""',
-                display: 'block',
-                paddingBottom: '100%',
-              },
+              aspectRatio: '1/1',
             }}
           >
             <Image
+              loading="lazy"
               objectFit={
                 shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
               }
               rounded="md"
               src={getUrl(thumbnail || url)}
-              loading="lazy"
+              fallback={<FaImage />}
               sx={{
-                position: 'absolute',
                 width: '100%',
                 height: '100%',
                 maxWidth: '100%',
                 maxHeight: '100%',
-                top: '50%',
-                transform: 'translate(-50%,-50%)',
-                ...(direction === 'rtl'
-                  ? { insetInlineEnd: '50%' }
-                  : { insetInlineStart: '50%' }),
               }}
             />
-            <Flex
-              onClick={handleSelectImage}
-              sx={{
-                position: 'absolute',
-                top: '0',
-                insetInlineStart: '0',
-                width: '100%',
-                height: '100%',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {isSelected && (
+            {isSelected && (
+              <Flex
+                sx={{
+                  position: 'absolute',
+                  top: '0',
+                  insetInlineStart: '0',
+                  width: '100%',
+                  height: '100%',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
                 <Icon
+                  filter={'drop-shadow(0px 0px 1rem black)'}
                   as={FaCheck}
                   sx={{
                     width: '50%',
@@ -327,9 +318,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                     fill: 'ok.500',
                   }}
                 />
-              )}
-            </Flex>
-            {isHovered && galleryImageMinimumWidth >= 64 && (
+              </Flex>
+            )}
+            {isHovered && galleryImageMinimumWidth >= 100 && (
               <Box
                 sx={{
                   position: 'absolute',

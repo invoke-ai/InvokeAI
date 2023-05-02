@@ -89,13 +89,6 @@ const ProgressImagePreview = () => {
           onResizeStop={(e, direction, ref, delta, position) => {
             const newRect: Partial<Rect> = {};
 
-            console.log(
-              ref.style.width,
-              ref.style.height,
-              position.x,
-              position.y
-            );
-
             if (ref.style.width) {
               newRect.width = ref.style.width;
             }

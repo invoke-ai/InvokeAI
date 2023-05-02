@@ -1,5 +1,13 @@
-import { ButtonGroup, Flex, Grid, Icon, Image, Text } from '@chakra-ui/react';
-// import { requestImages } from 'app/socketio/actions';
+import {
+  Box,
+  ButtonGroup,
+  Flex,
+  FlexProps,
+  Grid,
+  Icon,
+  Text,
+  forwardRef,
+} from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAICheckbox from 'common/components/IAICheckbox';
@@ -15,28 +23,33 @@ import {
   setShouldUseSingleGalleryColumn,
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
+import { useOverlayScrollbars } from 'overlayscrollbars-react';
 
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  PropsWithChildren,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
-import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import {
-  resultsAdapter,
-  selectResultsAll,
-  selectResultsTotal,
-} from '../store/resultsSlice';
+import { resultsAdapter } from '../store/resultsSlice';
 import {
   receivedResultImagesPage,
   receivedUploadImagesPage,
 } from 'services/thunks/gallery';
-import { selectUploadsAll, uploadsAdapter } from '../store/uploadsSlice';
+import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 
@@ -68,16 +81,28 @@ const ImageGalleryContent = () => {
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
+  const rootRef = useRef(null);
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  const [initialize, osInstance] = useOverlayScrollbars({
+    defer: true,
+    options: {
+      scrollbars: {
+        visibility: 'auto',
+        autoHide: 'leave',
+        autoHideDelay: 1300,
+        theme: 'os-theme-dark',
+      },
+      overflow: { x: 'hidden' },
+    },
+  });
 
   const {
     // images,
     currentCategory,
     shouldPinGallery,
     galleryImageMinimumWidth,
-    galleryGridTemplateColumns,
     galleryImageObjectFit,
     shouldAutoSwitchToNewImages,
-    // areMoreImagesAvailable,
     shouldUseSingleGalleryColumn,
     selectedImage,
   } = useAppSelector(imageGallerySelector);
@@ -85,9 +110,6 @@ const ImageGalleryContent = () => {
   const { images, areMoreImagesAvailable, isLoading } =
     useAppSelector(gallerySelector);
 
-  // const handleClickLoadMore = () => {
-  //   dispatch(requestImages(currentCategory));
-  // };
   const handleClickLoadMore = () => {
     if (currentCategory === 'results') {
       dispatch(receivedResultImagesPage());
@@ -127,6 +149,25 @@ const ImageGalleryContent = () => {
     });
     resizeObserver.observe(resizeObserverRef.current);
     return () => resizeObserver.disconnect(); // clean up
+  }, []);
+
+  useEffect(() => {
+    const { current: root } = rootRef;
+    if (scroller && root) {
+      initialize({
+        target: root,
+        elements: {
+          viewport: scroller,
+        },
+      });
+    }
+    return () => osInstance()?.destroy();
+  }, [scroller, initialize, osInstance]);
+
+  const setScrollerRef = useCallback((ref: HTMLElement | Window | null) => {
+    if (ref instanceof HTMLElement) {
+      setScroller(ref);
+    }
   }, []);
 
   return (
@@ -241,65 +282,119 @@ const ImageGalleryContent = () => {
           />
         </Flex>
       </Flex>
-      <Scrollable>
-        <Flex direction="column" gap={2} h="full">
-          {images.length || areMoreImagesAvailable ? (
-            <>
-              <Grid
-                gap={2}
-                style={{ gridTemplateColumns: galleryGridTemplateColumns }}
-              >
-                {images.map((image) => {
-                  const { name } = image;
-                  const isSelected = selectedImage?.name === name;
-                  return (
-                    <HoverableImage
-                      key={`${name}-${image.thumbnail}`}
-                      image={image}
-                      isSelected={isSelected}
-                    />
-                  );
-                })}
-              </Grid>
-              <IAIButton
-                onClick={handleClickLoadMore}
-                isDisabled={!areMoreImagesAvailable}
-                isLoading={isLoading}
-                flexShrink={0}
-              >
-                {areMoreImagesAvailable
-                  ? t('gallery.loadMore')
-                  : t('gallery.allImagesLoaded')}
-              </IAIButton>
-            </>
-          ) : (
-            <Flex
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 2,
-                padding: 8,
-                h: '100%',
-                w: '100%',
-                color: 'base.500',
-              }}
+      <Flex direction="column" gap={2} h="full">
+        {images.length || areMoreImagesAvailable ? (
+          <>
+            <Box ref={rootRef} data-overlayscrollbars="" h="100%">
+              {shouldUseSingleGalleryColumn ? (
+                <Virtuoso
+                  style={{ height: '100%' }}
+                  data={images}
+                  scrollerRef={(ref) => setScrollerRef(ref)}
+                  itemContent={(index, image) => {
+                    const { name } = image;
+                    const isSelected = selectedImage?.name === name;
+
+                    return (
+                      <Flex sx={{ pb: 2 }}>
+                        <HoverableImage
+                          key={`${name}-${image.thumbnail}`}
+                          image={image}
+                          isSelected={isSelected}
+                        />
+                      </Flex>
+                    );
+                  }}
+                />
+              ) : (
+                <VirtuosoGrid
+                  style={{ height: '100%' }}
+                  data={images}
+                  components={{
+                    Item: ItemContainer,
+                    List: ListContainer,
+                  }}
+                  scrollerRef={setScroller}
+                  itemContent={(index, image) => {
+                    const { name } = image;
+                    const isSelected = selectedImage?.name === name;
+
+                    return (
+                      <HoverableImage
+                        key={`${name}-${image.thumbnail}`}
+                        image={image}
+                        isSelected={isSelected}
+                      />
+                    );
+                  }}
+                />
+              )}
+            </Box>
+            <IAIButton
+              onClick={handleClickLoadMore}
+              isDisabled={!areMoreImagesAvailable}
+              isLoading={isLoading}
+              flexShrink={0}
             >
-              <Icon
-                as={MdPhotoLibrary}
-                sx={{
-                  w: 16,
-                  h: 16,
-                }}
-              />
-              <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
-            </Flex>
-          )}
-        </Flex>
-      </Scrollable>
+              {areMoreImagesAvailable
+                ? t('gallery.loadMore')
+                : t('gallery.allImagesLoaded')}
+            </IAIButton>
+          </>
+        ) : (
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              padding: 8,
+              h: '100%',
+              w: '100%',
+              color: 'base.500',
+            }}
+          >
+            <Icon
+              as={MdPhotoLibrary}
+              sx={{
+                w: 16,
+                h: 16,
+              }}
+            />
+            <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
+          </Flex>
+        )}
+      </Flex>
     </Flex>
   );
 };
 
-ImageGalleryContent.displayName = 'ImageGalleryContent';
-export default ImageGalleryContent;
+type ItemContainerProps = PropsWithChildren & FlexProps;
+const ItemContainer = forwardRef((props: ItemContainerProps, ref) => (
+  <Box className="item-container" ref={ref}>
+    {props.children}
+  </Box>
+));
+
+type ListContainerProps = PropsWithChildren & FlexProps;
+const ListContainer = forwardRef((props: ListContainerProps, ref) => {
+  const galleryImageMinimumWidth = useAppSelector(
+    (state: RootState) => state.gallery.galleryImageMinimumWidth
+  );
+
+  return (
+    <Grid
+      {...props}
+      className="list-container"
+      ref={ref}
+      sx={{
+        gap: 2,
+        gridTemplateColumns: `repeat(auto-fit, minmax(${galleryImageMinimumWidth}px, 1fr));`,
+      }}
+    >
+      {props.children}
+    </Grid>
+  );
+});
+
+export default memo(ImageGalleryContent);
