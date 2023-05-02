@@ -16,6 +16,8 @@ export const $Graph = {
         }, {
           type: 'ShowImageInvocation',
         }, {
+          type: 'DataURLToImageInvocation',
+        }, {
           type: 'CropImageInvocation',
         }, {
           type: 'PasteImageInvocation',
