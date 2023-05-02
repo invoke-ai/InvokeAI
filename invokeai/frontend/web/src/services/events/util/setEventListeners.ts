@@ -46,11 +46,11 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     const { disabledTabs } = config;
 
     // These thunks need to be dispatch in middleware; cannot handle in a reducer
-    if (!results.ids.length) {
+    if (!results.ids.length || config.shouldFetchImages) {
       dispatch(receivedResultImagesPage());
     }
 
-    if (!uploads.ids.length) {
+    if (!uploads.ids.length || config.shouldFetchImages) {
       dispatch(receivedUploadImagesPage());
     }
 
