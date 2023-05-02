@@ -1,5 +1,6 @@
 import { CanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import Konva from 'konva';
+import { Stage } from 'konva/lib/Stage';
 import { IRect } from 'konva/lib/types';
 
 /**
@@ -12,10 +13,50 @@ import { IRect } from 'konva/lib/types';
  * drawing the mask and compositing everything correctly to output a valid
  * mask image.
  */
-const generateMask = (
+export const getStageDataURL = (stage: Stage, boundingBox: IRect): string => {
+  // create an offscreen canvas and add the mask to it
+  // const { stage, offscreenContainer } = buildMaskStage(lines, boundingBox);
+
+  const dataURL = stage.toDataURL({ ...boundingBox });
+
+  // const imageData = stage
+  //   .toCanvas()
+  //   .getContext('2d')
+  //   ?.getImageData(
+  //     boundingBox.x,
+  //     boundingBox.y,
+  //     boundingBox.width,
+  //     boundingBox.height
+  //   );
+
+  // offscreenContainer.remove();
+
+  // return { dataURL, imageData };
+
+  return dataURL;
+};
+
+export const getStageImageData = (
+  stage: Stage,
+  boundingBox: IRect
+): ImageData | undefined => {
+  const imageData = stage
+    .toCanvas()
+    .getContext('2d')
+    ?.getImageData(
+      boundingBox.x,
+      boundingBox.y,
+      boundingBox.width,
+      boundingBox.height
+    );
+
+  return imageData;
+};
+
+export const buildMaskStage = (
   lines: CanvasMaskLine[],
   boundingBox: IRect
-): { dataURL: string; imageData: ImageData } => {
+): { stage: Stage; offscreenContainer: HTMLDivElement } => {
   // create an offscreen canvas and add the mask to it
   const { width, height } = boundingBox;
 
@@ -57,20 +98,5 @@ const generateMask = (
   stage.add(baseLayer);
   stage.add(maskLayer);
 
-  const dataURL = stage.toDataURL({ ...boundingBox });
-  const imageData = stage
-    .toCanvas()
-    .getContext('2d')
-    ?.getImageData(
-      boundingBox.x,
-      boundingBox.y,
-      boundingBox.width,
-      boundingBox.height
-    );
-
-  offscreenContainer.remove();
-
-  return { dataURL, imageData };
+  return { stage, offscreenContainer };
 };
-
-export default generateMask;
