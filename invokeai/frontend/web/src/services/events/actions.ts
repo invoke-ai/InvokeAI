@@ -1,4 +1,4 @@
-import { createAction } from '@reduxjs/toolkit';
+import { AnyAction, createAction } from '@reduxjs/toolkit';
 import {
   GeneratorProgressEvent,
   GraphExecutionStateCompleteEvent,

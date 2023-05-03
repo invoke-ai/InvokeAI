@@ -4,9 +4,11 @@ import { isFinite, isString } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from './usePrompt';
-import { initialImageSelected, setSeed } from '../store/generationSlice';
+import { initialImageChanged, setSeed } from '../store/generationSlice';
 import { isImage, isImageField } from 'services/types/guards';
 import { NUMPY_RAND_MAX } from 'app/constants';
+import { initialImageSelected } from '../store/actions';
+import { Image } from 'app/types/invokeai';
 
 export const useParameters = () => {
   const dispatch = useAppDispatch();
@@ -86,7 +88,7 @@ export const useParameters = () => {
       }
 
       dispatch(
-        initialImageSelected({ name: image.image_name, type: image.image_type })
+        initialImageChanged({ name: image.image_name, type: image.image_type })
       );
       toast({
         title: t('toast.initialImageSet'),
@@ -102,27 +104,10 @@ export const useParameters = () => {
    * Sets image as initial image with toast
    */
   const sendToImageToImage = useCallback(
-    (image: unknown) => {
-      if (!isImage(image)) {
-        toast({
-          title: t('toast.imageNotLoaded'),
-          description: t('toast.imageNotLoadedDesc'),
-          status: 'warning',
-          duration: 2500,
-          isClosable: true,
-        });
-        return;
-      }
-
+    (image: Image) => {
       dispatch(initialImageSelected({ name: image.name, type: image.type }));
-      toast({
-        title: t('toast.sentToImageToImage'),
-        status: 'info',
-        duration: 2500,
-        isClosable: true,
-      });
     },
-    [t, toast, dispatch]
+    [dispatch]
   );
 
   return { recallPrompt, recallSeed, recallInitialImage, sendToImageToImage };

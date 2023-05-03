@@ -22,7 +22,7 @@ import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
 import {
-  initialImageSelected,
+  initialImageChanged,
   setAllParameters,
   // setInitialImage,
   setSeed,
@@ -68,6 +68,7 @@ import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { imageDeleted } from 'services/thunks/image';
 import { useParameters } from 'features/parameters/hooks/useParameters';
+import { initialImageSelected } from 'features/parameters/store/actions';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -264,8 +265,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('p', handleUsePrompt, [image]);
 
   const handleSendToImageToImage = useCallback(() => {
-    sendToImageToImage(image);
-  }, [image, sendToImageToImage]);
+    dispatch(initialImageSelected(image));
+  }, [dispatch, image]);
 
   useHotkeys('shift+i', handleSendToImageToImage, [image]);
 

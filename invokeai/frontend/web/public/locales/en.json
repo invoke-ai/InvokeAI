@@ -550,7 +550,7 @@
         "imageCopied": "Image Copied",
         "imageLinkCopied": "Image Link Copied",
         "imageNotLoaded": "No Image Loaded",
-        "imageNotLoadedDesc": "No image found to send to image to image module",
+        "imageNotLoadedDesc": "Could not find image",
         "imageSavedToGallery": "Image Saved to Gallery",
         "canvasMerged": "Canvas Merged",
         "sentToImageToImage": "Sent To Image To Image",

@@ -1,7 +1,7 @@
 import { Box, BoxProps, Grid, GridItem } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { initialImageSelected } from 'features/parameters/store/generationSlice';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import {
   activeTabNameSelector,
   uiSelector,

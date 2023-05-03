@@ -1,4 +1,9 @@
-import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import {
+  AnyAction,
+  ThunkDispatch,
+  combineReducers,
+  configureStore,
+} from '@reduxjs/toolkit';
 
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
@@ -30,6 +35,7 @@ import { systemDenylist } from 'features/system/store/systemPersistDenylist';
 import { uiDenylist } from 'features/ui/store/uiPersistDenylist';
 import { resultsDenylist } from 'features/gallery/store/resultsPersistDenylist';
 import { uploadsDenylist } from 'features/gallery/store/uploadsPersistDenylist';
+import { listenerMiddleware } from './middleware/listenerMiddleware';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -101,7 +107,9 @@ export const store = configureStore({
     getDefaultMiddleware({
       immutableCheck: false,
       serializableCheck: false,
-    }).concat(dynamicMiddlewares),
+    })
+      .concat(dynamicMiddlewares)
+      .prepend(listenerMiddleware.middleware),
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [
@@ -120,4 +128,5 @@ export const store = configureStore({
 
 export type AppGetState = typeof store.getState;
 export type RootState = ReturnType<typeof store.getState>;
+export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
