@@ -162,4 +162,5 @@ export interface CanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
+  pendingBoundingBox?: IRect;
 }

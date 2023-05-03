@@ -1,11 +1,9 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { SessionsService } from 'services/api';
-import {
-  buildCanvasGraph,
-  buildLinearGraph as buildGenerateGraph,
-} from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
+import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/buildLinearGraph';
+import { buildCanvasGraph } from 'features/nodes/util/buildCanvasGraph';
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
-import { buildNodesGraph } from 'features/nodes/util/nodesGraphBuilder/buildNodesGraph';
+import { buildNodesGraph } from 'features/nodes/util/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
 import { serializeError } from 'serialize-error';
 
