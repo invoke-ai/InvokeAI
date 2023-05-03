@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { Panel } from 'reactflow';
 import FieldTypeLegend from '../FieldTypeLegend';

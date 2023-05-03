@@ -1,5 +1,5 @@
-import type { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import type { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setUpscalingStrength } from 'features/parameters/store/postprocessingSlice';
 import { useTranslation } from 'react-i18next';

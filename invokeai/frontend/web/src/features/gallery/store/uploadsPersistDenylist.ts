@@ -5,7 +5,7 @@ import { UploadsState } from './uploadsSlice';
  *
  * Currently denylisting uploads slice entirely, see persist config in store.ts
  */
-const itemsToDenylist: (keyof UploadsState)[] = [];
+const itemsToDenylist: (keyof UploadsState)[] = ['isLoading'];
 
 export const uploadsDenylist = itemsToDenylist.map(
   (denylistItem) => `uploads.${denylistItem}`

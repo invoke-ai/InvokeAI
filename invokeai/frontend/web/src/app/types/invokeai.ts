@@ -12,10 +12,11 @@
  * 'gfpgan'.
  */
 
+import { GalleryCategory } from 'features/gallery/store/gallerySlice';
 import { FacetoolType } from 'features/parameters/store/postprocessingSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
-import { ImageMetadata, ImageType } from 'services/api';
+import { ImageResponseMetadata, ImageType } from 'services/api';
 import { AnyInvocation } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
@@ -28,24 +29,24 @@ import { O } from 'ts-toolbelt';
  * TODO: Better documentation of types.
  */
 
-export declare type PromptItem = {
+export type PromptItem = {
   prompt: string;
   weight: number;
 };
 
 // TECHDEBT: We need to retain compatibility with plain prompt strings and the structure Prompt type
-export declare type Prompt = Array<PromptItem> | string;
+export type Prompt = Array<PromptItem> | string;
 
-export declare type SeedWeightPair = {
+export type SeedWeightPair = {
   seed: number;
   weight: number;
 };
 
-export declare type SeedWeights = Array<SeedWeightPair>;
+export type SeedWeights = Array<SeedWeightPair>;
 
 // All generated images contain these metadata.
-export declare type CommonGeneratedImageMetadata = {
-  postprocessing: null | Array<ESRGANMetadata | GFPGANMetadata>;
+export type CommonGeneratedImageMetadata = {
+  postprocessing: null | Array<ESRGANMetadata | FacetoolMetadata>;
   sampler:
     | 'ddim'
     | 'k_dpm_2_a'
@@ -70,11 +71,11 @@ export declare type CommonGeneratedImageMetadata = {
 };
 
 // txt2img and img2img images have some unique attributes.
-export declare type Txt2ImgMetadata = GeneratedImageMetadata & {
+export type Txt2ImgMetadata = CommonGeneratedImageMetadata & {
   type: 'txt2img';
 };
 
-export declare type Img2ImgMetadata = GeneratedImageMetadata & {
+export type Img2ImgMetadata = CommonGeneratedImageMetadata & {
   type: 'img2img';
   orig_hash: string;
   strength: number;
@@ -84,102 +85,80 @@ export declare type Img2ImgMetadata = GeneratedImageMetadata & {
 };
 
 // Superset of  generated image metadata types.
-export declare type GeneratedImageMetadata = Txt2ImgMetadata | Img2ImgMetadata;
+export type GeneratedImageMetadata = Txt2ImgMetadata | Img2ImgMetadata;
 
 // All post processed images contain these metadata.
-export declare type CommonPostProcessedImageMetadata = {
+export type CommonPostProcessedImageMetadata = {
   orig_path: string;
   orig_hash: string;
 };
 
 // esrgan and gfpgan images have some unique attributes.
-export declare type ESRGANMetadata = CommonPostProcessedImageMetadata & {
+export type ESRGANMetadata = CommonPostProcessedImageMetadata & {
   type: 'esrgan';
   scale: 2 | 4;
   strength: number;
   denoise_str: number;
 };
 
-export declare type FacetoolMetadata = CommonPostProcessedImageMetadata & {
+export type FacetoolMetadata = CommonPostProcessedImageMetadata & {
   type: 'gfpgan' | 'codeformer';
   strength: number;
   fidelity?: number;
 };
 
 // Superset of all postprocessed image metadata types..
-export declare type PostProcessedImageMetadata =
-  | ESRGANMetadata
-  | FacetoolMetadata;
+export type PostProcessedImageMetadata = ESRGANMetadata | FacetoolMetadata;
 
 // Metadata includes the system config and image metadata.
-export declare type Metadata = SystemGenerationMetadata & {
-  image: GeneratedImageMetadata | PostProcessedImageMetadata;
-};
-
-// An Image has a UUID, url, modified timestamp, width, height and maybe metadata
-export declare type _Image = {
-  uuid: string;
-  url: string;
-  thumbnail: string;
-  mtime: number;
-  metadata?: Metadata;
-  width: number;
-  height: number;
-  category: GalleryCategory;
-  isBase64?: boolean;
-  dreamPrompt?: 'string';
-  name?: string;
-};
+// export type Metadata = SystemGenerationMetadata & {
+//   image: GeneratedImageMetadata | PostProcessedImageMetadata;
+// };
 
 /**
  * ResultImage
  */
-export declare type Image = {
+export type Image = {
   name: string;
   type: ImageType;
   url: string;
   thumbnail: string;
-  metadata: ImageMetadata;
-};
-
-// GalleryImages is an array of Image.
-export declare type GalleryImages = {
-  images: Array<_Image>;
+  metadata: ImageResponseMetadata;
 };
 
 /**
  * Types related to the system status.
  */
 
-// This represents the processing status of the backend.
-export declare type SystemStatus = {
-  isProcessing: boolean;
-  currentStep: number;
-  totalSteps: number;
-  currentIteration: number;
-  totalIterations: number;
-  currentStatus: string;
-  currentStatusHasSteps: boolean;
-  hasError: boolean;
-};
+// // This represents the processing status of the backend.
+// export type SystemStatus = {
+//   isProcessing: boolean;
+//   currentStep: number;
+//   totalSteps: number;
+//   currentIteration: number;
+//   totalIterations: number;
+//   currentStatus: string;
+//   currentStatusHasSteps: boolean;
+//   hasError: boolean;
+// };
 
-export declare type SystemGenerationMetadata = {
-  model: string;
-  model_weights?: string;
-  model_id?: string;
-  model_hash: string;
-  app_id: string;
-  app_version: string;
-};
+// export type SystemGenerationMetadata = {
+//   model: string;
+//   model_weights?: string;
+//   model_id?: string;
+//   model_hash: string;
+//   app_id: string;
+//   app_version: string;
+// };
 
-export declare type SystemConfig = SystemGenerationMetadata & {
-  model_list: ModelList;
-  infill_methods: string[];
-};
+// export type SystemConfig = SystemGenerationMetadata & {
+//   model_list: ModelList;
+//   infill_methods: string[];
+// };
 
-export declare type ModelStatus = 'active' | 'cached' | 'not loaded';
+export type ModelStatus = 'active' | 'cached' | 'not loaded';
 
-export declare type Model = {
+export type Model = {
   status: ModelStatus;
   description: string;
   weights: string;
@@ -191,7 +170,7 @@ export declare type Model = {
   format?: string;
 };
 
-export declare type DiffusersModel = {
+export type DiffusersModel = {
   status: ModelStatus;
   description: string;
   repo_id?: string;
@@ -204,14 +183,14 @@ export declare type DiffusersModel = {
   default?: boolean;
 };
 
-export declare type ModelList = Record<string, Model & DiffusersModel>;
+export type ModelList = Record<string, Model & DiffusersModel>;
 
-export declare type FoundModel = {
+export type FoundModel = {
   name: string;
   location: string;
 };
 
-export declare type InvokeModelConfigProps = {
+export type InvokeModelConfigProps = {
   name: string | undefined;
   description: string | undefined;
   config: string | undefined;
@@ -223,7 +202,7 @@ export declare type InvokeModelConfigProps = {
   format: string | undefined;
 };
 
-export declare type InvokeDiffusersModelConfigProps = {
+export type InvokeDiffusersModelConfigProps = {
   name: string | undefined;
   description: string | undefined;
   repo_id: string | undefined;
@@ -236,13 +215,13 @@ export declare type InvokeDiffusersModelConfigProps = {
   };
 };
 
-export declare type InvokeModelConversionProps = {
+export type InvokeModelConversionProps = {
   model_name: string;
   save_location: string;
   custom_location: string | null;
 };
 
-export declare type InvokeModelMergingProps = {
+export type InvokeModelMergingProps = {
   models_to_merge: string[];
   alpha: number;
   interp: 'weighted_sum' | 'sigmoid' | 'inv_sigmoid' | 'add_difference';
@@ -255,48 +234,48 @@ export declare type InvokeModelMergingProps = {
  * These types type data received from the server via socketio.
  */
 
-export declare type ModelChangeResponse = {
+export type ModelChangeResponse = {
   model_name: string;
   model_list: ModelList;
 };
 
-export declare type ModelConvertedResponse = {
+export type ModelConvertedResponse = {
   converted_model_name: string;
   model_list: ModelList;
 };
 
-export declare type ModelsMergedResponse = {
+export type ModelsMergedResponse = {
   merged_models: string[];
   merged_model_name: string;
   model_list: ModelList;
 };
 
-export declare type ModelAddedResponse = {
+export type ModelAddedResponse = {
   new_model_name: string;
   model_list: ModelList;
   update: boolean;
 };
 
-export declare type ModelDeletedResponse = {
+export type ModelDeletedResponse = {
   deleted_model_name: string;
   model_list: ModelList;
 };
 
-export declare type FoundModelResponse = {
+export type FoundModelResponse = {
   search_folder: string;
   found_models: FoundModel[];
 };
 
-export declare type SystemStatusResponse = SystemStatus;
+// export type SystemStatusResponse = SystemStatus;
 
-export declare type SystemConfigResponse = SystemConfig;
+// export type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = Omit<_Image, 'uuid'> & {
+export type ImageResultResponse = Omit<_Image, 'uuid'> & {
   boundingBox?: IRect;
   generationMode: InvokeTabName;
 };
 
-export declare type ImageUploadResponse = {
+export type ImageUploadResponse = {
   // image: Omit<Image, 'uuid' | 'metadata' | 'category'>;
   url: string;
   mtime: number;
@@ -306,33 +285,16 @@ export declare type ImageUploadResponse = {
   // bbox: [number, number, number, number];
 };
 
-export declare type ErrorResponse = {
+export type ErrorResponse = {
   message: string;
   additionalData?: string;
 };
 
-export declare type GalleryImagesResponse = {
-  images: Array<Omit<_Image, 'uuid'>>;
-  areMoreImagesAvailable: boolean;
-  category: GalleryCategory;
-};
-
-export declare type ImageDeletedResponse = {
-  uuid: string;
-  url: string;
-  category: GalleryCategory;
-};
-
-export declare type ImageUrlResponse = {
+export type ImageUrlResponse = {
   url: string;
 };
 
-export declare type UploadImagePayload = {
-  file: File;
-  destination?: ImageUploadDestination;
-};
-
-export declare type UploadOutpaintingMergeImagePayload = {
+export type UploadOutpaintingMergeImagePayload = {
   dataURL: string;
   name: string;
 };
@@ -340,7 +302,7 @@ export declare type UploadOutpaintingMergeImagePayload = {
 /**
  * A disable-able application feature
  */
-export declare type AppFeature =
+export type AppFeature =
   | 'faceRestore'
   | 'upscaling'
   | 'lightbox'
@@ -353,7 +315,7 @@ export declare type AppFeature =
 /**
  * A disable-able Stable Diffusion feature
  */
-export declare type StableDiffusionFeature =
+export type StableDiffusionFeature =
   | 'noiseConfig'
   | 'variations'
   | 'symmetry'
@@ -364,7 +326,7 @@ export declare type StableDiffusionFeature =
  * Configuration options for the InvokeAI UI.
  * Distinct from system settings which may be changed inside the app.
  */
-export declare type AppConfig = {
+export type AppConfig = {
   /**
    * Whether or not URLs should be transformed to use a different host
    */
@@ -428,4 +390,4 @@ export declare type AppConfig = {
   };
 };
 
-export declare type PartialAppConfig = O.Partial<AppConfig, 'deep'>;
+export type PartialAppConfig = O.Partial<AppConfig, 'deep'>;

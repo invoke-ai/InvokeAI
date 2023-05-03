@@ -113,8 +113,8 @@ class NoiseInvocation(BaseInvocation):
 
     # Inputs
     seed:        int = Field(ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", default_factory=random_seed)
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting noise", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
+    width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting noise", )
+    height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting noise", )
 
 
     # Schema customisation

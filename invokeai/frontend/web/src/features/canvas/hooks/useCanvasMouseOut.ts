@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { mouseLeftCanvas } from 'features/canvas/store/canvasSlice';
 import { useCallback } from 'react';
 

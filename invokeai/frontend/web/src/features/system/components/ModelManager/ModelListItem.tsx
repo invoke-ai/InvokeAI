@@ -1,9 +1,9 @@
 import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
 import { Box, Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
-import { ModelStatus } from 'app/invokeai';
-import { deleteModel, requestModelChange } from 'app/socketio/actions';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { ModelStatus } from 'app/types/invokeai';
+// import { deleteModel, requestModelChange } from 'app/socketio/actions';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setOpenModel } from 'features/system/store/systemSlice';

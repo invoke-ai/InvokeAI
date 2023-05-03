@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { Group, Line } from 'react-konva';
 import { isCanvasMaskLine } from '../store/canvasTypes';

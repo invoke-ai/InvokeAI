@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { isEqual } from 'lodash';
+import { RootState } from 'app/store/store';
+import { isEqual } from 'lodash-es';
 
 import { tabMap } from './tabMap';
 import { UIState } from './uiTypes';

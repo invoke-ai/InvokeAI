@@ -11,8 +11,8 @@ import {
 } from '@chakra-ui/react';
 import { cloneElement } from 'react';
 
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 import type { ReactElement } from 'react';

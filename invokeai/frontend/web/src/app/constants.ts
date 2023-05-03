@@ -1,23 +1,6 @@
 // TODO: use Enums?
 
-import { InProgressImageType } from 'features/system/store/systemSlice';
-
-// Valid samplers
-export const SAMPLERS: Array<string> = [
-  'ddim',
-  'plms',
-  'k_lms',
-  'k_dpm_2',
-  'k_dpm_2_a',
-  'k_dpmpp_2',
-  'k_dpmpp_2_a',
-  'k_euler',
-  'k_euler_a',
-  'k_heun',
-];
-
-// Valid Diffusers Samplers
-export const DIFFUSERS_SAMPLERS: Array<string> = [
+export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'ddim',
   'plms',
   'k_lms',
@@ -48,17 +31,8 @@ export const UPSCALING_LEVELS: Array<{ key: string; value: number }> = [
 
 export const NUMPY_RAND_MIN = 0;
 
-export const NUMPY_RAND_MAX = 4294967295;
+export const NUMPY_RAND_MAX = 2147483647;
 
 export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;
-
-export const IN_PROGRESS_IMAGE_TYPES: Array<{
-  key: string;
-  value: InProgressImageType;
-}> = [
-  { key: 'None', value: 'none' },
-  { key: 'Fast', value: 'latents' },
-  { key: 'Accurate', value: 'full-res' },
-];
 
 export const NODE_MIN_WIDTH = 250;

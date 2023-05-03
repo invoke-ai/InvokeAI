@@ -1,6 +1,6 @@
 import { Box, useToast } from '@chakra-ui/react';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { ResourceKey } from 'i18next';

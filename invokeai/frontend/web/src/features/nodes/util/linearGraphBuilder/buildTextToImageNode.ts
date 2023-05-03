@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { TextToImageInvocation } from 'services/api';
 
 export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {

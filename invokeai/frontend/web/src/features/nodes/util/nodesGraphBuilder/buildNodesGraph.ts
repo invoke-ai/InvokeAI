@@ -1,7 +1,7 @@
 import { Graph } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
-import { reduce } from 'lodash';
-import { RootState } from 'app/store';
+import { reduce } from 'lodash-es';
+import { RootState } from 'app/store/store';
 import { AnyInvocation } from 'services/events/types';
 
 /**

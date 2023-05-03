@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIPopover from 'common/components/IAIPopover';
 import {
@@ -8,7 +8,7 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import { setBrushColor, setMaskColor } from 'features/canvas/store/canvasSlice';
-import { clamp, isEqual } from 'lodash';
+import { clamp, isEqual } from 'lodash-es';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 

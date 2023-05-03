@@ -1,11 +1,11 @@
 import { Accordion } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { Feature } from 'app/features';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { tabMap } from 'features/ui/store/tabMap';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { openAccordionItemsChanged } from 'features/ui/store/uiSlice';
-import { map } from 'lodash';
+import { map } from 'lodash-es';
 import { ReactNode, useCallback } from 'react';
 import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 

@@ -13,16 +13,16 @@ import {
   Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
-import { mergeDiffusersModels } from 'app/socketio/actions';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+// import { mergeDiffusersModels } from 'app/socketio/actions';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAISelect from 'common/components/IAISelect';
 import { diffusersModelsSelector } from 'features/system/store/systemSelectors';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import IAISlider from 'common/components/IAISlider';
 import IAICheckbox from 'common/components/IAICheckbox';
 

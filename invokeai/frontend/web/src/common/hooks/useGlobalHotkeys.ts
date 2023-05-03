@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
 const globalHotkeysSelector = createSelector(
