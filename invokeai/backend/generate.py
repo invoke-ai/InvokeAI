@@ -27,6 +27,7 @@ from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
 from pathlib import Path
 
+import invokeai.backend.util.logging as logger
 from .args import metadata_from_png
 from .generator import infill_methods
 from .globals import Globals, global_cache_dir
@@ -195,12 +196,12 @@ class Generate:
         # device to Generate(). However the device was then ignored, so
         # it wasn't actually doing anything. This logic could be reinstated.
         self.device = torch.device(choose_torch_device())
-        print(f">> Using device_type {self.device.type}")
+        logger.info(f"Using device_type {self.device.type}")
         if full_precision:
             if self.precision != "auto":
                 raise ValueError("Remove --full_precision / -F if using --precision")
-            print("Please remove deprecated --full_precision / -F")
-            print("If auto config does not work you can use --precision=float32")
+            logger.warning("Please remove deprecated --full_precision / -F")
+            logger.warning("If auto config does not work you can use --precision=float32")
             self.precision = "float32"
         if self.precision == "auto":
             self.precision = choose_precision(self.device)
@@ -208,13 +209,13 @@ class Generate:
 
         if is_xformers_available():
             if torch.cuda.is_available() and not Globals.disable_xformers:
-                print(">> xformers memory-efficient attention is available and enabled")
+                logger.info("xformers memory-efficient attention is available and enabled")
             else:
-                print(
-                    ">> xformers memory-efficient attention is available but disabled"
+                logger.info(
+                    "xformers memory-efficient attention is available but disabled"
                 )
         else:
-            print(">> xformers not installed")
+            logger.info("xformers not installed")
 
         # model caching system for fast switching
         self.model_manager = ModelManager(
@@ -229,8 +230,8 @@ class Generate:
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         model = model or fallback
         if not self.model_manager.valid_model(model):
-            print(
-                f'** "{model}" is not a known model name; falling back to {fallback}.'
+            logger.warning(
+                f'"{model}" is not a known model name; falling back to {fallback}.'
             )
             model = None
         self.model_name = model or fallback
@@ -246,10 +247,10 @@ class Generate:
 
         # load safety checker if requested
         if safety_checker:
-            print(">> Initializing NSFW checker")
+            logger.info("Initializing NSFW checker")
             self.safety_checker = SafetyChecker(self.device)
         else:
-            print(">> NSFW checker is disabled")
+            logger.info("NSFW checker is disabled")
 
     def prompt2png(self, prompt, outdir, **kwargs):
         """
@@ -567,7 +568,7 @@ class Generate:
             self.clear_cuda_cache()
 
             if catch_interrupts:
-                print("**Interrupted** Partial results will be returned.")
+                logger.warning("Interrupted** Partial results will be returned.")
             else:
                 raise KeyboardInterrupt
         except RuntimeError:
@@ -575,11 +576,11 @@ class Generate:
             self.clear_cuda_cache()
 
             print(traceback.format_exc(), file=sys.stderr)
-            print(">> Could not generate image.")
+            logger.info("Could not generate image.")
 
         toc = time.time()
-        print("\n>> Usage stats:")
-        print(f">>   {len(results)} image(s) generated in", "%4.2fs" % (toc - tic))
+        logger.info("Usage stats:")
+        logger.info(f"{len(results)} image(s) generated in "+"%4.2fs" % (toc - tic))
         self.print_cuda_stats()
         return results
 
@@ -609,16 +610,16 @@ class Generate:
     def print_cuda_stats(self):
         if self._has_cuda():
             self.gather_cuda_stats()
-            print(
-                ">>   Max VRAM used for this generation:",
-                "%4.2fG." % (self.max_memory_allocated / 1e9),
-                "Current VRAM utilization:",
-                "%4.2fG" % (self.memory_allocated / 1e9),
+            logger.info(
+                "Max VRAM used for this generation: "+
+                "%4.2fG. " % (self.max_memory_allocated / 1e9)+
+                "Current VRAM utilization: "+
+                "%4.2fG" % (self.memory_allocated / 1e9)
             )
 
-            print(
-                ">>   Max VRAM used since script start: ",
-                "%4.2fG" % (self.session_peakmem / 1e9),
+            logger.info(
+                "Max VRAM used since script start: " +
+                "%4.2fG" % (self.session_peakmem / 1e9)
             )
 
     # this needs to be generalized to all sorts of postprocessors, which should be wrapped
@@ -647,7 +648,7 @@ class Generate:
             seed = random.randrange(0, np.iinfo(np.uint32).max)
 
         prompt = opt.prompt or args.prompt or ""
-        print(f'>> using seed {seed} and prompt "{prompt}" for {image_path}')
+        logger.info(f'using seed {seed} and prompt "{prompt}" for {image_path}')
 
         # try to reuse the same filename prefix as the original file.
         # we take everything up to the first period
@@ -696,8 +697,8 @@ class Generate:
                 try:
                     extend_instructions[direction] = int(pixels)
                 except ValueError:
-                    print(
-                        '** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"'
+                    logger.warning(
+                        'invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"'
                     )
 
             opt.seed = seed
@@ -720,8 +721,8 @@ class Generate:
             # fetch the metadata from the image
             generator = self.select_generator(embiggen=True)
             opt.strength = opt.embiggen_strength or 0.40
-            print(
-                f">> Setting img2img strength to {opt.strength} for happy embiggening"
+            logger.info(
+                f"Setting img2img strength to {opt.strength} for happy embiggening"
             )
             generator.generate(
                 prompt,
@@ -748,12 +749,12 @@ class Generate:
             return restorer.process(opt, args, image_callback=callback, prefix=prefix)
 
         elif tool is None:
-            print(
-                "* please provide at least one postprocessing option, such as -G or -U"
+            logger.warning(
+                "please provide at least one postprocessing option, such as -G or -U"
             )
             return None
         else:
-            print(f"* postprocessing tool {tool} is not yet supported")
+            logger.warning(f"postprocessing tool {tool} is not yet supported")
             return None
 
     def select_generator(
@@ -797,8 +798,8 @@ class Generate:
         image = self._load_img(img)
 
         if image.width < self.width and image.height < self.height:
-            print(
-                f">> WARNING: img2img and inpainting may produce unexpected results with initial images smaller than {self.width}x{self.height} in both dimensions"
+            logger.warning(
+                f"img2img and inpainting may produce unexpected results with initial images smaller than {self.width}x{self.height} in both dimensions"
             )
 
         # if image has a transparent area and no mask was provided, then try to generate mask
@@ -809,8 +810,8 @@ class Generate:
         if (image.width * image.height) > (
             self.width * self.height
         ) and self.size_matters:
-            print(
-                ">> This input is larger than your defaults. If you run out of memory, please use a smaller image."
+            logger.info(
+                "This input is larger than your defaults. If you run out of memory, please use a smaller image."
             )
             self.size_matters = False
 
@@ -891,11 +892,11 @@ class Generate:
         try:
             model_data = cache.get_model(model_name)
         except Exception as e:
-            print(f"** model {model_name} could not be loaded: {str(e)}")
+            logger.warning(f"model {model_name} could not be loaded: {str(e)}")
             print(traceback.format_exc(), file=sys.stderr)
             if previous_model_name is None:
                 raise e
-            print("** trying to reload previous model")
+            logger.warning("trying to reload previous model")
             model_data = cache.get_model(previous_model_name)  # load previous
             if model_data is None:
                 raise e
@@ -962,15 +963,15 @@ class Generate:
                     if self.gfpgan is not None or self.codeformer is not None:
                         if facetool == "gfpgan":
                             if self.gfpgan is None:
-                                print(
-                                    ">> GFPGAN not found. Face restoration is disabled."
+                                logger.info(
+                                    "GFPGAN not found. Face restoration is disabled."
                                 )
                             else:
                                 image = self.gfpgan.process(image, strength, seed)
                         if facetool == "codeformer":
                             if self.codeformer is None:
-                                print(
-                                    ">> CodeFormer not found. Face restoration is disabled."
+                                logger.info(
+                                    "CodeFormer not found. Face restoration is disabled."
                                 )
                             else:
                                 cf_device = (
@@ -984,7 +985,7 @@ class Generate:
                                     fidelity=codeformer_fidelity,
                                 )
                     else:
-                        print(">> Face Restoration is disabled.")
+                        logger.info("Face Restoration is disabled.")
                 if upscale is not None:
                     if self.esrgan is not None:
                         if len(upscale) < 2:
@@ -997,10 +998,10 @@ class Generate:
                             denoise_str=upscale_denoise_str,
                         )
                     else:
-                        print(">> ESRGAN is disabled. Image not upscaled.")
+                        logger.info("ESRGAN is disabled. Image not upscaled.")
             except Exception as e:
-                print(
-                    f">> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}"
+                logger.info(
+                    f"Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}"
                 )
 
             if image_callback is not None:
@@ -1066,17 +1067,17 @@ class Generate:
         if self.sampler_name in scheduler_map:
             sampler_class = scheduler_map[self.sampler_name]
             msg = (
-                f">> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})"
+                f"Setting Sampler to {self.sampler_name} ({sampler_class.__name__})"
             )
             self.sampler = sampler_class.from_config(self.model.scheduler.config)
         else:
             msg = (
-                f">> Unsupported Sampler: {self.sampler_name} "
+                f" Unsupported Sampler: {self.sampler_name} "+
                 f"Defaulting to {default}"
             )
             self.sampler = default
 
-        print(msg)
+        logger.info(msg)
 
         if not hasattr(self.sampler, "uses_inpainting_model"):
             # FIXME: terrible kludge!
@@ -1085,17 +1086,17 @@ class Generate:
     def _load_img(self, img) -> Image:
         if isinstance(img, Image.Image):
             image = img
-            print(f">> using provided input image of size {image.width}x{image.height}")
+            logger.info(f"using provided input image of size {image.width}x{image.height}")
         elif isinstance(img, str):
-            assert os.path.exists(img), f">> {img}: File not found"
+            assert os.path.exists(img), f"{img}: File not found"
 
             image = Image.open(img)
-            print(
-                f">> loaded input image of size {image.width}x{image.height} from {img}"
+            logger.info(
+                f"loaded input image of size {image.width}x{image.height} from {img}"
             )
         else:
             image = Image.open(img)
-            print(f">> loaded input image of size {image.width}x{image.height}")
+            logger.info(f"loaded input image of size {image.width}x{image.height}")
         image = ImageOps.exif_transpose(image)
         return image
 
@@ -1183,14 +1184,14 @@ class Generate:
 
     def _transparency_check_and_warning(self, image, mask, force_outpaint=False):
         if not mask:
-            print(
-                ">> Initial image has transparent areas. Will inpaint in these regions."
+           logger.info(
+                "Initial image has transparent areas. Will inpaint in these regions."
             )
-            if (not force_outpaint) and self._check_for_erasure(image):
-                print(
-                    ">> WARNING: Colors underneath the transparent region seem to have been erased.\n",
-                    ">>          Inpainting will be suboptimal. Please preserve the colors when making\n",
-                    ">>          a transparency mask, or provide mask explicitly using --init_mask (-M).",
+           if (not force_outpaint) and self._check_for_erasure(image):
+                logger.info(
+                    "Colors underneath the transparent region seem to have been erased.\n" +
+                    "Inpainting will be suboptimal. Please preserve the colors when making\n" +
+                    "a transparency mask, or provide mask explicitly using --init_mask (-M)."
                 )
 
     def _squeeze_image(self, image):
@@ -1201,11 +1202,11 @@ class Generate:
 
     def _fit_image(self, image, max_dimensions):
         w, h = max_dimensions
-        print(f">> image will be resized to fit inside a box {w}x{h} in size.")
+        logger.info(f"image will be resized to fit inside a box {w}x{h} in size.")
         # note that InitImageResizer does the multiple of 64 truncation internally
         image = InitImageResizer(image).resize(width=w, height=h)
-        print(
-            f">> after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}"
+        logger.info(
+            f"after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}"
         )
         return image
 
@@ -1216,8 +1217,8 @@ class Generate:
         )  # resize to integer multiple of 64
         if h != height or w != width:
             if log:
-                print(
-                    f">> Provided width and height must be multiples of 64. Auto-resizing to {w}x{h}"
+                logger.info(
+                    f"Provided width and height must be multiples of 64. Auto-resizing to {w}x{h}"
                 )
             height = h
             width = w

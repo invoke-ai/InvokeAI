@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from PIL import Image
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals
-
 
 class GFPGAN:
     def __init__(self, gfpgan_model_path="models/gfpgan/GFPGANv1.4.pth") -> None:
@@ -19,7 +19,7 @@ class GFPGAN:
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
 
         if not self.gfpgan_model_exists:
-            print("## NOT FOUND: GFPGAN model not found at " + self.model_path)
+            logger.error("NOT FOUND: GFPGAN model not found at " + self.model_path)
             return None
 
     def model_exists(self):
@@ -27,7 +27,7 @@ class GFPGAN:
 
     def process(self, image, strength: float, seed: str = None):
         if seed is not None:
-            print(f">> GFPGAN - Restoring Faces for image seed:{seed}")
+            logger.info(f"GFPGAN - Restoring Faces for image seed:{seed}")
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -47,14 +47,14 @@ class GFPGAN:
             except Exception:
                 import traceback
 
-                print(">> Error loading GFPGAN:", file=sys.stderr)
+                logger.error("Error loading GFPGAN:", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
             os.chdir(cwd)
 
         if self.gfpgan is None:
-            print(f">> WARNING: GFPGAN not initialized.")
-            print(
-                f">> Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}"
+            logger.warning("WARNING: GFPGAN not initialized.")
+            logger.warning(
+                f"Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}"
             )
 
         image = image.convert("RGB")

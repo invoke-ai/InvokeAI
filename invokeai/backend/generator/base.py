@@ -25,6 +25,7 @@ from typing import Callable, List, Iterator, Optional, Type
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
+import invokeai.backend.util.logging as logger
 from ..image_util import configure_model_padding
 from ..util.util import rand_perlin_2d
 from ..safety_checker import SafetyChecker
@@ -372,7 +373,7 @@ class Generator:
                     try:
                         x_T = self.get_noise(width, height)
                     except:
-                        print("** An error occurred while getting initial noise **")
+                        logger.error("An error occurred while getting initial noise")
                         print(traceback.format_exc())
 
                 # Pass on the seed in case a layer beneath us needs to generate noise on its own.
@@ -607,7 +608,7 @@ class Generator:
         image = self.sample_to_image(sample)
         dirname = os.path.dirname(filepath) or "."
         if not os.path.exists(dirname):
-            print(f"** creating directory {dirname}")
+            logger.info(f"creating directory {dirname}")
             os.makedirs(dirname, exist_ok=True)
         image.save(filepath, "PNG")
 

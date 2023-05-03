@@ -3,6 +3,7 @@ import asyncio
 from inspect import signature
 
 import uvicorn
+import invokeai.backend.util.logging as logger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -16,7 +17,6 @@ from ..backend import Args
 from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
-from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 
 # Create the app
@@ -56,7 +56,7 @@ async def startup_event():
     config.parse_args()
 
     ApiDependencies.initialize(
-        config=config, event_handler_id=event_handler_id
+        config=config, event_handler_id=event_handler_id, logger=logger
     )
 
 
