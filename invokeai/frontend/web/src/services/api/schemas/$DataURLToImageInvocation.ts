@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $DataURLToImageInvocation = {
-  description: `Outputs an image from a base 64 data URL.`,
+  description: `Outputs an image from a data URL.`,
   properties: {
     id: {
       type: 'string',

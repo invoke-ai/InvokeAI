@@ -20,7 +20,12 @@
       "*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "*.d.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "*.d.ts",
+    "src/app/store/middleware/listenerMiddleware"
+  ],
   "exclude": ["src/services/fixtures/*", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

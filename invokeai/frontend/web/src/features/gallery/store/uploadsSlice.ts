@@ -35,7 +35,7 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadAdded: uploadsAdapter.addOne,
+    uploadAdded: uploadsAdapter.upsertOne,
   },
   extraReducers: (builder) => {
     /**
@@ -59,17 +59,6 @@ const uploadsSlice = createSlice({
       state.pages = pages;
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
-    });
-
-    /**
-     * Upload Image - FULFILLED
-     */
-    builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const { location, response } = action.payload;
-
-      const uploadedImage = deserializeImageResponse(response);
-
-      uploadsAdapter.setOne(state, uploadedImage);
     });
 
     /**

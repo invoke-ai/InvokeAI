@@ -13,6 +13,7 @@
  */
 
 import { GalleryCategory } from 'features/gallery/store/gallerySlice';
+import { SelectedImage } from 'features/parameters/store/actions';
 import { FacetoolType } from 'features/parameters/store/postprocessingSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
@@ -124,6 +125,14 @@ export type Image = {
   url: string;
   thumbnail: string;
   metadata: ImageResponseMetadata;
+};
+
+export const isInvokeAIImage = (obj: Image | SelectedImage): obj is Image => {
+  if ('url' in obj && 'thumbnail' in obj) {
+    return true;
+  }
+
+  return false;
 };
 
 /**

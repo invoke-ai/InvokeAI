@@ -3,7 +3,7 @@
 /* eslint-disable */
 
 /**
- * Outputs an image from a base 64 data URL.
+ * Outputs an image from a data URL.
  */
 export type DataURLToImageInvocation = {
   /**

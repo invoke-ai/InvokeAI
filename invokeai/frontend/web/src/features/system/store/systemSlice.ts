@@ -15,7 +15,7 @@ import {
 } from 'services/events/actions';
 
 import { ProgressImage } from 'services/events/types';
-import { initialImageSelected } from 'features/parameters/store/generationSlice';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
@@ -432,13 +432,6 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusConnected';
-    });
-
-    /**
-     * Initial Image Selected
-     */
-    builder.addCase(initialImageSelected, (state) => {
-      state.toastQueue.push(makeToast(t('toast.sentToImageToImage')));
     });
 
     /**

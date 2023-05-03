@@ -73,43 +73,43 @@ const resultsSlice = createSlice({
       state.isLoading = false;
     });
 
-    /**
-     * Invocation Complete
-     */
-    builder.addCase(invocationComplete, (state, action) => {
-      const { data, shouldFetchImages } = action.payload;
-      const { result, node, graph_execution_state_id } = data;
+    // /**
+    //  * Invocation Complete
+    //  */
+    // builder.addCase(invocationComplete, (state, action) => {
+    //   const { data, shouldFetchImages } = action.payload;
+    //   const { result, node, graph_execution_state_id } = data;
 
-      if (isImageOutput(result)) {
-        const name = result.image.image_name;
-        const type = result.image.image_type;
+    //   if (isImageOutput(result)) {
+    //     const name = result.image.image_name;
+    //     const type = result.image.image_type;
 
-        // if we need to refetch, set URLs to placeholder for now
-        const { url, thumbnail } = shouldFetchImages
-          ? { url: '', thumbnail: '' }
-          : buildImageUrls(type, name);
+    //     // if we need to refetch, set URLs to placeholder for now
+    //     const { url, thumbnail } = shouldFetchImages
+    //       ? { url: '', thumbnail: '' }
+    //       : buildImageUrls(type, name);
 
-        const timestamp = extractTimestampFromImageName(name);
+    //     const timestamp = extractTimestampFromImageName(name);
 
-        const image: Image = {
-          name,
-          type,
-          url,
-          thumbnail,
-          metadata: {
-            created: timestamp,
-            width: result.width,
-            height: result.height,
-            invokeai: {
-              session_id: graph_execution_state_id,
-              ...(node ? { node } : {}),
-            },
-          },
-        };
+    //     const image: Image = {
+    //       name,
+    //       type,
+    //       url,
+    //       thumbnail,
+    //       metadata: {
+    //         created: timestamp,
+    //         width: result.width,
+    //         height: result.height,
+    //         invokeai: {
+    //           session_id: graph_execution_state_id,
+    //           ...(node ? { node } : {}),
+    //         },
+    //       },
+    //     };
 
-        resultsAdapter.setOne(state, image);
-      }
-    });
+    //     resultsAdapter.setOne(state, image);
+    //   }
+    // });
 
     /**
      * Image Received - FULFILLED

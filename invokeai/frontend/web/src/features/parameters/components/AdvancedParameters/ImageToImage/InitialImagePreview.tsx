@@ -5,9 +5,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
 import useGetImageByNameAndType from 'features/gallery/hooks/useGetImageByName';
-import {
+import generationSlice, {
   clearInitialImage,
-  initialImageSelected,
+  initialImageChanged,
 } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
@@ -15,23 +15,26 @@ import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
 import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
-import { initialImageSelector } from 'features/parameters/store/generationSelectors';
+import {
+  generationSelector,
+  initialImageSelector,
+} from 'features/parameters/store/generationSelectors';
+import { initialImageSelected } from 'features/parameters/store/actions';
 
 const selector = createSelector(
-  [initialImageSelector],
-  (initialImage) => {
+  [generationSelector],
+  (generation) => {
+    const { initialImage, isImageToImageEnabled } = generation;
     return {
       initialImage,
+      isImageToImageEnabled,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const InitialImagePreview = () => {
-  const isImageToImageEnabled = useAppSelector(
-    (state: RootState) => state.generation.isImageToImageEnabled
-  );
-  const { initialImage } = useAppSelector(selector);
+  const { initialImage, isImageToImageEnabled } = useAppSelector(selector);
   const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -55,22 +58,13 @@ const InitialImagePreview = () => {
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       setIsLoaded(false);
+
       const name = e.dataTransfer.getData('invokeai/imageName');
       const type = e.dataTransfer.getData('invokeai/imageType') as ImageType;
 
-      if (!name || !type) {
-        return;
-      }
-
-      const image = getImageByNameAndType(name, type);
-
-      if (!image) {
-        return;
-      }
-
       dispatch(initialImageSelected({ name, type }));
     },
-    [getImageByNameAndType, dispatch]
+    [dispatch]
   );
 
   return (

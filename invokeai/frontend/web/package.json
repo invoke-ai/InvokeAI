@@ -118,6 +118,7 @@
     "@types/node": "^18.16.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.1",
+    "@types/react-redux": "^7.1.25",
     "@types/react-transition-group": "^4.4.5",
     "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.59.1",

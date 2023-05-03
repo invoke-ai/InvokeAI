@@ -11,7 +11,7 @@ import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
-import { memo } from 'react';
+import { DragEvent, memo, useCallback } from 'react';
 
 export const imagesSelector = createSelector(
   [uiSelector, selectedImageSelector, systemSelector],
@@ -36,6 +36,18 @@ const CurrentImagePreview = () => {
     useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
 
+  const handleDragStart = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      if (!image) {
+        return;
+      }
+      e.dataTransfer.setData('invokeai/imageName', image.name);
+      e.dataTransfer.setData('invokeai/imageType', image.type);
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    [image]
+  );
+
   return (
     <Flex
       sx={{
@@ -48,6 +60,7 @@ const CurrentImagePreview = () => {
     >
       {image && (
         <Image
+          onDragStart={handleDragStart}
           src={shouldHidePreview ? undefined : getUrl(image.url)}
           width={image.metadata.width}
           height={image.metadata.height}
