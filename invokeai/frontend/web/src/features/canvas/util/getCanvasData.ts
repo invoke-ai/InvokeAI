@@ -16,7 +16,7 @@ import { masks } from 'dateformat';
 
 const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
 
-export const getCanvasDataURLs = (state: RootState) => {
+export const getCanvasData = (state: RootState) => {
   const canvasBaseLayer = getCanvasBaseLayer();
   const canvasStage = getCanvasStage();
 
@@ -85,7 +85,6 @@ export const getCanvasDataURLs = (state: RootState) => {
   offscreenContainer.remove();
 
   if (!maskImageData) {
-    moduleLog.error('Unable to get mask stage context');
     return;
   }
 

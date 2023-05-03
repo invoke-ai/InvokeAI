@@ -29,6 +29,7 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
+import { invocationComplete } from 'services/events/actions';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -289,7 +290,7 @@ export const canvasSlice = createSlice({
       state,
       action: PayloadAction<{
         boundingBox: IRect;
-        image: InvokeAI._Image;
+        image: InvokeAI.Image;
       }>
     ) => {
       const { boundingBox, image } = action.payload;
@@ -814,6 +815,11 @@ export const canvasSlice = createSlice({
       state.isMovingBoundingBox = false;
       state.isTransformingBoundingBox = false;
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(invocationComplete, (state, action) => {
+      //
+    });
   },
 });
 

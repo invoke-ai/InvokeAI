@@ -2,7 +2,7 @@ import { Box } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
-import { buildNodesGraph } from '../util/nodesGraphBuilder/buildNodesGraph';
+import { buildNodesGraph } from '../util/buildNodesGraph';
 
 const NodeGraphOverlay = () => {
   const state = useAppSelector((state: RootState) => state);
