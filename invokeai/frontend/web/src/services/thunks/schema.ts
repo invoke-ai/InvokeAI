@@ -1,19 +1,20 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { parseSchema } from 'features/nodes/util/parseSchema';
+import { log } from 'app/logging/useLogger';
+import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 import { OpenAPIV3 } from 'openapi-types';
+
+const schemaLog = log.child({ namespace: 'schema' });
 
 export const receivedOpenAPISchema = createAsyncThunk(
   'nodes/receivedOpenAPISchema',
-  async () => {
+  async (_, { dispatch }): Promise<OpenAPIV3.Document> => {
     const response = await fetch(`openapi.json`);
-    const jsonData = (await response.json()) as OpenAPIV3.Document;
+    const openAPISchema = await response.json();
 
-    console.debug('OpenAPI schema: ', jsonData);
+    schemaLog.info({ openAPISchema }, 'Received OpenAPI schema');
 
-    const parsedSchema = parseSchema(jsonData);
+    dispatch(parsedOpenAPISchema(openAPISchema as OpenAPIV3.Document));
 
-    console.debug('Parsed schema: ', parsedSchema);
-
-    return parsedSchema;
+    return openAPISchema;
   }
 );

@@ -1,6 +1,6 @@
 import { FormControl, Textarea } from '@chakra-ui/react';
-import type { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import type { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 

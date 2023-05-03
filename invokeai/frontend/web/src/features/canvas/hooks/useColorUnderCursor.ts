@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import Konva from 'konva';
 import {
   commitColorPickerColor,

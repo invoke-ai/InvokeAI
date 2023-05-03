@@ -1,7 +1,7 @@
 import ReactDOM from 'react-dom/client';
 
-import Component from './component';
+import InvokeAIUI from './app/components/InvokeAIUI';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <Component />
+  <InvokeAIUI />
 );

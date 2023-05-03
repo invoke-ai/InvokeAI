@@ -2,8 +2,8 @@ import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import { ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme as invokeAITheme } from 'theme/theme';
-import { RootState } from './store';
-import { useAppSelector } from './storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 
 import { greenTeaThemeColors } from 'theme/colors/greenTea';
 import { invokeAIThemeColors } from 'theme/colors/invokeAI';
@@ -18,6 +18,8 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
+import 'overlayscrollbars/overlayscrollbars.css';
+import 'theme/css/overlayscrollbars.css';
 
 type ThemeLocaleProviderProps = {
   children: ReactNode;

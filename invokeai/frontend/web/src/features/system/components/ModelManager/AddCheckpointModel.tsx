@@ -17,15 +17,15 @@ import React from 'react';
 
 import SearchModels from './SearchModels';
 
-import { addNewModel } from 'app/socketio/actions';
+// import { addNewModel } from 'app/socketio/actions';
 
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { InvokeModelConfigProps } from 'app/invokeai';
-import type { RootState } from 'app/store';
+import type { InvokeModelConfigProps } from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import type { FieldInputProps, FormikProps } from 'formik';
 import IAIForm from 'common/components/IAIForm';

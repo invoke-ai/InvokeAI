@@ -25,7 +25,9 @@ import type { ParamIntInvocation } from './ParamIntInvocation';
 import type { PasteImageInvocation } from './PasteImageInvocation';
 import type { RandomRangeInvocation } from './RandomRangeInvocation';
 import type { RangeInvocation } from './RangeInvocation';
+import type { ResizeLatentsInvocation } from './ResizeLatentsInvocation';
 import type { RestoreFaceInvocation } from './RestoreFaceInvocation';
+import type { ScaleLatentsInvocation } from './ScaleLatentsInvocation';
 import type { ShowImageInvocation } from './ShowImageInvocation';
 import type { SubtractInvocation } from './SubtractInvocation';
 import type { TextToImageInvocation } from './TextToImageInvocation';
@@ -40,7 +42,7 @@ export type Graph = {
   /**
    * The nodes in this graph
    */
-  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
+  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
   /**
    * The connections between nodes and their fields in this graph
    */

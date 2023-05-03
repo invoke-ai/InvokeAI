@@ -16,10 +16,10 @@ import IAIButton from 'common/components/IAIButton';
 
 import { FaArrowLeft, FaPlus } from 'react-icons/fa';
 
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
-import type { RootState } from 'app/store';
+import type { RootState } from 'app/store/store';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import AddCheckpointModel from './AddCheckpointModel';
 import AddDiffusersModel from './AddDiffusersModel';

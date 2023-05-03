@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
-import { AddNewModelType, UIState } from './uiTypes';
+import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
 
 const initialUIState: UIState = {
   activeTab: 0,
@@ -21,6 +21,9 @@ const initialUIState: UIState = {
   openLinearAccordionItems: [],
   openGenerateAccordionItems: [],
   openUnifiedCanvasAccordionItems: [],
+  floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
+  shouldShowProgressImages: false,
+  shouldAutoShowProgressImages: false,
 };
 
 const initialState: UIState = initialUIState;
@@ -105,6 +108,30 @@ export const uiSlice = createSlice({
         state.openUnifiedCanvasAccordionItems = action.payload;
       }
     },
+    floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {
+      state.floatingProgressImageRect = {
+        ...state.floatingProgressImageRect,
+        ...action.payload,
+      };
+    },
+    floatingProgressImageResized: (
+      state,
+      action: PayloadAction<Partial<Rect>>
+    ) => {
+      state.floatingProgressImageRect = {
+        ...state.floatingProgressImageRect,
+        ...action.payload,
+      };
+    },
+    setShouldShowProgressImages: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowProgressImages = action.payload;
+    },
+    setShouldAutoShowProgressImages: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldAutoShowProgressImages = action.payload;
+    },
   },
 });
 
@@ -128,6 +155,10 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   openAccordionItemsChanged,
+  floatingProgressImageMoved,
+  floatingProgressImageResized,
+  setShouldShowProgressImages,
+  setShouldAutoShowProgressImages,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

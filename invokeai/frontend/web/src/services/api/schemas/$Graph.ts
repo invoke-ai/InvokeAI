@@ -34,6 +34,10 @@ export const $Graph = {
         }, {
           type: 'LatentsToImageInvocation',
         }, {
+          type: 'ResizeLatentsInvocation',
+        }, {
+          type: 'ScaleLatentsInvocation',
+        }, {
           type: 'AddInvocation',
         }, {
           type: 'SubtractInvocation',

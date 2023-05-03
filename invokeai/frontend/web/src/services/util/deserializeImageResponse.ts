@@ -1,4 +1,4 @@
-import { Image } from 'app/invokeai';
+import { Image } from 'app/types/invokeai';
 import { parseInvokeAIMetadata } from 'common/util/parseMetadata';
 import { ImageResponse } from 'services/api';
 

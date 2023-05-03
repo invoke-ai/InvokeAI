@@ -1,19 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   SystemState,
-  setCancelAfter,
-  setCancelType,
   cancelScheduled,
   cancelTypeChanged,
-  CancelType,
+  CancelStrategy,
 } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
-import { useEffect, useCallback, memo } from 'react';
+import { isEqual } from 'lodash-es';
+import { useCallback, memo } from 'react';
 import {
   ButtonSpinner,
   ButtonGroup,
@@ -27,16 +25,9 @@ import {
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import {
-  MdArrowDropDown,
-  MdArrowDropUp,
-  MdCancel,
-  MdCancelScheduleSend,
-} from 'react-icons/md';
+import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
-import IAISimpleMenu from 'common/components/IAISimpleMenu';
 import { sessionCanceled } from 'services/thunks/session';
-import { FaChevronDown } from 'react-icons/fa';
 import { BiChevronDown } from 'react-icons/bi';
 
 const cancelButtonSelector = createSelector(
@@ -48,8 +39,6 @@ const cancelButtonSelector = createSelector(
       isCancelable: system.isCancelable,
       currentIteration: system.currentIteration,
       totalIterations: system.totalIterations,
-      // cancelType: system.cancelOptions.cancelType,
-      // cancelAfter: system.cancelOptions.cancelAfter,
       sessionId: system.sessionId,
       cancelType: system.cancelType,
       isCancelScheduled: system.isCancelScheduled,
@@ -75,11 +64,8 @@ const CancelButton = (
     isProcessing,
     isConnected,
     isCancelable,
-    currentIteration,
-    totalIterations,
     cancelType,
     isCancelScheduled,
-    // cancelAfter,
     sessionId,
   } = useAppSelector(cancelButtonSelector);
 
@@ -101,11 +87,10 @@ const CancelButton = (
   const handleCancelTypeChanged = useCallback(
     (value: string | string[]) => {
       const newCancelType = Array.isArray(value) ? value[0] : value;
-      dispatch(cancelTypeChanged(newCancelType as CancelType));
+      dispatch(cancelTypeChanged(newCancelType as CancelStrategy));
     },
     [dispatch]
   );
-  // const isCancelScheduled = cancelAfter === null ? false : true;
 
   useHotkeys(
     'shift+x',
@@ -116,23 +101,6 @@ const CancelButton = (
     },
     [isConnected, isProcessing, isCancelable]
   );
-
-  // useEffect(() => {
-  //   if (cancelAfter !== null && cancelAfter < currentIteration) {
-  //     handleClickCancel();
-  //   }
-  // }, [cancelAfter, currentIteration, handleClickCancel]);
-
-  // const cancelMenuItems = [
-  //   {
-  //     item: t('parameters.cancel.immediate'),
-  //     onClick: () => dispatch(cancelTypeChanged('immediate')),
-  //   },
-  //   {
-  //     item: t('parameters.cancel.schedule'),
-  //     onClick: () => dispatch(cancelTypeChanged('scheduled')),
-  //   },
-  // ];
 
   return (
     <ButtonGroup isAttached width={btnGroupWidth}>
@@ -170,7 +138,7 @@ const CancelButton = (
 
       <Menu closeOnSelect={false}>
         <MenuButton
-          as={IconButton}
+          as={IAIIconButton}
           tooltip={t('parameters.cancel.setType')}
           aria-label={t('parameters.cancel.setType')}
           icon={<BiChevronDown />}

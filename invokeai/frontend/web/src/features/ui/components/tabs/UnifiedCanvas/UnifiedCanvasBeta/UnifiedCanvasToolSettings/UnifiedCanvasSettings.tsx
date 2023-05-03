@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
@@ -16,7 +16,7 @@ import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFold
 import { FaWrench } from 'react-icons/fa';
 
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 export const canvasControlsSelector = createSelector(

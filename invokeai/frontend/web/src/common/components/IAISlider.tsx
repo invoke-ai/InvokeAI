@@ -23,7 +23,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
 
 import { useTranslation } from 'react-i18next';
 import {
@@ -233,7 +233,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             hidden={hideTooltip}
             {...sliderTooltipProps}
           >
-            <SliderThumb {...sliderThumbProps} />
+            <SliderThumb {...sliderThumbProps} zIndex={0} />
           </Tooltip>
         </Slider>
 

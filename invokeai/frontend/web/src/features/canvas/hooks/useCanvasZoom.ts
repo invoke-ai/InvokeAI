@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setStageCoordinates,
@@ -7,7 +7,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { clamp, isEqual } from 'lodash';
+import { clamp, isEqual } from 'lodash-es';
 
 import { MutableRefObject, useCallback } from 'react';
 import {

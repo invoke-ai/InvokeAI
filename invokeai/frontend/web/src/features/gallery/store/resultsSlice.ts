@@ -1,8 +1,8 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/invokeai';
+import { Image } from 'app/types/invokeai';
 import { invocationComplete } from 'services/events/actions';
 
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import {
   receivedResultImagesPage,
   IMAGES_PER_PAGE,
@@ -65,7 +65,7 @@ const resultsSlice = createSlice({
         deserializeImageResponse(image)
       );
 
-      resultsAdapter.addMany(state, resultImages);
+      resultsAdapter.setMany(state, resultImages);
 
       state.page = page;
       state.pages = pages;
@@ -107,7 +107,7 @@ const resultsSlice = createSlice({
           },
         };
 
-        resultsAdapter.addOne(state, image);
+        resultsAdapter.setOne(state, image);
       }
     });
 

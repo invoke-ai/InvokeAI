@@ -1,6 +1,7 @@
 import sys
 import traceback
 import torch
+from typing import types
 from ...backend.restoration import Restoration
 from ...backend.util import choose_torch_device, CPU_DEVICE, MPS_DEVICE
 
@@ -10,7 +11,7 @@ from ...backend.util import choose_torch_device, CPU_DEVICE, MPS_DEVICE
 class RestorationServices:
     '''Face restoration and upscaling'''
     
-    def __init__(self,args):
+    def __init__(self,args,logger:types.ModuleType):
         try:
             gfpgan, codeformer, esrgan = None, None, None
             if args.restore or args.esrgan:
@@ -20,20 +21,22 @@ class RestorationServices:
                         args.gfpgan_model_path
                     )
                 else:
-                    print(">> Face restoration disabled")
+                    logger.info("Face restoration disabled")
                     if args.esrgan:
                         esrgan = restoration.load_esrgan(args.esrgan_bg_tile)
                     else:
-                        print(">> Upscaling disabled")
+                        logger.info("Upscaling disabled")
             else:
-                print(">> Face restoration and upscaling disabled")
+                logger.info("Face restoration and upscaling disabled")
         except (ModuleNotFoundError, ImportError):
             print(traceback.format_exc(), file=sys.stderr)
-            print(">> You may need to install the ESRGAN and/or GFPGAN modules")
+            logger.info("You may need to install the ESRGAN and/or GFPGAN modules")
         self.device = torch.device(choose_torch_device())
         self.gfpgan = gfpgan
         self.codeformer = codeformer
         self.esrgan = esrgan
+        self.logger = logger
+        self.logger.info('Face restoration initialized')
 
     # note that this one method does gfpgan and codepath reconstruction, as well as
     # esrgan upscaling
@@ -58,15 +61,15 @@ class RestorationServices:
                     if self.gfpgan is not None or self.codeformer is not None:
                         if facetool == "gfpgan":
                             if self.gfpgan is None:
-                                print(
-                                    ">> GFPGAN not found. Face restoration is disabled."
+                                self.logger.info(
+                                    "GFPGAN not found. Face restoration is disabled."
                                 )
                             else:
                                 image = self.gfpgan.process(image, strength, seed)
                         if facetool == "codeformer":
                             if self.codeformer is None:
-                                print(
-                                    ">> CodeFormer not found. Face restoration is disabled."
+                                self.logger.info(
+                                    "CodeFormer not found. Face restoration is disabled."
                                 )
                             else:
                                 cf_device = (
@@ -80,7 +83,7 @@ class RestorationServices:
                                     fidelity=codeformer_fidelity,
                                 )
                     else:
-                        print(">> Face Restoration is disabled.")
+                        self.logger.info("Face Restoration is disabled.")
                 if upscale is not None:
                     if self.esrgan is not None:
                         if len(upscale) < 2:
@@ -93,10 +96,10 @@ class RestorationServices:
                             denoise_str=upscale_denoise_str,
                         )
                     else:
-                        print(">> ESRGAN is disabled. Image not upscaled.")
+                        self.logger.info("ESRGAN is disabled. Image not upscaled.")
             except Exception as e:
-                print(
-                    f">> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}"
+                self.logger.info(
+                    f"Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}"
                 )
 
             if image_callback is not None:

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { TextToImageInvocation } from 'services/api';
 
 export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
@@ -10,6 +10,7 @@ export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
 
   const {
     prompt,
+    negativePrompt,
     seed,
     steps,
     width,
@@ -23,7 +24,7 @@ export const buildTxt2ImgNode = (state: RootState): TextToImageInvocation => {
   const textToImageNode: NonNullable<TextToImageInvocation> = {
     id: nodeId,
     type: 'txt2img',
-    prompt,
+    prompt: `${prompt} [${negativePrompt}]`,
     steps,
     width,
     height,

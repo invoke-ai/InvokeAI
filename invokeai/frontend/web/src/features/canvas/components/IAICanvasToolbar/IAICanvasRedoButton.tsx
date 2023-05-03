@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -9,7 +9,7 @@ import { FaRedo } from 'react-icons/fa';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 const canvasRedoSelector = createSelector(
