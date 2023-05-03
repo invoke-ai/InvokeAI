@@ -25,7 +25,7 @@ from invokeai.backend.modules.parameters import parameters_to_command
 import invokeai.frontend.dist as frontend
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from ldm.invoke.concepts_lib import get_hf_concepts_lib
 from ldm.invoke.conditioning import (
     get_tokens_for_prompt_object,
     get_prompt_structure,
@@ -538,7 +538,7 @@ class InvokeAIWebServer:
             try:
                 local_triggers = self.generate.model.textual_inversion_manager.get_all_trigger_strings()
                 locals = [{'name': x} for x in sorted(local_triggers, key=str.casefold)]
-                concepts = HuggingFaceConceptsLibrary().list_concepts(minimum_likes=5)
+                concepts = get_hf_concepts_lib().list_concepts(minimum_likes=5)
                 concepts = [{'name': f'<{x}>'} for x in sorted(concepts, key=str.casefold) if f'<{x}>' not in local_triggers]
                 socketio.emit("foundTextualInversionTriggers", {'local_triggers': locals, 'huggingface_concepts': concepts})
             except Exception as e:
