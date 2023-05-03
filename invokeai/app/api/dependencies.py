@@ -1,14 +1,12 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
-from argparse import Namespace
 
-from invokeai.app.services.metadata import PngMetadataService, MetadataServiceBase
+import invokeai.backend.util.logging as logger
+from typing import types
 
 from ..services.default_graphs import create_system_graphs
-
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-
 from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
@@ -19,6 +17,7 @@ from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
+from ..services.metadata import PngMetadataService
 from .events import FastAPIEventService
 
 
@@ -44,15 +43,16 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(config, event_handler_id: int):
+    def initialize(config, event_handler_id: int, logger: types.ModuleType=logger):
         Globals.try_patchmatch = config.patchmatch
         Globals.always_use_cpu = config.always_use_cpu
         Globals.internet_available = config.internet_available and check_internet()
         Globals.disable_xformers = not config.xformers
         Globals.ckpt_convert = config.ckpt_convert
 
-        # TODO: Use a logger
-        print(f">> Internet connectivity is {Globals.internet_available}")
+        # TO DO: Use the config to select the logger rather than use the default
+        # invokeai logging module
+        logger.info(f"Internet connectivity is {Globals.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
 
@@ -70,8 +70,9 @@ class ApiDependencies:
         db_location = os.path.join(output_folder, "invokeai.db")
 
         services = InvocationServices(
-            model_manager=get_model_manager(config),
+            model_manager=get_model_manager(config,logger),
             events=events,
+            logger=logger,
             latents=latents,
             images=images,
             metadata=metadata,
@@ -83,7 +84,7 @@ class ApiDependencies:
                 filename=db_location, table_name="graph_executions"
             ),
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config),
+            restoration=RestorationServices(config,logger),
         )
 
         create_system_graphs(services.graph_library)
