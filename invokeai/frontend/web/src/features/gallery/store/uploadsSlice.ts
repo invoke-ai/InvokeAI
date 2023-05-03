@@ -62,9 +62,10 @@ const uploadsSlice = createSlice({
     });
 
     /**
-     * Delete Image - FULFILLED
+     * Delete Image - pending
+     * Pre-emptively remove the image from the gallery
      */
-    builder.addCase(imageDeleted.fulfilled, (state, action) => {
+    builder.addCase(imageDeleted.pending, (state, action) => {
       const { imageType, imageName } = action.meta.arg;
 
       if (imageType === 'uploads') {

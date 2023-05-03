@@ -28,7 +28,6 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { useGetUrl } from 'common/util/getUrl';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { imageDeleted } from 'services/thunks/image';
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
@@ -36,6 +35,8 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { requestedImageDeletion } from '../store/actions';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -115,7 +116,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   // Immediately deletes an image
   const handleDelete = useCallback(() => {
     if (canDeleteImage && image) {
-      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+      dispatch(requestedImageDeletion(image));
     }
   }, [dispatch, image, canDeleteImage]);
 
@@ -151,8 +152,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   }, [image, recallSeed]);
 
   const handleSendToImageToImage = useCallback(() => {
-    sendToImageToImage(image);
-  }, [image, sendToImageToImage]);
+    dispatch(initialImageSelected(image));
+  }, [dispatch, image]);
 
   const handleRecallInitialImage = useCallback(() => {
     recallInitialImage(image.metadata.invokeai?.node?.image);

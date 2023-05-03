@@ -88,7 +88,7 @@ export const useParameters = () => {
       }
 
       dispatch(
-        initialImageChanged({ name: image.image_name, type: image.image_type })
+        initialImageSelected({ name: image.image_name, type: image.image_type })
       );
       toast({
         title: t('toast.initialImageSet'),

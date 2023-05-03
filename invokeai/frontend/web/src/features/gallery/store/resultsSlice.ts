@@ -1,17 +1,11 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
 import { Image } from 'app/types/invokeai';
-import { invocationComplete } from 'services/events/actions';
 
 import { RootState } from 'app/store/store';
 import {
   receivedResultImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { isImageOutput } from 'services/types/guards';
-import {
-  buildImageUrls,
-  extractTimestampFromImageName,
-} from 'services/util/deserializeImageField';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 import {
   imageDeleted,
@@ -73,44 +67,6 @@ const resultsSlice = createSlice({
       state.isLoading = false;
     });
 
-    // /**
-    //  * Invocation Complete
-    //  */
-    // builder.addCase(invocationComplete, (state, action) => {
-    //   const { data, shouldFetchImages } = action.payload;
-    //   const { result, node, graph_execution_state_id } = data;
-
-    //   if (isImageOutput(result)) {
-    //     const name = result.image.image_name;
-    //     const type = result.image.image_type;
-
-    //     // if we need to refetch, set URLs to placeholder for now
-    //     const { url, thumbnail } = shouldFetchImages
-    //       ? { url: '', thumbnail: '' }
-    //       : buildImageUrls(type, name);
-
-    //     const timestamp = extractTimestampFromImageName(name);
-
-    //     const image: Image = {
-    //       name,
-    //       type,
-    //       url,
-    //       thumbnail,
-    //       metadata: {
-    //         created: timestamp,
-    //         width: result.width,
-    //         height: result.height,
-    //         invokeai: {
-    //           session_id: graph_execution_state_id,
-    //           ...(node ? { node } : {}),
-    //         },
-    //       },
-    //     };
-
-    //     resultsAdapter.setOne(state, image);
-    //   }
-    // });
-
     /**
      * Image Received - FULFILLED
      */
@@ -142,9 +98,10 @@ const resultsSlice = createSlice({
     });
 
     /**
-     * Delete Image - FULFILLED
+     * Delete Image - PENDING
+     * Pre-emptively remove the image from the gallery
      */
-    builder.addCase(imageDeleted.fulfilled, (state, action) => {
+    builder.addCase(imageDeleted.pending, (state, action) => {
       const { imageType, imageName } = action.meta.arg;
 
       if (imageType === 'results') {

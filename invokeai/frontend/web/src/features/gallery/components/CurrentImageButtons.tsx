@@ -66,9 +66,9 @@ import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { imageDeleted } from 'services/thunks/image';
 import { useParameters } from 'features/parameters/hooks/useParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { requestedImageDeletion } from '../store/actions';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -376,7 +376,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
   const handleDelete = useCallback(() => {
     if (canDeleteImage && image) {
-      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+      dispatch(requestedImageDeletion(image));
     }
   }, [image, canDeleteImage, dispatch]);
 
