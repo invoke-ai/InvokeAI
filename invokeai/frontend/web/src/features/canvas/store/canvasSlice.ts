@@ -22,6 +22,7 @@ import {
   CanvasLayer,
   CanvasLayerState,
   CanvasMaskLine,
+  CanvasSession,
   CanvasState,
   CanvasTool,
   Dimensions,
@@ -29,6 +30,7 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
+import { stringToArray } from 'konva/lib/shapes/Text';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -285,16 +287,28 @@ export const canvasSlice = createSlice({
     setIsMoveStageKeyHeld: (state, action: PayloadAction<boolean>) => {
       state.isMoveStageKeyHeld = action.payload;
     },
-    addImageToStagingArea: (
+    canvasSessionIdChanged: (state, action: PayloadAction<string>) => {
+      state.layerState.stagingArea.sessionId = action.payload;
+    },
+    stagingAreaInitialized: (
       state,
-      action: PayloadAction<{
-        boundingBox: IRect;
-        image: InvokeAI.Image;
-      }>
+      action: PayloadAction<{ sessionId: string; boundingBox: IRect }>
     ) => {
-      const { boundingBox, image } = action.payload;
+      const { sessionId, boundingBox } = action.payload;
 
-      if (!boundingBox || !image) return;
+      state.layerState.stagingArea = {
+        boundingBox,
+        sessionId,
+        images: [],
+        selectedImageIndex: -1,
+      };
+    },
+    addImageToStagingArea: (state, action: PayloadAction<InvokeAI.Image>) => {
+      const image = action.payload;
+
+      if (!image || !state.layerState.stagingArea.boundingBox) {
+        return;
+      }
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
@@ -305,7 +319,7 @@ export const canvasSlice = createSlice({
       state.layerState.stagingArea.images.push({
         kind: 'image',
         layer: 'base',
-        ...boundingBox,
+        ...state.layerState.stagingArea.boundingBox,
         image,
       });
 
@@ -321,9 +335,7 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.stagingArea = {
-        ...initialLayerState.stagingArea,
-      };
+      state.layerState.stagingArea = { ...initialLayerState.stagingArea };
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
@@ -661,6 +673,10 @@ export const canvasSlice = createSlice({
       }
     },
     nextStagingAreaImage: (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        return;
+      }
+
       const currentIndex = state.layerState.stagingArea.selectedImageIndex;
       const length = state.layerState.stagingArea.images.length;
 
@@ -670,6 +686,10 @@ export const canvasSlice = createSlice({
       );
     },
     prevStagingAreaImage: (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        return;
+      }
+
       const currentIndex = state.layerState.stagingArea.selectedImageIndex;
 
       state.layerState.stagingArea.selectedImageIndex = Math.max(
@@ -678,6 +698,10 @@ export const canvasSlice = createSlice({
       );
     },
     commitStagingAreaImage: (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        return;
+      }
+
       const { images, selectedImageIndex } = state.layerState.stagingArea;
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
@@ -883,6 +907,8 @@ export const {
   undo,
   setScaledBoundingBoxDimensions,
   setShouldRestrictStrokesToBox,
+  stagingAreaInitialized,
+  canvasSessionIdChanged,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

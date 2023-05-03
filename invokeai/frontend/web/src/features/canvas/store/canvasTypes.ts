@@ -90,7 +90,14 @@ export type CanvasLayerState = {
   stagingArea: {
     images: CanvasImage[];
     selectedImageIndex: number;
+    sessionId?: string;
+    boundingBox?: IRect;
   };
+};
+
+export type CanvasSession = {
+  sessionId: string;
+  boundingBox: IRect;
 };
 
 // type guards
@@ -162,5 +169,4 @@ export interface CanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
-  pendingBoundingBox?: IRect;
 }

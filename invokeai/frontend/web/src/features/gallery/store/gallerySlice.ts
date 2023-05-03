@@ -1,9 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { invocationComplete } from 'services/events/actions';
-import { isImageOutput } from 'services/types/guards';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
-import { imageUploaded } from 'services/thunks/image';
 import { Image } from 'app/types/invokeai';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
@@ -66,20 +62,6 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
-  },
-  extraReducers(builder) {
-    /**
-     * Invocation Complete
-     */
-    builder.addCase(invocationComplete, (state, action) => {
-      const { data } = action.payload;
-      if (isImageOutput(data.result) && state.shouldAutoSwitchToNewImages) {
-        state.selectedImage = {
-          name: data.result.image.image_name,
-          type: 'results',
-        };
-      }
-    });
   },
 });
 

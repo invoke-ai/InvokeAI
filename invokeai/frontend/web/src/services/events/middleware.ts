@@ -11,6 +11,7 @@ import { getTimestamp } from 'common/util/getTimestamp';
 import {
   sessionInvoked,
   isFulfilledSessionCreatedAction,
+  sessionCreated,
 } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 import { setEventListeners } from 'services/events/util/setEventListeners';
@@ -65,7 +66,7 @@ export const socketMiddleware = () => {
         socket.connect();
       }
 
-      if (isFulfilledSessionCreatedAction(action)) {
+      if (sessionCreated.fulfilled.match(action)) {
         const sessionId = action.payload.id;
         const sessionLog = socketioLog.child({ sessionId });
         const oldSessionId = getState().system.sessionId;
