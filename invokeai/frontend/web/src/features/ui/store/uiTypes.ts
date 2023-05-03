@@ -1,6 +1,16 @@
-import { InvokeTabName } from './tabMap';
-
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
+
+export type Coordinates = {
+  x: number;
+  y: number;
+};
+
+export type Dimensions = {
+  width: number | string;
+  height: number | string;
+};
+
+export type Rect = Coordinates & Dimensions;
 
 export interface UIState {
   activeTab: number;
@@ -19,4 +29,7 @@ export interface UIState {
   openLinearAccordionItems: number[];
   openGenerateAccordionItems: number[];
   openUnifiedCanvasAccordionItems: number[];
+  floatingProgressImageRect: Rect;
+  shouldShowProgressImages: boolean;
+  shouldAutoShowProgressImages: boolean;
 }

@@ -1,7 +1,6 @@
 import {
   ChakraProps,
   Flex,
-  Grid,
   Heading,
   Modal,
   ModalBody,
@@ -14,64 +13,57 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
-import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
 import IAISwitch from 'common/components/IAISwitch';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   consoleLogLevelChanged,
-  InProgressImageType,
   setEnableImageDebugging,
-  setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
-  setShouldDisplayInProgressType,
   shouldLogToConsoleChanged,
   SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
+  setShouldAutoShowProgressImages,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
-import { isEqual, map } from 'lodash-es';
+import { isEqual } from 'lodash-es';
 import { persistor } from 'app/store/persistor';
 import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InvokeLogLevel, VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
-import { F } from 'ts-toolbelt';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
   (system: SystemState, ui: UIState) => {
     const {
-      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
-      model_list,
-      saveIntermediatesInterval,
       enableImageDebugging,
       consoleLogLevel,
       shouldLogToConsole,
     } = system;
 
-    const { shouldUseCanvasBetaLayout, shouldUseSliders } = ui;
+    const {
+      shouldUseCanvasBetaLayout,
+      shouldUseSliders,
+      shouldAutoShowProgressImages,
+    } = ui;
 
     return {
-      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
-      models: map(model_list, (_model, key) => key),
-      saveIntermediatesInterval,
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
+      shouldAutoShowProgressImages,
       consoleLogLevel,
       shouldLogToConsole,
     };
@@ -104,8 +96,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const steps = useAppSelector((state: RootState) => state.generation.steps);
-
   const {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
@@ -119,13 +109,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   } = useDisclosure();
 
   const {
-    shouldDisplayInProgressType,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
-    saveIntermediatesInterval,
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
+    shouldAutoShowProgressImages,
     consoleLogLevel,
     shouldLogToConsole,
   } = useAppSelector(selector);
@@ -134,18 +123,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
    * Resets localstorage, then opens a secondary modal informing user to
    * refresh their browser.
    * */
-  const handleClickResetWebUI = () => {
+  const handleClickResetWebUI = useCallback(() => {
     persistor.purge().then(() => {
       onSettingsModalClose();
       onRefreshModalOpen();
     });
-  };
-
-  const handleChangeIntermediateSteps = (value: number) => {
-    if (value > steps) value = steps;
-    if (value < 1) value = 1;
-    dispatch(setSaveIntermediatesInterval(value));
-  };
+  }, [onSettingsModalClose, onRefreshModalOpen]);
 
   const handleLogLevelChanged = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
@@ -182,32 +165,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               <Flex sx={modalSectionStyles}>
                 <Heading size="sm">{t('settings.general')}</Heading>
 
-                <IAISelect
-                  horizontal
-                  spaceEvenly
-                  label={t('settings.displayInProgress')}
-                  validValues={IN_PROGRESS_IMAGE_TYPES}
-                  value={shouldDisplayInProgressType}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                    dispatch(
-                      setShouldDisplayInProgressType(
-                        e.target.value as InProgressImageType
-                      )
-                    )
-                  }
-                />
-                {shouldDisplayInProgressType === 'full-res' && (
-                  <IAINumberInput
-                    label={t('settings.saveSteps')}
-                    min={1}
-                    max={steps}
-                    step={1}
-                    onChange={handleChangeIntermediateSteps}
-                    value={saveIntermediatesInterval}
-                    width="auto"
-                    textAlign="center"
-                  />
-                )}
                 <IAISwitch
                   label={t('settings.confirmOnDelete')}
                   isChecked={shouldConfirmOnDelete}
@@ -234,6 +191,13 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                   isChecked={shouldUseSliders}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     dispatch(setShouldUseSliders(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.autoShowProgress')}
+                  isChecked={shouldAutoShowProgressImages}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldAutoShowProgressImages(e.target.checked))
                   }
                 />
               </Flex>

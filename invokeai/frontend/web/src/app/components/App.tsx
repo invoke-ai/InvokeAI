@@ -27,6 +27,7 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
+import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
 
 const DEFAULT_CONFIG = {};
 
@@ -64,7 +65,7 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   }, []);
 
   return (
-    <Grid w="100vw" h="100vh" position="relative">
+    <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
       {isLightboxEnabled && <Lightbox />}
       <ImageUploader>
         <ProgressBar />
@@ -120,6 +121,7 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
       <Portal>
         <FloatingGalleryButton />
       </Portal>
+      <ProgressImagePreview />
     </Grid>
   );
 };

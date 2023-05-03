@@ -111,24 +111,9 @@ export type FacetoolMetadata = CommonPostProcessedImageMetadata & {
 export type PostProcessedImageMetadata = ESRGANMetadata | FacetoolMetadata;
 
 // Metadata includes the system config and image metadata.
-export type Metadata = SystemGenerationMetadata & {
-  image: GeneratedImageMetadata | PostProcessedImageMetadata;
-};
-
-// An Image has a UUID, url, modified timestamp, width, height and maybe metadata
-export type _Image = {
-  uuid: string;
-  url: string;
-  thumbnail: string;
-  mtime: number;
-  metadata?: Metadata;
-  width: number;
-  height: number;
-  category: GalleryCategory;
-  isBase64?: boolean;
-  dreamPrompt?: 'string';
-  name?: string;
-};
+// export type Metadata = SystemGenerationMetadata & {
+//   image: GeneratedImageMetadata | PostProcessedImageMetadata;
+// };
 
 /**
  * ResultImage
@@ -141,40 +126,35 @@ export type Image = {
   metadata: ImageResponseMetadata;
 };
 
-// GalleryImages is an array of Image.
-export type GalleryImages = {
-  images: Array<_Image>;
-};
-
 /**
  * Types related to the system status.
  */
 
-// This represents the processing status of the backend.
-export type SystemStatus = {
-  isProcessing: boolean;
-  currentStep: number;
-  totalSteps: number;
-  currentIteration: number;
-  totalIterations: number;
-  currentStatus: string;
-  currentStatusHasSteps: boolean;
-  hasError: boolean;
-};
+// // This represents the processing status of the backend.
+// export type SystemStatus = {
+//   isProcessing: boolean;
+//   currentStep: number;
+//   totalSteps: number;
+//   currentIteration: number;
+//   totalIterations: number;
+//   currentStatus: string;
+//   currentStatusHasSteps: boolean;
+//   hasError: boolean;
+// };
 
-export type SystemGenerationMetadata = {
-  model: string;
-  model_weights?: string;
-  model_id?: string;
-  model_hash: string;
-  app_id: string;
-  app_version: string;
-};
+// export type SystemGenerationMetadata = {
+//   model: string;
+//   model_weights?: string;
+//   model_id?: string;
+//   model_hash: string;
+//   app_id: string;
+//   app_version: string;
+// };
 
-export type SystemConfig = SystemGenerationMetadata & {
-  model_list: ModelList;
-  infill_methods: string[];
-};
+// export type SystemConfig = SystemGenerationMetadata & {
+//   model_list: ModelList;
+//   infill_methods: string[];
+// };
 
 export type ModelStatus = 'active' | 'cached' | 'not loaded';
 
@@ -286,9 +266,9 @@ export type FoundModelResponse = {
   found_models: FoundModel[];
 };
 
-export type SystemStatusResponse = SystemStatus;
+// export type SystemStatusResponse = SystemStatus;
 
-export type SystemConfigResponse = SystemConfig;
+// export type SystemConfigResponse = SystemConfig;
 
 export type ImageResultResponse = Omit<_Image, 'uuid'> & {
   boundingBox?: IRect;
@@ -310,26 +290,9 @@ export type ErrorResponse = {
   additionalData?: string;
 };
 
-export type GalleryImagesResponse = {
-  images: Array<Omit<_Image, 'uuid'>>;
-  areMoreImagesAvailable: boolean;
-  category: GalleryCategory;
-};
-
-export type ImageDeletedResponse = {
-  uuid: string;
-  url: string;
-  category: GalleryCategory;
-};
-
 export type ImageUrlResponse = {
   url: string;
 };
-
-// export type UploadImagePayload = {
-//   file: File;
-//   destination?: ImageUploadDestination;
-// };
 
 export type UploadOutpaintingMergeImagePayload = {
   dataURL: string;

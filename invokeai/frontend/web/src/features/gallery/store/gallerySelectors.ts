@@ -22,17 +22,22 @@ import {
 export const gallerySelector = (state: RootState) => state.gallery;
 
 export const imageGallerySelector = createSelector(
-  [gallerySelector, uiSelector, lightboxSelector, activeTabNameSelector],
-  (gallery, ui, lightbox, activeTabName) => {
+  [
+    (state: RootState) => state,
+    gallerySelector,
+    uiSelector,
+    lightboxSelector,
+    activeTabNameSelector,
+  ],
+  (state, gallery, ui, lightbox, activeTabName) => {
     const {
-      categories,
       currentCategory,
-      currentImageUuid,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldAutoSwitchToNewImages,
       galleryWidth,
       shouldUseSingleGalleryColumn,
+      selectedImage,
     } = gallery;
 
     const { shouldPinGallery } = ui;
@@ -40,7 +45,6 @@ export const imageGallerySelector = createSelector(
     const { isLightboxOpen } = lightbox;
 
     return {
-      currentImageUuid,
       shouldPinGallery,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
@@ -49,9 +53,7 @@ export const imageGallerySelector = createSelector(
         : `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       shouldAutoSwitchToNewImages,
       currentCategory,
-      images: categories[currentCategory].images,
-      areMoreImagesAvailable:
-        categories[currentCategory].areMoreImagesAvailable,
+      images: state[currentCategory].entities,
       galleryWidth,
       shouldEnableResize:
         isLightboxOpen ||
@@ -59,6 +61,7 @@ export const imageGallerySelector = createSelector(
           ? false
           : true,
       shouldUseSingleGalleryColumn,
+      selectedImage,
     };
   },
   {
@@ -69,16 +72,16 @@ export const imageGallerySelector = createSelector(
 );
 
 export const selectedImageSelector = createSelector(
-  [gallerySelector, selectResultsEntities, selectUploadsEntities],
-  (gallery, allResults, allUploads) => {
-    const selectedImageName = gallery.selectedImageName;
+  [(state: RootState) => state, gallerySelector],
+  (state, gallery) => {
+    const selectedImage = gallery.selectedImage;
 
-    if (selectedImageName in allResults) {
-      return allResults[selectedImageName];
+    if (selectedImage?.type === 'results') {
+      return selectResultsById(state, selectedImage.name);
     }
 
-    if (selectedImageName in allUploads) {
-      return allUploads[selectedImageName];
+    if (selectedImage?.type === 'uploads') {
+      return selectUploadsById(state, selectedImage.name);
     }
   }
 );
