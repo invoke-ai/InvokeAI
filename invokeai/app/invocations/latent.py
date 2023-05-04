@@ -1,8 +1,8 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 import random
-from typing import Literal, Optional, Union
 import einops
+from typing import Literal, Optional, Union, List
 
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
 
@@ -13,6 +13,7 @@ from invokeai.app.invocations.util.choose_model import choose_model
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from .controlnet_image_processors import ControlField
 
 from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype
@@ -169,8 +170,7 @@ class TextToLatentsInvocation(BaseInvocation):
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
-    control_model: Optional[str] = Field(default=None, description="The control model to use")
-    control_image: Optional[ImageField] = Field(default=None, description="The processed control image")
+    control: Optional[ControlField] = Field(default=None, description="The control to use")
     # fmt: on
 
     # Schema customisation
@@ -252,21 +252,32 @@ class TextToLatentsInvocation(BaseInvocation):
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(context, model)
 
-        # loading controlnet model
-        if (self.control_model is None or self.control_model==''):
-            control_model = None
+        print("type of control input: ", type(self.control))
+
+        if (self.control is None):
+            control_model_name = None
+            control_image_field = None
+            control_weight = None
         else:
+            control_model_name = self.control.control_model
+            control_image_field = self.control.image
+            control_weight = self.control.control_weight
+
+        # # loading controlnet model
+        # if (self.control_model is None or self.control_model==''):
+        #     control_model = None
+        # else:
             # FIXME: change this to dropdown menu?
             # FIXME: generalize so don't have to hardcode torch_dtype and device
-            control_model = ControlNetModel.from_pretrained(self.control_model,
+            control_model = ControlNetModel.from_pretrained(control_model_name,
                                                             torch_dtype=torch.float16).to("cuda")
         model.control_model = control_model
 
         # loading controlnet image (currently requires pre-processed image)
         control_image = (
-            None if self.control_image is None
+            None if control_image_field is None
             else context.services.images.get(
-                self.control_image.image_type, self.control_image.image_name
+                control_image_field.image_type, control_image_field.image_name
             )
         )
 
