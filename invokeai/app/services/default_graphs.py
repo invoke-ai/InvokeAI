@@ -29,8 +29,7 @@ def create_text_to_image() -> LibraryGraph:
                 Edge(source=EdgeConnection(node_id='seed', field='a'), destination=EdgeConnection(node_id='3', field='seed')),
                 Edge(source=EdgeConnection(node_id='3', field='noise'), destination=EdgeConnection(node_id='5', field='noise')),
                 Edge(source=EdgeConnection(node_id='5', field='latents'), destination=EdgeConnection(node_id='6', field='latents')),
-                Edge(source=EdgeConnection(node_id='4', field='positive'), destination=EdgeConnection(node_id='5', field='positive')),
-                Edge(source=EdgeConnection(node_id='4', field='negative'), destination=EdgeConnection(node_id='5', field='negative')),
+                Edge(source=EdgeConnection(node_id='4', field='conditioning'), destination=EdgeConnection(node_id='5', field='conditioning')),
             ]
         ),
         exposed_inputs=[
