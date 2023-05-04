@@ -61,6 +61,7 @@ export type FieldType =
   | 'image'
   | 'latents'
   | 'conditioning'
+  | 'control'
   | 'model'
   | 'array'
   | 'item'
@@ -82,6 +83,7 @@ export type InputFieldValue =
   | ImageInputFieldValue
   | LatentsInputFieldValue
   | ConditioningInputFieldValue
+  | ControlInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
   | ArrayInputFieldValue
@@ -102,6 +104,7 @@ export type InputFieldTemplate =
   | ImageInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
+  | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
   | ArrayInputFieldTemplate
@@ -177,6 +180,10 @@ export type LatentsInputFieldValue = FieldValueBase & {
 
 export type ConditioningInputFieldValue = FieldValueBase & {
   type: 'conditioning';
+};
+
+export type ControlInputFieldValue = FieldValueBase & {
+  type: 'control';
   value?: undefined;
 };
 
@@ -260,6 +267,11 @@ export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
 export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'conditioning';
+};
+
+export type ControlInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'control';
 };
 
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {

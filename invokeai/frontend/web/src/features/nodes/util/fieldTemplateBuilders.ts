@@ -10,6 +10,7 @@ import {
   IntegerInputFieldTemplate,
   LatentsInputFieldTemplate,
   ConditioningInputFieldTemplate,
+  ControlInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
   ArrayInputFieldTemplate,
@@ -215,6 +216,21 @@ const buildConditioningInputFieldTemplate = ({
   return template;
 };
 
+const buildControlInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ControlInputFieldTemplate => {
+  const template: ControlInputFieldTemplate = {
+    ...baseField,
+    type: 'control',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -330,6 +346,9 @@ export const buildInputFieldTemplate = (
   }
   if (['conditioning'].includes(fieldType)) {
     return buildConditioningInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['control'].includes(fieldType)) {
+    return buildControlInputFieldTemplate({ schemaObject, baseField });
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
