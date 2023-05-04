@@ -16,6 +16,7 @@ import os.path as osp
 from argparse import Namespace
 from pathlib import Path
 from typing import Union
+from pydantic import BaseSettings
 
 Globals = Namespace()
 
@@ -120,3 +121,15 @@ def global_cache_dir(subdir: Union[str, Path] = "") -> Path:
         return Path(home, subdir)
     else:
         return Path(Globals.root, "models", subdir)
+
+def copy_conf_to_globals(conf: Union[dict,BaseSettings]):
+    '''
+    Given a dict or dict-like object, copy its keys and
+    values into the Globals Namespace. This is a transitional
+    workaround until we remove Globals entirely.
+    '''
+    if isinstance(conf,BaseSettings):
+        conf = conf.dict()
+    for key in conf.keys():
+        if key is not None:
+            setattr(Globals,key,conf[key])

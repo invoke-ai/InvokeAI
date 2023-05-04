@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import List, Dict, Literal, get_args, get_type_hints, get_origin
 
 import invokeai.backend.util.logging as logger
-from ...backend import ModelManager, Globals
+from ...backend import ModelManager
 from ..invocations.baseinvocation import BaseInvocation
 from .commands import BaseCommand
+from ..services.invocation_services import InvocationServices
 
 # singleton object, class variable
 completer = None
@@ -131,13 +132,13 @@ class Completer(object):
             readline.redisplay()
             self.linebuffer = None
     
-def set_autocompleter(model_manager: ModelManager) -> Completer:
+def set_autocompleter(services: InvocationServices) -> Completer:
     global completer
     
     if completer:
         return completer
     
-    completer = Completer(model_manager)
+    completer = Completer(services.model_manager)
 
     readline.set_completer(completer.complete)
     # pyreadline3 does not have a set_auto_history() method
@@ -153,7 +154,7 @@ def set_autocompleter(model_manager: ModelManager) -> Completer:
     readline.parse_and_bind("set skip-completed-text on")
     readline.parse_and_bind("set show-all-if-ambiguous on")
 
-    histfile = Path(Globals.root, ".invoke_history")
+    histfile = Path(services.configuration.root_dir / ".invoke_history")
     try:
         readline.read_history_file(histfile)
         readline.set_history_length(1000)

@@ -19,8 +19,7 @@ from invokeai.app.services.metadata import PngMetadataService
 from .services.default_graphs import create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
-from ..backend import Args
-from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers
+from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers, SortedHelpFormatter
 from .cli.completer import set_autocompleter
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
@@ -34,7 +33,7 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-
+from .services.config import InvokeAIAppConfig
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -64,7 +63,7 @@ def add_invocation_args(command_parser):
 
 def get_command_parser(services: InvocationServices) -> argparse.ArgumentParser:
     # Create invocation parser
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=SortedHelpFormatter)
 
     def exit(*args, **kwargs):
         raise InvalidArgs
@@ -189,23 +188,12 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    config = Args()
-    config.parse_args()
+    config = InvokeAIAppConfig()
     model_manager = get_model_manager(config,logger=logger)
-
-    # This initializes the autocompleter and returns it.
-    # Currently nothing is done with the returned Completer
-    # object, but the object can be used to change autocompletion
-    # behavior on the fly, if desired.
-    set_autocompleter(model_manager)
-
+    
     events = EventServiceBase()
-
+    output_folder = config.output_path
     metadata = PngMetadataService()
-
-    output_folder = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../../outputs")
-    )
 
     # TODO: build a file/path manager?
     db_location = os.path.join(output_folder, "invokeai.db")
@@ -226,6 +214,7 @@ def invoke_cli():
         processor=DefaultInvocationProcessor(),
         restoration=RestorationServices(config,logger=logger),
         logger=logger,
+        configuration=config,
     )
 
     system_graphs = create_system_graphs(services.graph_library)
@@ -241,6 +230,7 @@ def invoke_cli():
     # print(services.session_manager.list())
 
     context = CliContext(invoker, session, parser)
+    set_autocompleter(services)
 
     while True:
         try:
