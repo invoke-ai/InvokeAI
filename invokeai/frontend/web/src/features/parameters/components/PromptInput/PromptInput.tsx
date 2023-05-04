@@ -1,7 +1,7 @@
 import { Box, FormControl, Textarea } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, KeyboardEvent, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { readinessSelector } from 'app/selectors/readinessSelector';
@@ -15,7 +15,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { generateGraphBuilt } from 'services/thunks/session';
+import { userInvoked } from 'app/store/middleware/listenerMiddleware/listeners/userInvoked';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -37,7 +37,7 @@ const promptInputSelector = createSelector(
  */
 const PromptInput = () => {
   const dispatch = useAppDispatch();
-  const { prompt } = useAppSelector(promptInputSelector);
+  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
   const { isReady } = useAppSelector(readinessSelector);
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -56,13 +56,16 @@ const PromptInput = () => {
     []
   );
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && e.shiftKey === false && isReady) {
-      e.preventDefault();
-      dispatch(clampSymmetrySteps());
-      dispatch(generateGraphBuilt());
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && e.shiftKey === false && isReady) {
+        e.preventDefault();
+        dispatch(clampSymmetrySteps());
+        dispatch(userInvoked(activeTabName));
+      }
+    },
+    [dispatch, activeTabName, isReady]
+  );
 
   return (
     <Box>

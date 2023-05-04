@@ -1,6 +1,7 @@
 import {
   Edge,
   ImageToImageInvocation,
+  InpaintInvocation,
   IterateInvocation,
   RandomRangeInvocation,
   RangeInvocation,
@@ -8,7 +9,7 @@ import {
 } from 'services/api';
 
 export const buildEdges = (
-  baseNode: TextToImageInvocation | ImageToImageInvocation,
+  baseNode: TextToImageInvocation | ImageToImageInvocation | InpaintInvocation,
   rangeNode: RangeInvocation | RandomRangeInvocation,
   iterateNode: IterateInvocation
 ): Edge[] => {

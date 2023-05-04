@@ -1,5 +1,4 @@
 export const getImageDataTransparency = (pixels: Uint8ClampedArray) => {
-  console.log(pixels);
   let isFullyTransparent = true;
   let isPartiallyTransparent = false;
   const len = pixels.length;

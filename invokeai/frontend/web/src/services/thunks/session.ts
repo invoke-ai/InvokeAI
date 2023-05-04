@@ -1,7 +1,7 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { SessionsService } from 'services/api';
 import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/buildLinearGraph';
-import { buildCanvasGraph } from 'features/nodes/util/buildCanvasGraph';
+import { buildCanvasGraphAndBlobs } from 'features/nodes/util/buildCanvasGraph';
 import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
 import { buildNodesGraph } from 'features/nodes/util/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
@@ -9,62 +9,62 @@ import { serializeError } from 'serialize-error';
 
 const sessionLog = log.child({ namespace: 'session' });
 
-export const generateGraphBuilt = createAppAsyncThunk(
-  'api/generateGraphBuilt',
-  async (_, { dispatch, getState, rejectWithValue }) => {
-    try {
-      const graph = buildGenerateGraph(getState());
-      dispatch(sessionCreated({ graph }));
-      return graph;
-    } catch (err: any) {
-      sessionLog.error(
-        { error: serializeError(err) },
-        'Problem building graph'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
+// export const generateGraphBuilt = createAppAsyncThunk(
+//   'api/generateGraphBuilt',
+//   async (_, { dispatch, getState, rejectWithValue }) => {
+//     try {
+//       const graph = buildGenerateGraph(getState());
+//       dispatch(sessionCreated({ graph }));
+//       return graph;
+//     } catch (err: any) {
+//       sessionLog.error(
+//         { error: serializeError(err) },
+//         'Problem building graph'
+//       );
+//       return rejectWithValue(err.message);
+//     }
+//   }
+// );
 
-export const nodesGraphBuilt = createAppAsyncThunk(
-  'api/nodesGraphBuilt',
-  async (_, { dispatch, getState, rejectWithValue }) => {
-    try {
-      const graph = buildNodesGraph(getState());
-      dispatch(sessionCreated({ graph }));
-      return graph;
-    } catch (err: any) {
-      sessionLog.error(
-        { error: serializeError(err) },
-        'Problem building graph'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
+// export const nodesGraphBuilt = createAppAsyncThunk(
+//   'api/nodesGraphBuilt',
+//   async (_, { dispatch, getState, rejectWithValue }) => {
+//     try {
+//       const graph = buildNodesGraph(getState());
+//       dispatch(sessionCreated({ graph }));
+//       return graph;
+//     } catch (err: any) {
+//       sessionLog.error(
+//         { error: serializeError(err) },
+//         'Problem building graph'
+//       );
+//       return rejectWithValue(err.message);
+//     }
+//   }
+// );
 
-export const canvasGraphBuilt = createAppAsyncThunk(
-  'api/canvasGraphBuilt',
-  async (_, { dispatch, getState, rejectWithValue }) => {
-    try {
-      const graph = await buildCanvasGraph(getState());
-      dispatch(sessionCreated({ graph }));
-      return graph;
-    } catch (err: any) {
-      sessionLog.error(
-        { error: serializeError(err) },
-        'Problem building graph'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
+// export const canvasGraphBuilt = createAppAsyncThunk(
+//   'api/canvasGraphBuilt',
+//   async (_, { dispatch, getState, rejectWithValue }) => {
+//     try {
+//       const graph = await buildCanvasGraph(getState());
+//       dispatch(sessionCreated({ graph }));
+//       return graph;
+//     } catch (err: any) {
+//       sessionLog.error(
+//         { error: serializeError(err) },
+//         'Problem building graph'
+//       );
+//       return rejectWithValue(err.message);
+//     }
+//   }
+// );
 
-export const isFulfilledAnyGraphBuilt = isAnyOf(
-  generateGraphBuilt.fulfilled,
-  nodesGraphBuilt.fulfilled,
-  canvasGraphBuilt.fulfilled
-);
+// export const isFulfilledAnyGraphBuilt = isAnyOf(
+//   generateGraphBuilt.fulfilled,
+//   nodesGraphBuilt.fulfilled,
+//   canvasGraphBuilt.fulfilled
+// );
 
 type SessionCreatedArg = {
   graph: Parameters<

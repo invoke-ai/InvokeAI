@@ -299,8 +299,6 @@ export const frontendToBackendParameters = (
     const doesBaseHaveTransparency = getIsImageDataTransparent(imageData);
     const doesMaskHaveTransparency = getIsImageDataWhite(maskImageData);
 
-    console.log(doesBaseHaveTransparency, doesMaskHaveTransparency);
-
     if (enableImageDebugging) {
       openBase64ImageInTab([
         { base64: maskDataURL, caption: 'mask sent as init_mask' },

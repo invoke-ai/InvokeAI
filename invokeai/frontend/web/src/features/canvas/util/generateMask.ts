@@ -104,6 +104,7 @@
 import { CanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import Konva from 'konva';
 import { IRect } from 'konva/lib/types';
+import { canvasToBlob } from './canvasToBlob';
 
 /**
  * Generating a mask image from InpaintingCanvas.tsx is not as simple
@@ -115,7 +116,7 @@ import { IRect } from 'konva/lib/types';
  * drawing the mask and compositing everything correctly to output a valid
  * mask image.
  */
-const generateMask = (lines: CanvasMaskLine[], boundingBox: IRect): string => {
+const generateMask = async (lines: CanvasMaskLine[], boundingBox: IRect) => {
   // create an offscreen canvas and add the mask to it
   const { width, height } = boundingBox;
 
@@ -157,11 +158,13 @@ const generateMask = (lines: CanvasMaskLine[], boundingBox: IRect): string => {
   stage.add(baseLayer);
   stage.add(maskLayer);
 
-  const dataURL = stage.toDataURL({ ...boundingBox });
+  const maskDataURL = stage.toDataURL(boundingBox);
+
+  const maskBlob = await canvasToBlob(stage.toCanvas(boundingBox));
 
   offscreenContainer.remove();
 
-  return dataURL;
+  return { maskDataURL, maskBlob };
 };
 
 export default generateMask;

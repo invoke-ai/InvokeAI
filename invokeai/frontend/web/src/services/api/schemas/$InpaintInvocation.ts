@@ -29,16 +29,17 @@ export const $InpaintInvocation = {
     width: {
       type: 'number',
       description: `The width of the resulting image`,
-      multipleOf: 64,
+      multipleOf: 8,
     },
     height: {
       type: 'number',
       description: `The height of the resulting image`,
-      multipleOf: 64,
+      multipleOf: 8,
     },
     cfg_scale: {
       type: 'number',
       description: `The Classifier-Free Guidance, higher values may result in a result closer to the prompt`,
+      exclusiveMinimum: 1,
     },
     scheduler: {
       type: 'Enum',
@@ -76,6 +77,50 @@ export const $InpaintInvocation = {
       description: `The mask`,
       contains: [{
         type: 'ImageField',
+      }],
+    },
+    seam_size: {
+      type: 'number',
+      description: `The seam inpaint size (px)`,
+      minimum: 1,
+    },
+    seam_blur: {
+      type: 'number',
+      description: `The seam inpaint blur radius (px)`,
+    },
+    seam_strength: {
+      type: 'number',
+      description: `The seam inpaint strength`,
+      maximum: 1,
+    },
+    seam_steps: {
+      type: 'number',
+      description: `The number of steps to use for seam inpaint`,
+      minimum: 1,
+    },
+    tile_size: {
+      type: 'number',
+      description: `The tile infill method size (px)`,
+      minimum: 1,
+    },
+    infill_method: {
+      type: 'Enum',
+    },
+    inpaint_width: {
+      type: 'number',
+      description: `The width of the inpaint region (px)`,
+      multipleOf: 8,
+    },
+    inpaint_height: {
+      type: 'number',
+      description: `The height of the inpaint region (px)`,
+      multipleOf: 8,
+    },
+    inpaint_fill: {
+      type: 'all-of',
+      description: `The solid infill method color`,
+      contains: [{
+        type: 'ColorField',
       }],
     },
     inpaint_replace: {

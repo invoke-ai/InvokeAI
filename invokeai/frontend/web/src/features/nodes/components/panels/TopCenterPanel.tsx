@@ -1,16 +1,16 @@
 import { HStack } from '@chakra-ui/react';
+import { userInvoked } from 'app/store/middleware/listenerMiddleware/listeners/userInvoked';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
 import { Panel } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
-import { nodesGraphBuilt } from 'services/thunks/session';
 
 const TopCenterPanel = () => {
   const dispatch = useAppDispatch();
 
   const handleInvoke = useCallback(() => {
-    dispatch(nodesGraphBuilt());
+    dispatch(userInvoked('nodes'));
   }, [dispatch]);
 
   const handleReloadSchema = useCallback(() => {

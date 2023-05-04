@@ -120,7 +120,7 @@ const initialSystemState: SystemState = {
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
-  infillMethods: ['tile'],
+  infillMethods: ['tile', 'patchmatch'],
 };
 
 export const systemSlice = createSlice({

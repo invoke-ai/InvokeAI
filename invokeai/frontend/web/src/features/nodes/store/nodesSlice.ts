@@ -13,11 +13,11 @@ import {
 } from 'reactflow';
 import { Graph, ImageField } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
-import { isFulfilledAnyGraphBuilt } from 'services/thunks/session';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
 import { size } from 'lodash-es';
+import { isAnyGraphBuilt } from './actions';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -25,7 +25,6 @@ export type NodesState = {
   schema: OpenAPIV3.Document | null;
   invocationTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
-  lastGraph: Graph | null;
   shouldShowGraphOverlay: boolean;
 };
 
@@ -35,7 +34,6 @@ export const initialNodesState: NodesState = {
   schema: null,
   invocationTemplates: {},
   connectionStartParams: null,
-  lastGraph: null,
   shouldShowGraphOverlay: false,
 };
 
@@ -104,8 +102,9 @@ const nodesSlice = createSlice({
       state.schema = action.payload;
     });
 
-    builder.addMatcher(isFulfilledAnyGraphBuilt, (state, action) => {
-      state.lastGraph = action.payload;
+    builder.addMatcher(isAnyGraphBuilt, (state, action) => {
+      // TODO: Achtung! Side effect in a reducer!
+      log.info({ namespace: 'nodes', data: action.payload }, 'Graph built');
     });
   },
 });

@@ -114,13 +114,18 @@ export class ImagesService {
    * @throws ApiError
    */
   public static uploadImage({
+    imageType,
     formData,
   }: {
+    imageType: ImageType,
     formData: Body_upload_image,
   }): CancelablePromise<ImageResponse> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/images/uploads/',
+      query: {
+        'image_type': imageType,
+      },
       formData: formData,
       mediaType: 'multipart/form-data',
       errors: {

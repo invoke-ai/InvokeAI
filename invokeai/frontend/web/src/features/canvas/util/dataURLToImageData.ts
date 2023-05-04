@@ -1,3 +1,6 @@
+/**
+ * Gets an ImageData object from an image dataURL by drawing it to a canvas.
+ */
 export const dataURLToImageData = async (
   dataURL: string,
   width: number,
