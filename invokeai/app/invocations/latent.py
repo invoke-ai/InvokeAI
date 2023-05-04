@@ -328,6 +328,7 @@ class TextToLatentsInvocation(BaseInvocation):
                                               latents_shape=noise.shape,
                                               do_classifier_free_guidance=(self.cfg_scale >= 1.0))
 
+
         # TODO: Verify the noise is the right size
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
