@@ -15,8 +15,10 @@ from transformers import AutoFeatureExtractor
 
 import invokeai.assets.web as web_assets
 import invokeai.backend.util.logging as logger
-from .globals import global_cache_dir
+from invokeai.app.services.config import InvokeAIAppConfig
 from .util import CPU_DEVICE
+
+config = InvokeAIAppConfig()
 
 class SafetyChecker(object):
     CAUTION_IMG = "caution.png"
@@ -29,7 +31,7 @@ class SafetyChecker(object):
         
         try:
             safety_model_id = "CompVis/stable-diffusion-safety-checker"
-            safety_model_path = global_cache_dir("hub")
+            safety_model_path = config.cache_dir
             self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
                 safety_model_id,
                 local_files_only=True,

@@ -19,11 +19,12 @@ from compel.prompt_parser import (
 )
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals
 
+from invokeai.app.services.config import InvokeAIAppConfig
 from ..stable_diffusion import InvokeAIDiffuserComponent
 from ..util import torch_dtype
 
+config = InvokeAIAppConfig()
 
 def get_uc_and_c_and_ec(
     prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False
@@ -61,7 +62,7 @@ def get_uc_and_c_and_ec(
         negative_prompt_string
     )
 
-    if log_tokens or getattr(Globals, "log_tokenization", False):
+    if log_tokens or config.log_tokenization:
         log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
 
     c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)

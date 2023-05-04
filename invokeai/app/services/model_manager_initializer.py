@@ -2,7 +2,6 @@ import os
 import sys
 import torch
 from argparse import Namespace
-from invokeai.backend import Args
 from omegaconf import OmegaConf
 from pathlib import Path
 from typing import types
@@ -13,7 +12,7 @@ from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 
 # TODO: Replace with an abstract class base ModelManagerBase
-def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
+def get_model_manager(config: InvokeAISettings, logger: types.ModuleType) -> ModelManager:
     model_config = config.model_conf_path
     if not model_config.exists():
         report_model_error(
@@ -44,7 +43,7 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
         else choose_precision(device)
         
         model_manager = ModelManager(
-            OmegaConf.load(config.conf),
+            OmegaConf.load(config.model_conf_path),
             precision=precision,
             device_type=device,
             max_loaded_models=config.max_loaded_models,

@@ -33,8 +33,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
-from invokeai.backend.globals import Globals
-
+from invokeai.app.services.config import InvokeAIAppConfig
 from ..util import CPU_DEVICE, normalize_device
 from .diffusion import (
     AttentionMapSaver,
@@ -44,6 +43,7 @@ from .diffusion import (
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
 from .textual_inversion_manager import TextualInversionManager
 
+config = InvokeAIAppConfig()
 
 @dataclass
 class PipelineIntermediateState:
@@ -351,7 +351,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if (
             torch.cuda.is_available()
             and is_xformers_available()
-            and not Globals.disable_xformers
+            and not config.disable_xformers
         ):
             self.enable_xformers_memory_efficient_attention()
         else:
