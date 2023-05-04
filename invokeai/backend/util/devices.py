@@ -4,12 +4,12 @@ from contextlib import nullcontext
 
 import torch
 from torch import autocast
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 def choose_torch_device() -> torch.device:
     """Convenience routine for guessing which GPU device to run model on"""

@@ -44,34 +44,37 @@ from ...frontend.install.widgets import (
     IntTitleSlider,
     set_min_terminal_size,
 )
-from ..args import PRECISION_CHOICES, Args
-from ..globals import Globals, global_cache_dir, global_config_dir, global_config_file
 from .model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,
     recommended_datasets,
 )
+from invokeai.app.services.config import get_invokeai_config()
 
 warnings.filterwarnings("ignore")
 
 transformers.logging.set_verbosity_error()
 
 # --------------------------globals-----------------------
+config = get_invokeai_config()
+
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
 Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
 
-Default_config_file = Path(global_config_dir()) / "models.yaml"
-SD_Configs = Path(global_config_dir()) / "stable-diffusion"
+Default_config_file = config.model_conf_path
+SD_Configs = config.legacy_conf_path
 
 Datasets = OmegaConf.load(Dataset_path)
 
 # minimum size for the UI
 MIN_COLS = 135
 MIN_LINES = 45
+
+PRECISION_CHOICES = ['auto','float16','float32','autocast']
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -103,7 +106,7 @@ Command-line interface:
    invokeai
 
 If you installed using an installation script, run:
-  {Globals.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+  {config.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
 
 Add the '--help' argument to see all of the command-line switches available for use.
 """
@@ -216,11 +219,11 @@ def download_realesrgan():
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
     model_dest = os.path.join(
-        Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
+        config.root, "models/realesrgan/realesr-general-x4v3.pth"
     )
 
     wdn_model_dest = os.path.join(
-        Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
+        config.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
     )
 
     download_with_progress_bar(model_url, model_dest, "RealESRGAN")
@@ -243,7 +246,7 @@ def download_gfpgan():
             "./models/gfpgan/weights/parsing_parsenet.pth",
         ],
     ):
-        model_url, model_dest = model[0], os.path.join(Globals.root, model[1])
+        model_url, model_dest = model[0], os.path.join(config.root, model[1])
         download_with_progress_bar(model_url, model_dest, "GFPGAN weights")
 
 
@@ -253,7 +256,7 @@ def download_codeformer():
     model_url = (
         "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     )
-    model_dest = os.path.join(Globals.root, "models/codeformer/codeformer.pth")
+    model_dest = os.path.join(config.root, "models/codeformer/codeformer.pth")
     download_with_progress_bar(model_url, model_dest, "CodeFormer")
 
 
@@ -306,7 +309,7 @@ def download_vaes():
         if not hf_download_with_resume(
             repo_id=repo_id,
             model_name=model_name,
-            model_dir=str(Globals.root / Model_dir / Weights_dir),
+            model_dir=str(config.root / Model_dir / Weights_dir),
         ):
             raise Exception(f"download of {model_name} failed")
     except Exception as e:
@@ -321,8 +324,7 @@ def get_root(root: str = None) -> str:
     elif os.environ.get("INVOKEAI_ROOT"):
         return os.environ.get("INVOKEAI_ROOT")
     else:
-        return Globals.root
-
+        return config.root
 
 # -------------------------------------
 class editOptsForm(npyscreen.FormMultiPage):
@@ -332,7 +334,7 @@ class editOptsForm(npyscreen.FormMultiPage):
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
-        first_time = not (Globals.root / Globals.initfile).exists()
+        first_time = not (config.root / 'invokeai.init').exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
         for i in [
@@ -384,7 +386,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.safety_checker = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="NSFW checker",
-            value=old_opts.safety_checker,
+            value=old_opts.nsfw_checker,
             relx=5,
             scroll_exit=True,
         )
@@ -438,14 +440,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.xformers = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Enable xformers support if available",
-            value=old_opts.xformers,
-            relx=5,
-            scroll_exit=True,
-        )
-        self.ckpt_convert = self.add_widget_intelligent(
-            npyscreen.Checkbox,
-            name="Load legacy checkpoint models into memory as diffusers models",
-            value=old_opts.ckpt_convert,
+            value=old_opts.xformers_enabled,
             relx=5,
             scroll_exit=True,
         )
@@ -583,7 +578,6 @@ class editOptsForm(npyscreen.FormMultiPage):
             "xformers",
             "always_use_cpu",
             "embedding_path",
-            "ckpt_convert",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
@@ -628,14 +622,13 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = Args().parse_args([])
+    opts = InvokeAIAppConfig(argv=[])
     outdir = Path(opts.outdir)
     if not outdir.is_absolute():
-        opts.outdir = str(Globals.root / opts.outdir)
+        opts.outdir = str(config.root / opts.outdir)
     if not init_file.exists():
-        opts.safety_checker = True
+        opts.nsfw_checker = True
     return opts
-
 
 def default_user_selections(program_opts: Namespace) -> Namespace:
     return Namespace(
@@ -724,7 +717,6 @@ def write_opts(opts: Namespace, init_file: Path):
 --max_loaded_models={int(opts.max_loaded_models)}
 --{'no-' if not opts.safety_checker else ''}nsfw_checker
 --{'no-' if not opts.xformers else ''}xformers
---{'no-' if not opts.ckpt_convert else ''}ckpt_convert
 {'--free_gpu_mem' if opts.free_gpu_mem else ''}
 {'--always_use_cpu' if opts.always_use_cpu else ''}
 """
@@ -740,13 +732,11 @@ def write_opts(opts: Namespace, init_file: Path):
 
 # -------------------------------------
 def default_output_dir() -> Path:
-    return Globals.root / "outputs"
-
+    return config.root / "outputs"
 
 # -------------------------------------
 def default_embedding_dir() -> Path:
-    return Globals.root / "embeddings"
-
+    return config.root / "embeddings"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
@@ -810,7 +800,7 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
-    Globals.root = Path(os.path.expanduser(get_root(opt.root) or ""))
+    config.root = Path(os.path.expanduser(get_root(opt.root) or ""))
 
     errors = set()
 
@@ -818,9 +808,10 @@ def main():
         models_to_download = default_user_selections(opt)
 
         # We check for to see if the runtime directory is correctly initialized.
-        init_file = Path(Globals.root, Globals.initfile)
-        if not init_file.exists() or not global_config_file().exists():
-            initialize_rootdir(Globals.root, opt.yes_to_all)
+        print('** invokeai.init init file is no longer supported. Migrate this code to invokeai.yaml **')
+        init_file = Path(config.root, 'invokeai.init')
+        if not init_file.exists() or not config.model_conf_path.exists():
+            initialize_rootdir(config.root, opt.yes_to_all)
 
         if opt.yes_to_all:
             write_default_options(opt, init_file)

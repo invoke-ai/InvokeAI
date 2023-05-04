@@ -47,7 +47,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 from ..stable_diffusion import (
     StableDiffusionGeneratorPipeline,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 from ..util import CUDA_DEVICE, ask_user, download_with_resume
 
 class SDLegacyType(Enum):
@@ -68,7 +68,7 @@ class SDModelComponent(Enum):
     feature_extractor="feature_extractor"
     
 DEFAULT_MAX_MODELS = 2
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 class ModelManager(object):
     """

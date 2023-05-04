@@ -26,7 +26,7 @@ import torch
 from safetensors.torch import load_file
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 
 from .model_manager import ModelManager, SDLegacyType
 
@@ -73,7 +73,7 @@ from transformers import (
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
 
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """

@@ -9,7 +9,7 @@ from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 
 from .cross_attention_control import (
     Arguments,
@@ -31,7 +31,7 @@ ModelForwardCallback: TypeAlias = Union[
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
 
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 @dataclass(frozen=True)
 class PostprocessingSettings:

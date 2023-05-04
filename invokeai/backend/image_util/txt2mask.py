@@ -33,11 +33,11 @@ from PIL import Image, ImageOps
 from transformers import AutoProcessor, CLIPSegForImageSegmentation
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 
 CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
 CLIPSEG_SIZE = 352
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 class SegmentedGrayscale(object):
     def __init__(self, image: Image, heatmap: torch.Tensor):

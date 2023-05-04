@@ -6,8 +6,8 @@ import numpy as np
 import torch
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
-config = InvokeAIAppConfig()
+from invokeai.app.services.config import get_invokeai_config
+config = get_invokeai_config()
 
 pretrained_model_url = (
     "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"

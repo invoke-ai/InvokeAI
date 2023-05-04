@@ -15,10 +15,10 @@ from transformers import AutoFeatureExtractor
 
 import invokeai.assets.web as web_assets
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 from .util import CPU_DEVICE
 
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 class SafetyChecker(object):
     CAUTION_IMG = "caution.png"

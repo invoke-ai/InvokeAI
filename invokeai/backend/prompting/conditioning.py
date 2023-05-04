@@ -20,11 +20,11 @@ from compel.prompt_parser import (
 
 import invokeai.backend.util.logging as logger
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 from ..stable_diffusion import InvokeAIDiffuserComponent
 from ..util import torch_dtype
 
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 def get_uc_and_c_and_ec(
     prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False

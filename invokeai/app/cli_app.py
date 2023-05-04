@@ -33,7 +33,7 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-from .services.config import InvokeAIAppConfig
+from .services.config import get_invokeai_config
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -188,7 +188,7 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
-    config = InvokeAIAppConfig()
+    config = get_invokeai_config()
     model_manager = get_model_manager(config,logger=logger)
     
     events = EventServiceBase()

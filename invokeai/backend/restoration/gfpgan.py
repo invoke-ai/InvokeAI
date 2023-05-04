@@ -7,8 +7,8 @@ import torch
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
-config = InvokeAIAppConfig()
+from invokeai.app.services.config import get_invokeai_config
+config = get_invokeai_config()
 
 class GFPGAN:
     def __init__(self, gfpgan_model_path="models/gfpgan/GFPGANv1.4.pth") -> None:

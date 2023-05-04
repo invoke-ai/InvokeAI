@@ -6,9 +6,9 @@ be suppressed or deferred
 """
 import numpy as np
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 class PatchMatch:
     """

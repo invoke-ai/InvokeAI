@@ -33,7 +33,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_invokeai_config
 from ..util import CPU_DEVICE, normalize_device
 from .diffusion import (
     AttentionMapSaver,
@@ -43,7 +43,7 @@ from .diffusion import (
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
 from .textual_inversion_manager import TextualInversionManager
 
-config = InvokeAIAppConfig()
+config = get_invokeai_config()
 
 @dataclass
 class PipelineIntermediateState:
