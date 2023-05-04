@@ -226,10 +226,10 @@ class Inpaint(Img2Img):
     def generate(self,
                  mask_image: Image.Image | torch.FloatTensor,
                  # Seam settings - when 0, doesn't fill seam
-                 seam_size: int = 0,
-                 seam_blur: int = 0,
+                 seam_size: int = 96,
+                 seam_blur: int = 16,
                  seam_strength: float = 0.7,
-                 seam_steps: int = 10,
+                 seam_steps: int = 30,
                  tile_size: int = 32,
                  inpaint_replace=False,
                  infill_method=None,
