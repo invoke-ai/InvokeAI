@@ -345,7 +345,7 @@ class TextToLatentsInvocation(BaseInvocation):
         print("type of control input: ", type(self.control))
 
         if (self.control is None):
-            control_model_name = None
+            control_model = None
             control_image_field = None
             control_weight = None
         else:
