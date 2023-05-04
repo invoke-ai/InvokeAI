@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { ColorField } from './ColorField';
 import type { ImageField } from './ImageField';
 
 /**
@@ -69,6 +70,42 @@ export type InpaintInvocation = {
    * The mask
    */
   mask?: ImageField;
+  /**
+   * The seam inpaint size (px)
+   */
+  seam_size?: number;
+  /**
+   * The seam inpaint blur radius (px)
+   */
+  seam_blur?: number;
+  /**
+   * The seam inpaint strength
+   */
+  seam_strength?: number;
+  /**
+   * The number of steps to use for seam inpaint
+   */
+  seam_steps?: number;
+  /**
+   * The tile infill method size (px)
+   */
+  tile_size?: number;
+  /**
+   * The method used to infill empty regions (px)
+   */
+  infill_method?: 'patchmatch' | 'tile' | 'solid';
+  /**
+   * The width of the inpaint region (px)
+   */
+  inpaint_width?: number;
+  /**
+   * The height of the inpaint region (px)
+   */
+  inpaint_height?: number;
+  /**
+   * The solid infill method color
+   */
+  inpaint_fill?: ColorField;
   /**
    * The amount by which to replace masked areas with latent noise
    */

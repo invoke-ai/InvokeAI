@@ -1,4 +1,4 @@
-export const getNodeType = (
+export const getGenerationMode = (
   baseIsPartiallyTransparent: boolean,
   baseIsFullyTransparent: boolean,
   doesMaskHaveBlackPixels: boolean

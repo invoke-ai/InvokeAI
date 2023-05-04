@@ -20,12 +20,12 @@ export const $NoiseInvocation = {
     width: {
       type: 'number',
       description: `The width of the resulting noise`,
-      multipleOf: 64,
+      multipleOf: 8,
     },
     height: {
       type: 'number',
       description: `The height of the resulting noise`,
-      multipleOf: 64,
+      multipleOf: 8,
     },
   },
 } as const;

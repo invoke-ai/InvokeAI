@@ -1,8 +1,10 @@
 import {
+  Action,
   AnyAction,
   ThunkDispatch,
   combineReducers,
   configureStore,
+  isAnyOf,
 } from '@reduxjs/toolkit';
 
 import { persistReducer } from 'redux-persist';
@@ -33,9 +35,10 @@ import { nodesDenylist } from 'features/nodes/store/nodesPersistDenylist';
 import { postprocessingDenylist } from 'features/parameters/store/postprocessingPersistDenylist';
 import { systemDenylist } from 'features/system/store/systemPersistDenylist';
 import { uiDenylist } from 'features/ui/store/uiPersistDenylist';
-import { resultsDenylist } from 'features/gallery/store/resultsPersistDenylist';
-import { uploadsDenylist } from 'features/gallery/store/uploadsPersistDenylist';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { isAnyGraphBuilt } from 'features/nodes/store/actions';
+import { forEach } from 'lodash-es';
+import { Graph } from 'services/api';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -101,6 +104,27 @@ const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 //   }
 // }
 
+// const actionSanitizer = (action: AnyAction): AnyAction => {
+//   if (isAnyGraphBuilt(action)) {
+//     if (action.payload.nodes) {
+//       const sanitizedNodes: Graph['nodes'] = {};
+//       forEach(action.payload.nodes, (node, key) => {
+//         if (node.type === 'dataURL_image') {
+//           const { dataURL, ...rest } = node;
+//           sanitizedNodes[key] = { ...rest, dataURL: '<<dataURL>>' };
+//         }
+//       });
+//       const sanitizedAction: AnyAction = {
+//         ...action,
+//         payload: { ...action.payload, nodes: sanitizedNodes },
+//       };
+//       return sanitizedAction;
+//     }
+//   }
+
+//   return action;
+// };
+
 export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
@@ -123,6 +147,31 @@ export const store = configureStore({
       'canvas/addPointToCurrentLine',
       'socket/generatorProgress',
     ],
+    actionSanitizer: (action) => {
+      if (isAnyGraphBuilt(action)) {
+        if (action.payload.nodes) {
+          const sanitizedNodes: Graph['nodes'] = {};
+
+          forEach(action.payload.nodes, (node, key) => {
+            if (node.type === 'dataURL_image') {
+              const { dataURL, ...rest } = node;
+              sanitizedNodes[key] = { ...rest, dataURL: '<<dataURL>>' };
+            } else {
+              sanitizedNodes[key] = { ...node };
+            }
+          });
+
+          return {
+            ...action,
+            payload: { ...action.payload, nodes: sanitizedNodes },
+          };
+        }
+      }
+
+      return action;
+    },
+    // stateSanitizer: (state) =>
+    // state.data ? { ...state, data: '<<LONG_BLOB>>' } : state,
   },
 });
 

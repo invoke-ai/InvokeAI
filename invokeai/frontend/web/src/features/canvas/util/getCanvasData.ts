@@ -8,7 +8,8 @@ import {
 } from 'common/util/arrayBuffer';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import generateMask from './generateMask';
-import { dataURLToImageData } from './dataURLToUint8ClampedArray';
+import { dataURLToImageData } from './dataURLToImageData';
+import { canvasToBlob } from './canvasToBlob';
 
 const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
 
@@ -62,10 +63,13 @@ export const getCanvasData = async (state: RootState) => {
   };
 
   const baseDataURL = canvasBaseLayer.toDataURL(offsetBoundingBox);
+  const baseBlob = await canvasToBlob(
+    canvasBaseLayer.toCanvas(offsetBoundingBox)
+  );
 
   canvasBaseLayer.scale(tempScale);
 
-  const maskDataURL = generateMask(
+  const { maskDataURL, maskBlob } = await generateMask(
     isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
     boundingBox
   );
@@ -81,9 +85,6 @@ export const getCanvasData = async (state: RootState) => {
     boundingBox.width,
     boundingBox.height
   );
-
-  console.log('baseImageData', baseImageData);
-  console.log('maskImageData', maskImageData);
 
   const {
     isPartiallyTransparent: baseIsPartiallyTransparent,
@@ -117,7 +118,9 @@ export const getCanvasData = async (state: RootState) => {
 
   return {
     baseDataURL,
+    baseBlob,
     maskDataURL,
+    maskBlob,
     baseIsPartiallyTransparent,
     baseIsFullyTransparent,
     doesMaskHaveBlackPixels,

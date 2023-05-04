@@ -29,16 +29,17 @@ export const $ImageToImageInvocation = {
     width: {
       type: 'number',
       description: `The width of the resulting image`,
-      multipleOf: 64,
+      multipleOf: 8,
     },
     height: {
       type: 'number',
       description: `The height of the resulting image`,
-      multipleOf: 64,
+      multipleOf: 8,
     },
     cfg_scale: {
       type: 'number',
       description: `The Classifier-Free Guidance, higher values may result in a result closer to the prompt`,
+      exclusiveMinimum: 1,
     },
     scheduler: {
       type: 'Enum',
