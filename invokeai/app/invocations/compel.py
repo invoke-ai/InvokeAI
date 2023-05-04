@@ -34,8 +34,7 @@ class CompelOutput(BaseInvocationOutput):
     # model: ModelField           = Field(default=None, description="Model")
     # src? + loras -> tokenizer + text_encoder + loras
     # clip:  ClipField            = Field(default=None, description="Text encoder(clip)")
-    positive: ConditioningField = Field(default=None, description="Positive conditioning")
-    negative: ConditioningField = Field(default=None, description="Negative conditioning")
+    conditioning: ConditioningField = Field(default=None, description="Conditioning")
     #fmt: on
 
 
@@ -134,20 +133,14 @@ class CompelInvocation(BaseInvocation):
             cross_attention_control_args=options.get("cross_attention_control", None),
         )
 
-        name_prefix = f'{context.graph_execution_state_id}__{self.id}'
-        name_positive = f"{name_prefix}_positive"
-        name_negative = f"{name_prefix}_negative"
+        name_cond = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
         # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.set(name_positive, (c, ec))
-        context.services.latents.set(name_negative, (uc, None))
+        context.services.latents.set(name_cond, (c, uc, ec))
 
         return CompelOutput(
-            positive=ConditioningField(
-                conditioning_name=name_positive,
-            ),
-            negative=ConditioningField(
-                conditioning_name=name_negative,
+            conditioning=ConditioningField(
+                conditioning_name=name_cond,
             ),
         )
 
