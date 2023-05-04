@@ -27,3 +27,10 @@ class ImageField(BaseModel):
 
     class Config:
         schema_extra = {"required": ["image_type", "image_name"]}
+
+
+class ColorField(BaseModel):
+    r: int = Field(ge=0, le=255, description="The red component")
+    g: int = Field(ge=0, le=255, description="The green component")
+    b: int = Field(ge=0, le=255, description="The blue component")
+    a: Optional[int] = Field(default=255, ge=0, le=255, description="The alpha component")

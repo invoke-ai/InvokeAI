@@ -20,9 +20,18 @@ class MetadataLatentsField(TypedDict):
     latents_name: str
 
 
+class MetadataColorField(TypedDict):
+    """Pydantic-less ColorField, used for metadata parsing"""
+    r: int
+    g: int
+    b: int
+    a: int
+
+
+
 # TODO: This is a placeholder for `InvocationsUnion` pending resolution of circular imports
 NodeMetadata = Dict[
-    str, str | int | float | bool | MetadataImageField | MetadataLatentsField
+    str, None | str | int | float | bool | MetadataImageField | MetadataLatentsField
 ]
 
 

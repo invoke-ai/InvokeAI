@@ -211,10 +211,10 @@ class Inpaint(Img2Img):
         strength: float,
         mask_blur_radius: int = 8,
         # Seam settings - when 0, doesn't fill seam
-        seam_size: int = 0,
-        seam_blur: int = 0,
+        seam_size: int = 96,
+        seam_blur: int = 16,
         seam_strength: float = 0.7,
-        seam_steps: int = 10,
+        seam_steps: int = 30,
         tile_size: int = 32,
         step_callback=None,
         inpaint_replace=False,
