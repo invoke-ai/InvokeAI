@@ -51,8 +51,6 @@ class ControlOutput(BaseInvocationOutput):
     # fmt: off
     type: Literal["control_output"] = "control_output"
     control: Optional[ControlField] = Field(default=None, description="The control info dict")
-    # raw_processed_image: ImageField = Field(default=None,
-    #                                        description="outputs just the image info (also included in control output)")
     # fmt: on
 
 
@@ -100,6 +98,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         raw_image = context.services.images.get(
+
             self.image.image_type, self.image.image_name
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
@@ -117,6 +116,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         context.services.images.save(image_type, image_name, processed_image, metadata)
 
         """Builds an ImageOutput and its ImageField"""
+
         processed_image_field = ImageField(
             image_name=image_name,
             image_type=image_type,

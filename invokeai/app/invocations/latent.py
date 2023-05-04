@@ -342,21 +342,32 @@ class TextToLatentsInvocation(BaseInvocation):
             multi_control = MultiControlNetModel(control_models)
             model.control_model = multi_control
 
-        # loading controlnet model
-        if (self.control_model is None or self.control_model==''):
-            control_model = None
+        print("type of control input: ", type(self.control))
+
+        if (self.control is None):
+            control_model_name = None
+            control_image_field = None
+            control_weight = None
         else:
+            control_model_name = self.control.control_model
+            control_image_field = self.control.image
+            control_weight = self.control.control_weight
+
+        # # loading controlnet model
+        # if (self.control_model is None or self.control_model==''):
+        #     control_model = None
+        # else:
             # FIXME: change this to dropdown menu?
             # FIXME: generalize so don't have to hardcode torch_dtype and device
-            control_model = ControlNetModel.from_pretrained(self.control_model,
+            control_model = ControlNetModel.from_pretrained(control_model_name,
                                                             torch_dtype=torch.float16).to("cuda")
         model.control_model = control_model
 
         # loading controlnet image (currently requires pre-processed image)
         control_image = (
-            None if self.control_image is None
+            None if control_image_field is None
             else context.services.images.get(
-                self.control_image.image_type, self.control_image.image_name
+                control_image_field.image_type, control_image_field.image_name
             )
         )
 
