@@ -145,7 +145,6 @@ class TextToLatentsInvocation(BaseInvocation):
     # Inputs
     # fmt: off
     conditioning: Optional[ConditioningField] = Field(description="Conditioning for generation")
-    seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
