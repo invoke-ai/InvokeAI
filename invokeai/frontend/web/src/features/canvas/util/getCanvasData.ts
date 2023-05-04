@@ -1,22 +1,18 @@
 import { RootState } from 'app/store/store';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { isCanvasMaskLine } from '../store/canvasTypes';
-import {
-  buildMaskStage,
-  getStageDataURL,
-  getStageImageData,
-} from './generateMask';
 import { log } from 'app/logging/useLogger';
 import {
   areAnyPixelsBlack,
   getImageDataTransparency,
 } from 'common/util/arrayBuffer';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { masks } from 'dateformat';
+import generateMask from './generateMask';
+import { dataURLToImageData } from './dataURLToUint8ClampedArray';
 
 const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
 
-export const getCanvasData = (state: RootState) => {
+export const getCanvasData = async (state: RootState) => {
   const canvasBaseLayer = getCanvasBaseLayer();
   const canvasStage = getCanvasStage();
 
@@ -65,56 +61,43 @@ export const getCanvasData = (state: RootState) => {
     height: boundingBox.height,
   };
 
-  const { stage: maskStage, offscreenContainer } = buildMaskStage(
-    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
-    offsetBoundingBox
-  );
-
-  const maskDataURL = maskStage.toDataURL(offsetBoundingBox);
-
-  const maskImageData = maskStage
-    .toCanvas()
-    .getContext('2d')
-    ?.getImageData(
-      offsetBoundingBox.x,
-      offsetBoundingBox.y,
-      offsetBoundingBox.width,
-      offsetBoundingBox.height
-    );
-
-  offscreenContainer.remove();
-
-  if (!maskImageData) {
-    return;
-  }
-
   const baseDataURL = canvasBaseLayer.toDataURL(offsetBoundingBox);
 
-  const ctx = canvasBaseLayer.getContext();
+  canvasBaseLayer.scale(tempScale);
 
-  const baseImageData = ctx.getImageData(
-    offsetBoundingBox.x,
-    offsetBoundingBox.y,
-    offsetBoundingBox.width,
-    offsetBoundingBox.height
+  const maskDataURL = generateMask(
+    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
+    boundingBox
   );
+
+  const baseImageData = await dataURLToImageData(
+    baseDataURL,
+    boundingBox.width,
+    boundingBox.height
+  );
+
+  const maskImageData = await dataURLToImageData(
+    maskDataURL,
+    boundingBox.width,
+    boundingBox.height
+  );
+
+  console.log('baseImageData', baseImageData);
+  console.log('maskImageData', maskImageData);
 
   const {
     isPartiallyTransparent: baseIsPartiallyTransparent,
     isFullyTransparent: baseIsFullyTransparent,
-  } = getImageDataTransparency(baseImageData);
+  } = getImageDataTransparency(baseImageData.data);
 
-  // const doesMaskHaveBlackPixels = false;
-  const doesMaskHaveBlackPixels = areAnyPixelsBlack(maskImageData);
+  const doesMaskHaveBlackPixels = areAnyPixelsBlack(maskImageData.data);
 
   if (state.system.enableImageDebugging) {
     openBase64ImageInTab([
-      { base64: maskDataURL, caption: 'mask sent as init_mask' },
-      { base64: baseDataURL, caption: 'image sent as init_img' },
+      { base64: maskDataURL, caption: 'mask b64' },
+      { base64: baseDataURL, caption: 'image b64' },
     ]);
   }
-
-  canvasBaseLayer.scale(tempScale);
 
   // generationParameters.init_img = imageDataURL;
   // generationParameters.progress_images = false;

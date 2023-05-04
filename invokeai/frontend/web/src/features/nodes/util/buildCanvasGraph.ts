@@ -16,8 +16,10 @@ const moduleLog = log.child({ namespace: 'buildCanvasGraph' });
 /**
  * Builds the Canvas workflow graph.
  */
-export const buildCanvasGraph = (state: RootState): Graph | undefined => {
-  const c = getCanvasData(state);
+export const buildCanvasGraph = async (
+  state: RootState
+): Promise<Graph | undefined> => {
+  const c = await getCanvasData(state);
 
   if (!c) {
     moduleLog.error('Unable to create canvas graph');
