@@ -993,6 +993,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def prepare_control_image(
         self,
         image,
+        # FIXME: need to fix hardwiring of width and height, change to basing on latents dimensions?
         width=512,
         height=512,
         batch_size=1,
