@@ -47,7 +47,7 @@ export const canvasGraphBuilt = createAppAsyncThunk(
   'api/canvasGraphBuilt',
   async (_, { dispatch, getState, rejectWithValue }) => {
     try {
-      const graph = buildCanvasGraph(getState());
+      const graph = await buildCanvasGraph(getState());
       dispatch(sessionCreated({ graph }));
       return graph;
     } catch (err: any) {
