@@ -48,7 +48,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
-    cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     model:       str = Field(default="", description="The model to use (currently ignored)")
