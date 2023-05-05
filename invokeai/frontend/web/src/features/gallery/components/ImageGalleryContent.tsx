@@ -298,6 +298,7 @@ const ImageGalleryContent = () => {
                 <Virtuoso
                   style={{ height: '100%' }}
                   data={images}
+                  endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
                   itemContent={(index, image) => {
                     const { name } = image;
