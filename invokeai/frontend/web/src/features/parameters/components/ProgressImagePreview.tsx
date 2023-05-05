@@ -15,7 +15,7 @@ import {
 } from 'features/ui/store/uiSlice';
 import { Rnd } from 'react-rnd';
 import { Rect } from 'features/ui/store/uiTypes';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import ProgressImage from './ProgressImage';
 
 const selector = createSelector(

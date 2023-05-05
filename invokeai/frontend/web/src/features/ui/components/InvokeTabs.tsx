@@ -27,7 +27,7 @@ import GenerateWorkspace from './tabs/Generate/GenerateWorkspace';
 import { createSelector } from '@reduxjs/toolkit';
 import { BsLightningChargeFill } from 'react-icons/bs';
 import { configSelector } from 'features/system/store/configSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
