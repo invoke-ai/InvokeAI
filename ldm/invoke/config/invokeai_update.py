@@ -39,7 +39,7 @@ def invokeai_is_running()->bool:
             if matches:
                 print(f':exclamation: [bold red]An InvokeAI instance appears to be running as process {p.pid}[/red bold]')
                 return True
-        except psutil.AccessDenied:
+        except (psutil.AccessDenied,psutil.NoSuchProcess):
             continue
     return False
         
