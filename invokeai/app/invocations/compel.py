@@ -30,35 +30,24 @@ class CompelOutput(BaseInvocationOutput):
 
     #fmt: off
     type: Literal["compel_output"] = "compel_output"
-    # name + loras -> pipeline + loras
-    # model: ModelField           = Field(default=None, description="Model")
-    # src? + loras -> tokenizer + text_encoder + loras
-    # clip:  ClipField            = Field(default=None, description="Text encoder(clip)")
-    positive: ConditioningField = Field(default=None, description="Positive conditioning")
-    negative: ConditioningField = Field(default=None, description="Negative conditioning")
+
+    conditioning: ConditioningField = Field(default=None, description="Conditioning")
     #fmt: on
 
 
 class CompelInvocation(BaseInvocation):
+    """Parse prompt using compel package to conditioning."""
 
     type: Literal["compel"] = "compel"
 
-    positive_prompt: str = Field(default="", description="Positive prompt")
-    negative_prompt: str = Field(default="", description="Negative prompt")
-
+    prompt: str = Field(default="", description="Prompt")
     model: str = Field(default="", description="Model to use")
-    truncate_long_prompts: bool = Field(default=False, description="Whether or not to truncate long prompt to 77 tokens")
-
-    # name + loras -> pipeline + loras
-    # model: ModelField = Field(default=None, description="Model to use") 
-    # src? + loras -> tokenizer + text_encoder + loras
-    # clip: ClipField = Field(default=None, description="Text encoder(clip) to use")
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["latents", "noise"],
+                "tags": ["prompt", "compel"],
                 "type_hints": {
                   "model": "model"
                 }
@@ -88,14 +77,8 @@ class CompelInvocation(BaseInvocation):
             pipeline.textual_inversion_manager.load_huggingface_concepts(concepts)
 
         # apply the concepts library to the prompt
-        positive_prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
-            self.positive_prompt,
-            lambda concepts: load_huggingface_concepts(concepts),
-            pipeline.textual_inversion_manager.get_all_trigger_strings(),
-        )
-
-        negative_prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
-            self.negative_prompt,
+        prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
+            self.prompt,
             lambda concepts: load_huggingface_concepts(concepts),
             pipeline.textual_inversion_manager.get_all_trigger_strings(),
         )
@@ -103,7 +86,7 @@ class CompelInvocation(BaseInvocation):
         # lazy-load any deferred textual inversions.
         # this might take a couple of seconds the first time a textual inversion is used.
         pipeline.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(
-            positive_prompt_str + "[" + negative_prompt_str + "]"
+            prompt_str
         )
 
         compel = Compel(
@@ -111,43 +94,35 @@ class CompelInvocation(BaseInvocation):
             text_encoder=text_encoder,
             textual_inversion_manager=pipeline.textual_inversion_manager,
             dtype_for_device_getter=torch_dtype,
-            truncate_long_prompts=self.truncate_long_prompts,
+            truncate_long_prompts=True, # TODO:
         )
 
         # TODO: support legacy blend?
 
-        positive_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(positive_prompt_str)
-        negative_prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(negative_prompt_str)
+        prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(prompt_str)
 
         if getattr(Globals, "log_tokenization", False):
-            log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
+            log_tokenization_for_prompt_object(prompt, tokenizer)
 
-        # TODO: add lora(with model and clip field types)
-        c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
-        uc, _      = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+        c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
 
-        if not self.truncate_long_prompts:
-            [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+        # TODO: long prompt support
+        #if not self.truncate_long_prompts:
+        #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
         ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-            tokens_count_including_eos_bos=get_max_token_count(tokenizer, positive_prompt),
+            tokens_count_including_eos_bos=get_max_token_count(tokenizer, prompt),
             cross_attention_control_args=options.get("cross_attention_control", None),
         )
 
-        name_prefix = f'{context.graph_execution_state_id}__{self.id}'
-        name_positive = f"{name_prefix}_positive"
-        name_negative = f"{name_prefix}_negative"
+        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
         # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.set(name_positive, (c, ec))
-        context.services.latents.set(name_negative, (uc, None))
+        context.services.latents.set(conditioning_name, (c, ec))
 
         return CompelOutput(
-            positive=ConditioningField(
-                conditioning_name=name_positive,
-            ),
-            negative=ConditioningField(
-                conditioning_name=name_negative,
+            conditioning=ConditioningField(
+                conditioning_name=conditioning_name,
             ),
         )
 
@@ -193,20 +168,6 @@ def get_tokens_for_prompt_object(
         max_tokens_length = tokenizer.model_max_length - 2  # typically 75
         tokens = tokens[0:max_tokens_length]
     return tokens
-
-
-def log_tokenization(
-    positive_prompt: Union[Blend, FlattenedPrompt],
-    negative_prompt: Union[Blend, FlattenedPrompt],
-    tokenizer,
-):
-    print(f"\n>> [TOKENLOG] Parsed Prompt: {positive_prompt}")
-    print(f"\n>> [TOKENLOG] Parsed Negative Prompt: {negative_prompt}")
-
-    log_tokenization_for_prompt_object(positive_prompt, tokenizer)
-    log_tokenization_for_prompt_object(
-        negative_prompt, tokenizer, display_label_prefix="(negative prompt)"
-    )
 
 
 def log_tokenization_for_prompt_object(
