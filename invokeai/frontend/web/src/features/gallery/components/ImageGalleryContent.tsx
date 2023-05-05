@@ -343,6 +343,7 @@ const ImageGalleryContent = () => {
               onClick={handleClickLoadMore}
               isDisabled={!areMoreImagesAvailable}
               isLoading={isLoading}
+              loadingText="Loading"
               flexShrink={0}
             >
               {areMoreImagesAvailable
