@@ -5692,10 +5692,10 @@ redux-persist@^6.0.0:
   resolved "https://registry.yarnpkg.com/redux-persist/-/redux-persist-6.0.0.tgz#b4d2972f9859597c130d40d4b146fecdab51b3a8"
   integrity sha512-71LLMbUq2r02ng2We9S215LtPu3fY0KgaGE0k8WRgl6RkqxtGfl7HUozz1Dftwsb0D/5mZ8dwAaPbtnzfvbEwQ==
 
-redux-remember@^3.2.1:
-  version "3.2.1"
-  resolved "https://registry.yarnpkg.com/redux-remember/-/redux-remember-3.2.1.tgz#e58600336ac7341c56dfe9d69d95db234a7c404e"
-  integrity sha512-ep2E5KOJDGmrvbAuHVfmVpnuftqhJ2um6VpHw/iWa7WvAIFcPq/B678n51NBd/g8BWnNdQ5131cDRKWrRd041Q==
+redux-remember@^3.3.1:
+  version "3.3.1"
+  resolved "https://registry.yarnpkg.com/redux-remember/-/redux-remember-3.3.1.tgz#fad0b3af81458d8e40a54cd30be148c17e40bda9"
+  integrity sha512-x30eZpdryapH8+hinYcyoTiGCSmtPUPdvL7OxjpMeRgTckJrVW57FgRAmiv41COqi/q4H+qn65Uftsasqj+F9A==
 
 redux-thunk@^2.4.2:
   version "2.4.2"
