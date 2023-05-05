@@ -7,6 +7,8 @@ import { ResultsState } from './resultsSlice';
  */
 const itemsToDenylist: (keyof ResultsState)[] = [];
 
+export const resultsPersistDenylist: (keyof ResultsState)[] = [];
+
 export const resultsDenylist = itemsToDenylist.map(
   (denylistItem) => `results.${denylistItem}`
 );

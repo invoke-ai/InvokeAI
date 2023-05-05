@@ -1,6 +1,6 @@
 import { Box } from '@chakra-ui/react';
 import { readinessSelector } from 'app/selectors/readinessSelector';
-import { userInvoked } from 'app/store/middleware/listenerMiddleware/listeners/userInvoked';
+import { userInvoked } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {

@@ -99,6 +99,7 @@
     "redux-deep-persist": "^1.0.7",
     "redux-dynamic-middlewares": "^2.2.0",
     "redux-persist": "^6.0.0",
+    "redux-remember": "^3.2.1",
     "roarr": "^7.15.0",
     "serialize-error": "^11.0.0",
     "socket.io-client": "^4.6.0",

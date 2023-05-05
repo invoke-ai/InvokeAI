@@ -27,12 +27,13 @@ export type ModelsState = typeof initialModelsState;
 
 export const modelsSlice = createSlice({
   name: 'models',
-  initialState: initialModelsState,
+  initialState: modelsAdapter.getInitialState(),
+  // initialState: initialModelsState,
   reducers: {
     modelAdded: modelsAdapter.upsertOne,
-    modelSelected: (state, action: PayloadAction<string>) => {
-      state.selectedModelName = action.payload;
-    },
+    // modelSelected: (state, action: PayloadAction<string>) => {
+    //   state.selectedModelName = action.payload;
+    // },
   },
   extraReducers(builder) {
     /**
@@ -44,18 +45,18 @@ export const modelsSlice = createSlice({
 
       // If the current selected model is `''` or isn't actually in the list of models,
       // choose a random model
-      if (
-        !state.selectedModelName ||
-        !keys(models).includes(state.selectedModelName)
-      ) {
-        const randomModel = sample(models);
+      // if (
+      //   !state.selectedModelName ||
+      //   !keys(models).includes(state.selectedModelName)
+      // ) {
+      //   const randomModel = sample(models);
 
-        if (randomModel) {
-          state.selectedModelName = randomModel.name;
-        } else {
-          state.selectedModelName = '';
-        }
-      }
+      //   if (randomModel) {
+      //     state.selectedModelName = randomModel.name;
+      //   } else {
+      //     state.selectedModelName = '';
+      //   }
+      // }
     });
   },
 });
@@ -75,6 +76,9 @@ export const {
   selectTotal: selectModelsTotal,
 } = modelsAdapter.getSelectors<RootState>((state) => state.models);
 
-export const { modelAdded, modelSelected } = modelsSlice.actions;
+export const {
+  modelAdded,
+  // modelSelected
+} = modelsSlice.actions;
 
 export default modelsSlice.reducer;

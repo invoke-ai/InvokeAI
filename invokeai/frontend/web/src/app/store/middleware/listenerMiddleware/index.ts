@@ -11,12 +11,9 @@ import { addInitialImageSelectedListener } from './listeners/initialImageSelecte
 import { addImageResultReceivedListener } from './listeners/invocationComplete';
 import { addImageUploadedListener } from './listeners/imageUploaded';
 import { addRequestedImageDeletionListener } from './listeners/imageDeleted';
-import {
-  addUserInvokedCanvasListener,
-  addUserInvokedCreateListener,
-  addUserInvokedNodesListener,
-} from './listeners/userInvoked';
-import { addCanvasGraphBuiltListener } from './listeners/canvasGraphBuilt';
+import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
+import { addUserInvokedCreateListener } from './listeners/userInvokedCreate';
+import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -40,7 +37,7 @@ addImageUploadedListener();
 addInitialImageSelectedListener();
 addImageResultReceivedListener();
 addRequestedImageDeletionListener();
+
 addUserInvokedCanvasListener();
 addUserInvokedCreateListener();
 addUserInvokedNodesListener();
-// addCanvasGraphBuiltListener();

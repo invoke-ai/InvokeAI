@@ -34,11 +34,11 @@ import {
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
-import { persistor } from 'app/store/persistor';
 import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
+import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -119,15 +119,18 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldLogToConsole,
   } = useAppSelector(selector);
 
-  /**
-   * Resets localstorage, then opens a secondary modal informing user to
-   * refresh their browser.
-   * */
   const handleClickResetWebUI = useCallback(() => {
-    persistor.purge().then(() => {
-      onSettingsModalClose();
-      onRefreshModalOpen();
+    // Only remove our keys
+    Object.keys(window.localStorage).forEach((key) => {
+      if (
+        LOCALSTORAGE_KEYS.includes(key) ||
+        key.startsWith(LOCALSTORAGE_PREFIX)
+      ) {
+        localStorage.removeItem(key);
+      }
     });
+    onSettingsModalClose();
+    onRefreshModalOpen();
   }, [onSettingsModalClose, onRefreshModalOpen]);
 
   const handleLogLevelChanged = useCallback(

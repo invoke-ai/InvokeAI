@@ -17,7 +17,7 @@ export interface GalleryState {
   currentCategory: 'results' | 'uploads';
 }
 
-const initialState: GalleryState = {
+export const initialGalleryState: GalleryState = {
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
@@ -28,7 +28,7 @@ const initialState: GalleryState = {
 
 export const gallerySlice = createSlice({
   name: 'gallery',
-  initialState,
+  initialState: initialGalleryState,
   reducers: {
     imageSelected: (state, action: PayloadAction<Image | undefined>) => {
       state.selectedImage = action.payload;

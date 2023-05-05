@@ -8,11 +8,7 @@ import {
 import { socketSubscribed, socketUnsubscribed } from './actions';
 import { AppThunkDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
-import {
-  sessionInvoked,
-  isFulfilledSessionCreatedAction,
-  sessionCreated,
-} from 'services/thunks/session';
+import { sessionInvoked, sessionCreated } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { log } from 'app/logging/useLogger';

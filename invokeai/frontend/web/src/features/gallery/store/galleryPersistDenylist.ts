@@ -8,6 +8,11 @@ const itemsToDenylist: (keyof GalleryState)[] = [
   'shouldAutoSwitchToNewImages',
 ];
 
+export const galleryPersistDenylist: (keyof GalleryState)[] = [
+  'currentCategory',
+  'shouldAutoSwitchToNewImages',
+];
+
 export const galleryDenylist = itemsToDenylist.map(
   (denylistItem) => `gallery.${denylistItem}`
 );

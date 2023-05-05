@@ -1,16 +1,8 @@
-import { createAction } from '@reduxjs/toolkit';
 import { startAppListening } from '..';
-import { InvokeTabName } from 'features/ui/store/tabMap';
-import { buildLinearGraph } from 'features/nodes/util/buildLinearGraph';
 import { sessionCreated, sessionInvoked } from 'services/thunks/session';
 import { buildCanvasGraphAndBlobs } from 'features/nodes/util/buildCanvasGraph';
-import { buildNodesGraph } from 'features/nodes/util/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
-import {
-  canvasGraphBuilt,
-  createGraphBuilt,
-  nodesGraphBuilt,
-} from 'features/nodes/store/actions';
+import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { imageUploaded } from 'services/thunks/image';
 import { v4 as uuidv4 } from 'uuid';
 import { Graph } from 'services/api';
@@ -18,26 +10,9 @@ import {
   canvasSessionIdChanged,
   stagingAreaInitialized,
 } from 'features/canvas/store/canvasSlice';
+import { userInvoked } from 'app/store/actions';
 
 const moduleLog = log.child({ namespace: 'invoke' });
-
-export const userInvoked = createAction<InvokeTabName>('app/userInvoked');
-
-export const addUserInvokedCreateListener = () => {
-  startAppListening({
-    predicate: (action): action is ReturnType<typeof userInvoked> =>
-      userInvoked.match(action) && action.payload === 'generate',
-    effect: (action, { getState, dispatch }) => {
-      const state = getState();
-
-      const graph = buildLinearGraph(state);
-      dispatch(createGraphBuilt(graph));
-      moduleLog({ data: graph }, 'Create graph built');
-
-      dispatch(sessionCreated({ graph }));
-    },
-  });
-};
 
 export const addUserInvokedCanvasListener = () => {
   startAppListening({
@@ -146,22 +121,6 @@ export const addUserInvokedCanvasListener = () => {
       }
 
       dispatch(canvasSessionIdChanged(sessionId));
-    },
-  });
-};
-
-export const addUserInvokedNodesListener = () => {
-  startAppListening({
-    predicate: (action): action is ReturnType<typeof userInvoked> =>
-      userInvoked.match(action) && action.payload === 'nodes',
-    effect: (action, { getState, dispatch }) => {
-      const state = getState();
-
-      const graph = buildNodesGraph(state);
-      dispatch(nodesGraphBuilt(graph));
-      moduleLog({ data: graph }, 'Nodes graph built');
-
-      dispatch(sessionCreated({ graph }));
     },
   });
 };

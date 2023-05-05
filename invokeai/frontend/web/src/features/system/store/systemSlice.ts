@@ -89,9 +89,10 @@ export interface SystemState {
    * TODO: get this from backend
    */
   infillMethods: InfillMethod[];
+  isPersisted: boolean;
 }
 
-const initialSystemState: SystemState = {
+export const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
   shouldDisplayGuides: true,
@@ -121,6 +122,7 @@ const initialSystemState: SystemState = {
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
   infillMethods: ['tile', 'patchmatch'],
+  isPersisted: false,
 };
 
 export const systemSlice = createSlice({
@@ -258,6 +260,9 @@ export const systemSlice = createSlice({
     },
     shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldLogToConsole = action.payload;
+    },
+    isPersistedChanged: (state, action: PayloadAction<boolean>) => {
+      state.isPersisted = action.payload;
     },
   },
   extraReducers(builder) {
@@ -476,6 +481,7 @@ export const {
   subscribedNodeIdsSet,
   consoleLogLevelChanged,
   shouldLogToConsoleChanged,
+  isPersistedChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
