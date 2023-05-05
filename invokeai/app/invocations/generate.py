@@ -250,8 +250,8 @@ class InpaintInvocation(ImageToImageInvocation):
 
         outputs = Inpaint(model).generate(
             prompt=self.prompt,
-            init_img=image,
-            init_mask=mask,
+            init_image=image,
+            mask_image=mask,
             step_callback=partial(self.dispatch_progress, context, source_node_id),
             **self.dict(
                 exclude={"prompt", "image", "mask"}
