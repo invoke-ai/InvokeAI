@@ -81,7 +81,8 @@ class PreprocessedControlInvocation(BaseInvocation, PILInvocationConfig):
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(image)
-        image_type = ImageType.INTERMEDIATE
+        # image_type = ImageType.INTERMEDIATE
+        image_type = ImageType.RESULT
         image_name = context.services.images.create_name(
             context.graph_execution_state_id, self.id
         )
@@ -124,3 +125,77 @@ class CannyControlInvocation(PreprocessedControlInvocation, PILInvocationConfig)
         return processed_image
 
 
+class HedProcessorInvocation(PreprocessedControlInvocation, PILInvocationConfig):
+    """Applies HED edge detection to image"""
+
+    # fmt: off
+    type: Literal["hed_control"] = "hed_control"
+
+    # Inputs
+    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
+    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    safe: bool = Field(default=False, description="whether to use safe mode")
+    scribble: bool = Field(default=False, description="whether to use scribble mode")
+    return_pil: bool = Field(default=True, description="whether to return PIL image")
+    # fmt: on
+
+    def run_processor(self, image):
+        print("**** running HED processor ****")
+        hed_processor = HEDdetector.from_pretrained("lllyasviel/Annotators")
+        processed_image = hed_processor(image,
+                                        detect_resolution=self.detect_resolution,
+                                        image_resolution=self.image_resolution,
+                                        safe=self.safe,
+                                        return_pil=self.return_pil,
+                                        scribble=self.scribble,
+                                        )
+        return processed_image
+
+
+class LineartProcessorInvocation(PreprocessedControlInvocation, PILInvocationConfig):
+    """Applies line art processing to image"""
+
+    # fmt: off
+    type: Literal["lineart_control"] = "lineart_control"
+    # Inputs
+    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
+    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    coarse: bool = Field(default=False, description="whether to use coarse mode")
+    return_pil: bool = Field(default=True, description="whether to return PIL image")
+
+    # fmt: on
+
+    def run_processor(self, image):
+        print("**** running Lineart processor ****")
+        print("image type: ", type(image))
+        lineart_processor = LineartDetector.from_pretrained("lllyasviel/Annotators")
+        processed_image = lineart_processor(image,
+                                            detect_resolution=self.detect_resolution,
+                                            image_resolution=self.image_resolution,
+                                            return_pil=self.return_pil,
+                                            coarse=self.coarse)
+        return processed_image
+
+
+class OpenposeProcessorInvocation(PreprocessedControlInvocation, PILInvocationConfig):
+    """Applies Openpose processing to image"""
+
+    # fmt: off
+    type: Literal["openpose_control"] = "openpose_control"
+    # Inputs
+    hand_and_face: bool = Field(default=False, description="whether to use hands and face mode")
+    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
+    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    return_pil: bool = Field(default=True, description="whether to return PIL image")
+    # fmt: on
+
+    def run_processor(self, image):
+        print("**** running Openpose processor ****")
+        print("image type: ", type(image))
+        openpose_processor = OpenposeDetector.from_pretrained("lllyasviel/Annotators")
+        processed_image = openpose_processor(image,
+                                             detect_resolution=self.detect_resolution,
+                                             image_resolution=self.image_resolution,
+                                             hand_and_face=self.hand_and_face,
+                                             return_pil=self.return_pil)
+        return processed_image
