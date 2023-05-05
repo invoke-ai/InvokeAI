@@ -1,17 +1,23 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
+import { ImageField, ImageType } from 'services/api';
+
+export type SelectedImage = {
+  name: string;
+  type: ImageType;
+};
 
 export interface GenerationState {
   cfgScale: number;
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI._Image | string; // can be an Image or url
+  initialImage?: SelectedImage; // can be an Image or url
   iterations: number;
   maskPath: string;
   perlin: number;
@@ -179,136 +185,126 @@ export const generationSlice = createSlice({
       state,
       action: PayloadAction<InvokeAI.Metadata>
     ) => {
-      const {
-        sampler,
-        prompt,
-        seed,
-        variations,
-        steps,
-        cfg_scale,
-        threshold,
-        perlin,
-        seamless,
-        _hires_fix,
-        width,
-        height,
-      } = action.payload.image;
-
-      if (variations && variations.length > 0) {
-        state.seedWeights = seedWeightsToString(variations);
-        state.shouldGenerateVariations = true;
-        state.variationAmount = 0;
-      } else {
-        state.shouldGenerateVariations = false;
-      }
-
-      if (seed) {
-        state.seed = seed;
-        state.shouldRandomizeSeed = false;
-      }
-
-      if (prompt) state.prompt = promptToString(prompt);
-      if (sampler) state.sampler = sampler;
-      if (steps) state.steps = steps;
-      if (cfg_scale) state.cfgScale = cfg_scale;
-      if (typeof threshold === 'undefined') {
-        state.threshold = 0;
-      } else {
-        state.threshold = threshold;
-      }
-      if (typeof perlin === 'undefined') {
-        state.perlin = 0;
-      } else {
-        state.perlin = perlin;
-      }
-      if (typeof seamless === 'boolean') state.seamless = seamless;
-      // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
-      if (width) state.width = width;
-      if (height) state.height = height;
+      // const {
+      //   sampler,
+      //   prompt,
+      //   seed,
+      //   variations,
+      //   steps,
+      //   cfg_scale,
+      //   threshold,
+      //   perlin,
+      //   seamless,
+      //   _hires_fix,
+      //   width,
+      //   height,
+      // } = action.payload.image;
+      // if (variations && variations.length > 0) {
+      //   state.seedWeights = seedWeightsToString(variations);
+      //   state.shouldGenerateVariations = true;
+      //   state.variationAmount = 0;
+      // } else {
+      //   state.shouldGenerateVariations = false;
+      // }
+      // if (seed) {
+      //   state.seed = seed;
+      //   state.shouldRandomizeSeed = false;
+      // }
+      // if (prompt) state.prompt = promptToString(prompt);
+      // if (sampler) state.sampler = sampler;
+      // if (steps) state.steps = steps;
+      // if (cfg_scale) state.cfgScale = cfg_scale;
+      // if (typeof threshold === 'undefined') {
+      //   state.threshold = 0;
+      // } else {
+      //   state.threshold = threshold;
+      // }
+      // if (typeof perlin === 'undefined') {
+      //   state.perlin = 0;
+      // } else {
+      //   state.perlin = perlin;
+      // }
+      // if (typeof seamless === 'boolean') state.seamless = seamless;
+      // // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
+      // if (width) state.width = width;
+      // if (height) state.height = height;
     },
     setAllImageToImageParameters: (
       state,
       action: PayloadAction<InvokeAI.Metadata>
     ) => {
-      const { type, strength, fit, init_image_path, mask_image_path } =
-        action.payload.image;
-
-      if (type === 'img2img') {
-        if (init_image_path) state.initialImage = init_image_path;
-        if (mask_image_path) state.maskPath = mask_image_path;
-        if (strength) state.img2imgStrength = strength;
-        if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-      }
+      //   const { type, strength, fit, init_image_path, mask_image_path } =
+      //     action.payload.image;
+      //   if (type === 'img2img') {
+      //     if (init_image_path) state.initialImage = init_image_path;
+      //     if (mask_image_path) state.maskPath = mask_image_path;
+      //     if (strength) state.img2imgStrength = strength;
+      //     if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
+      //   }
     },
     setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
-      const {
-        type,
-        sampler,
-        prompt,
-        seed,
-        variations,
-        steps,
-        cfg_scale,
-        threshold,
-        perlin,
-        seamless,
-        _hires_fix,
-        width,
-        height,
-        strength,
-        fit,
-        init_image_path,
-        mask_image_path,
-      } = action.payload.image;
-
-      if (type === 'img2img') {
-        if (init_image_path) state.initialImage = init_image_path;
-        if (mask_image_path) state.maskPath = mask_image_path;
-        if (strength) state.img2imgStrength = strength;
-        if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-      }
-
-      if (variations && variations.length > 0) {
-        state.seedWeights = seedWeightsToString(variations);
-        state.shouldGenerateVariations = true;
-        state.variationAmount = 0;
-      } else {
-        state.shouldGenerateVariations = false;
-      }
-
-      if (seed) {
-        state.seed = seed;
-        state.shouldRandomizeSeed = false;
-      }
-
-      if (prompt) {
-        const [promptOnly, negativePrompt] = getPromptAndNegative(prompt);
-        if (promptOnly) state.prompt = promptOnly;
-        negativePrompt
-          ? (state.negativePrompt = negativePrompt)
-          : (state.negativePrompt = '');
-      }
-
-      if (sampler) state.sampler = sampler;
-      if (steps) state.steps = steps;
-      if (cfg_scale) state.cfgScale = cfg_scale;
-      if (typeof threshold === 'undefined') {
-        state.threshold = 0;
-      } else {
-        state.threshold = threshold;
-      }
-      if (typeof perlin === 'undefined') {
-        state.perlin = 0;
-      } else {
-        state.perlin = perlin;
-      }
-      if (typeof seamless === 'boolean') state.seamless = seamless;
-      // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
-      if (width) state.width = width;
-      if (height) state.height = height;
-
-      // state.shouldRunESRGAN = false; // TODO: Needs to be fixed after reorg
-      // state.shouldRunFacetool = false; // TODO: Needs to be fixed after reorg
+      //   const {
+      //     type,
+      //     sampler,
+      //     prompt,
+      //     seed,
+      //     variations,
+      //     steps,
+      //     cfg_scale,
+      //     threshold,
+      //     perlin,
+      //     seamless,
+      //     _hires_fix,
+      //     width,
+      //     height,
+      //     strength,
+      //     fit,
+      //     init_image_path,
+      //     mask_image_path,
+      //   } = action.payload.image;
+      //   if (type === 'img2img') {
+      //     if (init_image_path) state.initialImage = init_image_path;
+      //     if (mask_image_path) state.maskPath = mask_image_path;
+      //     if (strength) state.img2imgStrength = strength;
+      //     if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
+      //   }
+      //   if (variations && variations.length > 0) {
+      //     state.seedWeights = seedWeightsToString(variations);
+      //     state.shouldGenerateVariations = true;
+      //     state.variationAmount = 0;
+      //   } else {
+      //     state.shouldGenerateVariations = false;
+      //   }
+      //   if (seed) {
+      //     state.seed = seed;
+      //     state.shouldRandomizeSeed = false;
+      //   }
+      //   if (prompt) {
+      //     const [promptOnly, negativePrompt] = getPromptAndNegative(prompt);
+      //     if (promptOnly) state.prompt = promptOnly;
+      //     negativePrompt
+      //       ? (state.negativePrompt = negativePrompt)
+      //       : (state.negativePrompt = '');
+      //   }
+      //   if (sampler) state.sampler = sampler;
+      //   if (steps) state.steps = steps;
+      //   if (cfg_scale) state.cfgScale = cfg_scale;
+      //   if (typeof threshold === 'undefined') {
+      //     state.threshold = 0;
+      //   } else {
+      //     state.threshold = threshold;
+      //   }
+      //   if (typeof perlin === 'undefined') {
+      //     state.perlin = 0;
+      //   } else {
+      //     state.perlin = perlin;
+      //   }
+      //   if (typeof seamless === 'boolean') state.seamless = seamless;
+      //   // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
+      //   if (width) state.width = width;
+      //   if (height) state.height = height;
+      //   // state.shouldRunESRGAN = false; // TODO: Needs to be fixed after reorg
+      //   // state.shouldRunFacetool = false; // TODO: Needs to be fixed after reorg
     },
     resetParametersState: (state) => {
       return {
@@ -355,7 +351,7 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
-    initialImageSelected: (state, action: PayloadAction<string>) => {
+    initialImageSelected: (state, action: PayloadAction<SelectedImage>) => {
       state.initialImage = action.payload;
       state.isImageToImageEnabled = true;
     },

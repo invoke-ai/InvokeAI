@@ -1,4 +1,4 @@
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import promptToString from './promptToString';
 
 export function getPromptAndNegative(inputPrompt: InvokeAI.Prompt) {

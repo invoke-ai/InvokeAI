@@ -30,9 +30,9 @@ work fine.
 import numpy as np
 import torch
 from PIL import Image, ImageOps
-from torchvision import transforms
 from transformers import AutoProcessor, CLIPSegForImageSegmentation
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import global_cache_dir
 
 CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
@@ -83,7 +83,7 @@ class Txt2Mask(object):
     """
 
     def __init__(self, device="cpu", refined=False):
-        print(">> Initializing clipseg model for text to mask inference")
+        logger.info("Initializing clipseg model for text to mask inference")
 
         # BUG: we are not doing anything with the device option at this time
         self.device = device
@@ -101,18 +101,6 @@ class Txt2Mask(object):
         provided image and returns a SegmentedGrayscale object in which the brighter
         pixels indicate where the object is inferred to be.
         """
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-                transforms.Resize(
-                    (CLIPSEG_SIZE, CLIPSEG_SIZE)
-                ),  # must be multiple of 64...
-            ]
-        )
-
         if type(image) is str:
             image = Image.open(image).convert("RGB")
 

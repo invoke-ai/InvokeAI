@@ -13,21 +13,20 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
+
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.metadata import PngMetadataService
-
 from .services.default_graphs import create_system_graphs
-
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
 from ..backend import Args
-from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers, get_graph_execution_history
+from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers
 from .cli.completer import set_autocompleter
-from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
 from .services.model_manager_initializer import get_model_manager
 from .services.restoration_services import RestorationServices
-from .services.graph import Edge, EdgeConnection, ExposedNodeInput, GraphExecutionState, GraphInvocation, LibraryGraph, are_connection_types_compatible
+from .services.graph import Edge, EdgeConnection, GraphExecutionState, GraphInvocation, LibraryGraph, are_connection_types_compatible
 from .services.default_graphs import default_text_to_image_graph_id
 from .services.image_storage import DiskImageStorage
 from .services.invocation_queue import MemoryInvocationQueue
@@ -182,7 +181,7 @@ def invoke_all(context: CliContext):
     # Print any errors
     if context.session.has_error():
         for n in context.session.errors:
-            print(
+            context.invoker.services.logger.error(
                 f"Error in node {n} (source node {context.session.prepared_source_mapping[n]}): {context.session.errors[n]}"
             )
         
@@ -192,13 +191,13 @@ def invoke_all(context: CliContext):
 def invoke_cli():
     config = Args()
     config.parse_args()
-    model_manager = get_model_manager(config)
+    model_manager = get_model_manager(config,logger=logger)
 
     # This initializes the autocompleter and returns it.
     # Currently nothing is done with the returned Completer
     # object, but the object can be used to change autocompletion
     # behavior on the fly, if desired.
-    completer = set_autocompleter(model_manager)
+    set_autocompleter(model_manager)
 
     events = EventServiceBase()
 
@@ -225,7 +224,8 @@ def invoke_cli():
             filename=db_location, table_name="graph_executions"
         ),
         processor=DefaultInvocationProcessor(),
-        restoration=RestorationServices(config),
+        restoration=RestorationServices(config,logger=logger),
+        logger=logger,
     )
 
     system_graphs = create_system_graphs(services.graph_library)
@@ -365,12 +365,12 @@ def invoke_cli():
             invoke_all(context)
 
         except InvalidArgs:
-            print('Invalid command, use "help" to list commands')
+            invoker.services.logger.warning('Invalid command, use "help" to list commands')
             continue
 
         except SessionError:
             # Start a new session
-            print("Session error: creating a new session")
+            invoker.services.logger.warning("Session error: creating a new session")
             context.reset()
 
         except ExitCli:

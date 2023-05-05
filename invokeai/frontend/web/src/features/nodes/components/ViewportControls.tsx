@@ -1,6 +1,6 @@
 import { ButtonGroup } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { IAIIconButton } from 'exports';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { memo, useCallback } from 'react';
 import { FaCode, FaExpand, FaMinus, FaPlus } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';

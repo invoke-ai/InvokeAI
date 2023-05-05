@@ -1,8 +1,8 @@
-import React, { lazy, PropsWithChildren, useEffect } from 'react';
+import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { buildMiddleware, store } from './app/store';
-import { persistor } from './persistor';
+import { store } from 'app/store/store';
+import { persistor } from '../store/persistor';
 import { OpenAPI } from 'services/api';
 import '@fontsource/inter/100.css';
 import '@fontsource/inter/200.css';
@@ -14,14 +14,15 @@ import '@fontsource/inter/700.css';
 import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
 
-import Loading from './common/components/Loading/Loading';
+import Loading from '../../common/components/Loading/Loading';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { PartialAppConfig } from 'app/invokeai';
+import { PartialAppConfig } from 'app/types/invokeai';
 
-import './i18n';
+import '../../i18n';
+import { socketMiddleware } from 'services/events/middleware';
 
-const App = lazy(() => import('./app/App'));
-const ThemeLocaleProvider = lazy(() => import('./app/ThemeLocaleProvider'));
+const App = lazy(() => import('./App'));
+const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
@@ -29,7 +30,7 @@ interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
 }
 
-export default function Component({ apiUrl, token, config, children }: Props) {
+const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
   useEffect(() => {
     // configure API client token
     if (token) {
@@ -50,7 +51,7 @@ export default function Component({ apiUrl, token, config, children }: Props) {
     // the `apiUrl`/`token` dynamically.
 
     // rebuild socket middleware with token and apiUrl
-    addMiddleware(buildMiddleware());
+    addMiddleware(socketMiddleware());
   }, [apiUrl, token]);
 
   return (
@@ -66,4 +67,6 @@ export default function Component({ apiUrl, token, config, children }: Props) {
       </Provider>
     </React.StrictMode>
   );
-}
+};
+
+export default memo(InvokeAIUI);

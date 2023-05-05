@@ -8,10 +8,6 @@ from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from pathlib import Path
 from ..dependencies import ApiDependencies
-from invokeai.backend.globals import Globals, global_converted_ckpts_dir
-from invokeai.backend.args import Args
-
-
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -112,19 +108,20 @@ async def update_model(
 async def delete_model(model_name: str) -> None:
     """Delete Model"""
     model_names = ApiDependencies.invoker.services.model_manager.model_names()
+    logger = ApiDependencies.invoker.services.logger
     model_exists = model_name in model_names
 
     # check if model exists
-    print(f">> Checking for model {model_name}...")
+    logger.info(f"Checking for model {model_name}...")
            
     if model_exists:
-        print(f">> Deleting Model: {model_name}")
+        logger.info(f"Deleting Model: {model_name}")
         ApiDependencies.invoker.services.model_manager.del_model(model_name, delete_files=True)
-        print(f">> Model Deleted: {model_name}")
+        logger.info(f"Model Deleted: {model_name}")
         raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
     else:
-        print(f">> Model not found")
+        logger.error(f"Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
     
 

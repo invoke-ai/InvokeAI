@@ -1,12 +1,12 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
 import { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash';
+import { clamp, cloneDeep } from 'lodash-es';
 //
 import { RgbaColor } from 'react-colorful';
 import calculateCoordinates from '../util/calculateCoordinates';

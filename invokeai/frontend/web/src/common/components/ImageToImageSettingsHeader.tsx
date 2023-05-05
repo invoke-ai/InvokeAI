@@ -1,34 +1,13 @@
-import {
-  Box,
-  ButtonGroup,
-  Collapse,
-  Flex,
-  Heading,
-  HStack,
-  Image,
-  Spacer,
-  Text,
-  useDisclosure,
-  VStack,
-} from '@chakra-ui/react';
-import { motion } from 'framer-motion';
-
-import IAIButton from 'common/components/IAIButton';
-import ImageFit from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageFit';
-import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
+import { ButtonGroup, Flex, Spacer, Text } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
 
 import { useTranslation } from 'react-i18next';
 import { FaUndo, FaUpload } from 'react-icons/fa';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 
 const ImageToImageSettingsHeader = () => {
-  const isImageToImageEnabled = useAppSelector(
-    (state: RootState) => state.generation.isImageToImageEnabled
-  );
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

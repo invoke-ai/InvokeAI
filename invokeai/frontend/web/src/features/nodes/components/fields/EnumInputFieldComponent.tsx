@@ -1,5 +1,5 @@
 import { Select } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   EnumInputFieldTemplate,

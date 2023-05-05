@@ -1,4 +1,4 @@
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { Graph } from 'services/api';
 import { buildImg2ImgNode } from './buildImageToImageNode';
 import { buildTxt2ImgNode } from './buildTextToImageNode';

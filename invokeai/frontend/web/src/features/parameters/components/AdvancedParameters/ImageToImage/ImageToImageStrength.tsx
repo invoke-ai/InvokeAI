@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setImg2imgStrength } from 'features/parameters/store/generationSlice';

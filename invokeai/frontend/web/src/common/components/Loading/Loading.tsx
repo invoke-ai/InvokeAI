@@ -1,5 +1,6 @@
 import { Flex, Image, Spinner } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
+import { memo } from 'react';
 
 // This component loads before the theme so we cannot use theme tokens here
 
@@ -29,4 +30,4 @@ const Loading = () => {
   );
 };
 
-export default Loading;
+export default memo(Loading);

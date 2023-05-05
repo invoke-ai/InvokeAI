@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldRunESRGAN } from 'features/parameters/store/postprocessingSlice';
 import { ChangeEvent } from 'react';

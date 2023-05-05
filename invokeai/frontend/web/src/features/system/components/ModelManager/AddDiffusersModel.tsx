@@ -7,16 +7,16 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react';
-import { InvokeDiffusersModelConfigProps } from 'app/invokeai';
-import { addNewModel } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { InvokeDiffusersModelConfigProps } from 'app/types/invokeai';
+// import { addNewModel } from 'app/socketio/actions';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { RootState } from 'app/store';
+import type { RootState } from 'app/store/store';
 import IAIForm from 'common/components/IAIForm';
 import { IAIFormItemWrapper } from 'common/components/IAIForms/IAIFormItemWrapper';
 

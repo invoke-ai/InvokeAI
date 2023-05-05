@@ -25,6 +25,7 @@ from typing import Union
 import torch
 from safetensors.torch import load_file
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import global_cache_dir, global_config_dir
 
 from .model_manager import ModelManager, SDLegacyType
@@ -372,9 +373,9 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     unet_key = "model.diffusion_model."
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100:
-        print(f"   | Checkpoint {path} has both EMA and non-EMA weights.")
+        logger.debug(f"Checkpoint {path} has both EMA and non-EMA weights.")
         if extract_ema:
-            print("   | Extracting EMA weights (usually better for inference)")
+            logger.debug("Extracting EMA weights (usually better for inference)")
             for key in keys:
                 if key.startswith("model.diffusion_model"):
                     flat_ema_key = "model_ema." + "".join(key.split(".")[1:])
@@ -392,8 +393,8 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                             key
                         )
         else:
-            print(
-                "   | Extracting only the non-EMA weights (usually better for fine-tuning)"
+            logger.debug(
+                "Extracting only the non-EMA weights (usually better for fine-tuning)"
             )
 
     for key in keys:
@@ -1115,7 +1116,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         if "global_step" in checkpoint:
             global_step = checkpoint["global_step"]
         else:
-            print("   | global_step key not found in model")
+            logger.debug("global_step key not found in model")
             global_step = None
 
         # sometimes there is a state_dict key and sometimes not
@@ -1229,15 +1230,15 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         # If a replacement VAE path was specified, we'll incorporate that into
         # the checkpoint model and then convert it
         if vae_path:
-            print(f"   | Converting VAE {vae_path}")
+            logger.debug(f"Converting VAE {vae_path}")
             replace_checkpoint_vae(checkpoint,vae_path)
         # otherwise we use the original VAE, provided that
         # an externally loaded diffusers VAE was not passed
         elif not vae:
-            print("   | Using checkpoint model's original VAE")
+            logger.debug("Using checkpoint model's original VAE")
 
         if vae:
-            print("   | Using replacement diffusers VAE")
+            logger.debug("Using replacement diffusers VAE")
         else:  # convert the original or replacement VAE
             vae_config = create_vae_diffusers_config(
                 original_config, image_size=image_size

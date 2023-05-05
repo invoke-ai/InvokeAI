@@ -1,4 +1,4 @@
-import { Image } from 'app/invokeai';
+import { Image } from 'app/types/invokeai';
 import { ImageField, ImageType } from 'services/api';
 import { AnyInvocation } from 'services/events/types';
 

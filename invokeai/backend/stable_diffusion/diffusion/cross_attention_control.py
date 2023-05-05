@@ -13,8 +13,8 @@ from compel.cross_attention_control import Arguments
 from diffusers.models.attention_processor import AttentionProcessor
 from torch import nn
 
+import invokeai.backend.util.logging as logger
 from ...util import torch_dtype
-
 
 class CrossAttentionType(enum.Enum):
     SELF = 1
@@ -421,7 +421,7 @@ def get_cross_attention_modules(
     expected_count = 16
     if cross_attention_modules_in_model_count != expected_count:
         # non-fatal error but .swap() won't work.
-        print(
+        logger.error(
             f"Error! CrossAttentionControl found an unexpected number of {cross_attention_class} modules in the model "
             + f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed "
             + "or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, "

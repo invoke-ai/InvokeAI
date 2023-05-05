@@ -1,6 +1,6 @@
-import { AppDispatch, AppGetState } from 'app/store';
+import { AppDispatch, AppGetState } from 'app/store/store';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { debounce } from 'lodash';
+import { debounce } from 'lodash-es';
 import { setDoesCanvasNeedScaling } from '../canvasSlice';
 
 const debouncedCanvasScale = debounce((dispatch: AppDispatch) => {

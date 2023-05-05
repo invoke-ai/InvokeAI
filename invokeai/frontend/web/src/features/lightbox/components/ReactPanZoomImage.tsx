@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { TransformComponent, useTransformContext } from 'react-zoom-pan-pinch';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import { useGetUrl } from 'common/util/getUrl';
 
 type ReactPanZoomProps = {

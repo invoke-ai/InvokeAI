@@ -1,3 +1,5 @@
+import { Image } from 'app/types/invokeai';
+import { get, isObject, isString } from 'lodash-es';
 import {
   GraphExecutionState,
   GraphInvocationOutput,
@@ -6,6 +8,8 @@ import {
   PromptOutput,
   IterateInvocationOutput,
   CollectInvocationOutput,
+  ImageType,
+  ImageField,
 } from 'services/api';
 
 export const isImageOutput = (
@@ -31,3 +35,16 @@ export const isIterateOutput = (
 export const isCollectOutput = (
   output: GraphExecutionState['results'][string]
 ): output is CollectInvocationOutput => output.type === 'collect_output';
+
+export const isImageType = (t: unknown): t is ImageType =>
+  isString(t) && ['results', 'uploads', 'intermediates'].includes(t);
+
+export const isImage = (image: unknown): image is Image =>
+  isObject(image) &&
+  isString(get(image, 'name')) &&
+  isImageType(get(image, 'type'));
+
+export const isImageField = (imageField: unknown): imageField is ImageField =>
+  isObject(imageField) &&
+  isString(get(imageField, 'image_name')) &&
+  isImageType(get(imageField, 'image_type'));

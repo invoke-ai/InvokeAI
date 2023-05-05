@@ -1,4 +1,6 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
+
+from typing import types
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.backend import ModelManager
 
@@ -29,6 +31,7 @@ class InvocationServices:
             self,
             model_manager: ModelManager,
             events: EventServiceBase,
+            logger: types.ModuleType,
             latents: LatentsStorageBase,
             images: ImageStorageBase,
             metadata: MetadataServiceBase,
@@ -40,6 +43,7 @@ class InvocationServices:
     ):
         self.model_manager = model_manager
         self.events = events
+        self.logger = logger
         self.latents = latents
         self.images = images
         self.metadata = metadata
