@@ -2,22 +2,20 @@ import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 
-import { selectedImageSelector } from '../store/gallerySelectors';
-import CurrentImageFallback from './CurrentImageFallback';
+import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
 import { DragEvent, memo, useCallback } from 'react';
 
 export const imagesSelector = createSelector(
-  [uiSelector, selectedImageSelector, systemSelector],
-  (ui, selectedImage, system) => {
+  [uiSelector, gallerySelector],
+  (ui, gallery) => {
     const { shouldShowImageDetails, shouldHidePreview } = ui;
-
+    const { selectedImage } = gallery;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
