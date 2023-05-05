@@ -21,7 +21,6 @@
   "scripts": {
     "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
-    "dev:nodes": "concurrently \"vite dev --mode nodes\" \"yarn run theme:watch\"",
     "dev:host": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
     "api:web": "openapi -i http://localhost:9090/openapi.json -o src/services/api --client axios --useOptions --useUnionTypes --exportSchemas true --indent 2 --request src/services/fixtures/request.ts",
