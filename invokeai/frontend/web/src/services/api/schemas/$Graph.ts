@@ -40,6 +40,8 @@ export const $Graph = {
         }, {
           type: 'ScaleLatentsInvocation',
         }, {
+          type: 'ImageToLatentsInvocation',
+        }, {
           type: 'AddInvocation',
         }, {
           type: 'SubtractInvocation',
@@ -61,6 +63,8 @@ export const $Graph = {
           type: 'RestoreFaceInvocation',
         }, {
           type: 'TextToImageInvocation',
+        }, {
+          type: 'InfillImageInvocation',
         }, {
           type: 'GraphInvocation',
         }, {

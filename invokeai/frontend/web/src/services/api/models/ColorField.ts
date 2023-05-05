@@ -8,16 +8,16 @@ export type ColorField = {
    */
   'r': number;
   /**
-   * The blue component
-   */
-  'b': number;
-  /**
    * The green component
    */
   'g': number;
   /**
+   * The blue component
+   */
+  'b': number;
+  /**
    * The alpha component
    */
-  'a'?: number;
+  'a': number;
 };
 

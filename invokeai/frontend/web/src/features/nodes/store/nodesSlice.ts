@@ -11,13 +11,14 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { Graph, ImageField } from 'services/api';
+import { ColorField, Graph, ImageField } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
 import { size } from 'lodash-es';
 import { isAnyGraphBuilt } from './actions';
+import { RgbaColor } from 'react-colorful';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -69,6 +70,7 @@ const nodesSlice = createSlice({
           | number
           | boolean
           | Pick<ImageField, 'image_name' | 'image_type'>
+          | RgbaColor
           | undefined;
       }>
     ) => {

@@ -1,8 +1,30 @@
 import { Graph } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
-import { reduce } from 'lodash-es';
+import { cloneDeep, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';
-import { AnyInvocation } from 'services/events/types';
+import { InputFieldValue } from '../types/types';
+
+/**
+ * We need to do special handling for some fields
+ */
+export const parseFieldValue = (field: InputFieldValue) => {
+  if (field.type === 'color') {
+    if (field.value) {
+      const clonedValue = cloneDeep(field.value);
+
+      const { r, g, b, a } = field.value;
+
+      // scale alpha value to PIL's desired range 0-255
+      const scaledAlpha = Math.max(0, Math.min(a * 255, 255));
+      const transformedColor = { r, g, b, a: scaledAlpha };
+
+      Object.assign(clonedValue, transformedColor);
+      return clonedValue;
+    }
+  }
+
+  return field.value;
+};
 
 /**
  * Builds a graph from the node editor state.
@@ -20,7 +42,8 @@ export const buildNodesGraph = (state: RootState): Graph => {
       const transformedInputs = reduce(
         inputs,
         (inputsAccumulator, input, name) => {
-          inputsAccumulator[name] = input.value;
+          const parsedValue = parseFieldValue(input);
+          inputsAccumulator[name] = parsedValue;
 
           return inputsAccumulator;
         },
