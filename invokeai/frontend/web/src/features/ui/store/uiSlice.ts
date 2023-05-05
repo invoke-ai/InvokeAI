@@ -4,7 +4,7 @@ import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
 import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
 
-const initialUIState: UIState = {
+export const initialUIState: UIState = {
   activeTab: 0,
   currentTheme: 'dark',
   parametersPanelScrollPosition: 0,
@@ -26,11 +26,9 @@ const initialUIState: UIState = {
   shouldAutoShowProgressImages: false,
 };
 
-const initialState: UIState = initialUIState;
-
 export const uiSlice = createSlice({
   name: 'ui',
-  initialState,
+  initialState: initialUIState,
   reducers: {
     setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
       setActiveTabReducer(state, action.payload);

@@ -6,16 +6,22 @@ import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import {
-  modelSelected,
+  // modelSelected,
   selectedModelSelector,
+  selectModelsById,
   selectModelsIds,
 } from '../store/modelSlice';
 import { RootState } from 'app/store/store';
+import generationSlice, {
+  modelSelected,
+} from 'features/parameters/store/generationSlice';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 
 const selector = createSelector(
-  [(state: RootState) => state],
-  (state) => {
-    const selectedModel = selectedModelSelector(state);
+  [(state: RootState) => state, generationSelector],
+  (state, generation) => {
+    // const selectedModel = selectedModelSelector(state);
+    const selectedModel = selectModelsById(state, generation.model);
     const allModelNames = selectModelsIds(state);
     return {
       allModelNames,

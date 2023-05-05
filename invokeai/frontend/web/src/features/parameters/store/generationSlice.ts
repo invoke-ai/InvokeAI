@@ -38,9 +38,10 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   isImageToImageEnabled: boolean;
+  model: string;
 }
 
-const initialGenerationState: GenerationState = {
+export const initialGenerationState: GenerationState = {
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -70,6 +71,7 @@ const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   isImageToImageEnabled: false,
+  model: '',
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -353,6 +355,9 @@ export const generationSlice = createSlice({
     isImageToImageEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isImageToImageEnabled = action.payload;
     },
+    modelSelected: (state, action: PayloadAction<string>) => {
+      state.model = action.payload;
+    },
   },
 });
 
@@ -396,6 +401,7 @@ export const {
   setVerticalSymmetrySteps,
   initialImageChanged,
   isImageToImageEnabledChanged,
+  modelSelected,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

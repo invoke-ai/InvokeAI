@@ -21,7 +21,7 @@ type AdditionalUploadsState = {
   nextPage: number;
 };
 
-const initialUploadsState =
+export const initialUploadsState =
   uploadsAdapter.getInitialState<AdditionalUploadsState>({
     page: 0,
     pages: 0,

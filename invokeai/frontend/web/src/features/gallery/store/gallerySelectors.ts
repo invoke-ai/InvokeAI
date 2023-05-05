@@ -44,6 +44,11 @@ export const imageGallerySelector = createSelector(
 
     const { isLightboxOpen } = lightbox;
 
+    const images =
+      currentCategory === 'results'
+        ? selectResultsEntities(state)
+        : selectUploadsAll(state);
+
     return {
       shouldPinGallery,
       galleryImageMinimumWidth,
@@ -53,7 +58,7 @@ export const imageGallerySelector = createSelector(
         : `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       shouldAutoSwitchToNewImages,
       currentCategory,
-      images: state[currentCategory].entities,
+      images,
       galleryWidth,
       shouldEnableResize:
         isLightboxOpen ||
