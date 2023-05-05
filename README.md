@@ -175,6 +175,13 @@ not supported.
 
 8. Point your browser to http://localhost:9090 to bring up the web interface.
 9. Type `banana sushi` in the box on the top left and click `Invoke`.
+10. For running Onnx Pipeline need to
+    i. configure the utils.py in openvino installed packages at line 33 and add line "os.environ["PATH"] = os.path.abspath(lib_path) + ";" + os.environ["PATH"]"
+    ii. Copy models weight file into the root directory of InvokeAI.
+    iii. To invoke Onnx pipeline use the following flag
+        ```terminal
+        invokeai --modeltype "Onnx"
+        ```
 
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.
