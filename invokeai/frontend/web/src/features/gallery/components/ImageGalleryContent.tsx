@@ -170,6 +170,14 @@ const ImageGalleryContent = () => {
     }
   }, []);
 
+  const handleEndReached = useCallback(() => {
+    if (currentCategory === 'results') {
+      dispatch(receivedResultImagesPage());
+    } else if (currentCategory === 'uploads') {
+      dispatch(receivedUploadImagesPage());
+    }
+  }, [dispatch, currentCategory]);
+
   return (
     <Flex flexDirection="column" w="full" h="full" gap={4}>
       <Flex
@@ -310,6 +318,7 @@ const ImageGalleryContent = () => {
                 <VirtuosoGrid
                   style={{ height: '100%' }}
                   data={images}
+                  endReached={handleEndReached}
                   components={{
                     Item: ItemContainer,
                     List: ListContainer,
