@@ -47,7 +47,7 @@ class ControlOutput(BaseInvocationOutput):
     # fmt: off
     type: Literal["control_output"] = "control_output"
     control: Optional[ControlField] = Field(default=None, description="The control info dict")
-    # image: ImageField = Field(default=None, description="outputs just them image info (which is also included in control output)")
+    raw_processed_image: ImageField = Field(default=None, description="outputs just them image info (which is also included in control output)")
     # fmt: on
 
 
@@ -101,7 +101,8 @@ class PreprocessedControlInvocation(BaseInvocation, PILInvocationConfig):
                 image=image_field,
                 control_model=self.control_model,
                 control_weight=self.control_weight,
-            )
+            ),
+            raw_processed_image=image_field,
         )
 
 
