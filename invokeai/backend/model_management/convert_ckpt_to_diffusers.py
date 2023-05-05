@@ -29,6 +29,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import global_cache_dir, global_config_dir
 
 from .model_manager import ModelManager, SDLegacyType
+from .model_cache import ModelCache
 
 try:
     from omegaconf import OmegaConf
@@ -1100,7 +1101,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         if Path(checkpoint_path).suffix == '.ckpt':
             if scan_needed:
-                ModelManager.scan_model(checkpoint_path,checkpoint_path)
+                ModelCache.scan_model(checkpoint_path,checkpoint_path)
             checkpoint = torch.load(checkpoint_path)
         else:
             checkpoint = load_file(checkpoint_path)

@@ -24,10 +24,10 @@ from collections.abc import Generator
 from collections import Counter
 from enum import Enum
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Sequence, Union, Tuple, types
 
 import torch
-from diffusers import AutoencoderKL, SchedulerMixin, UNet2DConditionModel
+from diffusers import StableDiffusionPipeline, AutoencoderKL, SchedulerMixin, UNet2DConditionModel
 from diffusers import logging as diffusers_logging
 from diffusers.pipelines.stable_diffusion.safety_checker import \
     StableDiffusionSafetyChecker
@@ -40,7 +40,6 @@ from transformers import logging as transformers_logging
 import invokeai.backend.util.logging as logger
 from ..globals import global_cache_dir
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
-from . import load_pipeline_from_original_stable_diffusion_ckpt
 
 MAX_MODELS = 4
 
@@ -54,9 +53,17 @@ class SDModelType(Enum):
     scheduler=SchedulerMixin
     safety_checker=StableDiffusionSafetyChecker
     feature_extractor=CLIPFeatureExtractor
+
+class ModelStatus(Enum):
+    unknown='unknown'
+    not_loaded='not loaded'
+    in_ram='cached'
+    in_vram='in gpu'
+    active='locked in gpu'
         
 # The list of model classes we know how to fetch, for typechecking
 ModelClass = Union[tuple([x.value for x in SDModelType])]
+DiffusionClasses = (StableDiffusionGeneratorPipeline, AutoencoderKL, SchedulerMixin, UNet2DConditionModel)
 
 # Legacy information needed to load a legacy checkpoint file
 class LegacyInfo(BaseModel):
@@ -81,6 +88,7 @@ class ModelCache(object):
             sequential_offload: bool=False,
             lazy_offloading: bool=True,
             sha_chunksize: int = 16777216,
+            logger: types.ModuleType = logger
     ):
         '''
         :param max_models: Maximum number of models to cache in CPU RAM [4]
@@ -100,8 +108,10 @@ class ModelCache(object):
         self.execution_device: torch.device=execution_device
         self.storage_device: torch.device=storage_device
         self.sha_chunksize=sha_chunksize
+        self.logger = logger
         self.loaded_models: set = set()   # set of model keys loaded in GPU
         self.locked_models: Counter = Counter()   # set of model keys locked in GPU
+
 
     @contextlib.contextmanager
     def get_model(
@@ -112,6 +122,7 @@ class ModelCache(object):
             submodel: SDModelType=None,
             revision: str=None,
             legacy_info: LegacyInfo=None,
+            attach_model_part: Tuple[SDModelType, str] = (None,None),
             gpu_load: bool=True,
             )->Generator[ModelClass, None, None]:
         '''
@@ -122,10 +133,28 @@ class ModelCache(object):
               with cache.get_model('stabilityai/stable-diffusion-2') as SD2:
                    do_something_with_the_model(SD2)
 
+        You can fetch an individual part of a diffusers model by passing the submodel
+        argument:
+
+              vae_context = cache.get_model(
+                                        'stabilityai/sd-stable-diffusion-2', 
+                                         submodel=SDModelType.vae
+                                         )
+
+        Vice versa, you can load and attach an external submodel to a diffusers model 
+        before returning it by passing the attach_submodel argument. This only works with
+        diffusers models:
+
+              pipeline_context = cache.get_model(
+                                      'runwayml/stable-diffusion-v1-5',
+                                      attach_model_part=(SDModelType.vae,'stabilityai/sd-vae-ft-mse')
+                                      )
+
         The model will be locked into GPU VRAM for the duration of the context.
         :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
         :param subfolder: name of a subfolder in which the model can be found, e.g. "vae"
         :param submodel: an SDModelType enum indicating the model part to return, e.g. SDModelType.vae
+        :param attach_model_part: load and attach a diffusers model component. Pass a tuple of format (SDModelType,repo_id)
         :param revision: model revision
         :param model_class: class of model to return
         :param gpu_load: load the model into GPU [default True]
@@ -151,6 +180,8 @@ class ModelCache(object):
                 revision=revision,
                 legacy_info=legacy_info,
             )
+            if model_type==SDModelType.diffusion_pipeline and attach_model_part[0]:
+                self.attach_part(model,*attach_model_part)
             self.stack.append(key)          # add to LRU cache
             self.models[key]=model          # keep copy of model in dict
             
@@ -163,7 +194,7 @@ class ModelCache(object):
                 self.locked_models[key] += 1
                 if self.lazy_offloading:
                     self._offload_unlocked_models()
-                logger.debug(f'Loading {key} into {self.execution_device}')
+                self.logger.debug(f'Loading {key} into {self.execution_device}')
                 model.to(self.execution_device)  # move into GPU
                 self._print_cuda_stats()
                 yield model
@@ -181,25 +212,59 @@ class ModelCache(object):
                 self.loaded_models.remove(key)
             yield model
 
-    def _offload_unlocked_models(self):
-        to_offload = set()
-        for key in self.loaded_models:
-            if key not in self.locked_models or self.locked_models[key] == 0:
-                logger.debug(f'Offloading {key} from {self.execution_device} into {self.storage_device}')
-                to_offload.add(key)
-        for key in to_offload:
-            self.models[key].to(self.storage_device)
-            self.loaded_models.remove(key)
+    def attach_part(self,
+                     diffusers_model: StableDiffusionPipeline,
+                     part_type: SDModelType,
+                     part_id: str
+                     ):
+        '''
+        Attach a diffusers model part to a diffusers model. This can be
+        used to replace the VAE, tokenizer, textencoder, unet, etc.
+        :param diffuser_model: The diffusers model to attach the part to.
+        :param part_type: An SD ModelType indicating the part
+        :param part_id: A HF repo_id for the part
+        '''
+        part_key = part_type.name
+        part_class = part_type.value
+        part = self._load_diffusers_from_storage(
+            part_id,
+            model_class=part_class,
+        )
+        part.to(diffusers_model.device)
+        setattr(diffusers_model,part_key,part)
+        self.logger.debug(f'Attached {part_key} {part_id}')
+
+    def status(self,
+               repo_id_or_path: Union[str,Path],
+               model_type: SDModelType=SDModelType.diffusion_pipeline,
+               revision: str=None,
+               subfolder: Path=None,
+               )->ModelStatus:
+        key = self._model_key(
+            repo_id_or_path,
+            model_type.value,
+            revision,
+            subfolder)
+        if key not in self.models:
+            return ModelStatus.not_loaded
+        if key in self.loaded_models:
+            if self.locked_models[key] > 0:
+                return ModelStatus.active
+            else:
+                return ModelStatus.in_vram
+        else:
+            return ModelStatus.in_ram
 
     def model_hash(self,
                    repo_id_or_path: Union[str,Path],
-                   revision: str=None)->str:
+                   revision: str="main")->str:
         '''
         Given the HF repo id or path to a model on disk, returns a unique
         hash. Works for legacy checkpoint files, HF models on disk, and HF repo IDs
         :param repo_id_or_path: repo_id string or Path to model file/directory on disk.
         :param revision: optional revision string (if fetching a HF repo_id)
         '''
+        revision = revision or "main"
         if self.is_legacy_ckpt(repo_id_or_path):
             return self._legacy_model_hash(repo_id_or_path)
         elif Path(repo_id_or_path).is_dir():
@@ -210,96 +275,6 @@ class ModelCache(object):
     def cache_size(self)->int:
         "Return the current number of models cached."
         return len(self.models)
-
-    @staticmethod
-    def _model_key(path,model_class,revision,subfolder)->str:
-        return ':'.join([str(path),model_class.__name__,str(revision or ''),str(subfolder or '')])
-
-    def _has_cuda(self)->bool:
-        return self.execution_device.type == 'cuda'
-
-    def _print_cuda_stats(self):
-        vram = "%4.2fG" % (torch.cuda.memory_allocated() / 1e9)
-        loaded_models = len(self.loaded_models)
-        locked_models = len([x for x in self.locked_models if self.locked_models[x]>0])
-        logger.debug(f"Current VRAM usage: {vram}; locked_models/loaded_models = {locked_models}/{loaded_models}")
-
-    def _make_cache_room(self):
-        models_in_ram = len(self.models)
-        while models_in_ram >= self.max_models:
-            if least_recently_used_key := self.stack.pop(0):
-                logger.debug(f'Maximum cache size reached: cache_size={models_in_ram}; unloading model {least_recently_used_key}')
-                del self.models[least_recently_used_key]
-            models_in_ram = len(self.models)
-        gc.collect()
-
-    @property
-    def current_model(self)->ModelClass:
-        '''
-        Returns current model.
-        '''
-        return self.models[self._current_model_key]
-
-    @property
-    def _current_model_key(self)->str:
-        '''
-        Returns key of currently loaded model.
-        '''
-        return self.stack[-1]
-
-    def _load_model_from_storage(
-            self,
-            repo_id_or_path: Union[str,Path],
-            subfolder: Path=None,
-            revision: str=None,
-            model_class: ModelClass=StableDiffusionGeneratorPipeline,
-            legacy_info: LegacyInfo=None,
-            )->ModelClass:
-        '''
-        Load and return a HuggingFace model.
-        :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
-        :param subfolder: name of a subfolder in which the model can be found, e.g. "vae"
-        :param revision: model revision
-        :param model_class: class of model to return, defaults to StableDiffusionGeneratorPIpeline
-        :param legacy_info: a LegacyInfo object containing additional info needed to load a legacy ckpt
-        '''
-        # silence transformer and diffuser warnings
-        with SilenceWarnings():
-            if self.is_legacy_ckpt(repo_id_or_path):
-                model = self._load_ckpt_from_storage(repo_id_or_path, legacy_info)
-            else:
-                model = self._load_diffusers_from_storage(
-                    repo_id_or_path,
-                    subfolder,
-                    revision,
-                    model_class,
-                )
-        if self.sequential_offload and isinstance(model,StableDiffusionGeneratorPipeline):
-            model.enable_offload_submodels(self.execution_device)
-        elif hasattr(model,'to'):
-            model.to(self.execution_device)
-        return model
-
-    def _load_diffusers_from_storage(
-            self,
-            repo_id_or_path: Union[str,Path],
-            subfolder: Path=None,
-            revision: str=None,
-            model_class: ModelClass=StableDiffusionGeneratorPipeline,
-    )->ModelClass:
-        '''
-        Load and return a HuggingFace model using from_pretrained().
-        :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
-        :param subfolder: name of a subfolder in which the model can be found, e.g. "vae"
-        :param revision: model revision
-        :param model_class: class of model to return, defaults to StableDiffusionGeneratorPIpeline
-        '''
-        return model_class.from_pretrained(
-            repo_id_or_path,
-            revision=revision,
-            subfolder=subfolder or '.',
-            cache_dir=global_cache_dir('hub'),
-        )
 
     @classmethod
     def is_legacy_ckpt(cls, repo_id_or_path: Union[str,Path])->bool:
@@ -327,6 +302,106 @@ class ModelCache(object):
         else:
             logger.debug("Model scanned ok")
             
+    @staticmethod
+    def _model_key(path,model_class,revision,subfolder)->str:
+        return ':'.join([str(path),model_class.__name__,str(revision or ''),str(subfolder or '')])
+
+    def _has_cuda(self)->bool:
+        return self.execution_device.type == 'cuda'
+
+    def _print_cuda_stats(self):
+        vram = "%4.2fG" % (torch.cuda.memory_allocated() / 1e9)
+        loaded_models = len(self.loaded_models)
+        locked_models = len([x for x in self.locked_models if self.locked_models[x]>0])
+        logger.debug(f"Current VRAM usage: {vram}; locked_models/loaded_models = {locked_models}/{loaded_models}")
+
+    def _make_cache_room(self):
+        models_in_ram = len(self.models)
+        while models_in_ram >= self.max_models:
+            if least_recently_used_key := self.stack.pop(0):
+                logger.debug(f'Maximum cache size reached: cache_size={models_in_ram}; unloading model {least_recently_used_key}')
+                del self.models[least_recently_used_key]
+            models_in_ram = len(self.models)
+        gc.collect()
+
+    def _offload_unlocked_models(self):
+        to_offload = set()
+        for key in self.loaded_models:
+            if key not in self.locked_models or self.locked_models[key] == 0:
+                self.logger.debug(f'Offloading {key} from {self.execution_device} into {self.storage_device}')
+                to_offload.add(key)
+        for key in to_offload:
+            self.models[key].to(self.storage_device)
+            self.loaded_models.remove(key)
+
+    def _load_model_from_storage(
+            self,
+            repo_id_or_path: Union[str,Path],
+            subfolder: Path=None,
+            revision: str=None,
+            model_class: ModelClass=StableDiffusionGeneratorPipeline,
+            legacy_info: LegacyInfo=None,
+            )->ModelClass:
+        '''
+        Load and return a HuggingFace model.
+        :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
+        :param subfolder: name of a subfolder in which the model can be found, e.g. "vae"
+        :param revision: model revision
+        :param model_class: class of model to return, defaults to StableDiffusionGeneratorPIpeline
+        :param legacy_info: a LegacyInfo object containing additional info needed to load a legacy ckpt
+        '''
+        if self.is_legacy_ckpt(repo_id_or_path):
+            model = self._load_ckpt_from_storage(repo_id_or_path, legacy_info)
+        else:
+            model = self._load_diffusers_from_storage(
+                repo_id_or_path,
+                subfolder,
+                revision,
+                model_class,
+            )
+        if self.sequential_offload and isinstance(model,StableDiffusionGeneratorPipeline):
+            model.enable_offload_submodels(self.execution_device)
+        return model
+
+    def _load_diffusers_from_storage(
+            self,
+            repo_id_or_path: Union[str,Path],
+            subfolder: Path=None,
+            revision: str=None,
+            model_class: ModelClass=StableDiffusionGeneratorPipeline,
+    )->ModelClass:
+        '''
+        Load and return a HuggingFace model using from_pretrained().
+        :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
+        :param subfolder: name of a subfolder in which the model can be found, e.g. "vae"
+        :param revision: model revision
+        :param model_class: class of model to return, defaults to StableDiffusionGeneratorPIpeline
+        '''
+        self.logger.info(f'Loading model {repo_id_or_path}')
+        revisions = [revision] if revision \
+            else ['fp16','main'] if self.precision==torch.float16 \
+                 else ['main']
+        extra_args = {'precision': self.precision} \
+            if model_class in DiffusionClasses \
+               else {}
+
+        # silence transformer and diffuser warnings
+        with SilenceWarnings():
+            for rev in revisions:
+                try:
+                    model =  model_class.from_pretrained(
+                        repo_id_or_path,
+                        revision=rev,
+                        subfolder=subfolder or '.',
+                        cache_dir=global_cache_dir('hub'),
+                        **extra_args,
+                    )
+                    self.logger.debug(f'Found revision {rev}')
+                    break
+                except OSError:
+                    pass
+        return model
+
     def _load_ckpt_from_storage(self,
                                 ckpt_path: Union[str,Path],
                                 legacy_info:LegacyInfo)->StableDiffusionGeneratorPipeline:
@@ -336,13 +411,17 @@ class ModelCache(object):
         :param legacy_info: LegacyInfo object containing paths to legacy config file and alternate vae if required
         '''
         assert legacy_info is not None
-        pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
-            checkpoint_path=ckpt_path,
-            original_config_file=legacy_info.config_file,
-            vae_path=legacy_info.vae_file,
-            return_generator_pipeline=True,
-            precision=self.precision,
-        )
+
+        # deferred loading to avoid circular import errors
+        from .convert_ckpt_to_diffusers import load_pipeline_from_original_stable_diffusion_ckpt
+        with SilenceWarnings():
+            pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
+                checkpoint_path=ckpt_path,
+                original_config_file=legacy_info.config_file,
+                vae_path=legacy_info.vae_file,
+                return_generator_pipeline=True,
+                precision=self.precision,
+            )
         return pipeline
 
     def _legacy_model_hash(self, checkpoint_path: Union[str,Path])->str:
@@ -398,6 +477,7 @@ class ModelCache(object):
         if not desired_revisions:
             raise KeyError(f"Revision '{revision}' not found in {repo_id}")
         return desired_revisions[0].target_commit
+
 
 class SilenceWarnings(object):
     def __init__(self):

@@ -93,6 +93,8 @@ def global_converted_ckpts_dir() -> Path:
 def global_set_root(root_dir: Union[str, Path]):
     Globals.root = root_dir
 
+def global_resolve_path(path: Union[str,Path]):
+    return Path(Globals.root,path).resolve()
 
 def global_cache_dir(subdir: Union[str, Path] = "") -> Path:
     """
