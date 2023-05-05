@@ -178,6 +178,7 @@ class ModelCache(object):
             if hasattr(model,'to') and (key in self.loaded_models
                                         and self.locked_models[key] == 0):
                 model.to(self.storage_device)
+                self.loaded_models.remove(key)
             yield model
 
     def _offload_unlocked_models(self):
