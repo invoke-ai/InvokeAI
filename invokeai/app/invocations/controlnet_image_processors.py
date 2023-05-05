@@ -136,7 +136,6 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
     # Input
     low_threshold: float = Field(default=100, ge=0, description="low threshold of Canny pixel gradient")
     high_threshold: float = Field(default=200, ge=0, description="high threshold of Canny pixel gradient")
-
     # fmt: on
 
     def run_processor(self, image):
