@@ -19,7 +19,6 @@ from ..util.step_callback import stable_diffusion_step_callback
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
 INFILL_METHODS = Literal[tuple(infill_methods())]
-
 DEFAULT_INFILL_METHOD = 'patchmatch' if 'patchmatch' in get_args(INFILL_METHODS) else 'tile'
 
 class SDImageInvocation(BaseModel):
