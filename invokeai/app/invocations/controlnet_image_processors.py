@@ -113,10 +113,10 @@ class ControlOutput(BaseInvocationOutput):
     control: ControlField = Field(default=None, description="The control info dict")
     # fmt: on
 
-class PreprocessedControlInvocation(BaseInvocation, PILInvocationConfig):
-     """Base class for invocations that preprocess images for ControlNet"""
 
-<<<<<<< HEAD
+class PreprocessedControlInvocation(BaseInvocation, PILInvocationConfig):
+    """Base class for invocations that preprocess images for ControlNet"""
+
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
     # fmt: off
