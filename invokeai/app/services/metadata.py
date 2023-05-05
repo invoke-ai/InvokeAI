@@ -31,7 +31,7 @@ class MetadataColorField(TypedDict):
 
 # TODO: This is a placeholder for `InvocationsUnion` pending resolution of circular imports
 NodeMetadata = Dict[
-    str, None | str | int | float | bool | MetadataImageField | MetadataLatentsField
+    str, None | str | int | float | bool | MetadataImageField | MetadataLatentsField | MetadataColorField
 ]
 
 
