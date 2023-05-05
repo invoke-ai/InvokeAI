@@ -47,6 +47,7 @@ class CompelInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Prompt (Compel)",
                 "tags": ["prompt", "compel"],
                 "type_hints": {
                   "model": "model"
