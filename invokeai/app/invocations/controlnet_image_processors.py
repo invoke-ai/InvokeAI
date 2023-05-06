@@ -50,18 +50,15 @@ class ControlOutput(BaseInvocationOutput):
     # fmt: off
     type: Literal["control_output"] = "control_output"
     control: Optional[ControlField] = Field(default=None, description="The control info dict")
-    raw_processed_image: ImageField = Field(default=None,
-                                            description="outputs just the image info (also included in control output)")
+    # raw_processed_image: ImageField = Field(default=None,
+    #                                        description="outputs just the image info (also included in control output)")
     # fmt: on
 
 
-# This super class handles invoke() call, which in turn calls run_processor(image)
-#     subclasses override run_processor() instead of implementing their own invoke()
-class PreprocessedControlNetInvocation(BaseInvocation, PILInvocationConfig):
-    """Base class for invocations that preprocess images for ControlNet"""
-
+class ControlNetInvocation(BaseInvocation):
+    """Collects ControlNet info to pass to other nodes"""
     # fmt: off
-    type: Literal["preprocessed_control"] = "preprocessed_control"
+    type: Literal["controlnet"] = "controlnet"
     # Inputs
     image: ImageField = Field(default=None, description="image to process")
     control_model: str = Field(default=None, description="control model to use")
@@ -75,11 +72,32 @@ class PreprocessedControlNetInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
 
+    def invoke(self, context: InvocationContext) -> ControlOutput:
+
+        return ControlOutput(
+            control=ControlField(
+                image=self.image,
+                control_model=self.control_model,
+                control_weight=self.control_weight,
+            ),
+        )
+
+# TODO: move image processors to separate file (image_analysis.py
+class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
+    """Base class for invocations that preprocess images for ControlNet"""
+
+    # fmt: off
+    type: Literal["image_processor"] = "image_processor"
+    # Inputs
+    image: ImageField = Field(default=None, description="image to process")
+    # fmt: on
+
+
     def run_processor(self, image):
         # superclass just passes through image without processing
         return image
 
-    def invoke(self, context: InvocationContext) -> ControlOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         raw_image = context.services.images.get(
             self.image.image_type, self.image.image_name
         )
@@ -98,24 +116,22 @@ class PreprocessedControlNetInvocation(BaseInvocation, PILInvocationConfig):
         context.services.images.save(image_type, image_name, processed_image, metadata)
 
         """Builds an ImageOutput and its ImageField"""
-        image_field = ImageField(
+        processed_image_field = ImageField(
             image_name=image_name,
             image_type=image_type,
         )
-        return ControlOutput(
-            control=ControlField(
-                image=image_field,
-                control_model=self.control_model,
-                control_weight=self.control_weight,
-            ),
-            raw_processed_image=image_field,
-        )
+        return ImageOutput(
+            image=processed_image_field,
+            width=processed_image.width,
+            height=processed_image.height,
+            mode=processed_image.mode,
+    )
 
 
-class CannyControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Canny edge detection for ControlNet"""
     # fmt: off
-    type: Literal["cannycontrol"] = "cannycontrol"
+    type: Literal["canny_image_processor"] = "canny_image_processor"
     # Input
     low_threshold: float = Field(default=100, ge=0, description="low threshold of Canny pixel gradient")
     high_threshold: float = Field(default=200, ge=0, description="high threshold of Canny pixel gradient")
@@ -127,10 +143,10 @@ class CannyControlInvocation(PreprocessedControlNetInvocation, PILInvocationConf
         return processed_image
 
 
-class HedControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies HED edge detection to image"""
     # fmt: off
-    type: Literal["hed_control"] = "hed_control"
+    type: Literal["hed_image_processor"] = "hed_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -149,10 +165,10 @@ class HedControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationCon
         return processed_image
 
 
-class LineartControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies line art processing to image"""
     # fmt: off
-    type: Literal["lineart_control"] = "lineart_control"
+    type: Literal["lineart_image_processor"] = "lineart_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -168,10 +184,10 @@ class LineartControlInvocation(PreprocessedControlNetInvocation, PILInvocationCo
         return processed_image
 
 
-class LineartAnimeControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies line art anime processing to image"""
     # fmt: off
-    type: Literal["lineart_anime_control"] = "lineart_anime_control"
+    type: Literal["lineart_anime_image_processor"] = "lineart_anime_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -186,10 +202,10 @@ class LineartAnimeControlInvocation(PreprocessedControlNetInvocation, PILInvocat
         return processed_image
 
 
-class OpenposeControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies Openpose processing to image"""
     # fmt: off
-    type: Literal["openpose_control"] = "openpose_control"
+    type: Literal["openpose_image_processor"] = "openpose_image_processor"
     # Inputs
     hand_and_face: bool = Field(default=False, description="whether to use hands and face mode")
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
@@ -206,10 +222,10 @@ class OpenposeControlInvocation(PreprocessedControlNetInvocation, PILInvocationC
         return processed_image
 
 
-class MidasDepthControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies Midas depth processing to image"""
     # fmt: off
-    type: Literal["midas_control"] = "midas_control"
+    type: Literal["midas_depth_image_processor"] = "midas_depth_image_processor"
     # Inputs
     a_mult: float = Field(default=2.0, ge=0, description="Midas parameter a = amult * PI")
     bg_th: float = Field(default=0.1, ge=0, description="Midas parameter bg_th")
@@ -225,10 +241,10 @@ class MidasDepthControlInvocation(PreprocessedControlNetInvocation, PILInvocatio
         return processed_image
 
 
-class NormalbaeControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies NormalBae processing to image"""
     # fmt: off
-    type: Literal["normalbae_control"] = "normalbae_control"
+    type: Literal["normalbae_image_processor"] = "normalbae_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -242,10 +258,10 @@ class NormalbaeControlNetInvocation(PreprocessedControlNetInvocation, PILInvocat
         return processed_image
 
 
-class MLSDControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies MLSD processing to image"""
     # fmt: off
-    type: Literal["mlsd_control"] = "mlsd_control"
+    type: Literal["mlsd_image_processor"] = "mlsd_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -263,10 +279,10 @@ class MLSDControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationCo
         return processed_image
 
 
-class PidiControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies PIDI processing to image"""
     # fmt: off
-    type: Literal["pidi_control"] = "pidi_control"
+    type: Literal["pidi_image_processor"] = "pidi_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -284,10 +300,10 @@ class PidiControlNetInvocation(PreprocessedControlNetInvocation, PILInvocationCo
         return processed_image
 
 
-class ContentShuffleControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies content shuffle processing to image"""
     # fmt: off
-    type: Literal["content_shuffle_control"] = "content_shuffle_control"
+    type: Literal["content_shuffle_image_processor"] = "content_shuffle_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
@@ -308,10 +324,10 @@ class ContentShuffleControlInvocation(PreprocessedControlNetInvocation, PILInvoc
         return processed_image
 
 
-class ZoeDepthControlInvocation(PreprocessedControlNetInvocation, PILInvocationConfig):
+class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies Zoe depth processing to image"""
     # fmt: off
-    type: Literal["zoe_depth_control"] = "zoe_depth_control"
+    type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
     # fmt: on
 
     def run_processor(self, image):
