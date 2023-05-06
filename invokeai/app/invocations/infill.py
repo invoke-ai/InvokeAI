@@ -122,7 +122,7 @@ def tile_fill_missing(
 
 
 class InfillColorInvocation(BaseInvocation):
-    """Infills transparent areas of an image with a color"""
+    """Infills transparent areas of an image with a solid color"""
 
     type: Literal["infill_rgba"] = "infill_rgba"
     image: ImageField = Field(default=None, description="The image to infill")
@@ -200,7 +200,7 @@ class InfillTileInvocation(BaseInvocation):
 
 
 class InfillPatchMatchInvocation(BaseInvocation):
-    """Infills transparent areas of an image with tiles of the image"""
+    """Infills transparent areas of an image using the PatchMatch algorithm"""
 
     type: Literal["infill_patchmatch"] = "infill_patchmatch"
 
