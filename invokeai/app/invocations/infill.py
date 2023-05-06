@@ -8,6 +8,7 @@ from PIL import Image, ImageOps
 from pydantic import Field
 
 from invokeai.app.invocations.image import ImageOutput, build_image_output
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
 from ..models.image import ColorField, ImageField, ImageType
@@ -120,28 +121,14 @@ def tile_fill_missing(
     return si
 
 
-class InfillImageInvocation(BaseInvocation):
-    """Infills transparent areas of an image"""
+class InfillColorInvocation(BaseInvocation):
+    """Infills transparent areas of an image with a color"""
 
-    type: Literal["infill"] = "infill"
-
+    type: Literal["infill_rgba"] = "infill_rgba"
     image: ImageField = Field(default=None, description="The image to infill")
-    infill_method: INFILL_METHODS = Field(
-        default=DEFAULT_INFILL_METHOD,
-        description="The method used to infill empty regions (px)",
-    )
-    inpaint_fill: Optional[ColorField] = Field(
+    color: Optional[ColorField] = Field(
         default=ColorField(r=127, g=127, b=127, a=255),
-        description="The solid infill method color",
-    )
-    tile_size: int = Field(
-        default=32, ge=1, description="The tile infill method size (px)"
-    )
-    seed: int = Field(
-        default=-1,
-        ge=-1,
-        le=np.iinfo(np.uint32).max,
-        description="The seed to use (-1 for a random seed)",
+        description="The color to use to infill",
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -149,22 +136,85 @@ class InfillImageInvocation(BaseInvocation):
             self.image.image_type, self.image.image_name
         )
 
-        # Do infill
-        if self.infill_method == "patchmatch" and PatchMatch.patchmatch_available():
-            infilled = infill_patchmatch(image.copy())
-        elif self.infill_method == "tile":
-            infilled = tile_fill_missing(
-                image.copy(), seed=self.seed, tile_size=self.tile_size
-            )
-        elif self.infill_method == "solid":
-            solid_bg = Image.new("RGBA", image.size, self.inpaint_fill.tuple())
-            infilled = Image.alpha_composite(solid_bg, image)
-        else:
-            raise ValueError(
-                f"Non-supported infill type {self.infill_method}", self.infill_method
-            )
+        solid_bg = Image.new("RGBA", image.size, self.color.tuple())
+        infilled = Image.alpha_composite(solid_bg, image)
 
         infilled.paste(image, (0, 0), image.split()[-1])
+
+        image_type = ImageType.RESULT
+        image_name = context.services.images.create_name(
+            context.graph_execution_state_id, self.id
+        )
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
+        )
+
+        context.services.images.save(image_type, image_name, infilled, metadata)
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=image,
+        )
+
+
+class InfillTileInvocation(BaseInvocation):
+    """Infills transparent areas of an image with tiles of the image"""
+
+    type: Literal["infill_tile"] = "infill_tile"
+
+    image: ImageField = Field(default=None, description="The image to infill")
+    tile_size: int = Field(default=32, ge=1, description="The tile size (px)")
+    seed: Optional[int] = Field(
+        ge=0,
+        le=SEED_MAX,
+        description="The seed to use for tile generation (omit for random)",
+        default_factory=get_random_seed,
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+
+        infilled = tile_fill_missing(
+            image.copy(), seed=self.seed, tile_size=self.tile_size
+        )
+        infilled.paste(image, (0, 0), image.split()[-1])
+
+        image_type = ImageType.RESULT
+        image_name = context.services.images.create_name(
+            context.graph_execution_state_id, self.id
+        )
+
+        metadata = context.services.metadata.build_metadata(
+            session_id=context.graph_execution_state_id, node=self
+        )
+
+        context.services.images.save(image_type, image_name, infilled, metadata)
+        return build_image_output(
+            image_type=image_type,
+            image_name=image_name,
+            image=image,
+        )
+
+
+class InfillPatchMatchInvocation(BaseInvocation):
+    """Infills transparent areas of an image with tiles of the image"""
+
+    type: Literal["infill_patchmatch"] = "infill_patchmatch"
+
+    image: ImageField = Field(default=None, description="The image to infill")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+
+        if PatchMatch.patchmatch_available():
+            infilled = infill_patchmatch(image.copy())
+        else:
+            raise ValueError("PatchMatch is not available on this system")
 
         image_type = ImageType.RESULT
         image_name = context.services.images.create_name(
