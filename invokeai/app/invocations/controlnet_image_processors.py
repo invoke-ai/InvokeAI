@@ -98,7 +98,6 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         raw_image = context.services.images.get(
-
             self.image.image_type, self.image.image_name
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
