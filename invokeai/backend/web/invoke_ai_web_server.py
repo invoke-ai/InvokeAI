@@ -78,7 +78,6 @@ class InvokeAIWebServer:
         mimetypes.add_type("application/javascript", ".js")
         mimetypes.add_type("text/css", ".css")
         # Socket IO
-        logger = True if args.web_verbose else False
         engineio_logger = True if args.web_verbose else False
         max_http_buffer_size = 10000000
 
