@@ -281,6 +281,10 @@ class TextToLatentsInvocation(BaseInvocation):
             )
         )
 
+        latents_shape = noise.shape
+        control_height_resize = latents_shape[2] * 8
+        control_width_resize = latents_shape[3] * 8
+
         # copied from old backend/txt2img.py
         # FIXME: still need to test with different widths, heights, devices, dtypes
         #        and add in batch_size, num_images_per_prompt?
@@ -290,10 +294,8 @@ class TextToLatentsInvocation(BaseInvocation):
                     image=control_image,
                     # do_classifier_free_guidance=do_classifier_free_guidance,
                     do_classifier_free_guidance=True,
-                    # width=width,
-                    # height=height,
-                    width=512,
-                    height=512,
+                    width=control_width_resize,
+                    height=control_height_resize,
                     # batch_size=batch_size * num_images_per_prompt,
                     # num_images_per_prompt=num_images_per_prompt,
                     device=control_model.device,
@@ -306,10 +308,8 @@ class TextToLatentsInvocation(BaseInvocation):
                         image=image_,
                         # do_classifier_free_guidance=do_classifier_free_guidance,
                         do_classifier_free_guidance=True,
-                        # width=width,
-                        # height=height,
-                        width=512,
-                        height=512,
+                        width=control_width_resize,
+                        height=control_height_resize,
                         # batch_size=batch_size * num_images_per_prompt,
                         # num_images_per_prompt=num_images_per_prompt,
                         device=control_model.device,
@@ -318,10 +318,7 @@ class TextToLatentsInvocation(BaseInvocation):
                     images.append(image_)
                 control_image = images
 
-
-
         # TODO: Verify the noise is the right size
-
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
             noise=noise,
