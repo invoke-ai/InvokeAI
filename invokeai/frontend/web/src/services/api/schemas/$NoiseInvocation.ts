@@ -15,7 +15,7 @@ export const $NoiseInvocation = {
     seed: {
       type: 'number',
       description: `The seed to use`,
-      maximum: 4294967295,
+      maximum: 2147483647,
     },
     width: {
       type: 'number',

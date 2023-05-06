@@ -1,8 +1,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export const $InfillImageInvocation = {
-  description: `Infills transparent areas of an image`,
+export const $InfillColorInvocation = {
+  description: `Infills transparent areas of an image with a color`,
   properties: {
     id: {
       type: 'string',
@@ -19,26 +19,12 @@ export const $InfillImageInvocation = {
         type: 'ImageField',
       }],
     },
-    infill_method: {
-      type: 'Enum',
-    },
-    inpaint_fill: {
+    color: {
       type: 'all-of',
-      description: `The solid infill method color`,
+      description: `The color to use to infill`,
       contains: [{
         type: 'ColorField',
       }],
-    },
-    tile_size: {
-      type: 'number',
-      description: `The tile infill method size (px)`,
-      minimum: 1,
-    },
-    seed: {
-      type: 'number',
-      description: `The seed to use (-1 for a random seed)`,
-      maximum: 4294967295,
-      minimum: -1,
     },
   },
 } as const;
