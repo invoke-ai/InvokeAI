@@ -38,7 +38,7 @@ class ImageOutput(BaseInvocationOutput):
     # fmt: on
 
     class Config:
-        schema_extra = {"required": ["type", "image", "width", "height", "mode"]}
+        schema_extra = {"required": ["type", "image", "width", "height"]}
 
 
 def build_image_output(
