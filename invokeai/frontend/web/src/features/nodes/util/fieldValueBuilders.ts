@@ -48,6 +48,10 @@ export const buildInputFieldValue = (
       fieldValue.value = undefined;
     }
 
+    if (template.type === 'conditioning') {
+      fieldValue.value = undefined;
+    }
+
     if (template.type === 'model') {
       fieldValue.value = undefined;
     }
