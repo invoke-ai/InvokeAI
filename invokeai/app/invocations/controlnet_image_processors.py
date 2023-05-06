@@ -115,7 +115,6 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         context.services.images.save(image_type, image_name, processed_image, metadata)
 
         """Builds an ImageOutput and its ImageField"""
-
         processed_image_field = ImageField(
             image_name=image_name,
             image_type=image_type,
