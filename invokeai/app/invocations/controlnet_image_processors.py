@@ -80,11 +80,11 @@ class PreprocessedControlNetInvocation(BaseInvocation, PILInvocationConfig):
         return image
 
     def invoke(self, context: InvocationContext) -> ControlOutput:
-        image = context.services.images.get(
+        raw_image = context.services.images.get(
             self.image.image_type, self.image.image_name
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
-        processed_image = self.run_processor(image)
+        processed_image = self.run_processor(raw_image)
         # currently can't see processed image in node UI without a showImage node,
         #    so for now setting image_type to RESULT instead of INTERMEDIATE so will get saved in gallery
         # image_type = ImageType.INTERMEDIATE
