@@ -69,7 +69,7 @@ class SDModelInfo():
     revision: str = None
     _cache: ModelCache = None
 
-
+    @property
     def status(self)->ModelStatus:
         '''Return load status of this model as a model_cache.ModelStatus enum'''
         if not self._cache:
@@ -106,7 +106,7 @@ class ModelManager(object):
             config_path: Path,
             device_type: torch.device = CUDA_DEVICE,
             precision: torch.dtype = torch.float16,
-            max_models=DEFAULT_MAX_MODELS,
+            max_loaded_models=DEFAULT_MAX_MODELS,
             sequential_offload=False,
             logger: types.ModuleType = logger,
     ):
@@ -119,7 +119,7 @@ class ModelManager(object):
         self.config_path = config_path
         self.config = OmegaConf.load(self.config_path)
         self.cache = ModelCache(
-            max_models=max_models,
+            max_models=max_loaded_models,
             execution_device = device_type,
             precision = precision,
             sequential_offload = sequential_offload,
@@ -164,7 +164,7 @@ class ModelManager(object):
             if mconfig.get('vae'):
                 legacy.vae_file = global_resolve_path(mconfig.vae)
         elif format=='diffusers':
-            location = mconfig.repo_id 
+            location = mconfig.get('repo_id') or mconfig.get('path')
             revision = mconfig.get('revision')
         else:
             raise InvalidModelError(

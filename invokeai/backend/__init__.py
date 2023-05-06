@@ -10,7 +10,7 @@ from .generator import (
     Img2Img,
     Inpaint
 )
-from .model_management import ModelManager
+from .model_management import ModelManager, ModelCache, ModelStatus, SDModelType
 from .safety_checker import SafetyChecker
 from .args import Args
 from .globals import Globals

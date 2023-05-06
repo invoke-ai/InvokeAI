@@ -7,6 +7,7 @@ get_uc_and_c_and_ec()           get the conditioned and unconditioned latent, an
 
 """
 import re
+import torch
 from typing import Optional, Union
 
 from compel import Compel

@@ -37,7 +37,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
-from .util import choose_precision, choose_torch_device
+from .util import choose_precision, choose_torch_device, torch_dtype
 
 def fix_func(orig):
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -49,7 +49,6 @@ def fix_func(orig):
 
         return new_func
     return orig
-
 
 torch.rand = fix_func(torch.rand)
 torch.rand_like = fix_func(torch.rand_like)
@@ -156,7 +155,6 @@ class Generate:
         weights=None,
         config=None,
     ):
-        mconfig = OmegaConf.load(conf)
         self.height = None
         self.width = None
         self.model_manager = None
@@ -171,7 +169,7 @@ class Generate:
         self.seamless_axes = {"x", "y"}
         self.hires_fix = False
         self.embedding_path = embedding_path
-        self.model = None  # empty for now
+        self.model_context = None  # empty for now
         self.model_hash = None
         self.sampler = None
         self.device = None
@@ -219,12 +217,12 @@ class Generate:
 
         # model caching system for fast switching
         self.model_manager = ModelManager(
-            mconfig,
+            conf,
             self.device,
-            self.precision,
+            torch_dtype(self.device),
             max_loaded_models=max_loaded_models,
             sequential_offload=self.free_gpu_mem,
-            embedding_path=Path(self.embedding_path),
+#            embedding_path=Path(self.embedding_path),
         )
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
@@ -418,170 +416,171 @@ class Generate:
         with_variations = [] if with_variations is None else with_variations
 
         # will instantiate the model or return it from cache
-        model = self.set_model(self.model_name)
+        model_context = self.set_model(self.model_name)
 
         # self.width and self.height are set by set_model()
         # to the width and height of the image training set
         width = width or self.width
         height = height or self.height
 
-        if isinstance(model, DiffusionPipeline):
-            configure_model_padding(model.unet, seamless, seamless_axes)
-            configure_model_padding(model.vae, seamless, seamless_axes)
-        else:
-            configure_model_padding(model, seamless, seamless_axes)
-
-        assert cfg_scale > 1.0, "CFG_Scale (-C) must be >1.0"
-        assert threshold >= 0.0, "--threshold must be >=0.0"
-        assert (
-            0.0 < strength <= 1.0
-        ), "img2img and inpaint strength can only work with 0.0 < strength < 1.0"
-        assert (
-            0.0 <= variation_amount <= 1.0
-        ), "-v --variation_amount must be in [0.0, 1.0]"
-        assert 0.0 <= perlin <= 1.0, "--perlin must be in [0.0, 1.0]"
-        assert (embiggen == None and embiggen_tiles == None) or (
-            (embiggen != None or embiggen_tiles != None) and init_img != None
-        ), "Embiggen requires an init/input image to be specified"
-
-        if len(with_variations) > 0 or variation_amount > 1.0:
-            assert seed is not None, "seed must be specified when using with_variations"
-            if variation_amount == 0.0:
-                assert (
-                    iterations == 1
-                ), "when using --with_variations, multiple iterations are only possible when using --variation_amount"
-            assert all(
-                0 <= weight <= 1 for _, weight in with_variations
-            ), f"variation weights must be in [0.0, 1.0]: got {[weight for _, weight in with_variations]}"
-
-        width, height, _ = self._resolution_check(width, height, log=True)
-        assert (
-            inpaint_replace >= 0.0 and inpaint_replace <= 1.0
-        ), "inpaint_replace must be between 0.0 and 1.0"
-
-        if sampler_name and (sampler_name != self.sampler_name):
-            self.sampler_name = sampler_name
-            self._set_scheduler()
-
-        # apply the concepts library to the prompt
-        prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
-            prompt,
-            lambda concepts: self.load_huggingface_concepts(concepts),
-            self.model.textual_inversion_manager.get_all_trigger_strings(),
-        )
-
-        tic = time.time()
-        if self._has_cuda():
-            torch.cuda.reset_peak_memory_stats()
-
-        results = list()
-
-        try:
-            uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
-                prompt,
-                model=self.model,
-                skip_normalize_legacy_blend=skip_normalize,
-                log_tokens=self.log_tokenization,
-            )
-
-            init_image, mask_image = self._make_images(
-                init_img,
-                init_mask,
-                width,
-                height,
-                fit=fit,
-                text_mask=text_mask,
-                invert_mask=invert_mask,
-                force_outpaint=force_outpaint,
-            )
-
-            # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            generator = self.select_generator(
-                init_image, mask_image, embiggen, hires_fix, force_outpaint
-            )
-
-            generator.set_variation(self.seed, variation_amount, with_variations)
-            generator.use_mps_noise = use_mps_noise
-
-            results = generator.generate(
-                prompt,
-                iterations=iterations,
-                seed=self.seed,
-                sampler=self.sampler,
-                steps=steps,
-                cfg_scale=cfg_scale,
-                conditioning=(uc, c, extra_conditioning_info),
-                ddim_eta=ddim_eta,
-                image_callback=image_callback,  # called after the final image is generated
-                step_callback=step_callback,  # called after each intermediate image is generated
-                width=width,
-                height=height,
-                init_img=init_img,  # embiggen needs to manipulate from the unmodified init_img
-                init_image=init_image,  # notice that init_image is different from init_img
-                mask_image=mask_image,
-                strength=strength,
-                threshold=threshold,
-                perlin=perlin,
-                h_symmetry_time_pct=h_symmetry_time_pct,
-                v_symmetry_time_pct=v_symmetry_time_pct,
-                embiggen=embiggen,
-                embiggen_tiles=embiggen_tiles,
-                embiggen_strength=embiggen_strength,
-                inpaint_replace=inpaint_replace,
-                mask_blur_radius=mask_blur_radius,
-                safety_checker=self.safety_checker,
-                seam_size=seam_size,
-                seam_blur=seam_blur,
-                seam_strength=seam_strength,
-                seam_steps=seam_steps,
-                tile_size=tile_size,
-                infill_method=infill_method,
-                force_outpaint=force_outpaint,
-                inpaint_height=inpaint_height,
-                inpaint_width=inpaint_width,
-                enable_image_debugging=enable_image_debugging,
-                free_gpu_mem=self.free_gpu_mem,
-                clear_cuda_cache=self.clear_cuda_cache,
-            )
-
-            if init_color:
-                self.correct_colors(
-                    image_list=results,
-                    reference_image_path=init_color,
-                    image_callback=image_callback,
-                )
-
-            if upscale is not None or facetool_strength > 0:
-                self.upscale_and_reconstruct(
-                    results,
-                    upscale=upscale,
-                    upscale_denoise_str=upscale_denoise_str,
-                    facetool=facetool,
-                    strength=facetool_strength,
-                    codeformer_fidelity=codeformer_fidelity,
-                    save_original=save_original,
-                    image_callback=image_callback,
-                )
-
-        except KeyboardInterrupt:
-            # Clear the CUDA cache on an exception
-            self.clear_cuda_cache()
-
-            if catch_interrupts:
-                logger.warning("Interrupted** Partial results will be returned.")
+        with model_context as model:
+            if isinstance(model, DiffusionPipeline):
+                configure_model_padding(model.unet, seamless, seamless_axes)
+                configure_model_padding(model.vae, seamless, seamless_axes)
             else:
-                raise KeyboardInterrupt
-        except RuntimeError:
-            # Clear the CUDA cache on an exception
-            self.clear_cuda_cache()
+                configure_model_padding(model, seamless, seamless_axes)
 
-            print(traceback.format_exc(), file=sys.stderr)
-            logger.info("Could not generate image.")
+            assert cfg_scale > 1.0, "CFG_Scale (-C) must be >1.0"
+            assert threshold >= 0.0, "--threshold must be >=0.0"
+            assert (
+                0.0 < strength <= 1.0
+            ), "img2img and inpaint strength can only work with 0.0 < strength < 1.0"
+            assert (
+                0.0 <= variation_amount <= 1.0
+            ), "-v --variation_amount must be in [0.0, 1.0]"
+            assert 0.0 <= perlin <= 1.0, "--perlin must be in [0.0, 1.0]"
+            assert (embiggen == None and embiggen_tiles == None) or (
+                (embiggen != None or embiggen_tiles != None) and init_img != None
+            ), "Embiggen requires an init/input image to be specified"
 
-        toc = time.time()
-        logger.info("Usage stats:")
-        logger.info(f"{len(results)} image(s) generated in "+"%4.2fs" % (toc - tic))
-        self.print_cuda_stats()
+            if len(with_variations) > 0 or variation_amount > 1.0:
+                assert seed is not None, "seed must be specified when using with_variations"
+                if variation_amount == 0.0:
+                    assert (
+                        iterations == 1
+                    ), "when using --with_variations, multiple iterations are only possible when using --variation_amount"
+                assert all(
+                    0 <= weight <= 1 for _, weight in with_variations
+                ), f"variation weights must be in [0.0, 1.0]: got {[weight for _, weight in with_variations]}"
+
+            width, height, _ = self._resolution_check(width, height, log=True)
+            assert (
+                inpaint_replace >= 0.0 and inpaint_replace <= 1.0
+            ), "inpaint_replace must be between 0.0 and 1.0"
+
+            if sampler_name and (sampler_name != self.sampler_name):
+                self.sampler_name = sampler_name
+                self._set_scheduler(model)
+
+            # apply the concepts library to the prompt
+            prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
+                prompt,
+                lambda concepts: self.load_huggingface_concepts(concepts),
+                model.textual_inversion_manager.get_all_trigger_strings(),
+            )
+
+            tic = time.time()
+            if self._has_cuda():
+                torch.cuda.reset_peak_memory_stats()
+
+            results = list()
+
+            try:
+                uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
+                    prompt,
+                    model=model,
+                    skip_normalize_legacy_blend=skip_normalize,
+                    log_tokens=self.log_tokenization,
+                )
+
+                init_image, mask_image = self._make_images(
+                    init_img,
+                    init_mask,
+                    width,
+                    height,
+                    fit=fit,
+                    text_mask=text_mask,
+                    invert_mask=invert_mask,
+                    force_outpaint=force_outpaint,
+                )
+
+                # TODO: Hacky selection of operation to perform. Needs to be refactored.
+                generator = self.select_generator(
+                    init_image, mask_image, embiggen, hires_fix, force_outpaint
+                )
+
+                generator.set_variation(self.seed, variation_amount, with_variations)
+                generator.use_mps_noise = use_mps_noise
+
+                results = generator.generate(
+                    prompt,
+                    iterations=iterations,
+                    seed=self.seed,
+                    sampler=self.sampler,
+                    steps=steps,
+                    cfg_scale=cfg_scale,
+                    conditioning=(uc, c, extra_conditioning_info),
+                    ddim_eta=ddim_eta,
+                    image_callback=image_callback,  # called after the final image is generated
+                    step_callback=step_callback,  # called after each intermediate image is generated
+                    width=width,
+                    height=height,
+                    init_img=init_img,  # embiggen needs to manipulate from the unmodified init_img
+                    init_image=init_image,  # notice that init_image is different from init_img
+                    mask_image=mask_image,
+                    strength=strength,
+                    threshold=threshold,
+                    perlin=perlin,
+                    h_symmetry_time_pct=h_symmetry_time_pct,
+                    v_symmetry_time_pct=v_symmetry_time_pct,
+                    embiggen=embiggen,
+                    embiggen_tiles=embiggen_tiles,
+                    embiggen_strength=embiggen_strength,
+                    inpaint_replace=inpaint_replace,
+                    mask_blur_radius=mask_blur_radius,
+                    safety_checker=self.safety_checker,
+                    seam_size=seam_size,
+                    seam_blur=seam_blur,
+                    seam_strength=seam_strength,
+                    seam_steps=seam_steps,
+                    tile_size=tile_size,
+                    infill_method=infill_method,
+                    force_outpaint=force_outpaint,
+                    inpaint_height=inpaint_height,
+                    inpaint_width=inpaint_width,
+                    enable_image_debugging=enable_image_debugging,
+                    free_gpu_mem=self.free_gpu_mem,
+                    clear_cuda_cache=self.clear_cuda_cache,
+                )
+
+                if init_color:
+                    self.correct_colors(
+                        image_list=results,
+                        reference_image_path=init_color,
+                        image_callback=image_callback,
+                    )
+
+                if upscale is not None or facetool_strength > 0:
+                    self.upscale_and_reconstruct(
+                        results,
+                        upscale=upscale,
+                        upscale_denoise_str=upscale_denoise_str,
+                        facetool=facetool,
+                        strength=facetool_strength,
+                        codeformer_fidelity=codeformer_fidelity,
+                        save_original=save_original,
+                        image_callback=image_callback,
+                    )
+
+            except KeyboardInterrupt:
+                # Clear the CUDA cache on an exception
+                self.clear_cuda_cache()
+
+                if catch_interrupts:
+                    logger.warning("Interrupted** Partial results will be returned.")
+                else:
+                    raise KeyboardInterrupt
+            except RuntimeError:
+                # Clear the CUDA cache on an exception
+                self.clear_cuda_cache()
+
+                print(traceback.format_exc(), file=sys.stderr)
+                logger.info("Could not generate image.")
+
+            toc = time.time()
+            logger.info("Usage stats:")
+            logger.info(f"{len(results)} image(s) generated in "+"%4.2fs" % (toc - tic))
+            self.print_cuda_stats()
         return results
 
     def gather_cuda_stats(self):
@@ -662,12 +661,13 @@ class Generate:
 
         # used by multiple postfixers
         # todo: cross-attention control
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
-            prompt,
-            model=self.model,
-            skip_normalize_legacy_blend=opt.skip_normalize,
-            log_tokens=log_tokenization,
-        )
+        with self.model_context as model:
+            uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
+                prompt,
+                model=model,
+                skip_normalize_legacy_blend=opt.skip_normalize,
+                log_tokens=log_tokenization,
+            )
 
         if tool in ("gfpgan", "codeformer", "upscale"):
             if tool == "gfpgan":
@@ -852,7 +852,8 @@ class Generate:
         cn = class_name
         module = importlib.import_module(mn)
         constructor = getattr(module, cn)
-        return constructor(self.model, self.precision)
+        with self.model_context as model:
+            return constructor(model, self.precision)
 
     def load_model(self):
         """
@@ -869,8 +870,8 @@ class Generate:
         If the model fails to load for some reason, will attempt to load the previously-
         loaded model (if any). If that fallback fails, will raise an AssertionError
         """
-        if self.model_name == model_name and self.model is not None:
-            return self.model
+        if self.model_name == model_name and self.model_context is not None:
+            return self.model_context
 
         previous_model_name = self.model_name
 
@@ -881,11 +882,9 @@ class Generate:
                 f'** "{model_name}" is not a known model name. Cannot change.'
             )
 
-        cache.print_vram_usage()
-
         # have to get rid of all references to model in order
         # to free it from GPU memory
-        self.model = None
+        self.model_context = None
         self.sampler = None
         self.generators = {}
         gc.collect()
@@ -902,29 +901,33 @@ class Generate:
                 raise e
             model_name = previous_model_name
 
-        self.model = model_data["model"]
-        self.width = model_data["width"]
-        self.height = model_data["height"]
-        self.model_hash = model_data["hash"]
+        self.model_context = model_data.context
+        self.width = 512
+        self.height = 512
+        self.model_hash = model_data.hash
 
         # uncache generators so they pick up new models
         self.generators = {}
 
         set_seed(random.randrange(0, np.iinfo(np.uint32).max))
         self.model_name = model_name
-        self._set_scheduler()  # requires self.model_name to be set first
-        return self.model
+        with self.model_context as model:
+            self._set_scheduler(model)  # requires self.model_name to be set first
+        return self.model_context
 
     def load_huggingface_concepts(self, concepts: list[str]):
-        self.model.textual_inversion_manager.load_huggingface_concepts(concepts)
+        with self.model_context as model:
+            model.textual_inversion_manager.load_huggingface_concepts(concepts)
 
     @property
     def huggingface_concepts_library(self) -> HuggingFaceConceptsLibrary:
-        return self.model.textual_inversion_manager.hf_concepts_library
+        with self.model_context as model:
+            return model.textual_inversion_manager.hf_concepts_library
 
     @property
     def embedding_trigger_strings(self) -> List[str]:
-        return self.model.textual_inversion_manager.get_all_trigger_strings()
+        with self.model_context as model:
+            return model.textual_inversion_manager.get_all_trigger_strings()
 
     def correct_colors(self, image_list, reference_image_path, image_callback=None):
         reference_image = Image.open(reference_image_path)
@@ -1044,8 +1047,8 @@ class Generate:
     def is_legacy_model(self, model_name) -> bool:
         return self.model_manager.is_legacy(model_name)
 
-    def _set_scheduler(self):
-        default = self.model.scheduler
+    def _set_scheduler(self,model):
+        default = model.scheduler
 
         # See https://github.com/huggingface/diffusers/issues/277#issuecomment-1371428672
         scheduler_map = dict(
@@ -1069,7 +1072,7 @@ class Generate:
             msg = (
                 f"Setting Sampler to {self.sampler_name} ({sampler_class.__name__})"
             )
-            self.sampler = sampler_class.from_config(self.model.scheduler.config)
+            self.sampler = sampler_class.from_config(model.scheduler.config)
         else:
             msg = (
                 f" Unsupported Sampler: {self.sampler_name} "+

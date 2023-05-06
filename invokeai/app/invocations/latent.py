@@ -180,31 +180,33 @@ class TextToLatentsInvocation(BaseInvocation):
 
     def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
         model_info = choose_model(model_manager, self.model)
-        model_name = model_info['model_name']
-        model_hash = model_info['hash']
-        model: StableDiffusionGeneratorPipeline = model_info['model']
-        model.scheduler = get_scheduler(
-            model=model,
-            scheduler_name=self.scheduler
-        )
+        model_name = model_info.name
+        model_hash = model_info.hash
+        model_ctx: StableDiffusionGeneratorPipeline = model_info.context
+        with model_ctx as model:
+            model.scheduler = get_scheduler(
+                model=model,
+                scheduler_name=self.scheduler
+            )
 
-        if isinstance(model, DiffusionPipeline):
-            for component in [model.unet, model.vae]:
-                configure_model_padding(component,
+            if isinstance(model, DiffusionPipeline):
+                for component in [model.unet, model.vae]:
+                    configure_model_padding(component,
+                                            self.seamless,
+                                            self.seamless_axes
+                                            )
+            else:
+                configure_model_padding(model,
                                         self.seamless,
                                         self.seamless_axes
                                         )
-        else:
-            configure_model_padding(model,
-                                    self.seamless,
-                                    self.seamless_axes
-                                    )
 
-        return model
+        return model_ctx
 
 
     def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
+        print(f'DEBUG: uc.dtype={uc.dtype}, c.dtype={c.dtype}')
         conditioning_data = ConditioningData(
             uc,
             c,
@@ -230,18 +232,17 @@ class TextToLatentsInvocation(BaseInvocation):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
 
-        model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        with self.get_model(context.services.model_manager) as model:
+            conditioning_data = self.get_conditioning_data(model)
 
-        # TODO: Verify the noise is the right size
-
-        result_latents, result_attention_map_saver = model.latents_from_embeddings(
-            latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
-            noise=noise,
-            num_inference_steps=self.steps,
-            conditioning_data=conditioning_data,
-            callback=step_callback
-        )
+            # TODO: Verify the noise is the right size
+            result_latents, result_attention_map_saver = model.latents_from_embeddings(
+                latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
+                noise=noise,
+                num_inference_steps=self.steps,
+                conditioning_data=conditioning_data,
+                callback=step_callback
+            )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -284,29 +285,29 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
 
-        model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        with self.get_model(context.services.model_manager) as model:
+            conditioning_data = self.get_conditioning_data(model)
 
-        # TODO: Verify the noise is the right size
+            # TODO: Verify the noise is the right size
 
-        initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
-            latent, device=model.device, dtype=latent.dtype
-        )
+            initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
+                latent, device=model.device, dtype=latent.dtype
+            )
 
-        timesteps, _ = model.get_img2img_timesteps(
-            self.steps,
-            self.strength,
-            device=model.device,
-        )
+            timesteps, _ = model.get_img2img_timesteps(
+                self.steps,
+                self.strength,
+                device=model.device,
+            )
 
-        result_latents, result_attention_map_saver = model.latents_from_embeddings(
-            latents=initial_latents,
-            timesteps=timesteps,
-            noise=noise,
-            num_inference_steps=self.steps,
-            conditioning_data=conditioning_data,
-            callback=step_callback
-        )
+            result_latents, result_attention_map_saver = model.latents_from_embeddings(
+                latents=initial_latents,
+                timesteps=timesteps,
+                noise=noise,
+                num_inference_steps=self.steps,
+                conditioning_data=conditioning_data,
+                callback=step_callback
+            )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()

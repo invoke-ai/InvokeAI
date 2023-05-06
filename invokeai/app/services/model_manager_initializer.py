@@ -47,22 +47,21 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
     else:
         embedding_path = None
 
-    # migrate legacy models
-    ModelManager.migrate_models()
-
     # creating the model manager
     try:
         device = torch.device(choose_torch_device())
-        precision = 'float16' if config.precision=='float16' \
-        else 'float32' if config.precision=='float32' \
-        else choose_precision(device)
+        if config.precision=="auto":
+            precision = choose_precision(device)
+        dtype = torch.float32 if precision=='float32' \
+                 else torch.float16
         
         model_manager = ModelManager(
-            OmegaConf.load(config.conf),
-            precision=precision,
+            config.conf,
+            precision=dtype,
             device_type=device,
             max_loaded_models=config.max_loaded_models,
-            embedding_path = Path(embedding_path),
+# temporarily disabled until model manager stabilizes
+#            embedding_path = Path(embedding_path),
             logger = logger,
         )
     except (FileNotFoundError, TypeError, AssertionError) as e:

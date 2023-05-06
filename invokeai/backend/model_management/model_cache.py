@@ -78,6 +78,10 @@ class UnscannableModelException(Exception):
     "Raised when picklescan is unable to scan a legacy model file"
     pass
 
+class ModelLocker(object):
+    "Forward declaration"
+    pass
+
 class ModelCache(object):
     def __init__(
             self,
@@ -112,8 +116,6 @@ class ModelCache(object):
         self.loaded_models: set = set()   # set of model keys loaded in GPU
         self.locked_models: Counter = Counter()   # set of model keys locked in GPU
 
-
-    @contextlib.contextmanager
     def get_model(
             self,
             repo_id_or_path: Union[str,Path],
@@ -124,7 +126,7 @@ class ModelCache(object):
             legacy_info: LegacyInfo=None,
             attach_model_part: Tuple[SDModelType, str] = (None,None),
             gpu_load: bool=True,
-            )->Generator[ModelClass, None, None]:
+            )->ModelLocker:  # ?? what does it return
         '''
         Load and return a HuggingFace model wrapped in a context manager generator, with RAM caching.
         Use like this:
@@ -188,29 +190,45 @@ class ModelCache(object):
         if submodel:
             model = getattr(model, submodel.name)
 
-        if gpu_load and hasattr(model,'to'):
-            try:
-                self.loaded_models.add(key)
-                self.locked_models[key] += 1
-                if self.lazy_offloading:
-                    self._offload_unlocked_models()
-                self.logger.debug(f'Loading {key} into {self.execution_device}')
-                model.to(self.execution_device)  # move into GPU
-                self._print_cuda_stats()
-                yield model
-            finally:
-                self.locked_models[key] -= 1
-                if not self.lazy_offloading:
-                    self._offload_unlocked_models()
-                self._print_cuda_stats()
-        else:
-            # in the event that the caller wants the model in RAM, we
-            # move it into CPU if it is in GPU and not locked
-            if hasattr(model,'to') and (key in self.loaded_models
-                                        and self.locked_models[key] == 0):
-                model.to(self.storage_device)
-                self.loaded_models.remove(key)
-            yield model
+        return self.ModelLocker(self, key, model, gpu_load)
+
+    class ModelLocker(object):
+        def __init__(self, cache, key, model, gpu_load):
+            self.gpu_load = gpu_load
+            self.cache = cache
+            self.key = key
+            # This will keep a copy of the model in RAM until the locker
+            # is garbage collected. Needs testing!
+            self.model = model
+
+        def __enter__(self)->ModelClass:
+            cache = self.cache
+            key = self.key
+            model = self.model
+            if self.gpu_load and hasattr(model,'to'):
+                cache.loaded_models.add(key)
+                cache.locked_models[key] += 1
+                if cache.lazy_offloading:
+                   cache._offload_unlocked_models()
+                cache.logger.debug(f'Loading {key} into {cache.execution_device}')
+                model.to(cache.execution_device)  # move into GPU
+                cache._print_cuda_stats()
+            else:
+                # in the event that the caller wants the model in RAM, we
+                # move it into CPU if it is in GPU and not locked
+                if hasattr(model,'to') and (key in cache.loaded_models
+                                            and cache.locked_models[key] == 0):
+                    model.to(cache.storage_device)
+                    cache.loaded_models.remove(key)
+            return model
+
+        def __exit__(self, type, value, traceback):
+            key = self.key
+            cache = self.cache
+            cache.locked_models[key] -= 1
+            if not cache.lazy_offloading:
+                cache._offload_unlocked_models()
+                cache._print_cuda_stats()
 
     def attach_part(self,
                      diffusers_model: StableDiffusionPipeline,
@@ -381,10 +399,11 @@ class ModelCache(object):
         revisions = [revision] if revision \
             else ['fp16','main'] if self.precision==torch.float16 \
                  else ['main']
-        extra_args = {'precision': self.precision} \
-            if model_class in DiffusionClasses \
-               else {}
-
+        extra_args = {'torch_dtype': self.precision,
+                      'safety_checker': None}\
+                      if model_class in DiffusionClasses\
+                         else {}
+        
         # silence transformer and diffuser warnings
         with SilenceWarnings():
             for rev in revisions:

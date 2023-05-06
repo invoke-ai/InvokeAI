@@ -109,9 +109,6 @@ def main():
     else:
         embedding_path = None
 
-    # migrate legacy models
-    ModelManager.migrate_models()
-
     # load the infile as a list of lines
     if opt.infile:
         try:
@@ -197,7 +194,7 @@ def main_loop(gen, opt):
     # changing the history file midstream when the output directory is changed.
     completer = get_completer(opt, models=gen.model_manager.list_models())
     set_default_output_dir(opt, completer)
-    if gen.model:
+    if gen.model_context:
         add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length() + 1
 
@@ -1080,7 +1077,8 @@ def add_embedding_terms(gen, completer):
     Called after setting the model, updates the autocompleter with
     any terms loaded by the embedding manager.
     """
-    trigger_strings = gen.model.textual_inversion_manager.get_all_trigger_strings()
+    with gen.model_context as model:
+        trigger_strings = model.textual_inversion_manager.get_all_trigger_strings()
     completer.add_embedding_terms(trigger_strings)
 
 
@@ -1222,6 +1220,7 @@ def report_model_error(opt: Namespace, e: Exception):
     logger.warning(
         "This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models."
     )
+    traceback.print_exc()
     yes_to_all = os.environ.get("INVOKE_MODEL_RECONFIGURE")
     if yes_to_all:
         logger.warning(
