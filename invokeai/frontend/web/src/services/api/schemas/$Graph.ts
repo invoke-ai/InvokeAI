@@ -30,6 +30,8 @@ export const $Graph = {
         }, {
           type: 'InverseLerpInvocation',
         }, {
+          type: 'CompelInvocation',
+        }, {
           type: 'NoiseInvocation',
         }, {
           type: 'TextToLatentsInvocation',
@@ -64,7 +66,11 @@ export const $Graph = {
         }, {
           type: 'TextToImageInvocation',
         }, {
-          type: 'InfillImageInvocation',
+          type: 'InfillColorInvocation',
+        }, {
+          type: 'InfillTileInvocation',
+        }, {
+          type: 'InfillPatchMatchInvocation',
         }, {
           type: 'GraphInvocation',
         }, {

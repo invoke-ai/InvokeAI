@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { CollectInvocationOutput } from './CollectInvocationOutput';
+import type { CompelOutput } from './CompelOutput';
 import type { Graph } from './Graph';
 import type { GraphInvocationOutput } from './GraphInvocationOutput';
 import type { ImageOutput } from './ImageOutput';
@@ -41,7 +42,7 @@ export type GraphExecutionState = {
   /**
    * The results of node executions
    */
-  results: Record<string, (ImageOutput | MaskOutput | LatentsOutput | NoiseOutput | IntOutput | PromptOutput | IntCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+  results: Record<string, (ImageOutput | MaskOutput | CompelOutput | LatentsOutput | NoiseOutput | IntOutput | PromptOutput | IntCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
   /**
    * Errors raised when executing nodes
    */
