@@ -69,7 +69,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   // 'config',
 ];
 
-export const store: Store = configureStore({
+export const store = configureStore({
   reducer: rememberedRootReducer,
   enhancers: [
     rememberEnhancer(window.localStorage, rememberedKeys, {
