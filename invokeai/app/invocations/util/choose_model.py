@@ -8,6 +8,6 @@ def choose_model(model_manager: ModelManager, model_name: str):
         model = model_manager.get_model(model_name)
     else:
         model = model_manager.get_model()
-        logger.warning(f"{model_name}' is not a valid model name. Using default model \'{model['model_name']}\' instead.")
+        logger.warning(f"\'{model_name}\' is not a valid model name. Using default model \'{model['model_name']}\' instead.")
 
     return model

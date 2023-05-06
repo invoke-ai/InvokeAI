@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 import torch
 
 from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
@@ -104,17 +105,13 @@ def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_c
     return x
 
 
-def random_seed():
-    return random.randint(0, np.iinfo(np.uint32).max)
-
-
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
     type: Literal["noise"] = "noise"
 
     # Inputs
-    seed:        int = Field(ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", default_factory=random_seed)
+    seed: Optional[int] = Field(ge=0, le=SEED_MAX, description="The seed to use", default_factory=get_random_seed)
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting noise", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting noise", )
 
@@ -152,10 +149,7 @@ class TextToLatentsInvocation(BaseInvocation):
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
-    seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     model:       str = Field(default="", description="The model to use (currently ignored)")
-    progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
     # fmt: on
 
     # Schema customisation
@@ -262,6 +256,10 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
     type: Literal["l2l"] = "l2l"
 
+    # Inputs
+    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
+    strength: float = Field(default=0.5, description="The strength of the latents to use")
+
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
@@ -272,10 +270,6 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 }
             },
         }
-
-    # Inputs
-    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
-    strength: float = Field(default=0.5, description="The strength of the latents to use")
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)

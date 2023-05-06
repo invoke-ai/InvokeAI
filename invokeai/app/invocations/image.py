@@ -54,7 +54,6 @@ def build_image_output(
         image=image_field,
         width=image.width,
         height=image.height,
-        mode=image.mode,
     )
 
 

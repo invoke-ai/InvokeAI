@@ -3,12 +3,12 @@
 from typing import Literal, Optional
 
 import numpy as np
-import numpy.random
 from pydantic import Field
+
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from .baseinvocation import (
     BaseInvocation,
-    InvocationConfig,
     InvocationContext,
     BaseInvocationOutput,
 )
@@ -52,9 +52,9 @@ class RandomRangeInvocation(BaseInvocation):
     size: int = Field(default=1, description="The number of values to generate")
     seed: Optional[int] = Field(
         ge=0,
-        le=np.iinfo(np.int32).max,
-        description="The seed for the RNG",
-        default_factory=lambda: numpy.random.randint(0, np.iinfo(np.int32).max),
+        le=SEED_MAX,
+        description="The seed for the RNG (omit for random)",
+        default_factory=get_random_seed,
     )
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
