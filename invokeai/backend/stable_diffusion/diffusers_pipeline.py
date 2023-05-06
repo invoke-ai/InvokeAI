@@ -994,14 +994,16 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         image,
         # FIXME: need to fix hardwiring of width and height, change to basing on latents dimensions?
-        width=512,
-        height=512,
+        # latents,
+        width=512,  # should be 8 * latent.shape[3]
+        height=512, # should be 8 * latent height[2]
         batch_size=1,
         num_images_per_prompt=1,
         device="cuda",
         dtype=torch.float16,
         do_classifier_free_guidance=True,
     ):
+
         if not isinstance(image, torch.Tensor):
             if isinstance(image, PIL.Image.Image):
                 image = [image]
