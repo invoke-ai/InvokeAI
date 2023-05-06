@@ -1003,6 +1003,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         dtype=torch.float16,
         do_classifier_free_guidance=True,
     ):
+
         if not isinstance(image, torch.Tensor):
             if isinstance(image, PIL.Image.Image):
                 image = [image]
