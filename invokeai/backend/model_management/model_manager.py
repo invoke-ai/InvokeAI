@@ -31,7 +31,56 @@ generation operations. The ModelCache object can be accessed using
 the manager's "cache" attribute.
 
 Other methods provided by ModelManager support importing, editing,
-converting and deleting models. 
+converting and deleting models.
+
+The general format of a models.yaml section is:
+
+ name-of-model:
+     format: diffusers|ckpt|vae|text_encoder|tokenizer...
+     repo_id: owner/repo
+     path: /path/to/local/file/or/directory
+     subfolder: subfolder-name
+     submodel: vae|text_encoder|tokenizer...
+
+The format is one of {diffusers, ckpt, vae, text_encoder, tokenizer,
+unet, scheduler, safety_checker, feature_extractor}, and correspond to
+items in the SDModelType enum defined in model_cache.py
+
+One, but not both, of repo_id and path are provided. repo_id is the
+HuggingFace repository ID of the model, and path points to the file or
+directory on disk.
+
+If subfolder is provided, then the model exists in a subdirectory of
+the main model. These are usually named after the model type, such as
+"unet".
+
+Finally, if submodel is provided, then the path/repo_id is treated as
+a diffusers model, the whole thing is ready into memory, and then the
+requested part (e.g. "unet") is retrieved.
+
+This summarizes the three ways of getting a non-diffuser model:
+
+ clip-test-1:
+   format: text_encoder
+   repo_id: openai/clip-vit-large-patch14
+   description: Returns standalone CLIPTextModel
+
+ clip-test-2:
+   format: diffusers
+   repo_id: stabilityai/stable-diffusion-2
+   submodel: text_encoder
+   description: Returns the text_encoder part of whole diffusers model (whole thing in RAM)
+
+ clip-test-3:
+   format: text_encoder
+   repo_id: stabilityai/stable-diffusion-2
+   subfolder: text_encoder
+   description: Returns the text_encoder in the subfolder of the diffusers model (just the encoder in RAM)
+
+ clip-token:
+   format: tokenizer
+   repo_id: openai/clip-vit-large-patch14
+   description: Returns standalone tokenizer
 """
 from __future__ import annotations
 
@@ -53,14 +102,14 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 from invokeai.backend.globals import Globals, global_cache_dir, global_resolve_path
-from .model_cache import Generator, ModelClass, ModelCache, SDModelType, ModelStatus, LegacyInfo
+from .model_cache import ModelClass, ModelCache, ModelLocker, SDModelType, ModelStatus, LegacyInfo
 
 from ..util import CUDA_DEVICE
 
 # wanted to use pydantic here, but Generator objects not supported
 @dataclass
 class SDModelInfo():
-    context: Generator[ModelClass, None, None]
+    context: ModelLocker
     name: str
     hash: str
     location: Union[Path,str]
@@ -125,6 +174,7 @@ class ModelManager(object):
             sequential_offload = sequential_offload,
             logger = logger,
         )
+        self.cache_keys = dict()
         self.logger = logger
 
     def valid_model(self, model_name: str) -> bool:
@@ -154,8 +204,12 @@ class ModelManager(object):
 
         # get the required loading info out of the config file
         mconfig = self.config[model_name]
+        
         format = mconfig.get('format','diffusers')
+        model_type = SDModelType.diffusion_pipeline
+        model_parts = dict([(x.name,x) for x in SDModelType])
         legacy = None
+        
         if format=='ckpt':
             location = global_resolve_path(mconfig.weights)
             legacy = LegacyInfo(
@@ -165,14 +219,22 @@ class ModelManager(object):
                 legacy.vae_file = global_resolve_path(mconfig.vae)
         elif format=='diffusers':
             location = mconfig.get('repo_id') or mconfig.get('path')
-            revision = mconfig.get('revision')
+            if sm := mconfig.get('submodel'):
+                submodel = model_parts[sm]
+        elif format in model_parts:
+            location = mconfig.get('repo_id') or mconfig.get('path') or mconfig.get('weights')
+            model_type = model_parts[format]
         else:
             raise InvalidModelError(
                 f'"{model_name}" has an unknown format {format}'
             )
             
         subfolder = mconfig.get('subfolder')
+        revision = mconfig.get('revision')
         hash = self.cache.model_hash(location,revision)
+
+        # to support the traditional way of attaching a VAE
+        # to a model, we hacked in `attach_model_part`
         vae = (None,None)
         try:
             vae_id = mconfig.vae.repo_id
@@ -181,12 +243,19 @@ class ModelManager(object):
             pass
         model_context = self.cache.get_model(
             location,
+            model_type = model_type,
             revision = revision,
             subfolder = subfolder,
             legacy_info = legacy,
             submodel = submodel,
             attach_model_part=vae,
         )
+
+        # in case we need to communicate information about this
+        # model to the cache manager, then we need to remember
+        # the cache key
+        self.cache_keys[model_name] = model_context.key
+        
         return SDModelInfo(
             context = model_context,
             name = model_name,
@@ -365,6 +434,7 @@ class ModelManager(object):
         attributes are incorrect or the model name is missing.
         """
         omega = self.config
+
         assert "format" in model_attributes, 'missing required field "format"'
         if model_attributes["format"] == "diffusers":
             assert (
@@ -373,9 +443,11 @@ class ModelManager(object):
             assert (
                 "path" in model_attributes or "repo_id" in model_attributes
             ), 'model must have either the "path" or "repo_id" fields defined'
-        else:
+        elif model_attributes["format"] == "ckpt":
             for field in ("description", "weights", "height", "width", "config"):
                 assert field in model_attributes, f"required field {field} is missing"
+        else:
+            assert "weights" in model_attributes and "description" in model_attributes
 
         assert (
             clobber or model_name not in omega
@@ -385,9 +457,10 @@ class ModelManager(object):
 
         if "weights" in omega[model_name]:
             omega[model_name]["weights"].replace("\\", "/")
-
-        if clobber:
-            self._invalidate_cached_model(model_name)
+            
+        if clobber and model_name in self.cache_keys:
+            self.cache.uncache_model(self.cache_keys[model_name])
+            del self.cache_keys[model_name]
 
     def import_diffuser_model(
         self,
@@ -424,6 +497,55 @@ class ModelManager(object):
         if commit_to_conf:
             self.commit(commit_to_conf)
         return model_name
+
+    def import_lora(
+            self,
+            path: Path,
+            model_name: str=None,
+            description: str=None,
+    ):
+        """
+        Creates an entry for the indicated lora file. Call
+        mgr.commit() to write out the configuration to models.yaml
+        """
+        path = Path(path)
+        model_name = model_name or path.stem
+        model_description = description or f"LoRA model {model_name}"
+        self.add_model(model_name,
+                       dict(
+                           format="lora",
+                           weights=str(path),
+                           description=model_description,
+                           ),
+                       True
+                       )
+        
+    def import_embedding(
+            self,
+            path: Path,
+            model_name: str=None,
+            description: str=None,
+    ):
+        """
+        Creates an entry for the indicated lora file. Call
+        mgr.commit() to write out the configuration to models.yaml
+        """
+        path = Path(path)
+        if path.is_directory() and (path / "learned_embeds.bin").exists():
+            weights = path / "learned_embeds.bin"
+        else:
+            weights = path
+            
+        model_name = model_name or path.stem
+        model_description = description or f"Textual embedding model {model_name}"
+        self.add_model(model_name,
+                       dict(
+                           format="textual_inversion",
+                           weights=str(path),
+                           description=model_description,
+                           ),
+                       True
+                       )
 
     @classmethod
     def probe_model_type(self, checkpoint: dict) -> SDLegacyType:

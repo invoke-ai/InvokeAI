@@ -20,13 +20,13 @@ import contextlib
 import gc
 import hashlib
 import warnings
-from collections.abc import Generator
 from collections import Counter
 from enum import Enum
 from pathlib import Path
 from typing import Sequence, Union, Tuple, types
 
 import torch
+import safetensors.torch
 from diffusers import StableDiffusionPipeline, AutoencoderKL, SchedulerMixin, UNet2DConditionModel
 from diffusers import logging as diffusers_logging
 from diffusers.pipelines.stable_diffusion.safety_checker import \
@@ -46,13 +46,18 @@ MAX_MODELS = 4
 # This is the mapping from the stable diffusion submodel dict key to the class
 class SDModelType(Enum):
     diffusion_pipeline=StableDiffusionGeneratorPipeline # whole thing
-    vae=AutoencoderKL                                   # parts
+    diffusers=StableDiffusionGeneratorPipeline          # same thing
+    vae=AutoencoderKL                                   # diffusers parts
     text_encoder=CLIPTextModel
     tokenizer=CLIPTokenizer
     unet=UNet2DConditionModel
     scheduler=SchedulerMixin
     safety_checker=StableDiffusionSafetyChecker
     feature_extractor=CLIPFeatureExtractor
+    # These are all loaded as dicts of tensors
+    lora=dict
+    textual_inversion=dict
+    ckpt=dict
 
 class ModelStatus(Enum):
     unknown='unknown'
@@ -192,6 +197,15 @@ class ModelCache(object):
 
         return self.ModelLocker(self, key, model, gpu_load)
 
+    def uncache_model(self, key: str):
+        '''Remove corresponding model from the cache'''
+        if key is not None and key in self.models:
+            with contextlib.suppress(ValueError):
+                del self.models[key]
+                del self.locked_models[key]
+                self.stack.remove(key)
+                self.loaded_models.remove(key)
+
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load):
             self.gpu_load = gpu_load
@@ -301,7 +315,7 @@ class ModelCache(object):
         :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
         '''
         path = Path(repo_id_or_path)
-        return path.is_file() and path.suffix in [".ckpt",".safetensors"]
+        return path.suffix in [".ckpt",".safetensors",".pt"]
 
     @classmethod
     def scan_model(cls, model_name, checkpoint):
@@ -368,15 +382,17 @@ class ModelCache(object):
         :param model_class: class of model to return, defaults to StableDiffusionGeneratorPIpeline
         :param legacy_info: a LegacyInfo object containing additional info needed to load a legacy ckpt
         '''
-        if self.is_legacy_ckpt(repo_id_or_path):
-            model = self._load_ckpt_from_storage(repo_id_or_path, legacy_info)
-        else:
-            model = self._load_diffusers_from_storage(
-                repo_id_or_path,
-                subfolder,
-                revision,
-                model_class,
-            )
+        # silence transformer and diffuser warnings
+        with SilenceWarnings():
+            if self.is_legacy_ckpt(repo_id_or_path):
+                model = self._load_ckpt_from_storage(repo_id_or_path, legacy_info)
+            else:
+                model = self._load_diffusers_from_storage(
+                    repo_id_or_path,
+                    subfolder,
+                    revision,
+                    model_class,
+                )
         if self.sequential_offload and isinstance(model,StableDiffusionGeneratorPipeline):
             model.enable_offload_submodels(self.execution_device)
         return model
@@ -404,21 +420,19 @@ class ModelCache(object):
                       if model_class in DiffusionClasses\
                          else {}
         
-        # silence transformer and diffuser warnings
-        with SilenceWarnings():
-            for rev in revisions:
-                try:
-                    model =  model_class.from_pretrained(
-                        repo_id_or_path,
-                        revision=rev,
-                        subfolder=subfolder or '.',
-                        cache_dir=global_cache_dir('hub'),
-                        **extra_args,
-                    )
-                    self.logger.debug(f'Found revision {rev}')
-                    break
-                except OSError:
-                    pass
+        for rev in revisions:
+            try:
+                model =  model_class.from_pretrained(
+                    repo_id_or_path,
+                    revision=rev,
+                    subfolder=subfolder or '.',
+                    cache_dir=global_cache_dir('hub'),
+                    **extra_args,
+                )
+                self.logger.debug(f'Found revision {rev}')
+                break
+            except OSError:
+                pass
         return model
 
     def _load_ckpt_from_storage(self,
@@ -429,24 +443,27 @@ class ModelCache(object):
         :param ckpt_path: string or Path pointing to the weights file (.ckpt or .safetensors)
         :param legacy_info: LegacyInfo object containing paths to legacy config file and alternate vae if required
         '''
-        assert legacy_info is not None
-
-        # deferred loading to avoid circular import errors
-        from .convert_ckpt_to_diffusers import load_pipeline_from_original_stable_diffusion_ckpt
-        with SilenceWarnings():
+        if legacy_info is None or legacy_info.config_file is None:
+            if Path(ckpt_path).suffix == '.safetensors':
+                return safetensors.torch.load_file(ckpt_path)
+            else:
+                return torch.load(ckpt_path)
+        else:
+            # deferred loading to avoid circular import errors
+            from .convert_ckpt_to_diffusers import load_pipeline_from_original_stable_diffusion_ckpt
             pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
                 checkpoint_path=ckpt_path,
                 original_config_file=legacy_info.config_file,
-                vae_path=legacy_info.vae_file,
+            vae_path=legacy_info.vae_file,
                 return_generator_pipeline=True,
                 precision=self.precision,
             )
-        return pipeline
+            return pipeline
 
     def _legacy_model_hash(self, checkpoint_path: Union[str,Path])->str:
         sha = hashlib.sha256()
         path = Path(checkpoint_path)
-        assert path.is_file()
+        assert path.is_file(),f"File {checkpoint_path} not found"
 
         hashpath = path.parent / f"{path.name}.sha256"
         if hashpath.exists() and path.stat().st_mtime <= hashpath.stat().st_mtime:
