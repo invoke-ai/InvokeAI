@@ -48,7 +48,10 @@ const ModelInputFieldComponent = (
   };
 
   return (
-    <Select onChange={handleValueChanged} value={field.value}>
+    <Select
+      onChange={handleValueChanged}
+      value={field.value || allModelNames[0]}
+    >
       {allModelNames.map((option) => (
         <option key={option}>{option}</option>
       ))}
