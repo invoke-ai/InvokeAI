@@ -360,6 +360,12 @@ export const buildInputFieldTemplate = (
   if (['color'].includes(fieldType)) {
     return buildColorInputFieldTemplate({ schemaObject, baseField });
   }
+  if (['array'].includes(fieldType)) {
+    return buildArrayInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['item'].includes(fieldType)) {
+    return buildItemInputFieldTemplate({ schemaObject, baseField });
+  }
 
   return;
 };
