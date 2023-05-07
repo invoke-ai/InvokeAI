@@ -13,7 +13,7 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const invocationDenylist = ['Graph', 'Collect', 'LoadImage'];
+const invocationDenylist = ['Graph', 'LoadImage'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
@@ -32,49 +32,62 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
     if (isInvocationSchemaObject(schema)) {
       const type = schema.properties.type.default;
 
-      const title =
-        schema.ui?.title ??
-        schema.title
-          .replace('Invocation', '')
-          .split(/(?=[A-Z])/) // split PascalCase into array
-          .join(' ');
+      const title = schema.ui?.title ?? schema.title.replace('Invocation', '');
 
       const typeHints = schema.ui?.type_hints;
 
-      const inputs = reduce(
-        schema.properties,
-        (inputsAccumulator, property, propertyName) => {
-          if (
-            // `type` and `id` are not valid inputs/outputs
-            !['type', 'id'].includes(propertyName) &&
-            isSchemaObject(property)
-          ) {
-            let field: InputFieldTemplate | undefined;
-            if (propertyName === 'collection') {
-              field = {
-                default: property.default ?? [],
-                name: 'collection',
-                title: property.title ?? '',
-                description: property.description ?? '',
-                type: 'array',
-                inputRequirement: 'always',
-                inputKind: 'connection',
-              };
-            } else {
-              field = buildInputFieldTemplate(
-                property,
-                propertyName,
-                typeHints
-              );
+      const inputs: Record<string, InputFieldTemplate> = {};
+
+      if (type === 'collect') {
+        const itemProperty = schema.properties[
+          'item'
+        ] as InvocationSchemaObject;
+        // Handle the special Collect node
+        inputs.item = {
+          type: 'item',
+          name: 'item',
+          description: itemProperty.description ?? '',
+          title: 'Collection Item',
+          inputKind: 'connection',
+          inputRequirement: 'always',
+          default: undefined,
+        };
+      } else if (type === 'iterate') {
+        const itemProperty = schema.properties[
+          'collection'
+        ] as InvocationSchemaObject;
+
+        inputs.collection = {
+          type: 'array',
+          name: 'collection',
+          title: itemProperty.title ?? '',
+          default: [],
+          description: itemProperty.description ?? '',
+          inputRequirement: 'always',
+          inputKind: 'connection',
+        };
+      } else {
+        // All other nodes
+        reduce(
+          schema.properties,
+          (inputsAccumulator, property, propertyName) => {
+            if (
+              // `type` and `id` are not valid inputs/outputs
+              !['type', 'id'].includes(propertyName) &&
+              isSchemaObject(property)
+            ) {
+              const field: InputFieldTemplate | undefined =
+                buildInputFieldTemplate(property, propertyName, typeHints);
+
+              if (field) {
+                inputsAccumulator[propertyName] = field;
+              }
             }
-            if (field) {
-              inputsAccumulator[propertyName] = field;
-            }
-          }
-          return inputsAccumulator;
-        },
-        {} as Record<string, InputFieldTemplate>
-      );
+            return inputsAccumulator;
+          },
+          inputs
+        );
+      }
 
       const rawOutput = (schema as InvocationSchemaObject).output;
 
