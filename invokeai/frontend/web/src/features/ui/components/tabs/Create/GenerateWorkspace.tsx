@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
-import GenerateContent from './GenerateContent';
+import CreateTabContent from './GenerateContent';
 import GenerateParameters from './GenerateParameters';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
 import { RootState } from 'app/store/store';
@@ -13,6 +13,8 @@ const GenerateWorkspace = () => {
   const shouldPinParametersPanel = useAppSelector(
     (state: RootState) => state.ui.shouldPinParametersPanel
   );
+
+  return <CreateTabContent />;
 
   return (
     <Flex
@@ -45,7 +47,7 @@ const GenerateWorkspace = () => {
           <GenerateParameters />
         </ParametersSlide>
       )}
-      <GenerateContent />
+      <CreateTabContent />
     </Flex>
   );
 };

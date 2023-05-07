@@ -11,7 +11,7 @@ import {
   CancelStrategy,
 } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
-import { useCallback, memo } from 'react';
+import { useCallback, memo, useMemo } from 'react';
 import {
   ButtonSpinner,
   ButtonGroup,
@@ -102,39 +102,39 @@ const CancelButton = (
     [isConnected, isProcessing, isCancelable]
   );
 
+  const cancelLabel = useMemo(() => {
+    if (isCancelScheduled) {
+      return t('parameters.cancel.isScheduled');
+    }
+    if (cancelType === 'immediate') {
+      return t('parameters.cancel.immediate');
+    }
+
+    return t('parameters.cancel.schedule');
+  }, [t, cancelType, isCancelScheduled]);
+
+  const cancelIcon = useMemo(() => {
+    if (isCancelScheduled) {
+      return <ButtonSpinner />;
+    }
+    if (cancelType === 'immediate') {
+      return <MdCancel />;
+    }
+
+    return <MdCancelScheduleSend />;
+  }, [cancelType, isCancelScheduled]);
+
   return (
     <ButtonGroup isAttached width={btnGroupWidth}>
-      {cancelType === 'immediate' ? (
-        <IAIIconButton
-          icon={<MdCancel />}
-          tooltip={t('parameters.cancel.immediate')}
-          aria-label={t('parameters.cancel.immediate')}
-          isDisabled={!isConnected || !isProcessing || !isCancelable}
-          onClick={handleClickCancel}
-          colorScheme="error"
-          {...rest}
-        />
-      ) : (
-        <IAIIconButton
-          icon={
-            isCancelScheduled ? <ButtonSpinner /> : <MdCancelScheduleSend />
-          }
-          tooltip={
-            isCancelScheduled
-              ? t('parameters.cancel.isScheduled')
-              : t('parameters.cancel.schedule')
-          }
-          aria-label={
-            isCancelScheduled
-              ? t('parameters.cancel.isScheduled')
-              : t('parameters.cancel.schedule')
-          }
-          isDisabled={!isConnected || !isProcessing || !isCancelable}
-          onClick={handleClickCancel}
-          colorScheme="error"
-          {...rest}
-        />
-      )}
+      <IAIIconButton
+        icon={cancelIcon}
+        tooltip={cancelLabel}
+        aria-label={cancelLabel}
+        isDisabled={!isConnected || !isProcessing || !isCancelable}
+        onClick={handleClickCancel}
+        colorScheme="error"
+        {...rest}
+      />
 
       <Menu closeOnSelect={false}>
         <MenuButton

@@ -155,7 +155,6 @@ export const getAnimations = ({
 };
 
 export type GetResizableStylesProps = {
-  isPinned: boolean;
   isResizable: boolean;
   direction: SlideDirection;
 };
@@ -168,10 +167,10 @@ const HANDLE_PADDING = '1rem';
 
 const HANDLE_WIDTH_PINNED = '2px';
 const HANDLE_WIDTH_UNPINNED = '5px';
+const HANDLE_WIDTH = '5px';
 
 // Get the styles for the container and handle. Do not need to handle langDirection here bc we use direction-agnostic CSS
 export const getStyles = ({
-  isPinned,
   isResizable,
   direction,
 }: GetResizableStylesProps): {
@@ -182,15 +181,13 @@ export const getStyles = ({
     return { containerStyles: {}, handleStyles: {} };
   }
 
-  const handleWidth = isPinned ? HANDLE_WIDTH_PINNED : HANDLE_WIDTH_UNPINNED;
-
   // Calculate the positioning offset of the handle hitbox so it is centered over the handle
-  const handleOffset = `calc((2 * ${HANDLE_INTERACT_PADDING} + ${handleWidth}) / -2)`;
+  const handleOffset = `calc((2 * ${HANDLE_INTERACT_PADDING} + ${HANDLE_WIDTH}) / -2)`;
 
   if (direction === 'top') {
     return {
       containerStyles: {
-        borderBottomWidth: handleWidth,
+        borderBottomWidth: HANDLE_WIDTH,
         paddingBottom: HANDLE_PADDING,
       },
       handleStyles: {
@@ -206,7 +203,7 @@ export const getStyles = ({
   if (direction === 'left') {
     return {
       containerStyles: {
-        borderInlineEndWidth: handleWidth,
+        borderInlineEndWidth: HANDLE_WIDTH,
         paddingInlineEnd: HANDLE_PADDING,
       },
       handleStyles: {
@@ -222,7 +219,7 @@ export const getStyles = ({
   if (direction === 'bottom') {
     return {
       containerStyles: {
-        borderTopWidth: handleWidth,
+        borderTopWidth: HANDLE_WIDTH,
         paddingTop: HANDLE_PADDING,
       },
       handleStyles: {
@@ -238,7 +235,7 @@ export const getStyles = ({
   if (direction === 'right') {
     return {
       containerStyles: {
-        borderInlineStartWidth: handleWidth,
+        borderInlineStartWidth: HANDLE_WIDTH,
         paddingInlineStart: HANDLE_PADDING,
       },
       handleStyles: {

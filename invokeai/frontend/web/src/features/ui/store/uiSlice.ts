@@ -78,9 +78,15 @@ export const uiSlice = createSlice({
     },
     togglePinGalleryPanel: (state) => {
       state.shouldPinGallery = !state.shouldPinGallery;
+      if (!state.shouldPinGallery) {
+        state.shouldShowGallery = true;
+      }
     },
     togglePinParametersPanel: (state) => {
       state.shouldPinParametersPanel = !state.shouldPinParametersPanel;
+      if (!state.shouldPinParametersPanel) {
+        state.shouldShowParametersPanel = true;
+      }
     },
     toggleParametersPanel: (state) => {
       state.shouldShowParametersPanel = !state.shouldShowParametersPanel;

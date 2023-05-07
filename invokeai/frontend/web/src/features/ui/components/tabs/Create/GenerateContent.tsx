@@ -2,7 +2,7 @@ import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
 import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
 
-const GenerateContent = () => {
+const CreateTabContent = () => {
   return (
     <Box
       sx={{
@@ -20,4 +20,4 @@ const GenerateContent = () => {
   );
 };
 
-export default GenerateContent;
+export default CreateTabContent;
