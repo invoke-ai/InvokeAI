@@ -7,7 +7,7 @@ export const buildIterateNode = (): IterateInvocation => {
   return {
     id: nodeId,
     type: 'iterate',
-    collection: [],
-    index: 0,
+    // collection: [],
+    // index: 0,
   };
 };

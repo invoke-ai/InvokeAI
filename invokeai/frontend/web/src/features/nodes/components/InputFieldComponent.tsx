@@ -10,6 +10,7 @@ import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComp
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
+import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -108,6 +109,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'array' && template.type === 'array') {
     return (
       <ArrayInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'item' && template.type === 'item') {
+    return (
+      <ItemInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

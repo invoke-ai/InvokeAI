@@ -14,6 +14,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   ConditioningField: 'conditioning',
   model: 'model',
   array: 'array',
+  item: 'item',
 };
 
 const COLOR_TOKEN_VALUE = 500;
@@ -81,5 +82,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     colorCssVar: getColorTokenCssVariable('gray'),
     title: 'Array',
     description: 'TODO: Array type description.',
+  },
+  item: {
+    color: 'gray',
+    colorCssVar: getColorTokenCssVariable('gray'),
+    title: 'Collection Item',
+    description: 'TODO: Collection Item type description.',
   },
 };
