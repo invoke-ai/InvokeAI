@@ -59,7 +59,7 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
             config.conf,
             precision=dtype,
             device_type=device,
-            max_loaded_models=config.max_loaded_models,
+            max_cache_size=config.max_cache_size,
 # temporarily disabled until model manager stabilizes
 #            embedding_path = Path(embedding_path),
             logger = logger,

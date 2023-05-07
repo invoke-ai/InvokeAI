@@ -141,7 +141,7 @@ class SDLegacyType(Enum):
     V2_v = auto()
     UNKNOWN = auto()
 
-DEFAULT_MAX_MODELS = 2
+MAX_CACHE_SIZE = 6.0  # GB
 
 class ModelManager(object):
     """
@@ -155,7 +155,7 @@ class ModelManager(object):
             config_path: Path,
             device_type: torch.device = CUDA_DEVICE,
             precision: torch.dtype = torch.float16,
-            max_loaded_models=DEFAULT_MAX_MODELS,
+            max_cache_size=MAX_CACHE_SIZE,
             sequential_offload=False,
             logger: types.ModuleType = logger,
     ):
@@ -168,7 +168,7 @@ class ModelManager(object):
         self.config_path = config_path
         self.config = OmegaConf.load(self.config_path)
         self.cache = ModelCache(
-            max_models=max_loaded_models,
+            max_cache_size=max_cache_size,
             execution_device = device_type,
             precision = precision,
             sequential_offload = sequential_offload,

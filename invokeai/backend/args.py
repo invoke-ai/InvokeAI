@@ -502,11 +502,11 @@ class Args(object):
             help="Deprecated way to set --precision=float32",
         )
         model_group.add_argument(
-            "--max_loaded_models",
-            dest="max_loaded_models",
-            type=int,
-            default=2,
-            help="Maximum number of models to keep in memory for fast switching, including the one in GPU",
+            "--max_cache_size",
+            dest="max_cache_size",
+            type=float,
+            default=6.0,
+            help="Maximum size of the model RAM cache (in GB). 6 GB is sufficient to keep 2-3 diffusers models in RAM simultaneously.",
         )
         model_group.add_argument(
             "--free_gpu_mem",
