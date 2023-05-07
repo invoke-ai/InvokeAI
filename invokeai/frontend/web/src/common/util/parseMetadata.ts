@@ -108,12 +108,7 @@ const parseControlField = (controlField: unknown): ControlField | undefined => {
   if (!('control' in controlField)) {
     return;
   }
-  console.log(typeof controlField.control);
-  // A ControlField's `controlnets` must be a array
-  // TODO: check type - array of tuples
-  //if (Array.isArray(controlField.control)) {
-  //return;
-  // }
+  // console.log(typeof controlField.control);
 
   // Build a valid ControlField
   return {
