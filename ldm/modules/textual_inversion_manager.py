@@ -3,14 +3,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
-import safetensors.torch
-import torch
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=UserWarning)
+    import safetensors.torch
+    import torch
 from picklescan.scanner import scan_file_path
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from compel.embeddings_provider import BaseTextualInversionManager
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
-
 
 @dataclass
 class TextualInversion:

@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Union
 
 import click
-
 from compel import PromptParser
 
 if sys.platform == "darwin":
