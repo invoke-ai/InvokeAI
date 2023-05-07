@@ -1,5 +1,5 @@
 import { forEach, size } from 'lodash-es';
-import { ImageField, LatentsField } from 'services/api';
+import { ImageField, LatentsField, ConditioningField } from 'services/api';
 
 const OBJECT_TYPESTRING = '[object Object]';
 const STRING_TYPESTRING = '[object String]';
@@ -74,8 +74,38 @@ const parseLatentsField = (latentsField: unknown): LatentsField | undefined => {
   };
 };
 
+const parseConditioningField = (
+  conditioningField: unknown
+): ConditioningField | undefined => {
+  // Must be an object
+  if (!isObject(conditioningField)) {
+    return;
+  }
+
+  // A ConditioningField must have a `conditioning_name`
+  if (!('conditioning_name' in conditioningField)) {
+    return;
+  }
+
+  // A ConditioningField's `conditioning_name` must be a string
+  if (typeof conditioningField.conditioning_name !== 'string') {
+    return;
+  }
+
+  // Build a valid ConditioningField
+  return {
+    conditioning_name: conditioningField.conditioning_name,
+  };
+};
+
 type NodeMetadata = {
-  [key: string]: string | number | boolean | ImageField | LatentsField;
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | ImageField
+    | LatentsField
+    | ConditioningField;
 };
 
 type InvokeAIMetadata = {
@@ -101,7 +131,7 @@ export const parseNodeMetadata = (
       return;
     }
 
-    // the only valid object types are ImageField and LatentsField
+    // the only valid object types are ImageField, LatentsField and ConditioningField
     if (isObject(nodeItem)) {
       if ('image_name' in nodeItem || 'image_type' in nodeItem) {
         const imageField = parseImageField(nodeItem);
@@ -115,6 +145,14 @@ export const parseNodeMetadata = (
         const latentsField = parseLatentsField(nodeItem);
         if (latentsField) {
           parsed[nodeKey] = latentsField;
+        }
+        return;
+      }
+
+      if ('conditioning_name' in nodeItem) {
+        const conditioningField = parseConditioningField(nodeItem);
+        if (conditioningField) {
+          parsed[nodeKey] = conditioningField;
         }
         return;
       }
