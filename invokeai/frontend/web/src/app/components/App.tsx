@@ -1,6 +1,6 @@
 import ImageUploader from 'common/components/ImageUploader';
-import ProgressBar from 'features/system/components/ProgressBar';
 import SiteHeader from 'features/system/components/SiteHeader';
+import ProgressBar from 'features/system/components/ProgressBar';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 
 import useToastWatcher from 'features/system/hooks/useToastWatcher';
@@ -28,6 +28,9 @@ import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
 import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
+import ResizableDrawer from 'features/ui/components/common/ResizableDrawer/ResizableDrawer';
+import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
+import CreateParametersDrawer from 'features/ui/components/CreateParametersDrawer';
 
 const DEFAULT_CONFIG = {};
 
@@ -84,10 +87,12 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
             flexDir={{ base: 'column', xl: 'row' }}
           >
             <InvokeTabs />
-            <ImageGalleryPanel />
           </Flex>
         </Grid>
       </ImageUploader>
+
+      <ImageGalleryPanel />
+      <CreateParametersDrawer />
 
       <AnimatePresence>
         {!isApplicationReady && !loadingOverridden && (

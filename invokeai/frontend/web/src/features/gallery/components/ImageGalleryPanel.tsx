@@ -73,7 +73,7 @@ const galleryPanelSelector = createSelector(
   }
 );
 
-export const ImageGalleryPanel = () => {
+const ImageGalleryPanel = () => {
   const dispatch = useAppDispatch();
   const {
     shouldPinGallery,
@@ -102,21 +102,21 @@ export const ImageGalleryPanel = () => {
 
   const resolution = useResolution();
 
-  useHotkeys(
-    'g',
-    () => {
-      handleToggleGallery();
-    },
-    [shouldPinGallery]
-  );
+  // useHotkeys(
+  //   'g',
+  //   () => {
+  //     handleToggleGallery();
+  //   },
+  //   [shouldPinGallery]
+  // );
 
-  useHotkeys(
-    'shift+g',
-    () => {
-      handleSetShouldPinGallery();
-    },
-    [shouldPinGallery]
-  );
+  // useHotkeys(
+  //   'shift+g',
+  //   () => {
+  //     handleSetShouldPinGallery();
+  //   },
+  //   [shouldPinGallery]
+  // );
 
   useHotkeys(
     'esc',
@@ -162,55 +162,71 @@ export const ImageGalleryPanel = () => {
     [galleryImageMinimumWidth]
   );
 
-  const calcGalleryMinHeight = () => {
-    if (resolution === 'desktop') return;
-    return 300;
-  };
+  // const calcGalleryMinHeight = () => {
+  //   if (resolution === 'desktop') return;
+  //   return 300;
+  // };
 
-  const imageGalleryContent = () => {
-    return (
-      <Flex
-        w="100vw"
-        h={{ base: 300, xl: '100vh' }}
-        paddingRight={{ base: 8, xl: 0 }}
-        paddingBottom={{ base: 4, xl: 0 }}
-      >
-        <ImageGalleryContent />
-      </Flex>
-    );
-  };
+  // const imageGalleryContent = () => {
+  //   return (
+  //     <Flex
+  //       w="100vw"
+  //       h={{ base: 300, xl: '100vh' }}
+  //       paddingRight={{ base: 8, xl: 0 }}
+  //       paddingBottom={{ base: 4, xl: 0 }}
+  //     >
+  //       <ImageGalleryContent />
+  //     </Flex>
+  //   );
+  // };
 
-  const resizableImageGalleryContent = () => {
-    return (
-      <ResizableDrawer
-        direction="right"
-        isResizable={isResizable || !shouldPinGallery}
-        isOpen={shouldShowGallery}
-        onClose={handleCloseGallery}
-        isPinned={shouldPinGallery && !isLightboxOpen}
-        minWidth={
-          shouldPinGallery
-            ? GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
-            : 200
-        }
-        maxWidth={
-          shouldPinGallery
-            ? GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
-            : undefined
-        }
-        minHeight={calcGalleryMinHeight()}
-      >
-        <ImageGalleryContent />
-      </ResizableDrawer>
-    );
-  };
+  // const resizableImageGalleryContent = () => {
+  //   return (
+  //     <ResizableDrawer
+  //       direction="right"
+  //       isResizable={isResizable || !shouldPinGallery}
+  //       isOpen={shouldShowGallery}
+  //       onClose={handleCloseGallery}
+  //       isPinned={shouldPinGallery && !isLightboxOpen}
+  //       minWidth={
+  //         shouldPinGallery
+  //           ? GALLERY_TAB_WIDTHS[activeTabName].galleryMinWidth
+  //           : 200
+  //       }
+  //       maxWidth={
+  //         shouldPinGallery
+  //           ? GALLERY_TAB_WIDTHS[activeTabName].galleryMaxWidth
+  //           : undefined
+  //       }
+  //       minHeight={calcGalleryMinHeight()}
+  //     >
+  //       <ImageGalleryContent />
+  //     </ResizableDrawer>
+  //   );
+  // };
 
-  const renderImageGallery = () => {
-    if (['mobile', 'tablet'].includes(resolution)) return imageGalleryContent();
-    return resizableImageGalleryContent();
-  };
+  // const renderImageGallery = () => {
+  //   if (['mobile', 'tablet'].includes(resolution)) return imageGalleryContent();
+  //   return resizableImageGalleryContent();
+  // };
 
-  return renderImageGallery();
+  if (shouldPinGallery) {
+    return null;
+  }
+
+  return (
+    <ResizableDrawer
+      direction="right"
+      isResizable={true}
+      isOpen={shouldShowGallery}
+      onClose={handleCloseGallery}
+      minWidth={200}
+    >
+      <ImageGalleryContent />
+    </ResizableDrawer>
+  );
+
+  // return renderImageGallery();
 };
 
 export default memo(ImageGalleryPanel);

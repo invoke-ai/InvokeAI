@@ -89,6 +89,7 @@
     "react-konva": "^18.2.7",
     "react-konva-utils": "^1.0.4",
     "react-redux": "^8.0.5",
+    "react-resizable-panels": "^0.0.42",
     "react-rnd": "^10.4.1",
     "react-transition-group": "^4.4.5",
     "react-use": "^17.4.0",

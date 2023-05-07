@@ -17,6 +17,7 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import { useTranslation } from 'react-i18next';
+import OverlayScrollable from '../../common/OverlayScrollable';
 
 export default function UnifiedCanvasParameters() {
   const { t } = useTranslation();
@@ -74,11 +75,21 @@ export default function UnifiedCanvasParameters() {
   };
 
   return (
-    <Flex flexDir="column" gap={2} position="relative">
-      <PromptInput />
-      <NegativePromptInput />
-      <ProcessButtons />
-      <ParametersAccordion accordionItems={unifiedCanvasAccordions} />
-    </Flex>
+    <OverlayScrollable>
+      <Flex
+        sx={{
+          gap: 2,
+          flexDirection: 'column',
+          h: 'full',
+          w: 'full',
+          position: 'absolute',
+        }}
+      >
+        <PromptInput />
+        <NegativePromptInput />
+        <ProcessButtons />
+        <ParametersAccordion accordionItems={unifiedCanvasAccordions} />
+      </Flex>
+    </OverlayScrollable>
   );
 }

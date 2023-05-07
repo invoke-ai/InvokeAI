@@ -10,7 +10,6 @@ import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComp
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
-import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
 import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
 import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
 

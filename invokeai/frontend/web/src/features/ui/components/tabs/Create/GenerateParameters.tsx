@@ -30,9 +30,15 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import { findIndex } from 'lodash-es';
-import { memo, useMemo, useState } from 'react';
+import {
+  OverlayScrollbarsComponent,
+  useOverlayScrollbars,
+} from 'overlayscrollbars-react';
+import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import OverlayScrollable from '../../common/OverlayScrollable';
+import AnimatedImageToImagePanel from 'features/parameters/components/AnimatedImageToImagePanel';
 
 const GenerateParameters = () => {
   const { t } = useTranslation();
@@ -83,25 +89,35 @@ const GenerateParameters = () => {
   );
 
   return (
-    <Flex flexDir="column" gap={2}>
-      <PromptInput />
-      <NegativePromptInput />
-      <ProcessButtons />
+    <OverlayScrollable>
       <Flex
         sx={{
-          flexDirection: 'column',
           gap: 2,
-          bg: 'base.800',
-          p: 4,
-          pb: 6,
-          borderRadius: 'base',
+          flexDirection: 'column',
+          h: 'full',
+          w: 'full',
+          position: 'absolute',
         }}
       >
-        <MainSettings />
+        <PromptInput />
+        <NegativePromptInput />
+        <ProcessButtons />
+        <Flex
+          sx={{
+            flexDirection: 'column',
+            gap: 2,
+            bg: 'base.800',
+            p: 4,
+            pb: 6,
+            borderRadius: 'base',
+          }}
+        >
+          <MainSettings />
+        </Flex>
+        <ImageToImageToggle />
+        <ParametersAccordion accordionItems={generateAccordionItems} />
       </Flex>
-      <ImageToImageToggle />
-      <ParametersAccordion accordionItems={generateAccordionItems} />
-    </Flex>
+    </OverlayScrollable>
   );
 };
 

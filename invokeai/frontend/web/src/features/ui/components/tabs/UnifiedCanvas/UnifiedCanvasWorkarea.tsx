@@ -18,6 +18,12 @@ const CanvasWorkspace = () => {
     (state: RootState) => state.ui.shouldUseCanvasBetaLayout
   );
 
+  return shouldUseCanvasBetaLayout ? (
+    <UnifiedCanvasContentBeta />
+  ) : (
+    <UnifiedCanvasContent />
+  );
+
   return (
     <Flex
       flexDirection={{ base: 'column-reverse', xl: 'row' }}
@@ -25,7 +31,7 @@ const CanvasWorkspace = () => {
       h="full"
       gap={4}
     >
-      {shouldPinParametersPanel ? (
+      {/* {shouldPinParametersPanel ? (
         <Box width="28rem" flexShrink={0} position="relative">
           <Scrollable>
             <UnifiedCanvasParameters />
@@ -38,7 +44,7 @@ const CanvasWorkspace = () => {
         <ParametersSlide>
           <UnifiedCanvasParameters />
         </ParametersSlide>
-      )}
+      )} */}
       {shouldUseCanvasBetaLayout ? (
         <UnifiedCanvasContentBeta />
       ) : (

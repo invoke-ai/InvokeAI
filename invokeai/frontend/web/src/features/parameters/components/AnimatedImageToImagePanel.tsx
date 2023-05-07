@@ -20,7 +20,7 @@ const AnimatedImageToImagePanel = () => {
           exit={{ opacity: 0, scale: 0, width: 0 }}
           transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
         >
-          <Box sx={{ h: 'full', w: 'full', pl: 4 }}>
+          <Box sx={{ h: 'full', w: 'full' }}>
             <ImageToImageSettings />
           </Box>
         </motion.div>
