@@ -100,7 +100,6 @@ class CompelInvocation(BaseInvocation):
 
         prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(prompt_str)
 
-        print('here i am')
         if context.services.configuration.log_tokenization:
             log_tokenization_for_prompt_object(prompt, tokenizer)
 
