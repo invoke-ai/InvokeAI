@@ -107,7 +107,7 @@ const initialSystemState: SystemState = {
   subscribedNodeIds: [],
   wereModelsReceived: false,
   wasSchemaParsed: false,
-  consoleLogLevel: 'error',
+  consoleLogLevel: 'debug',
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
