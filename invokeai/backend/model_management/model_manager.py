@@ -102,7 +102,7 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 from invokeai.backend.globals import Globals, global_cache_dir, global_resolve_path
-from .model_cache import ModelClass, ModelCache, ModelLocker, SDModelType, ModelStatus, LegacyInfo
+from .model_cache import ModelCache, ModelLocker, SDModelType, ModelStatus, LegacyInfo
 
 from ..util import CUDA_DEVICE
 
@@ -267,7 +267,7 @@ class ModelManager(object):
             _cache = self.cache
         )
 
-    def default_model(self) -> str | None:
+    def default_model(self) -> Union[str,None]:
         """
         Returns the name of the default model, or None
         if none is defined.
@@ -541,7 +541,7 @@ class ModelManager(object):
         self.add_model(model_name,
                        dict(
                            format="textual_inversion",
-                           weights=str(path),
+                           weights=str(weights),
                            description=model_description,
                            ),
                        True
@@ -865,12 +865,12 @@ class ModelManager(object):
 
         return search_folder, found_models
 
-    def commit(self) -> None:
+    def commit(self, conf_file: Path=None) -> None:
         """
         Write current configuration out to the indicated file.
         """
         yaml_str = OmegaConf.to_yaml(self.config)
-        config_file_path = self.config_path
+        config_file_path = conf_file or self.config_path
         tmpfile = os.path.join(os.path.dirname(config_file_path), "new_config.tmp")
         with open(tmpfile, "w", encoding="utf-8") as outfile:
             outfile.write(self.preamble())
