@@ -33,6 +33,11 @@ title: Overview
         Restore mangled faces and make images larger with upscaling. Also see
         the [Embiggen Upscaling Guide](EMBIGGEN.md).
 
+    -   The [Using LoRA Models](LORAS.md)
+
+        Add custom subjects and styles using HuggingFace's repository of
+        embeddings.
+	
     -   The [Concepts Library](CONCEPTS.md)
 
         Add custom subjects and styles using HuggingFace's repository of

@@ -75,7 +75,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
           obtaining an access token for downloading. It will then download and install the
           weights files for you.
 
-          Please look [here](../INSTALL_MANUAL.md) for a manual process for doing the
+          Please look [here](../020_INSTALL_MANUAL.md) for a manual process for doing the
           same thing.
 
 8. Start generating images!

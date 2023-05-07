@@ -32,9 +32,9 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",
-  "compel~=1.1.0",
+  "compel~=1.1.3",
   "datasets",
-  "diffusers[torch]~=0.15.0",
+  "diffusers[torch]~=0.16.1",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
@@ -76,7 +76,7 @@ dependencies = [
   "taming-transformers-rom1504",
   "test-tube>=0.7.5",
   "torch-fidelity",
-  "torch~=1.13.1",
+  "torch~=2.0.0",
   "torchmetrics",
   "torchvision>=0.14.1",
   "transformers~=4.26",
@@ -108,7 +108,7 @@ requires-python = ">=3.9, <3.11"
 "test" = ["pytest-cov", "pytest>6.0.0"]
 "xformers" = [
   "triton; sys_platform=='linux'",
-  "xformers~=0.0.16; sys_platform!='darwin'",
+  "xformers~=0.0.19; sys_platform!='darwin'",
 ]
 
 [project.scripts]
