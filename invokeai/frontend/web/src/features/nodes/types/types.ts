@@ -58,7 +58,8 @@ export type FieldType =
   | 'latents'
   | 'conditioning'
   | 'model'
-  | 'array';
+  | 'array'
+  | 'item';
 
 /**
  * An input field is persisted across reloads as part of the user's local state.
@@ -78,7 +79,8 @@ export type InputFieldValue =
   | ConditioningInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
-  | ArrayInputFieldValue;
+  | ArrayInputFieldValue
+  | ItemInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -96,7 +98,8 @@ export type InputFieldTemplate =
   | ConditioningInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
-  | ArrayInputFieldTemplate;
+  | ArrayInputFieldTemplate
+  | ItemInputFieldTemplate;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -185,6 +188,11 @@ export type ArrayInputFieldValue = FieldValueBase & {
   value?: (string | number)[];
 };
 
+export type ItemInputFieldValue = FieldValueBase & {
+  type: 'item';
+  value?: undefined;
+};
+
 export type InputFieldTemplateBase = {
   name: string;
   title: string;
@@ -255,8 +263,13 @@ export type ModelInputFieldTemplate = InputFieldTemplateBase & {
 };
 
 export type ArrayInputFieldTemplate = InputFieldTemplateBase & {
-  default: (string | number)[];
+  default: [];
   type: 'array';
+};
+
+export type ItemInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'item';
 };
 
 /**

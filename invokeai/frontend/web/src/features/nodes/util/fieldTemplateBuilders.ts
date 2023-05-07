@@ -16,6 +16,8 @@ import {
   OutputFieldTemplate,
   TypeHints,
   FieldType,
+  ArrayInputFieldTemplate,
+  ItemInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -230,6 +232,36 @@ const buildEnumInputFieldTemplate = ({
   return template;
 };
 
+const buildArrayInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ArrayInputFieldTemplate => {
+  const template: ArrayInputFieldTemplate = {
+    ...baseField,
+    type: 'array',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: [],
+  };
+
+  return template;
+};
+
+const buildItemInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ItemInputFieldTemplate => {
+  const template: ItemInputFieldTemplate = {
+    ...baseField,
+    type: 'item',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: undefined,
+  };
+
+  return template;
+};
+
 export const getFieldType = (
   schemaObject: OpenAPIV3.SchemaObject,
   name: string,
@@ -302,6 +334,12 @@ export const buildInputFieldTemplate = (
   }
   if (['boolean'].includes(fieldType)) {
     return buildBooleanInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['array'].includes(fieldType)) {
+    return buildArrayInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['item'].includes(fieldType)) {
+    return buildItemInputFieldTemplate({ schemaObject, baseField });
   }
 
   return;
