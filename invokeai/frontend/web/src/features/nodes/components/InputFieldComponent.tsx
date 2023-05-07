@@ -7,12 +7,7 @@ import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
 import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
 import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
 import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
-<<<<<<< HEAD
-=======
-import ControlNetInputFieldComponent from './fields/ControlNetInputFieldComponent';
 import ControlInputFieldComponent from './fields/ControlInputFieldComponent';
-
->>>>>>> 5b9fa636 (Refactored controlnet node to output ControlField that bundles control info.)
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
@@ -103,18 +98,6 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
     );
   }
 
-<<<<<<< HEAD
-=======
-  if (type === 'controlnet' && template.type === 'controlnet') {
-    return (
-      <ControlNetInputFieldComponent
-        nodeId={nodeId}
-        field={field}
-        template={template}
-      />
-    );
-  }
-
   if (type === 'control' && template.type === 'control') {
     return (
       <ControlInputFieldComponent
@@ -125,7 +108,6 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
     );
   }
 
->>>>>>> 5b9fa636 (Refactored controlnet node to output ControlField that bundles control info.)
   if (type === 'model' && template.type === 'model') {
     return (
       <ModelInputFieldComponent
