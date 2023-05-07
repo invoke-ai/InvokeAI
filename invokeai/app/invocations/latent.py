@@ -206,7 +206,6 @@ class TextToLatentsInvocation(BaseInvocation):
 
     def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
-        print(f'DEBUG: uc.dtype={uc.dtype}, c.dtype={c.dtype}')
         conditioning_data = ConditioningData(
             uc,
             c,
@@ -346,11 +345,11 @@ class LatentsToImageInvocation(BaseInvocation):
 
         # TODO: this only really needs the vae
         model_info = choose_model(context.services.model_manager, self.model)
-        model: StableDiffusionGeneratorPipeline = model_info['model']
-
-        with torch.inference_mode():
-            np_image = model.decode_latents(latents)
-            image = model.numpy_to_pil(np_image)[0]
+        
+        with model_info.context as model:
+            with torch.inference_mode():
+                np_image = model.decode_latents(latents)
+                image = model.numpy_to_pil(np_image)[0]
 
             image_type = ImageType.RESULT
             image_name = context.services.images.create_name(

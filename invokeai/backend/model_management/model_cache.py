@@ -213,7 +213,9 @@ class ModelCache(object):
             # this will remove older cached models until
             # there is sufficient room to load the requested model
             self._make_cache_room(key, model_type)
-            
+
+            # clean memory to make MemoryUsage() more accurate
+            gc.collect()
             with MemoryUsage() as usage:
                 model = self._load_model_from_storage(
                     repo_id_or_path=repo_id_or_path,

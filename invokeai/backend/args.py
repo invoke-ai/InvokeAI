@@ -558,12 +558,6 @@ class Args(object):
             help="Check for and blur potentially NSFW images. Use --no-nsfw_checker to disable.",
         )
         model_group.add_argument(
-            "--autoimport",
-            default=None,
-            type=str,
-            help="(DEPRECATED - NONFUNCTIONAL). Check the indicated directory for .ckpt/.safetensors weights files at startup and import directly",
-        )
-        model_group.add_argument(
             "--autoconvert",
             default=None,
             type=str,
@@ -764,6 +758,19 @@ class Args(object):
             dest="gui",
             action="store_true",
             help="Start InvokeAI GUI",
+        )
+        deprecated_group.add_argument(
+            "--autoimport",
+            default=None,
+            type=str,
+            help="(DEPRECATED - NONFUNCTIONAL). Check the indicated directory for .ckpt/.safetensors weights files at startup and import directly",
+        )
+        deprecated_group.add_argument(
+            "--max_loaded_models",
+            dest="max_loaded_models",
+            type=int,
+            default=3,
+            help="Maximum number of models to keep in RAM cache (deprecated - use max_cache_size)",
         )
         return parser
 

@@ -54,6 +54,10 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
             precision = choose_precision(device)
         dtype = torch.float32 if precision=='float32' \
                  else torch.float16
+
+        max_cache_size = config.max_cache_size \
+            if hasattr(config,'max_cache_size') \
+               else config.max_loaded_models * 2.5
         
         model_manager = ModelManager(
             config.conf,
