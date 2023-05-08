@@ -8,7 +8,7 @@ const ResizeHandle = () => {
       <Flex
         sx={{ w: 6, h: 'full', justifyContent: 'center', alignItems: 'center' }}
       >
-        <Box sx={{ w: 0.5, h: 'calc(100% - 1rem)', py: 4, bg: 'base.800' }} />
+        <Box sx={{ w: 0.5, h: 'calc(100% - 4px)', bg: 'base.850' }} />
       </Flex>
     </PanelResizeHandle>
   );

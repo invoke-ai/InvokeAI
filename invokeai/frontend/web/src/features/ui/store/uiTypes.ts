@@ -32,4 +32,5 @@ export interface UIState {
   floatingProgressImageRect: Rect;
   shouldShowProgressImages: boolean;
   shouldAutoShowProgressImages: boolean;
+  shouldShowImageParameters: boolean;
 }

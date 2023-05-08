@@ -24,6 +24,7 @@ export const initialUIState: UIState = {
   floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
   shouldShowProgressImages: false,
   shouldAutoShowProgressImages: false,
+  shouldShowImageParameters: false,
 };
 
 export const uiSlice = createSlice({
@@ -136,6 +137,12 @@ export const uiSlice = createSlice({
     ) => {
       state.shouldAutoShowProgressImages = action.payload;
     },
+    shouldShowImageParametersChanged: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldShowImageParameters = action.payload;
+    },
   },
 });
 
@@ -163,6 +170,7 @@ export const {
   floatingProgressImageResized,
   setShouldShowProgressImages,
   setShouldAutoShowProgressImages,
+  shouldShowImageParametersChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

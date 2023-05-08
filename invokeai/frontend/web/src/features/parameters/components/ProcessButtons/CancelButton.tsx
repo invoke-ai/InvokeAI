@@ -29,6 +29,8 @@ import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
 import { sessionCanceled } from 'services/thunks/session';
 import { BiChevronDown } from 'react-icons/bi';
+import { FaChevronDown } from 'react-icons/fa';
+import { ChevronDownIcon } from '@chakra-ui/icons';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -135,13 +137,12 @@ const CancelButton = (
         colorScheme="error"
         {...rest}
       />
-
       <Menu closeOnSelect={false}>
         <MenuButton
           as={IAIIconButton}
           tooltip={t('parameters.cancel.setType')}
           aria-label={t('parameters.cancel.setType')}
-          icon={<BiChevronDown />}
+          icon={<ChevronDownIcon w="1em" h="1em" />}
           paddingX={0}
           paddingY={0}
           colorScheme="error"

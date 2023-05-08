@@ -37,6 +37,7 @@ const NodesTab = () => {
 
   return (
     <PanelGroup
+      autoSaveId="nodesTab"
       direction="horizontal"
       style={{ height: '100%', width: '100%' }}
     >

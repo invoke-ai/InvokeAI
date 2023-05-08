@@ -102,7 +102,8 @@
         "generate": "Generate",
         "openInNewTab": "Open in New Tab",
         "dontAskMeAgain": "Don't ask me again",
-        "areYouSure": "Are you sure?"
+        "areYouSure": "Are you sure?",
+        "imagePrompt": "Image Prompt"
     },
     "gallery": {
         "generations": "Generations",

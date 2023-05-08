@@ -40,7 +40,7 @@ import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import OverlayScrollable from '../../common/OverlayScrollable';
 import AnimatedImageToImagePanel from 'features/parameters/components/AnimatedImageToImagePanel';
 
-const GenerateParameters = () => {
+const CreateBaseSettings = () => {
   const { t } = useTranslation();
 
   const generateAccordionItems: ParametersAccordionItems = useMemo(
@@ -102,23 +102,22 @@ const GenerateParameters = () => {
         <PromptInput />
         <NegativePromptInput />
         <ProcessButtons />
+        <ImageToImageToggle />
         <Flex
           sx={{
             flexDirection: 'column',
             gap: 2,
             bg: 'base.800',
             p: 4,
-            pb: 6,
             borderRadius: 'base',
           }}
         >
           <MainSettings />
         </Flex>
-        <ImageToImageToggle />
         <ParametersAccordion accordionItems={generateAccordionItems} />
       </Flex>
     </OverlayScrollable>
   );
 };
 
-export default memo(GenerateParameters);
+export default memo(CreateBaseSettings);

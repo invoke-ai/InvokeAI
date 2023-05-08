@@ -410,7 +410,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         }}
         {...props}
       >
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup size="sm" isAttached={true}>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -497,7 +497,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           )}
         </ButtonGroup>
 
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup size="sm" isAttached={true}>
           <IAIIconButton
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
@@ -528,7 +528,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         {(isUpscalingEnabled || isFaceRestoreEnabled) && (
-          <ButtonGroup isAttached={true}>
+          <ButtonGroup size="sm" isAttached={true}>
             {isFaceRestoreEnabled && (
               <IAIPopover
                 triggerComponent={
@@ -593,7 +593,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           </ButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup size="sm" isAttached={true}>
           <IAIIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
@@ -603,14 +603,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           />
         </ButtonGroup>
 
-        <IAIIconButton
-          onClick={handleInitiateDelete}
-          icon={<FaTrash />}
-          tooltip={`${t('gallery.deleteImage')} (Del)`}
-          aria-label={`${t('gallery.deleteImage')} (Del)`}
-          isDisabled={!image || !isConnected}
-          colorScheme="error"
-        />
+        <ButtonGroup size="sm" isAttached={true}>
+          <IAIIconButton
+            onClick={handleInitiateDelete}
+            icon={<FaTrash />}
+            tooltip={`${t('gallery.deleteImage')} (Del)`}
+            aria-label={`${t('gallery.deleteImage')} (Del)`}
+            isDisabled={!image || !isConnected}
+            colorScheme="error"
+          />
+        </ButtonGroup>
       </Flex>
       {image && (
         <DeleteImageModal

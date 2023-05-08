@@ -1,6 +1,6 @@
 import { isEqual } from 'lodash-es';
 import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
-import GenerateParameters from './tabs/Create/GenerateParameters';
+import CreateBaseSettings from './tabs/Create/CreateBaseSettings';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
@@ -13,16 +13,26 @@ import { memo } from 'react';
 import { Flex } from '@chakra-ui/react';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import PinParametersPanelButton from './PinParametersPanelButton';
+import { Panel, PanelGroup } from 'react-resizable-panels';
+import CreateSidePanelPinned from './tabs/Create/CreateSidePanelPinned';
+import CreateTextParameters from './tabs/Create/CreateBaseSettings';
+import ResizeHandle from './tabs/ResizeHandle';
+import CreateImageSettings from './tabs/Create/CreateImageSettings';
 
 const selector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],
   (ui, activeTabName, lightbox) => {
-    const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;
+    const {
+      shouldPinParametersPanel,
+      shouldShowParametersPanel,
+      shouldShowImageParameters,
+    } = ui;
     const { isLightboxOpen } = lightbox;
 
     return {
       shouldPinParametersPanel,
       shouldShowParametersPanel,
+      shouldShowImageParameters,
     };
   },
   {
@@ -34,8 +44,11 @@ const selector = createSelector(
 
 const CreateParametersPanel = () => {
   const dispatch = useAppDispatch();
-  const { shouldPinParametersPanel, shouldShowParametersPanel } =
-    useAppSelector(selector);
+  const {
+    shouldPinParametersPanel,
+    shouldShowParametersPanel,
+    shouldShowImageParameters,
+  } = useAppSelector(selector);
 
   const handleClosePanel = () => {
     dispatch(setShouldShowParametersPanel(false));
@@ -53,13 +66,7 @@ const CreateParametersPanel = () => {
       onClose={handleClosePanel}
       minWidth={500}
     >
-      <Flex
-        flexDir="column"
-        position="relative"
-        h={{ base: 600, xl: 'full' }}
-        w={{ sm: 'full', lg: '100vw', xl: 'full' }}
-        paddingRight={{ base: 8, xl: 0 }}
-      >
+      <Flex flexDir="column" position="relative" h="full" w="full">
         <Flex
           paddingTop={1.5}
           paddingBottom={4}
@@ -69,7 +76,37 @@ const CreateParametersPanel = () => {
           <InvokeAILogoComponent />
           <PinParametersPanelButton />
         </Flex>
-        <GenerateParameters />
+        <PanelGroup
+          autoSaveId="createTab_floatingParameters"
+          direction="horizontal"
+          style={{ height: '100%', width: '100%' }}
+        >
+          <>
+            <Panel
+              id="createTab_textParameters"
+              order={0}
+              defaultSize={25}
+              minSize={25}
+              style={{ position: 'relative' }}
+            >
+              <CreateTextParameters />
+            </Panel>
+            {shouldShowImageParameters && (
+              <>
+                <ResizeHandle />
+                <Panel
+                  id="createTab_imageParameters"
+                  order={1}
+                  defaultSize={25}
+                  minSize={25}
+                  style={{ position: 'relative' }}
+                >
+                  <CreateImageSettings />
+                </Panel>
+              </>
+            )}
+          </>
+        </PanelGroup>
       </Flex>
     </ResizableDrawer>
   );
