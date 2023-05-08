@@ -8,7 +8,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import TextTabMain from './TextTabMain';
 import ResizeHandle from '../ResizeHandle';
-import TextTabSettings from './TextTabParameters';
+import TextTabParameters from './TextTabParameters';
 
 const selector = createSelector(uiSelector, (ui) => {
   const {
@@ -47,13 +47,13 @@ const TextTab = () => {
       {shouldPinParametersPanel && shouldShowParametersPanel && (
         <>
           <Panel
-            id="textTab_settings"
+            id="textTab_parameters"
             order={0}
             defaultSize={25}
             minSize={25}
             style={{ position: 'relative' }}
           >
-            <TextTabSettings />
+            <TextTabParameters />
             <PinParametersPanelButton
               sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
             />
@@ -61,14 +61,7 @@ const TextTab = () => {
           <ResizeHandle />
         </>
       )}
-      <Panel
-        id="textTab_main"
-        order={2}
-        minSize={30}
-        onResize={() => {
-          dispatch(requestCanvasRescale());
-        }}
-      >
+      <Panel id="textTab_content" order={2} minSize={30}>
         <TextTabMain />
       </Panel>
     </PanelGroup>

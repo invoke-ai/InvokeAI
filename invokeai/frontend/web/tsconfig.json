@@ -24,7 +24,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "*.d.ts",
-    "src/app/store/middleware/listenerMiddleware"
+    "src/app/store/middleware/listenerMiddleware",
+    "src/features/nodes/util/edgeBuilders"
   ],
   "exclude": ["src/services/fixtures/*", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]

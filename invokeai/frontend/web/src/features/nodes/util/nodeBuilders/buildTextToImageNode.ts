@@ -10,8 +10,6 @@ export const buildTxt2ImgNode = (
   const nodeId = uuidv4();
   const { generation, models } = state;
 
-  const { selectedModelName } = models;
-
   const {
     prompt,
     negativePrompt,
@@ -21,8 +19,8 @@ export const buildTxt2ImgNode = (
     height,
     cfgScale: cfg_scale,
     sampler,
-    seamless,
     shouldRandomizeSeed,
+    model,
   } = generation;
 
   const textToImageNode: NonNullable<TextToImageInvocation> = {
@@ -34,9 +32,7 @@ export const buildTxt2ImgNode = (
     height,
     cfg_scale,
     scheduler: sampler as TextToImageInvocation['scheduler'],
-    seamless,
-    model: selectedModelName,
-    progress_images: true,
+    model,
   };
 
   if (!shouldRandomizeSeed) {

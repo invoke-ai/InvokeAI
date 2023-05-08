@@ -61,12 +61,12 @@ export const modelsSlice = createSlice({
   },
 });
 
-export const selectedModelSelector = (state: RootState) => {
-  const { selectedModelName } = state.models;
-  const selectedModel = selectModelsById(state, selectedModelName);
+// export const selectedModelSelector = (state: RootState) => {
+//   const { selectedModelName } = state.models;
+//   const selectedModel = selectModelsById(state, selectedModelName);
 
-  return selectedModel ?? null;
-};
+//   return selectedModel ?? null;
+// };
 
 export const {
   selectAll: selectModelsAll,

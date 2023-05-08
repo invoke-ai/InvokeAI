@@ -7,9 +7,6 @@ import { memo } from 'react';
 import { ParamHiresStrength } from './ParamHiresStrength';
 import { setHiresFix } from 'features/parameters/store/postprocessingSlice';
 
-/**
- * Seed & variation options. Includes iteration, seed, seed randomization, variation options.
- */
 const ParamHiresCollapse = () => {
   const { t } = useTranslation();
   const hiresFix = useAppSelector(

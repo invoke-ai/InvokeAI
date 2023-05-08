@@ -9,7 +9,7 @@ import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton'
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
-import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
+import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
@@ -28,9 +28,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
 import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
-import ResizableDrawer from 'features/ui/components/common/ResizableDrawer/ResizableDrawer';
-import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import CreateParametersDrawer from 'features/ui/components/CreateParametersDrawer';
+import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 
 const DEFAULT_CONFIG = {};
 
@@ -91,8 +89,8 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
         </Grid>
       </ImageUploader>
 
-      <ImageGalleryPanel />
-      <CreateParametersDrawer />
+      <GalleryDrawer />
+      <ParametersDrawer />
 
       <AnimatePresence>
         {!isApplicationReady && !loadingOverridden && (

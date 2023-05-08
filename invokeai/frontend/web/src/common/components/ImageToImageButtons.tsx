@@ -7,7 +7,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 
-const ImagePromptHeading = () => {
+const InitialImageButtons = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -38,4 +38,4 @@ const ImagePromptHeading = () => {
   );
 };
 
-export default ImagePromptHeading;
+export default InitialImageButtons;

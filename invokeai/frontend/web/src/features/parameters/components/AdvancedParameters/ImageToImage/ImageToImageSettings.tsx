@@ -13,7 +13,7 @@ import {
 import { motion } from 'framer-motion';
 
 import IAIButton from 'common/components/IAIButton';
-import ImageFit from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageFit';
+import ImageToImageFit from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageFit';
 import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
 import IAIIconButton from 'common/components/IAIIconButton';
 
@@ -21,16 +21,16 @@ import { useTranslation } from 'react-i18next';
 import InitialImagePreview from './InitialImagePreview';
 import { useState } from 'react';
 import { FaUndo, FaUpload } from 'react-icons/fa';
-import ImagePromptHeading from 'common/components/ImageToImageSettingsHeader';
+import InitialImageButtons from 'common/components/ImageToImageSettingsHeader';
 
 export default function ImageToImageSettings() {
   const { t } = useTranslation();
   return (
     <VStack gap={2} w="full" alignItems="stretch">
-      <ImagePromptHeading />
+      <InitialImageButtons />
       <InitialImagePreview />
       <ImageToImageStrength />
-      <ImageFit />
+      <ImageToImageFit />
     </VStack>
   );
 }

@@ -1,6 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
-import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
 
 const TextTabMain = () => {
   return (

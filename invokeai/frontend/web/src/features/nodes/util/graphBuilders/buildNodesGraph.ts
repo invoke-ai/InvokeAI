@@ -2,7 +2,7 @@ import { Graph } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
 import { cloneDeep, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';
-import { InputFieldValue } from '../types/types';
+import { InputFieldValue } from 'features/nodes/types/types';
 
 /**
  * We need to do special handling for some fields
