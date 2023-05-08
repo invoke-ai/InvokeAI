@@ -1,19 +1,15 @@
 import { RootState } from 'app/store/store';
 import { Graph } from 'services/api';
-import { buildImg2ImgNode } from './linearGraphBuilder/buildImageToImageNode';
-import { buildTxt2ImgNode } from './linearGraphBuilder/buildTextToImageNode';
-import { buildRangeNode } from './linearGraphBuilder/buildRangeNode';
-import { buildIterateNode } from './linearGraphBuilder/buildIterateNode';
-import { buildEdges } from './linearGraphBuilder/buildEdges';
+import { buildTxt2ImgNode } from '../nodeBuilders/buildTextToImageNode';
+import { buildRangeNode } from '../nodeBuilders/buildRangeNode';
+import { buildIterateNode } from '../nodeBuilders/buildIterateNode';
+import { buildEdges } from '../edgeBuilders/buildEdges';
 
 /**
  * Builds the Linear workflow graph.
  */
-export const buildLinearGraph = (state: RootState): Graph => {
-  // The base node is either a txt2img or img2img node
-  const baseNode = state.generation.isImageToImageEnabled
-    ? buildImg2ImgNode(state)
-    : buildTxt2ImgNode(state);
+export const buildTextToImageGraph = (state: RootState): Graph => {
+  const baseNode = buildTxt2ImgNode(state);
 
   // We always range and iterate nodes, no matter the iteration count
   // This is required to provide the correct seeds to the backend engine

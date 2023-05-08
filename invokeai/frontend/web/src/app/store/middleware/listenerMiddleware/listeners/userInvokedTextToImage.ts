@@ -1,22 +1,22 @@
 import { startAppListening } from '..';
+import { buildTextToImageGraph } from 'features/nodes/util/graphBuilders/buildTextToImageGraph';
 import { sessionCreated } from 'services/thunks/session';
-import { buildNodesGraph } from 'features/nodes/util/graphBuilders/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
-import { nodesGraphBuilt } from 'features/nodes/store/actions';
+import { textToImageGraphBuilt } from 'features/nodes/store/actions';
 import { userInvoked } from 'app/store/actions';
 
 const moduleLog = log.child({ namespace: 'invoke' });
 
-export const addUserInvokedNodesListener = () => {
+export const addUserInvokedTextToImageListener = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof userInvoked> =>
-      userInvoked.match(action) && action.payload === 'nodes',
+      userInvoked.match(action) && action.payload === 'text',
     effect: (action, { getState, dispatch }) => {
       const state = getState();
 
-      const graph = buildNodesGraph(state);
-      dispatch(nodesGraphBuilt(graph));
-      moduleLog({ data: graph }, 'Nodes graph built');
+      const graph = buildTextToImageGraph(state);
+      dispatch(textToImageGraphBuilt(graph));
+      moduleLog({ data: graph }, 'Text to Image graph built');
 
       dispatch(sessionCreated({ graph }));
     },

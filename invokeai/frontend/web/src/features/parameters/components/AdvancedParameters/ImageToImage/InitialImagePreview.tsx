@@ -71,6 +71,7 @@ const InitialImagePreview = () => {
     <Flex
       sx={{
         width: 'full',
+        height: 'full',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
@@ -115,7 +116,7 @@ const InitialImagePreview = () => {
         )}
         {!initialImage?.url && <SelectImagePlaceholder />}
       </Flex>
-      {!isImageToImageEnabled && (
+      {/* {!isImageToImageEnabled && (
         <Flex
           sx={{
             w: 'full',
@@ -134,7 +135,7 @@ const InitialImagePreview = () => {
             Image to Image is Disabled
           </Text>
         </Flex>
-      )}
+      )} */}
     </Flex>
   );
 };

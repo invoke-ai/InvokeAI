@@ -12,8 +12,9 @@ import { addImageResultReceivedListener } from './listeners/invocationComplete';
 import { addImageUploadedListener } from './listeners/imageUploaded';
 import { addRequestedImageDeletionListener } from './listeners/imageDeleted';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
-import { addUserInvokedCreateListener } from './listeners/userInvokedCreate';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
+import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -39,5 +40,6 @@ addImageResultReceivedListener();
 addRequestedImageDeletionListener();
 
 addUserInvokedCanvasListener();
-addUserInvokedCreateListener();
 addUserInvokedNodesListener();
+addUserInvokedTextToImageListener();
+addUserInvokedImageToImageListener();

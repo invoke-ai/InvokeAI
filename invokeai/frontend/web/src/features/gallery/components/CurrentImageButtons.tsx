@@ -441,13 +441,13 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.sendToUnifiedCanvas')}
               </IAIButton>
 
-              <IAIButton
+              {/* <IAIButton
                 size="sm"
                 onClick={handleCopyImage}
                 leftIcon={<FaCopy />}
               >
                 {t('parameters.copyImage')}
-              </IAIButton>
+              </IAIButton> */}
               <IAIButton
                 size="sm"
                 onClick={handleCopyImageLink}

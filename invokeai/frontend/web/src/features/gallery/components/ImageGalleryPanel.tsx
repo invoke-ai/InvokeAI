@@ -30,18 +30,18 @@ import useResolution from 'common/hooks/useResolution';
 import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
 
-const GALLERY_TAB_WIDTHS: Record<
-  InvokeTabName,
-  { galleryMinWidth: number; galleryMaxWidth: number }
-> = {
-  // txt2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-  // img2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-  generate: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-  unifiedCanvas: { galleryMinWidth: 200, galleryMaxWidth: 200 },
-  nodes: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-  // postprocessing: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-  // training: { galleryMinWidth: 200, galleryMaxWidth: 500 },
-};
+// const GALLERY_TAB_WIDTHS: Record<
+//   InvokeTabName,
+//   { galleryMinWidth: number; galleryMaxWidth: number }
+// > = {
+// txt2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+// img2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+// generate: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+// unifiedCanvas: { galleryMinWidth: 200, galleryMaxWidth: 200 },
+// nodes: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+// postprocessing: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+// training: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+// };
 
 const galleryPanelSelector = createSelector(
   [
@@ -73,34 +73,34 @@ const galleryPanelSelector = createSelector(
   }
 );
 
-const ImageGalleryPanel = () => {
+const GalleryDrawer = () => {
   const dispatch = useAppDispatch();
   const {
     shouldPinGallery,
     shouldShowGallery,
     galleryImageMinimumWidth,
-    activeTabName,
-    isStaging,
-    isResizable,
-    isLightboxOpen,
+    // activeTabName,
+    // isStaging,
+    // isResizable,
+    // isLightboxOpen,
   } = useAppSelector(galleryPanelSelector);
 
-  const handleSetShouldPinGallery = () => {
-    dispatch(togglePinGalleryPanel());
-    dispatch(requestCanvasRescale());
-  };
+  // const handleSetShouldPinGallery = () => {
+  //   dispatch(togglePinGalleryPanel());
+  //   dispatch(requestCanvasRescale());
+  // };
 
-  const handleToggleGallery = () => {
-    dispatch(toggleGalleryPanel());
-    shouldPinGallery && dispatch(requestCanvasRescale());
-  };
+  // const handleToggleGallery = () => {
+  //   dispatch(toggleGalleryPanel());
+  //   shouldPinGallery && dispatch(requestCanvasRescale());
+  // };
 
   const handleCloseGallery = () => {
     dispatch(setShouldShowGallery(false));
     shouldPinGallery && dispatch(requestCanvasRescale());
   };
 
-  const resolution = useResolution();
+  // const resolution = useResolution();
 
   // useHotkeys(
   //   'g',
@@ -229,4 +229,4 @@ const ImageGalleryPanel = () => {
   // return renderImageGallery();
 };
 
-export default memo(ImageGalleryPanel);
+export default memo(GalleryDrawer);

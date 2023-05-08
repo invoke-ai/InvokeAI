@@ -5,7 +5,7 @@ import { setShouldFitToWidthHeight } from 'features/parameters/store/generationS
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function ImageFit() {
+export default function ImageToImageFit() {
   const dispatch = useAppDispatch();
 
   const shouldFitToWidthHeight = useAppSelector(

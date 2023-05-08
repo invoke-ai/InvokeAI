@@ -1,6 +1,6 @@
 import { startAppListening } from '..';
 import { sessionCreated, sessionInvoked } from 'services/thunks/session';
-import { buildCanvasGraphAndBlobs } from 'features/nodes/util/buildCanvasGraph';
+import { buildCanvasGraphAndBlobs } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { log } from 'app/logging/useLogger';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { imageUploaded } from 'services/thunks/image';

@@ -10,17 +10,17 @@ import {
   RangeInvocation,
   TextToImageInvocation,
 } from 'services/api';
-import { buildImg2ImgNode } from './linearGraphBuilder/buildImageToImageNode';
-import { buildTxt2ImgNode } from './linearGraphBuilder/buildTextToImageNode';
-import { buildRangeNode } from './linearGraphBuilder/buildRangeNode';
-import { buildIterateNode } from './linearGraphBuilder/buildIterateNode';
-import { buildEdges } from './linearGraphBuilder/buildEdges';
+import { buildImg2ImgNode } from '../nodeBuilders/buildImageToImageNode';
+import { buildTxt2ImgNode } from '../nodeBuilders/buildTextToImageNode';
+import { buildRangeNode } from '../nodeBuilders/buildRangeNode';
+import { buildIterateNode } from '../nodeBuilders/buildIterateNode';
+import { buildEdges } from '../edgeBuilders/buildEdges';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
-import { getGenerationMode } from './getGenerationMode';
+import { getGenerationMode } from '../getGenerationMode';
 import { v4 as uuidv4 } from 'uuid';
 import { log } from 'app/logging/useLogger';
-import { buildInpaintNode } from './linearGraphBuilder/buildInpaintNode';
+import { buildInpaintNode } from '../nodeBuilders/buildInpaintNode';
 
 const moduleLog = log.child({ namespace: 'buildCanvasGraph' });
 

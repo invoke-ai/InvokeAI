@@ -15,8 +15,6 @@ export const buildImg2ImgNode = (
   const nodeId = uuidv4();
   const { generation, system, models } = state;
 
-  const { selectedModelName } = models;
-
   const {
     prompt,
     negativePrompt,
@@ -26,10 +24,13 @@ export const buildImg2ImgNode = (
     height,
     cfgScale,
     sampler,
-    seamless,
+    model,
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
     shouldRandomizeSeed,
+    shouldUseSeamless,
+    seamlessXAxis,
+    seamlessYAxis,
   } = generation;
 
   const initialImage = initialImageSelector(state);
@@ -48,9 +49,7 @@ export const buildImg2ImgNode = (
     height,
     cfg_scale: cfgScale,
     scheduler: sampler as ImageToImageInvocation['scheduler'],
-    seamless,
-    model: selectedModelName,
-    progress_images: true,
+    model,
     image: initialImage
       ? {
           image_name: initialImage.name,

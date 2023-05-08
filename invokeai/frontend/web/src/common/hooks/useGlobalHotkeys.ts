@@ -3,6 +3,7 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
 import {
+  setActiveTab,
   toggleGalleryPanel,
   toggleParametersPanel,
   togglePinGalleryPanel,
@@ -57,5 +58,21 @@ export const useGlobalHotkeys = () => {
 
   useHotkeys(['shift+g'], () => {
     dispatch(togglePinGalleryPanel());
+  });
+
+  useHotkeys('1', () => {
+    dispatch(setActiveTab('text'));
+  });
+
+  useHotkeys('2', () => {
+    dispatch(setActiveTab('image'));
+  });
+
+  useHotkeys('3', () => {
+    dispatch(setActiveTab('unifiedCanvas'));
+  });
+
+  useHotkeys('4', () => {
+    dispatch(setActiveTab('nodes'));
   });
 };

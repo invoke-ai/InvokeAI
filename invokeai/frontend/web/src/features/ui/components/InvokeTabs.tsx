@@ -33,7 +33,6 @@ import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import NodeEditor from 'features/nodes/components/NodeEditor';
-import GenerateWorkspace from './tabs/text/GenerateWorkspace';
 import { createSelector } from '@reduxjs/toolkit';
 import { BsLightningChargeFill } from 'react-icons/bs';
 import { configSelector } from 'features/system/store/configSelectors';
@@ -43,7 +42,7 @@ import Scrollable from './common/Scrollable';
 import TextTabParameters from './tabs/text/TextTabParameters';
 import PinParametersPanelButton from './PinParametersPanelButton';
 import ParametersSlide from './common/ParametersSlide';
-import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
+import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import TextTabMain from './tabs/text/TextTabMain';
@@ -54,6 +53,7 @@ import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';
 import { FaImage } from 'react-icons/fa';
 import ResizeHandle from './tabs/ResizeHandle';
+import ImageTab from './tabs/image/ImageTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -70,7 +70,7 @@ const tabs: InvokeTabInfo[] = [
   {
     id: 'image',
     icon: <Icon as={FaImage} sx={{ boxSize: 5 }} />,
-    content: <TextTab />,
+    content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
@@ -113,22 +113,6 @@ const InvokeTabs = () => {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-
-  useHotkeys('1', () => {
-    dispatch(setActiveTab('text'));
-  });
-
-  useHotkeys('2', () => {
-    dispatch(setActiveTab('image'));
-  });
-
-  useHotkeys('3', () => {
-    dispatch(setActiveTab('unifiedCanvas'));
-  });
-
-  useHotkeys('4', () => {
-    dispatch(setActiveTab('nodes'));
-  });
 
   // Lightbox Hotkey
   useHotkeys(
@@ -200,7 +184,7 @@ const InvokeTabs = () => {
         direction="horizontal"
         style={{ height: '100%', width: '100%' }}
       >
-        <Panel id="tabContent">
+        <Panel id="main">
           <TabPanels style={{ height: '100%', width: '100%' }}>
             {tabPanels}
           </TabPanels>
@@ -208,7 +192,13 @@ const InvokeTabs = () => {
         {shouldPinGallery && shouldShowGallery && (
           <>
             <ResizeHandle />
-            <Panel id="gallery" order={3} defaultSize={10} minSize={10}>
+            <Panel
+              id="gallery"
+              order={3}
+              defaultSize={10}
+              minSize={10}
+              maxSize={50}
+            >
               <ImageGalleryContent />
             </Panel>
           </>
