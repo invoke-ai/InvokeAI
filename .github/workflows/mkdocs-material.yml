@@ -4,6 +4,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'refs/heads/v2.3'
 
 permissions:
     contents: write
