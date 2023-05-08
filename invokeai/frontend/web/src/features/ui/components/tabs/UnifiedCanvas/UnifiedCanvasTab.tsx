@@ -49,6 +49,7 @@ const UnifiedCanvasTab = () => {
       {shouldPinParametersPanel && shouldShowParametersPanel && (
         <>
           <Panel
+            id="canvasTab_parameters"
             order={0}
             defaultSize={30}
             minSize={20}
@@ -75,14 +76,6 @@ const UnifiedCanvasTab = () => {
           <UnifiedCanvasContent />
         )}
       </Panel>
-      {shouldPinGallery && shouldShowGallery && (
-        <>
-          <ResizeHandle />
-          <Panel order={2} defaultSize={10} minSize={10}>
-            <ImageGalleryContent />
-          </Panel>
-        </>
-      )}
     </PanelGroup>
   );
 };
