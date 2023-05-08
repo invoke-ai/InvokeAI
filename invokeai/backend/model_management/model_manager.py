@@ -20,18 +20,37 @@ return a SDModelInfo object that contains the following attributes:
 Typical usage:
 
    from invokeai.backend import ModelManager
-   manager = ModelManager(config_path='./configs/models.yaml',max_models=4)
+
+   manager = ModelManager(
+                 config='./configs/models.yaml',
+                 max_cache_size=8
+             ) # gigabytes
+
    model_info = manager.get_model('stable-diffusion-1.5')
    with model_info.context as my_model:
       my_model.latents_from_embeddings(...)
 
 The manager uses the underlying ModelCache class to keep
 frequently-used models in RAM and move them into GPU as needed for
-generation operations. The ModelCache object can be accessed using 
-the manager's "cache" attribute.
+generation operations. The optional `max_cache_size` argument
+indicates the maximum size the cache can grow to, in gigabytes. The
+underlying ModelCache object can be accessed using the manager's "cache"
+attribute.
 
-Other methods provided by ModelManager support importing, editing,
-converting and deleting models.
+Because the model manager can return multiple different types of
+models, you may wish to add additional type checking on the class
+of model returned. To do this, provide the option `model_type`
+parameter:
+
+    model_info = manager.get_model(
+                      'clip-tokenizer',
+                       model_type=SDModelType.tokenizer
+                      )
+
+This will raise an InvalidModelError if the format defined in the
+config file doesn't match the requested model type.
+
+MODELS.YAML
 
 The general format of a models.yaml section is:
 
@@ -40,7 +59,6 @@ The general format of a models.yaml section is:
      repo_id: owner/repo
      path: /path/to/local/file/or/directory
      subfolder: subfolder-name
-     submodel: vae|text_encoder|tokenizer...
 
 The format is one of {diffusers, ckpt, vae, text_encoder, tokenizer,
 unet, scheduler, safety_checker, feature_extractor}, and correspond to
@@ -54,11 +72,7 @@ If subfolder is provided, then the model exists in a subdirectory of
 the main model. These are usually named after the model type, such as
 "unet".
 
-Finally, if submodel is provided, then the path/repo_id is treated as
-a diffusers model, the whole thing is ready into memory, and then the
-requested part (e.g. "unet") is retrieved.
-
-This summarizes the three ways of getting a non-diffuser model:
+This example summarizes the two ways of getting a non-diffuser model:
 
  clip-test-1:
    format: text_encoder
@@ -66,21 +80,48 @@ This summarizes the three ways of getting a non-diffuser model:
    description: Returns standalone CLIPTextModel
 
  clip-test-2:
-   format: diffusers
-   repo_id: stabilityai/stable-diffusion-2
-   submodel: text_encoder
-   description: Returns the text_encoder part of whole diffusers model (whole thing in RAM)
-
- clip-test-3:
    format: text_encoder
    repo_id: stabilityai/stable-diffusion-2
    subfolder: text_encoder
    description: Returns the text_encoder in the subfolder of the diffusers model (just the encoder in RAM)
 
- clip-token:
+SUBMODELS:
+
+It is also possible to fetch an isolated submodel from a diffusers
+model. Use the `submodel` parameter to select which part:
+
+ vae = manager.get_model('stable-diffusion-1.5',submodel=SDModelType.vae)
+ with vae.context as my_vae:
+    print(type(my_vae))
+    # "AutoencoderKL"
+
+DISAMBIGUATION:
+
+You may wish to use the same name for a related family of models. To
+do this, disambiguate the stanza key with the model and and format
+separated by "/". Example:
+
+ clip-large/tokenizer:
    format: tokenizer
    repo_id: openai/clip-vit-large-patch14
    description: Returns standalone tokenizer
+
+ clip-large/text_encoder:
+   format: text_encoder
+   repo_id: openai/clip-vit-large-patch14
+   description: Returns standalone text encoder
+
+You can now use the `model_type` argument to indicate which model you
+want:
+
+ tokenizer = mgr.get('clip-large',model_type=SDModelType.tokenizer)
+ encoder = mgr.get('clip-large',model_type=SDModelType.text_encoder)
+
+OTHER FUNCTIONS:
+
+Other methods provided by ModelManager support importing, editing,
+converting and deleting models.
+
 """
 from __future__ import annotations
 
@@ -152,7 +193,7 @@ class ModelManager(object):
 
     def __init__(
             self,
-            config_path: Path,
+            config: Union[Path, DictConfig, str],
             device_type: torch.device = CUDA_DEVICE,
             precision: torch.dtype = torch.float16,
             max_cache_size=MAX_CACHE_SIZE,
@@ -165,8 +206,15 @@ class ModelManager(object):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-        self.config_path = config_path
-        self.config = OmegaConf.load(self.config_path)
+        if isinstance(config, DictConfig):
+            self.config = config
+            self.config_path = None
+        elif type(config) in [str,DictConfig]:
+            self.config_path = config
+            self.config = OmegaConf.load(self.config_path)
+        else:
+            raise ValueError('config argument must be an OmegaConf object, a Path or a string')
+
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
             execution_device = device_type,
@@ -185,28 +233,64 @@ class ModelManager(object):
         return model_name in self.config
 
     def get_model(self,
-                  model_name: str = None,
+                  model_name: str,
+                  model_type: SDModelType=None,
                   submodel: SDModelType=None,
                   ) -> SDModelInfo:
         """Given a model named identified in models.yaml, return
         an SDModelInfo object describing it.
         :param model_name: symbolic name of the model in models.yaml
+        :param model_type: SDModelType enum indicating the type of model to return
         :param submodel: an SDModelType enum indicating the portion of 
                the model to retrieve (e.g. SDModelType.vae)
+
+        If not provided, the model_type will be read from the `format` field
+        of the corresponding stanza. If provided, the model_type will be used
+        to disambiguate stanzas in the configuration file. The default is to
+        assume a diffusers pipeline. The behavior is illustrated here:
+
+        [models.yaml]
+        test1/diffusers:
+           repo_id: foo/bar
+           format: diffusers
+           description: Typical diffusers pipeline
+
+        test1/lora:
+           repo_id: /tmp/loras/test1.safetensors
+           format: lora
+           description: Typical lora file
+
+        test1_pipeline = mgr.get_model('test1')
+        # returns a StableDiffusionGeneratorPipeline
+
+        test1_vae1 = mgr.get_model('test1',submodel=SDModelType.vae)
+        # returns the VAE part of a diffusers model as an AutoencoderKL
+
+        test1_vae2 = mgr.get_model('test1',model_type=SDModelType.diffusers,submodel=SDModelType.vae)
+        # does the same thing as the previous  statement. Note that model_type
+        # is for the parent model, and submodel is for the part
+
+        test1_lora = mgr.get_model('test1',model_type=SDModelType.lora)
+        # returns a LoRA embed (as a 'dict' of tensors)
+
+        test1_encoder = mgr.get_modelI('test1',model_type=SDModelType.textencoder)
+        # raises an InvalidModelError
+
         """
         if not model_name:
             model_name = self.default_model()
 
-        if not self.valid_model(model_name):
-            raise InvalidModelError(
-                f'"{model_name}" is not a known model name. Please check your models.yaml file'
-            )
-
+        model_key = self._disambiguate_name(model_name, model_type)
+        
         # get the required loading info out of the config file
-        mconfig = self.config[model_name]
+        mconfig = self.config[model_key]
         
         format = mconfig.get('format','diffusers')
-        model_type = SDModelType.diffusion_pipeline
+        if model_type and model_type.name != format:
+            raise InvalidModelError(
+                f'Inconsistent model definition; {model_key} has format {format}, but type {model_type.name} was requested'
+            )
+        
         model_parts = dict([(x.name,x) for x in SDModelType])
         legacy = None
         
@@ -219,16 +303,14 @@ class ModelManager(object):
                 legacy.vae_file = global_resolve_path(mconfig.vae)
         elif format=='diffusers':
             location = mconfig.get('repo_id') or mconfig.get('path')
-            if sm := mconfig.get('submodel'):
-                submodel = model_parts[sm]
         elif format in model_parts:
             location = mconfig.get('repo_id') or mconfig.get('path') or mconfig.get('weights')
-            model_type = model_parts[format]
         else:
             raise InvalidModelError(
-                f'"{model_name}" has an unknown format {format}'
+                f'"{model_key}" has an unknown format {format}'
             )
-            
+        
+        model_type = model_parts[format]
         subfolder = mconfig.get('subfolder')
         revision = mconfig.get('revision')
         hash = self.cache.model_hash(location,revision)
@@ -254,7 +336,7 @@ class ModelManager(object):
         # in case we need to communicate information about this
         # model to the cache manager, then we need to remember
         # the cache key
-        self.cache_keys[model_name] = model_context.key
+        self.cache_keys[model_key] = model_context.key
         
         return SDModelInfo(
             context = model_context,
@@ -449,18 +531,20 @@ class ModelManager(object):
         else:
             assert "weights" in model_attributes and "description" in model_attributes
 
+        model_key = f'{model_name}/{format}'
+
         assert (
-            clobber or model_name not in omega
-        ), f'attempt to overwrite existing model definition "{model_name}"'
+            clobber or model_key not in omega
+        ), f'attempt to overwrite existing model definition "{model_key}"'
 
-        omega[model_name] = model_attributes
+        omega[model_key] = model_attributes
 
-        if "weights" in omega[model_name]:
-            omega[model_name]["weights"].replace("\\", "/")
+        if "weights" in omega[model_key]:
+            omega[model_key]["weights"].replace("\\", "/")
             
-        if clobber and model_name in self.cache_keys:
-            self.cache.uncache_model(self.cache_keys[model_name])
-            del self.cache_keys[model_name]
+        if clobber and model_key in self.cache_keys:
+            self.cache.uncache_model(self.cache_keys[model_key])
+            del self.cache_keys[model_key]
 
     def import_diffuser_model(
         self,
@@ -482,6 +566,7 @@ class ModelManager(object):
         models.yaml file.
         """
         model_name = model_name or Path(repo_or_path).stem
+        model_key = f'{model_name}/diffusers'
         model_description = description or f"Imported diffusers model {model_name}"
         new_config = dict(
             description=model_description,
@@ -493,10 +578,10 @@ class ModelManager(object):
         else:
             new_config.update(repo_id=repo_or_path)
 
-        self.add_model(model_name, new_config, True)
+        self.add_model(model_key, new_config, True)
         if commit_to_conf:
             self.commit(commit_to_conf)
-        return model_name
+        return model_key
 
     def import_lora(
             self,
@@ -511,7 +596,7 @@ class ModelManager(object):
         path = Path(path)
         model_name = model_name or path.stem
         model_description = description or f"LoRA model {model_name}"
-        self.add_model(model_name,
+        self.add_model(f'{model_name}/{SDModelType.lora.name}',
                        dict(
                            format="lora",
                            weights=str(path),
@@ -538,7 +623,7 @@ class ModelManager(object):
             
         model_name = model_name or path.stem
         model_description = description or f"Textual embedding model {model_name}"
-        self.add_model(model_name,
+        self.add_model(f'{model_name}/{SDModelType.textual_inversion.name}',
                        dict(
                            format="textual_inversion",
                            weights=str(weights),
@@ -871,6 +956,7 @@ class ModelManager(object):
         """
         yaml_str = OmegaConf.to_yaml(self.config)
         config_file_path = conf_file or self.config_path
+        assert config_file_path is not None,'no config file path to write to'
         tmpfile = os.path.join(os.path.dirname(config_file_path), "new_config.tmp")
         with open(tmpfile, "w", encoding="utf-8") as outfile:
             outfile.write(self.preamble())
@@ -892,6 +978,18 @@ class ModelManager(object):
             # was trained on.
         """
         )
+
+    def _disambiguate_name(self, model_name:str, model_type:SDModelType)->str:
+        model_type = model_type or SDModelType.diffusers
+        full_name = f"{model_name}/{model_type.name}"
+        if self.valid_model(full_name):
+            return full_name
+        if self.valid_model(model_name):
+            return model_name
+        raise InvalidModelError(
+            f'Neither "{model_name}" nor "{full_name}" are known model names. Please check your models.yaml file'
+        )
+
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):

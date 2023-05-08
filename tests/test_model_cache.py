@@ -40,7 +40,7 @@ class DMType(Enum):
     type1 = DummyModelType1
     type2 = DummyModelType2
 
-cache = ModelCache(max_models=4)
+cache = ModelCache(max_cache_size=4)
 
 def test_pipeline_fetch():
     assert cache.cache_size()==0
@@ -53,12 +53,10 @@ def test_pipeline_fetch():
         assert type(pipeline1)==DMType.dummy_pipeline.value,'get_model() did not return model of expected type'
         assert pipeline1==pipeline1a,'pipelines with the same repo_id should be the same'
         assert pipeline1!=pipeline2,'pipelines with different repo_ids should not be the same'
-        assert cache.cache_size()==2,'cache should uniquely cache models with same identity'
+        assert len(cache.models)==2,'cache should uniquely cache models with same identity'
     with cache.get_model('dummy/pipeline3',DMType.dummy_pipeline) as pipeline3,\
          cache.get_model('dummy/pipeline4',DMType.dummy_pipeline) as pipeline4:
-        assert cache.cache_size()==4,'cache did not grow as expected'
-    with cache.get_model('dummy/pipeline5',DMType.dummy_pipeline) as pipeline5:
-        assert cache.cache_size()==4,'cache did not free space as expected'
+        assert len(cache.models)==4,'cache did not grow as expected'
 
 def test_signatures():
     with cache.get_model('dummy/pipeline',DMType.dummy_pipeline,revision='main') as pipeline1,\

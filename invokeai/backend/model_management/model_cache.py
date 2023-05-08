@@ -19,10 +19,9 @@ context. Use like this:
 import contextlib
 import gc
 import hashlib
-import logging
 import warnings
 from collections import Counter
-from enum import Enum
+from enum import Enum,auto
 from pathlib import Path
 from psutil import Process
 from typing import Dict, Sequence, Union, Tuple, types
@@ -52,9 +51,15 @@ DEFAULT_MAX_CACHE_SIZE = 6.0
 GIG = 1073741824 
 
 # This is the mapping from the stable diffusion submodel dict key to the class
+class LoraType(dict):
+    pass
+class TIType(dict):
+    pass
+class CkptType(dict):
+    pass
+
 class SDModelType(Enum):
-    diffusion_pipeline=StableDiffusionGeneratorPipeline # whole thing
-    diffusers=StableDiffusionGeneratorPipeline          # same thing, different name
+    diffusers=StableDiffusionGeneratorPipeline          # whole pipeline
     vae=AutoencoderKL                                   # diffusers parts
     text_encoder=CLIPTextModel
     tokenizer=CLIPTokenizer
@@ -62,10 +67,11 @@ class SDModelType(Enum):
     scheduler=SchedulerMixin
     safety_checker=StableDiffusionSafetyChecker
     feature_extractor=CLIPFeatureExtractor
-    # These are all loaded as dicts of tensors
-    lora=dict
-    textual_inversion=dict
-    ckpt=dict
+    # These are all loaded as dicts of tensors, and we
+    # distinguish them by class
+    lora=LoraType
+    textual_inversion=TIType
+    ckpt=CkptType
 
 class ModelStatus(Enum):
     unknown='unknown'
@@ -78,17 +84,16 @@ class ModelStatus(Enum):
 # After loading, we will know it exactly.
 # Sizes are in Gigs, estimated for float16; double for float32
 SIZE_GUESSTIMATE = {
-    SDModelType.diffusion_pipeline: 2.5,
     SDModelType.diffusers: 2.5,
     SDModelType.vae: 0.35,
     SDModelType.text_encoder: 0.5,
-    SDModelType.tokenizer: 0.0001,
+    SDModelType.tokenizer: 0.001,
     SDModelType.unet: 3.4,
-    SDModelType.scheduler: 0.0001,
+    SDModelType.scheduler: 0.001,
     SDModelType.safety_checker: 1.2,
-    SDModelType.feature_extractor: 0.0001,
+    SDModelType.feature_extractor: 0.001,
     SDModelType.lora: 0.1,
-    SDModelType.textual_inversion: 0.0001,
+    SDModelType.textual_inversion: 0.001,
     SDModelType.ckpt: 4.2,
 }
         
@@ -152,7 +157,7 @@ class ModelCache(object):
     def get_model(
             self,
             repo_id_or_path: Union[str,Path],
-            model_type: SDModelType=SDModelType.diffusion_pipeline,
+            model_type: SDModelType=SDModelType.diffusers,
             subfolder: Path=None,
             submodel: SDModelType=None,
             revision: str=None,
@@ -263,7 +268,7 @@ class ModelCache(object):
             self.current_cache_size += usage.mem_used   # increment size of the cache
             
             # this is a bit of legacy work needed to support the old-style "load this diffuser with custom VAE"
-            if model_type==SDModelType.diffusion_pipeline and attach_model_part[0]:
+            if model_type==SDModelType.diffusers and attach_model_part[0]:
                 self.attach_part(model,*attach_model_part)
                 
             self.stack.append(key)          # add to LRU cache
@@ -301,8 +306,10 @@ class ModelCache(object):
                 cache.locked_models[key] += 1
                 if cache.lazy_offloading:
                    cache._offload_unlocked_models()
-                cache.logger.debug(f'Loading {key} into {cache.execution_device}')
-                model.to(cache.execution_device)  # move into GPU
+                if  model.device != cache.execution_device:
+                    cache.logger.debug(f'Moving {key} into {cache.execution_device}')
+                    model.to(cache.execution_device)  # move into GPU
+                cache.logger.debug(f'Locking {key} in {cache.execution_device}')                
                 cache._print_cuda_stats()
             else:
                 # in the event that the caller wants the model in RAM, we
@@ -345,7 +352,7 @@ class ModelCache(object):
 
     def status(self,
                repo_id_or_path: Union[str,Path],
-               model_type: SDModelType=SDModelType.diffusion_pipeline,
+               model_type: SDModelType=SDModelType.diffusers,
                revision: str=None,
                subfolder: Path=None,
                )->ModelStatus:
@@ -428,7 +435,7 @@ class ModelCache(object):
     def _make_cache_room(self, key, model_type):
         # calculate how much memory this model will require
         multiplier = 2 if self.precision==torch.float32 else 1
-        bytes_needed = int(self.model_sizes.get(key,0) or SIZE_GUESSTIMATE[model_type]*GIG*multiplier)
+        bytes_needed = int(self.model_sizes.get(key,0) or SIZE_GUESSTIMATE.get(model_type,0.5)*GIG*multiplier)
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
         current_size = self.current_cache_size
 
@@ -473,7 +480,7 @@ class ModelCache(object):
         # silence transformer and diffuser warnings
         with SilenceWarnings():
             if self.is_legacy_ckpt(repo_id_or_path):
-                model = self._load_ckpt_from_storage(repo_id_or_path, legacy_info)
+                model = model_class(self._load_ckpt_from_storage(repo_id_or_path, legacy_info))
             else:
                 model = self._load_diffusers_from_storage(
                     repo_id_or_path,
