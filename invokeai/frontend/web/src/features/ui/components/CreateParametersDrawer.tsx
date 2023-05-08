@@ -1,6 +1,6 @@
 import { isEqual } from 'lodash-es';
 import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
-import CreateBaseSettings from './tabs/Create/CreateBaseSettings';
+import TextTabParameters from './tabs/text/TextTabParameters';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
@@ -14,10 +14,10 @@ import { Flex } from '@chakra-ui/react';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import PinParametersPanelButton from './PinParametersPanelButton';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import CreateSidePanelPinned from './tabs/Create/CreateSidePanelPinned';
-import CreateTextParameters from './tabs/Create/CreateBaseSettings';
+import CreateSidePanelPinned from './tabs/text/TextTabSettingsPinned';
+import CreateTextParameters from './tabs/text/TextTabParameters';
 import ResizeHandle from './tabs/ResizeHandle';
-import CreateImageSettings from './tabs/Create/CreateImageSettings';
+import CreateImageSettings from './tabs/image/ImageTabSettings';
 
 const selector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],

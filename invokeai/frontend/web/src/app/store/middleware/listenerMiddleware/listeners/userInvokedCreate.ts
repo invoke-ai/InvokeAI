@@ -10,7 +10,7 @@ const moduleLog = log.child({ namespace: 'invoke' });
 export const addUserInvokedCreateListener = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof userInvoked> =>
-      userInvoked.match(action) && action.payload === 'generate',
+      userInvoked.match(action) && action.payload === 'text',
     effect: (action, { getState, dispatch }) => {
       const state = getState();
 

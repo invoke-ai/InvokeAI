@@ -4,20 +4,23 @@ import BoundingBoxSettings from 'features/parameters/components/AdvancedParamete
 import InfillAndScalingSettings from 'features/parameters/components/AdvancedParameters/Canvas/InfillAndScalingSettings';
 import SeamCorrectionSettings from 'features/parameters/components/AdvancedParameters/Canvas/SeamCorrection/SeamCorrectionSettings';
 import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
-import SymmetrySettings from 'features/parameters/components/AdvancedParameters/Output/SymmetrySettings';
-import SymmetryToggle from 'features/parameters/components/AdvancedParameters/Output/SymmetryToggle';
-import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
-import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
-import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
 import MainSettings from 'features/parameters/components/MainParameters/MainSettings';
 import ParametersAccordion, {
   ParametersAccordionItems,
 } from 'features/parameters/components/ParametersAccordion';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
-import NegativePromptInput from 'features/parameters/components/PromptInput/NegativePromptInput';
-import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import { useTranslation } from 'react-i18next';
 import OverlayScrollable from '../../common/OverlayScrollable';
+// import ParamSeedSettings from 'features/parameters/components/Parameters/Seed/ParamSeedSettings';
+// import ParamVariationSettings from 'features/parameters/components/Parameters/Variations/ParamVariationSettings';
+// import ParamSymmetrySettings from 'features/parameters/components/Parameters/Symmetry/ParamSymmetrySettings';
+// import ParamVariationToggle from 'features/parameters/components/Parameters/Variations/ParamVariationToggle';
+// import ParamSymmetryToggle from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryToggle';
+import ParamPositiveConditioning from 'features/parameters/components/Parameters/ParamPositiveConditioning';
+import ParamNegativeConditioning from 'features/parameters/components/Parameters/ParamNegativeConditioning';
+import ParamSeedCollapse from 'features/parameters/components/Parameters/Seed/ParamSeedCollapse';
+import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
+import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 
 export default function UnifiedCanvasParameters() {
   const { t } = useTranslation();
@@ -35,12 +38,12 @@ export default function UnifiedCanvasParameters() {
       feature: undefined,
       content: <ImageToImageStrength />,
     },
-    seed: {
-      name: 'seed',
-      header: `${t('parameters.seed')}`,
-      feature: Feature.SEED,
-      content: <SeedSettings />,
-    },
+    // seed: {
+    //   name: 'seed',
+    //   header: `${t('parameters.seed')}`,
+    //   feature: Feature.SEED,
+    //   content: <ParamSeedSettings />,
+    // },
     boundingBox: {
       name: 'boundingBox',
       header: `${t('parameters.boundingBoxHeader')}`,
@@ -59,19 +62,19 @@ export default function UnifiedCanvasParameters() {
       feature: Feature.INFILL_AND_SCALING,
       content: <InfillAndScalingSettings />,
     },
-    variations: {
-      name: 'variations',
-      header: `${t('parameters.variations')}`,
-      feature: Feature.VARIATIONS,
-      content: <VariationsSettings />,
-      additionalHeaderComponents: <GenerateVariationsToggle />,
-    },
-    symmetry: {
-      name: 'symmetry',
-      header: `${t('parameters.symmetry')}`,
-      content: <SymmetrySettings />,
-      additionalHeaderComponents: <SymmetryToggle />,
-    },
+    // variations: {
+    //   name: 'variations',
+    //   header: `${t('parameters.variations')}`,
+    //   feature: Feature.VARIATIONS,
+    //   content: <ParamVariationSettings />,
+    //   additionalHeaderComponents: <ParamVariationToggle />,
+    // },
+    // symmetry: {
+    //   name: 'symmetry',
+    //   header: `${t('parameters.symmetry')}`,
+    //   content: <ParamSymmetrySettings />,
+    //   additionalHeaderComponents: <ParamSymmetryToggle />,
+    // },
   };
 
   return (
@@ -85,9 +88,12 @@ export default function UnifiedCanvasParameters() {
           position: 'absolute',
         }}
       >
-        <PromptInput />
-        <NegativePromptInput />
+        <ParamPositiveConditioning />
+        <ParamNegativeConditioning />
         <ProcessButtons />
+        <ParamSeedCollapse />
+        <ParamVariationCollapse />
+        <ParamSymmetryCollapse />
         <ParametersAccordion accordionItems={unifiedCanvasAccordions} />
       </Flex>
     </OverlayScrollable>

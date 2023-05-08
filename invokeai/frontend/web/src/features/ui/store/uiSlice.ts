@@ -18,9 +18,9 @@ export const initialUIState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
-  openLinearAccordionItems: [],
-  openGenerateAccordionItems: [],
-  openUnifiedCanvasAccordionItems: [],
+  textTabAccordionState: [],
+  imageTabAccordionState: [],
+  canvasTabAccordionState: [],
   floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
   shouldShowProgressImages: false,
   shouldAutoShowProgressImages: false,
@@ -105,12 +105,16 @@ export const uiSlice = createSlice({
       }
     },
     openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
-      if (tabMap[state.activeTab] === 'generate') {
-        state.openGenerateAccordionItems = action.payload;
+      if (tabMap[state.activeTab] === 'text') {
+        state.textTabAccordionState = action.payload;
+      }
+
+      if (tabMap[state.activeTab] === 'image') {
+        state.imageTabAccordionState = action.payload;
       }
 
       if (tabMap[state.activeTab] === 'unifiedCanvas') {
-        state.openUnifiedCanvasAccordionItems = action.payload;
+        state.canvasTabAccordionState = action.payload;
       }
     },
     floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {

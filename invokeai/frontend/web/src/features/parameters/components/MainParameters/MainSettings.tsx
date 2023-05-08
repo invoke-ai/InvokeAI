@@ -1,14 +1,15 @@
+import { memo } from 'react';
 import { Box, Flex, VStack } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+
 import ModelSelect from 'features/system/components/ModelSelect';
-import { memo } from 'react';
-import HeightSlider from './HeightSlider';
-import MainCFGScale from './MainCFGScale';
-import MainIterations from './MainIterations';
-import MainSampler from './MainSampler';
-import MainSteps from './MainSteps';
-import WidthSlider from './WidthSlider';
+import ParamHeight from 'features/parameters/components/Parameters/ParamHeight';
+import ParamCFGScale from 'features/parameters/components/Parameters/ParamCFGScale';
+import ParamIterations from 'features/parameters/components/Parameters/ParamIterations';
+import ParamScheduler from 'features/parameters/components/Parameters/ParamScheduler';
+import ParamSteps from 'features/parameters/components/Parameters/ParamSteps';
+import ParamWidth from 'features/parameters/components/Parameters/ParamWidth';
 
 const MainSettings = () => {
   const shouldUseSliders = useAppSelector(
@@ -17,14 +18,14 @@ const MainSettings = () => {
 
   return shouldUseSliders ? (
     <VStack gap={2}>
-      <MainIterations />
-      <MainSteps />
-      <MainCFGScale />
-      <WidthSlider />
-      <HeightSlider />
+      <ParamIterations />
+      <ParamSteps />
+      <ParamCFGScale />
+      <ParamWidth />
+      <ParamHeight />
       <Flex gap={3} w="full">
         <Box flexGrow={2}>
-          <MainSampler />
+          <ParamScheduler />
         </Box>
         <Box flexGrow={3}>
           <ModelSelect />
@@ -34,15 +35,15 @@ const MainSettings = () => {
   ) : (
     <Flex gap={3} flexDirection="column">
       <Flex gap={3}>
-        <MainIterations />
-        <MainSteps />
-        <MainCFGScale />
+        <ParamIterations />
+        <ParamSteps />
+        <ParamCFGScale />
       </Flex>
-      <WidthSlider />
-      <HeightSlider />
+      <ParamWidth />
+      <ParamHeight />
       <Flex gap={3} w="full">
         <Box flexGrow={2}>
-          <MainSampler />
+          <ParamScheduler />
         </Box>
         <Box flexGrow={3}>
           <ModelSelect />

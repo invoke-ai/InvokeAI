@@ -26,9 +26,9 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
-  openLinearAccordionItems: number[];
-  openGenerateAccordionItems: number[];
-  openUnifiedCanvasAccordionItems: number[];
+  textTabAccordionState: number[];
+  imageTabAccordionState: number[];
+  canvasTabAccordionState: number[];
   floatingProgressImageRect: Rect;
   shouldShowProgressImages: boolean;
   shouldAutoShowProgressImages: boolean;
