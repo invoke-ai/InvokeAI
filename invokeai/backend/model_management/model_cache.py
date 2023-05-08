@@ -29,6 +29,7 @@ from typing import Dict, Sequence, Union, Tuple, types
 
 import torch
 import safetensors.torch
+    
 from diffusers import StableDiffusionPipeline, AutoencoderKL, SchedulerMixin, UNet2DConditionModel
 from diffusers import logging as diffusers_logging
 from diffusers.pipelines.stable_diffusion.safety_checker import \
@@ -53,7 +54,7 @@ GIG = 1073741824
 # This is the mapping from the stable diffusion submodel dict key to the class
 class SDModelType(Enum):
     diffusion_pipeline=StableDiffusionGeneratorPipeline # whole thing
-    diffusers=StableDiffusionGeneratorPipeline          # same thing
+    diffusers=StableDiffusionGeneratorPipeline          # same thing, different name
     vae=AutoencoderKL                                   # diffusers parts
     text_encoder=CLIPTextModel
     tokenizer=CLIPTokenizer
@@ -164,8 +165,19 @@ class ModelCache(object):
         Use like this:
 
               cache = ModelCache()
-              with cache.get_model('stabilityai/stable-diffusion-2') as SD2:
-                   do_something_with_the_model(SD2)
+              with cache.get_model('stabilityai/stable-diffusion-2') as model:
+                   do_something_with_the_model(model)
+
+        While in context, model will be locked into GPU. If you want to do something
+        with the model while it is in RAM, just use the context's `model` attribute:
+
+              context = cache.get_model('stabilityai/stable-diffusion-2')
+              context.model.device
+              # device(type='cpu')
+
+              with context as model:
+                 model.device
+              # device(type='cuda')
 
         You can fetch an individual part of a diffusers model by passing the submodel
         argument:
@@ -173,6 +185,14 @@ class ModelCache(object):
               vae_context = cache.get_model(
                                         'stabilityai/sd-stable-diffusion-2', 
                                          submodel=SDModelType.vae
+                                         )
+
+        This is equivalent to:
+
+              vae_context = cache.get_model(
+                                        'stabilityai/sd-stable-diffusion-2', 
+                                        model_type = SDModelType.vae,
+                                        subfolder='vae'
                                          )
 
         Vice versa, you can load and attach an external submodel to a diffusers model 
@@ -196,12 +216,26 @@ class ModelCache(object):
         '''
         key = self._model_key( # internal unique identifier for the model
             repo_id_or_path,
-            model_type.value,
             revision,
-            subfolder
+            subfolder,
+            model_type.value,
         )
-        
-        if key in self.models: # cached - move to bottom of stack
+
+        # optimization: if caller is asking to load a submodel of a diffusers pipeline, then
+        # check whether it is already cached in RAM and return it instead of loading from disk again
+        if subfolder and not submodel:
+            possible_parent_key = self._model_key(
+                repo_id_or_path,
+                None,
+                revision,
+                SDModelType.diffusers.value
+            )
+            if possible_parent_key in self.models:
+                key = possible_parent_key
+                submodel=model_type
+
+        # Look for the model in the cache RAM
+        if key in self.models: # cached - move to bottom of stack (most recently used)
             with contextlib.suppress(ValueError):
                 self.stack.remove(key)
                 self.stack.append(key)
@@ -225,11 +259,13 @@ class ModelCache(object):
                     legacy_info=legacy_info,
                 )
             logger.debug(f'Actual memory used to load model: {(usage.mem_used/GIG):.2f} GB')
-            self.model_sizes[key] = usage.mem_used
-            self.current_cache_size += usage.mem_used
+            self.model_sizes[key] = usage.mem_used      # remember size of this model for cache cleansing
+            self.current_cache_size += usage.mem_used   # increment size of the cache
             
+            # this is a bit of legacy work needed to support the old-style "load this diffuser with custom VAE"
             if model_type==SDModelType.diffusion_pipeline and attach_model_part[0]:
                 self.attach_part(model,*attach_model_part)
+                
             self.stack.append(key)          # add to LRU cache
             self.models[key]=model          # keep copy of model in dict
             
@@ -376,8 +412,8 @@ class ModelCache(object):
             logger.debug("Model scanned ok")
             
     @staticmethod
-    def _model_key(path,model_class,revision,subfolder)->str:
-        return ':'.join([str(path),model_class.__name__,str(revision or ''),str(subfolder or '')])
+    def _model_key(path,revision,subfolder,model_class)->str:
+        return ':'.join([str(path),str(revision or ''),str(subfolder or ''),model_class.__name__])
 
     def _has_cuda(self)->bool:
         return self.execution_device.type == 'cuda'
