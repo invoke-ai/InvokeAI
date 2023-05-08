@@ -1,16 +1,16 @@
 import { VStack } from '@chakra-ui/react';
-import SeamBlur from './SeamBlur';
-import SeamSize from './SeamSize';
-import SeamSteps from './SeamSteps';
-import SeamStrength from './SeamStrength';
+import ParamSeamBlur from './ParamSeamBlur';
+import ParamSeamSize from './ParamSeamSize';
+import ParamSeamSteps from './ParamSeamSteps';
+import ParamSeamStrength from './ParamSeamStrength';
 
 const SeamCorrectionSettings = () => {
   return (
     <VStack gap={2} alignItems="stretch">
-      <SeamSize />
-      <SeamBlur />
-      <SeamStrength />
-      <SeamSteps />
+      <ParamSeamSize />
+      <ParamSeamBlur />
+      <ParamSeamStrength />
+      <ParamSeamSteps />
     </VStack>
   );
 };

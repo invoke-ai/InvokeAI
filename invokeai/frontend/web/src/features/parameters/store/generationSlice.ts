@@ -20,7 +20,6 @@ export interface GenerationState {
   negativePrompt: string;
   sampler: string;
   seamBlur: number;
-  seamless: boolean;
   seamSize: number;
   seamSteps: number;
   seamStrength: number;
@@ -29,6 +28,7 @@ export interface GenerationState {
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
+  shouldUseNoiseSettings: boolean;
   steps: number;
   threshold: number;
   tileSize: number;
@@ -39,6 +39,9 @@ export interface GenerationState {
   verticalSymmetrySteps: number;
   isImageToImageEnabled: boolean;
   model: string;
+  shouldUseSeamless: boolean;
+  seamlessXAxis: boolean;
+  seamlessYAxis: boolean;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -53,7 +56,6 @@ export const initialGenerationState: GenerationState = {
   negativePrompt: '',
   sampler: 'k_lms',
   seamBlur: 16,
-  seamless: false,
   seamSize: 96,
   seamSteps: 30,
   seamStrength: 0.7,
@@ -62,6 +64,7 @@ export const initialGenerationState: GenerationState = {
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
   shouldRandomizeSeed: true,
+  shouldUseNoiseSettings: false,
   steps: 50,
   threshold: 0,
   tileSize: 32,
@@ -72,6 +75,9 @@ export const initialGenerationState: GenerationState = {
   verticalSymmetrySteps: 0,
   isImageToImageEnabled: false,
   model: '',
+  shouldUseSeamless: false,
+  seamlessXAxis: true,
+  seamlessYAxis: true,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -146,7 +152,13 @@ export const generationSlice = createSlice({
       state.maskPath = action.payload;
     },
     setSeamless: (state, action: PayloadAction<boolean>) => {
-      state.seamless = action.payload;
+      state.shouldUseSeamless = action.payload;
+    },
+    setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
+      state.seamlessXAxis = action.payload;
+    },
+    setSeamlessYAxis: (state, action: PayloadAction<boolean>) => {
+      state.seamlessYAxis = action.payload;
     },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
@@ -348,6 +360,9 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
+    setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseNoiseSettings = action.payload;
+    },
     initialImageChanged: (state, action: PayloadAction<InvokeAI.Image>) => {
       state.initialImage = action.payload;
       state.isImageToImageEnabled = true;
@@ -382,7 +397,6 @@ export const {
   setNegativePrompt,
   setSampler,
   setSeamBlur,
-  setSeamless,
   setSeamSize,
   setSeamSteps,
   setSeamStrength,
@@ -402,6 +416,10 @@ export const {
   initialImageChanged,
   isImageToImageEnabledChanged,
   modelSelected,
+  setShouldUseNoiseSettings,
+  setSeamless,
+  setSeamlessXAxis,
+  setSeamlessYAxis,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

@@ -26,31 +26,34 @@ import {
 } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
+import { GoTextSize } from 'react-icons/go';
 import { activeTabIndexSelector } from '../store/uiSelectors';
 import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import NodeEditor from 'features/nodes/components/NodeEditor';
-import GenerateWorkspace from './tabs/Create/GenerateWorkspace';
+import GenerateWorkspace from './tabs/text/GenerateWorkspace';
 import { createSelector } from '@reduxjs/toolkit';
 import { BsLightningChargeFill } from 'react-icons/bs';
 import { configSelector } from 'features/system/store/configSelectors';
 import { isEqual } from 'lodash-es';
 import AnimatedImageToImagePanel from 'features/parameters/components/AnimatedImageToImagePanel';
 import Scrollable from './common/Scrollable';
-import CreateBaseSettings from './tabs/Create/CreateBaseSettings';
+import TextTabParameters from './tabs/text/TextTabParameters';
 import PinParametersPanelButton from './PinParametersPanelButton';
 import ParametersSlide from './common/ParametersSlide';
 import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import CreateTabContent from './tabs/Create/CreateContent';
+import TextTabMain from './tabs/text/TextTabMain';
 import ParametersPanel from './ParametersPanel';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import CreateTab from './tabs/Create/CreateTab';
+import TextTab from './tabs/text/TextTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';
+import { FaImage } from 'react-icons/fa';
+import ResizeHandle from './tabs/ResizeHandle';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -60,9 +63,14 @@ export interface InvokeTabInfo {
 
 const tabs: InvokeTabInfo[] = [
   {
-    id: 'generate',
-    icon: <Icon as={BsLightningChargeFill} sx={{ boxSize: 5 }} />,
-    content: <CreateTab />,
+    id: 'text',
+    icon: <Icon as={GoTextSize} sx={{ boxSize: 5 }} />,
+    content: <TextTab />,
+  },
+  {
+    id: 'image',
+    icon: <Icon as={FaImage} sx={{ boxSize: 5 }} />,
+    content: <TextTab />,
   },
   {
     id: 'unifiedCanvas',
@@ -107,14 +115,18 @@ const InvokeTabs = () => {
   const dispatch = useAppDispatch();
 
   useHotkeys('1', () => {
-    dispatch(setActiveTab('generate'));
+    dispatch(setActiveTab('text'));
   });
 
   useHotkeys('2', () => {
-    dispatch(setActiveTab('unifiedCanvas'));
+    dispatch(setActiveTab('image'));
   });
 
   useHotkeys('3', () => {
+    dispatch(setActiveTab('unifiedCanvas'));
+  });
+
+  useHotkeys('4', () => {
     dispatch(setActiveTab('nodes'));
   });
 
@@ -183,23 +195,27 @@ const InvokeTabs = () => {
       >
         {tabs}
       </TabList>
-      <TabPanels>{tabPanels}</TabPanels>
+      <PanelGroup
+        autoSaveId="app"
+        direction="horizontal"
+        style={{ height: '100%', width: '100%' }}
+      >
+        <Panel id="tabContent">
+          <TabPanels style={{ height: '100%', width: '100%' }}>
+            {tabPanels}
+          </TabPanels>
+        </Panel>
+        {shouldPinGallery && shouldShowGallery && (
+          <>
+            <ResizeHandle />
+            <Panel id="gallery" order={3} defaultSize={10} minSize={10}>
+              <ImageGalleryContent />
+            </Panel>
+          </>
+        )}
+      </PanelGroup>
     </Tabs>
   );
 };
 
 export default memo(InvokeTabs);
-
-// <PanelGroup autoSaveId="example" direction="horizontal">
-//   <Panel defaultSize={25}>
-//     <SourcesExplorer />
-//   </Panel>
-//   <PanelResizeHandle />
-//   <Panel>
-//     <SourceViewer />
-//   </Panel>
-//   <PanelResizeHandle />
-//   <Panel defaultSize={25}>
-//     <Console />
-//   </Panel>
-// </PanelGroup>;
