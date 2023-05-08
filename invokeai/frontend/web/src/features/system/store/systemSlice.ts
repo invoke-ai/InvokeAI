@@ -384,6 +384,13 @@ export const systemSlice = createSlice({
       state.statusTranslationKey = 'common.statusPreparing';
     });
 
+    builder.addCase(sessionInvoked.rejected, (state, action) => {
+      const error = action.payload as string | undefined;
+      state.toastQueue.push(
+        makeToast({ title: error || t('toast.serverError'), status: 'error' })
+      );
+    });
+
     /**
      * Session Canceled
      */
