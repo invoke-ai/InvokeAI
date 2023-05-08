@@ -42,6 +42,7 @@ const UnifiedCanvasTab = () => {
 
   return (
     <PanelGroup
+      autoSaveId="canvasTab"
       direction="horizontal"
       style={{ height: '100%', width: '100%' }}
     >

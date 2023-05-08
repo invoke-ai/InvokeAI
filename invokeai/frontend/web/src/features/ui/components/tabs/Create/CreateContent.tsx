@@ -10,10 +10,16 @@ const CreateTabContent = () => {
         width: '100%',
         height: '100%',
         borderRadius: 'base',
-        bg: 'base.850',
+        // bg: 'base.850',
       }}
     >
-      <Flex sx={{ p: 4, width: '100%', height: '100%' }}>
+      <Flex
+        sx={{
+          // p: 2,
+          width: '100%',
+          height: '100%',
+        }}
+      >
         <CurrentImageDisplay />
       </Flex>
     </Box>

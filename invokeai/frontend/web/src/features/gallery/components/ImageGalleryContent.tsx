@@ -179,7 +179,17 @@ const ImageGalleryContent = () => {
   }, [dispatch, currentCategory]);
 
   return (
-    <Flex flexDirection="column" w="full" h="full" gap={4}>
+    <Flex
+      sx={{
+        gap: 2,
+        flexDirection: 'column',
+        h: 'full',
+        w: 'full',
+        borderRadius: 'base',
+        // bg: 'base.850',
+        // p: 2,
+      }}
+    >
       <Flex
         ref={resizeObserverRef}
         alignItems="center"

@@ -55,7 +55,6 @@ const ProgressImagePreview = () => {
 
   return (
     <>
-      {' '}
       <IAIIconButton
         onClick={() =>
           dispatch(setShouldShowProgressImages(!showProgressWindow))

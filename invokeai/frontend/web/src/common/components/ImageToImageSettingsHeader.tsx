@@ -7,7 +7,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 
-const ImageToImageSettingsHeader = () => {
+const ImagePromptHeading = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -18,7 +18,7 @@ const ImageToImageSettingsHeader = () => {
   return (
     <Flex w="full" alignItems="center">
       <Text size="sm" fontWeight={500} color="base.300">
-        Image to Image
+        {t('parameters.initialImage')}
       </Text>
       <Spacer />
       <ButtonGroup>
@@ -38,4 +38,4 @@ const ImageToImageSettingsHeader = () => {
   );
 };
 
-export default ImageToImageSettingsHeader;
+export default ImagePromptHeading;

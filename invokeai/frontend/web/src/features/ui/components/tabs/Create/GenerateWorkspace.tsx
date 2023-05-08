@@ -1,8 +1,8 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
-import CreateTabContent from './GenerateContent';
-import GenerateParameters from './GenerateParameters';
+import CreateTabContent from './CreateContent';
+import CreateBaseSettings from './CreateBaseSettings';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
 import { RootState } from 'app/store/store';
 import Scrollable from '../../common/Scrollable';
@@ -35,7 +35,7 @@ const GenerateWorkspace = () => {
             }}
           >
             <Scrollable>
-              <GenerateParameters />
+              <CreateBaseSettings />
             </Scrollable>
             <PinParametersPanelButton
               sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
@@ -44,7 +44,7 @@ const GenerateWorkspace = () => {
         </Flex>
       ) : (
         <ParametersSlide>
-          <GenerateParameters />
+          <CreateBaseSettings />
         </ParametersSlide>
       )}
       <CreateTabContent />

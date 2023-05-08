@@ -70,7 +70,6 @@ const InitialImagePreview = () => {
   return (
     <Flex
       sx={{
-        height: 'full',
         width: 'full',
         alignItems: 'center',
         justifyContent: 'center',
@@ -78,39 +77,44 @@ const InitialImagePreview = () => {
       }}
       onDrop={handleDrop}
     >
-      {initialImage?.url && (
-        <Box
-          sx={{
-            height: 'full',
-            width: 'full',
-            opacity: isImageToImageEnabled ? 1 : 0.5,
-            filter: isImageToImageEnabled ? 'none' : 'auto',
-            blur: '5px',
-            position: 'relative',
-          }}
-        >
-          <Image
-            sx={{
-              fit: 'contain',
-              borderRadius: 'base',
-            }}
-            src={getUrl(initialImage?.url)}
-            onError={onError}
-            onLoad={() => {
-              setIsLoaded(true);
-            }}
-            fallback={
-              <Flex
-                sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Spinner color="grey" w="5rem" h="5rem" />
-              </Flex>
-            }
-          />
-          {isLoaded && <ImageToImageOverlay image={initialImage} />}
-        </Box>
-      )}
-      {!initialImage?.url && <SelectImagePlaceholder />}
+      <Flex
+        sx={{
+          height: 'full',
+          width: 'full',
+          opacity: isImageToImageEnabled ? 1 : 0.5,
+          filter: isImageToImageEnabled ? 'none' : 'auto',
+          blur: '5px',
+          position: 'relative',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {initialImage?.url && (
+          <>
+            <Image
+              sx={{
+                objectFit: 'contain',
+                borderRadius: 'base',
+                maxHeight: 'full',
+              }}
+              src={getUrl(initialImage?.url)}
+              onError={onError}
+              onLoad={() => {
+                setIsLoaded(true);
+              }}
+              fallback={
+                <Flex
+                  sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Spinner color="grey" w="5rem" h="5rem" />
+                </Flex>
+              }
+            />
+            {isLoaded && <ImageToImageOverlay image={initialImage} />}
+          </>
+        )}
+        {!initialImage?.url && <SelectImagePlaceholder />}
+      </Flex>
       {!isImageToImageEnabled && (
         <Flex
           sx={{
