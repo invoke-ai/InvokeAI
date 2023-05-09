@@ -1,8 +1,6 @@
 import { RootState } from 'app/store/store';
 import {
-  DataURLToImageInvocation,
   Edge,
-  Graph,
   ImageToImageInvocation,
   InpaintInvocation,
   IterateInvocation,
@@ -15,10 +13,8 @@ import { buildTxt2ImgNode } from '../nodeBuilders/buildTextToImageNode';
 import { buildRangeNode } from '../nodeBuilders/buildRangeNode';
 import { buildIterateNode } from '../nodeBuilders/buildIterateNode';
 import { buildEdges } from '../edgeBuilders/buildEdges';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getGenerationMode } from '../getGenerationMode';
-import { v4 as uuidv4 } from 'uuid';
 import { log } from 'app/logging/useLogger';
 import { buildInpaintNode } from '../nodeBuilders/buildInpaintNode';
 
@@ -73,9 +69,7 @@ export const buildCanvasGraphAndBlobs = async (
   }
 
   const {
-    baseDataURL,
     baseBlob,
-    maskDataURL,
     maskBlob,
     baseIsPartiallyTransparent,
     baseIsFullyTransparent,
@@ -112,14 +106,8 @@ export const buildCanvasGraphAndBlobs = async (
   }
 
   if (baseNode.type === 'inpaint') {
-    const {
-      seamSize,
-      seamBlur,
-      seamSteps,
-      seamStrength,
-      tileSize,
-      infillMethod,
-    } = state.generation;
+    const { seamSize, seamBlur, seamSteps, seamStrength, tileSize } =
+      state.generation;
 
     // generationParameters.invert_mask = shouldPreserveMaskedArea;
     // if (boundingBoxScale !== 'none') {

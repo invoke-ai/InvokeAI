@@ -12,13 +12,10 @@
  * 'gfpgan'.
  */
 
-import { GalleryCategory } from 'features/gallery/store/gallerySlice';
 import { SelectedImage } from 'features/parameters/store/actions';
-import { FacetoolType } from 'features/parameters/store/postprocessingSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { ImageResponseMetadata, ImageType } from 'services/api';
-import { AnyInvocation } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
 /**
@@ -279,7 +276,7 @@ export type FoundModelResponse = {
 
 // export type SystemConfigResponse = SystemConfig;
 
-export type ImageResultResponse = Omit<_Image, 'uuid'> & {
+export type ImageResultResponse = Omit<Image, 'uuid'> & {
   boundingBox?: IRect;
   generationMode: InvokeTabName;
 };

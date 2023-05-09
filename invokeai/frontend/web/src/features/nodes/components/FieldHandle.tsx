@@ -1,12 +1,6 @@
 import { Tooltip } from '@chakra-ui/react';
-import { CSSProperties, memo, useMemo } from 'react';
-import {
-  Handle,
-  Position,
-  Connection,
-  HandleType,
-  useReactFlow,
-} from 'reactflow';
+import { CSSProperties, memo } from 'react';
+import { Handle, Position, Connection, HandleType } from 'reactflow';
 import { FIELDS, HANDLE_TOOLTIP_OPEN_DELAY } from '../types/constants';
 // import { useConnectionEventStyles } from '../hooks/useConnectionEventStyles';
 import { InputFieldTemplate, OutputFieldTemplate } from '../types/types';
@@ -26,9 +20,9 @@ const outputHandleStyles: CSSProperties = {
   right: '-0.5rem',
 };
 
-const requiredConnectionStyles: CSSProperties = {
-  boxShadow: '0 0 0.5rem 0.5rem var(--invokeai-colors-error-400)',
-};
+// const requiredConnectionStyles: CSSProperties = {
+//   boxShadow: '0 0 0.5rem 0.5rem var(--invokeai-colors-error-400)',
+// };
 
 type FieldHandleProps = {
   nodeId: string;
@@ -39,8 +33,8 @@ type FieldHandleProps = {
 };
 
 const FieldHandle = (props: FieldHandleProps) => {
-  const { nodeId, field, isValidConnection, handleType, styles } = props;
-  const { name, title, type, description } = field;
+  const { field, isValidConnection, handleType, styles } = props;
+  const { name, type } = field;
 
   return (
     <Tooltip

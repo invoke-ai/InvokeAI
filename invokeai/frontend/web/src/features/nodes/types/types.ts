@@ -1,9 +1,7 @@
-import { Image } from 'app/types/invokeai';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { ImageField } from 'services/api';
 import { AnyInvocationType } from 'services/events/types';
-import { O } from 'ts-toolbelt';
 
 export type InvocationValue = {
   id: string;

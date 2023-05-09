@@ -20,4 +20,4 @@ export const APP_TEXT_TO_IMAGE_HEIGHT =
 // option bar
 export const OPTIONS_BAR_MAX_WIDTH = '22.5rem';
 
-export const PARAMETERS_PANEL_WIDTH = '30rem';
+export const PARAMETERS_PANEL_WIDTH = '28rem';

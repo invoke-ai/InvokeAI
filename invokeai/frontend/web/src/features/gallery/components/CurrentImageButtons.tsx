@@ -1,11 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { get, isEqual, isNumber, isString } from 'lodash-es';
+import { isEqual, isString } from 'lodash-es';
 
 import {
   ButtonGroup,
   Flex,
   FlexProps,
-  FormControl,
   Link,
   useDisclosure,
   useToast,
@@ -15,19 +14,12 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
+
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
-import {
-  initialImageChanged,
-  setAllParameters,
-  // setInitialImage,
-  setSeed,
-} from 'features/parameters/store/generationSlice';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { SystemState } from 'features/system/store/systemSlice';
+
 import {
   activeTabNameSelector,
   uiSelector,
@@ -165,31 +157,31 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const toast = useToast();
   const { t } = useTranslation();
 
-  const { recallPrompt, recallSeed, sendToImageToImage } = useParameters();
+  const { recallPrompt, recallSeed } = useParameters();
 
-  const handleCopyImage = useCallback(async () => {
-    if (!image?.url) {
-      return;
-    }
+  // const handleCopyImage = useCallback(async () => {
+  //   if (!image?.url) {
+  //     return;
+  //   }
 
-    const url = getUrl(image.url);
+  //   const url = getUrl(image.url);
 
-    if (!url) {
-      return;
-    }
+  //   if (!url) {
+  //     return;
+  //   }
 
-    const blob = await fetch(url).then((res) => res.blob());
-    const data = [new ClipboardItem({ [blob.type]: blob })];
+  //   const blob = await fetch(url).then((res) => res.blob());
+  //   const data = [new ClipboardItem({ [blob.type]: blob })];
 
-    await navigator.clipboard.write(data);
+  //   await navigator.clipboard.write(data);
 
-    toast({
-      title: t('toast.imageCopied'),
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
-  }, [getUrl, t, image?.url, toast]);
+  //   toast({
+  //     title: t('toast.imageCopied'),
+  //     status: 'success',
+  //     duration: 2500,
+  //     isClosable: true,
+  //   });
+  // }, [getUrl, t, image?.url, toast]);
 
   const handleCopyImageLink = useCallback(() => {
     const url = image

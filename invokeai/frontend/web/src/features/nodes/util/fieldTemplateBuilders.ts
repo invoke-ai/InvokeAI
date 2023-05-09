@@ -234,7 +234,6 @@ const buildEnumInputFieldTemplate = ({
 };
 
 const buildArrayInputFieldTemplate = ({
-  schemaObject,
   baseField,
 }: BuildInputFieldArg): ArrayInputFieldTemplate => {
   const template: ArrayInputFieldTemplate = {
@@ -249,7 +248,6 @@ const buildArrayInputFieldTemplate = ({
 };
 
 const buildItemInputFieldTemplate = ({
-  schemaObject,
   baseField,
 }: BuildInputFieldArg): ItemInputFieldTemplate => {
   const template: ItemInputFieldTemplate = {

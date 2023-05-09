@@ -6,7 +6,7 @@ import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { imageDeleted, imageUploaded } from 'services/thunks/image';
+import { imageDeleted } from 'services/thunks/image';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
 export const uploadsAdapter = createEntityAdapter<Image>({

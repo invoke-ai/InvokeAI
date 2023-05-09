@@ -81,12 +81,8 @@ const InvokeTabs = () => {
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const {
-    shouldPinGallery,
-    shouldPinParametersPanel,
-    shouldShowGallery,
-    shouldShowParametersPanel,
-  } = useAppSelector((state: RootState) => state.ui);
+  const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
+    useAppSelector((state: RootState) => state.ui);
 
   const { t } = useTranslation();
 

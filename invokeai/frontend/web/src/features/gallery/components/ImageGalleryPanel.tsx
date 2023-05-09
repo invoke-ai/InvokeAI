@@ -5,7 +5,6 @@ import {
   // selectPrevImage,
   setGalleryImageMinimumWidth,
 } from 'features/gallery/store/gallerySlice';
-import { InvokeTabName } from 'features/ui/store/tabMap';
 
 import { clamp, isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -13,11 +12,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import './ImageGallery.css';
 import ImageGalleryContent from './ImageGalleryContent';
 import ResizableDrawer from 'features/ui/components/common/ResizableDrawer/ResizableDrawer';
-import {
-  setShouldShowGallery,
-  toggleGalleryPanel,
-  togglePinGalleryPanel,
-} from 'features/ui/store/uiSlice';
+import { setShouldShowGallery } from 'features/ui/store/uiSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   activeTabNameSelector,
@@ -26,8 +21,6 @@ import {
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
-import useResolution from 'common/hooks/useResolution';
-import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
 
 // const GALLERY_TAB_WIDTHS: Record<

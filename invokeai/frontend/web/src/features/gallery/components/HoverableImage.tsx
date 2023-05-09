@@ -5,9 +5,7 @@ import {
   Image,
   MenuItem,
   MenuList,
-  Skeleton,
   useDisclosure,
-  useTheme,
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -98,17 +96,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   } = useDisclosure();
 
   const { image, isSelected } = props;
-  const { url, thumbnail, name, metadata } = image;
+  const { url, thumbnail, name } = image;
   const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
-  const { direction } = useTheme();
+
   const { t } = useTranslation();
   const { isFeatureEnabled: isLightboxEnabled } = useFeatureStatus('lightbox');
-  const { recallSeed, recallPrompt, sendToImageToImage, recallInitialImage } =
-    useParameters();
+  const { recallSeed, recallPrompt, recallInitialImage } = useParameters();
 
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);

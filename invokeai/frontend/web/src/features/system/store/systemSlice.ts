@@ -15,7 +15,6 @@ import {
 } from 'services/events/actions';
 
 import { ProgressImage } from 'services/events/types';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { makeToast } from '../hooks/useToastWatcher';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
@@ -284,8 +283,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Connected
      */
-    builder.addCase(socketConnected, (state, action) => {
-      const { timestamp } = action.payload;
+    builder.addCase(socketConnected, (state) => {
       state.isConnected = true;
       state.isCancelable = true;
       state.isProcessing = false;
@@ -300,9 +298,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Disconnected
      */
-    builder.addCase(socketDisconnected, (state, action) => {
-      const { timestamp } = action.payload;
-
+    builder.addCase(socketDisconnected, (state) => {
       state.isConnected = false;
       state.isProcessing = false;
       state.isCancelable = true;
@@ -317,7 +313,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(invocationStarted, (state, action) => {
+    builder.addCase(invocationStarted, (state) => {
       state.isCancelable = true;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
@@ -332,14 +328,7 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(generatorProgress, (state, action) => {
-      const {
-        step,
-        total_steps,
-        progress_image,
-        node,
-        source_node_id,
-        graph_execution_state_id,
-      } = action.payload.data;
+      const { step, total_steps, progress_image } = action.payload.data;
 
       state.isProcessing = true;
       state.isCancelable = true;
@@ -356,7 +345,7 @@ export const systemSlice = createSlice({
      * Invocation Complete
      */
     builder.addCase(invocationComplete, (state, action) => {
-      const { data, timestamp } = action.payload;
+      const { data } = action.payload;
 
       // state.currentIteration = 0;
       // state.totalIterations = 0;
@@ -374,9 +363,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Error
      */
-    builder.addCase(invocationError, (state, action) => {
-      const { data, timestamp } = action.payload;
-
+    builder.addCase(invocationError, (state) => {
       state.isProcessing = false;
       state.isCancelable = true;
       // state.currentIteration = 0;
@@ -410,8 +397,6 @@ export const systemSlice = createSlice({
      * Session Canceled
      */
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
-      const { timestamp } = action.payload;
-
       state.canceledSession = action.meta.arg.sessionId;
       state.isProcessing = false;
       state.isCancelable = false;
@@ -428,9 +413,7 @@ export const systemSlice = createSlice({
     /**
      * Session Canceled
      */
-    builder.addCase(graphExecutionStateComplete, (state, action) => {
-      const { timestamp } = action.payload;
-
+    builder.addCase(graphExecutionStateComplete, (state) => {
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;

@@ -43,7 +43,6 @@ const StatusIndicator = () => {
     currentIteration,
     totalIterations,
     statusTranslationKey,
-    currentStatusHasSteps,
   } = useAppSelector(statusIndicatorSelector);
   const { t } = useTranslation();
   const ref = useRef(null);

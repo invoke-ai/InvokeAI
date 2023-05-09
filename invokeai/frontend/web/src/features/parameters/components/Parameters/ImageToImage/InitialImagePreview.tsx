@@ -1,24 +1,16 @@
-import { Box, Flex, Image, Spinner, Text } from '@chakra-ui/react';
+import { Flex, Image, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
-import useGetImageByNameAndType from 'features/gallery/hooks/useGetImageByName';
-import generationSlice, {
-  clearInitialImage,
-  initialImageChanged,
-} from 'features/parameters/store/generationSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
 import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
 import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
-import {
-  generationSelector,
-  initialImageSelector,
-} from 'features/parameters/store/generationSelectors';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { initialImageSelected } from 'features/parameters/store/actions';
 
 const selector = createSelector(
@@ -40,7 +32,6 @@ const InitialImagePreview = () => {
   const { t } = useTranslation();
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const getImageByNameAndType = useGetImageByNameAndType();
 
   const onError = () => {
     dispatch(

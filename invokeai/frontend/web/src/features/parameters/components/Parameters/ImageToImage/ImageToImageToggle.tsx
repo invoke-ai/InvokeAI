@@ -1,11 +1,9 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { isImageToImageEnabledChanged } from 'features/parameters/store/generationSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { shouldShowImageParametersChanged } from 'features/ui/store/uiSlice';
 import { ChangeEvent } from 'react';
@@ -25,8 +23,7 @@ const selector = createSelector(
 );
 
 export default function ImageToImageToggle() {
-  const { isImageToImageEnabled, shouldShowImageParameters } =
-    useAppSelector(selector);
+  const { shouldShowImageParameters } = useAppSelector(selector);
 
   const { t } = useTranslation();
 

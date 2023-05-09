@@ -22,8 +22,7 @@ const selector = createSelector(
 
 const ParamSeamlessCollapse = () => {
   const { t } = useTranslation();
-  const { shouldUseSeamless, seamlessXAxis, seamlessYAxis } =
-    useAppSelector(selector);
+  const { shouldUseSeamless } = useAppSelector(selector);
 
   const dispatch = useAppDispatch();
 

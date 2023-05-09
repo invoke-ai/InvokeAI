@@ -13,7 +13,7 @@ export const buildImg2ImgNode = (
   overrides: O.Partial<ImageToImageInvocation, 'deep'> = {}
 ): ImageToImageInvocation => {
   const nodeId = uuidv4();
-  const { generation, system, models } = state;
+  const { generation } = state;
 
   const {
     prompt,
@@ -28,9 +28,6 @@ export const buildImg2ImgNode = (
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
     shouldRandomizeSeed,
-    shouldUseSeamless,
-    seamlessXAxis,
-    seamlessYAxis,
   } = generation;
 
   const initialImage = initialImageSelector(state);

@@ -1,4 +1,3 @@
-import { getCSSVar } from '@chakra-ui/utils';
 import { FieldType, FieldUIConfig } from './types';
 
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;

@@ -22,7 +22,6 @@ import {
   CanvasLayer,
   CanvasLayerState,
   CanvasMaskLine,
-  CanvasSession,
   CanvasState,
   CanvasTool,
   Dimensions,
@@ -30,7 +29,6 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
-import { stringToArray } from 'konva/lib/shapes/Text';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
