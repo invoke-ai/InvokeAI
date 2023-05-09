@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 import promptToString from 'common/util/promptToString';
 import { clamp } from 'lodash-es';
+import { setAllParametersReducer } from './setAllParametersReducer';
 
 export interface GenerationState {
   cfgScale: number;
@@ -187,131 +188,7 @@ export const generationSlice = createSlice({
       state.shouldGenerateVariations = true;
       state.variationAmount = 0;
     },
-    setAllTextToImageParameters: (
-      state,
-      action: PayloadAction<InvokeAI.Metadata>
-    ) => {
-      // const {
-      //   sampler,
-      //   prompt,
-      //   seed,
-      //   variations,
-      //   steps,
-      //   cfg_scale,
-      //   threshold,
-      //   perlin,
-      //   seamless,
-      //   _hires_fix,
-      //   width,
-      //   height,
-      // } = action.payload.image;
-      // if (variations && variations.length > 0) {
-      //   state.seedWeights = seedWeightsToString(variations);
-      //   state.shouldGenerateVariations = true;
-      //   state.variationAmount = 0;
-      // } else {
-      //   state.shouldGenerateVariations = false;
-      // }
-      // if (seed) {
-      //   state.seed = seed;
-      //   state.shouldRandomizeSeed = false;
-      // }
-      // if (prompt) state.prompt = promptToString(prompt);
-      // if (sampler) state.sampler = sampler;
-      // if (steps) state.steps = steps;
-      // if (cfg_scale) state.cfgScale = cfg_scale;
-      // if (typeof threshold === 'undefined') {
-      //   state.threshold = 0;
-      // } else {
-      //   state.threshold = threshold;
-      // }
-      // if (typeof perlin === 'undefined') {
-      //   state.perlin = 0;
-      // } else {
-      //   state.perlin = perlin;
-      // }
-      // if (typeof seamless === 'boolean') state.seamless = seamless;
-      // // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
-      // if (width) state.width = width;
-      // if (height) state.height = height;
-    },
-    setAllImageToImageParameters: (
-      state,
-      action: PayloadAction<InvokeAI.Metadata>
-    ) => {
-      //   const { type, strength, fit, init_image_path, mask_image_path } =
-      //     action.payload.image;
-      //   if (type === 'img2img') {
-      //     if (init_image_path) state.initialImage = init_image_path;
-      //     if (mask_image_path) state.maskPath = mask_image_path;
-      //     if (strength) state.img2imgStrength = strength;
-      //     if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-      //   }
-    },
-    setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
-      //   const {
-      //     type,
-      //     sampler,
-      //     prompt,
-      //     seed,
-      //     variations,
-      //     steps,
-      //     cfg_scale,
-      //     threshold,
-      //     perlin,
-      //     seamless,
-      //     _hires_fix,
-      //     width,
-      //     height,
-      //     strength,
-      //     fit,
-      //     init_image_path,
-      //     mask_image_path,
-      //   } = action.payload.image;
-      //   if (type === 'img2img') {
-      //     if (init_image_path) state.initialImage = init_image_path;
-      //     if (mask_image_path) state.maskPath = mask_image_path;
-      //     if (strength) state.img2imgStrength = strength;
-      //     if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-      //   }
-      //   if (variations && variations.length > 0) {
-      //     state.seedWeights = seedWeightsToString(variations);
-      //     state.shouldGenerateVariations = true;
-      //     state.variationAmount = 0;
-      //   } else {
-      //     state.shouldGenerateVariations = false;
-      //   }
-      //   if (seed) {
-      //     state.seed = seed;
-      //     state.shouldRandomizeSeed = false;
-      //   }
-      //   if (prompt) {
-      //     const [promptOnly, negativePrompt] = getPromptAndNegative(prompt);
-      //     if (promptOnly) state.prompt = promptOnly;
-      //     negativePrompt
-      //       ? (state.negativePrompt = negativePrompt)
-      //       : (state.negativePrompt = '');
-      //   }
-      //   if (sampler) state.sampler = sampler;
-      //   if (steps) state.steps = steps;
-      //   if (cfg_scale) state.cfgScale = cfg_scale;
-      //   if (typeof threshold === 'undefined') {
-      //     state.threshold = 0;
-      //   } else {
-      //     state.threshold = threshold;
-      //   }
-      //   if (typeof perlin === 'undefined') {
-      //     state.perlin = 0;
-      //   } else {
-      //     state.perlin = perlin;
-      //   }
-      //   if (typeof seamless === 'boolean') state.seamless = seamless;
-      //   // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
-      //   if (width) state.width = width;
-      //   if (height) state.height = height;
-      //   // state.shouldRunESRGAN = false; // TODO: Needs to be fixed after reorg
-      //   // state.shouldRunFacetool = false; // TODO: Needs to be fixed after reorg
-    },
+    allParametersSet: setAllParametersReducer,
     resetParametersState: (state) => {
       return {
         ...state,
@@ -321,12 +198,6 @@ export const generationSlice = createSlice({
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
-    // setInitialImage: (
-    //   state,
-    //   action: PayloadAction<InvokeAI._Image | string>
-    // ) => {
-    //   state.initialImage = action.payload;
-    // },
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
@@ -417,6 +288,7 @@ export const {
   setSeamless,
   setSeamlessXAxis,
   setSeamlessYAxis,
+  allParametersSet,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;
