@@ -1,10 +1,10 @@
 import { memo } from 'react';
 import { Panel } from 'reactflow';
-import AddNodeMenu from '../AddNodeMenu';
+import NodeSearch from '../search/NodeSearch';
 
 const TopLeftPanel = () => (
   <Panel position="top-left">
-    <AddNodeMenu />
+    <NodeSearch />
   </Panel>
 );
 

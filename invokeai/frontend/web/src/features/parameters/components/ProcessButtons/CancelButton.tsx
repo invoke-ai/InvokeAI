@@ -20,7 +20,6 @@ import {
   MenuList,
   MenuOptionGroup,
   MenuItemOption,
-  IconButton,
 } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -28,8 +27,6 @@ import { useTranslation } from 'react-i18next';
 import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
 import { sessionCanceled } from 'services/thunks/session';
-import { BiChevronDown } from 'react-icons/bi';
-import { FaChevronDown } from 'react-icons/fa';
 import { ChevronDownIcon } from '@chakra-ui/icons';
 
 const cancelButtonSelector = createSelector(

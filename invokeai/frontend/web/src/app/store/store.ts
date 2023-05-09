@@ -1,6 +1,5 @@
 import {
   AnyAction,
-  Store,
   ThunkDispatch,
   combineReducers,
   configureStore,

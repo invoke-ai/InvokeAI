@@ -1,4 +1,4 @@
-import { ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
+import { ChevronUpIcon } from '@chakra-ui/icons';
 import { Box, Collapse, Flex, Spacer, Switch } from '@chakra-ui/react';
 import { PropsWithChildren, memo } from 'react';
 

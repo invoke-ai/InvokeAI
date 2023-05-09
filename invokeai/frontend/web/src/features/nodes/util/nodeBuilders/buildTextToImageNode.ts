@@ -8,7 +8,7 @@ export const buildTxt2ImgNode = (
   overrides: O.Partial<TextToImageInvocation, 'deep'> = {}
 ): TextToImageInvocation => {
   const nodeId = uuidv4();
-  const { generation, models } = state;
+  const { generation } = state;
 
   const {
     prompt,

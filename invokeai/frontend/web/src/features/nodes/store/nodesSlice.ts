@@ -11,7 +11,7 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ColorField, Graph, ImageField } from 'services/api';
+import { ImageField } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';

@@ -3,7 +3,6 @@ import {
   Box,
   Center,
   Flex,
-  Heading,
   IconButton,
   Link,
   Text,
@@ -19,8 +18,6 @@ import {
   setCfgScale,
   setHeight,
   setImg2imgStrength,
-  // setInitialImage,
-  setMaskPath,
   setPerlin,
   setSampler,
   setSeamless,
@@ -31,15 +28,7 @@ import {
   setThreshold,
   setWidth,
 } from 'features/parameters/store/generationSlice';
-import {
-  setCodeformerFidelity,
-  setFacetoolStrength,
-  setFacetoolType,
-  setHiresFix,
-  setUpscalingDenoising,
-  setUpscalingLevel,
-  setUpscalingStrength,
-} from 'features/parameters/store/postprocessingSlice';
+import { setHiresFix } from 'features/parameters/store/postprocessingSlice';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

@@ -1,11 +1,11 @@
-import { UseToastOptions, useToast } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { isFinite, isString } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from './usePrompt';
-import { initialImageChanged, setSeed } from '../store/generationSlice';
-import { isImage, isImageField } from 'services/types/guards';
+import { setSeed } from '../store/generationSlice';
+import { isImageField } from 'services/types/guards';
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { initialImageSelected } from '../store/actions';
 import { Image } from 'app/types/invokeai';

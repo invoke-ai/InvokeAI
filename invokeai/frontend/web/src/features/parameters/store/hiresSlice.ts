@@ -1,6 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { FACETOOL_TYPES } from 'app/constants';
 
 export interface HiresState {
   codeformerFidelity: number;

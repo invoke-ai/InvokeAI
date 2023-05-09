@@ -22,7 +22,7 @@ type InputFieldComponentProps = {
 // build an individual input element based on the schema
 const InputFieldComponent = (props: InputFieldComponentProps) => {
   const { nodeId, field, template } = props;
-  const { type, value } = field;
+  const { type } = field;
 
   if (type === 'string' && template.type === 'string') {
     return (

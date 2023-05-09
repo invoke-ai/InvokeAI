@@ -13,7 +13,7 @@ export const readinessSelector = createSelector(
     initialCanvasImageSelector,
     activeTabNameSelector,
   ],
-  (generation, system, initialCanvasImage, activeTabName) => {
+  (generation, system) => {
     const {
       prompt,
       shouldGenerateVariations,

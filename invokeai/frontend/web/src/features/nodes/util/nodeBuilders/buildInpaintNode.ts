@@ -1,11 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store/store';
-import {
-  Edge,
-  ImageToImageInvocation,
-  InpaintInvocation,
-  TextToImageInvocation,
-} from 'services/api';
+import { InpaintInvocation } from 'services/api';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 import { O } from 'ts-toolbelt';
 
@@ -14,7 +9,7 @@ export const buildInpaintNode = (
   overrides: O.Partial<InpaintInvocation, 'deep'> = {}
 ): InpaintInvocation => {
   const nodeId = uuidv4();
-  const { generation, system, models } = state;
+  const { generation, models } = state;
 
   const { selectedModelName } = models;
 

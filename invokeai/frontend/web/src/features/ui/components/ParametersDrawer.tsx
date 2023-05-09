@@ -1,8 +1,7 @@
-import { isEqual } from 'lodash-es';
 import { createSelector } from '@reduxjs/toolkit';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { PropsWithChildren, memo, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import OverlayScrollable from './common/OverlayScrollable';

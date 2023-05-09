@@ -4,7 +4,7 @@ import * as InvokeAI from 'app/types/invokeai';
 import { useGetUrl } from 'common/util/getUrl';
 
 type ReactPanZoomProps = {
-  image: InvokeAI._Image;
+  image: InvokeAI.Image;
   styleClass?: string;
   alt?: string;
   ref?: React.Ref<HTMLImageElement>;

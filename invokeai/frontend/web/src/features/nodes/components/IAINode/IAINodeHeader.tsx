@@ -1,6 +1,6 @@
 import { Flex, Heading, Tooltip, Icon } from '@chakra-ui/react';
 import { InvocationTemplate } from 'features/nodes/types/types';
-import { memo, MutableRefObject } from 'react';
+import { memo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
 
 interface IAINodeHeaderProps {
