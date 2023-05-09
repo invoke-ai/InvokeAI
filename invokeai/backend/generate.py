@@ -150,7 +150,7 @@ class Generate:
         esrgan=None,
         free_gpu_mem: bool = False,
         safety_checker: bool = False,
-        max_loaded_models: int = 2,
+        max_cache_size: int = 6,
         # these are deprecated; if present they override values in the conf file
         weights=None,
         config=None,
@@ -183,7 +183,7 @@ class Generate:
         self.codeformer = codeformer
         self.esrgan = esrgan
         self.free_gpu_mem = free_gpu_mem
-        self.max_loaded_models = (max_loaded_models,)
+        self.max_cache_size = max_cache_size
         self.size_matters = True  # used to warn once about large image sizes and VRAM
         self.txt2mask = None
         self.safety_checker = None
@@ -220,7 +220,7 @@ class Generate:
             conf,
             self.device,
             torch_dtype(self.device),
-            max_loaded_models=max_loaded_models,
+            max_cache_size=max_cache_size,
             sequential_offload=self.free_gpu_mem,
 #            embedding_path=Path(self.embedding_path),
         )

@@ -361,9 +361,10 @@ class ModelCache(object):
                )->ModelStatus:
         key = self._model_key(
             repo_id_or_path,
-            model_type.value,
             revision,
-            subfolder)
+            subfolder,
+            model_type.value,
+        )
         if key not in self.models:
             return ModelStatus.not_loaded
         if key in self.loaded_models:
@@ -384,9 +385,7 @@ class ModelCache(object):
         :param revision: optional revision string (if fetching a HF repo_id)
         '''
         revision = revision or "main"
-        if self.is_legacy_ckpt(repo_id_or_path):
-            return self._legacy_model_hash(repo_id_or_path)
-        elif Path(repo_id_or_path).is_dir():
+        if Path(repo_id_or_path).is_dir():
             return self._local_model_hash(repo_id_or_path)
         else:
             return self._hf_commit_hash(repo_id_or_path,revision)
@@ -394,15 +393,6 @@ class ModelCache(object):
     def cache_size(self)->float:
         "Return the current size of the cache, in GB"
         return self.current_cache_size / GIG
-
-    @classmethod
-    def is_legacy_ckpt(cls, repo_id_or_path: Union[str,Path])->bool:
-        '''
-        Return true if the indicated path is a legacy checkpoint
-        :param repo_id_or_path: either the HuggingFace repo_id or a Path to a local model
-        '''
-        path = Path(repo_id_or_path)
-        return path.suffix in [".ckpt",".safetensors",".pt"]
 
     @classmethod
     def scan_model(cls, model_name, checkpoint):
@@ -482,16 +472,12 @@ class ModelCache(object):
         '''
         # silence transformer and diffuser warnings
         with SilenceWarnings():
-            # !!! NOTE: conversion should not happen here, but in ModelManager
-            if self.is_legacy_ckpt(repo_id_or_path):
-                model = self._load_ckpt_from_storage(repo_id_or_path, legacy_info)
-            else:
-                model = self._load_diffusers_from_storage(
-                    repo_id_or_path,
-                    subfolder,
-                    revision,
-                    model_class,
-                )
+            model = self._load_diffusers_from_storage(
+                repo_id_or_path,
+                subfolder,
+                revision,
+                model_class,
+            )
             if self.sequential_offload and isinstance(model,StableDiffusionGeneratorPipeline):
                 model.enable_offload_submodels(self.execution_device)
         return model
