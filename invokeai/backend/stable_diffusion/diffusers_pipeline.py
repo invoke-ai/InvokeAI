@@ -647,11 +647,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         if (self.control_model is not None) and (kwargs.get("control_image") is not None):
             control_image = kwargs.get("control_image") # should be a processed tensor derived from the control image(s)
-            control_scale = kwargs.get("control_scale", 1.0)  # control_scale default is 1.0
-            # handling case where using multiple control models but only specifying single control_scale
-            #     so reshape control_scale to match number of control models
-            if isinstance(self.control_model, MultiControlNetModel) and isinstance(control_scale, float):
-                control_scale = [control_scale] * len(self.control_model.nets)
+            control_weight = kwargs.get("control_weight", 1.0)  # control_weight default is 1.0
+            # handling case where using multiple control models but only specifying single control_weight
+            #     so reshape control_weight to match number of control models
+            if isinstance(self.control_model, MultiControlNetModel) and isinstance(control_weight, float):
+                control_weight = [control_weight] * len(self.control_model.nets)
             if conditioning_data.guidance_scale > 1.0:
                 # expand the latents input to control model if doing classifier free guidance
                 #    (which I think for now is always true, there is conditional elsewhere that stops execution if
@@ -660,13 +660,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             else:
                 latent_control_input = latent_model_input
             # controlnet inference
+
+            print("control_weight: ", control_weight)
             down_block_res_samples, mid_block_res_sample = self.control_model(
                 latent_control_input,
                 timestep,
                 encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
                                                  conditioning_data.text_embeddings]),
                 controlnet_cond=control_image,
-                conditioning_scale=control_scale,
+                conditioning_scale=control_weight,
                 return_dict=False,
             )
         else:

@@ -41,7 +41,7 @@ print("testing Txt2Img.generate() with control_image arg")
 outputs = txt2img_canny.generate(
     prompt="old man",
     control_image=canny_image,
-    control_scale=1.0,
+    control_weight=1.0,
     seed=0,
     num_steps=30,
     precision="float16",
