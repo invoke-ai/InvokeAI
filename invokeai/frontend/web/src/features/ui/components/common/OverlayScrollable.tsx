@@ -5,7 +5,7 @@ const OverlayScrollable = (props: PropsWithChildren) => {
   return (
     <OverlayScrollbarsComponent
       defer
-      style={{ height: '100%' }}
+      style={{ height: '100%', width: '100%' }}
       options={{
         scrollbars: {
           visibility: 'auto',

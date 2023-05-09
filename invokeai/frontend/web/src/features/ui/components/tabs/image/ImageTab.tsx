@@ -14,10 +14,10 @@ import ResizeHandle from '../ResizeHandle';
 import ImageTabParameters from './ImageTabParameters';
 import ImageTabImageParameters from './ImageTabImageParameters';
 import TextTabMain from '../text/TextTabMain';
-import InitialImagePreview from 'features/parameters/components/AdvancedParameters/ImageToImage/InitialImagePreview';
-import InitialImageDisplay from 'features/parameters/components/AdvancedParameters/ImageToImage/InitialImageDisplay';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import { ImperativePanelGroupHandle } from 'react-resizable-panels';
+import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
+import InitialImageDisplay from 'features/parameters/components/Parameters/ImageToImage/InitialImageDisplay';
 
 const selector = createSelector(uiSelector, (ui) => {
   const {
@@ -60,19 +60,9 @@ const TextTab = () => {
   return (
     <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       {shouldPinParametersPanel && shouldShowParametersPanel && (
-        <Box
-          sx={{
-            position: 'relative',
-            h: 'full',
-            w: PARAMETERS_PANEL_WIDTH,
-            flexShrink: 0,
-          }}
-        >
+        <ParametersPinnedWrapper>
           <ImageTabParameters />
-          <PinParametersPanelButton
-            sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
-          />
-        </Box>
+        </ParametersPinnedWrapper>
       )}
       <Box sx={{ w: 'full', h: 'full' }}>
         <PanelGroup

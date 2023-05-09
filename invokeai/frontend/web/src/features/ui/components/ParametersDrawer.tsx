@@ -14,10 +14,10 @@ import {
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
 import PinParametersPanelButton from './PinParametersPanelButton';
-import TextTabParametersDrawer from './tabs/text/TextTabParametersDrawer';
 import TextTabParameters from './tabs/text/TextTabParameters';
 import ImageTabParameters from './tabs/image/ImageTabParameters';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';
 
 const selector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],
@@ -59,18 +59,26 @@ const ParametersDrawer = () => {
     }
 
     if (activeTabName === 'unifiedCanvas') {
-      return null;
+      return <UnifiedCanvasParameters />;
     }
+
+    return null;
   }, [activeTabName]);
+
+  if (shouldPinParametersPanel) {
+    return null;
+  }
 
   return (
     <ResizableDrawer
       direction="left"
       isResizable={false}
-      isOpen={shouldShowParametersPanel && !shouldPinParametersPanel}
+      isOpen={shouldShowParametersPanel}
       onClose={handleClosePanel}
     >
-      <Flex flexDir="column" position="relative" h="full" w="full">
+      <Flex
+        sx={{ flexDir: 'column', h: 'full', w: PARAMETERS_PANEL_WIDTH, gap: 2 }}
+      >
         <Flex
           paddingTop={1.5}
           paddingBottom={4}
@@ -81,9 +89,7 @@ const ParametersDrawer = () => {
           <PinParametersPanelButton />
         </Flex>
         <OverlayScrollable>
-          <Box sx={{ h: 'full', w: PARAMETERS_PANEL_WIDTH }}>
-            {drawerContent}
-          </Box>
+          <Flex sx={{ flexDir: 'column', gap: 2 }}>{drawerContent}</Flex>
         </OverlayScrollable>
       </Flex>
     </ResizableDrawer>
