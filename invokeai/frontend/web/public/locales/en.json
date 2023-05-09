@@ -553,6 +553,7 @@
         "downloadImageStarted": "Image Download Started",
         "imageCopied": "Image Copied",
         "imageLinkCopied": "Image Link Copied",
+        "problemCopyingImageLink": "Unable to Copy Image Link",
         "imageNotLoaded": "No Image Loaded",
         "imageNotLoadedDesc": "Could not find image",
         "imageSavedToGallery": "Image Saved to Gallery",

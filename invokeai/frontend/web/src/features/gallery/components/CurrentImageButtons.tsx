@@ -184,13 +184,32 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   // }, [getUrl, t, image?.url, toast]);
 
   const handleCopyImageLink = useCallback(() => {
-    const url = image
-      ? shouldTransformUrls
-        ? getUrl(image.url)
-        : window.location.toString() + image.url
-      : '';
+    const getImageUrl = () => {
+      if (!image) {
+        return;
+      }
+
+      if (shouldTransformUrls) {
+        return getUrl(image.url);
+      }
+
+      if (image.url.startsWith('http')) {
+        return image.url;
+      }
+
+      return window.location.toString() + image.url;
+    };
+
+    const url = getImageUrl();
 
     if (!url) {
+      toast({
+        title: t('toast.problemCopyingImageLink'),
+        status: 'error',
+        duration: 2500,
+        isClosable: true,
+      });
+
       return;
     }
 
