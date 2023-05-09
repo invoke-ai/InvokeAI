@@ -1,4 +1,4 @@
-import { TabPanel } from '@chakra-ui/react';
+import { Box, Flex, TabPanel } from '@chakra-ui/react';
 import { memo } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
@@ -11,6 +11,8 @@ import UnifiedCanvasContent from './UnifiedCanvasContent';
 import ResizeHandle from '../ResizeHandle';
 import UnifiedCanvasParameters from './UnifiedCanvasParameters';
 import UnifiedCanvasContentBeta from './UnifiedCanvasBeta/UnifiedCanvasContentBeta';
+import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
 
 const selector = createSelector(uiSelector, (ui) => {
   const {
@@ -41,42 +43,18 @@ const UnifiedCanvasTab = () => {
   } = useAppSelector(selector);
 
   return (
-    <PanelGroup
-      autoSaveId="canvasTab"
-      direction="horizontal"
-      style={{ height: '100%', width: '100%' }}
-    >
+    <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       {shouldPinParametersPanel && shouldShowParametersPanel && (
-        <>
-          <Panel
-            id="canvasTab_parameters"
-            order={0}
-            defaultSize={30}
-            minSize={20}
-            style={{ position: 'relative' }}
-          >
-            <UnifiedCanvasParameters />
-            <PinParametersPanelButton
-              sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
-            />
-          </Panel>
-          <ResizeHandle />
-        </>
+        <ParametersPinnedWrapper>
+          <UnifiedCanvasParameters />
+        </ParametersPinnedWrapper>
       )}
-      <Panel
-        order={1}
-        minSize={30}
-        onResize={() => {
-          dispatch(requestCanvasRescale());
-        }}
-      >
-        {shouldUseCanvasBetaLayout ? (
-          <UnifiedCanvasContentBeta />
-        ) : (
-          <UnifiedCanvasContent />
-        )}
-      </Panel>
-    </PanelGroup>
+      {shouldUseCanvasBetaLayout ? (
+        <UnifiedCanvasContentBeta />
+      ) : (
+        <UnifiedCanvasContent />
+      )}
+    </Flex>
   );
 };
 

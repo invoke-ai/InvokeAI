@@ -19,8 +19,6 @@ import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
-import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
-import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
 import {
   initialImageChanged,
   setAllParameters,
@@ -69,6 +67,8 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { requestedImageDeletion } from '../store/actions';
+import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
+import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
 
 const currentImageButtonsSelector = createSelector(
   [

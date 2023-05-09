@@ -10,6 +10,7 @@ import TextTabMain from './TextTabMain';
 import ResizeHandle from '../ResizeHandle';
 import TextTabParameters from './TextTabParameters';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
 
 const selector = createSelector(uiSelector, (ui) => {
   const {
@@ -42,19 +43,9 @@ const TextTab = () => {
   return (
     <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       {shouldPinParametersPanel && shouldShowParametersPanel && (
-        <Box
-          sx={{
-            position: 'relative',
-            h: 'full',
-            // w: PARAMETERS_PANEL_WIDTH,
-            flexShrink: 0,
-          }}
-        >
+        <ParametersPinnedWrapper>
           <TextTabParameters />
-          <PinParametersPanelButton
-            sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
-          />
-        </Box>
+        </ParametersPinnedWrapper>
       )}
       <TextTabMain />
     </Flex>

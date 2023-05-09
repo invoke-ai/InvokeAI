@@ -6,7 +6,7 @@ import { setSampler } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamScheduler = () => {
+const ParamSampler = () => {
   const sampler = useAppSelector(
     (state: RootState) => state.generation.sampler
   );
@@ -29,4 +29,4 @@ const ParamScheduler = () => {
   );
 };
 
-export default memo(ParamScheduler);
+export default memo(ParamSampler);
