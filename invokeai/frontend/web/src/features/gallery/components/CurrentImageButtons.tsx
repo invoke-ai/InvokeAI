@@ -61,6 +61,7 @@ import { initialImageSelected } from 'features/parameters/store/actions';
 import { requestedImageDeletion } from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
+import { allParametersSet } from 'features/parameters/store/generationSlice';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -157,7 +158,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const toast = useToast();
   const { t } = useTranslation();
 
-  const { recallPrompt, recallSeed } = useParameters();
+  const { recallPrompt, recallSeed, recallAllParameters } = useParameters();
 
   // const handleCopyImage = useCallback(async () => {
   //   if (!image?.url) {
@@ -228,39 +229,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   }, [dispatch, shouldHidePreview]);
 
   const handleClickUseAllParameters = useCallback(() => {
-    if (!image) return;
-    // selectedImage.metadata &&
-    //   dispatch(setAllParameters(selectedImage.metadata));
-    // if (selectedImage.metadata?.image.type === 'img2img') {
-    //   dispatch(setActiveTab('img2img'));
-    // } else if (selectedImage.metadata?.image.type === 'txt2img') {
-    //   dispatch(setActiveTab('txt2img'));
-    // }
-  }, [image]);
+    recallAllParameters(image);
+  }, [image, recallAllParameters]);
 
   useHotkeys(
     'a',
     () => {
-      const type = image?.metadata?.invokeai?.node?.types;
-      if (isString(type) && ['txt2img', 'img2img'].includes(type)) {
-        handleClickUseAllParameters();
-        toast({
-          title: t('toast.parametersSet'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: t('toast.parametersNotSet'),
-          description: t('toast.parametersNotSetDesc'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickUseAllParameters;
     },
-    [image]
+    [image, recallAllParameters]
   );
 
   const handleUseSeed = useCallback(() => {
@@ -530,8 +507,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={
-              !['txt2img', 'img2img'].includes(
-                image?.metadata?.sd_metadata?.type
+              !['txt2img', 'img2img', 'inpaint'].includes(
+                String(image?.metadata?.invokeai?.node?.type)
               )
             }
             onClick={handleClickUseAllParameters}

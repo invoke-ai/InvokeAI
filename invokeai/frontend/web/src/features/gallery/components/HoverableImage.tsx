@@ -105,7 +105,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const { t } = useTranslation();
   const { isFeatureEnabled: isLightboxEnabled } = useFeatureStatus('lightbox');
-  const { recallSeed, recallPrompt, recallInitialImage } = useParameters();
+  const { recallSeed, recallPrompt, recallInitialImage, recallAllParameters } =
+    useParameters();
 
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
@@ -176,16 +177,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     });
   };
 
-  const handleUseAllParameters = () => {
-    // metadata.invokeai?.node &&
-    //   dispatch(setAllParameters(metadata.invokeai?.node));
-    // toast({
-    //   title: t('toast.parametersSet'),
-    //   status: 'success',
-    //   duration: 2500,
-    //   isClosable: true,
-    // });
-  };
+  const handleUseAllParameters = useCallback(() => {
+    recallAllParameters(image);
+  }, [image, recallAllParameters]);
 
   const handleLightBox = () => {
     // dispatch(setCurrentImage(image));
@@ -239,7 +233,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
               isDisabled={
-                !['txt2img', 'img2img'].includes(
+                !['txt2img', 'img2img', 'inpaint'].includes(
                   String(image?.metadata?.invokeai?.node?.type)
                 )
               }
