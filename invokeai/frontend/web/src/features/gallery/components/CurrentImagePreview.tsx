@@ -60,8 +60,8 @@ const CurrentImagePreview = () => {
         <Image
           onDragStart={handleDragStart}
           src={shouldHidePreview ? undefined : getUrl(image.url)}
-          width={image.metadata.width}
-          height={image.metadata.height}
+          width={image.metadata.width || 'auto'}
+          height={image.metadata.height || 'auto'}
           fallback={shouldHidePreview ? <CurrentImageHidden /> : undefined}
           sx={{
             objectFit: 'contain',
