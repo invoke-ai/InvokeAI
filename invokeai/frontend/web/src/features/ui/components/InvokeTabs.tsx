@@ -1,7 +1,4 @@
 import {
-  Box,
-  ChakraProps,
-  Flex,
   Icon,
   Tab,
   TabList,
@@ -16,38 +13,19 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import {
-  memo,
-  ReactNode,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, ReactNode, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { GoTextSize } from 'react-icons/go';
 import { activeTabIndexSelector } from '../store/uiSelectors';
-import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import NodeEditor from 'features/nodes/components/NodeEditor';
 import { createSelector } from '@reduxjs/toolkit';
-import { BsLightningChargeFill } from 'react-icons/bs';
 import { configSelector } from 'features/system/store/configSelectors';
 import { isEqual } from 'lodash-es';
-import AnimatedImageToImagePanel from 'features/parameters/components/AnimatedImageToImagePanel';
-import Scrollable from './common/Scrollable';
-import TextTabParameters from './tabs/text/TextTabParameters';
-import PinParametersPanelButton from './PinParametersPanelButton';
-import ParametersSlide from './common/ParametersSlide';
-import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { Panel, PanelGroup } from 'react-resizable-panels';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import TextTabMain from './tabs/text/TextTabMain';
-import ParametersPanel from './ParametersPanel';
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import TextTab from './tabs/text/TextTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';

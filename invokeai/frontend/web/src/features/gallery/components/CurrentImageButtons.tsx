@@ -410,7 +410,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         }}
         {...props}
       >
-        <ButtonGroup size="sm" isAttached={true}>
+        <ButtonGroup isAttached={true}>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -497,7 +497,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           )}
         </ButtonGroup>
 
-        <ButtonGroup size="sm" isAttached={true}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
@@ -528,7 +528,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         {(isUpscalingEnabled || isFaceRestoreEnabled) && (
-          <ButtonGroup size="sm" isAttached={true}>
+          <ButtonGroup isAttached={true}>
             {isFaceRestoreEnabled && (
               <IAIPopover
                 triggerComponent={
@@ -593,7 +593,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           </ButtonGroup>
         )}
 
-        <ButtonGroup size="sm" isAttached={true}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
@@ -603,7 +603,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           />
         </ButtonGroup>
 
-        <ButtonGroup size="sm" isAttached={true}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             onClick={handleInitiateDelete}
             icon={<FaTrash />}

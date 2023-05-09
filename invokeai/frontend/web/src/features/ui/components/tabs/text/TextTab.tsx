@@ -1,4 +1,4 @@
-import { Portal, TabPanel } from '@chakra-ui/react';
+import { Box, Flex, Portal, TabPanel } from '@chakra-ui/react';
 import { memo } from 'react';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
@@ -9,6 +9,7 @@ import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvas
 import TextTabMain from './TextTabMain';
 import ResizeHandle from '../ResizeHandle';
 import TextTabParameters from './TextTabParameters';
+import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 
 const selector = createSelector(uiSelector, (ui) => {
   const {
@@ -39,32 +40,24 @@ const TextTab = () => {
   } = useAppSelector(selector);
 
   return (
-    <PanelGroup
-      autoSaveId="textTab"
-      direction="horizontal"
-      style={{ height: '100%', width: '100%' }}
-    >
+    <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       {shouldPinParametersPanel && shouldShowParametersPanel && (
-        <>
-          <Panel
-            id="textTab_parameters"
-            order={0}
-            defaultSize={25}
-            minSize={25}
-            style={{ position: 'relative' }}
-          >
-            <TextTabParameters />
-            <PinParametersPanelButton
-              sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
-            />
-          </Panel>
-          <ResizeHandle />
-        </>
+        <Box
+          sx={{
+            position: 'relative',
+            h: 'full',
+            // w: PARAMETERS_PANEL_WIDTH,
+            flexShrink: 0,
+          }}
+        >
+          <TextTabParameters />
+          <PinParametersPanelButton
+            sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
+          />
+        </Box>
       )}
-      <Panel id="textTab_content" order={2} minSize={30}>
-        <TextTabMain />
-      </Panel>
-    </PanelGroup>
+      <TextTabMain />
+    </Flex>
   );
 };
 

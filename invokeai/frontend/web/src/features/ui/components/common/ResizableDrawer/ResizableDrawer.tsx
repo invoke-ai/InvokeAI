@@ -20,7 +20,6 @@ import {
   getMinMaxDimensions,
   getSlideDirection,
   getStyles,
-  parseAndPadSize,
 } from './util';
 
 type ResizableDrawerProps = ResizableProps & {
@@ -72,7 +71,7 @@ const ResizableDrawer = ({
     () =>
       initialWidth ??
       minWidth ??
-      (['left', 'right'].includes(direction) ? 500 : '100%'),
+      (['left', 'right'].includes(direction) ? 'auto' : '100%'),
     [initialWidth, minWidth, direction]
   );
 
@@ -80,7 +79,7 @@ const ResizableDrawer = ({
     () =>
       initialHeight ??
       minHeight ??
-      (['top', 'bottom'].includes(direction) ? 500 : '100%'),
+      (['top', 'bottom'].includes(direction) ? 'auto' : '100%'),
     [initialHeight, minHeight, direction]
   );
 
@@ -105,18 +104,6 @@ const ResizableDrawer = ({
     () =>
       getMinMaxDimensions({
         direction,
-        // minWidth: isResizable
-        //   ? parseAndPadSize(minWidth, 18)
-        //   : parseAndPadSize(minWidth),
-        // maxWidth: isResizable
-        //   ? parseAndPadSize(maxWidth, 18)
-        //   : parseAndPadSize(maxWidth),
-        // minHeight: isResizable
-        //   ? parseAndPadSize(minHeight, 18)
-        //   : parseAndPadSize(minHeight),
-        // maxHeight: isResizable
-        //   ? parseAndPadSize(maxHeight, 18)
-        //   : parseAndPadSize(maxHeight),
         minWidth,
         maxWidth,
         minHeight,
@@ -154,24 +141,8 @@ const ResizableDrawer = ({
     <Slide
       direction={slideDirection}
       in={isOpen}
-      // unmountOnExit={isPinned}
       motionProps={{ initial: false }}
       style={{ zIndex: 99, width: 'full' }}
-      // {...(isPinned
-      //   ? {
-      //       style: {
-      //         position: undefined,
-      //         left: undefined,
-      //         right: undefined,
-      //         top: undefined,
-      //         bottom: undefined,
-      //         width: undefined,
-      //       },
-      //     }
-      //   : {
-      //       // transition: { enter: { duration: 0.15 }, exit: { duration: 0.15 } },
-      //       style: { zIndex: 99, width: 'full' },
-      //     })}
     >
       <Box
         ref={outsideClickRef}

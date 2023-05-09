@@ -21,6 +21,7 @@ import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/ParamHiresCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
+import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 
 const selector = createSelector(
   uiSelector,
@@ -43,7 +44,6 @@ const TextTabParameters = () => {
           flexDirection: 'column',
           h: 'full',
           w: 'full',
-          position: 'absolute',
         }}
       >
         <ParamPositiveConditioning />
