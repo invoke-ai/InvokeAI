@@ -35,6 +35,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -289,7 +290,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           </Text>
         </Center>
       )}
-      <Flex gap={2} direction="column">
+      <Flex gap={2} direction="column" overflow="auto">
         <Flex gap={2}>
           <Tooltip label="Copy metadata JSON">
             <IconButton
@@ -303,22 +304,19 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           </Tooltip>
           <Text fontWeight="semibold">Metadata JSON:</Text>
         </Flex>
-        <Box
-          sx={{
-            mt: 0,
-            mr: 2,
-            mb: 4,
-            ml: 2,
-            padding: 4,
-            borderRadius: 'base',
-            overflowX: 'scroll',
-            wordBreak: 'break-all',
-            bg: 'whiteAlpha.500',
-            _dark: { bg: 'blackAlpha.500' },
-          }}
-        >
-          <pre>{metadataJSON}</pre>
-        </Box>
+        <OverlayScrollbarsComponent defer>
+          <Box
+            sx={{
+              padding: 4,
+              borderRadius: 'base',
+              bg: 'whiteAlpha.500',
+              _dark: { bg: 'blackAlpha.500' },
+              w: 'max-content',
+            }}
+          >
+            <pre>{metadataJSON}</pre>
+          </Box>
+        </OverlayScrollbarsComponent>
       </Flex>
     </Flex>
   );
