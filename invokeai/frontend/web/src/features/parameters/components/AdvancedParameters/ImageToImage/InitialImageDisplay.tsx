@@ -14,6 +14,8 @@ const InitialImageDisplay = () => {
         borderRadius: 'base',
         alignItems: 'center',
         justifyContent: 'center',
+        bg: 'base.850',
+        p: 4,
       }}
     >
       <Flex

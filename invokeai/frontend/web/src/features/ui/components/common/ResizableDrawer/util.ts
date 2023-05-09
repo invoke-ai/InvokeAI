@@ -164,9 +164,6 @@ const HANDLE_INTERACT_PADDING = '0.75rem';
 
 // Visible padding around handle
 const HANDLE_PADDING = '1rem';
-
-const HANDLE_WIDTH_PINNED = '2px';
-const HANDLE_WIDTH_UNPINNED = '5px';
 const HANDLE_WIDTH = '5px';
 
 // Get the styles for the container and handle. Do not need to handle langDirection here bc we use direction-agnostic CSS
@@ -177,9 +174,9 @@ export const getStyles = ({
   containerStyles: CSSProperties; // technically this could be ChakraProps['sx'], but we cannot use this for HandleStyles so leave it as CSSProperties to be consistent
   handleStyles: HandleStyles;
 } => {
-  if (!isResizable) {
-    return { containerStyles: {}, handleStyles: {} };
-  }
+  // if (!isResizable) {
+  //   return { containerStyles: {}, handleStyles: {} };
+  // }
 
   // Calculate the positioning offset of the handle hitbox so it is centered over the handle
   const handleOffset = `calc((2 * ${HANDLE_INTERACT_PADDING} + ${HANDLE_WIDTH}) / -2)`;
@@ -190,13 +187,15 @@ export const getStyles = ({
         borderBottomWidth: HANDLE_WIDTH,
         paddingBottom: HANDLE_PADDING,
       },
-      handleStyles: {
-        top: {
-          paddingTop: HANDLE_INTERACT_PADDING,
-          paddingBottom: HANDLE_INTERACT_PADDING,
-          bottom: handleOffset,
-        },
-      },
+      handleStyles: isResizable
+        ? {
+            top: {
+              paddingTop: HANDLE_INTERACT_PADDING,
+              paddingBottom: HANDLE_INTERACT_PADDING,
+              bottom: handleOffset,
+            },
+          }
+        : {},
     };
   }
 
@@ -206,13 +205,15 @@ export const getStyles = ({
         borderInlineEndWidth: HANDLE_WIDTH,
         paddingInlineEnd: HANDLE_PADDING,
       },
-      handleStyles: {
-        right: {
-          paddingInlineStart: HANDLE_INTERACT_PADDING,
-          paddingInlineEnd: HANDLE_INTERACT_PADDING,
-          insetInlineEnd: handleOffset,
-        },
-      },
+      handleStyles: isResizable
+        ? {
+            right: {
+              paddingInlineStart: HANDLE_INTERACT_PADDING,
+              paddingInlineEnd: HANDLE_INTERACT_PADDING,
+              insetInlineEnd: handleOffset,
+            },
+          }
+        : {},
     };
   }
 
@@ -222,13 +223,15 @@ export const getStyles = ({
         borderTopWidth: HANDLE_WIDTH,
         paddingTop: HANDLE_PADDING,
       },
-      handleStyles: {
-        bottom: {
-          paddingTop: HANDLE_INTERACT_PADDING,
-          paddingBottom: HANDLE_INTERACT_PADDING,
-          top: handleOffset,
-        },
-      },
+      handleStyles: isResizable
+        ? {
+            bottom: {
+              paddingTop: HANDLE_INTERACT_PADDING,
+              paddingBottom: HANDLE_INTERACT_PADDING,
+              top: handleOffset,
+            },
+          }
+        : {},
     };
   }
 
@@ -238,13 +241,15 @@ export const getStyles = ({
         borderInlineStartWidth: HANDLE_WIDTH,
         paddingInlineStart: HANDLE_PADDING,
       },
-      handleStyles: {
-        left: {
-          paddingInlineStart: HANDLE_INTERACT_PADDING,
-          paddingInlineEnd: HANDLE_INTERACT_PADDING,
-          insetInlineStart: handleOffset,
-        },
-      },
+      handleStyles: isResizable
+        ? {
+            left: {
+              paddingInlineStart: HANDLE_INTERACT_PADDING,
+              paddingInlineEnd: HANDLE_INTERACT_PADDING,
+              insetInlineStart: handleOffset,
+            },
+          }
+        : {},
     };
   }
 
@@ -275,17 +280,4 @@ export const getSlideDirection = (
   }
 
   return 'left';
-};
-
-// Hack to correct the width of panels while pinned and unpinned, due to different padding in pinned vs unpinned
-export const parseAndPadSize = (size?: number, padding?: number) => {
-  if (!size) {
-    return undefined;
-  }
-
-  if (!padding) {
-    return size;
-  }
-
-  return size + padding;
 };

@@ -23,16 +23,11 @@ const InitialImageButtons = () => {
       <Spacer />
       <ButtonGroup>
         <IAIIconButton
-          size="sm"
           icon={<FaUndo />}
           aria-label={t('accessibility.reset')}
           onClick={handleResetInitialImage}
         />
-        <IAIIconButton
-          size="sm"
-          icon={<FaUpload />}
-          aria-label={t('common.upload')}
-        />
+        <IAIIconButton icon={<FaUpload />} aria-label={t('common.upload')} />
       </ButtonGroup>
     </Flex>
   );

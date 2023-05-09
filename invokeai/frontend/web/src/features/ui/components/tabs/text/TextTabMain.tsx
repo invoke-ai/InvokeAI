@@ -9,12 +9,12 @@ const TextTabMain = () => {
         width: '100%',
         height: '100%',
         borderRadius: 'base',
-        // bg: 'base.850',
+        bg: 'base.850',
+        p: 4,
       }}
     >
       <Flex
         sx={{
-          // p: 2,
           width: '100%',
           height: '100%',
         }}

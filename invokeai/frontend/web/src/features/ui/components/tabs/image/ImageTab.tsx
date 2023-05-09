@@ -1,6 +1,10 @@
-import { Portal, TabPanel } from '@chakra-ui/react';
-import { memo } from 'react';
-import { Panel, PanelGroup } from 'react-resizable-panels';
+import { Box, Flex, Portal, TabPanel } from '@chakra-ui/react';
+import { memo, useCallback, useRef } from 'react';
+import {
+  ImperativePanelHandle,
+  Panel,
+  PanelGroup,
+} from 'react-resizable-panels';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
 import { createSelector } from '@reduxjs/toolkit';
 import { uiSelector } from 'features/ui/store/uiSelectors';
@@ -12,6 +16,8 @@ import ImageTabImageParameters from './ImageTabImageParameters';
 import TextTabMain from '../text/TextTabMain';
 import InitialImagePreview from 'features/parameters/components/AdvancedParameters/ImageToImage/InitialImagePreview';
 import InitialImageDisplay from 'features/parameters/components/AdvancedParameters/ImageToImage/InitialImageDisplay';
+import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import { ImperativePanelGroupHandle } from 'react-resizable-panels';
 
 const selector = createSelector(uiSelector, (ui) => {
   const {
@@ -33,6 +39,16 @@ const selector = createSelector(uiSelector, (ui) => {
 
 const TextTab = () => {
   const dispatch = useAppDispatch();
+  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+
+  const handleDoubleClickHandle = useCallback(() => {
+    if (!panelGroupRef.current) {
+      return;
+    }
+
+    panelGroupRef.current.setLayout([50, 50]);
+  }, []);
+
   const {
     shouldPinGallery,
     shouldShowGallery,
@@ -42,36 +58,31 @@ const TextTab = () => {
   } = useAppSelector(selector);
 
   return (
-    <PanelGroup
-      autoSaveId="imageTab"
-      direction="horizontal"
-      style={{ height: '100%', width: '100%' }}
-    >
+    <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       {shouldPinParametersPanel && shouldShowParametersPanel && (
-        <>
-          <Panel
-            id="imageTab_parameters"
-            order={0}
-            defaultSize={25}
-            minSize={25}
-            style={{ position: 'relative' }}
-          >
-            <ImageTabParameters />
-            <PinParametersPanelButton
-              sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
-            />
-          </Panel>
-          <ResizeHandle />
-        </>
+        <Box
+          sx={{
+            position: 'relative',
+            h: 'full',
+            w: PARAMETERS_PANEL_WIDTH,
+            flexShrink: 0,
+          }}
+        >
+          <ImageTabParameters />
+          <PinParametersPanelButton
+            sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
+          />
+        </Box>
       )}
-      <Panel id="imageTab_content" order={1}>
+      <Box sx={{ w: 'full', h: 'full' }}>
         <PanelGroup
-          autoSaveId="imageTab_contentWrapper"
+          ref={panelGroupRef}
+          autoSaveId="imageTab.content"
           direction="horizontal"
           style={{ height: '100%', width: '100%' }}
         >
           <Panel
-            id="imageTab_initImage"
+            id="imageTab.content.initImage"
             order={0}
             defaultSize={50}
             minSize={25}
@@ -79,9 +90,9 @@ const TextTab = () => {
           >
             <InitialImageDisplay />
           </Panel>
-          <ResizeHandle />
+          <ResizeHandle onDoubleClick={handleDoubleClickHandle} />
           <Panel
-            id="imageTab_selectedImage"
+            id="imageTab.content.selectedImage"
             order={1}
             defaultSize={50}
             minSize={25}
@@ -92,8 +103,8 @@ const TextTab = () => {
             <TextTabMain />
           </Panel>
         </PanelGroup>
-      </Panel>
-    </PanelGroup>
+      </Box>
+    </Flex>
   );
 };
 

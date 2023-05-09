@@ -4,7 +4,7 @@ import { memo } from 'react';
 import PinParametersPanelButton from '../../PinParametersPanelButton';
 import { RootState } from 'app/store/store';
 import Scrollable from '../../common/Scrollable';
-import ParametersSlide from '../../common/ParametersSlide';
+import ParametersSlide from '../../ParametersDrawer';
 import UnifiedCanvasParameters from './UnifiedCanvasParameters';
 import UnifiedCanvasContentBeta from './UnifiedCanvasBeta/UnifiedCanvasContentBeta';
 import UnifiedCanvasContent from './UnifiedCanvasContent';
