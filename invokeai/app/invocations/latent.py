@@ -345,6 +345,7 @@ class TextToLatentsInvocation(BaseInvocation):
             conditioning_data=conditioning_data,
             callback=step_callback,
             control_image=control_images,
+            control_weight=control_weights,
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699

@@ -35,8 +35,8 @@ class ControlField(BaseModel):
     # width: Optional[int] = Field(default=None, description="The width of the image in pixels")
     # height: Optional[int] = Field(default=None, description="The height of the image in pixels")
     # mode: Optional[str] = Field(default=None, description="The mode of the image")
-    control_model: Optional[str] = Field(default=None, description="The control model used")
-    control_weight: Optional[float] = Field(default=None, description="The control weight used")
+    control_model: Optional[str] = Field(default=None, description="control model used")
+    control_weight: Optional[float] = Field(default=None, description="weight given to controlnet")
 
     class Config:
         schema_extra = {
@@ -62,7 +62,7 @@ class ControlNetInvocation(BaseInvocation):
     # Inputs
     image: ImageField = Field(default=None, description="image to process")
     control_model: str = Field(default=None, description="control model to use")
-    control_weight: float = Field(default=0.5, ge=0, le=1, description="control weight")
+    control_weight: float = Field(default=0.5, ge=0, le=1, description="weight given to controlnet")
     # TODO: support additional ControlNet parameters (mostly just passthroughs to other nodes with ControlField inputs)
     # begin_step_percent: float = Field(default=0, ge=0, le=1,
     #                                    description="% of total steps at which controlnet is first applied")
@@ -78,7 +78,7 @@ class ControlNetInvocation(BaseInvocation):
             control=ControlField(
                 image=self.image,
                 control_model=self.control_model,
-                control_weight=self.control_weight,
+                control_weight=self.control_weight
             ),
         )
 
