@@ -1,5 +1,10 @@
 import { forEach, size } from 'lodash-es';
-import { ImageField, LatentsField, ConditioningField, ControlField} from 'services/api';
+import {
+  ImageField,
+  LatentsField,
+  ConditioningField,
+  ControlField,
+} from 'services/api';
 
 const OBJECT_TYPESTRING = '[object Object]';
 const STRING_TYPESTRING = '[object String]';
