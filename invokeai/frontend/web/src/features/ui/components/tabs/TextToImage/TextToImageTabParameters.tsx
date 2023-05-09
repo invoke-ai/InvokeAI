@@ -8,15 +8,15 @@ import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/ParamHiresCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
-import TextTabCoreParameters from './TextTabCoreParameters';
+import TextToImageTabCoreParameters from './TextToImageTabCoreParameters';
 
-const TextTabParameters = () => {
+const TextToImageTabParameters = () => {
   return (
     <>
       <ParamPositiveConditioning />
       <ParamNegativeConditioning />
       <ProcessButtons />
-      <TextTabCoreParameters />
+      <TextToImageTabCoreParameters />
       <ParamSeedCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />
@@ -27,4 +27,4 @@ const TextTabParameters = () => {
   );
 };
 
-export default memo(TextTabParameters);
+export default memo(TextToImageTabParameters);

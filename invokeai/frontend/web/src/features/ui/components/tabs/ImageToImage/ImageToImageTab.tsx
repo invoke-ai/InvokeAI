@@ -1,43 +1,16 @@
-import { Box, Flex, Portal, TabPanel } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { memo, useCallback, useRef } from 'react';
-import {
-  ImperativePanelHandle,
-  Panel,
-  PanelGroup,
-} from 'react-resizable-panels';
-import PinParametersPanelButton from '../../PinParametersPanelButton';
-import { createSelector } from '@reduxjs/toolkit';
-import { uiSelector } from 'features/ui/store/uiSelectors';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Panel, PanelGroup } from 'react-resizable-panels';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ResizeHandle from '../ResizeHandle';
-import ImageTabParameters from './ImageTabParameters';
-import ImageTabImageParameters from './ImageTabImageParameters';
-import TextTabMain from '../text/TextTabMain';
-import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import ImageToImageTabParameters from './ImageToImageTabParameters';
+import TextToImageTabMain from '../TextToImage/TextToImageTabMain';
 import { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
 import InitialImageDisplay from 'features/parameters/components/Parameters/ImageToImage/InitialImageDisplay';
 
-const selector = createSelector(uiSelector, (ui) => {
-  const {
-    shouldPinGallery,
-    shouldShowGallery,
-    shouldPinParametersPanel,
-    shouldShowParametersPanel,
-    shouldShowImageParameters,
-  } = ui;
-
-  return {
-    shouldPinGallery,
-    shouldShowGallery,
-    shouldPinParametersPanel,
-    shouldShowParametersPanel,
-    shouldShowImageParameters,
-  };
-});
-
-const TextTab = () => {
+const ImageToImageTab = () => {
   const dispatch = useAppDispatch();
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
 
@@ -49,21 +22,11 @@ const TextTab = () => {
     panelGroupRef.current.setLayout([50, 50]);
   }, []);
 
-  const {
-    shouldPinGallery,
-    shouldShowGallery,
-    shouldPinParametersPanel,
-    shouldShowParametersPanel,
-    shouldShowImageParameters,
-  } = useAppSelector(selector);
-
   return (
     <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
-      {shouldPinParametersPanel && shouldShowParametersPanel && (
-        <ParametersPinnedWrapper>
-          <ImageTabParameters />
-        </ParametersPinnedWrapper>
-      )}
+      <ParametersPinnedWrapper>
+        <ImageToImageTabParameters />
+      </ParametersPinnedWrapper>
       <Box sx={{ w: 'full', h: 'full' }}>
         <PanelGroup
           ref={panelGroupRef}
@@ -90,7 +53,7 @@ const TextTab = () => {
               dispatch(requestCanvasRescale());
             }}
           >
-            <TextTabMain />
+            <TextToImageTabMain />
           </Panel>
         </PanelGroup>
       </Box>
@@ -98,4 +61,4 @@ const TextTab = () => {
   );
 };
 
-export default memo(TextTab);
+export default memo(ImageToImageTab);

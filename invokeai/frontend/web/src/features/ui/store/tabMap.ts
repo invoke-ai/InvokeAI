@@ -1,6 +1,6 @@
 export const tabMap = [
-  'text',
-  'image',
+  'txt2img',
+  'img2img',
   // 'generate',
   'unifiedCanvas',
   'nodes',

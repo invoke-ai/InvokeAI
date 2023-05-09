@@ -14,8 +14,8 @@ import {
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
 import PinParametersPanelButton from './PinParametersPanelButton';
-import TextTabParameters from './tabs/text/TextTabParameters';
-import ImageTabParameters from './tabs/image/ImageTabParameters';
+import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
+import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';
 
@@ -50,12 +50,12 @@ const ParametersDrawer = () => {
   };
 
   const drawerContent = useMemo(() => {
-    if (activeTabName === 'text') {
-      return <TextTabParameters />;
+    if (activeTabName === 'txt2img') {
+      return <TextToImageTabParameters />;
     }
 
-    if (activeTabName === 'image') {
-      return <ImageTabParameters />;
+    if (activeTabName === 'img2img') {
+      return <ImageToImageTabParameters />;
     }
 
     if (activeTabName === 'unifiedCanvas') {

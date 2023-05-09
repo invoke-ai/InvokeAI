@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
 
-const TextTabMain = () => {
+const TextToImageTabMain = () => {
   return (
     <Box
       sx={{
@@ -25,4 +25,4 @@ const TextTabMain = () => {
   );
 };
 
-export default TextTabMain;
+export default TextToImageTabMain;
