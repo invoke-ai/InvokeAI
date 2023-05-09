@@ -26,12 +26,12 @@ import { configSelector } from 'features/system/store/configSelectors';
 import { isEqual } from 'lodash-es';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import TextTab from './tabs/text/TextTab';
+import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';
 import { FaImage } from 'react-icons/fa';
 import ResizeHandle from './tabs/ResizeHandle';
-import ImageTab from './tabs/image/ImageTab';
+import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -41,12 +41,12 @@ export interface InvokeTabInfo {
 
 const tabs: InvokeTabInfo[] = [
   {
-    id: 'text',
+    id: 'txt2img',
     icon: <Icon as={GoTextSize} sx={{ boxSize: 5 }} />,
-    content: <TextTab />,
+    content: <TextToImageTab />,
   },
   {
-    id: 'image',
+    id: 'img2img',
     icon: <Icon as={FaImage} sx={{ boxSize: 5 }} />,
     content: <ImageTab />,
   },

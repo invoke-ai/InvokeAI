@@ -105,11 +105,11 @@ export const uiSlice = createSlice({
       }
     },
     openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
-      if (tabMap[state.activeTab] === 'text') {
+      if (tabMap[state.activeTab] === 'txt2img') {
         state.textTabAccordionState = action.payload;
       }
 
-      if (tabMap[state.activeTab] === 'image') {
+      if (tabMap[state.activeTab] === 'img2img') {
         state.imageTabAccordionState = action.payload;
       }
 

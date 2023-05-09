@@ -61,11 +61,11 @@ export const useGlobalHotkeys = () => {
   });
 
   useHotkeys('1', () => {
-    dispatch(setActiveTab('text'));
+    dispatch(setActiveTab('txt2img'));
   });
 
   useHotkeys('2', () => {
-    dispatch(setActiveTab('image'));
+    dispatch(setActiveTab('img2img'));
   });
 
   useHotkeys('3', () => {

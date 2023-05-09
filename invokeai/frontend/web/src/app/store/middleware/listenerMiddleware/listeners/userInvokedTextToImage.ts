@@ -10,7 +10,7 @@ const moduleLog = log.child({ namespace: 'invoke' });
 export const addUserInvokedTextToImageListener = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof userInvoked> =>
-      userInvoked.match(action) && action.payload === 'text',
+      userInvoked.match(action) && action.payload === 'txt2img',
     effect: (action, { getState, dispatch }) => {
       const state = getState();
 

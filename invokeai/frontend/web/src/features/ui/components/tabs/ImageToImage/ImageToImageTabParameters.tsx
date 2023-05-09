@@ -7,15 +7,15 @@ import ParamVariationCollapse from 'features/parameters/components/Parameters/Va
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
-import ImageTabCoreParameters from './ImageTabCoreParameters';
+import ImageToImageTabCoreParameters from './ImageToImageTabCoreParameters';
 
-const ImageTabParameters = () => {
+const ImageToImageTabParameters = () => {
   return (
     <>
       <ParamPositiveConditioning />
       <ParamNegativeConditioning />
       <ProcessButtons />
-      <ImageTabCoreParameters />
+      <ImageToImageTabCoreParameters />
       <ParamSeedCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />
@@ -25,4 +25,4 @@ const ImageTabParameters = () => {
   );
 };
 
-export default memo(ImageTabParameters);
+export default memo(ImageToImageTabParameters);

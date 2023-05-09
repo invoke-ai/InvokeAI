@@ -1,9 +1,3 @@
-import { memo } from 'react';
-import { Box, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { uiSelector } from 'features/ui/store/uiSelectors';
-import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
@@ -11,8 +5,12 @@ import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidt
 import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
 import ParamSampler from 'features/parameters/components/Parameters/Core/ParamSampler';
 import ModelSelect from 'features/system/components/ModelSelect';
-import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
-import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
+import { Box, Flex } from '@chakra-ui/react';
+import { useAppSelector } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { memo } from 'react';
 
 const selector = createSelector(
   uiSelector,
@@ -24,7 +22,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ImageTabCoreParameters = () => {
+const TextToImageTabCoreParameters = () => {
   const { shouldUseSliders } = useAppSelector(selector);
 
   return (
@@ -44,8 +42,6 @@ const ImageTabCoreParameters = () => {
           <ParamCFGScale />
           <ParamWidth />
           <ParamHeight />
-          <ImageToImageStrength />
-          <ImageToImageFit />
           <Flex gap={3} w="full">
             <Box flexGrow={2}>
               <ParamSampler />
@@ -62,8 +58,6 @@ const ImageTabCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <ParamWidth />
-          <ParamHeight />
           <Flex gap={3} w="full">
             <Box flexGrow={2}>
               <ParamSampler />
@@ -72,12 +66,12 @@ const ImageTabCoreParameters = () => {
               <ModelSelect />
             </Box>
           </Flex>
-          <ImageToImageStrength />
-          <ImageToImageFit />
+          <ParamWidth />
+          <ParamHeight />
         </Flex>
       )}
     </Flex>
   );
 };
 
-export default memo(ImageTabCoreParameters);
+export default memo(TextToImageTabCoreParameters);
