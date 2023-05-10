@@ -12,7 +12,7 @@ from picklescan.scanner import scan_file_path
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from compel.embeddings_provider import BaseTextualInversionManager
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from ldm.invoke.concepts_lib import get_hf_concepts_lib
 
 @dataclass
 class TextualInversion:
@@ -36,7 +36,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         self.tokenizer = tokenizer
         self.text_encoder = text_encoder
         self.full_precision = full_precision
-        self.hf_concepts_library = HuggingFaceConceptsLibrary()
+        self.hf_concepts_library = get_hf_concepts_lib()
         self.trigger_to_sourcefile = dict()
         default_textual_inversions: list[TextualInversion] = []
         self.textual_inversions = default_textual_inversions
