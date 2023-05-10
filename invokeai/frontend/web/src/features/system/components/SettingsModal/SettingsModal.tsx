@@ -23,6 +23,7 @@ import {
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
+  shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
   SystemState,
 } from 'features/system/store/systemSlice';
@@ -49,6 +50,7 @@ const selector = createSelector(
       enableImageDebugging,
       consoleLogLevel,
       shouldLogToConsole,
+      shouldAntialiasProgressImage,
     } = system;
 
     const {
@@ -66,6 +68,7 @@ const selector = createSelector(
       shouldShowProgressInViewer,
       consoleLogLevel,
       shouldLogToConsole,
+      shouldAntialiasProgressImage,
     };
   },
   {
@@ -117,6 +120,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldShowProgressInViewer,
     consoleLogLevel,
     shouldLogToConsole,
+    shouldAntialiasProgressImage,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -201,6 +205,15 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                   isChecked={shouldShowProgressInViewer}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     dispatch(setShouldShowProgressInViewer(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.antialiasProgressImages')}
+                  isChecked={shouldAntialiasProgressImage}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(
+                      shouldAntialiasProgressImageChanged(e.target.checked)
+                    )
                   }
                 />
               </Flex>

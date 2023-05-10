@@ -90,6 +90,7 @@ export interface SystemState {
    */
   infillMethods: InfillMethod[];
   isPersisted: boolean;
+  shouldAntialiasProgressImage: boolean;
 }
 
 export const initialSystemState: SystemState = {
@@ -111,6 +112,7 @@ export const initialSystemState: SystemState = {
   foundModels: null,
   openModel: null,
   progressImage: null,
+  shouldAntialiasProgressImage: false,
   sessionId: null,
   cancelType: 'immediate',
   isCancelScheduled: false,
@@ -260,6 +262,12 @@ export const systemSlice = createSlice({
     },
     shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldLogToConsole = action.payload;
+    },
+    shouldAntialiasProgressImageChanged: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldAntialiasProgressImage = action.payload;
     },
     isPersistedChanged: (state, action: PayloadAction<boolean>) => {
       state.isPersisted = action.payload;
@@ -471,6 +479,7 @@ export const {
   consoleLogLevelChanged,
   shouldLogToConsoleChanged,
   isPersistedChanged,
+  shouldAntialiasProgressImageChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
