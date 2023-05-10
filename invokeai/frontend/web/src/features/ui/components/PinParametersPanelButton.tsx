@@ -1,5 +1,5 @@
 import { Tooltip } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
@@ -33,6 +33,7 @@ const PinParametersPanelButton = (props: PinParametersPanelButtonProps) => {
         icon={shouldPinParametersPanel ? <BsPinAngleFill /> : <BsPinAngle />}
         variant="ghost"
         size="sm"
+        px={{ base: 10, xl: 0 }}
         sx={{
           color: 'base.700',
           _hover: {

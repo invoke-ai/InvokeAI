@@ -1,7 +1,7 @@
 import { HStack } from '@chakra-ui/react';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { setSeed } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';

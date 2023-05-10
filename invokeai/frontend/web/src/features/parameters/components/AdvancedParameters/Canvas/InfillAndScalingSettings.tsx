@@ -1,6 +1,6 @@
 import { VStack } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -18,7 +18,7 @@ import {
   setTileSize,
 } from 'features/parameters/store/generationSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -115,9 +115,7 @@ const InfillAndScalingSettings = () => {
         onChange={handleChangeBoundingBoxScaleMethod}
       />
       <IAISlider
-        isInputDisabled={!isManual}
-        isResetDisabled={!isManual}
-        isSliderDisabled={!isManual}
+        isDisabled={!isManual}
         label={t('parameters.scaledWidth')}
         min={64}
         max={1024}
@@ -132,9 +130,7 @@ const InfillAndScalingSettings = () => {
         handleReset={handleResetScaledWidth}
       />
       <IAISlider
-        isInputDisabled={!isManual}
-        isResetDisabled={!isManual}
-        isSliderDisabled={!isManual}
+        isDisabled={!isManual}
         label={t('parameters.scaledHeight')}
         min={64}
         max={1024}
@@ -155,9 +151,7 @@ const InfillAndScalingSettings = () => {
         onChange={(e) => dispatch(setInfillMethod(e.target.value))}
       />
       <IAISlider
-        isInputDisabled={infillMethod !== 'tile'}
-        isResetDisabled={infillMethod !== 'tile'}
-        isSliderDisabled={infillMethod !== 'tile'}
+        isDisabled={infillMethod !== 'tile'}
         label={t('parameters.tileSize')}
         min={16}
         max={64}

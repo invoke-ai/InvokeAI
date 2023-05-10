@@ -1,5 +1,5 @@
 import traceback
-from threading import Event, Thread
+from threading import Event, Thread, BoundedSemaphore
 
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
@@ -10,8 +10,11 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker_thread: Thread
     __stop_event: Event
     __invoker: Invoker
+    __threadLimit: BoundedSemaphore
 
     def start(self, invoker) -> None:
+        # if we do want multithreading at some point, we could make this configurable
+        self.__threadLimit = BoundedSemaphore(1)
         self.__invoker = invoker
         self.__stop_event = Event()
         self.__invoker_thread = Thread(
@@ -20,7 +23,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
             kwargs=dict(stop_event=self.__stop_event),
         )
         self.__invoker_thread.daemon = (
-            True  # TODO: probably better to just not use threads?
+            True  # TODO: make async and do not use threads
         )
         self.__invoker_thread.start()
 
@@ -29,6 +32,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
     def __process(self, stop_event: Event):
         try:
+            self.__threadLimit.acquire()
             while not stop_event.is_set():
                 queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
                 if not queue_item:  # Probably stopping
@@ -43,10 +47,14 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     queue_item.invocation_id
                 )
 
+                # get the source node id to provide to clients (the prepared node id is not as useful)
+                source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
+
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
                     graph_execution_state_id=graph_execution_state.id,
-                    invocation_id=invocation.id,
+                    node=invocation.dict(),
+                    source_node_id=source_node_id
                 )
 
                 # Invoke
@@ -75,7 +83,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send complete event
                     self.__invoker.services.events.emit_invocation_complete(
                         graph_execution_state_id=graph_execution_state.id,
-                        invocation_id=invocation.id,
+                        node=invocation.dict(),
+                        source_node_id=source_node_id,
                         result=outputs.dict(),
                     )
 
@@ -99,12 +108,13 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
                         graph_execution_state_id=graph_execution_state.id,
-                        invocation_id=invocation.id,
+                        node=invocation.dict(),
+                        source_node_id=source_node_id,
                         error=error,
                     )
 
                     pass
-                
+
                 # Check queue to see if this is canceled, and skip if so
                 if self.__invoker.services.queue.is_canceled(
                     graph_execution_state.id
@@ -121,4 +131,6 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     )
 
         except KeyboardInterrupt:
-            ...  # Log something?
+            pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
+        finally:
+            self.__threadLimit.release()

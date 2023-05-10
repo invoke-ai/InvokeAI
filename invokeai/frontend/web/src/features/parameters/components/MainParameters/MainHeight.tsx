@@ -1,6 +1,6 @@
 import { HEIGHTS } from 'app/constants';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import { setHeight } from 'features/parameters/store/generationSlice';
@@ -19,13 +19,11 @@ export default function MainHeight() {
 
   return shouldUseSliders ? (
     <IAISlider
-      isSliderDisabled={activeTabName === 'unifiedCanvas'}
-      isInputDisabled={activeTabName === 'unifiedCanvas'}
-      isResetDisabled={activeTabName === 'unifiedCanvas'}
+      isDisabled={activeTabName === 'unifiedCanvas'}
       label={t('parameters.height')}
       value={height}
       min={64}
-      step={64}
+      step={8}
       max={2048}
       onChange={(v) => dispatch(setHeight(v))}
       handleReset={() => dispatch(setHeight(512))}

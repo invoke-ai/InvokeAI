@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setFacetoolStrength } from 'features/parameters/store/postprocessingSlice';
 import { useTranslation } from 'react-i18next';
@@ -18,9 +18,7 @@ export default function FaceRestoreStrength() {
 
   return (
     <IAISlider
-      isSliderDisabled={!isGFPGANAvailable}
-      isInputDisabled={!isGFPGANAvailable}
-      isResetDisabled={!isGFPGANAvailable}
+      isDisabled={!isGFPGANAvailable}
       label={t('parameters.strength')}
       step={0.05}
       min={0}

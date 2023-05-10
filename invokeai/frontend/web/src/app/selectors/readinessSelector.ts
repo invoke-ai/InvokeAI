@@ -4,7 +4,7 @@ import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelector
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 export const readinessSelector = createSelector(
   [
@@ -20,6 +20,7 @@ export const readinessSelector = createSelector(
       seedWeights,
       initialImage,
       seed,
+      isImageToImageEnabled,
     } = generation;
 
     const { isProcessing, isConnected } = system;
@@ -33,7 +34,7 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('Missing prompt');
     }
 
-    if (activeTabName === 'img2img' && !initialImage) {
+    if (isImageToImageEnabled && !initialImage) {
       isReady = false;
       reasonsWhyNotReady.push('No initial image selected');
     }

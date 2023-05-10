@@ -1,9 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
-import { AddNewModelType, UIState } from './uiTypes';
+import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
 
-const initialtabsState: UIState = {
+const initialUIState: UIState = {
   activeTab: 0,
   currentTheme: 'dark',
   parametersPanelScrollPosition: 0,
@@ -17,20 +18,22 @@ const initialtabsState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
+  openLinearAccordionItems: [],
+  openGenerateAccordionItems: [],
+  openUnifiedCanvasAccordionItems: [],
+  floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
+  shouldShowProgressImages: false,
+  shouldAutoShowProgressImages: false,
 };
 
-const initialState: UIState = initialtabsState;
+const initialState: UIState = initialUIState;
 
 export const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
     setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
-      if (typeof action.payload === 'number') {
-        state.activeTab = action.payload;
-      } else {
-        state.activeTab = tabMap.indexOf(action.payload);
-      }
+      setActiveTabReducer(state, action.payload);
     },
     setCurrentTheme: (state, action: PayloadAction<string>) => {
       state.currentTheme = action.payload;
@@ -96,6 +99,39 @@ export const uiSlice = createSlice({
         state.shouldShowParametersPanel = true;
       }
     },
+    openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
+      if (tabMap[state.activeTab] === 'generate') {
+        state.openGenerateAccordionItems = action.payload;
+      }
+
+      if (tabMap[state.activeTab] === 'unifiedCanvas') {
+        state.openUnifiedCanvasAccordionItems = action.payload;
+      }
+    },
+    floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {
+      state.floatingProgressImageRect = {
+        ...state.floatingProgressImageRect,
+        ...action.payload,
+      };
+    },
+    floatingProgressImageResized: (
+      state,
+      action: PayloadAction<Partial<Rect>>
+    ) => {
+      state.floatingProgressImageRect = {
+        ...state.floatingProgressImageRect,
+        ...action.payload,
+      };
+    },
+    setShouldShowProgressImages: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowProgressImages = action.payload;
+    },
+    setShouldAutoShowProgressImages: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldAutoShowProgressImages = action.payload;
+    },
   },
 });
 
@@ -118,6 +154,11 @@ export const {
   togglePinParametersPanel,
   toggleParametersPanel,
   toggleGalleryPanel,
+  openAccordionItemsChanged,
+  floatingProgressImageMoved,
+  floatingProgressImageResized,
+  setShouldShowProgressImages,
+  setShouldAutoShowProgressImages,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

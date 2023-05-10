@@ -1,4 +1,4 @@
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 
@@ -37,7 +37,7 @@ export type CanvasImage = {
   y: number;
   width: number;
   height: number;
-  image: InvokeAI.Image;
+  image: InvokeAI._Image;
 };
 
 export type CanvasMaskLine = {
@@ -125,7 +125,7 @@ export interface CanvasState {
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
-  intermediateImage?: InvokeAI.Image;
+  intermediateImage?: InvokeAI._Image;
   isCanvasInitialized: boolean;
   isDrawing: boolean;
   isMaskEnabled: boolean;

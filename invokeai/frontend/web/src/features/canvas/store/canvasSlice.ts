@@ -1,12 +1,12 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
 import { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash';
+import { clamp, cloneDeep } from 'lodash-es';
 //
 import { RgbaColor } from 'react-colorful';
 import calculateCoordinates from '../util/calculateCoordinates';
@@ -156,7 +156,7 @@ export const canvasSlice = createSlice({
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
     },
-    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI._Image>) => {
       const image = action.payload;
       const { stageDimensions } = state;
 
@@ -291,7 +291,7 @@ export const canvasSlice = createSlice({
       state,
       action: PayloadAction<{
         boundingBox: IRect;
-        image: InvokeAI.Image;
+        image: InvokeAI._Image;
       }>
     ) => {
       const { boundingBox, image } = action.payload;

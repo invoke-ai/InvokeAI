@@ -5,21 +5,21 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 import torch
 
-from invokeai.app.models.exceptions import CanceledException
-from invokeai.app.invocations.util.get_model import choose_model
-from invokeai.app.util.step_callback import diffusers_step_callback_adapter
+from invokeai.app.invocations.util.choose_model import choose_model
+
+from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
-from ...backend.prompting.conditioning import get_uc_and_c_and_ec
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
 from ..services.image_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
+from .image import ImageField, ImageOutput, build_image_output
+from .compel import ConditioningField
 from ...backend.stable_diffusion import PipelineIntermediateState
 from diffusers.schedulers import SchedulerMixin as Scheduler
 import diffusers
@@ -31,6 +31,8 @@ class LatentsField(BaseModel):
 
     latents_name: Optional[str] = Field(default=None, description="The name of the latents")
 
+    class Config:
+        schema_extra = {"required": ["latents_name"]}
 
 class LatentsOutput(BaseInvocationOutput):
     """Base class for invocations that output latents"""
@@ -111,8 +113,8 @@ class NoiseInvocation(BaseInvocation):
 
     # Inputs
     seed:        int = Field(ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", default_factory=random_seed)
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting noise", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
+    width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting noise", )
+    height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting noise", )
 
 
     # Schema customisation
@@ -136,19 +138,16 @@ class NoiseInvocation(BaseInvocation):
 
 # Text to image
 class TextToLatentsInvocation(BaseInvocation):
-    """Generates latents from a prompt."""
+    """Generates latents from conditionings."""
 
     type: Literal["t2l"] = "t2l"
 
     # Inputs
-    # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
-    prompt: Optional[str] = Field(description="The prompt to generate an image from")
-    seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
+    positive_conditioning: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
+    negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
@@ -170,21 +169,14 @@ class TextToLatentsInvocation(BaseInvocation):
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
-        self, context: InvocationContext, intermediate_state: PipelineIntermediateState
+        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
     ) -> None:
-        if (context.services.queue.is_canceled(context.graph_execution_state_id)):
-            raise CanceledException
-
-        step = intermediate_state.step
-        if intermediate_state.predicted_original is not None:
-            # Some schedulers report not only the noisy latents at the current timestep,
-            # but also their estimate so far of what the de-noised latents will be.
-            sample = intermediate_state.predicted_original
-        else:
-            sample = intermediate_state.latents
-
-        diffusers_step_callback_adapter(sample, step, steps=self.steps, id=self.id, context=context)
-
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            node=self.dict(),
+            source_node_id=source_node_id,
+        )
 
     def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
         model_info = choose_model(model_manager, self.model)
@@ -211,8 +203,10 @@ class TextToLatentsInvocation(BaseInvocation):
         return model
 
 
-    def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
+    def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
+        c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
+        uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
+
         conditioning_data = ConditioningData(
             uc,
             c,
@@ -231,11 +225,15 @@ class TextToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state)
+            self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        conditioning_data = self.get_conditioning_data(context, model)
 
         # TODO: Verify the noise is the right size
 
@@ -281,8 +279,12 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         noise = context.services.latents.get(self.noise.latents_name)
         latent = context.services.latents.get(self.latents.latents_name)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state)
+            self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(model)
@@ -355,7 +357,79 @@ class LatentsToImageInvocation(BaseInvocation):
             image_name = context.services.images.create_name(
                 context.graph_execution_state_id, self.id
             )
-            context.services.images.save(image_type, image_name, image)
-            return ImageOutput(
-                image=ImageField(image_type=image_type, image_name=image_name)
+
+            metadata = context.services.metadata.build_metadata(
+                session_id=context.graph_execution_state_id, node=self
             )
+
+            torch.cuda.empty_cache()
+
+            context.services.images.save(image_type, image_name, image, metadata)
+            return build_image_output(
+                image_type=image_type, image_name=image_name, image=image
+            )
+
+
+LATENTS_INTERPOLATION_MODE = Literal[
+    "nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"
+]
+
+
+class ResizeLatentsInvocation(BaseInvocation):
+    """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
+
+    type: Literal["lresize"] = "lresize"
+
+    # Inputs
+    latents: Optional[LatentsField]             = Field(description="The latents to resize")
+    width: int                                  = Field(ge=64, multiple_of=8, description="The width to resize to (px)")
+    height: int                                 = Field(ge=64, multiple_of=8, description="The height to resize to (px)")
+    mode: Optional[LATENTS_INTERPOLATION_MODE]  = Field(default="bilinear", description="The interpolation mode")
+    antialias: Optional[bool]                   = Field(default=False, description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents = context.services.latents.get(self.latents.latents_name)
+
+        resized_latents = torch.nn.functional.interpolate(
+            latents,
+            size=(self.height // 8, self.width // 8),
+            mode=self.mode,
+            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.set(name, resized_latents)
+        return LatentsOutput(latents=LatentsField(latents_name=name))
+
+
+class ScaleLatentsInvocation(BaseInvocation):
+    """Scales latents by a given factor."""
+
+    type: Literal["lscale"] = "lscale"
+
+    # Inputs
+    latents: Optional[LatentsField]             = Field(description="The latents to scale")
+    scale_factor: float                         = Field(gt=0, description="The factor by which to scale the latents")
+    mode: Optional[LATENTS_INTERPOLATION_MODE]  = Field(default="bilinear", description="The interpolation mode")
+    antialias: Optional[bool]                   = Field(default=False, description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents = context.services.latents.get(self.latents.latents_name)
+
+        # resizing
+        resized_latents = torch.nn.functional.interpolate(
+            latents,
+            scale_factor=self.scale_factor,
+            mode=self.mode,
+            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.set(name, resized_latents)
+        return LatentsOutput(latents=LatentsField(latents_name=name))

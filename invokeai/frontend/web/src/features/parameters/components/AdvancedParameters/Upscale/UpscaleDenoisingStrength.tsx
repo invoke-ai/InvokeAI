@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setUpscalingDenoising } from 'features/parameters/store/postprocessingSlice';
 import { useTranslation } from 'react-i18next';
@@ -30,9 +30,7 @@ export default function UpscaleDenoisingStrength() {
       withSliderMarks
       withInput
       withReset
-      isSliderDisabled={!isESRGANAvailable}
-      isInputDisabled={!isESRGANAvailable}
-      isResetDisabled={!isESRGANAvailable}
+      isDisabled={!isESRGANAvailable}
     />
   );
 }

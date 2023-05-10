@@ -1,5 +1,5 @@
-import type { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import type { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setCodeformerFidelity } from 'features/parameters/store/postprocessingSlice';
 import { useTranslation } from 'react-i18next';
@@ -18,9 +18,7 @@ export default function CodeformerFidelity() {
 
   return (
     <IAISlider
-      isSliderDisabled={!isGFPGANAvailable}
-      isInputDisabled={!isGFPGANAvailable}
-      isResetDisabled={!isGFPGANAvailable}
+      isDisabled={!isGFPGANAvailable}
       label={t('parameters.codeformerFidelity')}
       step={0.05}
       min={0}

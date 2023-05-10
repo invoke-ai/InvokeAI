@@ -1,16 +1,17 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal
+from typing import Literal, Optional
 
-import cv2 as cv
 import numpy as np
 import numpy.random
-from PIL import Image, ImageOps
 from pydantic import Field
 
-from ..services.image_storage import ImageType
-from .baseinvocation import BaseInvocation, InvocationContext, BaseInvocationOutput
-from .image import ImageField, ImageOutput
+from .baseinvocation import (
+    BaseInvocation,
+    InvocationConfig,
+    InvocationContext,
+    BaseInvocationOutput,
+)
 
 
 class IntCollectionOutput(BaseInvocationOutput):
@@ -33,7 +34,9 @@ class RangeInvocation(BaseInvocation):
     step: int = Field(default=1, description="The step of the range")
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
-        return IntCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
+        return IntCollectionOutput(
+            collection=list(range(self.start, self.stop, self.step))
+        )
 
 
 class RandomRangeInvocation(BaseInvocation):
@@ -43,8 +46,19 @@ class RandomRangeInvocation(BaseInvocation):
 
     # Inputs
     low: int = Field(default=0, description="The inclusive low value")
-    high: int = Field(default=np.iinfo(np.int32).max, description="The exclusive high value")
+    high: int = Field(
+        default=np.iinfo(np.int32).max, description="The exclusive high value"
+    )
     size: int = Field(default=1, description="The number of values to generate")
+    seed: Optional[int] = Field(
+        ge=0,
+        le=np.iinfo(np.int32).max,
+        description="The seed for the RNG",
+        default_factory=lambda: numpy.random.randint(0, np.iinfo(np.int32).max),
+    )
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
-        return IntCollectionOutput(collection=list(numpy.random.randint(self.low, self.high, size=self.size)))
+        rng = np.random.default_rng(self.seed)
+        return IntCollectionOutput(
+            collection=list(rng.integers(low=self.low, high=self.high, size=self.size))
+        )

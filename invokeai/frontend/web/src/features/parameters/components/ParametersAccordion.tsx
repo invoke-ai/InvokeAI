@@ -1,63 +1,84 @@
 import { Accordion } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setOpenAccordions } from 'features/system/store/systemSlice';
-import { ReactElement } from 'react';
-import InvokeAccordionItem, {
-  InvokeAccordionItemProps,
-} from './AccordionItems/InvokeAccordionItem';
+import { createSelector } from '@reduxjs/toolkit';
+import { Feature } from 'app/features';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { tabMap } from 'features/ui/store/tabMap';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { openAccordionItemsChanged } from 'features/ui/store/uiSlice';
+import { map } from 'lodash-es';
+import { ReactNode, useCallback } from 'react';
+import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 
-type ParametersAccordionType = {
-  [parametersAccordionKey: string]: InvokeAccordionItemProps;
+const parametersAccordionSelector = createSelector([uiSelector], (uiSlice) => {
+  const {
+    activeTab,
+    openLinearAccordionItems,
+    openUnifiedCanvasAccordionItems,
+  } = uiSlice;
+
+  let openAccordions: number[] = [];
+
+  if (tabMap[activeTab] === 'generate') {
+    openAccordions = openLinearAccordionItems;
+  }
+
+  if (tabMap[activeTab] === 'unifiedCanvas') {
+    openAccordions = openUnifiedCanvasAccordionItems;
+  }
+
+  return {
+    openAccordions,
+  };
+});
+
+export type ParametersAccordionItem = {
+  name: string;
+  header: string;
+  content: ReactNode;
+  feature?: Feature;
+  additionalHeaderComponents?: ReactNode;
 };
 
-type ParametersAccordionsType = {
-  accordionInfo: ParametersAccordionType;
+export type ParametersAccordionItems = {
+  [parametersAccordionKey: string]: ParametersAccordionItem;
+};
+
+type ParametersAccordionProps = {
+  accordionItems: ParametersAccordionItems;
 };
 
 /**
  * Main container for generation and processing parameters.
  */
-const ParametersAccordion = (props: ParametersAccordionsType) => {
-  const { accordionInfo } = props;
-
-  const openAccordions = useAppSelector(
-    (state: RootState) => state.system.openAccordions
-  );
+const ParametersAccordion = ({ accordionItems }: ParametersAccordionProps) => {
+  const { openAccordions } = useAppSelector(parametersAccordionSelector);
 
   const dispatch = useAppDispatch();
 
-  /**
-   * Stores accordion state in redux so preferred UI setup is retained.
-   */
-  const handleChangeAccordionState = (openAccordions: number | number[]) =>
-    dispatch(setOpenAccordions(openAccordions));
-
-  const renderAccordions = () => {
-    const accordionsToRender: ReactElement[] = [];
-    if (accordionInfo) {
-      Object.keys(accordionInfo).forEach((key) => {
-        const { header, feature, content, additionalHeaderComponents } =
-          accordionInfo[key];
-        accordionsToRender.push(
-          <InvokeAccordionItem
-            key={key}
-            header={header}
-            feature={feature}
-            content={content}
-            additionalHeaderComponents={additionalHeaderComponents}
-          />
-        );
-      });
-    }
-    return accordionsToRender;
+  const handleChangeAccordionState = (openAccordions: number | number[]) => {
+    dispatch(
+      openAccordionItemsChanged(
+        Array.isArray(openAccordions) ? openAccordions : [openAccordions]
+      )
+    );
   };
+
+  // Render function for accordion items
+  const renderAccordionItems = useCallback(
+    () =>
+      map(accordionItems, (accordionItem) => (
+        <InvokeAccordionItem
+          key={accordionItem.name}
+          accordionItem={accordionItem}
+        />
+      )),
+    [accordionItems]
+  );
 
   return (
     <Accordion
       defaultIndex={openAccordions}
       allowMultiple
-      reduceMotion
       onChange={handleChangeAccordionState}
       sx={{
         display: 'flex',
@@ -65,7 +86,7 @@ const ParametersAccordion = (props: ParametersAccordionsType) => {
         gap: 2,
       }}
     >
-      {renderAccordions()}
+      {renderAccordionItems()}
     </Accordion>
   );
 };

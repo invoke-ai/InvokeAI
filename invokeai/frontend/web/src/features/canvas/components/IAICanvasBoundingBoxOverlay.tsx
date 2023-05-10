@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
-import { isEqual } from 'lodash';
+import { useAppSelector } from 'app/store/storeHooks';
+import { isEqual } from 'lodash-es';
 
 import { Group, Rect } from 'react-konva';
 import { canvasSelector } from '../store/canvasSelectors';

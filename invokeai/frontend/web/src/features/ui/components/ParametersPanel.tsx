@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
 import { memo, ReactNode } from 'react';
 
@@ -17,8 +17,9 @@ import PinParametersPanelButton from './PinParametersPanelButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import useResolution from 'common/hooks/useResolution';
 
 const parametersPanelSelector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],
@@ -58,6 +59,8 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
     dispatch(setShouldShowParametersPanel(false));
   };
 
+  const resolution = useResolution();
+
   useHotkeys(
     'o',
     () => {
@@ -88,22 +91,16 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
     },
     []
   );
-  return (
-    <ResizableDrawer
-      direction="left"
-      isResizable={isResizable || !shouldPinParametersPanel}
-      isOpen={shouldShowParametersPanel}
-      onClose={closeParametersPanel}
-      isPinned={shouldPinParametersPanel || isLightboxOpen}
-      sx={{
-        borderColor: 'base.700',
-        p: shouldPinParametersPanel ? 0 : 4,
-        bg: 'base.900',
-      }}
-      initialWidth={PARAMETERS_PANEL_WIDTH}
-      minWidth={PARAMETERS_PANEL_WIDTH}
-    >
-      <Flex flexDir="column" position="relative" h="full" w="full">
+
+  const parametersPanelContent = () => {
+    return (
+      <Flex
+        flexDir="column"
+        position="relative"
+        h={{ base: 600, xl: 'full' }}
+        w={{ sm: 'full', lg: '100vw', xl: 'full' }}
+        paddingRight={{ base: 8, xl: 0 }}
+      >
         {!shouldPinParametersPanel && (
           <Flex
             paddingTop={1.5}
@@ -112,18 +109,47 @@ const ParametersPanel = ({ children }: ParametersPanelProps) => {
             alignItems="center"
           >
             <InvokeAILogoComponent />
-            <PinParametersPanelButton />
+            {resolution == 'desktop' && <PinParametersPanelButton />}
           </Flex>
         )}
         <Scrollable>{children}</Scrollable>
-        {shouldPinParametersPanel && (
+        {shouldPinParametersPanel && resolution == 'desktop' && (
           <PinParametersPanelButton
             sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
           />
         )}
       </Flex>
-    </ResizableDrawer>
-  );
+    );
+  };
+
+  const resizableParametersPanelContent = () => {
+    return (
+      <ResizableDrawer
+        direction="left"
+        isResizable={isResizable || !shouldPinParametersPanel}
+        isOpen={shouldShowParametersPanel}
+        onClose={closeParametersPanel}
+        isPinned={shouldPinParametersPanel || isLightboxOpen}
+        sx={{
+          borderColor: 'base.700',
+          p: shouldPinParametersPanel ? 0 : 4,
+          bg: 'base.900',
+        }}
+        initialWidth={PARAMETERS_PANEL_WIDTH}
+        minWidth={PARAMETERS_PANEL_WIDTH}
+      >
+        {parametersPanelContent()}
+      </ResizableDrawer>
+    );
+  };
+
+  const renderParametersPanel = () => {
+    if (['mobile', 'tablet'].includes(resolution))
+      return parametersPanelContent();
+    return resizableParametersPanelContent();
+  };
+
+  return renderParametersPanel();
 };
 
 export default memo(ParametersPanel);

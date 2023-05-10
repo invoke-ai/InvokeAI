@@ -18,6 +18,7 @@ from compel.prompt_parser import (
     PromptParser,
 )
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.globals import Globals
 
 from ..stable_diffusion import InvokeAIDiffuserComponent
@@ -162,8 +163,8 @@ def log_tokenization(
     negative_prompt: Union[Blend, FlattenedPrompt],
     tokenizer,
 ):
-    print(f"\n>> [TOKENLOG] Parsed Prompt: {positive_prompt}")
-    print(f"\n>> [TOKENLOG] Parsed Negative Prompt: {negative_prompt}")
+    logger.info(f"[TOKENLOG] Parsed Prompt: {positive_prompt}")
+    logger.info(f"[TOKENLOG] Parsed Negative Prompt: {negative_prompt}")
 
     log_tokenization_for_prompt_object(positive_prompt, tokenizer)
     log_tokenization_for_prompt_object(
@@ -237,12 +238,12 @@ def log_tokenization_for_text(text, tokenizer, display_label=None, truncate_if_t
             usedTokens += 1
 
     if usedTokens > 0:
-        print(f'\n>> [TOKENLOG] Tokens {display_label or ""} ({usedTokens}):')
-        print(f"{tokenized}\x1b[0m")
+        logger.info(f'[TOKENLOG] Tokens {display_label or ""} ({usedTokens}):')
+        logger.debug(f"{tokenized}\x1b[0m")
 
     if discarded != "":
-        print(f"\n>> [TOKENLOG] Tokens Discarded ({totalTokens - usedTokens}):")
-        print(f"{discarded}\x1b[0m")
+        logger.info(f"[TOKENLOG] Tokens Discarded ({totalTokens - usedTokens}):")
+        logger.debug(f"{discarded}\x1b[0m")
 
 
 def try_parse_legacy_blend(text: str, skip_normalize: bool = False) -> Optional[Blend]:
@@ -295,8 +296,8 @@ def split_weighted_subprompts(text, skip_normalize=False) -> list:
         return parsed_prompts
     weight_sum = sum(map(lambda x: x[1], parsed_prompts))
     if weight_sum == 0:
-        print(
-            "* Warning: Subprompt weights add up to zero. Discarding and using even weights instead."
+        logger.warning(
+            "Subprompt weights add up to zero. Discarding and using even weights instead."
         )
         equal_weight = 1 / max(len(parsed_prompts), 1)
         return [(x[0], equal_weight) for x in parsed_prompts]

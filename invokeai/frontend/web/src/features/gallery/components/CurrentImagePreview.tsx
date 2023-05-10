@@ -1,28 +1,27 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
-import { APP_METADATA_HEIGHT } from 'theme/util/constants';
+import { isEqual } from 'lodash-es';
 
-import { gallerySelector } from '../store/gallerySelectors';
+import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageFallback from './CurrentImageFallback';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
+import { memo } from 'react';
 
 export const imagesSelector = createSelector(
-  [gallerySelector, uiSelector],
-  (gallery: GalleryState, ui) => {
-    const { currentImage, intermediateImage } = gallery;
+  [uiSelector, selectedImageSelector, systemSelector],
+  (ui, selectedImage, system) => {
     const { shouldShowImageDetails, shouldHidePreview } = ui;
 
     return {
-      imageToDisplay: intermediateImage ? intermediateImage : currentImage,
-      isIntermediate: Boolean(intermediateImage),
       shouldShowImageDetails,
       shouldHidePreview,
+      image: selectedImage,
     };
   },
   {
@@ -32,13 +31,10 @@ export const imagesSelector = createSelector(
   }
 );
 
-export default function CurrentImagePreview() {
-  const {
-    shouldShowImageDetails,
-    imageToDisplay,
-    isIntermediate,
-    shouldHidePreview,
-  } = useAppSelector(imagesSelector);
+const CurrentImagePreview = () => {
+  const { shouldShowImageDetails, image, shouldHidePreview } =
+    useAppSelector(imagesSelector);
+  const { getUrl } = useGetUrl();
 
   return (
     <Flex
@@ -50,31 +46,23 @@ export default function CurrentImagePreview() {
         height: '100%',
       }}
     >
-      {imageToDisplay && (
+      {image && (
         <Image
-          src={shouldHidePreview ? undefined : imageToDisplay.url}
-          width={imageToDisplay.width}
-          height={imageToDisplay.height}
-          fallback={
-            shouldHidePreview ? (
-              <CurrentImageHidden />
-            ) : !isIntermediate ? (
-              <CurrentImageFallback />
-            ) : undefined
-          }
+          src={shouldHidePreview ? undefined : getUrl(image.url)}
+          width={image.metadata.width}
+          height={image.metadata.height}
+          fallback={shouldHidePreview ? <CurrentImageHidden /> : undefined}
           sx={{
             objectFit: 'contain',
             maxWidth: '100%',
             maxHeight: '100%',
             height: 'auto',
             position: 'absolute',
-            imageRendering: isIntermediate ? 'pixelated' : 'initial',
             borderRadius: 'base',
           }}
         />
       )}
-      {!shouldShowImageDetails && <NextPrevImageButtons />}
-      {shouldShowImageDetails && imageToDisplay && (
+      {shouldShowImageDetails && image && 'metadata' in image && (
         <Box
           sx={{
             position: 'absolute',
@@ -83,12 +71,14 @@ export default function CurrentImagePreview() {
             height: '100%',
             borderRadius: 'base',
             overflow: 'scroll',
-            maxHeight: APP_METADATA_HEIGHT,
           }}
         >
-          <ImageMetadataViewer image={imageToDisplay} />
+          <ImageMetadataViewer image={image} />
         </Box>
       )}
+      {!shouldShowImageDetails && <NextPrevImageButtons />}
     </Flex>
   );
-}
+};
+
+export default memo(CurrentImagePreview);

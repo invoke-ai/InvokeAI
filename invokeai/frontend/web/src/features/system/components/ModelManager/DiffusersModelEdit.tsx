@@ -4,18 +4,18 @@ import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import { useEffect, useState } from 'react';
 
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
 import { Flex, FormControl, FormLabel, Text, VStack } from '@chakra-ui/react';
 
-import { addNewModel } from 'app/socketio/actions';
+// import { addNewModel } from 'app/socketio/actions';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { InvokeDiffusersModelConfigProps } from 'app/invokeai';
-import type { RootState } from 'app/store';
-import { isEqual, pickBy } from 'lodash';
+import type { InvokeDiffusersModelConfigProps } from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
+import { isEqual, pickBy } from 'lodash-es';
 import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
 import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
 import IAIForm from 'common/components/IAIForm';

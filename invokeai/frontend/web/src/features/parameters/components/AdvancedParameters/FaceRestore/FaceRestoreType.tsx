@@ -1,6 +1,6 @@
 import { FACETOOL_TYPES } from 'app/constants';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import {
   FacetoolType,

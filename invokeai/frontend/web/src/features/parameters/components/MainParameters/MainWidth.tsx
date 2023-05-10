@@ -1,6 +1,6 @@
 import { WIDTHS } from 'app/constants';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import { setWidth } from 'features/parameters/store/generationSlice';
@@ -19,12 +19,10 @@ export default function MainWidth() {
 
   return shouldUseSliders ? (
     <IAISlider
-      isSliderDisabled={activeTabName === 'unifiedCanvas'}
-      isInputDisabled={activeTabName === 'unifiedCanvas'}
-      isResetDisabled={activeTabName === 'unifiedCanvas'}
+      isDisabled={activeTabName === 'unifiedCanvas'}
       label={t('parameters.width')}
       value={width}
-      min={64}
+      min={8}
       step={64}
       max={2048}
       onChange={(v) => dispatch(setWidth(v))}

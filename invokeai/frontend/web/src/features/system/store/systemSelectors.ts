@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { isEqual, reduce, pickBy } from 'lodash';
+import { RootState } from 'app/store/store';
+import { isEqual, reduce, pickBy } from 'lodash-es';
 
 export const systemSelector = (state: RootState) => state.system;
 

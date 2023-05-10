@@ -1,7 +1,7 @@
 import { ThemeOverride } from '@chakra-ui/react';
 import type { StyleFunctionProps } from '@chakra-ui/styled-system';
 
-import { invokeAIThemeColors } from './colors/invokeAI';
+import { invokeAIThemeColors } from 'theme/colors/invokeAI';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
 import { checkboxTheme } from './components/checkbox';
@@ -29,7 +29,10 @@ export const theme: ThemeOverride = {
       body: {
         bg: 'base.900',
         color: 'base.50',
-        overflow: 'hidden',
+        overflow: {
+          base: 'scroll',
+          xl: 'hidden',
+        },
       },
       '*': { ...no_scrollbar },
     }),
@@ -37,6 +40,14 @@ export const theme: ThemeOverride = {
   direction: 'ltr',
   fonts: {
     body: `'Inter', sans-serif`,
+  },
+  breakpoints: {
+    base: '0em', // 0px and onwards
+    sm: '30em', // 480px and onwards
+    md: '48em', // 768px and onwards
+    lg: '62em', // 992px and onwards
+    xl: '80em', // 1280px and onwards
+    '2xl': '96em', // 1536px and onwards
   },
   shadows: {
     light: {
@@ -53,6 +64,7 @@ export const theme: ThemeOverride = {
       working: `0 0 7px var(--invokeai-colors-working-400)`,
       error: `0 0 7px var(--invokeai-colors-error-400)`,
     },
+    nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-base-500)`,
   },
   colors: {
     ...invokeAIThemeColors,

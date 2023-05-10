@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 import { Flex } from '@chakra-ui/react';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import UnifiedCanvasBaseBrushSettings from './UnifiedCanvasToolSettings/UnifiedCanvasBaseBrushSettings';
 import UnifiedCanvasMaskBrushSettings from './UnifiedCanvasToolSettings/UnifiedCanvasMaskBrushSettings';
 import UnifiedCanvasMoveSettings from './UnifiedCanvasToolSettings/UnifiedCanvasMoveSettings';

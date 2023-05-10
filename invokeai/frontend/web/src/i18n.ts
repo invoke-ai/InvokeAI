@@ -3,7 +3,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import Backend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
 
-import translationEN from '../dist/locales/en.json';
+import translationEN from '../public/locales/en.json';
 
 if (import.meta.env.MODE === 'package') {
   i18n.use(initReactI18next).init({

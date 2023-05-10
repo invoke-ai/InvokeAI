@@ -1,5 +1,5 @@
 import { Box, ChakraProps } from '@chakra-ui/react';
-import { throttle } from 'lodash';
+import { throttle } from 'lodash-es';
 import { ReactNode, useEffect, useRef } from 'react';
 
 const scrollShadowBaseStyles: ChakraProps['sx'] = {

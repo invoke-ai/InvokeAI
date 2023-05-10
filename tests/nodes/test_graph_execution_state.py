@@ -25,8 +25,10 @@ def mock_services():
     return InvocationServices(
         model_manager = None, # type: ignore
         events = None, # type: ignore
+        logger = None, # type: ignore
         images = None, # type: ignore
         latents = None, # type: ignore
+        metadata = None, # type: ignore
         queue = MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
             filename=sqlite_memory, table_name="graphs"

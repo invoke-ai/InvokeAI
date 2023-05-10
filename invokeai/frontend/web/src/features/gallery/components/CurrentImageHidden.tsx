@@ -13,7 +13,7 @@ const CurrentImageHidden = () => {
         color: 'base.400',
       }}
     >
-      <FaEyeSlash size={'30vh'} />
+      <FaEyeSlash fontSize="25vh" />
     </Flex>
   );
 };
