@@ -23,6 +23,7 @@ import { LogLevelName } from 'roarr';
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { TFuncKey } from 'i18next';
 import { t } from 'i18next';
+import { userInvoked } from 'app/store/actions';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -382,7 +383,10 @@ export const systemSlice = createSlice({
      * Session Invoked - PENDING
      */
 
-    builder.addCase(sessionInvoked.pending, (state) => {
+    builder.addCase(userInvoked, (state) => {
+      state.isProcessing = true;
+      state.isCancelable = true;
+      state.currentStatusHasSteps = false;
       state.statusTranslationKey = 'common.statusPreparing';
     });
 
