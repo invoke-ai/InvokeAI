@@ -10,7 +10,7 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { DragEvent, memo, useCallback, useState } from 'react';
+import { DragEvent, MouseEvent, memo, useCallback, useState } from 'react';
 import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
@@ -119,13 +119,17 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   }, [dispatch, image, canDeleteImage]);
 
   // Opens the alert dialog to check if user is sure they want to delete
-  const handleInitiateDelete = useCallback(() => {
-    if (shouldConfirmOnDelete) {
-      onDeleteDialogOpen();
-    } else {
-      handleDelete();
-    }
-  }, [handleDelete, onDeleteDialogOpen, shouldConfirmOnDelete]);
+  const handleInitiateDelete = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      if (shouldConfirmOnDelete) {
+        onDeleteDialogOpen();
+      } else {
+        handleDelete();
+      }
+    },
+    [handleDelete, onDeleteDialogOpen, shouldConfirmOnDelete]
+  );
 
   const handleSelectImage = useCallback(() => {
     dispatch(imageSelected(image));
