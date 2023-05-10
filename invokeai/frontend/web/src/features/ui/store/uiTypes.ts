@@ -31,6 +31,6 @@ export interface UIState {
   canvasTabAccordionState: number[];
   floatingProgressImageRect: Rect;
   shouldShowProgressImages: boolean;
-  shouldAutoShowProgressImages: boolean;
+  shouldShowProgressInViewer: boolean;
   shouldShowImageParameters: boolean;
 }

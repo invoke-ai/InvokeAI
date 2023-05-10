@@ -10,6 +10,7 @@ export const actionSanitizer = <A extends AnyAction>(action: A): A => {
 
       // Sanitize nodes as needed
       forEach(action.payload.nodes, (node, key) => {
+        // Don't log the whole freaking dataURL
         if (node.type === 'dataURL_image') {
           const { dataURL, ...rest } = node;
           sanitizedNodes[key] = { ...rest, dataURL: '<dataURL>' };

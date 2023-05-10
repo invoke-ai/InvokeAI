@@ -354,6 +354,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusProcessingComplete';
+      state.progressImage = null;
 
       if (state.canceledSession === data.graph_execution_state_id) {
         state.isProcessing = false;
@@ -373,6 +374,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusError';
+      state.progressImage = null;
 
       state.toastQueue.push(
         makeToast({ title: t('toast.serverError'), status: 'error' })

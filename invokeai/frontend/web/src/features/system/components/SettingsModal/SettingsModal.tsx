@@ -28,7 +28,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
-  setShouldAutoShowProgressImages,
+  setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
@@ -54,7 +54,7 @@ const selector = createSelector(
     const {
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
-      shouldAutoShowProgressImages,
+      shouldShowProgressInViewer,
     } = ui;
 
     return {
@@ -63,7 +63,7 @@ const selector = createSelector(
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
-      shouldAutoShowProgressImages,
+      shouldShowProgressInViewer,
       consoleLogLevel,
       shouldLogToConsole,
     };
@@ -114,7 +114,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
-    shouldAutoShowProgressImages,
+    shouldShowProgressInViewer,
     consoleLogLevel,
     shouldLogToConsole,
   } = useAppSelector(selector);
@@ -197,10 +197,10 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                   }
                 />
                 <IAISwitch
-                  label={t('settings.autoShowProgress')}
-                  isChecked={shouldAutoShowProgressImages}
+                  label={t('settings.showProgressInViewer')}
+                  isChecked={shouldShowProgressInViewer}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldAutoShowProgressImages(e.target.checked))
+                    dispatch(setShouldShowProgressInViewer(e.target.checked))
                   }
                 />
               </Flex>

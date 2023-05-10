@@ -27,7 +27,7 @@ const IAIPopover = (props: IAIPopoverProps) => {
   return (
     <Popover isLazy={isLazy} {...rest}>
       <PopoverTrigger>{triggerComponent}</PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent shadow="dark-lg">
         {hasArrow && <PopoverArrow />}
         {children}
       </PopoverContent>

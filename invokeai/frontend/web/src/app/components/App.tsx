@@ -27,7 +27,7 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
-import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
+import ProgressImagePreview from 'features/parameters/components/_ProgressImagePreview';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 
 const DEFAULT_CONFIG = {};
@@ -124,7 +124,6 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
       <Portal>
         <FloatingGalleryButton />
       </Portal>
-      <ProgressImagePreview />
     </Grid>
   );
 };

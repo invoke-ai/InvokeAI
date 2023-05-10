@@ -5,7 +5,13 @@ import {
   ButtonGroup,
   Flex,
   FlexProps,
+  IconButton,
   Link,
+  Menu,
+  MenuButton,
+  MenuItemOption,
+  MenuList,
+  MenuOptionGroup,
   useDisclosure,
   useToast,
 } from '@chakra-ui/react';
@@ -46,6 +52,7 @@ import {
   FaShare,
   FaShareAlt,
   FaTrash,
+  FaWrench,
 } from 'react-icons/fa';
 import {
   gallerySelector,
@@ -62,6 +69,7 @@ import { requestedImageDeletion } from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
 import { allParametersSet } from 'features/parameters/store/generationSlice';
+import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -451,7 +459,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               </Link>
             </Flex>
           </IAIPopover>
-          <IAIIconButton
+          {/* <IAIIconButton
             icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
             tooltip={
               !shouldHidePreview
@@ -465,7 +473,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             }
             isChecked={shouldHidePreview}
             onClick={handlePreviewVisibility}
-          />
+          /> */}
           {isLightboxEnabled && (
             <IAIIconButton
               icon={<FaExpand />}
@@ -592,23 +600,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         <ButtonGroup isAttached={true}>
-          <IAIIconButton
-            onClick={handleInitiateDelete}
-            icon={<FaTrash />}
-            tooltip={`${t('gallery.deleteImage')} (Del)`}
-            aria-label={`${t('gallery.deleteImage')} (Del)`}
-            isDisabled={!image || !isConnected}
-            colorScheme="error"
-          />
+          <DeleteImageButton image={image} />
         </ButtonGroup>
       </Flex>
-      {image && (
-        <DeleteImageModal
-          isOpen={isDeleteDialogOpen}
-          onClose={onDeleteDialogClose}
-          handleDelete={handleDelete}
-        />
-      )}
     </>
   );
 };
