@@ -1,17 +1,16 @@
-import { Box, BoxProps, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { ChangeEvent } from 'react';
-import { isEqual } from 'lodash';
+import { ChangeEvent, memo } from 'react';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import {
   modelSelected,
   selectedModelSelector,
   selectModelsIds,
 } from '../store/modelSlice';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 
 const selector = createSelector(
   [(state: RootState) => state],
@@ -30,7 +29,7 @@ const selector = createSelector(
   }
 );
 
-const ModelSelect = (props: BoxProps) => {
+const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { allModelNames, selectedModel } = useAppSelector(selector);
@@ -39,18 +38,16 @@ const ModelSelect = (props: BoxProps) => {
   };
 
   return (
-    <Box {...props}>
-      <IAISelect
-        label={t('modelManager.model')}
-        style={{ fontSize: 'sm' }}
-        aria-label={t('accessibility.modelSelect')}
-        tooltip={selectedModel?.description || ''}
-        value={selectedModel?.name || undefined}
-        validValues={allModelNames}
-        onChange={handleChangeModel}
-      />
-    </Box>
+    <IAISelect
+      label={t('modelManager.model')}
+      style={{ fontSize: 'sm' }}
+      aria-label={t('accessibility.modelSelect')}
+      tooltip={selectedModel?.description || ''}
+      value={selectedModel?.name || undefined}
+      validValues={allModelNames}
+      onChange={handleChangeModel}
+    />
   );
 };
 
-export default ModelSelect;
+export default memo(ModelSelect);

@@ -10,6 +10,7 @@ import shlex
 from pathlib import Path
 from typing import List, Dict, Literal, get_args, get_type_hints, get_origin
 
+import invokeai.backend.util.logging as logger
 from ...backend import ModelManager, Globals
 from ..invocations.baseinvocation import BaseInvocation
 from .commands import BaseCommand
@@ -160,8 +161,8 @@ def set_autocompleter(model_manager: ModelManager) -> Completer:
         pass
     except OSError:  # file likely corrupted
         newname = f"{histfile}.old"
-        print(
-            f"## Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}"
+        logger.error(
+            f"Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}"
         )
         histfile.replace(Path(newname))
     atexit.register(readline.write_history_file, histfile)

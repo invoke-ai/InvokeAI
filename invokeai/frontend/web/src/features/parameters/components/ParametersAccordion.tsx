@@ -1,45 +1,35 @@
 import { Accordion } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { Feature } from 'app/features';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { systemSelector } from 'features/system/store/systemSelectors';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { tabMap } from 'features/ui/store/tabMap';
-import {
-  activeTabNameSelector,
-  uiSelector,
-} from 'features/ui/store/uiSelectors';
+import { uiSelector } from 'features/ui/store/uiSelectors';
 import { openAccordionItemsChanged } from 'features/ui/store/uiSlice';
-import { filter, map } from 'lodash';
+import { map } from 'lodash-es';
 import { ReactNode, useCallback } from 'react';
 import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 
-const parametersAccordionSelector = createSelector(
-  [uiSelector, systemSelector],
-  (uiSlice, system) => {
-    const {
-      activeTab,
-      openLinearAccordionItems,
-      openUnifiedCanvasAccordionItems,
-    } = uiSlice;
+const parametersAccordionSelector = createSelector([uiSelector], (uiSlice) => {
+  const {
+    activeTab,
+    openLinearAccordionItems,
+    openUnifiedCanvasAccordionItems,
+  } = uiSlice;
 
-    const { disabledFeatures } = system;
+  let openAccordions: number[] = [];
 
-    let openAccordions: number[] = [];
-
-    if (tabMap[activeTab] === 'generate') {
-      openAccordions = openLinearAccordionItems;
-    }
-
-    if (tabMap[activeTab] === 'unifiedCanvas') {
-      openAccordions = openUnifiedCanvasAccordionItems;
-    }
-
-    return {
-      openAccordions,
-      disabledFeatures,
-    };
+  if (tabMap[activeTab] === 'generate') {
+    openAccordions = openLinearAccordionItems;
   }
-);
+
+  if (tabMap[activeTab] === 'unifiedCanvas') {
+    openAccordions = openUnifiedCanvasAccordionItems;
+  }
+
+  return {
+    openAccordions,
+  };
+});
 
 export type ParametersAccordionItem = {
   name: string;
@@ -61,9 +51,7 @@ type ParametersAccordionProps = {
  * Main container for generation and processing parameters.
  */
 const ParametersAccordion = ({ accordionItems }: ParametersAccordionProps) => {
-  const { openAccordions, disabledFeatures } = useAppSelector(
-    parametersAccordionSelector
-  );
+  const { openAccordions } = useAppSelector(parametersAccordionSelector);
 
   const dispatch = useAppDispatch();
 

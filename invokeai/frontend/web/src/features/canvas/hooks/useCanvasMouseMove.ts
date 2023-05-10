@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   canvasSelector,
   isStagingSelector,
@@ -11,7 +11,7 @@ import {
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
 import { Vector2d } from 'konva/lib/types';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { MutableRefObject, useCallback } from 'react';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';

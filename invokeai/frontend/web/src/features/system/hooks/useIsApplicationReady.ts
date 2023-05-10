@@ -1,21 +1,19 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
+import { configSelector } from '../store/configSelectors';
+import { systemSelector } from '../store/systemSelectors';
 
 const isApplicationReadySelector = createSelector(
-  [(state: RootState) => state.system],
-  (system) => {
-    const {
-      disabledFeatures,
-      disabledTabs,
-      wereModelsReceived,
-      wasSchemaParsed,
-    } = system;
+  [systemSelector, configSelector],
+  (system, config) => {
+    const { wereModelsReceived, wasSchemaParsed } = system;
+
+    const { disabledTabs } = config;
 
     return {
       disabledTabs,
-      disabledFeatures,
       wereModelsReceived,
       wasSchemaParsed,
     };
@@ -23,12 +21,9 @@ const isApplicationReadySelector = createSelector(
 );
 
 export const useIsApplicationReady = () => {
-  const {
-    disabledTabs,
-    disabledFeatures,
-    wereModelsReceived,
-    wasSchemaParsed,
-  } = useAppSelector(isApplicationReadySelector);
+  const { disabledTabs, wereModelsReceived, wasSchemaParsed } = useAppSelector(
+    isApplicationReadySelector
+  );
 
   const isApplicationReady = useMemo(() => {
     if (!wereModelsReceived) {

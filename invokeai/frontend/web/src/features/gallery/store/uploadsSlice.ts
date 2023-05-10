@@ -1,12 +1,12 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/invokeai';
+import { Image } from 'app/types/invokeai';
 
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { imageUploaded } from 'services/thunks/image';
+import { imageDeleted, imageUploaded } from 'services/thunks/image';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
 export const uploadsAdapter = createEntityAdapter<Image>({
@@ -53,7 +53,7 @@ const uploadsSlice = createSlice({
 
       const images = items.map((image) => deserializeImageResponse(image));
 
-      uploadsAdapter.addMany(state, images);
+      uploadsAdapter.setMany(state, images);
 
       state.page = page;
       state.pages = pages;
@@ -69,7 +69,18 @@ const uploadsSlice = createSlice({
 
       const uploadedImage = deserializeImageResponse(response);
 
-      uploadsAdapter.addOne(state, uploadedImage);
+      uploadsAdapter.setOne(state, uploadedImage);
+    });
+
+    /**
+     * Delete Image - FULFILLED
+     */
+    builder.addCase(imageDeleted.fulfilled, (state, action) => {
+      const { imageType, imageName } = action.meta.arg;
+
+      if (imageType === 'uploads') {
+        uploadsAdapter.removeOne(state, imageName);
+      }
     });
   },
 });

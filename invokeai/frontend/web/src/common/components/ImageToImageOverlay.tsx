@@ -1,32 +1,11 @@
-import { Badge, Box, ButtonGroup, Flex } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaUndo, FaUpload } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
-import { Image } from 'app/invokeai';
+import { Badge, Box, Flex } from '@chakra-ui/react';
+import { Image } from 'app/types/invokeai';
 
 type ImageToImageOverlayProps = {
-  setIsLoaded: (isLoaded: boolean) => void;
   image: Image;
 };
 
-const ImageToImageOverlay = ({
-  setIsLoaded,
-  image,
-}: ImageToImageOverlayProps) => {
-  const isImageToImageEnabled = useAppSelector(
-    (state: RootState) => state.generation.isImageToImageEnabled
-  );
-  const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-  const handleResetInitialImage = useCallback(() => {
-    dispatch(clearInitialImage());
-    setIsLoaded(false);
-  }, [dispatch, setIsLoaded]);
-
+const ImageToImageOverlay = ({ image }: ImageToImageOverlayProps) => {
   return (
     <Box
       sx={{
@@ -40,8 +19,8 @@ const ImageToImageOverlay = ({
       <Flex
         sx={{
           position: 'absolute',
-          bottom: 0,
-          left: 0,
+          top: 0,
+          right: 0,
           p: 2,
           alignItems: 'flex-start',
         }}

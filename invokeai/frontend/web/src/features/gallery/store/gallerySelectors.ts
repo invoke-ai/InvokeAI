@@ -1,12 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { configSelector } from 'features/system/store/configSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   activeTabNameSelector,
   uiSelector,
 } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import {
   selectResultsAll,
   selectResultsById,
@@ -21,17 +22,22 @@ import {
 export const gallerySelector = (state: RootState) => state.gallery;
 
 export const imageGallerySelector = createSelector(
-  [gallerySelector, uiSelector, lightboxSelector, activeTabNameSelector],
-  (gallery, ui, lightbox, activeTabName) => {
+  [
+    (state: RootState) => state,
+    gallerySelector,
+    uiSelector,
+    lightboxSelector,
+    activeTabNameSelector,
+  ],
+  (state, gallery, ui, lightbox, activeTabName) => {
     const {
-      categories,
       currentCategory,
-      currentImageUuid,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldAutoSwitchToNewImages,
       galleryWidth,
       shouldUseSingleGalleryColumn,
+      selectedImage,
     } = gallery;
 
     const { shouldPinGallery } = ui;
@@ -39,7 +45,6 @@ export const imageGallerySelector = createSelector(
     const { isLightboxOpen } = lightbox;
 
     return {
-      currentImageUuid,
       shouldPinGallery,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
@@ -48,9 +53,7 @@ export const imageGallerySelector = createSelector(
         : `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       shouldAutoSwitchToNewImages,
       currentCategory,
-      images: categories[currentCategory].images,
-      areMoreImagesAvailable:
-        categories[currentCategory].areMoreImagesAvailable,
+      images: state[currentCategory].entities,
       galleryWidth,
       shouldEnableResize:
         isLightboxOpen ||
@@ -58,26 +61,7 @@ export const imageGallerySelector = createSelector(
           ? false
           : true,
       shouldUseSingleGalleryColumn,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
-export const hoverableImageSelector = createSelector(
-  [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
-  (gallery, system, lightbox, activeTabName) => {
-    return {
-      mayDeleteImage: system.isConnected && !system.isProcessing,
-      galleryImageObjectFit: gallery.galleryImageObjectFit,
-      galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
-      shouldUseSingleGalleryColumn: gallery.shouldUseSingleGalleryColumn,
-      activeTabName,
-      isLightboxOpen: lightbox.isLightboxOpen,
-      disabledFeatures: system.disabledFeatures,
+      selectedImage,
     };
   },
   {
@@ -88,16 +72,16 @@ export const hoverableImageSelector = createSelector(
 );
 
 export const selectedImageSelector = createSelector(
-  [gallerySelector, selectResultsEntities, selectUploadsEntities],
-  (gallery, allResults, allUploads) => {
-    const selectedImageName = gallery.selectedImageName;
+  [(state: RootState) => state, gallerySelector],
+  (state, gallery) => {
+    const selectedImage = gallery.selectedImage;
 
-    if (selectedImageName in allResults) {
-      return allResults[selectedImageName];
+    if (selectedImage?.type === 'results') {
+      return selectResultsById(state, selectedImage.name);
     }
 
-    if (selectedImageName in allUploads) {
-      return allUploads[selectedImageName];
+    if (selectedImage?.type === 'uploads') {
+      return selectUploadsById(state, selectedImage.name);
     }
   }
 );

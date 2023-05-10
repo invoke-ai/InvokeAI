@@ -10,6 +10,7 @@ from compel.embeddings_provider import BaseTextualInversionManager
 from picklescan.scanner import scan_file_path
 from transformers import CLIPTextModel, CLIPTokenizer
 
+import invokeai.backend.util.logging as logger
 from .concepts_lib import HuggingFaceConceptsLibrary
 
 @dataclass
@@ -59,12 +60,12 @@ class TextualInversionManager(BaseTextualInversionManager):
                 or self.has_textual_inversion_for_trigger_string(concept_name)
                 or self.has_textual_inversion_for_trigger_string(f"<{concept_name}>")
             ):  # in case a token with literal angle brackets encountered
-                print(f">> Loaded local embedding for trigger {concept_name}")
+                logger.info(f"Loaded local embedding for trigger {concept_name}")
                 continue
             bin_file = self.hf_concepts_library.get_concept_model_path(concept_name)
             if not bin_file:
                 continue
-            print(f">> Loaded remote embedding for trigger {concept_name}")
+            logger.info(f"Loaded remote embedding for trigger {concept_name}")
             self.load_textual_inversion(bin_file)
             self.hf_concepts_library.concepts_loaded[concept_name] = True
 
@@ -85,8 +86,8 @@ class TextualInversionManager(BaseTextualInversionManager):
         embedding_list = self._parse_embedding(str(ckpt_path))
         for embedding_info in embedding_list:
             if (self.text_encoder.get_input_embeddings().weight.data[0].shape[0] != embedding_info.token_dim):
-                print(
-                    f"   ** Notice: {ckpt_path.parents[0].name}/{ckpt_path.name} was trained on a model with an incompatible token dimension: {self.text_encoder.get_input_embeddings().weight.data[0].shape[0]} vs {embedding_info.token_dim}."
+                logger.warning(
+                    f"Notice: {ckpt_path.parents[0].name}/{ckpt_path.name} was trained on a model with an incompatible token dimension: {self.text_encoder.get_input_embeddings().weight.data[0].shape[0]} vs {embedding_info.token_dim}."
                 )
                 continue
 
@@ -105,8 +106,8 @@ class TextualInversionManager(BaseTextualInversionManager):
                     if ckpt_path.name == "learned_embeds.bin"
                     else f"<{ckpt_path.stem}>"
                 )
-                print(
-                    f">> {sourcefile}: Trigger token '{trigger_str}' is already claimed by '{self.trigger_to_sourcefile[trigger_str]}'. Trigger this concept with {replacement_trigger_str}"
+                logger.info(
+                    f"{sourcefile}: Trigger token '{trigger_str}' is already claimed by '{self.trigger_to_sourcefile[trigger_str]}'. Trigger this concept with {replacement_trigger_str}"
                 )
                 trigger_str = replacement_trigger_str
 
@@ -120,8 +121,8 @@ class TextualInversionManager(BaseTextualInversionManager):
                 self.trigger_to_sourcefile[trigger_str] = sourcefile
 
             except ValueError as e:
-                print(f'   | Ignoring incompatible embedding {embedding_info["name"]}')
-                print(f"   | The error was {str(e)}")
+                logger.debug(f'Ignoring incompatible embedding {embedding_info["name"]}')
+                logger.debug(f"The error was {str(e)}")
 
     def _add_textual_inversion(
         self, trigger_str, embedding, defer_injecting_tokens=False
@@ -133,8 +134,8 @@ class TextualInversionManager(BaseTextualInversionManager):
         :return: The token id for the added embedding, either existing or newly-added.
         """
         if trigger_str in [ti.trigger_string for ti in self.textual_inversions]:
-            print(
-                f"** TextualInversionManager refusing to overwrite already-loaded token '{trigger_str}'"
+            logger.warning(
+                f"TextualInversionManager refusing to overwrite already-loaded token '{trigger_str}'"
             )
             return
         if not self.full_precision:
@@ -155,11 +156,11 @@ class TextualInversionManager(BaseTextualInversionManager):
 
         except ValueError as e:
             if str(e).startswith("Warning"):
-                print(f">> {str(e)}")
+                logger.warning(f"{str(e)}")
             else:
                 traceback.print_exc()
-                print(
-                    f"** TextualInversionManager was unable to add a textual inversion with trigger string {trigger_str}."
+                logger.error(
+                    f"TextualInversionManager was unable to add a textual inversion with trigger string {trigger_str}."
                 )
                 raise
 
@@ -219,16 +220,16 @@ class TextualInversionManager(BaseTextualInversionManager):
         for ti in self.textual_inversions:
             if ti.trigger_token_id is None and ti.trigger_string in prompt_string:
                 if ti.embedding_vector_length > 1:
-                    print(
-                        f">> Preparing tokens for textual inversion {ti.trigger_string}..."
+                    logger.info(
+                        f"Preparing tokens for textual inversion {ti.trigger_string}..."
                     )
                 try:
                     self._inject_tokens_and_assign_embeddings(ti)
                 except ValueError as e:
-                    print(
-                        f"   | Ignoring incompatible embedding trigger {ti.trigger_string}"
+                    logger.debug(
+                        f"Ignoring incompatible embedding trigger {ti.trigger_string}"
                     )
-                    print(f"   | The error was {str(e)}")
+                    logger.debug(f"The error was {str(e)}")
                     continue
                 injected_token_ids.append(ti.trigger_token_id)
                 injected_token_ids.extend(ti.pad_token_ids)
@@ -306,16 +307,16 @@ class TextualInversionManager(BaseTextualInversionManager):
             if suffix in [".pt",".ckpt",".bin"]:
                 scan_result = scan_file_path(embedding_file)
                 if scan_result.infected_files > 0:
-                    print(
-                        f"   ** Security Issues Found in Model: {scan_result.issues_count}"
+                    logger.critical(
+                        f"Security Issues Found in Model: {scan_result.issues_count}"
                     )
-                    print("   ** For your safety, InvokeAI will not load this embed.")
+                    logger.critical("For your safety, InvokeAI will not load this embed.")
                     return list()
                 ckpt = torch.load(embedding_file,map_location="cpu")
             else:
                 ckpt = safetensors.torch.load_file(embedding_file)
         except Exception as e:
-            print(f"   ** Notice: unrecognized embedding file format: {embedding_file}: {e}")
+            logger.warning(f"Notice: unrecognized embedding file format: {embedding_file}: {e}")
             return list()
         
         # try to figure out what kind of embedding file it is and parse accordingly
@@ -334,7 +335,7 @@ class TextualInversionManager(BaseTextualInversionManager):
 
     def _parse_embedding_v1(self, embedding_ckpt: dict, file_path: str)->List[EmbeddingInfo]:
         basename = Path(file_path).stem
-        print(f'   | Loading v1 embedding file: {basename}')
+        logger.debug(f'Loading v1 embedding file: {basename}')
 
         embeddings = list()
         token_counter = -1
@@ -342,7 +343,7 @@ class TextualInversionManager(BaseTextualInversionManager):
             if token_counter < 0:
                 trigger = embedding_ckpt["name"]
             elif token_counter == 0:
-                trigger = f'<basename>'
+                trigger = '<basename>'
             else:
                 trigger = f'<{basename}-{int(token_counter:=token_counter)}>'
             token_counter += 1
@@ -365,7 +366,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         This handles embedding .pt file variant #2.
         """
         basename = Path(file_path).stem
-        print(f'   | Loading v2 embedding file: {basename}')
+        logger.debug(f'Loading v2 embedding file: {basename}')
         embeddings = list()
         
         if isinstance(
@@ -384,7 +385,7 @@ class TextualInversionManager(BaseTextualInversionManager):
                 )
                 embeddings.append(embedding_info)
         else:
-            print(f"   ** {basename}: Unrecognized embedding format")
+            logger.warning(f"{basename}: Unrecognized embedding format")
 
         return embeddings
 
@@ -393,7 +394,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         Parse 'version 3' of the .pt textual inversion embedding files.
         """
         basename = Path(file_path).stem
-        print(f'   | Loading v3 embedding file: {basename}')
+        logger.debug(f'Loading v3 embedding file: {basename}')
         embedding = embedding_ckpt['emb_params']
         embedding_info = EmbeddingInfo(
             name = f'<{basename}>',
@@ -411,11 +412,11 @@ class TextualInversionManager(BaseTextualInversionManager):
         basename = Path(filepath).stem
         short_path = Path(filepath).parents[0].name+'/'+Path(filepath).name
         
-        print(f'   | Loading v4 embedding file: {short_path}')
+        logger.debug(f'Loading v4 embedding file: {short_path}')
         
         embeddings = list()
         if list(embedding_ckpt.keys()) == 0:
-            print(f"   ** Invalid embeddings file: {short_path}")
+            logger.warning(f"Invalid embeddings file: {short_path}")
         else:
             for token,embedding in embedding_ckpt.items():
                 embedding_info = EmbeddingInfo(

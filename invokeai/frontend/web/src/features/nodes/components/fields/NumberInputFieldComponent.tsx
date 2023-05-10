@@ -5,7 +5,7 @@ import {
   NumberInputField,
   NumberInputStepper,
 } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   FloatInputFieldTemplate,
@@ -31,7 +31,12 @@ const NumberInputFieldComponent = (
   };
 
   return (
-    <NumberInput onChange={handleValueChanged} value={field.value}>
+    <NumberInput
+      onChange={handleValueChanged}
+      value={field.value}
+      step={props.template.type === 'integer' ? 1 : 0.1}
+      precision={props.template.type === 'integer' ? 0 : 3}
+    >
       <NumberInputField />
       <NumberInputStepper>
         <NumberIncrementStepper />

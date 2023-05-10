@@ -5,6 +5,7 @@ import warnings
 import numpy as np
 import torch
 
+import invokeai.backend.util.logging as logger
 from ..globals import Globals
 
 pretrained_model_url = (
@@ -23,12 +24,12 @@ class CodeFormerRestoration:
         self.codeformer_model_exists = os.path.isfile(self.model_path)
 
         if not self.codeformer_model_exists:
-            print("## NOT FOUND: CodeFormer model not found at " + self.model_path)
+            logger.error("NOT FOUND: CodeFormer model not found at " + self.model_path)
         sys.path.append(os.path.abspath(codeformer_dir))
 
     def process(self, image, strength, device, seed=None, fidelity=0.75):
         if seed is not None:
-            print(f">> CodeFormer - Restoring Faces for image seed:{seed}")
+            logger.info(f"CodeFormer - Restoring Faces for image seed:{seed}")
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
@@ -97,7 +98,7 @@ class CodeFormerRestoration:
                     del output
                     torch.cuda.empty_cache()
                 except RuntimeError as error:
-                    print(f"\tFailed inference for CodeFormer: {error}.")
+                    logger.error(f"Failed inference for CodeFormer: {error}.")
                     restored_face = cropped_face
 
                 restored_face = restored_face.astype("uint8")

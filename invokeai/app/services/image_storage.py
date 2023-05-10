@@ -5,10 +5,11 @@ from glob import glob
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from PIL.Image import Image
 import PIL.Image as PILImage
+from send2trash import send2trash
 from invokeai.app.api.models.images import (
     ImageResponse,
     ImageResponseMetadata,
@@ -186,7 +187,9 @@ class DiskImageStorage(ImageStorageBase):
         else:
             path = os.path.join(self.__output_folder, image_type, basename)
 
-        return path
+        abspath = os.path.abspath(path)
+
+        return abspath
 
     def get_uri(
         self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
@@ -244,15 +247,15 @@ class DiskImageStorage(ImageStorageBase):
         image_path = self.get_path(image_type, basename)
 
         if os.path.exists(image_path):
-            os.remove(image_path)
+            send2trash(image_path)
         if image_path in self.__cache:
             del self.__cache[image_path]
 
         thumbnail_name = get_thumbnail_name(image_name)
         thumbnail_path = self.get_path(image_type, thumbnail_name, True)
 
-        if os.path.exists(image_path):
-            os.remove(thumbnail_path)
+        if os.path.exists(thumbnail_path):
+            send2trash(thumbnail_path)
         if thumbnail_path in self.__cache:
             del self.__cache[thumbnail_path]
 
@@ -267,4 +270,5 @@ class DiskImageStorage(ImageStorageBase):
             )  # TODO: this should refresh position for LRU cache
             if len(self.__cache) > self.__max_cache_size:
                 cache_id = self.__cache_ids.get()
-                del self.__cache[cache_id]
+                if cache_id in self.__cache:
+                    del self.__cache[cache_id]

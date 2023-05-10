@@ -1,7 +1,7 @@
 import math
 
 from PIL import Image
-
+import invokeai.backend.util.logging as logger
 
 class Outcrop(object):
     def __init__(
@@ -82,7 +82,7 @@ class Outcrop(object):
             pixels = extents[direction]
             # round pixels up to the nearest 64
             pixels = math.ceil(pixels / 64) * 64
-            print(f">> extending image {direction}ward by {pixels} pixels")
+            logger.info(f"extending image {direction}ward by {pixels} pixels")
             image = self._rotate(image, direction)
             image = self._extend(image, pixels)
             image = self._rotate(image, direction, reverse=True)

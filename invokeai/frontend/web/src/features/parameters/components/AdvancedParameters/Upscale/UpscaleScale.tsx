@@ -1,6 +1,6 @@
 import { UPSCALING_LEVELS } from 'app/constants';
-import type { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import type { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import {
   setUpscalingLevel,

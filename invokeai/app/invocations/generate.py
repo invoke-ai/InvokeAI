@@ -46,8 +46,8 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
     seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
+    width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
+    height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
@@ -150,6 +150,9 @@ class ImageToImageInvocation(TextToImageInvocation):
         )
         mask = None
 
+        if self.fit:
+            image = image.resize((self.width, self.height))
+
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
@@ -247,8 +250,8 @@ class InpaintInvocation(ImageToImageInvocation):
 
         outputs = Inpaint(model).generate(
             prompt=self.prompt,
-            init_img=image,
-            init_mask=mask,
+            init_image=image,
+            mask_image=mask,
             step_callback=partial(self.dispatch_progress, context, source_node_id),
             **self.dict(
                 exclude={"prompt", "image", "mask"}

@@ -14,7 +14,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
 
 import { FocusEvent, memo, useEffect, useState } from 'react';
 

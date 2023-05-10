@@ -1,6 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import {
   GeneratorProgressEvent,
+  GraphExecutionStateCompleteEvent,
   InvocationCompleteEvent,
   InvocationErrorEvent,
   InvocationStartedEvent,
@@ -35,12 +36,19 @@ export const invocationStarted = createAction<
 >('socket/invocationStarted');
 
 export const invocationComplete = createAction<
-  BaseSocketPayload & { data: InvocationCompleteEvent }
+  BaseSocketPayload & {
+    data: InvocationCompleteEvent;
+    shouldFetchImages: boolean;
+  }
 >('socket/invocationComplete');
 
 export const invocationError = createAction<
   BaseSocketPayload & { data: InvocationErrorEvent }
 >('socket/invocationError');
+
+export const graphExecutionStateComplete = createAction<
+  BaseSocketPayload & { data: GraphExecutionStateCompleteEvent }
+>('socket/graphExecutionStateComplete');
 
 export const generatorProgress = createAction<
   BaseSocketPayload & { data: GeneratorProgressEvent }

@@ -1,5 +1,17 @@
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
+export type Coordinates = {
+  x: number;
+  y: number;
+};
+
+export type Dimensions = {
+  width: number | string;
+  height: number | string;
+};
+
+export type Rect = Coordinates & Dimensions;
+
 export interface UIState {
   activeTab: number;
   currentTheme: string;
@@ -15,8 +27,9 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   openLinearAccordionItems: number[];
-  disabledParameterPanels: string[];
-  disabledTabs: InvokeTabName[];
   openGenerateAccordionItems: number[];
   openUnifiedCanvasAccordionItems: number[];
+  floatingProgressImageRect: Rect;
+  shouldShowProgressImages: boolean;
+  shouldAutoShowProgressImages: boolean;
 }

@@ -2,8 +2,7 @@ name: mkdocs-material
 on:
   push:
     branches:
-      - 'main'
-      - 'development'
+      - 'refs/heads/v2.3'
 
 permissions:
     contents: write
@@ -12,6 +11,10 @@ jobs:
   mkdocs-material:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      REPO_URL: '${{ github.server_url }}/${{ github.repository }}'
+      REPO_NAME: '${{ github.repository }}'
+      SITE_URL: 'https://${{ github.repository_owner }}.github.io/InvokeAI'
     steps:
       - name: checkout sources
         uses: actions/checkout@v3
@@ -22,11 +25,15 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: install requirements
+        env:
+          PIP_USE_PEP517: 1
         run: |
           python -m \
-            pip install -r docs/requirements-mkdocs.txt
+            pip install ".[docs]"
 
       - name: confirm buildability
         run: |
@@ -36,7 +43,7 @@ jobs:
             --verbose
 
       - name: deploy to gh-pages
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/v2.3' }}
         run: |
           python -m \
             mkdocs gh-deploy \

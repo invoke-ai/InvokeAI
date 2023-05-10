@@ -1,8 +1,9 @@
 import { Progress } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { SystemState } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PROGRESS_BAR_THICKNESS } from 'theme/util/constants';
 import { systemSelector } from '../store/systemSelectors';
@@ -40,4 +41,4 @@ const ProgressBar = () => {
   );
 };
 
-export default ProgressBar;
+export default memo(ProgressBar);

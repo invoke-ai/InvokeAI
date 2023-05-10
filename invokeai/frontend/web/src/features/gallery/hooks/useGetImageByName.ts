@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { ImageType } from 'services/api';
 import { selectResultsEntities } from '../store/resultsSlice';
 import { selectUploadsEntities } from '../store/uploadsSlice';

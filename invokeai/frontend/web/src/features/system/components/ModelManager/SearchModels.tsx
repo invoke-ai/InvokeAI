@@ -14,24 +14,24 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 
 import { FaSearch, FaTrash } from 'react-icons/fa';
 
-import { addNewModel, searchForModels } from 'app/socketio/actions';
+// import { addNewModel, searchForModels } from 'app/socketio/actions';
 import {
   setFoundModels,
   setSearchFolder,
 } from 'features/system/store/systemSlice';
 import { setShouldShowExistingModelsInSearch } from 'features/ui/store/uiSlice';
 
-import type { FoundModel } from 'app/invokeai';
-import type { RootState } from 'app/store';
+import type { FoundModel } from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
 import IAIInput from 'common/components/IAIInput';
 import { Field, Formik } from 'formik';
-import { forEach, remove } from 'lodash';
+import { forEach, remove } from 'lodash-es';
 import type { ChangeEvent, ReactNode } from 'react';
 import IAIForm from 'common/components/IAIForm';
 

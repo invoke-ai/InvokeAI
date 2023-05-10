@@ -1,4 +1,7 @@
-import { InputFieldTemplate, InputFieldValue } from 'features/nodes/types';
+import {
+  InputFieldTemplate,
+  InputFieldValue,
+} from 'features/nodes/types/types';
 
 export type FieldComponentProps<
   V extends InputFieldValue,

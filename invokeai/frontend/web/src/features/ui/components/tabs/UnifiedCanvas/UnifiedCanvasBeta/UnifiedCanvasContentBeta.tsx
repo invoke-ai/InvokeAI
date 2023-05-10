@@ -1,12 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 // import IAICanvas from 'features/canvas/components/IAICanvas';
 import { Box, Flex } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 import { useLayoutEffect } from 'react';
 import UnifiedCanvasToolbarBeta from './UnifiedCanvasToolbarBeta';
 import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasToolSettingsBeta';

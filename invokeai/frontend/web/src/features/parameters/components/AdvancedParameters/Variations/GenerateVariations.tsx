@@ -1,5 +1,5 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldGenerateVariations } from 'features/parameters/store/generationSlice';
 import { ChangeEvent } from 'react';

@@ -463,16 +463,16 @@ def test_graph_subgraph_t2i():
     
     n4 = ShowImageInvocation(id = "4")
     g.add_node(n4)
-    g.add_edge(create_edge("1.5","image","4","image"))
+    g.add_edge(create_edge("1.7","image","4","image"))
 
     # Validate
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(['1.width', '1.height', '1.3', '1.4', '1.5', '2', '3', '4'])
+    assert set(dg.nodes) == set(['1.width', '1.height', '1.seed', '1.3', '1.4', '1.5', '1.6', '1.7', '2', '3', '4'])
     expected_edges = [(f'1.{e.source.node_id}',f'1.{e.destination.node_id}') for e in lg.graph.edges]
     expected_edges.extend([
         ('2','1.width'),
         ('3','1.height'),
-        ('1.5','4')
+        ('1.7','4')
     ])
     print(expected_edges)
     print(list(dg.edges))

@@ -1,11 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { RootState } from 'app/store';
+import { RootState } from 'app/store/store';
 import {
   Edge,
   ImageToImageInvocation,
   TextToImageInvocation,
 } from 'services/api';
-import { _Image } from 'app/invokeai';
+import { _Image } from 'app/types/invokeai';
 import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 
 export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
@@ -16,6 +16,7 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
 
   const {
     prompt,
+    negativePrompt,
     seed,
     steps,
     width,
@@ -38,7 +39,7 @@ export const buildImg2ImgNode = (state: RootState): ImageToImageInvocation => {
   const imageToImageNode: ImageToImageInvocation = {
     id: nodeId,
     type: 'img2img',
-    prompt,
+    prompt: `${prompt} [${negativePrompt}]`,
     steps,
     width,
     height,

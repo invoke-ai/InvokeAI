@@ -1,4 +1,4 @@
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 
 export const stringToSeedWeights = (
   string: string

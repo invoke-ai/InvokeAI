@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { RootState } from 'app/store/store';
 
 type HotkeysState = {
   shift: boolean;
@@ -24,3 +25,5 @@ export const hotkeysSlice = createSlice({
 export const { shiftKeyPressed } = hotkeysSlice.actions;
 
 export default hotkeysSlice.reducer;
+
+export const hotkeysSelector = (state: RootState) => state.hotkeys;
