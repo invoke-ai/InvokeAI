@@ -10,7 +10,7 @@ import diffusers
 import psutil
 import torch
 from compel.cross_attention_control import Arguments
-from diffusers.models.attention_processor import AttentionProcessor
+from diffusers.models.cross_attention import AttnProcessor
 from torch import nn
 
 import invokeai.backend.util.logging as logger
@@ -344,7 +344,7 @@ class InvokeAICrossAttentionMixin:
 def restore_default_cross_attention(
     model,
     is_running_diffusers: bool,
-    restore_attention_processor: Optional[AttentionProcessor] = None,
+    restore_attention_processor: Optional[AttnProcessor] = None,
 ):
     if is_running_diffusers:
         unet = model
@@ -546,7 +546,7 @@ def get_mem_free_total(device):
 
 
 class InvokeAIDiffusersCrossAttention(
-    diffusers.models.attention.Attention, InvokeAICrossAttentionMixin
+    diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin
 ):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -597,9 +597,9 @@ class AttnProcessor:
 from dataclasses import dataclass, field
 
 import torch
-from diffusers.models.attention_processor import (
-    Attention,
-    AttnProcessor,
+from diffusers.models.cross_attention import (
+    CrossAttention,
+    CrossAttnProcessor,
     SlicedAttnProcessor,
 )
 
@@ -649,7 +649,7 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
 
     def __call__(
         self,
-        attn: Attention,
+        attn: CrossAttention,
         hidden_states,
         encoder_hidden_states=None,
         attention_mask=None,
