@@ -6,7 +6,7 @@ from torch import nn
 
 import sys
 
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from ldm.invoke.concepts_lib import get_hf_concepts_lib
 from ldm.data.personalized import per_img_token_list
 from transformers import CLIPTokenizer
 from functools import partial
@@ -39,7 +39,7 @@ class EmbeddingManager(nn.Module):
         super().__init__()
 
         self.embedder = embedder
-        self.concepts_library=HuggingFaceConceptsLibrary()
+        self.concepts_library=get_hf_concepts_lib()
 
         self.string_to_token_dict = {}
         self.string_to_param_dict = nn.ParameterDict()

@@ -13,7 +13,7 @@ import re
 import atexit
 from typing import List
 from ldm.invoke.args import Args
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from ldm.invoke.concepts_lib import get_hf_concepts_lib
 from ldm.invoke.globals import Globals
 from ldm.modules.lora_manager import LoraManager
 
@@ -287,7 +287,7 @@ class Completer(object):
     def _concept_completions(self, text, state):
         if self.concepts is None:
             # cache Concepts() instance so we can check for updates in concepts_list during runtime.
-            self.concepts = HuggingFaceConceptsLibrary()
+            self.concepts = get_hf_concepts_lib()
             self.embedding_terms.update(set(self.concepts.list_concepts()))
         else:
             self.embedding_terms.update(set(self.concepts.list_concepts()))
