@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
+import { IAIFullSliderProps } from 'common/components/IAISlider';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setWidth } from 'features/parameters/store/generationSlice';
 import { configSelector } from 'features/system/store/configSelectors';
@@ -13,7 +14,7 @@ const selector = createSelector(
   (generation, hotkeys, config) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.width;
-    const { width, shouldFitToWidthHeight, isImageToImageEnabled } = generation;
+    const { width } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
@@ -24,23 +25,15 @@ const selector = createSelector(
       sliderMax,
       inputMax,
       step,
-      shouldFitToWidthHeight,
-      isImageToImageEnabled,
     };
   }
 );
 
-const ParamWidth = () => {
-  const {
-    width,
-    initial,
-    min,
-    sliderMax,
-    inputMax,
-    step,
-    shouldFitToWidthHeight,
-    isImageToImageEnabled,
-  } = useAppSelector(selector);
+type ParamWidthProps = Omit<IAIFullSliderProps, 'label' | 'value' | 'onChange'>;
+
+const ParamWidth = (props: ParamWidthProps) => {
+  const { width, initial, min, sliderMax, inputMax, step } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -57,7 +50,6 @@ const ParamWidth = () => {
 
   return (
     <IAISlider
-      isDisabled={!shouldFitToWidthHeight && isImageToImageEnabled}
       label={t('parameters.width')}
       value={width}
       min={min}
@@ -69,6 +61,7 @@ const ParamWidth = () => {
       withReset
       withSliderMarks
       sliderNumberInputProps={{ max: inputMax }}
+      {...props}
     />
   );
 };

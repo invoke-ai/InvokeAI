@@ -13,19 +13,21 @@ import ParamSampler from 'features/parameters/components/Parameters/Core/ParamSa
 import ModelSelect from 'features/system/components/ModelSelect';
 import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 
 const selector = createSelector(
-  uiSelector,
-  (ui) => {
+  [uiSelector, generationSelector],
+  (ui, generation) => {
     const { shouldUseSliders } = ui;
+    const { shouldFitToWidthHeight } = generation;
 
-    return { shouldUseSliders };
+    return { shouldUseSliders, shouldFitToWidthHeight };
   },
   defaultSelectorOptions
 );
 
 const ImageToImageTabCoreParameters = () => {
-  const { shouldUseSliders } = useAppSelector(selector);
+  const { shouldUseSliders, shouldFitToWidthHeight } = useAppSelector(selector);
 
   return (
     <Flex
@@ -42,8 +44,8 @@ const ImageToImageTabCoreParameters = () => {
           <ParamIterations />
           <ParamSteps />
           <ParamCFGScale />
-          <ParamWidth />
-          <ParamHeight />
+          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
+          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
           <ImageToImageStrength />
           <ImageToImageFit />
           <Flex gap={3} w="full">
@@ -62,8 +64,8 @@ const ImageToImageTabCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <ParamWidth />
-          <ParamHeight />
+          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
+          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
           <Flex gap={3} w="full">
             <Box flexGrow={2}>
               <ParamSampler />
