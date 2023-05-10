@@ -101,17 +101,24 @@ export const nodeAdded = createAppAsyncThunk(
  */
 export const sessionInvoked = createAppAsyncThunk(
   'api/sessionInvoked',
-  async (arg: { sessionId: string }, _thunkApi) => {
+  async (arg: { sessionId: string }, { rejectWithValue }) => {
     const { sessionId } = arg;
 
-    const response = await SessionsService.invokeSession({
-      sessionId,
-      all: true,
-    });
+    try {
+      const response = await SessionsService.invokeSession({
+        sessionId,
+        all: true,
+      });
+      sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
 
-    sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
-
-    return response;
+      return response;
+    } catch (error) {
+      const err = error as any;
+      if (err.status === 403) {
+        return rejectWithValue(err.body.detail);
+      }
+      throw error;
+    }
   }
 );
 

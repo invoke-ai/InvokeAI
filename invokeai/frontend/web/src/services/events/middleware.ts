@@ -46,6 +46,8 @@ export const socketMiddleware = () => {
       // TODO: handle providing jwt to socket.io
       socketOptions.auth = { token: OpenAPI.TOKEN };
     }
+
+    socketOptions.transports = ['websocket', 'polling'];
   }
 
   const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
