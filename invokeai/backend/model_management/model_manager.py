@@ -1054,10 +1054,13 @@ class ModelManager(object):
         full_name = f"{model_name}/{model_type.name}"
         if full_name in self.config:
             return full_name
-        if model_name in self.config:
+        # special case - if diffusers requested, then allow name without type appended
+        if model_type==SDModelType.diffusers \
+           and model_name in self.config \
+           and self.config[model_name].format=='diffusers':
             return model_name
         raise InvalidModelError(
-            f'Neither "{model_name}" nor "{full_name}" are known model names. Please check your models.yaml file'
+            f'"{full_name}" is not a known model name. Please check your models.yaml file'
         )
 
 

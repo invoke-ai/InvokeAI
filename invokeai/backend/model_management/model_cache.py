@@ -289,19 +289,26 @@ class ModelCache(object):
             cache = self.cache
             key = self.key
             model = self.model
+            
+            # NOTE that the model has to have the to() method in order for this
+            # code to move it into GPU!
             if self.gpu_load and hasattr(model,'to'):
                 cache.loaded_models.add(key)
                 cache.locked_models[key] += 1
+                
                 if cache.lazy_offloading:
                    cache._offload_unlocked_models()
+                   
                 if  model.device != cache.execution_device:
                     cache.logger.debug(f'Moving {key} into {cache.execution_device}')
                     with VRAMUsage() as mem:
                         model.to(cache.execution_device)  # move into GPU
                     cache.logger.debug(f'GPU VRAM used for load: {(mem.vram_used/GIG):.2f} GB')
                     cache.model_sizes[key] = mem.vram_used   # more accurate size
+                    
                 cache.logger.debug(f'Locking {key} in {cache.execution_device}')                
                 cache._print_cuda_stats()
+                
             else:
                 # in the event that the caller wants the model in RAM, we
                 # move it into CPU if it is in GPU and not locked
