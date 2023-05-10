@@ -126,6 +126,7 @@ app.openapi = custom_openapi
 # Override API doc favicons
 app.mount("/static", StaticFiles(directory="static/dream_web"), name="static")
 
+app.mount("/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui")
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
