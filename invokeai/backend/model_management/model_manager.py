@@ -296,7 +296,6 @@ class ModelManager(object):
             )
         
         model_parts = dict([(x.name,x) for x in SDModelType])
-        legacy = None
         
         if format == 'diffusers':
             # intercept stanzas that point to checkpoint weights and replace them
@@ -332,7 +331,6 @@ class ModelManager(object):
             model_type = model_type,
             revision = revision,
             subfolder = subfolder,
-            legacy_info = legacy,
             submodel = submodel,
             attach_model_part=vae,
         )
