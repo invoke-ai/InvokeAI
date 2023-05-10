@@ -1,10 +1,15 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { getLoraModels } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
 import IAISimpleMenu, { IAIMenuItem } from 'common/components/IAISimpleMenu';
-import { setLorasInUse } from 'features/parameters/store/generationSlice';
+import {
+  setClearLoras,
+  setLorasInUse,
+} from 'features/parameters/store/generationSlice';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MdClear } from 'react-icons/md';
 
 export default function LoraManager() {
   const dispatch = useAppDispatch();
@@ -53,11 +58,20 @@ export default function LoraManager() {
   };
 
   return foundLoras && foundLoras?.length > 0 ? (
-    <IAISimpleMenu
-      menuItems={makeLoraItems()}
-      menuType="regular"
-      buttonText={`${t('modelManager.addLora')} (${numOfActiveLoras()})`}
-    />
+    <Flex columnGap={2}>
+      <IAISimpleMenu
+        menuItems={makeLoraItems()}
+        menuType="regular"
+        buttonText={`${t('modelManager.addLora')} (${numOfActiveLoras()})`}
+        menuButtonProps={{ width: '100%', padding: '0 1rem' }}
+      />
+      <IAIIconButton
+        icon={<MdClear />}
+        tooltip={t('modelManager.clearLoras')}
+        aria-label={t('modelManager.clearLoras')}
+        onClick={() => dispatch(setClearLoras())}
+      />
+    </Flex>
   ) : (
     <Box
       background="var(--btn-base-color)"

@@ -372,12 +372,6 @@ class ModelManager(object):
         )
         from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
 
-#        try:
-#            if self.list_models()[self.current_model]['status'] == 'active':
-#                self.offload_model(self.current_model)
-#        except Exception:
-#            pass
-
         if self._has_cuda():
             torch.cuda.empty_cache()
         pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
@@ -423,9 +417,9 @@ class ModelManager(object):
             pipeline_args.update(cache_dir=global_cache_dir("hub"))
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
-            fp_args_list = [{"revision": "fp16"}, {}]
-        else:
-            fp_args_list = [{}]
+        revision = mconfig.get('revision') or ('fp16' if using_fp16 else None)
+        fp_args_list = [{"revision": revision}] if revision else []
+        fp_args_list.append({})
 
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
@@ -1162,7 +1156,7 @@ class ModelManager(object):
         return self.device.type == "cuda"
 
     def _diffuser_sha256(
-        self, name_or_path: Union[str, Path], chunksize=4096
+        self, name_or_path: Union[str, Path], chunksize=16777216
     ) -> Union[str, bytes]:
         path = None
         if isinstance(name_or_path, Path):

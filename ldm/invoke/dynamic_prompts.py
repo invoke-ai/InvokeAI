@@ -99,8 +99,9 @@ def expand_prompts(
             sequence = 0
             for command in commands:
                 sequence += 1
-                parent_conn.send(
-                    command + f' --fnformat="dp.{sequence:04}.{{prompt}}.png"'
+                format = _get_fn_format(outdir, sequence)
+                parent_conn.send_bytes(
+                    (command + f' --fnformat="{format}"').encode('utf-8')
                 )
             parent_conn.close()
         else:
@@ -110,7 +111,20 @@ def expand_prompts(
         for p in children:
             p.terminate()
 
-
+def _get_fn_format(directory:str, sequence:int)->str:
+    """
+    Get a filename that doesn't exceed filename length restrictions
+    on the current platform.
+    """
+    try:
+        max_length = os.pathconf(directory,'PC_NAME_MAX')
+    except:
+        max_length = 255
+    prefix = f'dp.{sequence:04}.'
+    suffix = '.png'
+    max_length -= len(prefix)+len(suffix)
+    return f'{prefix}{{prompt:0.{max_length}}}{suffix}'
+            
 class MessageToStdin(object):
     def __init__(self, connection: Connection):
         self.connection = connection
@@ -119,7 +133,7 @@ class MessageToStdin(object):
     def readline(self) -> str:
         try:
             if len(self.linebuffer) == 0:
-                message = self.connection.recv()
+                message = self.connection.recv_bytes().decode('utf-8')
                 self.linebuffer = message.split("\n")
             result = self.linebuffer.pop(0)
             return result

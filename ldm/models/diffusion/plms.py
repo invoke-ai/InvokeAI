@@ -14,17 +14,6 @@ class PLMSSampler(Sampler):
     def __init__(self, model, schedule='linear', device=None, **kwargs):
         super().__init__(model,schedule,model.num_timesteps, device)
 
-    def prepare_to_sample(self, t_enc, **kwargs):
-        super().prepare_to_sample(t_enc, **kwargs)
-
-        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
-        all_timesteps_count = kwargs.get('all_timesteps_count', t_enc)
-
-        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.override_attention_processors(extra_conditioning_info, step_count = all_timesteps_count)
-        else:
-            self.invokeai_diffuser.restore_default_cross_attention()
-
 
     # this is the essential routine
     @torch.no_grad()

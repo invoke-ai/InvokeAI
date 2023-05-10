@@ -12,20 +12,12 @@ from typing import Union, Optional, Any
 from transformers import CLIPTokenizer
 
 from compel import Compel
-from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser
+from compel.prompt_parser import FlattenedPrompt, Blend, Fragment, CrossAttentionControlSubstitute, PromptParser, \
+    Conjunction
 from .devices import torch_dtype
+from .generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.invoke.globals import Globals
-
-def get_tokenizer(model) -> CLIPTokenizer:
-    # TODO remove legacy ckpt fallback handling
-    return (getattr(model, 'tokenizer', None) # diffusers
-            or model.cond_stage_model.tokenizer) # ldm
-
-def get_text_encoder(model) -> Any:
-    # TODO remove legacy ckpt fallback handling
-    return (getattr(model, 'text_encoder', None)  # diffusers
-            or UnsqueezingLDMTransformer(model.cond_stage_model.transformer)) # ldm
 
 class UnsqueezingLDMTransformer:
     def __init__(self, ldm_transformer):
@@ -40,48 +32,57 @@ class UnsqueezingLDMTransformer:
         return insufficiently_unsqueezed_tensor.unsqueeze(0)
 
 
-def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
+def get_uc_and_c_and_ec(prompt_string,
+                        model: StableDiffusionGeneratorPipeline,
+                        log_tokens=False, skip_normalize_legacy_blend=False):
     # lazy-load any deferred textual inversions.
     # this might take a couple of seconds the first time a textual inversion is used.
     model.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(prompt_string)
 
-    tokenizer = get_tokenizer(model)
-    text_encoder = get_text_encoder(model)
-    compel = Compel(tokenizer=tokenizer,
-                    text_encoder=text_encoder,
+    compel = Compel(tokenizer=model.tokenizer,
+                    text_encoder=model.text_encoder,
                     textual_inversion_manager=model.textual_inversion_manager,
                     dtype_for_device_getter=torch_dtype)
 
     # get rid of any newline characters
     prompt_string = prompt_string.replace("\n", " ")
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
+
     legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
-    positive_prompt: FlattenedPrompt|Blend
-    lora_conditions = None
+    positive_conjunction: Conjunction
     if legacy_blend is not None:
-        positive_prompt = legacy_blend
+        positive_conjunction = legacy_blend
     else:
         positive_conjunction = Compel.parse_prompt_string(positive_prompt_string)
-        positive_prompt = positive_conjunction.prompts[0]
-        should_use_lora_manager = True
-        lora_weights = positive_conjunction.lora_weights
-        if model.peft_manager:
-            should_use_lora_manager = model.peft_manager.should_use(lora_weights)
-            if not should_use_lora_manager:
-                model.peft_manager.set_loras(lora_weights)
-        if model.lora_manager and should_use_lora_manager:
-            lora_conditions = model.lora_manager.set_loras_conditions(lora_weights)
+    positive_prompt = positive_conjunction.prompts[0]
+
+    should_use_lora_manager = True
+    lora_weights = positive_conjunction.lora_weights
+    lora_conditions = None
+    if model.peft_manager:
+        should_use_lora_manager = model.peft_manager.should_use(lora_weights)
+        if not should_use_lora_manager:
+            model.peft_manager.set_loras(lora_weights)
+    if model.lora_manager and should_use_lora_manager:
+        lora_conditions = model.lora_manager.set_loras_conditions(lora_weights)
+
     negative_conjunction = Compel.parse_prompt_string(negative_prompt_string)
     negative_prompt: FlattenedPrompt | Blend = negative_conjunction.prompts[0]
 
+    tokens_count = get_max_token_count(model.tokenizer, positive_prompt)
     if log_tokens or getattr(Globals, "log_tokenization", False):
-        log_tokenization(positive_prompt, negative_prompt, tokenizer=tokenizer)
+        log_tokenization(positive_prompt, negative_prompt, tokenizer=model.tokenizer)
 
-    c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
-    uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+    # some LoRA models also mess with the text encoder, so they must be active while compel builds conditioning tensors
+    lora_conditioning_ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
+                                                                                            lora_conditions=lora_conditions)
+    with InvokeAIDiffuserComponent.custom_attention_context(model.unet,
+                                                            extra_conditioning_info=lora_conditioning_ec,
+                                                            step_count=-1):
+        c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
+        uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
 
-    tokens_count = get_max_token_count(tokenizer, positive_prompt)
-
+    # now build the "real" ec
     ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
                                                          cross_attention_control_args=options.get(
                                                              'cross_attention_control', None),
@@ -93,12 +94,12 @@ def get_prompt_structure(prompt_string, skip_normalize_legacy_blend: bool = Fals
     Union[FlattenedPrompt, Blend], FlattenedPrompt):
     positive_prompt_string, negative_prompt_string = split_prompt_to_positive_and_negative(prompt_string)
     legacy_blend = try_parse_legacy_blend(positive_prompt_string, skip_normalize_legacy_blend)
-    positive_prompt: FlattenedPrompt|Blend
+    positive_conjunction: Conjunction
     if legacy_blend is not None:
-        positive_prompt = legacy_blend
+        positive_conjunction = legacy_blend
     else:
         positive_conjunction = Compel.parse_prompt_string(positive_prompt_string)
-        positive_prompt = positive_conjunction.prompts[0]
+    positive_prompt = positive_conjunction.prompts[0]
     negative_conjunction = Compel.parse_prompt_string(negative_prompt_string)
     negative_prompt: FlattenedPrompt|Blend = negative_conjunction.prompts[0]
 
@@ -217,18 +218,26 @@ def log_tokenization_for_text(text, tokenizer, display_label=None):
         print(f'{discarded}\x1b[0m')
 
 
-def try_parse_legacy_blend(text: str, skip_normalize: bool=False) -> Optional[Blend]:
+def try_parse_legacy_blend(text: str, skip_normalize: bool=False) -> Optional[Conjunction]:
     weighted_subprompts = split_weighted_subprompts(text, skip_normalize=skip_normalize)
     if len(weighted_subprompts) <= 1:
         return None
     strings = [x[0] for x in weighted_subprompts]
-    weights = [x[1] for x in weighted_subprompts]
 
     pp = PromptParser()
     parsed_conjunctions = [pp.parse_conjunction(x) for x in strings]
-    flattened_prompts = [x.prompts[0] for x in parsed_conjunctions]
+    flattened_prompts = []
+    weights = []
+    loras = []
+    for i, x in enumerate(parsed_conjunctions):
+        if len(x.prompts)>0:
+            flattened_prompts.append(x.prompts[0])
+            weights.append(weighted_subprompts[i][1])
+        if len(x.lora_weights)>0:
+            loras.extend(x.lora_weights)
 
-    return Blend(prompts=flattened_prompts, weights=weights, normalize_weights=not skip_normalize)
+    return Conjunction([Blend(prompts=flattened_prompts, weights=weights, normalize_weights=not skip_normalize)],
+                       lora_weights = loras)
 
 
 def split_weighted_subprompts(text, skip_normalize=False)->list:

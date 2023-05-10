@@ -25,12 +25,11 @@ from invokeai.backend.modules.parameters import parameters_to_command
 import invokeai.frontend.dist as frontend
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from ldm.invoke.concepts_lib import get_hf_concepts_lib
 from ldm.invoke.conditioning import (
     get_tokens_for_prompt_object,
     get_prompt_structure,
     split_weighted_subprompts,
-    get_tokenizer,
 )
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
@@ -38,11 +37,11 @@ from ldm.invoke.globals import (
     Globals,
     global_converted_ckpts_dir,
     global_models_dir,
-    global_lora_models_dir,
 )
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from compel.prompt_parser import Blend
 from ldm.invoke.merge_diffusers import merge_diffusion_models
+from ldm.modules.lora_manager import LoraManager
 
 # Loading Arguments
 opt = Args()
@@ -524,20 +523,12 @@ class InvokeAIWebServer:
         @socketio.on("getLoraModels")
         def get_lora_models():
             try:
-                lora_path = global_lora_models_dir()
-                loras = []
-                for root, _, files in os.walk(lora_path):
-                    models = [
-                        Path(root, x)
-                        for x in files
-                        if Path(x).suffix in [".ckpt", ".pt", ".safetensors"]
-                    ]
-                    loras = loras + models
-
+                model = self.generate.model
+                lora_mgr = LoraManager(model)
+                loras = lora_mgr.list_compatible_loras()
                 found_loras = []
-                for lora in sorted(loras, key=lambda s: s.stem.lower()):
-                    location = str(lora.resolve()).replace("\\", "/")
-                    found_loras.append({"name": lora.stem, "location": location})
+                for lora in sorted(loras, key=str.casefold):
+                    found_loras.append({"name":lora,"location":str(loras[lora])})
                 socketio.emit("foundLoras", found_loras)
             except Exception as e:
                 self.handle_exceptions(e)
@@ -1315,7 +1306,7 @@ class InvokeAIWebServer:
                     None
                     if type(parsed_prompt) is Blend
                     else get_tokens_for_prompt_object(
-                        get_tokenizer(self.generate.model), parsed_prompt
+                        self.generate.model.tokenizer, parsed_prompt
                     )
                 )
                 attention_maps_image_base64_url = (

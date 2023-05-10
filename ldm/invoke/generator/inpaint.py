@@ -255,8 +255,8 @@ class Inpaint(Img2Img):
         pipeline.scheduler = sampler
 
         # todo: support cross-attention control
-        uc, c, _ = conditioning
-        conditioning_data = (ConditioningData(uc, c, cfg_scale)
+        uc, c, extra_conditioning_info = conditioning
+        conditioning_data = (ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
                              .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
 
