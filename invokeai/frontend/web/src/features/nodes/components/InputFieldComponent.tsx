@@ -6,9 +6,11 @@ import BooleanInputFieldComponent from './fields/BooleanInputFieldComponent';
 import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
 import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
 import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
+import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
+import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -84,6 +86,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
     );
   }
 
+  if (type === 'conditioning' && template.type === 'conditioning') {
+    return (
+      <ConditioningInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
   if (type === 'model' && template.type === 'model') {
     return (
       <ModelInputFieldComponent
@@ -97,6 +109,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'array' && template.type === 'array') {
     return (
       <ArrayInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'item' && template.type === 'item') {
+    return (
+      <ItemInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

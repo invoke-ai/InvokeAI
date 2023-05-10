@@ -9,12 +9,15 @@ import {
   ImageInputFieldTemplate,
   IntegerInputFieldTemplate,
   LatentsInputFieldTemplate,
+  ConditioningInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
   InputFieldTemplateBase,
   OutputFieldTemplate,
   TypeHints,
   FieldType,
+  ArrayInputFieldTemplate,
+  ItemInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -196,6 +199,21 @@ const buildLatentsInputFieldTemplate = ({
   return template;
 };
 
+const buildConditioningInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ConditioningInputFieldTemplate => {
+  const template: ConditioningInputFieldTemplate = {
+    ...baseField,
+    type: 'conditioning',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -209,6 +227,36 @@ const buildEnumInputFieldTemplate = ({
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? options[0],
+  };
+
+  return template;
+};
+
+const buildArrayInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ArrayInputFieldTemplate => {
+  const template: ArrayInputFieldTemplate = {
+    ...baseField,
+    type: 'array',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: [],
+  };
+
+  return template;
+};
+
+const buildItemInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ItemInputFieldTemplate => {
+  const template: ItemInputFieldTemplate = {
+    ...baseField,
+    type: 'item',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: undefined,
   };
 
   return template;
@@ -266,6 +314,9 @@ export const buildInputFieldTemplate = (
   if (['latents'].includes(fieldType)) {
     return buildLatentsInputFieldTemplate({ schemaObject, baseField });
   }
+  if (['conditioning'].includes(fieldType)) {
+    return buildConditioningInputFieldTemplate({ schemaObject, baseField });
+  }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
   }
@@ -283,6 +334,12 @@ export const buildInputFieldTemplate = (
   }
   if (['boolean'].includes(fieldType)) {
     return buildBooleanInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['array'].includes(fieldType)) {
+    return buildArrayInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['item'].includes(fieldType)) {
+    return buildItemInputFieldTemplate({ schemaObject, baseField });
   }
 
   return;

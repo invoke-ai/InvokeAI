@@ -107,7 +107,7 @@ const initialSystemState: SystemState = {
   subscribedNodeIds: [],
   wereModelsReceived: false,
   wasSchemaParsed: false,
-  consoleLogLevel: 'error',
+  consoleLogLevel: 'debug',
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
@@ -382,6 +382,13 @@ export const systemSlice = createSlice({
 
     builder.addCase(sessionInvoked.pending, (state) => {
       state.statusTranslationKey = 'common.statusPreparing';
+    });
+
+    builder.addCase(sessionInvoked.rejected, (state, action) => {
+      const error = action.payload as string | undefined;
+      state.toastQueue.push(
+        makeToast({ title: error || t('toast.serverError'), status: 'error' })
+      );
     });
 
     /**

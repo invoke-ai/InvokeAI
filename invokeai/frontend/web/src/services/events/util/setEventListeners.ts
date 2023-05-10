@@ -22,6 +22,8 @@ import {
 } from 'services/thunks/gallery';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { makeToast } from '../../../features/system/hooks/useToastWatcher';
+import { addToast } from '../../../features/system/store/systemSlice';
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -74,6 +76,16 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
           sessionId: system.sessionId,
           timestamp: getTimestamp(),
         })
+      );
+    }
+  });
+
+  socket.on('connect_error', (error) => {
+    if (error && error.message) {
+      dispatch(
+        addToast(
+          makeToast({ title: error.message, status: 'error', duration: 10000 })
+        )
       );
     }
   });

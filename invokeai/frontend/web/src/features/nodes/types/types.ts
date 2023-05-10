@@ -56,8 +56,10 @@ export type FieldType =
   | 'enum'
   | 'image'
   | 'latents'
+  | 'conditioning'
   | 'model'
-  | 'array';
+  | 'array'
+  | 'item';
 
 /**
  * An input field is persisted across reloads as part of the user's local state.
@@ -74,9 +76,11 @@ export type InputFieldValue =
   | BooleanInputFieldValue
   | ImageInputFieldValue
   | LatentsInputFieldValue
+  | ConditioningInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
-  | ArrayInputFieldValue;
+  | ArrayInputFieldValue
+  | ItemInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -91,9 +95,11 @@ export type InputFieldTemplate =
   | BooleanInputFieldTemplate
   | ImageInputFieldTemplate
   | LatentsInputFieldTemplate
+  | ConditioningInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
-  | ArrayInputFieldTemplate;
+  | ArrayInputFieldTemplate
+  | ItemInputFieldTemplate;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -162,6 +168,11 @@ export type LatentsInputFieldValue = FieldValueBase & {
   value?: undefined;
 };
 
+export type ConditioningInputFieldValue = FieldValueBase & {
+  type: 'conditioning';
+  value?: undefined;
+};
+
 export type ImageInputFieldValue = FieldValueBase & {
   type: 'image';
   value?: Pick<ImageField, 'image_name' | 'image_type'>;
@@ -175,6 +186,11 @@ export type ModelInputFieldValue = FieldValueBase & {
 export type ArrayInputFieldValue = FieldValueBase & {
   type: 'array';
   value?: (string | number)[];
+};
+
+export type ItemInputFieldValue = FieldValueBase & {
+  type: 'item';
+  value?: undefined;
 };
 
 export type InputFieldTemplateBase = {
@@ -229,6 +245,11 @@ export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
   type: 'latents';
 };
 
+export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'conditioning';
+};
+
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
   default: string | number;
   type: 'enum';
@@ -242,8 +263,13 @@ export type ModelInputFieldTemplate = InputFieldTemplateBase & {
 };
 
 export type ArrayInputFieldTemplate = InputFieldTemplateBase & {
-  default: (string | number)[];
+  default: [];
   type: 'array';
+};
+
+export type ItemInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'item';
 };
 
 /**
