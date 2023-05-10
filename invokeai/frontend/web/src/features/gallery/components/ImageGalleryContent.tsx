@@ -5,6 +5,7 @@ import {
   FlexProps,
   Grid,
   Icon,
+  Image,
   Text,
   forwardRef,
 } from '@chakra-ui/react';
@@ -14,7 +15,10 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
-import { imageGallerySelector } from 'features/gallery/store/gallerySelectors';
+import {
+  gallerySelector,
+  imageGallerySelector,
+} from 'features/gallery/store/gallerySelectors';
 import {
   setCurrentCategory,
   setGalleryImageMinimumWidth,
@@ -50,30 +54,48 @@ import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
+import ProgressImagePreview from 'features/parameters/components/_ProgressImagePreview';
+import ProgressImage from 'features/parameters/components/ProgressImage';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { Image as ImageType } from 'app/types/invokeai';
+import { ProgressImage as ProgressImageType } from 'services/events/types';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import GalleryProgressImage from './GalleryProgressImage';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
+const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
 
-const gallerySelector = createSelector(
-  [
-    (state: RootState) => state.uploads,
-    (state: RootState) => state.results,
-    (state: RootState) => state.gallery,
-  ],
-  (uploads, results, gallery) => {
+const selector = createSelector(
+  [(state: RootState) => state],
+  (state) => {
+    const { results, uploads, system, gallery } = state;
     const { currentCategory } = gallery;
 
-    return currentCategory === 'results'
-      ? {
-          images: resultsAdapter.getSelectors().selectAll(results),
-          isLoading: results.isLoading,
-          areMoreImagesAvailable: results.page < results.pages - 1,
-        }
-      : {
-          images: uploadsAdapter.getSelectors().selectAll(uploads),
-          isLoading: uploads.isLoading,
-          areMoreImagesAvailable: uploads.page < uploads.pages - 1,
-        };
-  }
+    const tempImages: (ImageType | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
+
+    if (system.progressImage) {
+      tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
+    }
+
+    if (currentCategory === 'results') {
+      return {
+        images: tempImages.concat(
+          resultsAdapter.getSelectors().selectAll(results)
+        ),
+        isLoading: results.isLoading,
+        areMoreImagesAvailable: results.page < results.pages - 1,
+      };
+    }
+
+    return {
+      images: tempImages.concat(
+        uploadsAdapter.getSelectors().selectAll(uploads)
+      ),
+      isLoading: uploads.isLoading,
+      areMoreImagesAvailable: uploads.page < uploads.pages - 1,
+    };
+  },
+  defaultSelectorOptions
 );
 
 const ImageGalleryContent = () => {
@@ -108,7 +130,7 @@ const ImageGalleryContent = () => {
   } = useAppSelector(imageGallerySelector);
 
   const { images, areMoreImagesAvailable, isLoading } =
-    useAppSelector(gallerySelector);
+    useAppSelector(selector);
 
   const handleClickLoadMore = () => {
     if (currentCategory === 'results') {
@@ -186,8 +208,6 @@ const ImageGalleryContent = () => {
         h: 'full',
         w: 'full',
         borderRadius: 'base',
-        // bg: 'base.850',
-        // p: 2,
       }}
     >
       <Flex
@@ -311,16 +331,24 @@ const ImageGalleryContent = () => {
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
                   itemContent={(index, image) => {
-                    const { name } = image;
-                    const isSelected = selectedImage?.name === name;
+                    const isSelected =
+                      image === PROGRESS_IMAGE_PLACEHOLDER
+                        ? false
+                        : selectedImage?.name === image?.name;
 
                     return (
                       <Flex sx={{ pb: 2 }}>
-                        <HoverableImage
-                          key={`${name}-${image.thumbnail}`}
-                          image={image}
-                          isSelected={isSelected}
-                        />
+                        {image === PROGRESS_IMAGE_PLACEHOLDER ? (
+                          <GalleryProgressImage
+                            key={PROGRESS_IMAGE_PLACEHOLDER}
+                          />
+                        ) : (
+                          <HoverableImage
+                            key={`${image.name}-${image.thumbnail}`}
+                            image={image}
+                            isSelected={isSelected}
+                          />
+                        )}
                       </Flex>
                     );
                   }}
@@ -336,12 +364,16 @@ const ImageGalleryContent = () => {
                   }}
                   scrollerRef={setScroller}
                   itemContent={(index, image) => {
-                    const { name } = image;
-                    const isSelected = selectedImage?.name === name;
+                    const isSelected =
+                      image === PROGRESS_IMAGE_PLACEHOLDER
+                        ? false
+                        : selectedImage?.name === image?.name;
 
-                    return (
+                    return image === PROGRESS_IMAGE_PLACEHOLDER ? (
+                      <GalleryProgressImage key={PROGRESS_IMAGE_PLACEHOLDER} />
+                    ) : (
                       <HoverableImage
-                        key={`${name}-${image.thumbnail}`}
+                        key={`${image.name}-${image.thumbnail}`}
                         image={image}
                         isSelected={isSelected}
                       />

@@ -28,13 +28,14 @@ export const buildImg2ImgNode = (
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
     shouldRandomizeSeed,
+    initialImage,
   } = generation;
 
-  const initialImage = initialImageSelector(state);
+  // const initialImage = initialImageSelector(state);
 
   if (!initialImage) {
     // TODO: handle this
-    // throw 'no initial image';
+    throw 'no initial image';
   }
 
   const imageToImageNode: ImageToImageInvocation = {
@@ -47,12 +48,10 @@ export const buildImg2ImgNode = (
     cfg_scale: cfgScale,
     scheduler: sampler as ImageToImageInvocation['scheduler'],
     model,
-    image: initialImage
-      ? {
-          image_name: initialImage.name,
-          image_type: initialImage.type,
-        }
-      : undefined,
+    image: {
+      image_name: initialImage.name,
+      image_type: initialImage.type,
+    },
     strength,
     fit,
   };

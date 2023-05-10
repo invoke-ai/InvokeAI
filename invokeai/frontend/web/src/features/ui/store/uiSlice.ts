@@ -23,7 +23,7 @@ export const initialUIState: UIState = {
   canvasTabAccordionState: [],
   floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
   shouldShowProgressImages: false,
-  shouldAutoShowProgressImages: false,
+  shouldShowProgressInViewer: false,
   shouldShowImageParameters: false,
 };
 
@@ -135,11 +135,8 @@ export const uiSlice = createSlice({
     setShouldShowProgressImages: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressImages = action.payload;
     },
-    setShouldAutoShowProgressImages: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
-      state.shouldAutoShowProgressImages = action.payload;
+    setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowProgressInViewer = action.payload;
     },
     shouldShowImageParametersChanged: (
       state,
@@ -173,7 +170,7 @@ export const {
   floatingProgressImageMoved,
   floatingProgressImageResized,
   setShouldShowProgressImages,
-  setShouldAutoShowProgressImages,
+  setShouldShowProgressInViewer,
   shouldShowImageParametersChanged,
 } = uiSlice.actions;
 
