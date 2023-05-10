@@ -650,7 +650,8 @@
         "betaClear": "Clear",
         "betaDarkenOutside": "Darken Outside",
         "betaLimitToBox": "Limit To Box",
-        "betaPreserveMasked": "Preserve Masked"
+        "betaPreserveMasked": "Preserve Masked",
+        "antialiasing": "Antialiasing"
     },
     "ui": {
         "showProgressImages": "Show Progress Images",

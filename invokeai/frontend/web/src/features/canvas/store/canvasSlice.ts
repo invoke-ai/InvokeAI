@@ -66,6 +66,7 @@ export const initialCanvasState: CanvasState = {
   minimumStageScale: 1,
   pastLayerStates: [],
   scaledBoundingBoxDimensions: { width: 512, height: 512 },
+  shouldAntialias: true,
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
@@ -796,6 +797,9 @@ export const canvasSlice = createSlice({
     setShouldRestrictStrokesToBox: (state, action: PayloadAction<boolean>) => {
       state.shouldRestrictStrokesToBox = action.payload;
     },
+    setShouldAntialias: (state, action: PayloadAction<boolean>) => {
+      state.shouldAntialias = action.payload;
+    },
     setShouldCropToBoundingBoxOnSave: (
       state,
       action: PayloadAction<boolean>
@@ -907,6 +911,7 @@ export const {
   setShouldRestrictStrokesToBox,
   stagingAreaInitialized,
   canvasSessionIdChanged,
+  setShouldAntialias,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
