@@ -38,9 +38,9 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "compel==1.0.5",
+ "compel~=1.1.5",
   "datasets",
-  "diffusers[torch]==0.15.1",
+  "diffusers[torch]~=0.16.1",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
@@ -72,7 +72,7 @@ dependencies = [
   "scikit-image>=0.19",
   "send2trash",
   "test-tube>=0.7.5",
-  "torch>=1.13.1",
+  "torch~=2.0.0",
   "torchvision>=0.14.1",
   "torchmetrics",
   "transformers~=4.26",
@@ -92,7 +92,7 @@ dependencies = [
 ]
 "test" = ["pytest>6.0.0", "pytest-cov"]
 "xformers" = [
-	   "xformers~=0.0.16; sys_platform!='darwin'",
+	   "xformers~=0.0.19; sys_platform!='darwin'",
 	   "triton; sys_platform=='linux'",
 ]
 
