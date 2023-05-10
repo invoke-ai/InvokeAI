@@ -82,11 +82,18 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('connect_error', (error) => {
     if (error && error.message) {
-      dispatch(
-        addToast(
-          makeToast({ title: error.message, status: 'error', duration: 10000 })
-        )
-      );
+      const data: string | undefined = (error as any).data;
+      if (data === 'ERR_UNAUTHENTICATED') {
+        dispatch(
+          addToast(
+            makeToast({
+              title: error.message,
+              status: 'error',
+              duration: 10000,
+            })
+          )
+        );
+      }
     }
   });
 
