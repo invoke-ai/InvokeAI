@@ -10,20 +10,25 @@ const selector = createSelector(
   [systemSelector, gallerySelector],
   (system, gallery) => {
     const { shouldUseSingleGalleryColumn, galleryImageObjectFit } = gallery;
-    const { progressImage } = system;
+    const { progressImage, shouldAntialiasProgressImage } = system;
 
     return {
       progressImage,
       shouldUseSingleGalleryColumn,
       galleryImageObjectFit,
+      shouldAntialiasProgressImage,
     };
   },
   defaultSelectorOptions
 );
 
 const GalleryProgressImage = () => {
-  const { progressImage, shouldUseSingleGalleryColumn, galleryImageObjectFit } =
-    useAppSelector(selector);
+  const {
+    progressImage,
+    shouldUseSingleGalleryColumn,
+    galleryImageObjectFit,
+    shouldAntialiasProgressImage,
+  } = useAppSelector(selector);
 
   if (!progressImage) {
     return null;
@@ -53,6 +58,7 @@ const GalleryProgressImage = () => {
           maxWidth: '100%',
           maxHeight: '100%',
           borderRadius: 'base',
+          imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
         }}
       />
     </Flex>

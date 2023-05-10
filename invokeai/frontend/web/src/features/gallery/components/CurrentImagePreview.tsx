@@ -22,13 +22,14 @@ export const imagesSelector = createSelector(
       shouldShowProgressInViewer,
     } = ui;
     const { selectedImage } = gallery;
-    const { progressImage } = system;
+    const { progressImage, shouldAntialiasProgressImage } = system;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
       image: selectedImage,
       progressImage,
       shouldShowProgressInViewer,
+      shouldAntialiasProgressImage,
     };
   },
   {
@@ -45,6 +46,7 @@ const CurrentImagePreview = () => {
     shouldHidePreview,
     progressImage,
     shouldShowProgressInViewer,
+    shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
 
@@ -84,6 +86,7 @@ const CurrentImagePreview = () => {
             height: 'auto',
             position: 'absolute',
             borderRadius: 'base',
+            imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
           }}
         />
       ) : (
