@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setImg2imgStrength } from 'features/parameters/store/generationSlice';
@@ -13,32 +14,25 @@ const selector = createSelector(
   (generation, hotkeys, config) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.img2imgStrength;
-    const { img2imgStrength, isImageToImageEnabled } = generation;
+    const { img2imgStrength } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
     return {
       img2imgStrength,
-      isImageToImageEnabled,
       initial,
       min,
       sliderMax,
       inputMax,
       step,
     };
-  }
+  },
+  defaultSelectorOptions
 );
 
 const ImageToImageStrength = () => {
-  const {
-    img2imgStrength,
-    isImageToImageEnabled,
-    initial,
-    min,
-    sliderMax,
-    inputMax,
-    step,
-  } = useAppSelector(selector);
+  const { img2imgStrength, initial, min, sliderMax, inputMax, step } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -64,7 +58,6 @@ const ImageToImageStrength = () => {
       withInput
       withSliderMarks
       withReset
-      isDisabled={!isImageToImageEnabled}
       sliderNumberInputProps={{ max: inputMax }}
     />
   );

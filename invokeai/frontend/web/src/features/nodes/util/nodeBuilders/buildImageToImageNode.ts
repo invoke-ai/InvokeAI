@@ -5,8 +5,8 @@ import {
   ImageToImageInvocation,
   TextToImageInvocation,
 } from 'services/api';
-import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 import { O } from 'ts-toolbelt';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
 export const buildImg2ImgNode = (
   state: RootState,
@@ -14,6 +14,8 @@ export const buildImg2ImgNode = (
 ): ImageToImageInvocation => {
   const nodeId = uuidv4();
   const { generation } = state;
+
+  const activeTabName = activeTabNameSelector(state);
 
   const {
     prompt,
@@ -33,11 +35,6 @@ export const buildImg2ImgNode = (
 
   // const initialImage = initialImageSelector(state);
 
-  if (!initialImage) {
-    // TODO: handle this
-    throw 'no initial image';
-  }
-
   const imageToImageNode: ImageToImageInvocation = {
     id: nodeId,
     type: 'img2img',
@@ -48,13 +45,22 @@ export const buildImg2ImgNode = (
     cfg_scale: cfgScale,
     scheduler: sampler as ImageToImageInvocation['scheduler'],
     model,
-    image: {
-      image_name: initialImage.name,
-      image_type: initialImage.type,
-    },
     strength,
     fit,
   };
+
+  // on Canvas tab, we do not manually specific init image
+  if (activeTabName === 'img2img') {
+    if (!initialImage) {
+      // TODO: handle this more better
+      throw 'no initial image';
+    }
+
+    imageToImageNode.image = {
+      image_name: initialImage.name,
+      image_type: initialImage.type,
+    };
+  }
 
   if (!shouldRandomizeSeed) {
     imageToImageNode.seed = seed;

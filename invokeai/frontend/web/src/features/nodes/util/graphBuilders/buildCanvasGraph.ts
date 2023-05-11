@@ -79,8 +79,6 @@ export const buildCanvasGraphAndBlobs = async (
   moduleLog.debug(
     {
       data: {
-        // baseDataURL,
-        // maskDataURL,
         baseIsPartiallyTransparent,
         baseIsFullyTransparent,
         doesMaskHaveBlackPixels,
