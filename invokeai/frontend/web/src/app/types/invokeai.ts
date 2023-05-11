@@ -321,11 +321,11 @@ export type AppFeature =
 /**
  * A disable-able Stable Diffusion feature
  */
-export type StableDiffusionFeature =
-  | 'noiseConfig'
-  | 'variations'
+export type SDFeature =
+  | 'noise'
+  | 'variation'
   | 'symmetry'
-  | 'tiling'
+  | 'seamless'
   | 'hires';
 
 /**
@@ -343,6 +343,7 @@ export type AppConfig = {
   shouldFetchImages: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
+  disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     iterations: {
