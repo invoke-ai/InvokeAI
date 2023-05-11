@@ -18,6 +18,12 @@ export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'unipc',
 ];
 
+export const IMG2IMG_DIFFUSERS_SCHEDULERS = DIFFUSERS_SCHEDULERS.filter(
+  (scheduler) => {
+    return scheduler !== 'dpmpp_2s';
+  }
+);
+
 // Valid image widths
 export const WIDTHS: Array<number> = Array.from(Array(64)).map(
   (_x, i) => (i + 1) * 64
