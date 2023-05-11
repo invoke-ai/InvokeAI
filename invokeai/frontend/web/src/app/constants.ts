@@ -2,6 +2,7 @@
 
 export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'ddim',
+  'deis',
   'lms',
   'pndm',
   'heun',

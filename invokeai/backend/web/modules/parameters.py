@@ -4,6 +4,7 @@ from .parse_seed_weights import parse_seed_weights
 
 SAMPLER_CHOICES = [
     "ddim",
+    "deis",
     "lms",
     "pndm",
     "heun",
