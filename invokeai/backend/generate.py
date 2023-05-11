@@ -37,6 +37,7 @@ from .safety_checker import SafetyChecker
 from .prompting import get_uc_and_c_and_ec
 from .prompting.conditioning import log_tokenization
 from .stable_diffusion import HuggingFaceConceptsLibrary
+from .stable_diffusion.schedulers import SCHEDULER_MAP
 from .util import choose_precision, choose_torch_device
 
 def fix_func(orig):
@@ -1047,26 +1048,8 @@ class Generate:
     def _set_scheduler(self):
         default = self.model.scheduler
 
-        # See https://github.com/huggingface/diffusers/issues/277#issuecomment-1371428672
-        scheduler_map = dict(
-            ddim=(diffusers.DDIMScheduler, dict(cpu_only=False)),
-            dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict(cpu_only=False)),
-            k_dpm_2=(diffusers.KDPM2DiscreteScheduler, dict(cpu_only=False)),
-            k_dpm_2_a=(diffusers.KDPM2AncestralDiscreteScheduler, dict(cpu_only=False)),
-            # DPMSolverMultistepScheduler is technically not `k_` anything, as it is neither
-            # the k-diffusers implementation nor included in EDM (Karras 2022), but we can
-            # provide an alias for compatibility.
-            k_dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict(cpu_only=False)),
-            k_euler=(diffusers.EulerDiscreteScheduler, dict(cpu_only=False)),
-            k_euler_a=(diffusers.EulerAncestralDiscreteScheduler, dict(cpu_only=False)),
-            k_heun=(diffusers.HeunDiscreteScheduler, dict(cpu_only=False)),
-            k_lms=(diffusers.LMSDiscreteScheduler, dict(cpu_only=False)),
-            plms=(diffusers.PNDMScheduler, dict(cpu_only=False)),
-            unipc=(diffusers.UniPCMultistepScheduler, dict(cpu_only=True))
-        )
-
-        if self.sampler_name in scheduler_map:
-            sampler_class, sampler_extra_config = scheduler_map[self.sampler_name]
+        if self.sampler_name in SCHEDULER_MAP:
+            sampler_class, sampler_extra_config = SCHEDULER_MAP[self.sampler_name]
             msg = (
                 f"Setting Sampler to {self.sampler_name} ({sampler_class.__name__})"
             )
