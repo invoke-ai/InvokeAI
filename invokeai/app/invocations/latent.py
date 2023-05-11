@@ -176,14 +176,6 @@ class TextToLatentsInvocation(BaseInvocation):
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
     control: list[ControlField] = Field(default=None, description="The controlnet(s) to use")
-    # control: Union[list[ControlField] | None] = Field(default=None, description="The controlnet(s) to use")
-    # control: ControlField = Field(default=None, description="The controlnet(s) to use")
-    # control: Union[ControlField | list[ControlField] | None] = Field(default=None, description="The controlnet(s) to use")
-    # control: Any = Field(default=None, description="The controlnet(s) to use")
-    # control: Optional[ControlField] = Field(default=None, description="The control to use")
-    # control: List[ControlField] = Field(description="The controlnet(s) to use")
-    # control: Optional[list[ControlField]] = Field(default=None, description="The controlnet(s) to use")
-    # control: Optional[list[ControlField]] = Field(description="The controlnet(s) to use")
     # fmt: on
 
     # Schema customisation
