@@ -23,22 +23,23 @@ import {
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
+  shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
   SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
-  setShouldAutoShowProgressImages,
+  setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
-import { persistor } from 'app/store/persistor';
 import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
+import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -49,12 +50,13 @@ const selector = createSelector(
       enableImageDebugging,
       consoleLogLevel,
       shouldLogToConsole,
+      shouldAntialiasProgressImage,
     } = system;
 
     const {
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
-      shouldAutoShowProgressImages,
+      shouldShowProgressInViewer,
     } = ui;
 
     return {
@@ -63,9 +65,10 @@ const selector = createSelector(
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
-      shouldAutoShowProgressImages,
+      shouldShowProgressInViewer,
       consoleLogLevel,
       shouldLogToConsole,
+      shouldAntialiasProgressImage,
     };
   },
   {
@@ -114,20 +117,24 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
-    shouldAutoShowProgressImages,
+    shouldShowProgressInViewer,
     consoleLogLevel,
     shouldLogToConsole,
+    shouldAntialiasProgressImage,
   } = useAppSelector(selector);
 
-  /**
-   * Resets localstorage, then opens a secondary modal informing user to
-   * refresh their browser.
-   * */
   const handleClickResetWebUI = useCallback(() => {
-    persistor.purge().then(() => {
-      onSettingsModalClose();
-      onRefreshModalOpen();
+    // Only remove our keys
+    Object.keys(window.localStorage).forEach((key) => {
+      if (
+        LOCALSTORAGE_KEYS.includes(key) ||
+        key.startsWith(LOCALSTORAGE_PREFIX)
+      ) {
+        localStorage.removeItem(key);
+      }
     });
+    onSettingsModalClose();
+    onRefreshModalOpen();
   }, [onSettingsModalClose, onRefreshModalOpen]);
 
   const handleLogLevelChanged = useCallback(
@@ -194,10 +201,19 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                   }
                 />
                 <IAISwitch
-                  label={t('settings.autoShowProgress')}
-                  isChecked={shouldAutoShowProgressImages}
+                  label={t('settings.showProgressInViewer')}
+                  isChecked={shouldShowProgressInViewer}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldAutoShowProgressImages(e.target.checked))
+                    dispatch(setShouldShowProgressInViewer(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.antialiasProgressImages')}
+                  isChecked={shouldAntialiasProgressImage}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(
+                      shouldAntialiasProgressImageChanged(e.target.checked)
+                    )
                   }
                 />
               </Flex>

@@ -12,9 +12,19 @@ export const $LatentsToLatentsInvocation = {
     type: {
       type: 'Enum',
     },
-    prompt: {
-      type: 'string',
-      description: `The prompt to generate an image from`,
+    positive_conditioning: {
+      type: 'all-of',
+      description: `Positive conditioning for generation`,
+      contains: [{
+        type: 'ConditioningField',
+      }],
+    },
+    negative_conditioning: {
+      type: 'all-of',
+      description: `Negative conditioning for generation`,
+      contains: [{
+        type: 'ConditioningField',
+      }],
     },
     noise: {
       type: 'all-of',
@@ -34,21 +44,9 @@ export const $LatentsToLatentsInvocation = {
     scheduler: {
       type: 'Enum',
     },
-    seamless: {
-      type: 'boolean',
-      description: `Whether or not to generate an image that can tile without seams`,
-    },
-    seamless_axes: {
-      type: 'string',
-      description: `The axes to tile the image on, 'x' and/or 'y'`,
-    },
     model: {
       type: 'string',
       description: `The model to use (currently ignored)`,
-    },
-    progress_images: {
-      type: 'boolean',
-      description: `Whether or not to produce progress images during generation`,
     },
     latents: {
       type: 'all-of',

@@ -3,7 +3,7 @@ import {
   ItemInputFieldValue,
 } from 'features/nodes/types/types';
 import { memo } from 'react';
-import { FaAddressCard, FaList } from 'react-icons/fa';
+import { FaAddressCard } from 'react-icons/fa';
 import { FieldComponentProps } from './types';
 
 const ItemInputFieldComponent = (

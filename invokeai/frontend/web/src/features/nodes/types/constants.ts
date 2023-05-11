@@ -1,4 +1,3 @@
-import { getCSSVar } from '@chakra-ui/utils';
 import { FieldType, FieldUIConfig } from './types';
 
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
@@ -15,6 +14,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   model: 'model',
   array: 'array',
   item: 'item',
+  ColorField: 'color',
 };
 
 const COLOR_TOKEN_VALUE = 500;
@@ -88,5 +88,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     colorCssVar: getColorTokenCssVariable('gray'),
     title: 'Collection Item',
     description: 'TODO: Collection Item type description.',
+  },
+  color: {
+    color: 'gray',
+    colorCssVar: getColorTokenCssVariable('gray'),
+    title: 'Color',
+    description: 'A RGBA color.',
   },
 };

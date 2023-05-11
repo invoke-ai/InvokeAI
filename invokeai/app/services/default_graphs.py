@@ -51,7 +51,7 @@ def create_system_graphs(graph_library: ItemStorageABC[LibraryGraph]) -> list[Li
 
     graphs: list[LibraryGraph] = list()
 
-    text_to_image = graph_library.get(default_text_to_image_graph_id)
+    # text_to_image = graph_library.get(default_text_to_image_graph_id)
     
     # TODO: Check if the graph is the same as the default one, and if not, update it
     #if text_to_image is None:

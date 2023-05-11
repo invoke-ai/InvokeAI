@@ -6,7 +6,7 @@ import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { imageDeleted, imageUploaded } from 'services/thunks/image';
+import { imageDeleted } from 'services/thunks/image';
 import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 
 export const uploadsAdapter = createEntityAdapter<Image>({
@@ -21,7 +21,7 @@ type AdditionalUploadsState = {
   nextPage: number;
 };
 
-const initialUploadsState =
+export const initialUploadsState =
   uploadsAdapter.getInitialState<AdditionalUploadsState>({
     page: 0,
     pages: 0,
@@ -35,7 +35,7 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadAdded: uploadsAdapter.addOne,
+    uploadAdded: uploadsAdapter.upsertOne,
   },
   extraReducers: (builder) => {
     /**
@@ -62,20 +62,10 @@ const uploadsSlice = createSlice({
     });
 
     /**
-     * Upload Image - FULFILLED
+     * Delete Image - pending
+     * Pre-emptively remove the image from the gallery
      */
-    builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const { location, response } = action.payload;
-
-      const uploadedImage = deserializeImageResponse(response);
-
-      uploadsAdapter.setOne(state, uploadedImage);
-    });
-
-    /**
-     * Delete Image - FULFILLED
-     */
-    builder.addCase(imageDeleted.fulfilled, (state, action) => {
+    builder.addCase(imageDeleted.pending, (state, action) => {
       const { imageType, imageName } = action.meta.arg;
 
       if (imageType === 'uploads') {

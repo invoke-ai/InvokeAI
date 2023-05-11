@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import io
 from typing import Literal, Optional
 
 import numpy
@@ -37,9 +38,7 @@ class ImageOutput(BaseInvocationOutput):
     # fmt: on
 
     class Config:
-        schema_extra = {
-            "required": ["type", "image", "width", "height", "mode"]
-        }
+        schema_extra = {"required": ["type", "image", "width", "height"]}
 
 
 def build_image_output(
@@ -54,7 +53,6 @@ def build_image_output(
         image=image_field,
         width=image.width,
         height=image.height,
-        mode=image.mode,
     )
 
 
@@ -151,7 +149,7 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
         metadata = context.services.metadata.build_metadata(
             session_id=context.graph_execution_state_id, node=self
         )
-        
+
         context.services.images.save(image_type, image_name, image_crop, metadata)
         return build_image_output(
             image_type=image_type,
@@ -209,7 +207,7 @@ class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
         metadata = context.services.metadata.build_metadata(
             session_id=context.graph_execution_state_id, node=self
         )
-        
+
         context.services.images.save(image_type, image_name, new_image, metadata)
         return build_image_output(
             image_type=image_type,

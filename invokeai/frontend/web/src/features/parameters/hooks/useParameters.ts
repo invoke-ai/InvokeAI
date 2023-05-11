@@ -1,12 +1,15 @@
-import { UseToastOptions, useToast } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { isFinite, isString } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSetBothPrompts from './usePrompt';
-import { initialImageSelected, setSeed } from '../store/generationSlice';
-import { isImage, isImageField } from 'services/types/guards';
+import { allParametersSet, setSeed } from '../store/generationSlice';
+import { isImageField } from 'services/types/guards';
 import { NUMPY_RAND_MAX } from 'app/constants';
+import { initialImageSelected } from '../store/actions';
+import { Image } from 'app/types/invokeai';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 
 export const useParameters = () => {
   const dispatch = useAppDispatch();
@@ -102,28 +105,48 @@ export const useParameters = () => {
    * Sets image as initial image with toast
    */
   const sendToImageToImage = useCallback(
-    (image: unknown) => {
-      if (!isImage(image)) {
+    (image: Image) => {
+      dispatch(initialImageSelected({ name: image.name, type: image.type }));
+    },
+    [dispatch]
+  );
+
+  const recallAllParameters = useCallback(
+    (image: Image | undefined) => {
+      const type = image?.metadata?.invokeai?.node?.type;
+      if (['txt2img', 'img2img', 'inpaint'].includes(String(type))) {
+        dispatch(allParametersSet(image));
+
+        if (image?.metadata?.invokeai?.node?.type === 'img2img') {
+          dispatch(setActiveTab('img2img'));
+        } else if (image?.metadata?.invokeai?.node?.type === 'txt2img') {
+          dispatch(setActiveTab('txt2img'));
+        }
+
         toast({
-          title: t('toast.imageNotLoaded'),
-          description: t('toast.imageNotLoadedDesc'),
-          status: 'warning',
+          title: t('toast.parametersSet'),
+          status: 'success',
           duration: 2500,
           isClosable: true,
         });
-        return;
+      } else {
+        toast({
+          title: t('toast.parametersNotSet'),
+          description: t('toast.parametersNotSetDesc'),
+          status: 'error',
+          duration: 2500,
+          isClosable: true,
+        });
       }
-
-      dispatch(initialImageSelected({ name: image.name, type: image.type }));
-      toast({
-        title: t('toast.sentToImageToImage'),
-        status: 'info',
-        duration: 2500,
-        isClosable: true,
-      });
     },
     [t, toast, dispatch]
   );
 
-  return { recallPrompt, recallSeed, recallInitialImage, sendToImageToImage };
+  return {
+    recallPrompt,
+    recallSeed,
+    recallInitialImage,
+    sendToImageToImage,
+    recallAllParameters,
+  };
 };
