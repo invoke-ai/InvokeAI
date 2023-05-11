@@ -433,7 +433,7 @@ class ModelManager(object):
                     **fp_args,
                 )
             except OSError as e:
-                if str(e).startswith("fp16 is not a valid"):
+                if 'Revision Not Found' in str(e):
                     pass
                 else:
                     print(
