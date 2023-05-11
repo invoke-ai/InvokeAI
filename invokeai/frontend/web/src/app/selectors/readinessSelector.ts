@@ -1,26 +1,20 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
-import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 
 export const readinessSelector = createSelector(
-  [
-    generationSelector,
-    systemSelector,
-    initialCanvasImageSelector,
-    activeTabNameSelector,
-  ],
-  (generation, system) => {
+  [generationSelector, systemSelector, activeTabNameSelector],
+  (generation, system, activeTabName) => {
     const {
       prompt,
       shouldGenerateVariations,
       seedWeights,
       initialImage,
       seed,
-      isImageToImageEnabled,
     } = generation;
 
     const { isProcessing, isConnected } = system;
@@ -34,7 +28,7 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('Missing prompt');
     }
 
-    if (isImageToImageEnabled && !initialImage) {
+    if (activeTabName === 'img2img' && !initialImage) {
       isReady = false;
       reasonsWhyNotReady.push('No initial image selected');
     }
@@ -64,10 +58,5 @@ export const readinessSelector = createSelector(
     // All good
     return { isReady, reasonsWhyNotReady };
   },
-  {
-    memoizeOptions: {
-      equalityCheck: isEqual,
-      resultEqualityCheck: isEqual,
-    },
-  }
+  defaultSelectorOptions
 );

@@ -35,7 +35,6 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  isImageToImageEnabled: boolean;
   model: string;
   shouldUseSeamless: boolean;
   seamlessXAxis: boolean;
@@ -71,7 +70,6 @@ export const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
-  isImageToImageEnabled: false,
   model: '',
   shouldUseSeamless: false,
   seamlessXAxis: true,
@@ -233,10 +231,6 @@ export const generationSlice = createSlice({
     },
     initialImageChanged: (state, action: PayloadAction<InvokeAI.Image>) => {
       state.initialImage = action.payload;
-      state.isImageToImageEnabled = true;
-    },
-    isImageToImageEnabledChanged: (state, action: PayloadAction<boolean>) => {
-      state.isImageToImageEnabled = action.payload;
     },
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
@@ -249,9 +243,6 @@ export const {
   clearInitialImage,
   resetParametersState,
   resetSeed,
-  setAllImageToImageParameters,
-  setAllParameters,
-  setAllTextToImageParameters,
   setCfgScale,
   setHeight,
   setImg2imgStrength,
@@ -282,7 +273,6 @@ export const {
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
   initialImageChanged,
-  isImageToImageEnabledChanged,
   modelSelected,
   setShouldUseNoiseSettings,
   setSeamless,

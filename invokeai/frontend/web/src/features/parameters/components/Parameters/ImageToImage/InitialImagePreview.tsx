@@ -5,28 +5,27 @@ import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash-es';
 import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
 import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 const selector = createSelector(
   [generationSelector],
   (generation) => {
-    const { initialImage, isImageToImageEnabled } = generation;
+    const { initialImage } = generation;
     return {
       initialImage,
-      isImageToImageEnabled,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  defaultSelectorOptions
 );
 
 const InitialImagePreview = () => {
-  const { initialImage, isImageToImageEnabled } = useAppSelector(selector);
+  const { initialImage } = useAppSelector(selector);
   const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -73,8 +72,6 @@ const InitialImagePreview = () => {
         sx={{
           height: 'full',
           width: 'full',
-          opacity: isImageToImageEnabled ? 1 : 0.5,
-          filter: isImageToImageEnabled ? 'none' : 'auto',
           blur: '5px',
           position: 'relative',
           alignItems: 'center',
@@ -107,26 +104,6 @@ const InitialImagePreview = () => {
         )}
         {!initialImage?.url && <SelectImagePlaceholder />}
       </Flex>
-      {/* {!isImageToImageEnabled && (
-        <Flex
-          sx={{
-            w: 'full',
-            h: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'absolute',
-          }}
-        >
-          <Text
-            fontWeight={500}
-            fontSize="md"
-            userSelect="none"
-            color="base.200"
-          >
-            Image to Image is Disabled
-          </Text>
-        </Flex>
-      )} */}
     </Flex>
   );
 };
