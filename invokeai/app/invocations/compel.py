@@ -59,7 +59,7 @@ class CompelInvocation(BaseInvocation):
 
         # TODO: load without model
         model = choose_model(context.services.model_manager, self.model)
-        pipeline = model["model"]
+        pipeline = model.context.model
         tokenizer = pipeline.tokenizer
         text_encoder = pipeline.text_encoder
 

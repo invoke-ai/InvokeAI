@@ -6,7 +6,7 @@ from typing import Union, Callable
 
 from invokeai.backend import ModelManager, SDModelType, SDModelInfo
 
-class ModelManagerBase(ABC):
+class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory"""
 
     @abstractmethod
@@ -177,3 +177,35 @@ class ModelManagerBase(ABC):
         original file/database used to initialize the object.
         """
         pass
+
+    # simple implementation
+    class ModelManagerService(ModelManagerServiceBase):
+        """Responsible for managing models on disk and in memory"""
+            def __init__(
+            self,
+            config: Union[Path, DictConfig, str],
+            device_type: torch.device = CUDA_DEVICE,
+            precision: torch.dtype = torch.float16,
+            max_cache_size=MAX_CACHE_SIZE,
+            sequential_offload=False,
+            logger: types.ModuleType = logger,
+    ):
+        """
+        Initialize with the path to the models.yaml config file. 
+        Optional parameters are the torch device type, precision, max_models,
+        and sequential_offload boolean. Note that the default device
+        type and precision are set up for a CUDA system running at half precision.
+        """
+        self.mgr = ModelManager(config=config,
+                                device_type=device_type,
+                                precision=precision,
+                                max_cache_size=max_cache_size,
+                                sequential_offload=sequential_offload,
+                                logger=logger
+                                )
+        
+        def get(self, model_name: str, submodel: SDModelType=None)->SDModelInfo:
+        """Retrieve the indicated model. submodel can be used to get a
+        part (such as the vae) of a diffusers mode."""
+        self.mgr.get_model(
+

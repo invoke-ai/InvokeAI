@@ -3,7 +3,7 @@
 from typing import Any
 from invokeai.app.api.models.images import ProgressImage
 from invokeai.app.util.misc import get_timestamp
-
+from invokeai.app.services.model_manager_service import SDModelType, SDModelInfo
 
 class EventServiceBase:
     session_event: str = "session_event"
@@ -99,5 +99,47 @@ class EventServiceBase:
             event_name="graph_execution_state_complete",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
+            ),
+        )
+
+    def emit_model_load_started (
+            self,
+            graph_execution_state_id: str,
+            node: dict,
+            source_node_id: str,
+            model_name: str,
+            submodel: SDModelType,
+    ) -> None:
+        """Emitted when a model is requested"""
+        self.__emit_session_event(
+            event_name="model_load_started",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                node=node,
+                source_node_id=source_node_id,
+                model_name=str,
+                submodel=submodel,
+            ),
+        )
+
+    def emit_model_load_completed (
+            self,
+            graph_execution_state_id: str,
+            node: dict,
+            source_node_id: str,
+            model_name: str,
+            submodel: SDModelType,
+            model_info: SDModelInfo,
+    ) -> None:
+        """Emitted when a model is correctly loaded (returns model info)"""
+        self.__emit_session_event(
+            event_name="model_load_started",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                node=node,
+                source_node_id=source_node_id,
+                model_name=str,
+                submodel=submodel,
+                model_info=model_info,
             ),
         )

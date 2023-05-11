@@ -479,10 +479,11 @@ class ModelManager(object):
                 line = f"\033[1m{line}\033[0m"
             print(line)
 
-    def del_model(self, model_name: str, delete_files: bool = False) -> None:
+    def del_model(self, model_name: str, model_type: SDModelType.diffusers, delete_files: bool = False):
         """
         Delete the named model.
         """
+        model_name = self._disambiguate_name(model_name, model_type)
         omega = self.config
         if model_name not in omega:
             self.logger.error(f"Unknown model {model_name}")

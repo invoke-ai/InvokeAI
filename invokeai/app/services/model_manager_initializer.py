@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import types
 
 import invokeai.version
-from ...backend import ModelManager
+from .model_manager_service import ModelManagerService
 from ...backend.util import choose_precision, choose_torch_device
 from ...backend import Globals
 
-# TODO: Replace with an abstract class base ModelManagerBase
-def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
+# temporary function - should call ModelManagerService() directly
+def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManagerService:
     if not config.conf:
         config_file = os.path.join(Globals.root, "configs", "models.yaml")
         if not os.path.exists(config_file):
@@ -59,7 +59,7 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
             if hasattr(config,'max_cache_size') \
                else config.max_loaded_models * 2.5
         
-        model_manager = ModelManager(
+        model_manager = ModelManagerService(
             config.conf,
             precision=dtype,
             device_type=device,
