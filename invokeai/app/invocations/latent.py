@@ -295,15 +295,9 @@ class TextToLatentsInvocation(BaseInvocation):
                 control_weights.append(control_info.control_weight)
 
                 # handle control models
-                # FIXME: change this to dropdown menu?
-                # FIXME: generalize so don't have to hardcode torch_dtype and device
+                # FIXME: change this to dropdown menu
                 control_model = ControlNetModel.from_pretrained(control_info.control_model,
-                                                            #torch_dtype=model.unet.dtype).to(model.device)
-                                                            #torch.dtype=model.unet.dtype).to("cuda")
-                                                            # torch.dtype = model.unet.dtype).to("cuda")
-                                                            torch_dtype=torch.float16).to("cuda")
-                                                            # torch_dtype = torch.float16).to(model.device)
-                                                            # model.dtype).to(model.device)
+                                                                torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
 
                 # handle control images
