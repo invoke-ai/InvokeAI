@@ -208,7 +208,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(model.scheduler, eta=None)#ddim_eta)
+        ).add_scheduler_args_if_applicable(model.scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
 
