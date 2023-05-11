@@ -11,7 +11,7 @@ import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
 import { DragEvent, memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import CurrentImageFallback from './CurrentImageFallback';
+import ImageFallbackSpinner from './ImageFallbackSpinner';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -90,18 +90,10 @@ const CurrentImagePreview = () => {
       ) : (
         image && (
           <Image
-            onDragStart={handleDragStart}
+            src={getUrl(image.url)}
             fallbackStrategy="beforeLoadOrError"
-            src={shouldHidePreview ? undefined : getUrl(image.url)}
-            width={image.metadata.width || 'auto'}
-            height={image.metadata.height || 'auto'}
-            fallback={
-              shouldHidePreview ? (
-                <CurrentImageHidden />
-              ) : (
-                <CurrentImageFallback />
-              )
-            }
+            fallback={<ImageFallbackSpinner />}
+            onDragStart={handleDragStart}
             sx={{
               objectFit: 'contain',
               maxWidth: '100%',
