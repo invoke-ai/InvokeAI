@@ -74,7 +74,7 @@ SAMPLER_NAME_VALUES = Literal[
 
 
 def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-    scheduler_class, scheduler_extra_config = scheduler_map.get(scheduler_name,'ddim')
+    scheduler_class, scheduler_extra_config = scheduler_map.get(scheduler_name, scheduler_map['ddim'])
     scheduler_config = {**model.scheduler.config, **scheduler_extra_config}
     scheduler = scheduler_class.from_config(scheduler_config)
     # hack copied over from generate.py

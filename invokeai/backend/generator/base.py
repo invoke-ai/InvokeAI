@@ -182,7 +182,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         return generator_class(model, self.params.precision)
 
     def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-        scheduler_class, scheduler_extra_config = self.scheduler_map.get(scheduler_name,'ddim')
+        scheduler_class, scheduler_extra_config = self.scheduler_map.get(scheduler_name, self.scheduler_map['ddim'])
         scheduler_config = {**model.scheduler.config, **scheduler_extra_config}
         scheduler = scheduler_class.from_config(scheduler_config)
         # hack copied over from generate.py
