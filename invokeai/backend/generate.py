@@ -142,7 +142,7 @@ class Generate:
         model=None,
         conf="configs/models.yaml",
         embedding_path=None,
-        sampler_name="k_lms",
+        sampler_name="lms",
         ddim_eta=0.0,  # deterministic
         full_precision=False,
         precision="auto",

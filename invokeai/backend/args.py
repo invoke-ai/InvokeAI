@@ -634,7 +634,7 @@ class Args(object):
             choices=SAMPLER_CHOICES,
             metavar="SAMPLER_NAME",
             help=f'Set the default sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
-            default="k_lms",
+            default="lms",
         )
         render_group.add_argument(
             "--log_tokenization",
