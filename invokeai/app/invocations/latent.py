@@ -287,7 +287,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        conditioning_data = self.get_conditioning_data(context, model)
 
         # TODO: Verify the noise is the right size
 
