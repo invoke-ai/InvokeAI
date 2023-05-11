@@ -12,12 +12,12 @@ export const makeGraphOfXImages = (numberOfImages: string) =>
         prompt: 'pizza',
         steps: 50,
         seed: 123,
-        sampler_name: 'ddim',
+        scheduler: 'ddim',
       })
     )
     .reduce(
       (acc, val: TextToImageInvocation) => {
-        acc.nodes![val.id] = val;
+        if (acc.nodes) acc.nodes[val.id] = val;
         return acc;
       },
       { nodes: {} } as Graph

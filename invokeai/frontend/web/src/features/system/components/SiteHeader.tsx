@@ -1,6 +1,5 @@
 import { Flex, Grid } from '@chakra-ui/react';
 import { memo, useState } from 'react';
-import ModelSelect from './ModelSelect';
 import StatusIndicator from './StatusIndicator';
 
 import InvokeAILogoComponent from './InvokeAILogoComponent';

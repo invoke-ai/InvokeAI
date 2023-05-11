@@ -1,5 +1,6 @@
 import { Box } from '@chakra-ui/react';
 import { readinessSelector } from 'app/selectors/readinessSelector';
+import { userInvoked } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
@@ -11,7 +12,6 @@ import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
-import { generateGraphBuilt } from 'services/thunks/session';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -26,8 +26,8 @@ export default function InvokeButton(props: InvokeButton) {
 
   const handleInvoke = useCallback(() => {
     dispatch(clampSymmetrySteps());
-    dispatch(generateGraphBuilt());
-  }, [dispatch]);
+    dispatch(userInvoked(activeTabName));
+  }, [dispatch, activeTabName]);
 
   const { t } = useTranslation();
 

@@ -16,7 +16,7 @@ const floatingGalleryButtonSelector = createSelector(
 
     return {
       shouldPinGallery,
-      shouldShowGalleryButton: !shouldPinGallery || !shouldShowGallery,
+      shouldShowGalleryButton: !shouldShowGallery,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }

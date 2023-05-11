@@ -20,7 +20,7 @@ export interface PostprocessingState {
   upscalingStrength: number;
 }
 
-const initialPostprocessingState: PostprocessingState = {
+export const initialPostprocessingState: PostprocessingState = {
   codeformerFidelity: 0.75,
   facetoolStrength: 0.75,
   facetoolType: 'gfpgan',
@@ -34,11 +34,9 @@ const initialPostprocessingState: PostprocessingState = {
   upscalingStrength: 0.75,
 };
 
-const initialState: PostprocessingState = initialPostprocessingState;
-
 export const postprocessingSlice = createSlice({
   name: 'postprocessing',
-  initialState,
+  initialState: initialPostprocessingState,
   reducers: {
     setFacetoolStrength: (state, action: PayloadAction<number>) => {
       state.facetoolStrength = action.payload;

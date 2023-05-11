@@ -83,7 +83,7 @@ async def get_thumbnail(
     status_code=201,
 )
 async def upload_image(
-    file: UploadFile, request: Request, response: Response
+    file: UploadFile, image_type: ImageType, request: Request, response: Response
 ) -> ImageResponse:
     if not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
@@ -99,21 +99,21 @@ async def upload_image(
     filename = f"{uuid.uuid4()}_{str(int(datetime.now(timezone.utc).timestamp()))}.png"
 
     saved_image = ApiDependencies.invoker.services.images.save(
-        ImageType.UPLOAD, filename, img
+        image_type, filename, img
     )
 
     invokeai_metadata = ApiDependencies.invoker.services.metadata.get_metadata(img)
 
     image_url = ApiDependencies.invoker.services.images.get_uri(
-        ImageType.UPLOAD, saved_image.image_name
+        image_type, saved_image.image_name
     )
 
     thumbnail_url = ApiDependencies.invoker.services.images.get_uri(
-        ImageType.UPLOAD, saved_image.image_name, True
+        image_type, saved_image.image_name, True
     )
 
     res = ImageResponse(
-        image_type=ImageType.UPLOAD,
+        image_type=image_type,
         image_name=saved_image.image_name,
         image_url=image_url,
         thumbnail_url=thumbnail_url,

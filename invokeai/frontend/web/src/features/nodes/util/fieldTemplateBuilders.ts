@@ -12,12 +12,13 @@ import {
   ConditioningInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
+  ArrayInputFieldTemplate,
+  ItemInputFieldTemplate,
+  ColorInputFieldTemplate,
   InputFieldTemplateBase,
   OutputFieldTemplate,
   TypeHints,
   FieldType,
-  ArrayInputFieldTemplate,
-  ItemInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -233,7 +234,6 @@ const buildEnumInputFieldTemplate = ({
 };
 
 const buildArrayInputFieldTemplate = ({
-  schemaObject,
   baseField,
 }: BuildInputFieldArg): ArrayInputFieldTemplate => {
   const template: ArrayInputFieldTemplate = {
@@ -248,7 +248,6 @@ const buildArrayInputFieldTemplate = ({
 };
 
 const buildItemInputFieldTemplate = ({
-  schemaObject,
   baseField,
 }: BuildInputFieldArg): ItemInputFieldTemplate => {
   const template: ItemInputFieldTemplate = {
@@ -257,6 +256,21 @@ const buildItemInputFieldTemplate = ({
     inputRequirement: 'always',
     inputKind: 'direct',
     default: undefined,
+  };
+
+  return template;
+};
+
+const buildColorInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ColorInputFieldTemplate => {
+  const template: ColorInputFieldTemplate = {
+    ...baseField,
+    type: 'color',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? { r: 127, g: 127, b: 127, a: 255 },
   };
 
   return template;
@@ -334,6 +348,15 @@ export const buildInputFieldTemplate = (
   }
   if (['boolean'].includes(fieldType)) {
     return buildBooleanInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['array'].includes(fieldType)) {
+    return buildArrayInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['item'].includes(fieldType)) {
+    return buildItemInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['color'].includes(fieldType)) {
+    return buildColorInputFieldTemplate({ schemaObject, baseField });
   }
   if (['array'].includes(fieldType)) {
     return buildArrayInputFieldTemplate({ schemaObject, baseField });

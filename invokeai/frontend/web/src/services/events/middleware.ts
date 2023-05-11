@@ -5,20 +5,11 @@ import {
   ClientToServerEvents,
   ServerToClientEvents,
 } from 'services/events/types';
-import {
-  invocationComplete,
-  socketSubscribed,
-  socketUnsubscribed,
-} from './actions';
-import { AppDispatch, RootState } from 'app/store/store';
+import { socketSubscribed, socketUnsubscribed } from './actions';
+import { AppThunkDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
-import {
-  sessionInvoked,
-  isFulfilledSessionCreatedAction,
-} from 'services/thunks/session';
+import { sessionInvoked, sessionCreated } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
-import { isImageOutput } from 'services/types/guards';
-import { imageReceived, thumbnailReceived } from 'services/thunks/image';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { log } from 'app/logging/useLogger';
 
@@ -56,20 +47,22 @@ export const socketMiddleware = () => {
   );
 
   const middleware: Middleware =
-    (store: MiddlewareAPI<AppDispatch, RootState>) => (next) => (action) => {
-      const { dispatch, getState } = store;
+    (storeApi: MiddlewareAPI<AppThunkDispatch, RootState>) =>
+    (next) =>
+    (action) => {
+      const { dispatch, getState } = storeApi;
 
       // Set listeners for `connect` and `disconnect` events once
       // Must happen in middleware to get access to `dispatch`
       if (!areListenersSet) {
-        setEventListeners({ store, socket, log: socketioLog });
+        setEventListeners({ storeApi, socket, log: socketioLog });
 
         areListenersSet = true;
 
         socket.connect();
       }
 
-      if (isFulfilledSessionCreatedAction(action)) {
+      if (sessionCreated.fulfilled.match(action)) {
         const sessionId = action.payload.id;
         const sessionLog = socketioLog.child({ sessionId });
         const oldSessionId = getState().system.sessionId;
@@ -105,26 +98,6 @@ export const socketMiddleware = () => {
 
         // Finally we actually invoke the session, starting processing
         dispatch(sessionInvoked({ sessionId }));
-      }
-
-      if (invocationComplete.match(action)) {
-        const { config } = getState();
-
-        if (config.shouldFetchImages) {
-          const { result } = action.payload.data;
-          if (isImageOutput(result)) {
-            const imageName = result.image.image_name;
-            const imageType = result.image.image_type;
-
-            dispatch(imageReceived({ imageName, imageType }));
-            dispatch(
-              thumbnailReceived({
-                thumbnailName: imageName,
-                thumbnailType: imageType,
-              })
-            );
-          }
-        }
       }
 
       next(action);

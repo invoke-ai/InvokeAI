@@ -1,6 +1,6 @@
 import ImageUploader from 'common/components/ImageUploader';
-import ProgressBar from 'features/system/components/ProgressBar';
 import SiteHeader from 'features/system/components/SiteHeader';
+import ProgressBar from 'features/system/components/ProgressBar';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 
 import useToastWatcher from 'features/system/hooks/useToastWatcher';
@@ -9,7 +9,7 @@ import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton'
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
-import ImageGalleryPanel from 'features/gallery/components/ImageGalleryPanel';
+import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
@@ -27,7 +27,8 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
-import ProgressImagePreview from 'features/parameters/components/ProgressImagePreview';
+import ProgressImagePreview from 'features/parameters/components/_ProgressImagePreview';
+import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 
 const DEFAULT_CONFIG = {};
 
@@ -84,10 +85,12 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
             flexDir={{ base: 'column', xl: 'row' }}
           >
             <InvokeTabs />
-            <ImageGalleryPanel />
           </Flex>
         </Grid>
       </ImageUploader>
+
+      <GalleryDrawer />
+      <ParametersDrawer />
 
       <AnimatePresence>
         {!isApplicationReady && !loadingOverridden && (
@@ -121,7 +124,6 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
       <Portal>
         <FloatingGalleryButton />
       </Portal>
-      <ProgressImagePreview />
     </Grid>
   );
 };

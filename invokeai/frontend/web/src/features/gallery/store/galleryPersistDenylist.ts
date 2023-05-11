@@ -4,12 +4,13 @@ import { GalleryState } from './gallerySlice';
  * Gallery slice persist denylist
  */
 const itemsToDenylist: (keyof GalleryState)[] = [
-  'categories',
   'currentCategory',
-  'currentImage',
-  'currentImageUuid',
   'shouldAutoSwitchToNewImages',
-  'intermediateImage',
+];
+
+export const galleryPersistDenylist: (keyof GalleryState)[] = [
+  'currentCategory',
+  'shouldAutoSwitchToNewImages',
 ];
 
 export const galleryDenylist = itemsToDenylist.map(

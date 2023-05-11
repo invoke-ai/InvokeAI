@@ -243,12 +243,14 @@ class ModelManagerService(ModelManagerServiceBase):
             submodel,
         )
 
-    def valid_model(self, *args, **kwargs) -> bool:
+    def valid_model(self, model_name: str, model_type: SDModelType=SDModelType.diffusers) -> bool:
         """
         Given a model name, returns True if it is a valid
         identifier.
         """
-        return self.mgr.valid_model(*args, **kwargs)
+        return self.mgr.valid_model(
+            model_name,
+            model_type)
 
     def default_model(self) -> Union[str,None]:
         """
