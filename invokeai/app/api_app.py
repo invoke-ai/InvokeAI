@@ -126,7 +126,6 @@ app.openapi = custom_openapi
 # Override API doc favicons
 app.mount("/static", StaticFiles(directory="static/dream_web"), name="static")
 
-
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(
@@ -144,6 +143,8 @@ def overridden_redoc():
         redoc_favicon_url="/static/favicon.ico",
     )
 
+# Must mount *after* the other routes else it borks em
+app.mount("/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui")
 
 def invoke_api():
     # Start our own event loop for eventing usage
