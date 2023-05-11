@@ -1,10 +1,11 @@
 from diffusers import DDIMScheduler, DPMSolverMultistepScheduler, KDPM2DiscreteScheduler, \
     KDPM2AncestralDiscreteScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
     HeunDiscreteScheduler, LMSDiscreteScheduler, PNDMScheduler, UniPCMultistepScheduler, \
-    DPMSolverSinglestepScheduler, DEISMultistepScheduler
+    DPMSolverSinglestepScheduler, DEISMultistepScheduler, DDPMScheduler
 
 SCHEDULER_MAP = dict(
     ddim=(DDIMScheduler, dict()),
+    ddpm=(DDPMScheduler, dict()),
     deis=(DEISMultistepScheduler, dict()),
     lms=(LMSDiscreteScheduler, dict()),
     pndm=(PNDMScheduler, dict()),

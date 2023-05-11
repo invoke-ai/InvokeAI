@@ -108,6 +108,7 @@ APP_VERSION = invokeai.version.__version__
 
 SAMPLER_CHOICES = [
     "ddim",
+    "ddpm",
     "deis",
     "lms",
     "pndm",

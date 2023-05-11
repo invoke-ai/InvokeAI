@@ -47,6 +47,7 @@ export type CommonGeneratedImageMetadata = {
   postprocessing: null | Array<ESRGANMetadata | FacetoolMetadata>;
   sampler:
     | 'ddim'
+    | 'ddpm'
     | 'deis'
     | 'lms'
     | 'pndm'
