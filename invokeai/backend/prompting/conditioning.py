@@ -64,6 +64,7 @@ def get_uc_and_c_and_ec(prompt_string,
                                                             step_count=-1):
         c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
         uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+        [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
     # now build the "real" ec
     ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
