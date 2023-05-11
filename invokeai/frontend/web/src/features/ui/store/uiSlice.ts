@@ -3,8 +3,10 @@ import { createSlice } from '@reduxjs/toolkit';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
 import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
-const initialUIState: UIState = {
+export const initialUIState: UIState = {
   activeTab: 0,
   currentTheme: 'dark',
   parametersPanelScrollPosition: 0,
@@ -18,19 +20,18 @@ const initialUIState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
-  openLinearAccordionItems: [],
-  openGenerateAccordionItems: [],
-  openUnifiedCanvasAccordionItems: [],
+  textTabAccordionState: [],
+  imageTabAccordionState: [],
+  canvasTabAccordionState: [],
   floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
   shouldShowProgressImages: false,
-  shouldAutoShowProgressImages: false,
+  shouldShowProgressInViewer: false,
+  shouldShowImageParameters: false,
 };
-
-const initialState: UIState = initialUIState;
 
 export const uiSlice = createSlice({
   name: 'ui',
-  initialState,
+  initialState: initialUIState,
   reducers: {
     setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
       setActiveTabReducer(state, action.payload);
@@ -80,9 +81,15 @@ export const uiSlice = createSlice({
     },
     togglePinGalleryPanel: (state) => {
       state.shouldPinGallery = !state.shouldPinGallery;
+      if (!state.shouldPinGallery) {
+        state.shouldShowGallery = true;
+      }
     },
     togglePinParametersPanel: (state) => {
       state.shouldPinParametersPanel = !state.shouldPinParametersPanel;
+      if (!state.shouldPinParametersPanel) {
+        state.shouldShowParametersPanel = true;
+      }
     },
     toggleParametersPanel: (state) => {
       state.shouldShowParametersPanel = !state.shouldShowParametersPanel;
@@ -100,12 +107,16 @@ export const uiSlice = createSlice({
       }
     },
     openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
-      if (tabMap[state.activeTab] === 'generate') {
-        state.openGenerateAccordionItems = action.payload;
+      if (tabMap[state.activeTab] === 'txt2img') {
+        state.textTabAccordionState = action.payload;
+      }
+
+      if (tabMap[state.activeTab] === 'img2img') {
+        state.imageTabAccordionState = action.payload;
       }
 
       if (tabMap[state.activeTab] === 'unifiedCanvas') {
-        state.openUnifiedCanvasAccordionItems = action.payload;
+        state.canvasTabAccordionState = action.payload;
       }
     },
     floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {
@@ -126,12 +137,20 @@ export const uiSlice = createSlice({
     setShouldShowProgressImages: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressImages = action.payload;
     },
-    setShouldAutoShowProgressImages: (
+    setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowProgressInViewer = action.payload;
+    },
+    shouldShowImageParametersChanged: (
       state,
       action: PayloadAction<boolean>
     ) => {
-      state.shouldAutoShowProgressImages = action.payload;
+      state.shouldShowImageParameters = action.payload;
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(initialImageChanged, (state) => {
+      setActiveTabReducer(state, 'img2img');
+    });
   },
 });
 
@@ -158,7 +177,8 @@ export const {
   floatingProgressImageMoved,
   floatingProgressImageResized,
   setShouldShowProgressImages,
-  setShouldAutoShowProgressImages,
+  setShouldShowProgressInViewer,
+  shouldShowImageParametersChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

@@ -1,16 +1,16 @@
-import { Box, Image, Icon, Flex } from '@chakra-ui/react';
+import { Box, Image } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
 import useGetImageByNameAndType from 'features/gallery/hooks/useGetImageByName';
-import useGetImageByUuid from 'features/gallery/hooks/useGetImageByUuid';
+
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ImageInputFieldTemplate,
   ImageInputFieldValue,
 } from 'features/nodes/types/types';
 import { DragEvent, memo, useCallback, useState } from 'react';
-import { FaImage } from 'react-icons/fa';
+
 import { ImageType } from 'services/api';
 import { FieldComponentProps } from './types';
 
@@ -18,7 +18,6 @@ const ImageInputFieldComponent = (
   props: FieldComponentProps<ImageInputFieldValue, ImageInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
-  const { value } = field;
 
   const getImageByNameAndType = useGetImageByNameAndType();
   const dispatch = useAppDispatch();

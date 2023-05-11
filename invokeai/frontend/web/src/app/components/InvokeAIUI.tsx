@@ -1,8 +1,6 @@
 import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
 import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
 import { store } from 'app/store/store';
-import { persistor } from '../store/persistor';
 import { OpenAPI } from 'services/api';
 import '@fontsource/inter/100.css';
 import '@fontsource/inter/200.css';
@@ -57,13 +55,11 @@ const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
   return (
     <React.StrictMode>
       <Provider store={store}>
-        <PersistGate loading={<Loading />} persistor={persistor}>
-          <React.Suspense fallback={<Loading />}>
-            <ThemeLocaleProvider>
-              <App config={config}>{children}</App>
-            </ThemeLocaleProvider>
-          </React.Suspense>
-        </PersistGate>
+        <React.Suspense fallback={<Loading />}>
+          <ThemeLocaleProvider>
+            <App config={config}>{children}</App>
+          </ThemeLocaleProvider>
+        </React.Suspense>
       </Provider>
     </React.StrictMode>
   );

@@ -14,6 +14,7 @@ const ImageToImageOverlay = ({ image }: ImageToImageOverlayProps) => {
         w: 'full',
         h: 'full',
         position: 'absolute',
+        pointerEvents: 'none',
       }}
     >
       <Flex

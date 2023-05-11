@@ -2,7 +2,6 @@ import { Box, Flex } from '@chakra-ui/layout';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInput from 'common/components/IAIInput';
-import { Panel } from 'reactflow';
 import { map } from 'lodash-es';
 import {
   ChangeEvent,
@@ -192,19 +191,17 @@ const NodeSearch = () => {
   };
 
   return (
-    <Panel position="top-left">
-      <Flex
-        flexDirection="column"
-        tabIndex={1}
-        onKeyDown={searchKeyHandler}
-        onFocus={() => setShowNodeList(true)}
-        onBlur={searchInputBlurHandler}
-        ref={nodeSearchRef}
-      >
-        <IAIInput value={searchText} onChange={findNode} />
-        {showNodeList && renderNodeList()}
-      </Flex>
-    </Panel>
+    <Flex
+      flexDirection="column"
+      tabIndex={1}
+      onKeyDown={searchKeyHandler}
+      onFocus={() => setShowNodeList(true)}
+      onBlur={searchInputBlurHandler}
+      ref={nodeSearchRef}
+    >
+      <IAIInput value={searchText} onChange={findNode} />
+      {showNodeList && renderNodeList()}
+    </Flex>
   );
 };
 

@@ -22,6 +22,8 @@ export const $InvokeAIMetadata = {
           type: 'MetadataImageField',
         }, {
           type: 'MetadataLatentsField',
+        }, {
+          type: 'MetadataColorField',
         }],
       },
     },

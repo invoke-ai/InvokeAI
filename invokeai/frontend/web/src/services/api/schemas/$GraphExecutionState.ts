@@ -48,6 +48,8 @@ export const $GraphExecutionState = {
         }, {
           type: 'MaskOutput',
         }, {
+          type: 'CompelOutput',
+        }, {
           type: 'LatentsOutput',
         }, {
           type: 'NoiseOutput',

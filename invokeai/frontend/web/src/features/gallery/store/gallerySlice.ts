@@ -1,10 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { invocationComplete } from 'services/events/actions';
-import { isImageOutput } from 'services/types/guards';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
-import { imageUploaded } from 'services/thunks/image';
-import { SelectedImage } from 'features/parameters/store/generationSlice';
+import { Image } from 'app/types/invokeai';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -12,7 +8,7 @@ export interface GalleryState {
   /**
    * The selected image
    */
-  selectedImage?: SelectedImage;
+  selectedImage?: Image;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
@@ -21,8 +17,7 @@ export interface GalleryState {
   currentCategory: 'results' | 'uploads';
 }
 
-const initialState: GalleryState = {
-  selectedImage: undefined,
+export const initialGalleryState: GalleryState = {
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
@@ -33,12 +28,9 @@ const initialState: GalleryState = {
 
 export const gallerySlice = createSlice({
   name: 'gallery',
-  initialState,
+  initialState: initialGalleryState,
   reducers: {
-    imageSelected: (
-      state,
-      action: PayloadAction<SelectedImage | undefined>
-    ) => {
+    imageSelected: (state, action: PayloadAction<Image | undefined>) => {
       state.selectedImage = action.payload;
       // TODO: if the user selects an image, disable the auto switch?
       // state.shouldAutoSwitchToNewImages = false;
@@ -70,30 +62,6 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
-  },
-  extraReducers(builder) {
-    /**
-     * Invocation Complete
-     */
-    builder.addCase(invocationComplete, (state, action) => {
-      const { data } = action.payload;
-      if (isImageOutput(data.result) && state.shouldAutoSwitchToNewImages) {
-        state.selectedImage = {
-          name: data.result.image.image_name,
-          type: 'results',
-        };
-      }
-    });
-
-    /**
-     * Upload Image - FULFILLED
-     */
-    builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const { response } = action.payload;
-
-      const uploadedImage = deserializeImageResponse(response);
-      state.selectedImage = { name: uploadedImage.name, type: 'uploads' };
-    });
   },
 });
 

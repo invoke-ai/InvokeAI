@@ -9,6 +9,12 @@ const itemsToDenylist: (keyof CanvasState)[] = [
   'doesCanvasNeedScaling',
 ];
 
+export const canvasPersistDenylist: (keyof CanvasState)[] = [
+  'cursorPosition',
+  'isCanvasInitialized',
+  'doesCanvasNeedScaling',
+];
+
 export const canvasDenylist = itemsToDenylist.map(
   (denylistItem) => `canvas.${denylistItem}`
 );

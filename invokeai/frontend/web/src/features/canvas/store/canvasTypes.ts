@@ -37,7 +37,7 @@ export type CanvasImage = {
   y: number;
   width: number;
   height: number;
-  image: InvokeAI._Image;
+  image: InvokeAI.Image;
 };
 
 export type CanvasMaskLine = {
@@ -90,7 +90,14 @@ export type CanvasLayerState = {
   stagingArea: {
     images: CanvasImage[];
     selectedImageIndex: number;
+    sessionId?: string;
+    boundingBox?: IRect;
   };
+};
+
+export type CanvasSession = {
+  sessionId: string;
+  boundingBox: IRect;
 };
 
 // type guards
@@ -125,7 +132,7 @@ export interface CanvasState {
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
-  intermediateImage?: InvokeAI._Image;
+  intermediateImage?: InvokeAI.Image;
   isCanvasInitialized: boolean;
   isDrawing: boolean;
   isMaskEnabled: boolean;
@@ -142,6 +149,7 @@ export interface CanvasState {
   minimumStageScale: number;
   pastLayerStates: CanvasLayerState[];
   scaledBoundingBoxDimensions: Dimensions;
+  shouldAntialias: boolean;
   shouldAutoSave: boolean;
   shouldCropToBoundingBoxOnSave: boolean;
   shouldDarkenOutsideBoundingBox: boolean;
