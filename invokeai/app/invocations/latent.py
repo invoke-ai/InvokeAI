@@ -54,16 +54,17 @@ class NoiseOutput(BaseInvocationOutput):
 
 # TODO: this seems like a hack
 scheduler_map = dict(
-    ddim=diffusers.DDIMScheduler,
-    dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-    k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-    k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
-    k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-    k_euler=diffusers.EulerDiscreteScheduler,
-    k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-    k_heun=diffusers.HeunDiscreteScheduler,
-    k_lms=diffusers.LMSDiscreteScheduler,
-    plms=diffusers.PNDMScheduler,
+    ddim=(diffusers.DDIMScheduler, dict()),
+    dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict()),
+    k_dpm_2=(diffusers.KDPM2DiscreteScheduler, dict()),
+    k_dpm_2_a=(diffusers.KDPM2AncestralDiscreteScheduler, dict()),
+    k_dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict()),
+    k_euler=(diffusers.EulerDiscreteScheduler, dict()),
+    k_euler_a=(diffusers.EulerAncestralDiscreteScheduler, dict()),
+    k_heun=(diffusers.HeunDiscreteScheduler, dict()),
+    k_lms=(diffusers.LMSDiscreteScheduler, dict()),
+    plms=(diffusers.PNDMScheduler, dict()),
+    unipc=(diffusers.UniPCMultistepScheduler, dict(cpu_only=True))
 )
 
 
@@ -73,8 +74,9 @@ SAMPLER_NAME_VALUES = Literal[
 
 
 def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-    scheduler_class = scheduler_map.get(scheduler_name,'ddim')
-    scheduler = scheduler_class.from_config(model.scheduler.config)
+    scheduler_class, scheduler_extra_config = scheduler_map.get(scheduler_name,'ddim')
+    scheduler_config = {**model.scheduler.config, **scheduler_extra_config}
+    scheduler = scheduler_class.from_config(scheduler_config)
     # hack copied over from generate.py
     if not hasattr(scheduler, 'uses_inpainting_model'):
         scheduler.uses_inpainting_model = lambda: False
@@ -293,11 +295,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             latent, device=model.device, dtype=latent.dtype
         )
 
-        timesteps, _ = model.get_img2img_timesteps(
-            self.steps,
-            self.strength,
-            device=model.device,
-        )
+        timesteps, _ = model.get_img2img_timesteps(self.steps, self.strength)
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=initial_latents,

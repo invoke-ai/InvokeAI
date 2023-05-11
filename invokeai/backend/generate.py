@@ -1049,27 +1049,28 @@ class Generate:
 
         # See https://github.com/huggingface/diffusers/issues/277#issuecomment-1371428672
         scheduler_map = dict(
-            ddim=diffusers.DDIMScheduler,
-            dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-            k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-            k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
+            ddim=(diffusers.DDIMScheduler, dict()),
+            dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict()),
+            k_dpm_2=(diffusers.KDPM2DiscreteScheduler, dict()),
+            k_dpm_2_a=(diffusers.KDPM2AncestralDiscreteScheduler, dict()),
             # DPMSolverMultistepScheduler is technically not `k_` anything, as it is neither
             # the k-diffusers implementation nor included in EDM (Karras 2022), but we can
             # provide an alias for compatibility.
-            k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-            k_euler=diffusers.EulerDiscreteScheduler,
-            k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-            k_heun=diffusers.HeunDiscreteScheduler,
-            k_lms=diffusers.LMSDiscreteScheduler,
-            plms=diffusers.PNDMScheduler,
+            k_dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict()),
+            k_euler=(diffusers.EulerDiscreteScheduler, dict()),
+            k_euler_a=(diffusers.EulerAncestralDiscreteScheduler, dict()),
+            k_heun=(diffusers.HeunDiscreteScheduler, dict()),
+            k_lms=(diffusers.LMSDiscreteScheduler, dict()),
+            plms=(diffusers.PNDMScheduler, dict()),
+            unipc=(diffusers.UniPCMultistepScheduler, dict(cpu_only=True))
         )
 
         if self.sampler_name in scheduler_map:
-            sampler_class = scheduler_map[self.sampler_name]
+            sampler_class, sampler_extra_config = scheduler_map[self.sampler_name]
             msg = (
                 f"Setting Sampler to {self.sampler_name} ({sampler_class.__name__})"
             )
-            self.sampler = sampler_class.from_config(self.model.scheduler.config)
+            self.sampler = sampler_class.from_config({**self.model.scheduler.config, **sampler_extra_config})
         else:
             msg = (
                 f" Unsupported Sampler: {self.sampler_name} "+

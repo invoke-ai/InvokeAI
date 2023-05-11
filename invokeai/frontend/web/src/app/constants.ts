@@ -11,6 +11,7 @@ export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'k_euler',
   'k_euler_a',
   'k_heun',
+  'unipc',
 ];
 
 // Valid image widths

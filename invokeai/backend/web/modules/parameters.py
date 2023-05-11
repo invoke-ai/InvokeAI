@@ -15,6 +15,7 @@ SAMPLER_CHOICES = [
     "plms",
     # diffusers:
     "pndm",
+    "unipc"
 ]
 
 

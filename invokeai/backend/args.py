@@ -119,6 +119,7 @@ SAMPLER_CHOICES = [
     "plms",
     # diffusers:
     "pndm",
+    "unipc"
 ]
 
 PRECISION_CHOICES = [
