@@ -111,7 +111,7 @@ class NoiseInvocation(BaseInvocation):
     type: Literal["noise"] = "noise"
 
     # Inputs
-    seed: Optional[int] = Field(ge=0, le=SEED_MAX, description="The seed to use", default_factory=get_random_seed)
+    seed:       int = Field(ge=0, le=SEED_MAX, description="The seed to use", default_factory=get_random_seed)
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting noise", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting noise", )
 

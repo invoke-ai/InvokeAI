@@ -50,7 +50,7 @@ class RandomRangeInvocation(BaseInvocation):
         default=np.iinfo(np.int32).max, description="The exclusive high value"
     )
     size: int = Field(default=1, description="The number of values to generate")
-    seed: Optional[int] = Field(
+    seed: int = Field(
         ge=0,
         le=SEED_MAX,
         description="The seed for the RNG (omit for random)",
