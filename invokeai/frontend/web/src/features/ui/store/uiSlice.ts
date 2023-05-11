@@ -3,6 +3,8 @@ import { createSlice } from '@reduxjs/toolkit';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName, tabMap } from './tabMap';
 import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -144,6 +146,11 @@ export const uiSlice = createSlice({
     ) => {
       state.shouldShowImageParameters = action.payload;
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(initialImageChanged, (state) => {
+      setActiveTabReducer(state, 'img2img');
+    });
   },
 });
 
