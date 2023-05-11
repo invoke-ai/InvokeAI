@@ -72,16 +72,16 @@ class InvokeAIGeneratorOutput:
 # old code that calls Generate will continue to work.
 class InvokeAIGenerator(metaclass=ABCMeta):
     scheduler_map = dict(
-            ddim=(diffusers.DDIMScheduler, dict()),
-            dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict()),
-            k_dpm_2=(diffusers.KDPM2DiscreteScheduler, dict()),
-            k_dpm_2_a=(diffusers.KDPM2AncestralDiscreteScheduler, dict()),
-            k_dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict()),
-            k_euler=(diffusers.EulerDiscreteScheduler, dict()),
-            k_euler_a=(diffusers.EulerAncestralDiscreteScheduler, dict()),
-            k_heun=(diffusers.HeunDiscreteScheduler, dict()),
-            k_lms=(diffusers.LMSDiscreteScheduler, dict()),
-            plms=(diffusers.PNDMScheduler, dict()),
+            ddim=(diffusers.DDIMScheduler, dict(cpu_only=False)),
+            dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict(cpu_only=False)),
+            k_dpm_2=(diffusers.KDPM2DiscreteScheduler, dict(cpu_only=False)),
+            k_dpm_2_a=(diffusers.KDPM2AncestralDiscreteScheduler, dict(cpu_only=False)),
+            k_dpmpp_2=(diffusers.DPMSolverMultistepScheduler, dict(cpu_only=False)),
+            k_euler=(diffusers.EulerDiscreteScheduler, dict(cpu_only=False)),
+            k_euler_a=(diffusers.EulerAncestralDiscreteScheduler, dict(cpu_only=False)),
+            k_heun=(diffusers.HeunDiscreteScheduler, dict(cpu_only=False)),
+            k_lms=(diffusers.LMSDiscreteScheduler, dict(cpu_only=False)),
+            plms=(diffusers.PNDMScheduler, dict(cpu_only=False)),
             unipc=(diffusers.UniPCMultistepScheduler, dict(cpu_only=True))
         )
 
