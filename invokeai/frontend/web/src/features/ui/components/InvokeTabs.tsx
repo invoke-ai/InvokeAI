@@ -13,11 +13,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import { memo, ReactNode, useMemo } from 'react';
+import { memo, ReactNode, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { GoTextSize } from 'react-icons/go';
-import { activeTabIndexSelector } from '../store/uiSelectors';
+import {
+  activeTabIndexSelector,
+  activeTabNameSelector,
+} from '../store/uiSelectors';
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
@@ -76,6 +79,7 @@ const enabledTabsSelector = createSelector(
 
 const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
@@ -106,6 +110,12 @@ const InvokeTabs = () => {
     },
     [shouldPinGallery, shouldPinParametersPanel]
   );
+
+  const handleResizeGallery = useCallback(() => {
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
+  }, [dispatch, activeTabName]);
 
   const tabs = useMemo(
     () =>
@@ -167,6 +177,7 @@ const InvokeTabs = () => {
           <>
             <ResizeHandle />
             <Panel
+              onResize={handleResizeGallery}
               id="gallery"
               order={3}
               defaultSize={10}
