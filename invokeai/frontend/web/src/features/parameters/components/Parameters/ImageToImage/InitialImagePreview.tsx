@@ -8,7 +8,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { DragEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
-import ImageToImageOverlay from 'common/components/ImageToImageOverlay';
+import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -80,7 +80,7 @@ const InitialImagePreview = () => {
               borderRadius: 'base',
             }}
           />
-          <ImageToImageOverlay image={initialImage} />
+          <ImageMetadataOverlay image={initialImage} />
         </>
       )}
       {!initialImage?.url && <SelectImagePlaceholder />}

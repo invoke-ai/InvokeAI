@@ -12,6 +12,7 @@ import CurrentImageHidden from './CurrentImageHidden';
 import { DragEvent, memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import ImageFallbackSpinner from './ImageFallbackSpinner';
+import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -89,20 +90,23 @@ const CurrentImagePreview = () => {
         />
       ) : (
         image && (
-          <Image
-            src={getUrl(image.url)}
-            fallbackStrategy="beforeLoadOrError"
-            fallback={<ImageFallbackSpinner />}
-            onDragStart={handleDragStart}
-            sx={{
-              objectFit: 'contain',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              height: 'auto',
-              position: 'absolute',
-              borderRadius: 'base',
-            }}
-          />
+          <>
+            <Image
+              src={getUrl(image.url)}
+              fallbackStrategy="beforeLoadOrError"
+              fallback={<ImageFallbackSpinner />}
+              onDragStart={handleDragStart}
+              sx={{
+                objectFit: 'contain',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                height: 'auto',
+                position: 'absolute',
+                borderRadius: 'base',
+              }}
+            />
+            <ImageMetadataOverlay image={image} />
+          </>
         )
       )}
       {shouldShowImageDetails && image && 'metadata' in image && (
