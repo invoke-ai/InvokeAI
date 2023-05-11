@@ -47,7 +47,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
-    seed:   Optional[int] = Field(ge=0, le=SEED_MAX, description="The seed to use (omit for random)", default_factory=get_random_seed)
+    seed:        int = Field(ge=0, le=SEED_MAX, description="The seed to use (omit for random)", default_factory=get_random_seed)
     steps:       int = Field(default=30, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
