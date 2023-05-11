@@ -62,48 +62,40 @@ const InitialImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
+        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'relative',
       }}
       onDrop={handleDrop}
     >
-      <Flex
-        sx={{
-          height: 'full',
-          width: 'full',
-          blur: '5px',
-          position: 'relative',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {initialImage?.url && (
-          <>
-            <Image
-              sx={{
-                objectFit: 'contain',
-                borderRadius: 'base',
-                maxHeight: 'full',
-              }}
-              src={getUrl(initialImage?.url)}
-              onError={onError}
-              onLoad={() => {
-                setIsLoaded(true);
-              }}
-              fallback={
-                <Flex
-                  sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Spinner color="grey" w="5rem" h="5rem" />
-                </Flex>
-              }
-            />
-            {isLoaded && <ImageToImageOverlay image={initialImage} />}
-          </>
-        )}
-        {!initialImage?.url && <SelectImagePlaceholder />}
-      </Flex>
+      {initialImage?.url && (
+        <>
+          <Image
+            sx={{
+              objectFit: 'contain',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              height: 'auto',
+              position: 'absolute',
+              borderRadius: 'base',
+            }}
+            src={getUrl(initialImage?.url)}
+            onError={onError}
+            onLoad={() => {
+              setIsLoaded(true);
+            }}
+            fallback={
+              <Flex
+                sx={{ h: 36, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Spinner color="grey" w="5rem" h="5rem" />
+              </Flex>
+            }
+          />
+          {isLoaded && <ImageToImageOverlay image={initialImage} />}
+        </>
+      )}
+      {!initialImage?.url && <SelectImagePlaceholder />}
     </Flex>
   );
 };

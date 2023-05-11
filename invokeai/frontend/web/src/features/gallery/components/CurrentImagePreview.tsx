@@ -1,4 +1,4 @@
-import { Box, Flex, Image, Skeleton, useBoolean } from '@chakra-ui/react';
+import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
@@ -50,8 +50,6 @@ const CurrentImagePreview = () => {
   } = useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
 
-  const [isLoaded, { on, off }] = useBoolean();
-
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       if (!image) {
@@ -67,11 +65,11 @@ const CurrentImagePreview = () => {
   return (
     <Flex
       sx={{
-        position: 'relative',
-        justifyContent: 'center',
-        alignItems: 'center',
         width: '100%',
         height: '100%',
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
