@@ -2,15 +2,17 @@
 
 export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'ddim',
-  'plms',
   'k_lms',
-  'dpmpp_2',
+  'plms',
+  'k_heun',
+  'k_euler',
+  'euler_karras',
+  'k_euler_a',
   'k_dpm_2',
   'k_dpm_2_a',
+  'dpmpp_2s',
   'k_dpmpp_2',
-  'k_euler',
-  'k_euler_a',
-  'k_heun',
+  'k_dpmpp_2_karras',
   'unipc',
 ];
 

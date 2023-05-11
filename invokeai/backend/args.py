@@ -108,18 +108,18 @@ APP_VERSION = invokeai.version.__version__
 
 SAMPLER_CHOICES = [
     "ddim",
-    "k_dpm_2_a",
-    "k_dpm_2",
-    "k_dpmpp_2_a",
-    "k_dpmpp_2",
-    "k_euler_a",
-    "k_euler",
-    "k_heun",
     "k_lms",
     "plms",
-    # diffusers:
-    "pndm",
-    "unipc"
+    "k_heun",
+    "k_euler",
+    "euler_karras",
+    "k_euler_a",
+    "k_dpm_2",
+    "k_dpm_2_a",
+    "dpmpp_2s",
+    "k_dpmpp_2",
+    "k_dpmpp_2_karras",
+    "unipc",
 ]
 
 PRECISION_CHOICES = [

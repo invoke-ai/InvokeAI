@@ -170,8 +170,13 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
     def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
         scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
-        scheduler_config = {**model.scheduler.config, **scheduler_extra_config}
+        
+        scheduler_config = model.scheduler.config
+        if "_backup" in scheduler_config:
+            scheduler_config = scheduler_config["_backup"]
+        scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
         scheduler = scheduler_class.from_config(scheduler_config)
+        
         # hack copied over from generate.py
         if not hasattr(scheduler, 'uses_inpainting_model'):
             scheduler.uses_inpainting_model = lambda: False
