@@ -278,6 +278,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               h: 'full',
               transition: 'transform 0.2s ease-out',
               aspectRatio: '1/1',
+              cursor: 'pointer',
             }}
           >
             <Image

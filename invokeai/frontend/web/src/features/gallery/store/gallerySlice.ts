@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { Image } from 'app/types/invokeai';
+import { imageReceived, thumbnailReceived } from 'services/thunks/image';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -62,6 +63,29 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(imageReceived.fulfilled, (state, action) => {
+      // When we get an updated URL for an image, we need to update the selectedImage in gallery,
+      // which is currently its own object (instead of a reference to an image in results/uploads)
+      const { imagePath } = action.payload;
+      const { imageName } = action.meta.arg;
+
+      if (state.selectedImage?.name === imageName) {
+        state.selectedImage.url = imagePath;
+      }
+    });
+
+    builder.addCase(thumbnailReceived.fulfilled, (state, action) => {
+      // When we get an updated URL for an image, we need to update the selectedImage in gallery,
+      // which is currently its own object (instead of a reference to an image in results/uploads)
+      const { thumbnailPath } = action.payload;
+      const { thumbnailName } = action.meta.arg;
+
+      if (state.selectedImage?.name === thumbnailName) {
+        state.selectedImage.thumbnail = thumbnailPath;
+      }
+    });
   },
 });
 

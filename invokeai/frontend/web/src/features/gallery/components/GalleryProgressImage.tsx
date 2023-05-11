@@ -1,4 +1,4 @@
-import { Box, Flex, Image } from '@chakra-ui/react';
+import { Flex, Image, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -42,6 +42,7 @@ const GalleryProgressImage = () => {
         alignItems: 'center',
         justifyContent: 'center',
         aspectRatio: '1/1',
+        position: 'relative',
       }}
     >
       <Image
@@ -61,6 +62,7 @@ const GalleryProgressImage = () => {
           imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
         }}
       />
+      <Spinner sx={{ position: 'absolute', top: 1, right: 1, opacity: 0.7 }} />
     </Flex>
   );
 };
