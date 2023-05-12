@@ -1,4 +1,5 @@
 import {
+  IconButton,
   Menu,
   MenuButton,
   MenuItemOption,
@@ -6,14 +7,13 @@ import {
   MenuOptionGroup,
   Tooltip,
 } from '@chakra-ui/react';
-import IAIIconButton from 'common/components/IAIIconButton';
 import { useTranslation } from 'react-i18next';
-import { FaLanguage } from 'react-icons/fa';
 import i18n from 'i18n';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { languageSelector } from '../store/systemSelectors';
 import { languageChanged } from '../store/systemSlice';
 import { map } from 'lodash-es';
+import { IoLanguage } from 'react-icons/io5';
 
 export const LANGUAGES = {
   ar: i18n.t('common.langArabic', { lng: 'ar' }),
@@ -43,10 +43,12 @@ export default function LanguagePicker() {
     <Menu closeOnSelect={false}>
       <Tooltip label={t('common.languagePickerLabel')} hasArrow>
         <MenuButton
-          as={IAIIconButton}
-          icon={<FaLanguage />}
+          as={IconButton}
+          icon={<IoLanguage />}
           variant="link"
           aria-label={t('common.languagePickerLabel')}
+          fontSize={22}
+          minWidth={8}
         />
       </Tooltip>
       <MenuList>
