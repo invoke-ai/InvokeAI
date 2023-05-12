@@ -5,6 +5,7 @@ import { InvokeTabName, tabMap } from './tabMap';
 import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { SCHEDULERS } from 'app/constants';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -27,6 +28,7 @@ export const initialUIState: UIState = {
   shouldShowProgressImages: false,
   shouldShowProgressInViewer: false,
   shouldShowImageParameters: false,
+  schedulers: SCHEDULERS,
 };
 
 export const uiSlice = createSlice({
@@ -146,6 +148,10 @@ export const uiSlice = createSlice({
     ) => {
       state.shouldShowImageParameters = action.payload;
     },
+    setSchedulers: (state, action: PayloadAction<string[]>) => {
+      state.schedulers = [];
+      state.schedulers = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -179,6 +185,7 @@ export const {
   setShouldShowProgressImages,
   setShouldShowProgressInViewer,
   shouldShowImageParametersChanged,
+  setSchedulers,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

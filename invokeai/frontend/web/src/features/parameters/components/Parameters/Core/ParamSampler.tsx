@@ -1,7 +1,3 @@
-import {
-  DIFFUSERS_SCHEDULERS,
-  IMG2IMG_DIFFUSERS_SCHEDULERS,
-} from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISelect from 'common/components/IAISelect';
@@ -17,6 +13,12 @@ const ParamSampler = () => {
 
   const activeTabName = useAppSelector(activeTabNameSelector);
 
+  const schedulers = useAppSelector((state: RootState) => state.ui.schedulers);
+
+  const img2imgSchedulers = schedulers.filter((scheduler) => {
+    return !['dpmpp_2s'].includes(scheduler);
+  });
+
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -31,9 +33,9 @@ const ParamSampler = () => {
       value={sampler}
       onChange={handleChange}
       validValues={
-        activeTabName === 'img2img' || activeTabName == 'unifiedCanvas'
-          ? IMG2IMG_DIFFUSERS_SCHEDULERS
-          : DIFFUSERS_SCHEDULERS
+        ['img2img', 'unifiedCanvas'].includes(activeTabName)
+          ? img2imgSchedulers
+          : schedulers
       }
       minWidth={36}
     />

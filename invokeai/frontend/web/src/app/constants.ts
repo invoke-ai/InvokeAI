@@ -1,29 +1,23 @@
 // TODO: use Enums?
 
-export const DIFFUSERS_SCHEDULERS: Array<string> = [
+export const SCHEDULERS: Array<string> = [
   'ddim',
-  'ddpm',
-  'deis',
   'lms',
-  'pndm',
-  'heun',
-  'heun_k',
   'euler',
   'euler_k',
   'euler_a',
-  'kdpm_2',
-  'kdpm_2_a',
   'dpmpp_2s',
   'dpmpp_2m',
   'dpmpp_2m_k',
+  'kdpm_2',
+  'kdpm_2_a',
+  'deis',
+  'ddpm',
+  'pndm',
+  'heun',
+  'heun_k',
   'unipc',
 ];
-
-export const IMG2IMG_DIFFUSERS_SCHEDULERS = DIFFUSERS_SCHEDULERS.filter(
-  (scheduler) => {
-    return scheduler !== 'dpmpp_2s';
-  }
-);
 
 // Valid image widths
 export const WIDTHS: Array<number> = Array.from(Array(64)).map(
