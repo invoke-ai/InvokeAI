@@ -43,7 +43,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 if not queue_item:  # Probably stopping
                     # do not hammer the queue
-                    time.sleep(1)
+                    time.sleep(0.5)
                     continue
 
                 graph_execution_state = (
