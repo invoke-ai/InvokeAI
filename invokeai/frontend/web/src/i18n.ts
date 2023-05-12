@@ -21,11 +21,11 @@ if (import.meta.env.MODE === 'package') {
 } else {
   i18n
     .use(Backend)
-    .use(
-      new LanguageDetector(null, {
-        lookupLocalStorage: `${LOCALSTORAGE_PREFIX}lng`,
-      })
-    )
+    // .use(
+    //   new LanguageDetector(null, {
+    //     lookupLocalStorage: `${LOCALSTORAGE_PREFIX}lng`,
+    //   })
+    // )
     .use(initReactI18next)
     .init({
       fallbackLng: 'en',
