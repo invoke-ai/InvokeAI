@@ -71,7 +71,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Handle invalid model parameter
-        model = context.services.model_manager.get_model(self.model)
+        model = context.services.model_manager.get_model(self.model,node=self,context=context)
 
         # Get the source node id (we are invoking the prepared node)
         graph_execution_state = context.services.graph_execution_manager.get(

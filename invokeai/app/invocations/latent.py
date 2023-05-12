@@ -9,12 +9,10 @@ from diffusers import DiffusionPipeline
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ...backend.image_util.seamless import configure_model_padding
-from ...backend.model_management.model_manager import SDModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData, StableDiffusionGeneratorPipeline,
@@ -104,37 +102,11 @@ def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_c
     #     x = (1 - self.perlin) * x + self.perlin * perlin_noise
     return x
 
-class ModelChooser:
-    def choose_model(self, context: InvocationContext) -> StableDiffusionGeneratorPipeline:
-
-        if context.services.queue.is_canceled(context.graph_execution_state_id):
-            raise CanceledException
-
-        # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
-
-        context.services.events.emit_model_load_started(
-            graph_execution_state_id=context.graph_execution_state_id,
-            node=self.dict(),
-            source_node_id=source_node_id,
-            model_name=self.model,
-            submodel=SDModelType.diffusers
-        )
-
+class ModelGetter:
+    def get_model(self, context: InvocationContext) -> StableDiffusionGeneratorPipeline:
         model_manager = context.services.model_manager
-        model_info = model_manager.get_model(self.model)
-        model_ctx: StableDiffusionGeneratorPipeline = model_info.context
-        context.services.events.emit_model_load_completed (
-            graph_execution_state_id=context.graph_execution_state_id,
-            node=self.dict(),
-            source_node_id=source_node_id,
-            model_name=self.model,
-            submodel=SDModelType.diffusers,
-            model_info=model_info
-        )
-
-        return model_ctx
+        model_info = model_manager.get_model(self.model,node=self,context=context)
+        return model_info.context
 
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
@@ -167,7 +139,7 @@ class NoiseInvocation(BaseInvocation):
 
 
 # Text to image
-class TextToLatentsInvocation(BaseInvocation, ModelChooser):
+class TextToLatentsInvocation(BaseInvocation, ModelGetter):
     """Generates latents from conditionings."""
 
     type: Literal["t2l"] = "t2l"
@@ -236,7 +208,7 @@ class TextToLatentsInvocation(BaseInvocation, ModelChooser):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
             
-        with self.choose_model(context) as model:
+        with self.get_model(context) as model:
             conditioning_data = self.get_conditioning_data(context, model)
 
         # TODO: Verify the noise is the right size
@@ -257,8 +229,8 @@ class TextToLatentsInvocation(BaseInvocation, ModelChooser):
             latents=LatentsField(latents_name=name)
         )
 
-    def choose_model(self, context: InvocationContext) -> StableDiffusionGeneratorPipeline:
-        model_ctx = super().choose_model(context)
+    def get_model(self, context: InvocationContext) -> StableDiffusionGeneratorPipeline:
+        model_ctx = super().get_model(context)
 
         with model_ctx as model:
             model.scheduler = get_scheduler(
@@ -280,7 +252,7 @@ class TextToLatentsInvocation(BaseInvocation, ModelChooser):
         return model_ctx
 
 
-class LatentsToLatentsInvocation(TextToLatentsInvocation, ModelChooser):
+class LatentsToLatentsInvocation(TextToLatentsInvocation, ModelGetter):
     """Generates latents using latents as base image."""
 
     type: Literal["l2l"] = "l2l"
@@ -311,7 +283,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation, ModelChooser):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
 
-        with self.choose_model(context) as model:
+        with self.get_model(context) as model:
             conditioning_data = self.get_conditioning_data(model)
 
             # TODO: Verify the noise is the right size
@@ -346,7 +318,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation, ModelChooser):
 
 
 # Latent to image
-class LatentsToImageInvocation(BaseInvocation, ModelChooser):
+class LatentsToImageInvocation(BaseInvocation, ModelGetter):
     """Generates an image from latents."""
 
     type: Literal["l2i"] = "l2i"
@@ -371,7 +343,7 @@ class LatentsToImageInvocation(BaseInvocation, ModelChooser):
         latents = context.services.latents.get(self.latents.latents_name)
 
         # TODO: this only really needs the vae
-        with self.choose_model(context) as model:
+        with self.get_model(context) as model:
             with torch.inference_mode():
                 np_image = model.decode_latents(latents)
                 image = model.numpy_to_pil(np_image)[0]
@@ -458,7 +430,7 @@ class ScaleLatentsInvocation(BaseInvocation):
         return LatentsOutput(latents=LatentsField(latents_name=name))
 
 
-class ImageToLatentsInvocation(BaseInvocation, ModelChooser):
+class ImageToLatentsInvocation(BaseInvocation, ModelGetter):
     """Encodes an image into latents."""
 
     type: Literal["i2l"] = "i2l"
@@ -483,7 +455,7 @@ class ImageToLatentsInvocation(BaseInvocation, ModelChooser):
         )
 
         # TODO: this only really needs the vae
-        model_info = self.choose_model(context)
+        model_info = self.get_model(context)
         model: StableDiffusionGeneratorPipeline = model_info["model"]
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))

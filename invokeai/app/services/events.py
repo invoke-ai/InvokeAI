@@ -109,6 +109,7 @@ class EventServiceBase:
             node: dict,
             source_node_id: str,
             model_name: str,
+            model_type: SDModelType,
             submodel: SDModelType,
     ) -> None:
         """Emitted when a model is requested"""
@@ -119,6 +120,7 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 model_name=str,
+                model_type=model_type,
                 submodel=submodel,
             ),
         )
@@ -129,6 +131,7 @@ class EventServiceBase:
             node: dict,
             source_node_id: str,
             model_name: str,
+            model_type: SDModelType,
             submodel: SDModelType,
             model_info: SDModelInfo,
     ) -> None:
@@ -140,6 +143,7 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 model_name=str,
+                model_type=model_type,
                 submodel=submodel,
                 model_info=model_info,
             ),

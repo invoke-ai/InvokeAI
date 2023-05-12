@@ -10,16 +10,18 @@ from invokeai.backend.model_management.model_manager import (
     ModelManager,
     SDModelType,
     SDModelInfo,
-    types,
     torch,
 )
+from invokeai.app.models.exceptions import CanceledException
 from ...backend import Args,Globals # this must go when pr 3340 merged
 from ...backend.util import choose_precision, choose_torch_device
 
 @dataclass
 class LastUsedModel:
-    model_name: str
-    model_type: SDModelType
+    model_name: str=None
+    model_type: SDModelType=None
+
+last_used_model = LastUsedModel()
 
 class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory"""
@@ -42,7 +44,9 @@ class ModelManagerServiceBase(ABC):
     def get_model(self,
                   model_name: str,
                   model_type: SDModelType=SDModelType.diffusers,
-                  submodel: SDModelType=None
+                  submodel: SDModelType=None,
+                  node=None,  # circular dependency issues, so untyped at moment
+                  context=None,
                   )->SDModelInfo:
         """Retrieve the indicated model with name and type. 
         submodel can be used to get a part (such as the vae) 
@@ -274,6 +278,8 @@ class ModelManagerService(ModelManagerServiceBase):
                   model_name: str,
                   model_type: SDModelType=SDModelType.diffusers,
                   submodel: SDModelType=None,
+                  node=None,
+                  context=None,
                   )->SDModelInfo:
         """
         Retrieve the indicated model. submodel can be used to get a
@@ -287,19 +293,44 @@ class ModelManagerService(ModelManagerServiceBase):
         # displaced by model loader mechanism.
         # This is to work around lack of model loader at current time,
         # which was causing inconsistent model usage throughout graph.
+        global last_used_model
+        
         if not model_name:
             self.logger.debug('No model name provided, defaulting to last loaded model')
-            model_name = LastUsedModel.name
-            model_type = model_type or LastUsedModel.type
+            model_name = last_used_model.model_name
+            model_type = model_type or last_used_model.model_type
         else:
-            LastUsedModel.name = model_name
-            LastUsedModel.model_type = model_type
-        
-        return self.mgr.get_model(
+            last_used_model.model_name = model_name
+            last_used_model.model_type = model_type
+
+        # if we are called from within a node, then we get to emit
+        # load start and complete events
+        if node and context:
+            self._emit_load_event(
+                node=node,
+                context=context,
+                model_name=model_name,
+                model_type=model_type,
+                submodel=submodel
+            )
+
+        model_info = self.mgr.get_model(
             model_name,
             model_type,
             submodel,
         )
+
+        if node and context:
+            self._emit_load_event(
+                node=node,
+                context=context,
+                model_name=model_name,
+                model_type=model_type,
+                submodel=submodel,
+                model_info=model_info
+            )
+            
+        return model_info
 
     def valid_model(self, model_name: str, model_type: SDModelType=SDModelType.diffusers) -> bool:
         """
@@ -465,6 +496,39 @@ class ModelManagerService(ModelManagerServiceBase):
         original file/database used to initialize the object.
         """
         return self.mgr.commit(conf_file)
+
+    def _emit_load_event(
+            self,
+            node,
+            context,
+            model_name: str,
+            model_type: SDModelType,
+            submodel: SDModelType,
+            model_info: SDModelInfo=None,
+    ):
+        if context.services.queue.is_canceled(context.graph_execution_state_id):
+            raise CanceledException
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[node.id]
+        if context:
+            context.services.events.emit_model_load_started(
+                graph_execution_state_id=context.graph_execution_state_id,
+                node=node.dict(),
+                source_node_id=source_node_id,
+                model_name=model_name,
+                model_type=model_type,
+                submodel=submodel,
+            )
+        else:
+            context.services.events.emit_model_load_completed (
+                graph_execution_state_id=context.graph_execution_state_id,
+                node=node.dict(),
+                source_node_id=source_node_id,
+                model_name=model_name,
+                model_type=model_type,
+                submodel=submodel,
+                model_info=model_info
+            )
 
     @property
     def logger(self):
