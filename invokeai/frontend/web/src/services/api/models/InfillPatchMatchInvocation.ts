@@ -5,7 +5,7 @@
 import type { ImageField } from './ImageField';
 
 /**
- * Infills transparent areas of an image with tiles of the image
+ * Infills transparent areas of an image using the PatchMatch algorithm
  */
 export type InfillPatchMatchInvocation = {
   /**
