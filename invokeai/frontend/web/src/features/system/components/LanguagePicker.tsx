@@ -1,15 +1,19 @@
-import type { ReactNode } from 'react';
-
-import { VStack } from '@chakra-ui/react';
-import IAIButton from 'common/components/IAIButton';
+import {
+  Menu,
+  MenuButton,
+  MenuItemOption,
+  MenuList,
+  MenuOptionGroup,
+  Tooltip,
+} from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
 import { useTranslation } from 'react-i18next';
-import { FaCheck, FaLanguage } from 'react-icons/fa';
+import { FaLanguage } from 'react-icons/fa';
 import i18n from 'i18n';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { languageSelector } from '../store/systemSelectors';
 import { languageChanged } from '../store/systemSlice';
+import { map } from 'lodash-es';
 
 export const LANGUAGES = {
   ar: i18n.t('common.langArabic', { lng: 'ar' }),
@@ -35,43 +39,29 @@ export default function LanguagePicker() {
   const dispatch = useAppDispatch();
   const language = useAppSelector(languageSelector);
 
-  const renderLanguagePicker = () => {
-    const languagesToRender: ReactNode[] = [];
-    Object.keys(LANGUAGES).forEach((lang) => {
-      const l = lang as keyof typeof LANGUAGES;
-      languagesToRender.push(
-        <IAIButton
-          key={lang}
-          isChecked={language === l}
-          leftIcon={language === l ? <FaCheck /> : undefined}
-          onClick={() => dispatch(languageChanged(l))}
-          aria-label={LANGUAGES[l]}
-          size="sm"
-          minWidth="200px"
-        >
-          {LANGUAGES[l]}
-        </IAIButton>
-      );
-    });
-
-    return languagesToRender;
-  };
-
   return (
-    <IAIPopover
-      triggerComponent={
-        <IAIIconButton
-          aria-label={t('common.languagePickerLabel')}
-          tooltip={t('common.languagePickerLabel')}
+    <Tooltip title={t('common.languagePickerLabel')}>
+      <Menu closeOnSelect={false}>
+        <MenuButton
+          as={IAIIconButton}
           icon={<FaLanguage />}
-          size="sm"
           variant="link"
-          data-variant="link"
-          fontSize={26}
+          aria-label={t('common.languagePickerLabel')}
         />
-      }
-    >
-      <VStack>{renderLanguagePicker()}</VStack>
-    </IAIPopover>
+        <MenuList>
+          <MenuOptionGroup value={language}>
+            {map(LANGUAGES, (languageName, l: keyof typeof LANGUAGES) => (
+              <MenuItemOption
+                key={l}
+                value={l}
+                onClick={() => dispatch(languageChanged(l))}
+              >
+                {languageName}
+              </MenuItemOption>
+            ))}
+          </MenuOptionGroup>
+        </MenuList>
+      </Menu>
+    </Tooltip>
   );
 }
