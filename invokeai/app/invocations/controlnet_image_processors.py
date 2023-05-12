@@ -33,16 +33,16 @@ from .image import ImageOutput, build_image_output, PILInvocationConfig
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="processed image")
-    # width: Optional[int] = Field(default=None, description="The width of the image in pixels")
-    # height: Optional[int] = Field(default=None, description="The height of the image in pixels")
-    # mode: Optional[str] = Field(default=None, description="The mode of the image")
     control_model: Optional[str] = Field(default=None, description="control model used")
     control_weight: Optional[float] = Field(default=None, description="weight given to controlnet")
+    begin_step_percent: float = Field(default=0, ge=0, le=1,
+                                                description="% of total steps at which controlnet is first applied")
+    end_step_percent: float = Field(default=1, ge=0, le=1,
+                                    description="% of total steps at which controlnet is last applied")
 
     class Config:
         schema_extra = {
-            "required": ["image", "control_model", "control_weight"]
-            # "required": ["type", "image", "width", "height", "mode"]
+            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"]
         }
 
 
@@ -62,12 +62,11 @@ class ControlNetInvocation(BaseInvocation):
     image: ImageField = Field(default=None, description="image to process")
     control_model: str = Field(default=None, description="control model to use")
     control_weight: float = Field(default=0.5, ge=0, le=1, description="weight given to controlnet")
-    # TODO: support additional ControlNet parameters (mostly just passthroughs to other nodes with ControlField inputs)
-    # begin_step_percent: float = Field(default=0, ge=0, le=1,
-    #                                    description="% of total steps at which controlnet is first applied")
-    # end_step_percent: float = Field(default=1, ge=0, le=1,
-    #                                  description="% of total steps at which controlnet is last applied")
-    # guess_mode: bool = Field(default=False, description="use guess mode (controlnet ignores prompt)")
+    # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
+    begin_step_percent: float = Field(default=0, ge=0, le=1,
+                                        description="% of total steps at which controlnet is first applied")
+    end_step_percent: float = Field(default=1, ge=0, le=1,
+                                      description="% of total steps at which controlnet is last applied")
     # fmt: on
 
 
@@ -77,7 +76,9 @@ class ControlNetInvocation(BaseInvocation):
             control=ControlField(
                 image=self.image,
                 control_model=self.control_model,
-                control_weight=self.control_weight
+                control_weight=self.control_weight,
+                begin_step_percent=self.begin_step_percent,
+                end_step_percent=self.end_step_percent,
             ),
         )
 

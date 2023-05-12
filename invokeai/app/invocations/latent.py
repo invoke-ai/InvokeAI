@@ -317,7 +317,9 @@ class TextToLatentsInvocation(BaseInvocation):
                 )
                 control_item = ControlNetData(model=control_model,
                                               image_tensor=control_image,
-                                              weight=control_info.control_weight)
+                                              weight=control_info.control_weight,
+                                              begin_step_percent=control_info.begin_step_percent,
+                                              end_step_percent=control_info.end_step_percent)
                 control_data.append(control_item)
             # multi_control = MultiControlNetModel(control_models)
             # model.control_model = multi_control
