@@ -73,7 +73,6 @@ const FloatingParametersPanelButtons = () => {
     <Flex
       pos="absolute"
       transform="translate(0, -50%)"
-      zIndex={20}
       minW={8}
       top="50%"
       insetInlineStart="4.5rem"

@@ -20,7 +20,7 @@ export const iterationGraph = {
       model: '',
       progress_images: false,
       prompt: 'dog',
-      sampler_name: 'k_lms',
+      sampler_name: 'lms',
       seamless: false,
       steps: 11,
       type: 'txt2img',

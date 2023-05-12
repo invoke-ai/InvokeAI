@@ -23,7 +23,7 @@
     ],
     "threshold": 0,
     "postprocessing": null,
-    "sampler": "k_lms",
+    "sampler": "lms",
     "variations": [],
     "type": "txt2img"
   }

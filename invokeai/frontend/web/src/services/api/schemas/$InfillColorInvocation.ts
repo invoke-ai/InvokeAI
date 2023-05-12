@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $InfillColorInvocation = {
-  description: `Infills transparent areas of an image with a color`,
+  description: `Infills transparent areas of an image with a solid color`,
   properties: {
     id: {
       type: 'string',

@@ -3,6 +3,7 @@
 from typing import Literal
 
 from pydantic import BaseModel, Field
+import numpy as np
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 
@@ -73,3 +74,12 @@ class DivideInvocation(BaseInvocation, MathInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=int(self.a / self.b))
+
+
+class RandomIntInvocation(BaseInvocation):
+    """Outputs a single random integer."""
+    #fmt: off
+    type: Literal["rand_int"] = "rand_int"
+    #fmt: on
+    def invoke(self, context: InvocationContext) -> IntOutput:
+        return IntOutput(a=np.random.randint(0, np.iinfo(np.int32).max))

@@ -1,4 +1,4 @@
-import { Box, Flex, Image, Skeleton, useBoolean } from '@chakra-ui/react';
+import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
@@ -11,7 +11,8 @@ import NextPrevImageButtons from './NextPrevImageButtons';
 import CurrentImageHidden from './CurrentImageHidden';
 import { DragEvent, memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import CurrentImageFallback from './CurrentImageFallback';
+import ImageFallbackSpinner from './ImageFallbackSpinner';
+import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -50,8 +51,6 @@ const CurrentImagePreview = () => {
   } = useAppSelector(imagesSelector);
   const { getUrl } = useGetUrl();
 
-  const [isLoaded, { on, off }] = useBoolean();
-
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       if (!image) {
@@ -67,11 +66,11 @@ const CurrentImagePreview = () => {
   return (
     <Flex
       sx={{
-        position: 'relative',
-        justifyContent: 'center',
-        alignItems: 'center',
         width: '100%',
         height: '100%',
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
@@ -91,28 +90,23 @@ const CurrentImagePreview = () => {
         />
       ) : (
         image && (
-          <Image
-            onDragStart={handleDragStart}
-            fallbackStrategy="beforeLoadOrError"
-            src={shouldHidePreview ? undefined : getUrl(image.url)}
-            width={image.metadata.width || 'auto'}
-            height={image.metadata.height || 'auto'}
-            fallback={
-              shouldHidePreview ? (
-                <CurrentImageHidden />
-              ) : (
-                <CurrentImageFallback />
-              )
-            }
-            sx={{
-              objectFit: 'contain',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              height: 'auto',
-              position: 'absolute',
-              borderRadius: 'base',
-            }}
-          />
+          <>
+            <Image
+              src={getUrl(image.url)}
+              fallbackStrategy="beforeLoadOrError"
+              fallback={<ImageFallbackSpinner />}
+              onDragStart={handleDragStart}
+              sx={{
+                objectFit: 'contain',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                height: 'auto',
+                position: 'absolute',
+                borderRadius: 'base',
+              }}
+            />
+            <ImageMetadataOverlay image={image} />
+          </>
         )
       )}
       {shouldShowImageDetails && image && 'metadata' in image && (
