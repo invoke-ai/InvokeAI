@@ -7,6 +7,7 @@ export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'lms',
   'pndm',
   'heun',
+  'heun_k',
   'euler',
   'euler_k',
   'euler_a',
