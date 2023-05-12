@@ -51,7 +51,7 @@ export const initialGenerationState: GenerationState = {
   perlin: 0,
   prompt: '',
   negativePrompt: '',
-  sampler: 'k_lms',
+  sampler: 'lms',
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,
