@@ -11,7 +11,7 @@ import { Box, Flex, Grid, Portal } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, ReactNode, useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Loading from 'common/components/Loading/Loading';
@@ -22,6 +22,8 @@ import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
+import { languageSelector } from 'features/system/store/systemSelectors';
+import i18n from 'i18n';
 
 const DEFAULT_CONFIG = {};
 
@@ -33,6 +35,9 @@ interface Props {
 const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
+
+  const language = useAppSelector(languageSelector);
+
   const log = useLogger();
 
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
@@ -42,6 +47,10 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   const [loadingOverridden, setLoadingOverridden] = useState(false);
 
   const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    i18n.changeLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     log.info({ namespace: 'App', data: config }, 'Received config');

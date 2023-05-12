@@ -24,6 +24,7 @@ import { InvokeLogLevel } from 'app/logging/useLogger';
 import { TFuncKey } from 'i18next';
 import { t } from 'i18next';
 import { userInvoked } from 'app/store/actions';
+import { LANGUAGES } from '../components/LanguagePicker';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -91,6 +92,7 @@ export interface SystemState {
   infillMethods: InfillMethod[];
   isPersisted: boolean;
   shouldAntialiasProgressImage: boolean;
+  language: keyof typeof LANGUAGES;
 }
 
 export const initialSystemState: SystemState = {
@@ -125,6 +127,7 @@ export const initialSystemState: SystemState = {
   canceledSession: '',
   infillMethods: ['tile', 'patchmatch'],
   isPersisted: false,
+  language: 'en',
 };
 
 export const systemSlice = createSlice({
@@ -271,6 +274,9 @@ export const systemSlice = createSlice({
     },
     isPersistedChanged: (state, action: PayloadAction<boolean>) => {
       state.isPersisted = action.payload;
+    },
+    languageChanged: (state, action: PayloadAction<keyof typeof LANGUAGES>) => {
+      state.language = action.payload;
     },
   },
   extraReducers(builder) {
@@ -481,6 +487,7 @@ export const {
   shouldLogToConsoleChanged,
   isPersistedChanged,
   shouldAntialiasProgressImageChanged,
+  languageChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
