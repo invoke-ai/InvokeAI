@@ -8,7 +8,6 @@ from typing import types
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 from ...backend import Globals
-from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_storage import DiskImageStorage
@@ -18,6 +17,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.metadata import PngMetadataService
+from ..services.model_manager_service import ModelManagerService
 from .events import FastAPIEventService
 
 
@@ -70,7 +70,7 @@ class ApiDependencies:
         db_location = os.path.join(output_folder, "invokeai.db")
 
         services = InvocationServices(
-            model_manager=get_model_manager(config,logger),
+            model_manager=ModelManagerService(config,logger),
             events=events,
             logger=logger,
             latents=latents,
