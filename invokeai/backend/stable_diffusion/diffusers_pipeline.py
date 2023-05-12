@@ -670,6 +670,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             else:
                 latent_control_input = latent_model_input
             # control_data should be type List[ControlNetData]
+
             # this loop covers both ControlNet (one ControlNetData in list)
             #      and MultiControlNet (multiple ControlNetData in list)
             for i, control_datum in enumerate(control_data):
@@ -699,6 +700,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                             for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
                         ]
                         mid_block_res_sample += mid_sample
+
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
             latent_model_input,
