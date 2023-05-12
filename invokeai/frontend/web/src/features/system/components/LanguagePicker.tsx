@@ -40,28 +40,28 @@ export default function LanguagePicker() {
   const language = useAppSelector(languageSelector);
 
   return (
-    <Tooltip title={t('common.languagePickerLabel')}>
-      <Menu closeOnSelect={false}>
+    <Menu closeOnSelect={false}>
+      <Tooltip label={t('common.languagePickerLabel')} hasArrow>
         <MenuButton
           as={IAIIconButton}
           icon={<FaLanguage />}
           variant="link"
           aria-label={t('common.languagePickerLabel')}
         />
-        <MenuList>
-          <MenuOptionGroup value={language}>
-            {map(LANGUAGES, (languageName, l: keyof typeof LANGUAGES) => (
-              <MenuItemOption
-                key={l}
-                value={l}
-                onClick={() => dispatch(languageChanged(l))}
-              >
-                {languageName}
-              </MenuItemOption>
-            ))}
-          </MenuOptionGroup>
-        </MenuList>
-      </Menu>
-    </Tooltip>
+      </Tooltip>
+      <MenuList>
+        <MenuOptionGroup value={language}>
+          {map(LANGUAGES, (languageName, l: keyof typeof LANGUAGES) => (
+            <MenuItemOption
+              key={l}
+              value={l}
+              onClick={() => dispatch(languageChanged(l))}
+            >
+              {languageName}
+            </MenuItemOption>
+          ))}
+        </MenuOptionGroup>
+      </MenuList>
+    </Menu>
   );
 }
