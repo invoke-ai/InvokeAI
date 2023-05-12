@@ -12,18 +12,20 @@ const selector = createSelector(
   [canvasSelector],
   (canvas) => {
     const {
-      layerState: {
-        stagingArea: { images, selectedImageIndex },
-      },
+      layerState,
       shouldShowStagingImage,
       shouldShowStagingOutline,
       boundingBoxCoordinates: { x, y },
       boundingBoxDimensions: { width, height },
     } = canvas;
 
+    const { selectedImageIndex, images } = layerState.stagingArea;
+
     return {
       currentStagingAreaImage:
-        images.length > 0 ? images[selectedImageIndex] : undefined,
+        images.length > 0 && selectedImageIndex !== undefined
+          ? images[selectedImageIndex]
+          : undefined,
       isOnFirstImage: selectedImageIndex === 0,
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,

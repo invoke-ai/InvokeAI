@@ -6,6 +6,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
+  setShouldAntialias,
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
@@ -36,6 +37,7 @@ export const canvasControlsSelector = createSelector(
       shouldShowIntermediates,
       shouldSnapToGrid,
       shouldRestrictStrokesToBox,
+      shouldAntialias,
     } = canvas;
 
     return {
@@ -47,6 +49,7 @@ export const canvasControlsSelector = createSelector(
       shouldShowIntermediates,
       shouldSnapToGrid,
       shouldRestrictStrokesToBox,
+      shouldAntialias,
     };
   },
   {
@@ -69,6 +72,7 @@ const IAICanvasSettingsButtonPopover = () => {
     shouldShowIntermediates,
     shouldSnapToGrid,
     shouldRestrictStrokesToBox,
+    shouldAntialias,
   } = useAppSelector(canvasControlsSelector);
 
   useHotkeys(
@@ -147,6 +151,12 @@ const IAICanvasSettingsButtonPopover = () => {
           onChange={(e) =>
             dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
           }
+        />
+
+        <IAICheckbox
+          label={t('unifiedCanvas.antialiasing')}
+          isChecked={shouldAntialias}
+          onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
         />
         <ClearCanvasHistoryButtonModal />
         <EmptyTempFolderButtonModal />

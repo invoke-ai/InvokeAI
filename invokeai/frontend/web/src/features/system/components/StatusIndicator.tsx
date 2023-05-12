@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useRef } from 'react';
 import { FaCircle } from 'react-icons/fa';
 import { useHoverDirty } from 'react-use';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 const statusIndicatorSelector = createSelector(
   systemSelector,
@@ -31,9 +32,7 @@ const statusIndicatorSelector = createSelector(
       currentStatusHasSteps,
     };
   },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
-  }
+  defaultSelectorOptions
 );
 
 const StatusIndicator = () => {
@@ -43,7 +42,6 @@ const StatusIndicator = () => {
     currentIteration,
     totalIterations,
     statusTranslationKey,
-    currentStatusHasSteps,
   } = useAppSelector(statusIndicatorSelector);
   const { t } = useTranslation();
   const ref = useRef(null);

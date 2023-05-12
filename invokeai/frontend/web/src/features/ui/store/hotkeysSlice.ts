@@ -6,15 +6,13 @@ type HotkeysState = {
   shift: boolean;
 };
 
-const initialHotkeysState: HotkeysState = {
+export const initialHotkeysState: HotkeysState = {
   shift: false,
 };
 
-const initialState: HotkeysState = initialHotkeysState;
-
 export const hotkeysSlice = createSlice({
   name: 'hotkeys',
-  initialState,
+  initialState: initialHotkeysState,
   reducers: {
     shiftKeyPressed: (state, action: PayloadAction<boolean>) => {
       state.shift = action.payload;

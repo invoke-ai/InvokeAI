@@ -11,7 +11,7 @@ export const APP_GALLERY_POPOVER_HEIGHT = `calc(100vh - (${APP_CONTENT_HEIGHT_CU
 export const APP_METADATA_HEIGHT = `calc(100vh - (${APP_CONTENT_HEIGHT_CUTOFF} + 4.4rem))`;
 
 // this is in pixels
-export const PARAMETERS_PANEL_WIDTH = 384;
+// export const PARAMETERS_PANEL_WIDTH = 384;
 
 // do not touch ffs
 export const APP_TEXT_TO_IMAGE_HEIGHT =
@@ -19,3 +19,5 @@ export const APP_TEXT_TO_IMAGE_HEIGHT =
 
 // option bar
 export const OPTIONS_BAR_MAX_WIDTH = '22.5rem';
+
+export const PARAMETERS_PANEL_WIDTH = '28rem';

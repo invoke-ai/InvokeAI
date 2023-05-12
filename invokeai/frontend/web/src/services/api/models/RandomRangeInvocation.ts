@@ -24,7 +24,7 @@ export type RandomRangeInvocation = {
    */
   size?: number;
   /**
-   * The seed for the RNG
+   * The seed for the RNG (omit for random)
    */
   seed?: number;
 };

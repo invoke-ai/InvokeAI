@@ -7,7 +7,7 @@ const SelectImagePlaceholder = () => {
       sx={{
         w: 'full',
         h: 'full',
-        bg: 'base.800',
+        // bg: 'base.800',
         borderRadius: 'base',
         alignItems: 'center',
         justifyContent: 'center',

@@ -5,19 +5,20 @@ import {
   Image,
   MenuItem,
   MenuList,
-  Skeleton,
   useDisclosure,
-  useTheme,
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { DragEvent, memo, useCallback, useState } from 'react';
+import { DragEvent, MouseEvent, memo, useCallback, useState } from 'react';
 import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import * as InvokeAI from 'app/types/invokeai';
-import { resizeAndScaleCanvas } from 'features/canvas/store/canvasSlice';
+import {
+  resizeAndScaleCanvas,
+  setInitialCanvasImage,
+} from 'features/canvas/store/canvasSlice';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,6 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { useGetUrl } from 'common/util/getUrl';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { imageDeleted } from 'services/thunks/image';
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
@@ -33,6 +33,8 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { requestedImageDeletion } from '../store/actions';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -94,16 +96,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   } = useDisclosure();
 
   const { image, isSelected } = props;
-  const { url, thumbnail, name, metadata } = image;
+  const { url, thumbnail, name } = image;
   const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
-  const { direction } = useTheme();
+
   const { t } = useTranslation();
   const { isFeatureEnabled: isLightboxEnabled } = useFeatureStatus('lightbox');
-  const { recallSeed, recallPrompt, sendToImageToImage, recallInitialImage } =
+  const { recallSeed, recallPrompt, recallInitialImage, recallAllParameters } =
     useParameters();
 
   const handleMouseOver = () => setIsHovered(true);
@@ -112,18 +114,22 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   // Immediately deletes an image
   const handleDelete = useCallback(() => {
     if (canDeleteImage && image) {
-      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+      dispatch(requestedImageDeletion(image));
     }
   }, [dispatch, image, canDeleteImage]);
 
   // Opens the alert dialog to check if user is sure they want to delete
-  const handleInitiateDelete = useCallback(() => {
-    if (shouldConfirmOnDelete) {
-      onDeleteDialogOpen();
-    } else {
-      handleDelete();
-    }
-  }, [handleDelete, onDeleteDialogOpen, shouldConfirmOnDelete]);
+  const handleInitiateDelete = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      if (shouldConfirmOnDelete) {
+        onDeleteDialogOpen();
+      } else {
+        handleDelete();
+      }
+    },
+    [handleDelete, onDeleteDialogOpen, shouldConfirmOnDelete]
+  );
 
   const handleSelectImage = useCallback(() => {
     dispatch(imageSelected(image));
@@ -148,8 +154,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   }, [image, recallSeed]);
 
   const handleSendToImageToImage = useCallback(() => {
-    sendToImageToImage(image);
-  }, [image, sendToImageToImage]);
+    dispatch(initialImageSelected(image));
+  }, [dispatch, image]);
 
   const handleRecallInitialImage = useCallback(() => {
     recallInitialImage(image.metadata.invokeai?.node?.image);
@@ -159,7 +165,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
    * TODO: the rest of these
    */
   const handleSendToCanvas = () => {
-    // dispatch(setInitialCanvasImage(image));
+    dispatch(setInitialCanvasImage(image));
 
     dispatch(resizeAndScaleCanvas());
 
@@ -175,16 +181,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     });
   };
 
-  const handleUseAllParameters = () => {
-    // metadata.invokeai?.node &&
-    //   dispatch(setAllParameters(metadata.invokeai?.node));
-    // toast({
-    //   title: t('toast.parametersSet'),
-    //   status: 'success',
-    //   duration: 2500,
-    //   isClosable: true,
-    // });
-  };
+  const handleUseAllParameters = useCallback(() => {
+    recallAllParameters(image);
+  }, [image, recallAllParameters]);
 
   const handleLightBox = () => {
     // dispatch(setCurrentImage(image));
@@ -238,7 +237,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
               isDisabled={
-                !['txt2img', 'img2img'].includes(
+                !['txt2img', 'img2img', 'inpaint'].includes(
                   String(image?.metadata?.invokeai?.node?.type)
                 )
               }
@@ -315,6 +314,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                   sx={{
                     width: '50%',
                     height: '50%',
+                    maxWidth: '4rem',
+                    maxHeight: '4rem',
                     fill: 'ok.500',
                   }}
                 />
