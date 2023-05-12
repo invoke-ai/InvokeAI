@@ -104,7 +104,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const toast = useToast();
 
   const { t } = useTranslation();
-  const { isFeatureEnabled: isLightboxEnabled } = useFeatureStatus('lightbox');
+
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
+  const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
+
   const { recallSeed, recallPrompt, recallInitialImage, recallAllParameters } =
     useParameters();
 
@@ -250,9 +253,11 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             >
               {t('parameters.sendToImg2Img')}
             </MenuItem>
-            <MenuItem icon={<FaShare />} onClickCapture={handleSendToCanvas}>
-              {t('parameters.sendToUnifiedCanvas')}
-            </MenuItem>
+            {isCanvasEnabled && (
+              <MenuItem icon={<FaShare />} onClickCapture={handleSendToCanvas}>
+                {t('parameters.sendToUnifiedCanvas')}
+              </MenuItem>
+            )}
             <MenuItem icon={<FaTrash />} onClickCapture={onDeleteDialogOpen}>
               {t('gallery.deleteImage')}
             </MenuItem>
