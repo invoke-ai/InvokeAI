@@ -4,6 +4,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Union, Callable, types
+from dataclasses import dataclass
 
 from invokeai.backend.model_management.model_manager import (
     ModelManager,
@@ -14,6 +15,11 @@ from invokeai.backend.model_management.model_manager import (
 )
 from ...backend import Args,Globals # this must go when pr 3340 merged
 from ...backend.util import choose_precision, choose_torch_device
+
+@dataclass
+class LastUsedModel:
+    model_name: str
+    model_type: SDModelType
 
 class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory"""
@@ -273,6 +279,22 @@ class ModelManagerService(ModelManagerServiceBase):
         Retrieve the indicated model. submodel can be used to get a
         part (such as the vae) of a diffusers mode.
         """
+        
+        # Temporary hack here: we remember the last model fetched
+        # so that when executing a graph, the first node called gets
+        # to set default model for subsequent nodes in the event that
+        # they do not set the model explicitly. This should be
+        # displaced by model loader mechanism.
+        # This is to work around lack of model loader at current time,
+        # which was causing inconsistent model usage throughout graph.
+        if not model_name:
+            self.logger.debug('No model name provided, defaulting to last loaded model')
+            model_name = LastUsedModel.name
+            model_type = model_type or LastUsedModel.type
+        else:
+            LastUsedModel.name = model_name
+            LastUsedModel.model_type = model_type
+        
         return self.mgr.get_model(
             model_name,
             model_type,

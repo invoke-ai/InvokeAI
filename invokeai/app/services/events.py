@@ -4,6 +4,7 @@ from typing import Any
 from invokeai.app.api.models.images import ProgressImage
 from invokeai.app.util.misc import get_timestamp
 from invokeai.app.services.model_manager_service import SDModelType, SDModelInfo
+from invokeai.app.models.exceptions import CanceledException
 
 class EventServiceBase:
     session_event: str = "session_event"
