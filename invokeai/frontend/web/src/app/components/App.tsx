@@ -7,7 +7,7 @@ import useToastWatcher from 'features/system/hooks/useToastWatcher';
 
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
-import { Box, Flex, Grid, Portal, useColorMode } from '@chakra-ui/react';
+import { Box, Flex, Grid, Portal } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
@@ -41,25 +41,18 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
   useGlobalHotkeys();
   const log = useLogger();
 
-  const currentTheme = useAppSelector((state) => state.ui.currentTheme);
-
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
   const isApplicationReady = useIsApplicationReady();
 
   const [loadingOverridden, setLoadingOverridden] = useState(false);
 
-  const { setColorMode } = useColorMode();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     log.info({ namespace: 'App', data: config }, 'Received config');
     dispatch(configChanged(config));
   }, [dispatch, config, log]);
-
-  useEffect(() => {
-    setColorMode(['light'].includes(currentTheme) ? 'light' : 'dark');
-  }, [setColorMode, currentTheme]);
 
   const handleOverrideClicked = useCallback(() => {
     setLoadingOverridden(true);
