@@ -142,7 +142,7 @@ const ResizableDrawer = ({
       direction={slideDirection}
       in={isOpen}
       motionProps={{ initial: false }}
-      style={{ zIndex: 99, width: 'full' }}
+      style={{ width: 'full' }}
     >
       <Box
         ref={outsideClickRef}

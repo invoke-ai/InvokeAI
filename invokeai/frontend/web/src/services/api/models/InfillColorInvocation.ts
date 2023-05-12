@@ -6,7 +6,7 @@ import type { ColorField } from './ColorField';
 import type { ImageField } from './ImageField';
 
 /**
- * Infills transparent areas of an image with a color
+ * Infills transparent areas of an image with a solid color
  */
 export type InfillColorInvocation = {
   /**

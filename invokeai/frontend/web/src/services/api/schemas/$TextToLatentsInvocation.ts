@@ -48,5 +48,13 @@ export const $TextToLatentsInvocation = {
       type: 'string',
       description: `The model to use (currently ignored)`,
     },
+    seamless: {
+      type: 'boolean',
+      description: `Whether or not to generate an image that can tile without seams`,
+    },
+    seamless_axes: {
+      type: 'string',
+      description: `The axes to tile the image on, 'x' and/or 'y'`,
+    },
   },
 } as const;

@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $InfillPatchMatchInvocation = {
-  description: `Infills transparent areas of an image with tiles of the image`,
+  description: `Infills transparent areas of an image using the PatchMatch algorithm`,
   properties: {
     id: {
       type: 'string',

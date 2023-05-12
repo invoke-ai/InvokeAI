@@ -8,7 +8,6 @@ import type { CollectInvocation } from './CollectInvocation';
 import type { CompelInvocation } from './CompelInvocation';
 import type { CropImageInvocation } from './CropImageInvocation';
 import type { CvInpaintInvocation } from './CvInpaintInvocation';
-import type { DataURLToImageInvocation } from './DataURLToImageInvocation';
 import type { DivideInvocation } from './DivideInvocation';
 import type { Edge } from './Edge';
 import type { GraphInvocation } from './GraphInvocation';
@@ -48,7 +47,7 @@ export type Graph = {
   /**
    * The nodes in this graph
    */
-  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | DataURLToImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | CompelInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
+  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | CompelInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
   /**
    * The connections between nodes and their fields in this graph
    */
