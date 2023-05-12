@@ -34,7 +34,7 @@ from .image import ImageOutput, build_image_output, PILInvocationConfig
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="processed image")
     control_model: Optional[str] = Field(default=None, description="control model used")
-    control_weight: Optional[float] = Field(default=None, description="weight given to controlnet")
+    control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
                                                 description="% of total steps at which controlnet is first applied")
     end_step_percent: float = Field(default=1, ge=0, le=1,
@@ -61,7 +61,7 @@ class ControlNetInvocation(BaseInvocation):
     # Inputs
     image: ImageField = Field(default=None, description="image to process")
     control_model: str = Field(default=None, description="control model to use")
-    control_weight: float = Field(default=0.5, ge=0, le=1, description="weight given to controlnet")
+    control_weight: float = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
     # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
                                         description="% of total steps at which controlnet is first applied")
