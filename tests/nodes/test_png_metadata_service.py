@@ -17,7 +17,7 @@ valid_metadata = {
         "width": 512,
         "height": 512,
         "cfg_scale": 7.5,
-        "scheduler": "k_lms",
+        "scheduler": "lms",
         "model": "stable-diffusion-1.5",
     },
 }

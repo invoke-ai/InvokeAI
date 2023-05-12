@@ -1,8 +1,8 @@
 import { Flex, Spinner, SpinnerProps } from '@chakra-ui/react';
 
-type CurrentImageFallbackProps = SpinnerProps;
+type ImageFallbackSpinnerProps = SpinnerProps;
 
-const CurrentImageFallback = (props: CurrentImageFallbackProps) => {
+const ImageFallbackSpinner = (props: ImageFallbackSpinnerProps) => {
   const { size = 'xl', ...rest } = props;
 
   return (
@@ -21,4 +21,4 @@ const CurrentImageFallback = (props: CurrentImageFallbackProps) => {
   );
 };
 
-export default CurrentImageFallback;
+export default ImageFallbackSpinner;

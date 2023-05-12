@@ -47,7 +47,7 @@ const ImageToImageStrength = () => {
 
   return (
     <IAISlider
-      label={`${t('parameters.strength')}`}
+      label={`${t('parameters.denoisingStrength')}`}
       step={step}
       min={min}
       max={sliderMax}
