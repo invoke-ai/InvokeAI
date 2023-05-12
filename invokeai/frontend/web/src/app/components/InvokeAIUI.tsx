@@ -1,4 +1,10 @@
-import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
+import React, {
+  lazy,
+  memo,
+  PropsWithChildren,
+  ReactNode,
+  useEffect,
+} from 'react';
 import { Provider } from 'react-redux';
 import { store } from 'app/store/store';
 import { OpenAPI } from 'services/api';
@@ -17,9 +23,10 @@ interface Props extends PropsWithChildren {
   apiUrl?: string;
   token?: string;
   config?: PartialAppConfig;
+  headerComponent?: ReactNode;
 }
 
-const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
+const InvokeAIUI = ({ apiUrl, token, config, headerComponent }: Props) => {
   useEffect(() => {
     // configure API client token
     if (token) {
@@ -48,7 +55,7 @@ const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <App config={config}>{children}</App>
+            <App config={config} headerComponent={headerComponent} />
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>

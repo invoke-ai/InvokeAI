@@ -11,14 +11,8 @@ import { Box, Flex, Grid, Portal } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  memo,
-  PropsWithChildren,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { memo, ReactNode, useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Loading from 'common/components/Loading/Loading';
 import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
@@ -27,16 +21,16 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { configChanged } from 'features/system/store/configSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useLogger } from 'app/logging/useLogger';
-import ProgressImagePreview from 'features/parameters/components/_ProgressImagePreview';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 
 const DEFAULT_CONFIG = {};
 
-interface Props extends PropsWithChildren {
+interface Props {
   config?: PartialAppConfig;
+  headerComponent?: ReactNode;
 }
 
-const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
+const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
   const log = useLogger();
@@ -70,7 +64,7 @@ const App = ({ config = DEFAULT_CONFIG, children }: Props) => {
           w={APP_WIDTH}
           h={APP_HEIGHT}
         >
-          {children || <SiteHeader />}
+          {headerComponent || <SiteHeader />}
           <Flex
             gap={4}
             w={{ base: '100vw', xl: 'full' }}
