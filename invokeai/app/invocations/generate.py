@@ -9,7 +9,6 @@ from torch import Tensor
 from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ColorField, ImageField, ImageType
-from invokeai.app.invocations.util.choose_model import choose_model
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
@@ -72,7 +71,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Handle invalid model parameter
-        model = choose_model(context.services.model_manager, self.model)
+        model = context.services.model_manager.get_model(self.model)
 
         # Get the source node id (we are invoking the prepared node)
         graph_execution_state = context.services.graph_execution_manager.get(

@@ -13,18 +13,20 @@ from typing import (
 from pydantic import BaseModel
 from pydantic.fields import Field
 
-
 import invokeai.backend.util.logging as logger
+import invokeai.version
+
 from invokeai.app.services.metadata import PngMetadataService
 from .services.default_graphs import create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
 from ..backend import Args
+from ..backend import Globals   # this should go when pr 3340 merged
+
 from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers
 from .cli.completer import set_autocompleter
 from .invocations.baseinvocation import BaseInvocation
 from .services.events import EventServiceBase
-from .services.model_manager_initializer import get_model_manager
 from .services.restoration_services import RestorationServices
 from .services.graph import Edge, EdgeConnection, GraphExecutionState, GraphInvocation, LibraryGraph, are_connection_types_compatible
 from .services.default_graphs import default_text_to_image_graph_id
@@ -34,7 +36,7 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-
+from .services.model_manager_service import ModelManagerService
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -191,7 +193,11 @@ def invoke_all(context: CliContext):
 def invoke_cli():
     config = Args()
     config.parse_args()
-    model_manager = get_model_manager(config,logger=logger)
+
+    logger.info(f"{invokeai.version.__app_name__}, version {invokeai.version.__version__}")
+    logger.info(f'InvokeAI runtime directory is "{Globals.root}"')
+
+    model_manager = ModelManagerService(config,logger)
 
     # This initializes the autocompleter and returns it.
     # Currently nothing is done with the returned Completer

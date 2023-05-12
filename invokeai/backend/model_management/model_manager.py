@@ -209,7 +209,7 @@ class ModelManager(object):
         if isinstance(config, DictConfig):
             self.config = config
             self.config_path = None
-        elif type(config) in [str,DictConfig]:
+        elif isinstance(config,(str,Path)):
             self.config_path = config
             self.config = OmegaConf.load(self.config_path)
         else:

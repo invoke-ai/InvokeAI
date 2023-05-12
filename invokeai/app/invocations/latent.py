@@ -6,7 +6,6 @@ import einops
 from pydantic import BaseModel, Field
 import torch
 
-from invokeai.app.invocations.util.choose_model import choose_model
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
@@ -177,7 +176,7 @@ class TextToLatentsInvocation(BaseInvocation):
         )
 
     def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
-        model_info = choose_model(model_manager, self.model)
+        model_info = model_manager.get_model(self.model)
         model_name = model_info.name
         model_hash = model_info.hash
         model_ctx: StableDiffusionGeneratorPipeline = model_info.context

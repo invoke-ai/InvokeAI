@@ -3,23 +3,35 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Union, Callable
+from typing import Union, Callable, types
 
-from invokeai.backend.util import CUDA_DEVICE
 from invokeai.backend.model_management.model_manager import (
     ModelManager,
     SDModelType,
     SDModelInfo,
-    DictConfig,
-    MAX_CACHE_SIZE,
     types,
     torch,
-    logger,
 )
+from ...backend import Args,Globals # this must go when pr 3340 merged
+from ...backend.util import choose_precision, choose_torch_device
 
 class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory"""
 
+    @abstractmethod
+    def __init__(
+            self,
+            config: Args,
+            logger: types.ModuleType
+    ):
+        """
+        Initialize with the path to the models.yaml config file. 
+        Optional parameters are the torch device type, precision, max_models,
+        and sequential_offload boolean. Note that the default device
+        type and precision are set up for a CUDA system running at half precision.
+        """
+        pass
+    
     @abstractmethod
     def get_model(self,
                   model_name: str,
@@ -207,26 +219,50 @@ class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory"""
     def __init__(
             self,
-            config: Union[Path, DictConfig, str],
-            device_type: torch.device = CUDA_DEVICE,
-            precision: torch.dtype = torch.float16,
-            max_cache_size=MAX_CACHE_SIZE,
-            sequential_offload=False,
-            logger: types.ModuleType = logger,
-    ):
+            config: Args,
+            logger: types.ModuleType
+        ):
         """
         Initialize with the path to the models.yaml config file. 
         Optional parameters are the torch device type, precision, max_models,
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-        self.mgr = ModelManager(config=config,
-                                device_type=device_type,
-                                precision=precision,
+        if config.conf and Path(config.conf).exists():
+            config_file = config.conf
+        else:
+            config_file = Path(Globals.root, "configs", "models.yaml")
+        if not config_file.exists():
+            raise IOError(f"The file {config_file} could not be found.")
+
+        logger.debug(f'config file={config_file}')
+
+        device = torch.device(choose_torch_device())
+        if config.precision=="auto":
+            precision = choose_precision(device)
+        dtype = torch.float32 if precision=='float32' \
+                 else torch.float16
+
+        # this is transitional backward compatibility
+        # support for the deprecated `max_loaded_models`
+        # configuration value. If present, then the
+        # cache size is set to 2.5 GB times
+        # the number of max_loaded_models. Otherwise
+        # use new `max_cache_size` config setting
+        max_cache_size = config.max_cache_size \
+            if hasattr(config,'max_cache_size') \
+               else config.max_loaded_models * 2.5
+
+        sequential_offload = config.sequential_guidance
+
+        self.mgr = ModelManager(config=config_file,
+                                device_type=device,
+                                precision=dtype,
                                 max_cache_size=max_cache_size,
                                 sequential_offload=sequential_offload,
                                 logger=logger
                                 )
+        logger.info('Model manager service initialized')
 
     def get_model(self,
                   model_name: str,
