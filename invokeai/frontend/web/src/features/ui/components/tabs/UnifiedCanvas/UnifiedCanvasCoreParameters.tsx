@@ -62,8 +62,6 @@ const UnifiedCanvasCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <ParamWidth />
-          <ParamHeight />
           <Flex gap={3} w="full">
             <Box flexGrow={2}>
               <ParamSampler />
@@ -72,8 +70,9 @@ const UnifiedCanvasCoreParameters = () => {
               <ModelSelect />
             </Box>
           </Flex>
+          <ParamWidth />
+          <ParamHeight />
           <ImageToImageStrength />
-          <ImageToImageFit />
         </Flex>
       )}
     </Flex>
