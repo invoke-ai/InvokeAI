@@ -8,6 +8,7 @@ export const initialConfigState: AppConfig = {
   shouldFetchImages: false,
   disabledTabs: [],
   disabledFeatures: [],
+  disabledSDFeatures: [],
   canRestoreDeletedImagesFromBin: true,
   sd: {
     iterations: {

@@ -37,11 +37,19 @@ export type LatentsToLatentsInvocation = {
   /**
    * The scheduler to use
    */
-  scheduler?: 'ddim' | 'dpmpp_2' | 'k_dpm_2' | 'k_dpm_2_a' | 'k_dpmpp_2' | 'k_euler' | 'k_euler_a' | 'k_heun' | 'k_lms' | 'plms';
+  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'pndm' | 'heun' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'unipc';
   /**
    * The model to use (currently ignored)
    */
   model?: string;
+  /**
+   * Whether or not to generate an image that can tile without seams
+   */
+  seamless?: boolean;
+  /**
+   * The axes to tile the image on, 'x' and/or 'y'
+   */
+  seamless_axes?: string;
   /**
    * The latents to use as a base image
    */

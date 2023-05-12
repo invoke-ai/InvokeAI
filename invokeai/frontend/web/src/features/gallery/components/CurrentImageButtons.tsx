@@ -152,6 +152,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   } = useAppSelector(currentImageButtonsSelector);
 
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
+  const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
 
@@ -429,13 +430,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               >
                 {t('parameters.sendToImg2Img')}
               </IAIButton>
-              <IAIButton
-                size="sm"
-                onClick={handleSendToCanvas}
-                leftIcon={<FaShare />}
-              >
-                {t('parameters.sendToUnifiedCanvas')}
-              </IAIButton>
+              {isCanvasEnabled && (
+                <IAIButton
+                  size="sm"
+                  onClick={handleSendToCanvas}
+                  leftIcon={<FaShare />}
+                >
+                  {t('parameters.sendToUnifiedCanvas')}
+                </IAIButton>
+              )}
 
               {/* <IAIButton
                 size="sm"

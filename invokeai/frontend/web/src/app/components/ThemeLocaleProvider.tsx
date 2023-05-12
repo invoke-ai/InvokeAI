@@ -1,4 +1,8 @@
-import { ChakraProvider, extendTheme } from '@chakra-ui/react';
+import {
+  ChakraProvider,
+  createLocalStorageManager,
+  extendTheme,
+} from '@chakra-ui/react';
 import { ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme as invokeAITheme } from 'theme/theme';
@@ -9,15 +13,8 @@ import { greenTeaThemeColors } from 'theme/colors/greenTea';
 import { invokeAIThemeColors } from 'theme/colors/invokeAI';
 import { lightThemeColors } from 'theme/colors/lightTheme';
 import { oceanBlueColors } from 'theme/colors/oceanBlue';
-import '@fontsource/inter/100.css';
-import '@fontsource/inter/200.css';
-import '@fontsource/inter/300.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
-import '@fontsource/inter/900.css';
+
+import '@fontsource/inter/variable.css';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'theme/css/overlayscrollbars.css';
 
@@ -31,6 +28,8 @@ const THEMES = {
   green: greenTeaThemeColors,
   ocean: oceanBlueColors,
 };
+
+const manager = createLocalStorageManager('@@invokeai-color-mode');
 
 function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   const { i18n } = useTranslation();
@@ -51,7 +50,11 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
     document.body.dir = direction;
   }, [direction]);
 
-  return <ChakraProvider theme={theme}>{children}</ChakraProvider>;
+  return (
+    <ChakraProvider theme={theme} colorModeManager={manager}>
+      {children}
+    </ChakraProvider>
+  );
 }
 
 export default ThemeLocaleProvider;

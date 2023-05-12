@@ -7,9 +7,13 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setShouldUseNoiseSettings } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const ParamNoiseCollapse = () => {
   const { t } = useTranslation();
+
+  const isNoiseEnabled = useFeatureStatus('noise').isFeatureEnabled;
+
   const shouldUseNoiseSettings = useAppSelector(
     (state: RootState) => state.generation.shouldUseNoiseSettings
   );
@@ -18,6 +22,10 @@ const ParamNoiseCollapse = () => {
 
   const handleToggle = () =>
     dispatch(setShouldUseNoiseSettings(!shouldUseNoiseSettings));
+
+  if (!isNoiseEnabled) {
+    return null;
+  }
 
   return (
     <IAICollapse

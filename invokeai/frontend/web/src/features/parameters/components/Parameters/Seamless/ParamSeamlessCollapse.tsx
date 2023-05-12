@@ -9,6 +9,7 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ParamSeamlessXAxis from './ParamSeamlessXAxis';
 import ParamSeamlessYAxis from './ParamSeamlessYAxis';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   generationSelector,
@@ -24,9 +25,15 @@ const ParamSeamlessCollapse = () => {
   const { t } = useTranslation();
   const { shouldUseSeamless } = useAppSelector(selector);
 
+  const isSeamlessEnabled = useFeatureStatus('seamless').isFeatureEnabled;
+
   const dispatch = useAppDispatch();
 
   const handleToggle = () => dispatch(setSeamless(!shouldUseSeamless));
+
+  if (!isSeamlessEnabled) {
+    return null;
+  }
 
   return (
     <IAICollapse

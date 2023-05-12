@@ -6,9 +6,12 @@ import { imageUploaded } from 'services/thunks/image';
 
 export const addImageUploadedListener = () => {
   startAppListening({
-    actionCreator: imageUploaded.fulfilled,
+    predicate: (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
+      imageUploaded.fulfilled.match(action) &&
+      action.payload.response.image_type !== 'intermediates',
     effect: (action, { dispatch, getState }) => {
       const { response } = action.payload;
+
       const state = getState();
       const image = deserializeImageResponse(response);
 

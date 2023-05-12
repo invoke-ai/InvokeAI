@@ -1,16 +1,13 @@
-import React, { lazy, memo, PropsWithChildren, useEffect } from 'react';
+import React, {
+  lazy,
+  memo,
+  PropsWithChildren,
+  ReactNode,
+  useEffect,
+} from 'react';
 import { Provider } from 'react-redux';
 import { store } from 'app/store/store';
 import { OpenAPI } from 'services/api';
-import '@fontsource/inter/100.css';
-import '@fontsource/inter/200.css';
-import '@fontsource/inter/300.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
-import '@fontsource/inter/900.css';
 
 import Loading from '../../common/components/Loading/Loading';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
@@ -26,9 +23,10 @@ interface Props extends PropsWithChildren {
   apiUrl?: string;
   token?: string;
   config?: PartialAppConfig;
+  headerComponent?: ReactNode;
 }
 
-const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
+const InvokeAIUI = ({ apiUrl, token, config, headerComponent }: Props) => {
   useEffect(() => {
     // configure API client token
     if (token) {
@@ -57,7 +55,7 @@ const InvokeAIUI = ({ apiUrl, token, config, children }: Props) => {
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <App config={config}>{children}</App>
+            <App config={config} headerComponent={headerComponent} />
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>
