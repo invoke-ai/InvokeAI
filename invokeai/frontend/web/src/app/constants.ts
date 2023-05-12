@@ -2,16 +2,27 @@
 
 export const DIFFUSERS_SCHEDULERS: Array<string> = [
   'ddim',
-  'plms',
-  'k_lms',
-  'dpmpp_2',
-  'k_dpm_2',
-  'k_dpm_2_a',
-  'k_dpmpp_2',
-  'k_euler',
-  'k_euler_a',
-  'k_heun',
+  'ddpm',
+  'deis',
+  'lms',
+  'pndm',
+  'heun',
+  'euler',
+  'euler_k',
+  'euler_a',
+  'kdpm_2',
+  'kdpm_2_a',
+  'dpmpp_2s',
+  'dpmpp_2m',
+  'dpmpp_2m_k',
+  'unipc',
 ];
+
+export const IMG2IMG_DIFFUSERS_SCHEDULERS = DIFFUSERS_SCHEDULERS.filter(
+  (scheduler) => {
+    return scheduler !== 'dpmpp_2s';
+  }
+);
 
 // Valid image widths
 export const WIDTHS: Array<number> = Array.from(Array(64)).map(
