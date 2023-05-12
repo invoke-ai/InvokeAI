@@ -221,7 +221,8 @@ class ControlNetData:
     model: ControlNetModel = Field(default=None)
     image_tensor: torch.Tensor= Field(default=None)
     weight: float = Field(default=1.0)
-
+    begin_step_percent: float = Field(default=0.0)
+    end_step_percent: float = Field(default=1.0)
 
 @dataclass(frozen=True)
 class ConditioningData:
@@ -657,7 +658,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
-        # if (self.control_model is not None) and (control_image is not None):
+        # default is no controlnet, so set controlnet processing output to None
+        down_block_res_samples, mid_block_res_sample = None, None
+
         if control_data is not None:
             if conditioning_data.guidance_scale > 1.0:
                 # expand the latents input to control model if doing classifier free guidance
@@ -671,28 +674,31 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             #      and MultiControlNet (multiple ControlNetData in list)
             for i, control_datum in enumerate(control_data):
                 # print("controlnet", i, "==>", type(control_datum))
-                down_samples, mid_sample = control_datum.model(
-                    sample=latent_control_input,
-                    timestep=timestep,
-                    encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
-                                                     conditioning_data.text_embeddings]),
-                    controlnet_cond=control_datum.image_tensor,
-                    conditioning_scale=control_datum.weight,
-                    # cross_attention_kwargs,
-                    guess_mode=False,
-                    return_dict=False,
-                )
-                if i == 0:
-                    down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
-                else:
-                    # add controlnet outputs together if have multiple controlnets
-                    down_block_res_samples = [
-                        samples_prev + samples_curr
-                        for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
-                    ]
-                    mid_block_res_sample += mid_sample
-        else:
-            down_block_res_samples, mid_block_res_sample = None, None
+                first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
+                last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
+                # apply_control_this_step = step_index >= first_control_step and step_index <= last_control_step
+                if step_index >= first_control_step and step_index <= last_control_step:
+                    print("running controlnet", i, "for step", step_index)
+                    down_samples, mid_sample = control_datum.model(
+                        sample=latent_control_input,
+                        timestep=timestep,
+                        encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
+                                                         conditioning_data.text_embeddings]),
+                        controlnet_cond=control_datum.image_tensor,
+                        conditioning_scale=control_datum.weight,
+                        # cross_attention_kwargs,
+                        guess_mode=False,
+                        return_dict=False,
+                    )
+                    if down_block_res_samples is None and mid_block_res_sample is None:
+                        down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
+                    else:
+                        # add controlnet outputs together if have multiple controlnets
+                        down_block_res_samples = [
+                            samples_prev + samples_curr
+                            for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
+                        ]
+                        mid_block_res_sample += mid_sample
 
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
