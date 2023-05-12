@@ -6,6 +6,7 @@ from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationCont
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
+from ...backend.model_management import SDModelType
 
 from compel import Compel
 from compel.prompt_parser import (
@@ -58,9 +59,14 @@ class CompelInvocation(BaseInvocation):
 
         # TODO: load without model
         model = context.services.model_manager.get_model(self.model)
-        with model.context as pipeline:
-            tokenizer = pipeline.tokenizer
-            text_encoder = pipeline.text_encoder
+        text_encoder_info = context.services.model_manager.get_model(
+            self.model, SDModelType.diffusers, SDModelType.text_encoder
+        )
+        tokenizer_info = context.services.model_manager.get_model(
+            self.model, SDModelType.diffusers, SDModelType.tokenizer
+        )
+        with text_encoder_info.context as text_encoder,\
+             tokenizer_info.context as tokenizer:
 
             # TODO: global? input?
             #use_full_precision = precision == "float32" or precision == "autocast"
@@ -73,33 +79,17 @@ class CompelInvocation(BaseInvocation):
             #    full_precision=use_full_precision,
             #)
 
-            def load_huggingface_concepts(concepts: list[str]):
-                pipeline.textual_inversion_manager.load_huggingface_concepts(concepts)
-
-            # apply the concepts library to the prompt
-            prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
-                self.prompt,
-                lambda concepts: load_huggingface_concepts(concepts),
-                pipeline.textual_inversion_manager.get_all_trigger_strings(),
-            )
-
-            # lazy-load any deferred textual inversions.
-            # this might take a couple of seconds the first time a textual inversion is used.
-            pipeline.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(
-                prompt_str
-            )
-
             compel = Compel(
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
-                textual_inversion_manager=pipeline.textual_inversion_manager,
+                textual_inversion_manager=None, # TODO:
                 dtype_for_device_getter=torch_dtype,
                 truncate_long_prompts=True, # TODO:
             )
 
             # TODO: support legacy blend?
 
-            prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(prompt_str)
+            prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.prompt)
 
             if getattr(Globals, "log_tokenization", False):
                 log_tokenization_for_prompt_object(prompt, tokenizer)
