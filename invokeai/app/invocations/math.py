@@ -5,8 +5,6 @@ from typing import Literal
 from pydantic import BaseModel, Field
 import numpy as np
 
-from invokeai.app.util.misc import get_random_seed
-
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 
 
