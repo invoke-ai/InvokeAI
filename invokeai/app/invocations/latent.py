@@ -17,6 +17,7 @@ from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import Post
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline, image_resized_to_grid_as_tensor
+from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
 from ..services.image_storage import ImageType
@@ -75,29 +76,20 @@ def build_noise_output(latents_name: str, latents: torch.Tensor):
       )
 
 
-# TODO: this seems like a hack
-scheduler_map = dict(
-    ddim=diffusers.DDIMScheduler,
-    dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-    k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-    k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
-    k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-    k_euler=diffusers.EulerDiscreteScheduler,
-    k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-    k_heun=diffusers.HeunDiscreteScheduler,
-    k_lms=diffusers.LMSDiscreteScheduler,
-    plms=diffusers.PNDMScheduler,
-)
-
-
 SAMPLER_NAME_VALUES = Literal[
-    tuple(list(scheduler_map.keys()))
+    tuple(list(SCHEDULER_MAP.keys()))
 ]
 
 
 def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-    scheduler_class = scheduler_map.get(scheduler_name,'ddim')
-    scheduler = scheduler_class.from_config(model.scheduler.config)
+    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
+    
+    scheduler_config = model.scheduler.config
+    if "_backup" in scheduler_config:
+        scheduler_config = scheduler_config["_backup"]
+    scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
+    scheduler = scheduler_class.from_config(scheduler_config)
+    
     # hack copied over from generate.py
     if not hasattr(scheduler, 'uses_inpainting_model'):
         scheduler.uses_inpainting_model = lambda: False
@@ -169,7 +161,7 @@ class TextToLatentsInvocation(BaseInvocation):
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
@@ -237,7 +229,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(model.scheduler, eta=None)#ddim_eta)
+        ).add_scheduler_args_if_applicable(model.scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
 
@@ -312,11 +304,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             latent, device=model.device, dtype=latent.dtype
         )
 
-        timesteps, _ = model.get_img2img_timesteps(
-            self.steps,
-            self.strength,
-            device=model.device,
-        )
+        timesteps, _ = model.get_img2img_timesteps(self.steps, self.strength)
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=initial_latents,

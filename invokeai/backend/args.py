@@ -108,17 +108,20 @@ APP_VERSION = invokeai.version.__version__
 
 SAMPLER_CHOICES = [
     "ddim",
-    "k_dpm_2_a",
-    "k_dpm_2",
-    "k_dpmpp_2_a",
-    "k_dpmpp_2",
-    "k_euler_a",
-    "k_euler",
-    "k_heun",
-    "k_lms",
-    "plms",
-    # diffusers:
+    "ddpm",
+    "deis",
+    "lms",
     "pndm",
+    "heun",
+    "euler",
+    "euler_k",
+    "euler_a",
+    "kdpm_2",
+    "kdpm_2_a",
+    "dpmpp_2s",
+    "dpmpp_2m",
+    "dpmpp_2m_k",
+    "unipc",
 ]
 
 PRECISION_CHOICES = [
@@ -631,7 +634,7 @@ class Args(object):
             choices=SAMPLER_CHOICES,
             metavar="SAMPLER_NAME",
             help=f'Set the default sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
-            default="k_lms",
+            default="lms",
         )
         render_group.add_argument(
             "--log_tokenization",

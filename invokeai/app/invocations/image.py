@@ -33,8 +33,8 @@ class ImageOutput(BaseInvocationOutput):
     # fmt: off
     type: Literal["image"] = "image"
     image:      ImageField = Field(default=None, description="The output image")
-    width:   Optional[int] = Field(default=None, description="The width of the image in pixels")
-    height:  Optional[int] = Field(default=None, description="The height of the image in pixels")
+    width:             int = Field(description="The width of the image in pixels")
+    height:            int = Field(description="The height of the image in pixels")
     # fmt: on
 
     class Config:

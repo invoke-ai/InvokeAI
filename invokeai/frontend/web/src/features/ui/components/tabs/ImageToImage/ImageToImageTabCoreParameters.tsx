@@ -64,8 +64,6 @@ const ImageToImageTabCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
           <Flex gap={3} w="full">
             <Box flexGrow={2}>
               <ParamSampler />
@@ -74,6 +72,8 @@ const ImageToImageTabCoreParameters = () => {
               <ModelSelect />
             </Box>
           </Flex>
+          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
+          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
           <ImageToImageStrength />
           <ImageToImageFit />
         </Flex>
