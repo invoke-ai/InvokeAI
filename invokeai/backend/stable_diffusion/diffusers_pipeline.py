@@ -670,15 +670,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             else:
                 latent_control_input = latent_model_input
             # control_data should be type List[ControlNetData]
-            # this loop covers both ControlNet (1 ControlNetData in list)
+            # this loop covers both ControlNet (one ControlNetData in list)
             #      and MultiControlNet (multiple ControlNetData in list)
             for i, control_datum in enumerate(control_data):
                 # print("controlnet", i, "==>", type(control_datum))
                 first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
                 last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
-                # apply_control_this_step = step_index >= first_control_step and step_index <= last_control_step
+                # only apply controlnet if current step is within the controlnet's begin/end step range
                 if step_index >= first_control_step and step_index <= last_control_step:
-                    print("running controlnet", i, "for step", step_index)
+                    # print("running controlnet", i, "for step", step_index)
                     down_samples, mid_sample = control_datum.model(
                         sample=latent_control_input,
                         timestep=timestep,
@@ -709,8 +709,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
-            down_block_additional_residuals=down_block_res_samples,
-            mid_block_additional_residual=mid_block_res_sample,
+            down_block_additional_residuals=down_block_res_samples,  # from controlnet(s)
+            mid_block_additional_residual=mid_block_res_sample,      # from controlnet(s)
         )
 
         # compute the previous noisy sample x_t -> x_t-1
