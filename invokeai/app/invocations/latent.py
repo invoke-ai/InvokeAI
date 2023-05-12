@@ -265,24 +265,25 @@ class TextToLatentsInvocation(BaseInvocation):
         conditioning_data = self.get_conditioning_data(context, model)
         # print("type of control input: ", type(self.control))
         if self.control is None:
-            print("control input is None")
+            # print("control input is None")
             control_list = None
         elif isinstance(self.control, list) and len(self.control) == 0:
-            print("control input is empty list")
+            # print("control input is empty list")
             control_list = None
         elif isinstance(self.control, ControlField):
-            print("control input is ControlField")
+            # print("control input is ControlField")
             control_list = [self.control]
         elif isinstance(self.control, list) and len(self.control) > 0 and isinstance(self.control[0], ControlField):
-            print("control input is list[ControlField]")
+            # print("control input is list[ControlField]")
             control_list = self.control
         else:
-            print("input control is unrecognized:", type(self.control))
+            #print("input control is unrecognized:", type(self.control))
             control_list = None
 
         #if (self.control is None or (isinstance(self.control, list) and len(self.control)==0)):
         if (control_list is None):
             control_models = None
+            control_data = None
         # from above handling, any control that is not None should now be of type list[ControlField]
         else:
             # FIXME: add checks to skip entry if model or image is None
