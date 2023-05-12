@@ -119,13 +119,13 @@ class EventServiceBase:
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
-                model_name=str,
-                model_type=model_type,
+                model_name=model_name,
+                model_type=model_type.name,
                 submodel=submodel,
             ),
         )
 
-    def emit_model_load_completed (
+    def emit_model_load_completed(
             self,
             graph_execution_state_id: str,
             node: dict,
@@ -137,13 +137,13 @@ class EventServiceBase:
     ) -> None:
         """Emitted when a model is correctly loaded (returns model info)"""
         self.__emit_session_event(
-            event_name="model_load_started",
+            event_name="model_load_completed",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
-                model_name=str,
-                model_type=model_type,
+                model_name=model_name,
+                model_type=model_type.name,
                 submodel=submodel,
                 model_info=model_info,
             ),
