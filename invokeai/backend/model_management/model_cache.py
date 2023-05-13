@@ -68,7 +68,7 @@ class SDModelType(Enum):
     # distinguish them by class
     lora=LoraType
     textual_inversion=TIType
-
+    
 class ModelStatus(Enum):
     unknown='unknown'
     not_loaded='not loaded'

@@ -176,6 +176,12 @@ class SDModelInfo():
     revision: str = None
     _cache: ModelCache = None
 
+    def __enter__(self):
+        return self.context.__enter__()
+
+    def __exit__(self,*args, **kwargs):
+        self.context.__exit__(*args, **kwargs)
+        
     @property
     def status(self)->ModelStatus:
         '''Return load status of this model as a model_cache.ModelStatus enum'''
