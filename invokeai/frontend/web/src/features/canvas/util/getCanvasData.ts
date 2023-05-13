@@ -26,11 +26,11 @@ export const getCanvasData = async (state: RootState) => {
     layerState: { objects },
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    stageScale,
     isMaskEnabled,
     shouldPreserveMaskedArea,
     boundingBoxScaleMethod: boundingBoxScale,
     scaledBoundingBoxDimensions,
+    stageCoordinates,
   } = state.canvas;
 
   const boundingBox = {
@@ -46,14 +46,14 @@ export const getCanvasData = async (state: RootState) => {
 
   // generationParameters.bounding_box = boundingBox;
 
-  const tempScale = canvasBaseLayer.scale();
+  // clone the base layer so we don't affect the actual canvas during scaling
+  const clonedBaseLayer = canvasBaseLayer.clone();
 
-  canvasBaseLayer.scale({
-    x: 1 / stageScale,
-    y: 1 / stageScale,
-  });
+  // scale to 1 so we get an uninterpolated image
+  clonedBaseLayer.scale({ x: 1, y: 1 });
 
-  const absPos = canvasBaseLayer.getAbsolutePosition();
+  // absolute position is needed to get the bounding box coords relative to the base layer
+  const absPos = clonedBaseLayer.getAbsolutePosition();
 
   const offsetBoundingBox = {
     x: boundingBox.x + absPos.x,
@@ -62,35 +62,41 @@ export const getCanvasData = async (state: RootState) => {
     height: boundingBox.height,
   };
 
-  const baseDataURL = canvasBaseLayer.toDataURL(offsetBoundingBox);
+  // get a dataURL of the bbox'd region (will convert this to an ImageData to check its transparency)
+  const baseDataURL = clonedBaseLayer.toDataURL(offsetBoundingBox);
+
+  // get a blob (will upload this as the canvas intermediate)
   const baseBlob = await canvasToBlob(
-    canvasBaseLayer.toCanvas(offsetBoundingBox)
+    clonedBaseLayer.toCanvas(offsetBoundingBox)
   );
 
-  canvasBaseLayer.scale(tempScale);
-
+  // build a new mask layer and get its dataURL and blob
   const { maskDataURL, maskBlob } = await generateMask(
     isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
     boundingBox
   );
 
+  // convert to ImageData (via pure jank)
   const baseImageData = await dataURLToImageData(
     baseDataURL,
     boundingBox.width,
     boundingBox.height
   );
 
+  // convert to ImageData (via pure jank)
   const maskImageData = await dataURLToImageData(
     maskDataURL,
     boundingBox.width,
     boundingBox.height
   );
 
+  // check transparency
   const {
     isPartiallyTransparent: baseIsPartiallyTransparent,
     isFullyTransparent: baseIsFullyTransparent,
   } = getImageDataTransparency(baseImageData.data);
 
+  // check mask for black
   const doesMaskHaveBlackPixels = areAnyPixelsBlack(maskImageData.data);
 
   if (state.system.enableImageDebugging) {
