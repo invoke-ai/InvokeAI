@@ -357,6 +357,13 @@ class ModelManager(object):
             vae_id = mconfig.vae.repo_id
             vae = (SDModelType.vae, vae_id)
 
+        # optimization - don't load whole model if the user
+        # is asking for just a piece of it
+        if model_type == SDModelType.diffusers and submodel and not subfolder:
+            model_type = submodel
+            subfolder = submodel.name
+            submodel = None
+
         model_context = self.cache.get_model(
             location,
             model_type = model_type,
