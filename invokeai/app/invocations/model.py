@@ -60,14 +60,14 @@ class ModelLoaderInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
 
         # TODO: not found exceptions
-        if not context.services.model_manager.valid_model(
+        if not context.services.model_manager.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.diffusers,
         ):
             raise Exception(f"Unkown model name: {self.model_name}!")
 
         """
-        if not context.services.model_manager.valid_model(
+        if not context.services.model_manager.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.diffusers,
             submodel=SDModelType.tokenizer,
@@ -76,7 +76,7 @@ class ModelLoaderInvocation(BaseInvocation):
                 f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
             )
 
-        if not context.services.model_manager.valid_model(
+        if not context.services.model_manager.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.diffusers,
             submodel=SDModelType.text_encoder,
@@ -85,7 +85,7 @@ class ModelLoaderInvocation(BaseInvocation):
                 f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
             )
 
-        if not context.services.model_manager.valid_model(
+        if not context.services.model_manager.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.diffusers,
             submodel=SDModelType.unet,

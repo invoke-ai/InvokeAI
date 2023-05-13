@@ -227,7 +227,7 @@ class Generate:
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         model = model or fallback
-        if not self.model_manager.valid_model(model):
+        if not self.model_manager.model_exists(model):
             logger.warning(
                 f'"{model}" is not a known model name; falling back to {fallback}.'
             )
@@ -877,7 +877,7 @@ class Generate:
 
         # the model cache does the loading and offloading
         cache = self.model_manager
-        if not cache.valid_model(model_name):
+        if not cache.model_exists(model_name):
             raise KeyError(
                 f'** "{model_name}" is not a known model name. Cannot change.'
             )

@@ -345,13 +345,14 @@ class Completer(object):
             partial = text
         matches = list()
         for s in self.models:
+            name = self.models[s]["model_name"]
             format = self.models[s]["format"]
             if format == "vae":
                 continue
             if ckpt_only and format != "ckpt":
                 continue
-            if s.startswith(partial):
-                matches.append(switch + s)
+            if name.startswith(partial):
+                matches.append(switch + name)
         matches.sort()
         return matches
 

@@ -1,12 +1,9 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and 2023 Kent Keirsey (https://github.com/hipsterusername)
 
-import shutil
-import asyncio
-from typing import Annotated, Any, List, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
-from pathlib import Path
 from ..dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
@@ -19,6 +16,15 @@ class VaeRepo(BaseModel):
 
 class ModelInfo(BaseModel):
     description: Optional[str] = Field(description="A description of the model")
+    model_name: str = Field(description="The name of the model")
+    model_type: str = Field(description="The type of the model")
+    
+class DiffusersModelInfo(ModelInfo):
+    format: Literal['folder'] = 'folder'
+
+    vae: Optional[VaeRepo] = Field(description="The VAE repo to use for this model")
+    repo_id: Optional[str] = Field(description="The repo ID to use for this model")
+    path: Optional[str] = Field(description="The path to the model")
     
 class CkptModelInfo(ModelInfo):
     format: Literal['ckpt'] = 'ckpt'
@@ -29,12 +35,8 @@ class CkptModelInfo(ModelInfo):
     width: Optional[int] = Field(description="The width of the model")
     height: Optional[int] = Field(description="The height of the model")
 
-class DiffusersModelInfo(ModelInfo):
-    format: Literal['diffusers'] = 'diffusers'
-
-    vae: Optional[VaeRepo] = Field(description="The VAE repo to use for this model")
-    repo_id: Optional[str] = Field(description="The repo ID to use for this model")
-    path: Optional[str] = Field(description="The path to the model")
+class SafetensorsModelInfo(CkptModelInfo):
+    format: Literal['safetensors'] = 'safetensors'
 
 class CreateModelRequest(BaseModel):
     name: str = Field(description="The name of the model")
@@ -56,7 +58,7 @@ class ConvertedModelResponse(BaseModel):
     info: DiffusersModelInfo = Field(description="The converted model info")
 
 class ModelsList(BaseModel):
-    models: dict[str, Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")]]
+    models: dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]
 
 
 @models_router.get(
@@ -121,7 +123,7 @@ async def delete_model(model_name: str) -> None:
         raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
     else:
-        logger.error(f"Model not found")
+        logger.error("Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
     
 

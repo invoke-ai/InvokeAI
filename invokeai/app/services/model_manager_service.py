@@ -59,35 +59,35 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def valid_model(self, model_name: str) -> bool:
-        """
-        Given a model name, returns True if it is a valid
-        identifier.
-        """
+    def model_exists(
+            self,
+            model_name: str,
+            model_type: SDModelType
+    ) -> bool:
         pass
 
     @abstractmethod
-    def default_model(self) -> Union[str,None]:
+    def default_model(self) -> Union[Tuple(str, SDModelType),None],
         """
-        Returns the name of the default model, or None
+        Returns the name and typeof the default model, or None
         if none is defined.
         """
         pass
 
     @abstractmethod
-    def set_default_model(self, model_name:str):
+    def set_default_model(self, model_name: str, model_type: SDModelType):
         """Sets the default model to the indicated name."""
         pass
 
     @abstractmethod
-    def model_info(self, model_name: str)->dict:
+    def model_info(self, model_name: str, model_type: SDModelType)->dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
         """
         pass
 
     @abstractmethod
-    def model_names(self)->list[str]:
+    def model_names(self)->List[Tuple(str, SDModelType)]:
         """
         Returns a list of all the model names known.
         """
@@ -97,18 +97,25 @@ class ModelManagerServiceBase(ABC):
     def list_models(self)->dict:
         """
         Return a dict of models in the format:
-        { model_name1: {'status': ('active'|'cached'|'not loaded'),
-                        'description': description,
-                        'format': ('ckpt'|'diffusers'|'vae'|'text_encoder'|'tokenizer'|'lora'...),
+        { model_key1: {'status': 'active'|'cached'|'not loaded',
+                       'model_name' : name,
+                       'model_type' : SDModelType,
+                       'description': description,
+                       'format': 'folder'|'safetensors'|'ckpt'
                        },
-          model_name2: { etc }
+          model_key2: { etc }
         """
         pass
 
 
     @abstractmethod
     def add_model(
-            self, model_name: str, model_attributes: dict, clobber: bool = False)->None:
+            self,
+            model_name: str,
+            model_type: SDModelType,
+            model_attributes: dict,
+            clobber: bool = False
+    )->None:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -121,7 +128,7 @@ class ModelManagerServiceBase(ABC):
     @abstractmethod
     def del_model(self,
                   model_name: str,
-                  model_type: SDModelType=SDModelType.diffusers,
+                  model_type: SDModelType,
                   delete_files: bool = False):
         """
         Delete the named model from configuration. If delete_files is true, 
@@ -332,33 +339,37 @@ class ModelManagerService(ModelManagerServiceBase):
             
         return model_info
 
-    def valid_model(self, model_name: str, model_type: SDModelType=SDModelType.diffusers) -> bool:
+    def model_exists(
+            self,
+            model_name: str,
+            model_type: SDModelType
+    ) -> bool:
         """
         Given a model name, returns True if it is a valid
         identifier.
         """
-        return self.mgr.valid_model(
+        return self.mgr.model_exists(
             model_name,
             model_type)
 
-    def default_model(self) -> Union[str,None]:
+    def default_model(self) -> Union[Tuple(str, SDModelType),None],
         """
         Returns the name of the default model, or None
         if none is defined.
         """
         return self.mgr.default_model()
 
-    def set_default_model(self, model_name:str):
+    def set_default_model(self, model_name:str, model_type: SDModelType):
         """Sets the default model to the indicated name."""
         self.mgr.set_default_model(model_name)
 
-    def model_info(self, model_name: str)->dict:
+    def model_info(self, model_name: str, model_type: SDModelType)->dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
         """
         return self.mgr.model_info(model_name)
 
-    def model_names(self)->list[str]:
+    def model_names(self)->List[Tuple(str, SDModelType)]:
         """
         Returns a list of all the model names known.
         """
@@ -367,16 +378,21 @@ class ModelManagerService(ModelManagerServiceBase):
     def list_models(self)->dict:
         """
         Return a dict of models in the format:
-        { model_name1: {'status': ('active'|'cached'|'not loaded'),
+        { model_key: {'status': 'active'|'cached'|'not loaded',
+                        'model_name' : name,
+                        'model_type' : SDModelType,
                         'description': description,
-                        'format': ('ckpt'|'diffusers'|'vae'|'text_encoder'|'tokenizer'|'lora'...),
+                        'format': 'folder'|'safetensors'|'ckpt'
                        },
-          model_name2: { etc }
         """
         return self.mgr.list_models()
 
     def add_model(
-            self, model_name: str, model_attributes: dict, clobber: bool = False)->None:
+            self,
+            model_name: str,
+            model_type: SDModelType,
+            model_attributes: dict,
+            clobber: bool = False)->None:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -384,7 +400,7 @@ class ModelManagerService(ModelManagerServiceBase):
         with an assertion error if provided attributes are incorrect or 
         the model name is missing. Call commit() to write changes to disk.
         """
-        return self.mgr.add_model(model_name, model_attributes, dict, clobber)
+        return self.mgr.add_model(model_name, model_type, model_attributes, dict, clobber)
 
 
     def del_model(self,
@@ -439,7 +455,7 @@ class ModelManagerService(ModelManagerServiceBase):
         Creates an entry for the indicated textual inversion embedding file. 
         Call commit() to write out the configuration to models.yaml
         """
-        self.mgr(path, model_name, description)
+        self.mgr.import_embedding(path, model_name, description)
 
     def heuristic_import(
         self,
