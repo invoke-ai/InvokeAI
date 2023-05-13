@@ -67,7 +67,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def default_model(self) -> Union[Tuple(str, SDModelType),None]:
+    def default_model(self) -> Union[Tuple[str, SDModelType],None]:
         """
         Returns the name and typeof the default model, or None
         if none is defined.
@@ -87,7 +87,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def model_names(self)->List[Tuple(str, SDModelType)]:
+    def model_names(self)->List[Tuple[str, SDModelType]]:
         """
         Returns a list of all the model names known.
         """
@@ -352,7 +352,7 @@ class ModelManagerService(ModelManagerServiceBase):
             model_name,
             model_type)
 
-    def default_model(self) -> Union[Tuple(str, SDModelType),None]:
+    def default_model(self) -> Union[Tuple[str, SDModelType],None]:
         """
         Returns the name of the default model, or None
         if none is defined.
@@ -369,7 +369,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         return self.mgr.model_info(model_name)
 
-    def model_names(self)->List[Tuple(str, SDModelType)]:
+    def model_names(self)->List[Tuple[str, SDModelType]]:
         """
         Returns a list of all the model names known.
         """

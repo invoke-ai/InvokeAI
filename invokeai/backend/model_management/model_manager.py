@@ -377,7 +377,7 @@ class ModelManager(object):
             _cache = self.cache
         )
 
-    def default_model(self) -> Union[Tuple(str, SDModelType),None]:
+    def default_model(self) -> Union[Tuple[str, SDModelType],None]:
         """
         Returns the name of the default model, or None
         if none is defined.
@@ -413,7 +413,7 @@ class ModelManager(object):
             return None
         return self.config[self.create_key(model_name,model_type)]
 
-    def model_names(self) -> List[Tuple(str, SDModelType)]:
+    def model_names(self) -> List[Tuple[str, SDModelType]]:
         """
         Return a list of (str, SDModelType) corresponding to all models 
         known to the configuration.
