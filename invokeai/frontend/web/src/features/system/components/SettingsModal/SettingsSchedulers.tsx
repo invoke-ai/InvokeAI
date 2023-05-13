@@ -1,4 +1,5 @@
 import {
+  Box,
   Menu,
   MenuButton,
   MenuItemOption,
@@ -12,8 +13,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { setSchedulers } from 'features/ui/store/uiSlice';
 import { isArray } from 'lodash-es';
-
-import { ReactNode } from 'react';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { useTranslation } from 'react-i18next';
 
 export default function SettingsSchedulers() {
@@ -26,32 +26,22 @@ export default function SettingsSchedulers() {
     if (isArray(v)) dispatch(setSchedulers(v.sort()));
   };
 
-  const renderSchedulerMenuItems = () => {
-    const schedulerMenuItemsToRender: ReactNode[] = [];
-
-    SCHEDULERS.forEach((scheduler) => {
-      schedulerMenuItemsToRender.push(
-        <MenuItemOption key={scheduler} value={scheduler}>
-          {scheduler}
-        </MenuItemOption>
-      );
-    });
-
-    return schedulerMenuItemsToRender;
-  };
-
   return (
     <Menu closeOnSelect={false}>
       <MenuButton as={IAIButton}>
         {t('settings.availableSchedulers')}
       </MenuButton>
-      <MenuList minWidth="480px" maxHeight="39vh" overflowY="scroll">
+      <MenuList maxHeight={64} overflowY="scroll">
         <MenuOptionGroup
           value={schedulers}
           type="checkbox"
           onChange={schedulerSettingsHandler}
         >
-          {renderSchedulerMenuItems()}
+          {SCHEDULERS.map((scheduler) => (
+            <MenuItemOption key={scheduler} value={scheduler}>
+              {scheduler}
+            </MenuItemOption>
+          ))}
         </MenuOptionGroup>
       </MenuList>
     </Menu>
