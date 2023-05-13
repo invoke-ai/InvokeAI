@@ -8,9 +8,9 @@ const OverlayScrollable = (props: PropsWithChildren) => {
       style={{ height: '100%', width: '100%' }}
       options={{
         scrollbars: {
-          visibility: 'visible',
-          autoHide: 'never',
-          autoHideDelay: 500,
+          visibility: 'auto',
+          autoHide: 'move',
+          autoHideDelay: 1300,
           theme: 'os-theme-dark',
         },
         overflow: { x: 'hidden' },

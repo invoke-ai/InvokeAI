@@ -43,18 +43,13 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
             h: 'full',
             w: 'full',
             position: 'absolute',
-            paddingRight: 4,
           }}
         >
           {props.children}
         </Flex>
       </OverlayScrollable>
       <PinParametersPanelButton
-        sx={{
-          position: 'absolute',
-          top: 0,
-          insetInlineEnd: 4,
-        }}
+        sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
       />
     </Box>
   );

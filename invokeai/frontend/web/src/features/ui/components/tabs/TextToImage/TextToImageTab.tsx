@@ -6,7 +6,7 @@ import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
 
 const TextToImageTab = () => {
   return (
-    <Flex sx={{ gap: 2, w: 'full', h: 'full' }}>
+    <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       <ParametersPinnedWrapper>
         <TextToImageTabParameters />
       </ParametersPinnedWrapper>
