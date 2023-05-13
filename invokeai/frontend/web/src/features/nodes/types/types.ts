@@ -58,6 +58,9 @@ export type FieldType =
   | 'image'
   | 'latents'
   | 'conditioning'
+  | 'unet'
+  | 'clip'
+  | 'vae'
   | 'model'
   | 'array'
   | 'item'
@@ -79,6 +82,9 @@ export type InputFieldValue =
   | ImageInputFieldValue
   | LatentsInputFieldValue
   | ConditioningInputFieldValue
+  | UNetInputFieldValue
+  | ClipInputFieldValue
+  | VaeInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
   | ArrayInputFieldValue
@@ -99,6 +105,9 @@ export type InputFieldTemplate =
   | ImageInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
+  | UNetInputFieldTemplate
+  | ClipInputFieldTemplate
+  | VaeInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
   | ArrayInputFieldTemplate
@@ -174,6 +183,21 @@ export type LatentsInputFieldValue = FieldValueBase & {
 
 export type ConditioningInputFieldValue = FieldValueBase & {
   type: 'conditioning';
+  value?: undefined;
+};
+
+export type UNetInputFieldValue = FieldValueBase & {
+  type: 'unet';
+  value?: undefined;
+};
+
+export type ClipInputFieldValue = FieldValueBase & {
+  type: 'clip';
+  value?: undefined;
+};
+
+export type VaeInputFieldValue = FieldValueBase & {
+  type: 'vae';
   value?: undefined;
 };
 

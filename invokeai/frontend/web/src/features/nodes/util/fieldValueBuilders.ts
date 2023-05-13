@@ -52,6 +52,18 @@ export const buildInputFieldValue = (
       fieldValue.value = undefined;
     }
 
+    if (template.type === 'unet') {
+      fieldValue.value = undefined;
+    }
+
+    if (template.type === 'clip') {
+      fieldValue.value = undefined;
+    }
+
+    if (template.type === 'vae') {
+      fieldValue.value = undefined;
+    }
+
     if (template.type === 'model') {
       fieldValue.value = undefined;
     }

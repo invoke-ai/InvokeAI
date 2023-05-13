@@ -1,5 +1,12 @@
 import { forEach, size } from 'lodash-es';
-import { ImageField, LatentsField, ConditioningField } from 'services/api';
+import {
+  ImageField,
+  LatentsField,
+  ConditioningField,
+  UNetField,
+  ClipField,
+  VaeField,
+} from 'services/api';
 
 const OBJECT_TYPESTRING = '[object Object]';
 const STRING_TYPESTRING = '[object String]';
@@ -98,6 +105,101 @@ const parseConditioningField = (
   };
 };
 
+const _parseModelInfo = (modelInfo: unknown): ModelInfo | undefined => {
+  // Must be an object
+  if (!isObject(modelInfo)) {
+    return;
+  }
+
+  if (!('model_name' in modelInfo && typeof modelInfo.model_name == 'string')) {
+    return;
+  }
+
+  if (!('model_type' in modelInfo && typeof modelInfo.model_type == 'string')) {
+    return;
+  }
+
+  if (!('submodel' in modelInfo && typeof modelInfo.submodel == 'string')) {
+    return;
+  }
+
+  return {
+    model_name: modelInfo.model_name,
+    model_type: modelInfo.model_type,
+    submodel: modelInfo.submodel,
+  };
+};
+
+const parseUNetField = (unetField: unknown): UNetField | undefined => {
+  // Must be an object
+  if (!isObject(unetField)) {
+    return;
+  }
+
+  if (!('unet' in unetField && 'scheduler' in unetField)) {
+    return;
+  }
+
+  const unet = _parseModelInfo(unetField.unet);
+  const scheduler = _parseModelInfo(unetField.scheduler);
+
+  if (!(unet && scheduler)) {
+    return;
+  }
+
+  // Build a valid UNetField
+  return {
+    unet: unet,
+    scheduler: scheduler,
+  };
+};
+
+const parseClipField = (clipField: unknown): ClipField | undefined => {
+  // Must be an object
+  if (!isObject(clipField)) {
+    return;
+  }
+
+  if (!('tokenizer' in clipField && 'text_encoder' in clipField)) {
+    return;
+  }
+
+  const tokenizer = _parseModelInfo(clipField.tokenizer);
+  const text_encoder = _parseModelInfo(clipField.text_encoder);
+
+  if (!(tokenizer && text_encoder)) {
+    return;
+  }
+
+  // Build a valid ClipField
+  return {
+    tokenizer: tokenizer,
+    text_encoder: text_encoder,
+  };
+};
+
+const parseVaeField = (vaeField: unknown): VaeField | undefined => {
+  // Must be an object
+  if (!isObject(vaeField)) {
+    return;
+  }
+
+  if (!('vae' in vaeField)) {
+    return;
+  }
+
+  const vae = _parseModelInfo(vaeField.vae);
+
+  if (!vae) {
+    return;
+  }
+
+  // Build a valid VaeField
+  return {
+    vae: vae,
+  };
+};
+
 type NodeMetadata = {
   [key: string]:
     | string
@@ -105,7 +207,10 @@ type NodeMetadata = {
     | boolean
     | ImageField
     | LatentsField
-    | ConditioningField;
+    | ConditioningField
+    | UNetField
+    | ClipField
+    | VaeField;
 };
 
 type InvokeAIMetadata = {
@@ -131,7 +236,8 @@ export const parseNodeMetadata = (
       return;
     }
 
-    // the only valid object types are ImageField, LatentsField and ConditioningField
+    // valid object types are:
+    // ImageField, LatentsField ConditioningField, UNetField, ClipField, VaeField
     if (isObject(nodeItem)) {
       if ('image_name' in nodeItem || 'image_type' in nodeItem) {
         const imageField = parseImageField(nodeItem);
@@ -155,6 +261,27 @@ export const parseNodeMetadata = (
           parsed[nodeKey] = conditioningField;
         }
         return;
+      }
+
+      if ('unet' in nodeItem && 'tokenizer' in nodeItem) {
+        const unetField = parseUNetField(nodeItem);
+        if (unetField) {
+          parsed[nodeKey] = unetField;
+        }
+      }
+
+      if ('tokenizer' in nodeItem && 'text_encoder' in nodeItem) {
+        const clipField = parseClipField(nodeItem);
+        if (clipField) {
+          parsed[nodeKey] = clipField;
+        }
+      }
+
+      if ('vae' in nodeItem) {
+        const vaeField = parseVaeField(nodeItem);
+        if (vaeField) {
+          parsed[nodeKey] = vaeField;
+        }
       }
     }
 

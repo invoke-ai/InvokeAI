@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 
+from .model import ClipField
+
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
@@ -41,7 +43,7 @@ class CompelInvocation(BaseInvocation):
     type: Literal["compel"] = "compel"
 
     prompt: str = Field(default="", description="Prompt")
-    model: str = Field(default="", description="Model to use")
+    clip: ClipField = Field(None, description="Clip to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -58,12 +60,15 @@ class CompelInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> CompelOutput:
 
         # TODO: load without model
-        model = context.services.model_manager.get_model(self.model)
         text_encoder_info = context.services.model_manager.get_model(
-            self.model, SDModelType.diffusers, SDModelType.text_encoder
+            model_name=self.clip.text_encoder.model_name,
+            model_type=SDModelType[self.clip.text_encoder.model_type],
+            submodel=SDModelType[self.clip.text_encoder.submodel],
         )
         tokenizer_info = context.services.model_manager.get_model(
-            self.model, SDModelType.diffusers, SDModelType.tokenizer
+            model_name=self.clip.tokenizer.model_name,
+            model_type=SDModelType[self.clip.tokenizer.model_type],
+            submodel=SDModelType[self.clip.tokenizer.submodel],
         )
         with text_encoder_info.context as text_encoder,\
              tokenizer_info.context as tokenizer:

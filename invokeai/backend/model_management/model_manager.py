@@ -236,7 +236,7 @@ class ModelManager(object):
         Given a model name, returns True if it is a valid
         identifier.
         """
-        model_key = self.create_key(model_name, model_class)
+        model_key = self.create_key(model_name, model_type)
         return model_key in self.config
 
     def create_key(self, model_name: str, model_type: SDModelType) -> str:
