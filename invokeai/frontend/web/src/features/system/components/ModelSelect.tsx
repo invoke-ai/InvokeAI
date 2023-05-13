@@ -1,21 +1,20 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { ChangeEvent, memo } from 'react';
+import { memo, useCallback } from 'react';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISelect from 'common/components/IAISelect';
 import { selectModelsById, selectModelsIds } from '../store/modelSlice';
 import { RootState } from 'app/store/store';
 import { modelSelected } from 'features/parameters/store/generationSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
+import IAICustomSelect from 'common/components/IAICustomSelect';
 
 const selector = createSelector(
   [(state: RootState) => state, generationSelector],
   (state, generation) => {
-    // const selectedModel = selectedModelSelector(state);
     const selectedModel = selectModelsById(state, generation.model);
-    const allModelNames = selectModelsIds(state);
+    const allModelNames = selectModelsIds(state).map((id) => String(id));
     return {
       allModelNames,
       selectedModel,
@@ -32,19 +31,25 @@ const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { allModelNames, selectedModel } = useAppSelector(selector);
-  const handleChangeModel = (e: ChangeEvent<HTMLSelectElement>) => {
-    dispatch(modelSelected(e.target.value));
-  };
+  const handleChangeModel = useCallback(
+    (v: string | null | undefined) => {
+      if (!v) {
+        return;
+      }
+      dispatch(modelSelected(v));
+    },
+    [dispatch]
+  );
 
   return (
-    <IAISelect
+    <IAICustomSelect
       label={t('modelManager.model')}
-      style={{ fontSize: 'sm' }}
-      aria-label={t('accessibility.modelSelect')}
-      tooltip={selectedModel?.description || ''}
-      value={selectedModel?.name || undefined}
-      validValues={allModelNames}
-      onChange={handleChangeModel}
+      tooltip={selectedModel?.description}
+      items={allModelNames}
+      selectedItem={selectedModel?.name ?? ''}
+      setSelectedItem={handleChangeModel}
+      withCheckIcon={true}
+      tooltipProps={{ placement: 'top', hasArrow: true }}
     />
   );
 };
