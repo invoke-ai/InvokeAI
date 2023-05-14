@@ -59,15 +59,12 @@ def get_uc_and_c_and_ec(prompt_string,
     if log_tokens or getattr(Globals, "log_tokenization", False):
         log_tokenization(positive_prompt, negative_prompt, tokenizer=model.tokenizer)
 
-    # The below has been commented out as it is an instance method used for cleanly loading LoRA models, but is not currently needed. 
-    # TODO: Reimplement custom_attention for 3.0 support of LoRA.
-
-    # with InvokeAIDiffuserComponent.custom_attention_context(model.unet,
-    #                                                         extra_conditioning_info=None,
-    #                                                         step_count=-1):
-    #     c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
-    #     uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
-    #     [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+    with InvokeAIDiffuserComponent.custom_attention_context(model.unet,
+                                                            extra_conditioning_info=None,
+                                                            step_count=-1):
+        c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)
+        uc, _ = compel.build_conditioning_tensor_for_prompt_object(negative_prompt)
+        [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
     # now build the "real" ec
     ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(tokens_count_including_eos_bos=tokens_count,
