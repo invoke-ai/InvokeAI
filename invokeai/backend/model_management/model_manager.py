@@ -146,6 +146,7 @@ from typing import Callable, Optional, List, Tuple, Union, types
 import safetensors
 import safetensors.torch
 import torch
+from diffusers import AutoencoderKL
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -157,7 +158,7 @@ from invokeai.backend.util import download_with_resume
 
 from ..util import CUDA_DEVICE
 from .model_cache import (ModelCache, ModelLocker, ModelStatus, SDModelType,
-                          SilenceWarnings)
+                          SilenceWarnings, DIFFUSERS_PARTS)
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
@@ -375,12 +376,14 @@ class ModelManager(object):
         # to support the traditional way of attaching a VAE
         # to a model, we hacked in `attach_model_part`
         # TODO: generalize this
-        vae = (None, None)
+        external_parts = set()
         if model_type == SDModelType.Diffusers:
-            with suppress(Exception):
-                vae_id = mconfig.vae.get('path') or mconfig.vae.get('repo_id')
-                vae_subfolder = mconfig.vae.get('subfolder')
-                vae = (SDModelType.Vae, vae_id, vae_subfolder)
+            for part in DIFFUSERS_PARTS:
+                with suppress(Exception):
+                    if part_config := mconfig.get(part):
+                        id = part_config.get('path') or part_config.get('repo_id')
+                        subfolder = part_config.get('subfolder')
+                        external_parts.add((part, id, subfolder))
 
         model_context = self.cache.get_model(
             location,
@@ -388,7 +391,7 @@ class ModelManager(object):
             revision = revision,
             subfolder = subfolder,
             submodel = submodel,
-            attach_model_part = vae,
+            attach_model_parts = external_parts,
         )
 
         # in case we need to communicate information about this
