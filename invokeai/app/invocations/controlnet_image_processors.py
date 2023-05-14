@@ -31,6 +31,65 @@ from controlnet_aux import (
 
 from .image import ImageOutput, build_image_output, PILInvocationConfig
 
+CONTROLNET_DEFAULT_MODELS = [
+    ###########################################
+    # lllyasviel sd v1.5, ControlNet v1.0 models
+    ##############################################
+    "lllyasviel/sd-controlnet-canny",
+    "lllyasviel/sd-controlnet-depth",
+    "lllyasviel/sd-controlnet-hed",
+    "lllyasviel/sd-controlnet-seg",
+    "lllyasviel/sd-controlnet-openpose",
+    "lllyasviel/sd-controlnet-scribble",
+    "lllyasviel/sd-controlnet-normal",
+    "lllyasviel/sd-controlnet-mlsd",
+
+    #############################################
+    # lllyasviel sd v1.5, ControlNet v1.1 models
+    #############################################
+    "lllyasviel/control_v11p_sd15_canny",
+    "lllyasviel/control_v11p_sd15_openpose",
+    "lllyasviel/control_v11p_sd15_seg",
+    # "lllyasviel/control_v11p_sd15_depth",  # broken
+    "lllyasviel/control_v11f1p_sd15_depth",
+    "lllyasviel/control_v11p_sd15_normalbae",
+    "lllyasviel/control_v11p_sd15_scribble",
+    "lllyasviel/control_v11p_sd15_mlsd",
+    "lllyasviel/control_v11p_sd15_softedge",
+    "lllyasviel/control_v11p_sd15s2_lineart_anime",
+    "lllyasviel/control_v11p_sd15_lineart",
+    "lllyasviel/control_v11p_sd15_inpaint",
+    # "lllyasviel/control_v11u_sd15_tile",
+    # problem (temporary?) with huffingface "lllyasviel/control_v11u_sd15_tile",
+    # so for now replace  "lllyasviel/control_v11f1e_sd15_tile",
+    "lllyasviel/control_v11e_sd15_shuffle",
+    "lllyasviel/control_v11e_sd15_ip2p",
+    "lllyasviel/control_v11f1e_sd15_tile",
+
+     #################################################
+     #  thibaud sd v2.1 models (ControlNet v1.0? or v1.1?
+     ##################################################
+     "thibaud/controlnet-sd21-openpose-diffusers",
+     "thibaud/controlnet-sd21-canny-diffusers",
+     "thibaud/controlnet-sd21-depth-diffusers",
+     "thibaud/controlnet-sd21-scribble-diffusers",
+     "thibaud/controlnet-sd21-hed-diffusers",
+     "thibaud/controlnet-sd21-zoedepth-diffusers",
+     "thibaud/controlnet-sd21-color-diffusers",
+     "thibaud/controlnet-sd21-openposev2-diffusers",
+     "thibaud/controlnet-sd21-lineart-diffusers",
+     "thibaud/controlnet-sd21-normalbae-diffusers",
+     "thibaud/controlnet-sd21-ade20k-diffusers",
+
+     ##############################################
+     #  ControlNetMediaPipeface, ControlNet v1.1
+     ##############################################
+     "CrucibleAI/ControlNetMediaPipeFace",# SD 2.1?
+     # diffusion_sd15 needs to be passed to from_pretrained() as subfolder arg
+     # ["CrucibleAI/ControlNetMediaPipeFace", "diffusion_sd15"],  # SD 1.5
+]
+
+CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="processed image")
@@ -61,7 +120,8 @@ class ControlNetInvocation(BaseInvocation):
     type: Literal["controlnet"] = "controlnet"
     # Inputs
     image: ImageField = Field(default=None, description="image to process")
-    control_model: str = Field(default=None, description="control model to use")
+    control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
+                                                  description="control model used")
     control_weight: float = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
     # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
