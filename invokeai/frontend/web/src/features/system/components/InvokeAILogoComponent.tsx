@@ -25,7 +25,7 @@ const InvokeAILogoComponent = () => {
           base: 'inherit',
           sm: 'none',
           md: 'inherit',
-          userSelect = 'none',
+          userSelect: 'none',
         }}
       >
         <Text fontSize="xl">
