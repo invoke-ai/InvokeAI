@@ -30,9 +30,14 @@ const DEFAULT_CONFIG = {};
 interface Props {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
+  setIsReady?: (isReady: boolean) => void;
 }
 
-const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
+const App = ({
+  config = DEFAULT_CONFIG,
+  headerComponent,
+  setIsReady,
+}: Props) => {
   useToastWatcher();
   useGlobalHotkeys();
 
@@ -60,6 +65,16 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   const handleOverrideClicked = useCallback(() => {
     setLoadingOverridden(true);
   }, []);
+
+  useEffect(() => {
+    if (isApplicationReady && setIsReady) {
+      setIsReady(true);
+    }
+
+    return () => {
+      setIsReady && setIsReady(false);
+    };
+  }, [isApplicationReady, setIsReady]);
 
   return (
     <Grid w="100vw" h="100vh" position="relative" overflow="hidden">

@@ -540,7 +540,10 @@
         "consoleLogLevel": "Log Level",
         "shouldLogToConsole": "Console Logging",
         "developer": "Developer",
-        "general": "General"
+        "general": "General",
+        "generation": "Generation",
+        "ui": "User Interface",
+        "availableSchedulers": "Available Schedulers"
     },
     "toast": {
         "serverError": "Server Error",

@@ -1,10 +1,9 @@
 import { memo } from 'react';
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import ModelSelect from 'features/system/components/ModelSelect';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
@@ -12,7 +11,7 @@ import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidt
 import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
 import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
-import ParamSampler from 'features/parameters/components/Parameters/Core/ParamSampler';
+import ParamSchedulerAndModel from 'features/parameters/components/Parameters/Core/ParamSchedulerAndModel';
 
 const selector = createSelector(
   uiSelector,
@@ -46,14 +45,7 @@ const UnifiedCanvasCoreParameters = () => {
           <ParamHeight />
           <ImageToImageStrength />
           <ImageToImageFit />
-          <Flex gap={3} w="full">
-            <Box flexGrow={2}>
-              <ParamSampler />
-            </Box>
-            <Box flexGrow={3}>
-              <ModelSelect />
-            </Box>
-          </Flex>
+          <ParamSchedulerAndModel />
         </Flex>
       ) : (
         <Flex sx={{ gap: 2, flexDirection: 'column' }}>
@@ -62,14 +54,7 @@ const UnifiedCanvasCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <Flex gap={3} w="full">
-            <Box flexGrow={2}>
-              <ParamSampler />
-            </Box>
-            <Box flexGrow={3}>
-              <ModelSelect />
-            </Box>
-          </Flex>
+          <ParamSchedulerAndModel />
           <ParamWidth />
           <ParamHeight />
           <ImageToImageStrength />
