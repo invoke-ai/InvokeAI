@@ -24,9 +24,16 @@ interface Props extends PropsWithChildren {
   token?: string;
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
+  setIsReady?: (isReady: boolean) => void;
 }
 
-const InvokeAIUI = ({ apiUrl, token, config, headerComponent }: Props) => {
+const InvokeAIUI = ({
+  apiUrl,
+  token,
+  config,
+  headerComponent,
+  setIsReady,
+}: Props) => {
   useEffect(() => {
     // configure API client token
     if (token) {
@@ -55,7 +62,11 @@ const InvokeAIUI = ({ apiUrl, token, config, headerComponent }: Props) => {
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <App config={config} headerComponent={headerComponent} />
+            <App
+              config={config}
+              headerComponent={headerComponent}
+              setIsReady={setIsReady}
+            />
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>
