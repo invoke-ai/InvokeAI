@@ -2,10 +2,8 @@
 
 from typing import Literal, Optional, Union
 
-import diffusers
 import einops
 import torch
-from diffusers import DiffusionPipeline
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from diffusers.image_processor import VaeImageProcessor
 from pydantic import BaseModel, Field
@@ -22,18 +20,16 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
 from ...backend.util.devices import choose_torch_device, torch_dtype
-from ...backend.prompting.conditioning import get_uc_and_c_and_ec
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
-import numpy as np
+from .baseinvocation import (
+    BaseInvocation, BaseInvocationOutput,
+    InvocationContext, InvocationConfig
+    )
 from ..services.image_storage import ImageType
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext)
 from .compel import ConditioningField
 from .image import ImageField, ImageOutput, build_image_output
 
 from .model import ModelInfo, UNetField, VaeField
-from ...backend.model_management import SDModelType
 
 
 class LatentsField(BaseModel):
@@ -213,7 +209,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(scheduler, eta=None)#ddim_eta)
+        ).add_scheduler_args_if_applicable(scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
     def create_pipeline(self, unet, scheduler) -> StableDiffusionGeneratorPipeline:

@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from enum import Enum
-from invokeai.backend.model_management.model_cache import ModelCache
+from invokeai.backend.model_management.model_cache import ModelCache, MODEL_CLASSES
 
 class DummyModelBase(object):
     '''Base class for dummy component of a diffusers model'''
@@ -32,13 +32,21 @@ class DummyPipeline(DummyModelBase):
     '''Dummy pipeline object is a composite of several types'''
     def __init__(self,repo_id):
         super().__init__(repo_id)
-        self.type1 = DummyModelType1('dummy/type1')
-        self.type2 = DummyModelType2('dummy/type2')
+        self.dummy_model_type1 = DummyModelType1('dummy/type1')
+        self.dummy_model_type2 = DummyModelType2('dummy/type2')
 
-class DMType(Enum):
-    dummy_pipeline = DummyPipeline
-    type1 = DummyModelType1
-    type2 = DummyModelType2
+class DMType(str, Enum):
+    dummy_pipeline = 'dummy_pipeline'
+    type1 = 'dummy_model_type1'
+    type2 = 'dummy_model_type2'
+
+MODEL_CLASSES.update(
+    {
+        DMType.dummy_pipeline: DummyPipeline,
+        DMType.type1: DummyModelType1,
+        DMType.type2: DummyModelType2,
+    }
+)
 
 cache = ModelCache(max_cache_size=4)
 
@@ -50,7 +58,7 @@ def test_pipeline_fetch():
         assert pipeline1 is not None, 'get_model() should not return None'
         assert pipeline1a is not None, 'get_model() should not return None'
         assert pipeline2 is not None, 'get_model() should not return None'
-        assert type(pipeline1)==DMType.dummy_pipeline.value,'get_model() did not return model of expected type'
+        assert type(pipeline1)==DummyPipeline,'get_model() did not return model of expected type'
         assert pipeline1==pipeline1a,'pipelines with the same repo_id should be the same'
         assert pipeline1!=pipeline2,'pipelines with different repo_ids should not be the same'
         assert len(cache.models)==2,'cache should uniquely cache models with same identity'
@@ -77,6 +85,6 @@ def test_submodel_fetch():
          cache.get_model(repo_id_or_path='dummy/pipeline2',model_type=DMType.dummy_pipeline,submodel=DMType.type1) as part2:
         assert type(part1)==DummyModelType1,'returned submodel is not of expected type'
         assert part1.device==torch.device('cuda'),'returned submodel should be in the GPU when in context'
-        assert pipeline.type1==part1,'returned submodel should match the corresponding subpart of parent model'
-        assert pipeline.type1!=part2,'returned submodel should not match the subpart of a different parent'
+        assert pipeline.dummy_model_type1==part1,'returned submodel should match the corresponding subpart of parent model'
+        assert pipeline.dummy_model_type1!=part2,'returned submodel should not match the subpart of a different parent'
 
