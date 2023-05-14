@@ -59,19 +59,14 @@ class CompelInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> CompelOutput:
 
-        # TODO: load without model
         text_encoder_info = context.services.model_manager.get_model(
-            model_name=self.clip.text_encoder.model_name,
-            model_type=SDModelType[self.clip.text_encoder.model_type],
-            submodel=SDModelType[self.clip.text_encoder.submodel],
+            **self.clip.text_encoder.dict(),
         )
         tokenizer_info = context.services.model_manager.get_model(
-            model_name=self.clip.tokenizer.model_name,
-            model_type=SDModelType[self.clip.tokenizer.model_type],
-            submodel=SDModelType[self.clip.tokenizer.submodel],
+            **self.clip.tokenizer.dict(),
         )
-        with text_encoder_info.context as text_encoder,\
-             tokenizer_info.context as tokenizer:
+        with text_encoder_info as text_encoder,\
+             tokenizer_info as tokenizer:
 
             # TODO: global? input?
             #use_full_precision = precision == "float32" or precision == "autocast"

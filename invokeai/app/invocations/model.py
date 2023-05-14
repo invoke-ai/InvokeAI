@@ -8,8 +8,8 @@ from ...backend.model_management import SDModelType
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load unet submodel")
-    model_type: str = Field(description="Info to load unet submodel")
-    submodel: Optional[str] = Field(description="Info to load unet submodel")
+    model_type: SDModelType = Field(description="Info to load unet submodel")
+    submodel: Optional[SDModelType] = Field(description="Info to load unet submodel")
 
 class UNetField(BaseModel):
     unet: ModelInfo = Field(description="Info to load unet submodel")
@@ -62,15 +62,15 @@ class ModelLoaderInvocation(BaseInvocation):
         # TODO: not found exceptions
         if not context.services.model_manager.model_exists(
             model_name=self.model_name,
-            model_type=SDModelType.diffusers,
+            model_type=SDModelType.Diffusers,
         ):
             raise Exception(f"Unkown model name: {self.model_name}!")
 
         """
         if not context.services.model_manager.model_exists(
             model_name=self.model_name,
-            model_type=SDModelType.diffusers,
-            submodel=SDModelType.tokenizer,
+            model_type=SDModelType.Diffusers,
+            submodel=SDModelType.Tokenizer,
         ):
             raise Exception(
                 f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
@@ -78,8 +78,8 @@ class ModelLoaderInvocation(BaseInvocation):
 
         if not context.services.model_manager.model_exists(
             model_name=self.model_name,
-            model_type=SDModelType.diffusers,
-            submodel=SDModelType.text_encoder,
+            model_type=SDModelType.Diffusers,
+            submodel=SDModelType.TextEncoder,
         ):
             raise Exception(
                 f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
@@ -87,8 +87,8 @@ class ModelLoaderInvocation(BaseInvocation):
 
         if not context.services.model_manager.model_exists(
             model_name=self.model_name,
-            model_type=SDModelType.diffusers,
-            submodel=SDModelType.unet,
+            model_type=SDModelType.Diffusers,
+            submodel=SDModelType.UNet,
         ):
             raise Exception(
                 f"Failed to find unet submodel from {self.model_name}! Check if model corrupted"
@@ -100,32 +100,32 @@ class ModelLoaderInvocation(BaseInvocation):
             unet=UNetField(
                 unet=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.diffusers.name,
-                    submodel=SDModelType.unet.name,
+                    model_type=SDModelType.Diffusers,
+                    submodel=SDModelType.UNet,
                 ),
                 scheduler=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.diffusers.name,
-                    submodel=SDModelType.scheduler.name,
+                    model_type=SDModelType.Diffusers,
+                    submodel=SDModelType.Scheduler,
                 ),
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.diffusers.name,
-                    submodel=SDModelType.tokenizer.name,
+                    model_type=SDModelType.Diffusers,
+                    submodel=SDModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.diffusers.name,
-                    submodel=SDModelType.text_encoder.name,
+                    model_type=SDModelType.Diffusers,
+                    submodel=SDModelType.TextEncoder,
                 ),
             ),
             vae=VaeField(
                 vae=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.diffusers.name,
-                    submodel=SDModelType.vae.name,
+                    model_type=SDModelType.Diffusers,
+                    submodel=SDModelType.Vae,
                 ),
             )
         )

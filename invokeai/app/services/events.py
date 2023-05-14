@@ -120,7 +120,7 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 model_name=model_name,
-                model_type=model_type.name,
+                model_type=model_type,
                 submodel=submodel,
             ),
         )
@@ -143,7 +143,7 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 model_name=model_name,
-                model_type=model_type.name,
+                model_type=model_type,
                 submodel=submodel,
                 model_info=model_info,
             ),

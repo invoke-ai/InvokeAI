@@ -27,7 +27,7 @@ Typical usage:
                  max_cache_size=8
              ) # gigabytes
 
-   model_info = manager.get_model('stable-diffusion-1.5', SDModelType.diffusers)
+   model_info = manager.get_model('stable-diffusion-1.5', SDModelType.Diffusers)
    with model_info.context as my_model:
       my_model.latents_from_embeddings(...)
 
@@ -45,7 +45,7 @@ parameter:
 
     model_info = manager.get_model(
                       'clip-tokenizer',
-                       model_type=SDModelType.tokenizer
+                       model_type=SDModelType.Tokenizer
                       )
 
 This will raise an InvalidModelError if the format defined in the
@@ -96,7 +96,7 @@ SUBMODELS:
 It is also possible to fetch an isolated submodel from a diffusers
 model. Use the `submodel` parameter to select which part:
 
- vae = manager.get_model('stable-diffusion-1.5',submodel=SDModelType.vae)
+ vae = manager.get_model('stable-diffusion-1.5',submodel=SDModelType.Vae)
  with vae.context as my_vae:
     print(type(my_vae))
     # "AutoencoderKL"
@@ -120,8 +120,8 @@ separated by "/". Example:
 You can now use the `model_type` argument to indicate which model you
 want:
 
- tokenizer = mgr.get('clip-large',model_type=SDModelType.tokenizer)
- encoder = mgr.get('clip-large',model_type=SDModelType.text_encoder)
+ tokenizer = mgr.get('clip-large',model_type=SDModelType.Tokenizer)
+ encoder = mgr.get('clip-large',model_type=SDModelType.TextEncoder)
 
 OTHER FUNCTIONS:
 
@@ -254,7 +254,7 @@ class ModelManager(object):
     def model_exists(
         self,
         model_name: str,
-        model_type: SDModelType = SDModelType.diffusers,
+        model_type: SDModelType = SDModelType.Diffusers,
     ) -> bool:
         """
         Given a model name, returns True if it is a valid
@@ -264,28 +264,28 @@ class ModelManager(object):
         return model_key in self.config
 
     def create_key(self, model_name: str, model_type: SDModelType) -> str:
-        return f"{model_type.name}/{model_name}"
+        return f"{model_type}/{model_name}"
 
     def parse_key(self, model_key: str) -> Tuple[str, SDModelType]:
         model_type_str, model_name = model_key.split('/', 1)
-        if model_type_str not in SDModelType.__members__:
-            # TODO:
+        try:
+            model_type = SDModelType(model_type_str)
+            return (model_name, model_type)
+        except:
             raise Exception(f"Unknown model type: {model_type_str}")
-
-        return (model_name, SDModelType[model_type_str])
 
     def get_model(
         self,
         model_name: str,
-        model_type: SDModelType=SDModelType.diffusers,
-        submodel: SDModelType=None,
+        model_type: SDModelType = SDModelType.Diffusers,
+        submodel: Optional[SDModelType] = None,
     ) -> SDModelInfo:
         """Given a model named identified in models.yaml, return
         an SDModelInfo object describing it.
         :param model_name: symbolic name of the model in models.yaml
         :param model_type: SDModelType enum indicating the type of model to return
         :param submodel: an SDModelType enum indicating the portion of 
-               the model to retrieve (e.g. SDModelType.vae)
+               the model to retrieve (e.g. SDModelType.Vae)
 
         If not provided, the model_type will be read from the `format` field
         of the corresponding stanza. If provided, the model_type will be used
@@ -304,17 +304,17 @@ class ModelManager(object):
         test1_pipeline = mgr.get_model('test1')
         # returns a StableDiffusionGeneratorPipeline
 
-        test1_vae1 = mgr.get_model('test1', submodel=SDModelType.vae)
+        test1_vae1 = mgr.get_model('test1', submodel=SDModelType.Vae)
         # returns the VAE part of a diffusers model as an AutoencoderKL
 
-        test1_vae2 = mgr.get_model('test1', model_type=SDModelType.diffusers, submodel=SDModelType.vae)
+        test1_vae2 = mgr.get_model('test1', model_type=SDModelType.Diffusers, submodel=SDModelType.Vae)
         # does the same thing as the previous  statement. Note that model_type
         # is for the parent model, and submodel is for the part
 
-        test1_lora = mgr.get_model('test1', model_type=SDModelType.lora)
+        test1_lora = mgr.get_model('test1', model_type=SDModelType.Lora)
         # returns a LoRA embed (as a 'dict' of tensors)
 
-        test1_encoder = mgr.get_modelI('test1', model_type=SDModelType.textencoder)
+        test1_encoder = mgr.get_modelI('test1', model_type=SDModelType.TextEncoder)
         # raises an InvalidModelError
 
         """
@@ -332,10 +332,10 @@ class ModelManager(object):
         mconfig = self.config[model_key]
         
         # type already checked as it's part of key
-        if model_type == SDModelType.diffusers:
+        if model_type == SDModelType.Diffusers:
             # intercept stanzas that point to checkpoint weights and replace them
             # with the equivalent diffusers model
-            if mconfig.format in ["ckpt", "diffusers"]:
+            if mconfig.format in ["ckpt", "safetensors"]:
                 location = self.convert_ckpt_and_cache(mconfig)
             else:
                 location = global_resolve_path(mconfig.get('path')) or mconfig.get('repo_id')
@@ -355,13 +355,13 @@ class ModelManager(object):
         vae = (None, None)
         with suppress(Exception):
             vae_id = mconfig.vae.repo_id
-            vae = (SDModelType.vae, vae_id)
+            vae = (SDModelType.Vae, vae_id)
 
         # optimization - don't load whole model if the user
         # is asking for just a piece of it
-        if model_type == SDModelType.diffusers and submodel and not subfolder:
+        if model_type == SDModelType.Diffusers and submodel and not subfolder:
             model_type = submodel
-            subfolder = submodel.name
+            subfolder = submodel.value
             submodel = None
 
         model_context = self.cache.get_model(
@@ -390,7 +390,7 @@ class ModelManager(object):
             _cache = self.cache
         )
 
-    def default_model(self) -> Union[Tuple[str, SDModelType],None]:
+    def default_model(self) -> Optional[Tuple[str, SDModelType]]:
         """
         Returns the name of the default model, or None
         if none is defined.
@@ -401,7 +401,7 @@ class ModelManager(object):
                 return (model_name, model_type)
         return self.model_names()[0][0]
 
-    def set_default_model(self, model_name: str, model_type: SDModelType=SDModelType.diffusers) -> None:
+    def set_default_model(self, model_name: str, model_type: SDModelType=SDModelType.Diffusers) -> None:
         """
         Set the default model. The change will not take
         effect until you call model_manager.commit()
@@ -415,25 +415,25 @@ class ModelManager(object):
         config[self.create_key(model_name, model_type)]["default"] = True
 
     def model_info(
-            self,
-            model_name: str,
-            model_type: SDModelType=SDModelType.diffusers
+        self,
+        model_name: str,
+        model_type: SDModelType=SDModelType.Diffusers,
     ) -> dict:
         """
         Given a model name returns the OmegaConf (dict-like) object describing it.
         """
         if not self.exists(model_name, model_type):
             return None
-        return self.config[self.create_key(model_name,model_type)]
+        return self.config[self.create_key(model_name, model_type)]
 
     def model_names(self) -> List[Tuple[str, SDModelType]]:
         """
         Return a list of (str, SDModelType) corresponding to all models 
         known to the configuration.
         """
-        return [(self.parse_key(x)) for x in self.config.keys() if isinstance(self.config[x],DictConfig)]
+        return [(self.parse_key(x)) for x in self.config.keys() if isinstance(self.config[x], DictConfig)]
 
-    def is_legacy(self, model_name: str, model_type: SDModelType.diffusers) -> bool:
+    def is_legacy(self, model_name: str, model_type: SDModelType.Diffusers) -> bool:
         """
         Return true if this is a legacy (.ckpt) model
         """
@@ -461,14 +461,14 @@ class ModelManager(object):
             # don't include VAEs in listing (legacy style)
             if "config" in stanza and "/VAE/" in stanza["config"]:
                 continue
-            if model_key=='config_file_version':
+            if model_key == 'config_file_version':
                 continue
 
             model_name, model_type = self.parse_key(model_key)
             models[model_key] = dict()
 
             # TODO: return all models in future
-            if model_type != SDModelType.diffusers:
+            if model_type != SDModelType.Diffusers:
                 continue
 
             model_format = stanza.get('format')
@@ -477,15 +477,15 @@ class ModelManager(object):
             status = self.cache.status(
                 stanza.get('weights') or stanza.get('repo_id'),
                 revision=stanza.get('revision'),
-                subfolder=stanza.get('subfolder')
+                subfolder=stanza.get('subfolder'),
             )
             description = stanza.get("description", None)
             models[model_key].update(
                 model_name=model_name,
-                model_type=model_type.name,
+                model_type=model_type,
                 format=model_format,
                 description=description,
-                status=status.value
+                status=status.value,
             )
 
 
@@ -528,8 +528,8 @@ class ModelManager(object):
     def del_model(
         self,
         model_name: str,
-        model_type: SDModelType.diffusers,
-        delete_files: bool = False
+        model_type: SDModelType.Diffusers,
+        delete_files: bool = False,
     ):
         """
         Delete the named model.
@@ -539,9 +539,9 @@ class ModelManager(object):
 
         if model_cfg is None:
             self.logger.error(
-            f"Unknown model {model_key}"
-        )
-        return
+                f"Unknown model {model_key}"
+            )
+            return
 
         # TODO: some legacy?
         #if model_name in self.stack:
@@ -571,7 +571,7 @@ class ModelManager(object):
         model_name: str,
         model_type: SDModelType,
         model_attributes: dict,
-        clobber: bool = False
+        clobber: bool = False,
     ) -> None:
         """
         Update the named model with a dictionary of attributes. Will fail with an
@@ -581,7 +581,7 @@ class ModelManager(object):
         attributes are incorrect or the model name is missing.
         """
 
-        if model_type == SDModelType.diffusers:
+        if model_type == SDModelType.Fiffusers:
             # TODO: automaticaly or manualy?
             #assert "format" in model_attributes, 'missing required field "format"'
             model_format = "ckpt" if "weights" in model_attributes else "diffusers"
@@ -647,16 +647,16 @@ class ModelManager(object):
         else:
             new_config.update(repo_id=repo_or_path)
 
-        self.add_model(model_name, SDModelType.diffusers, new_config, True)
+        self.add_model(model_name, SDModelType.Diffusers, new_config, True)
         if commit_to_conf:
             self.commit(commit_to_conf)
-        return self.create_key(model_name, SDModelType.diffusers)
+        return self.create_key(model_name, SDModelType.Diffusers)
 
     def import_lora(
         self,
         path: Path,
-        model_name: str=None,
-        description: str=None,
+        model_name: Optional[str] = None,
+        description: Optional[str] = None,
     ):
         """
         Creates an entry for the indicated lora file. Call
@@ -667,7 +667,7 @@ class ModelManager(object):
         model_description = description or f"LoRA model {model_name}"
         self.add_model(
             model_name,
-            SDModelType.lora,
+            SDModelType.Lora,
             dict(
                 format="lora",
                 weights=str(path),
@@ -679,8 +679,8 @@ class ModelManager(object):
     def import_embedding(
         self,
         path: Path,
-        model_name: str=None,
-        description: str=None,
+        model_name: Optional[str] = None,
+        description: Optional[str] = None,
     ):
         """
         Creates an entry for the indicated lora file. Call
@@ -696,7 +696,7 @@ class ModelManager(object):
         model_description = description or f"Textual embedding model {model_name}"
         self.add_model(
             model_name,
-            SDModelType.textual_inversion,
+            SDModelType.TextualInversion,
             dict(
                 format="textual_inversion",
                 weights=str(weights),
@@ -746,11 +746,11 @@ class ModelManager(object):
     def heuristic_import(
         self,
         path_url_or_repo: str,
-        model_name: str = None,
-        description: str = None,
-        model_config_file: Path = None,
-        commit_to_conf: Path = None,
-        config_file_callback: Callable[[Path], Path] = None,
+        model_name: Optional[str] = None,
+        description: Optional[str] = None,
+        model_config_file: Optional[Path] = None,
+        commit_to_conf: Optional[Path] = None,
+        config_file_callback: Optional[Callable[[Path], Path]] = None,
     ) -> str:
         """Accept a string which could be:
            - a HF diffusers repo_id
@@ -927,7 +927,7 @@ class ModelManager(object):
             )
         return model_name
 
-    def convert_ckpt_and_cache(self, mconfig: DictConfig)->Path:
+    def convert_ckpt_and_cache(self, mconfig: DictConfig) -> Path:
         """
         Convert the checkpoint model indicated in mconfig into a
         diffusers, cache it to disk, and return Path to converted
@@ -961,7 +961,7 @@ class ModelManager(object):
         self,
         weights: Path,
         mconfig: DictConfig
-    ) -> Tuple[Path, SDModelType.vae]:
+    ) -> Tuple[Path, AutoencoderKL]:
         # VAE handling is convoluted
         # 1. If there is a .vae.ckpt file sharing same stem as weights, then use
         # it as the vae_path passed to convert
@@ -990,7 +990,7 @@ class ModelManager(object):
             vae_diffusers_location = "stabilityai/sd-vae-ft-mse"
 
         if vae_diffusers_location:
-            vae_model = self.cache.get_model(vae_diffusers_location, SDModelType.vae).model
+            vae_model = self.cache.get_model(vae_diffusers_location, SDModelType.Vae).model
             return (None, vae_model)
 
         return (None, None)
@@ -1038,7 +1038,7 @@ class ModelManager(object):
             vae_model = None
             if vae:
                 vae_location = global_resolve_path(vae.get('path')) or vae.get('repo_id')
-                vae_model = self.cache.get_model(vae_location,SDModelType.vae).model
+                vae_model = self.cache.get_model(vae_location, SDModelType.Vae).model
                 vae_path = None
             convert_ckpt_to_diffusers(
                 ckpt_path,
@@ -1058,11 +1058,11 @@ class ModelManager(object):
                 description=model_description,
                 format="diffusers",
             )
-            if self.model_exists(model_name, SDModelType.diffusers):
-                self.del_model(model_name, SDModelType.diffusers)
+            if self.model_exists(model_name, SDModelType.Diffusers):
+                self.del_model(model_name, SDModelType.Diffusers)
             self.add_model(
                 model_name,
-                SDModelType.diffusers,
+                SDModelType.Diffusers,
                 new_config,
                 True
             )

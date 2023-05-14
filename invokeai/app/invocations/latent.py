@@ -79,12 +79,8 @@ def get_scheduler(
     scheduler_info: ModelInfo,
     scheduler_name: str,
 ) -> Scheduler:
-    orig_scheduler_info = context.services.model_manager.get_model(
-        model_name=scheduler_info.model_name,
-        model_type=SDModelType[scheduler_info.model_type],
-        submodel=SDModelType[scheduler_info.submodel],
-    )
-    with orig_scheduler_info.context as orig_scheduler:
+    orig_scheduler_info = context.services.model_manager.get_model(**scheduler_info.dict())
+    with orig_scheduler_info as orig_scheduler:
         scheduler_config = orig_scheduler.config
 
     scheduler_class = scheduler_map.get(scheduler_name,'ddim')
@@ -243,14 +239,8 @@ class TextToLatentsInvocation(BaseInvocation):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
 
-        #unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
-        unet_info = context.services.model_manager.get_model(
-            model_name=self.unet.unet.model_name,
-            model_type=SDModelType[self.unet.unet.model_type],
-            submodel=SDModelType[self.unet.unet.submodel] if self.unet.unet.submodel else None,
-        )
-
-        with unet_info.context as unet:
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
+        with unet_info as unet:
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -309,12 +299,10 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
         #unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
         unet_info = context.services.model_manager.get_model(
-            model_name=self.unet.unet.model_name,
-            model_type=SDModelType[self.unet.unet.model_type],
-            submodel=SDModelType[self.unet.unet.submodel] if self.unet.unet.submodel else None,
+            **self.unet.unet.dict(),
         )
 
-        with unet_info.context as unet:
+        with unet_info as unet:
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -379,17 +367,17 @@ class LatentsToImageInvocation(BaseInvocation):
 
         #vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
         vae_info = context.services.model_manager.get_model(
-            model_name=self.vae.vae.model_name,
-            model_type=SDModelType[self.vae.vae.model_type],
-            submodel=SDModelType[self.vae.vae.submodel] if self.vae.vae.submodel else None,
+            **self.vae.vae.dict(),
         )
 
-        with vae_info.context as vae:
-            # TODO: check if it works
+        with vae_info as vae:
             if self.tiled:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
+
+            # clear memory as vae decode can request a lot
+            torch.cuda.empty_cache()
 
             with torch.inference_mode():
                 # copied from diffusers pipeline
@@ -509,36 +497,29 @@ class ImageToLatentsInvocation(BaseInvocation):
 
         #vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
         vae_info = context.services.model_manager.get_model(
-            model_name=self.vae.vae.model_name,
-            model_type=SDModelType[self.vae.vae.model_type],
-            submodel=SDModelType[self.vae.vae.submodel] if self.vae.vae.submodel else None,
+            **self.vae.vae.dict(),
         )
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
-        with vae_info.context as vae:
-            # TODO: check if it works
+        with vae_info as vae:
             if self.tiled:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
 
-            latents = self.non_noised_latents_from_image(vae, image_tensor)
+            # non_noised_latents_from_image
+            image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
+            with torch.inference_mode():
+                image_tensor_dist = vae.encode(image_tensor).latent_dist
+                latents = image_tensor_dist.sample().to(
+                    dtype=vae.dtype
+                )  # FIXME: uses torch.randn. make reproducible!
+
+            latents = 0.18215 * latents
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         context.services.latents.set(name, latents)
         return LatentsOutput(latents=LatentsField(latents_name=name))
-
-
-    def non_noised_latents_from_image(self, vae, init_image):
-        init_image = init_image.to(device=vae.device, dtype=vae.dtype)
-        with torch.inference_mode():
-            init_latent_dist = vae.encode(init_image).latent_dist
-            init_latents = init_latent_dist.sample().to(
-                dtype=vae.dtype
-            )  # FIXME: uses torch.randn. make reproducible!
-
-        init_latents = 0.18215 * init_latents
-        return init_latents

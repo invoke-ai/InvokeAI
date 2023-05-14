@@ -263,7 +263,7 @@ export const parseNodeMetadata = (
         return;
       }
 
-      if ('unet' in nodeItem && 'tokenizer' in nodeItem) {
+      if ('unet' in nodeItem && 'scheduler' in nodeItem) {
         const unetField = parseUNetField(nodeItem);
         if (unetField) {
           parsed[nodeKey] = unetField;
