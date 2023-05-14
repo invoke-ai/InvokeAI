@@ -39,8 +39,8 @@ export const floatingParametersPanelButtonSelector = createSelector(
 
     const shouldShowParametersPanelButton =
       !canvasBetaLayoutCheck &&
-      (!shouldPinParametersPanel || !shouldShowParametersPanel) &&
-      ['generate', 'unifiedCanvas'].includes(activeTabName);
+      !shouldShowParametersPanel &&
+      ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     return {
       shouldPinParametersPanel,
@@ -65,11 +65,14 @@ const FloatingParametersPanelButtons = () => {
     shouldPinParametersPanel && dispatch(requestCanvasRescale());
   };
 
-  return shouldShowParametersPanelButton ? (
+  if (!shouldShowParametersPanelButton) {
+    return null;
+  }
+
+  return (
     <Flex
       pos="absolute"
       transform="translate(0, -50%)"
-      zIndex={20}
       minW={8}
       top="50%"
       insetInlineStart="4.5rem"
@@ -92,7 +95,7 @@ const FloatingParametersPanelButtons = () => {
         </>
       )}
     </Flex>
-  ) : null;
+  );
 };
 
 export default memo(FloatingParametersPanelButtons);

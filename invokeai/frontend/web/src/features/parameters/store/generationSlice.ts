@@ -1,23 +1,16 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
-import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import promptToString from 'common/util/promptToString';
-import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { clamp } from 'lodash-es';
-import { ImageField, ImageType } from 'services/api';
-
-export type SelectedImage = {
-  name: string;
-  type: ImageType;
-};
+import { setAllParametersReducer } from './setAllParametersReducer';
 
 export interface GenerationState {
   cfgScale: number;
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: SelectedImage; // can be an Image or url
+  initialImage?: InvokeAI.Image; // can be an Image or url
   iterations: number;
   maskPath: string;
   perlin: number;
@@ -25,7 +18,6 @@ export interface GenerationState {
   negativePrompt: string;
   sampler: string;
   seamBlur: number;
-  seamless: boolean;
   seamSize: number;
   seamSteps: number;
   seamStrength: number;
@@ -34,6 +26,7 @@ export interface GenerationState {
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
+  shouldUseNoiseSettings: boolean;
   steps: number;
   threshold: number;
   tileSize: number;
@@ -42,10 +35,13 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  isImageToImageEnabled: boolean;
+  model: string;
+  shouldUseSeamless: boolean;
+  seamlessXAxis: boolean;
+  seamlessYAxis: boolean;
 }
 
-const initialGenerationState: GenerationState = {
+export const initialGenerationState: GenerationState = {
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -55,9 +51,8 @@ const initialGenerationState: GenerationState = {
   perlin: 0,
   prompt: '',
   negativePrompt: '',
-  sampler: 'k_lms',
+  sampler: 'lms',
   seamBlur: 16,
-  seamless: false,
   seamSize: 96,
   seamSteps: 30,
   seamStrength: 0.7,
@@ -66,6 +61,7 @@ const initialGenerationState: GenerationState = {
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
   shouldRandomizeSeed: true,
+  shouldUseNoiseSettings: false,
   steps: 50,
   threshold: 0,
   tileSize: 32,
@@ -74,7 +70,10 @@ const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
-  isImageToImageEnabled: false,
+  model: '',
+  shouldUseSeamless: false,
+  seamlessXAxis: true,
+  seamlessYAxis: true,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -149,7 +148,13 @@ export const generationSlice = createSlice({
       state.maskPath = action.payload;
     },
     setSeamless: (state, action: PayloadAction<boolean>) => {
-      state.seamless = action.payload;
+      state.shouldUseSeamless = action.payload;
+    },
+    setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
+      state.seamlessXAxis = action.payload;
+    },
+    setSeamlessYAxis: (state, action: PayloadAction<boolean>) => {
+      state.seamlessYAxis = action.payload;
     },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
@@ -181,131 +186,7 @@ export const generationSlice = createSlice({
       state.shouldGenerateVariations = true;
       state.variationAmount = 0;
     },
-    setAllTextToImageParameters: (
-      state,
-      action: PayloadAction<InvokeAI.Metadata>
-    ) => {
-      // const {
-      //   sampler,
-      //   prompt,
-      //   seed,
-      //   variations,
-      //   steps,
-      //   cfg_scale,
-      //   threshold,
-      //   perlin,
-      //   seamless,
-      //   _hires_fix,
-      //   width,
-      //   height,
-      // } = action.payload.image;
-      // if (variations && variations.length > 0) {
-      //   state.seedWeights = seedWeightsToString(variations);
-      //   state.shouldGenerateVariations = true;
-      //   state.variationAmount = 0;
-      // } else {
-      //   state.shouldGenerateVariations = false;
-      // }
-      // if (seed) {
-      //   state.seed = seed;
-      //   state.shouldRandomizeSeed = false;
-      // }
-      // if (prompt) state.prompt = promptToString(prompt);
-      // if (sampler) state.sampler = sampler;
-      // if (steps) state.steps = steps;
-      // if (cfg_scale) state.cfgScale = cfg_scale;
-      // if (typeof threshold === 'undefined') {
-      //   state.threshold = 0;
-      // } else {
-      //   state.threshold = threshold;
-      // }
-      // if (typeof perlin === 'undefined') {
-      //   state.perlin = 0;
-      // } else {
-      //   state.perlin = perlin;
-      // }
-      // if (typeof seamless === 'boolean') state.seamless = seamless;
-      // // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
-      // if (width) state.width = width;
-      // if (height) state.height = height;
-    },
-    setAllImageToImageParameters: (
-      state,
-      action: PayloadAction<InvokeAI.Metadata>
-    ) => {
-      //   const { type, strength, fit, init_image_path, mask_image_path } =
-      //     action.payload.image;
-      //   if (type === 'img2img') {
-      //     if (init_image_path) state.initialImage = init_image_path;
-      //     if (mask_image_path) state.maskPath = mask_image_path;
-      //     if (strength) state.img2imgStrength = strength;
-      //     if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-      //   }
-    },
-    setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
-      //   const {
-      //     type,
-      //     sampler,
-      //     prompt,
-      //     seed,
-      //     variations,
-      //     steps,
-      //     cfg_scale,
-      //     threshold,
-      //     perlin,
-      //     seamless,
-      //     _hires_fix,
-      //     width,
-      //     height,
-      //     strength,
-      //     fit,
-      //     init_image_path,
-      //     mask_image_path,
-      //   } = action.payload.image;
-      //   if (type === 'img2img') {
-      //     if (init_image_path) state.initialImage = init_image_path;
-      //     if (mask_image_path) state.maskPath = mask_image_path;
-      //     if (strength) state.img2imgStrength = strength;
-      //     if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-      //   }
-      //   if (variations && variations.length > 0) {
-      //     state.seedWeights = seedWeightsToString(variations);
-      //     state.shouldGenerateVariations = true;
-      //     state.variationAmount = 0;
-      //   } else {
-      //     state.shouldGenerateVariations = false;
-      //   }
-      //   if (seed) {
-      //     state.seed = seed;
-      //     state.shouldRandomizeSeed = false;
-      //   }
-      //   if (prompt) {
-      //     const [promptOnly, negativePrompt] = getPromptAndNegative(prompt);
-      //     if (promptOnly) state.prompt = promptOnly;
-      //     negativePrompt
-      //       ? (state.negativePrompt = negativePrompt)
-      //       : (state.negativePrompt = '');
-      //   }
-      //   if (sampler) state.sampler = sampler;
-      //   if (steps) state.steps = steps;
-      //   if (cfg_scale) state.cfgScale = cfg_scale;
-      //   if (typeof threshold === 'undefined') {
-      //     state.threshold = 0;
-      //   } else {
-      //     state.threshold = threshold;
-      //   }
-      //   if (typeof perlin === 'undefined') {
-      //     state.perlin = 0;
-      //   } else {
-      //     state.perlin = perlin;
-      //   }
-      //   if (typeof seamless === 'boolean') state.seamless = seamless;
-      //   // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
-      //   if (width) state.width = width;
-      //   if (height) state.height = height;
-      //   // state.shouldRunESRGAN = false; // TODO: Needs to be fixed after reorg
-      //   // state.shouldRunFacetool = false; // TODO: Needs to be fixed after reorg
-    },
+    allParametersSet: setAllParametersReducer,
     resetParametersState: (state) => {
       return {
         ...state,
@@ -315,12 +196,6 @@ export const generationSlice = createSlice({
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
-    // setInitialImage: (
-    //   state,
-    //   action: PayloadAction<InvokeAI._Image | string>
-    // ) => {
-    //   state.initialImage = action.payload;
-    // },
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
@@ -351,12 +226,14 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
-    initialImageSelected: (state, action: PayloadAction<SelectedImage>) => {
-      state.initialImage = action.payload;
-      state.isImageToImageEnabled = true;
+    setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseNoiseSettings = action.payload;
     },
-    isImageToImageEnabledChanged: (state, action: PayloadAction<boolean>) => {
-      state.isImageToImageEnabled = action.payload;
+    initialImageChanged: (state, action: PayloadAction<InvokeAI.Image>) => {
+      state.initialImage = action.payload;
+    },
+    modelSelected: (state, action: PayloadAction<string>) => {
+      state.model = action.payload;
     },
   },
 });
@@ -366,9 +243,6 @@ export const {
   clearInitialImage,
   resetParametersState,
   resetSeed,
-  setAllImageToImageParameters,
-  setAllParameters,
-  setAllTextToImageParameters,
   setCfgScale,
   setHeight,
   setImg2imgStrength,
@@ -382,7 +256,6 @@ export const {
   setNegativePrompt,
   setSampler,
   setSeamBlur,
-  setSeamless,
   setSeamSize,
   setSeamSteps,
   setSeamStrength,
@@ -399,8 +272,13 @@ export const {
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
-  initialImageSelected,
-  isImageToImageEnabledChanged,
+  initialImageChanged,
+  modelSelected,
+  setShouldUseNoiseSettings,
+  setSeamless,
+  setSeamlessXAxis,
+  setSeamlessYAxis,
+  allParametersSet,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

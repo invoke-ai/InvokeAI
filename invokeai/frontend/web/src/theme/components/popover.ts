@@ -20,9 +20,6 @@ const invokeAIContent = defineStyle((_props) => {
     minW: 'unset',
     width: 'unset',
     p: 4,
-    borderWidth: '2px',
-    borderStyle: 'solid',
-    borderColor: 'base.600',
     bg: 'base.800',
   };
 });

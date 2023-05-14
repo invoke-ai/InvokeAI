@@ -49,7 +49,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   const fileAcceptedCallback = useCallback(
     async (file: File) => {
-      dispatch(imageUploaded({ formData: { file } }));
+      dispatch(imageUploaded({ imageType: 'uploads', formData: { file } }));
     },
     [dispatch]
   );
@@ -124,7 +124,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         return;
       }
 
-      dispatch(imageUploaded({ formData: { file } }));
+      dispatch(imageUploaded({ imageType: 'uploads', formData: { file } }));
     };
     document.addEventListener('paste', pasteImageListener);
     return () => {

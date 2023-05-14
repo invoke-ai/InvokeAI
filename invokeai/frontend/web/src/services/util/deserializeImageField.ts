@@ -1,6 +1,4 @@
-import { Image } from 'app/types/invokeai';
-import { ImageField, ImageType } from 'services/api';
-import { AnyInvocation } from 'services/events/types';
+import { ImageType } from 'services/api';
 
 export const buildImageUrls = (
   imageType: ImageType,

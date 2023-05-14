@@ -5,6 +5,7 @@ import { PluginOption, UserConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 import eslint from 'vite-plugin-eslint';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 
 export const packageConfig: UserConfig = {
   base: './',
@@ -16,9 +17,10 @@ export const packageConfig: UserConfig = {
     dts({
       insertTypesEntry: true,
     }),
+    cssInjectedByJsPlugin(),
   ],
   build: {
-    chunkSizeWarningLimit: 1500,
+    cssCodeSplit: true,
     lib: {
       entry: path.resolve(__dirname, '../src/index.ts'),
       name: 'InvokeAIUI',
@@ -30,6 +32,7 @@ export const packageConfig: UserConfig = {
         globals: {
           react: 'React',
           'react-dom': 'ReactDOM',
+          '@emotion/react': 'EmotionReact',
         },
       },
     },

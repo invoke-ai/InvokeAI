@@ -1,51 +1,9 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { SessionsService } from 'services/api';
-import { buildLinearGraph as buildGenerateGraph } from 'features/nodes/util/linearGraphBuilder/buildLinearGraph';
-import { isAnyOf, isFulfilled } from '@reduxjs/toolkit';
-import { buildNodesGraph } from 'features/nodes/util/nodesGraphBuilder/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
 import { serializeError } from 'serialize-error';
 
 const sessionLog = log.child({ namespace: 'session' });
-
-export const generateGraphBuilt = createAppAsyncThunk(
-  'api/generateGraphBuilt',
-  async (_, { dispatch, getState, rejectWithValue }) => {
-    try {
-      const graph = buildGenerateGraph(getState());
-      dispatch(sessionCreated({ graph }));
-      return graph;
-    } catch (err: any) {
-      sessionLog.error(
-        { error: serializeError(err) },
-        'Problem building graph'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const nodesGraphBuilt = createAppAsyncThunk(
-  'api/nodesGraphBuilt',
-  async (_, { dispatch, getState, rejectWithValue }) => {
-    try {
-      const graph = buildNodesGraph(getState());
-      dispatch(sessionCreated({ graph }));
-      return graph;
-    } catch (err: any) {
-      sessionLog.error(
-        { error: serializeError(err) },
-        'Problem building graph'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const isFulfilledAnyGraphBuilt = isAnyOf(
-  generateGraphBuilt.fulfilled,
-  nodesGraphBuilt.fulfilled
-);
 
 type SessionCreatedArg = {
   graph: Parameters<
@@ -58,21 +16,24 @@ type SessionCreatedArg = {
  */
 export const sessionCreated = createAppAsyncThunk(
   'api/sessionCreated',
-  async (arg: SessionCreatedArg, { dispatch, getState }) => {
-    const response = await SessionsService.createSession({
-      requestBody: arg.graph,
-    });
-
-    sessionLog.info({ arg, response }, `Session created (${response.id})`);
-
-    return response;
+  async (arg: SessionCreatedArg, { rejectWithValue }) => {
+    try {
+      const response = await SessionsService.createSession({
+        requestBody: arg.graph,
+      });
+      sessionLog.info({ arg, response }, `Session created (${response.id})`);
+      return response;
+    } catch (err: any) {
+      sessionLog.error(
+        {
+          error: serializeError(err),
+        },
+        'Problem creating session'
+      );
+      return rejectWithValue(err.message);
+    }
   }
 );
-
-/**
- * Function to check if an action is a fulfilled `SessionsService.createSession()` thunk
- */
-export const isFulfilledSessionCreatedAction = isFulfilled(sessionCreated);
 
 type NodeAddedArg = Parameters<(typeof SessionsService)['addNode']>[0];
 
@@ -101,17 +62,24 @@ export const nodeAdded = createAppAsyncThunk(
  */
 export const sessionInvoked = createAppAsyncThunk(
   'api/sessionInvoked',
-  async (arg: { sessionId: string }, _thunkApi) => {
+  async (arg: { sessionId: string }, { rejectWithValue }) => {
     const { sessionId } = arg;
 
-    const response = await SessionsService.invokeSession({
-      sessionId,
-      all: true,
-    });
+    try {
+      const response = await SessionsService.invokeSession({
+        sessionId,
+        all: true,
+      });
+      sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
 
-    sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
-
-    return response;
+      return response;
+    } catch (error) {
+      const err = error as any;
+      if (err.status === 403) {
+        return rejectWithValue(err.body.detail);
+      }
+      throw error;
+    }
   }
 );
 

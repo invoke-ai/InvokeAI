@@ -18,7 +18,7 @@ export type ImageToImageInvocation = {
    */
   prompt?: string;
   /**
-   * The seed to use (-1 for a random seed)
+   * The seed to use (omit for random)
    */
   seed?: number;
   /**
@@ -40,19 +40,11 @@ export type ImageToImageInvocation = {
   /**
    * The scheduler to use
    */
-  scheduler?: 'ddim' | 'dpmpp_2' | 'k_dpm_2' | 'k_dpm_2_a' | 'k_dpmpp_2' | 'k_euler' | 'k_euler_a' | 'k_heun' | 'k_lms' | 'plms';
-  /**
-   * Whether or not to generate an image that can tile without seams
-   */
-  seamless?: boolean;
+  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'pndm' | 'heun' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'unipc';
   /**
    * The model to use (currently ignored)
    */
   model?: string;
-  /**
-   * Whether or not to produce progress images during generation
-   */
-  progress_images?: boolean;
   /**
    * The input image
    */

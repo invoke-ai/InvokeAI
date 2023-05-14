@@ -1,12 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { get, isEqual, isNumber, isString } from 'lodash-es';
+import { isEqual, isString } from 'lodash-es';
 
 import {
   ButtonGroup,
   Flex,
   FlexProps,
-  FormControl,
+  IconButton,
   Link,
+  Menu,
+  MenuButton,
+  MenuItemOption,
+  MenuList,
+  MenuOptionGroup,
   useDisclosure,
   useToast,
 } from '@chakra-ui/react';
@@ -15,21 +20,12 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
+
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
-import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
-import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
-import {
-  initialImageSelected,
-  setAllParameters,
-  // setInitialImage,
-  setSeed,
-} from 'features/parameters/store/generationSlice';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { SystemState } from 'features/system/store/systemSlice';
+
 import {
   activeTabNameSelector,
   uiSelector,
@@ -56,6 +52,7 @@ import {
   FaShare,
   FaShareAlt,
   FaTrash,
+  FaWrench,
 } from 'react-icons/fa';
 import {
   gallerySelector,
@@ -66,8 +63,13 @@ import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { imageDeleted } from 'services/thunks/image';
 import { useParameters } from 'features/parameters/hooks/useParameters';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { requestedImageDeletion } from '../store/actions';
+import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
+import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
+import { allParametersSet } from 'features/parameters/store/generationSlice';
+import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -150,6 +152,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   } = useAppSelector(currentImageButtonsSelector);
 
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
+  const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
 
@@ -164,40 +167,59 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const toast = useToast();
   const { t } = useTranslation();
 
-  const { recallPrompt, recallSeed, sendToImageToImage } = useParameters();
+  const { recallPrompt, recallSeed, recallAllParameters } = useParameters();
 
-  const handleCopyImage = useCallback(async () => {
-    if (!image?.url) {
-      return;
-    }
+  // const handleCopyImage = useCallback(async () => {
+  //   if (!image?.url) {
+  //     return;
+  //   }
 
-    const url = getUrl(image.url);
+  //   const url = getUrl(image.url);
 
-    if (!url) {
-      return;
-    }
+  //   if (!url) {
+  //     return;
+  //   }
 
-    const blob = await fetch(url).then((res) => res.blob());
-    const data = [new ClipboardItem({ [blob.type]: blob })];
+  //   const blob = await fetch(url).then((res) => res.blob());
+  //   const data = [new ClipboardItem({ [blob.type]: blob })];
 
-    await navigator.clipboard.write(data);
+  //   await navigator.clipboard.write(data);
 
-    toast({
-      title: t('toast.imageCopied'),
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
-  }, [getUrl, t, image?.url, toast]);
+  //   toast({
+  //     title: t('toast.imageCopied'),
+  //     status: 'success',
+  //     duration: 2500,
+  //     isClosable: true,
+  //   });
+  // }, [getUrl, t, image?.url, toast]);
 
   const handleCopyImageLink = useCallback(() => {
-    const url = image
-      ? shouldTransformUrls
-        ? getUrl(image.url)
-        : window.location.toString() + image.url
-      : '';
+    const getImageUrl = () => {
+      if (!image) {
+        return;
+      }
+
+      if (shouldTransformUrls) {
+        return getUrl(image.url);
+      }
+
+      if (image.url.startsWith('http')) {
+        return image.url;
+      }
+
+      return window.location.toString() + image.url;
+    };
+
+    const url = getImageUrl();
 
     if (!url) {
+      toast({
+        title: t('toast.problemCopyingImageLink'),
+        status: 'error',
+        duration: 2500,
+        isClosable: true,
+      });
+
       return;
     }
 
@@ -216,39 +238,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   }, [dispatch, shouldHidePreview]);
 
   const handleClickUseAllParameters = useCallback(() => {
-    if (!image) return;
-    // selectedImage.metadata &&
-    //   dispatch(setAllParameters(selectedImage.metadata));
-    // if (selectedImage.metadata?.image.type === 'img2img') {
-    //   dispatch(setActiveTab('img2img'));
-    // } else if (selectedImage.metadata?.image.type === 'txt2img') {
-    //   dispatch(setActiveTab('txt2img'));
-    // }
-  }, [image]);
+    recallAllParameters(image);
+  }, [image, recallAllParameters]);
 
   useHotkeys(
     'a',
     () => {
-      const type = image?.metadata?.invokeai?.node?.types;
-      if (isString(type) && ['txt2img', 'img2img'].includes(type)) {
-        handleClickUseAllParameters();
-        toast({
-          title: t('toast.parametersSet'),
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: t('toast.parametersNotSet'),
-          description: t('toast.parametersNotSetDesc'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
+      handleClickUseAllParameters;
     },
-    [image]
+    [image, recallAllParameters]
   );
 
   const handleUseSeed = useCallback(() => {
@@ -264,8 +262,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('p', handleUsePrompt, [image]);
 
   const handleSendToImageToImage = useCallback(() => {
-    sendToImageToImage(image);
-  }, [image, sendToImageToImage]);
+    dispatch(initialImageSelected(image));
+  }, [dispatch, image]);
 
   useHotkeys('shift+i', handleSendToImageToImage, [image]);
 
@@ -375,7 +373,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
   const handleDelete = useCallback(() => {
     if (canDeleteImage && image) {
-      dispatch(imageDeleted({ imageType: image.type, imageName: image.name }));
+      dispatch(requestedImageDeletion(image));
     }
   }, [image, canDeleteImage, dispatch]);
 
@@ -432,21 +430,23 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               >
                 {t('parameters.sendToImg2Img')}
               </IAIButton>
-              <IAIButton
-                size="sm"
-                onClick={handleSendToCanvas}
-                leftIcon={<FaShare />}
-              >
-                {t('parameters.sendToUnifiedCanvas')}
-              </IAIButton>
+              {isCanvasEnabled && (
+                <IAIButton
+                  size="sm"
+                  onClick={handleSendToCanvas}
+                  leftIcon={<FaShare />}
+                >
+                  {t('parameters.sendToUnifiedCanvas')}
+                </IAIButton>
+              )}
 
-              <IAIButton
+              {/* <IAIButton
                 size="sm"
                 onClick={handleCopyImage}
                 leftIcon={<FaCopy />}
               >
                 {t('parameters.copyImage')}
-              </IAIButton>
+              </IAIButton> */}
               <IAIButton
                 size="sm"
                 onClick={handleCopyImageLink}
@@ -462,7 +462,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               </Link>
             </Flex>
           </IAIPopover>
-          <IAIIconButton
+          {/* <IAIIconButton
             icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
             tooltip={
               !shouldHidePreview
@@ -476,7 +476,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             }
             isChecked={shouldHidePreview}
             onClick={handlePreviewVisibility}
-          />
+          /> */}
           {isLightboxEnabled && (
             <IAIIconButton
               icon={<FaExpand />}
@@ -518,8 +518,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={
-              !['txt2img', 'img2img'].includes(
-                image?.metadata?.sd_metadata?.type
+              !['txt2img', 'img2img', 'inpaint'].includes(
+                String(image?.metadata?.invokeai?.node?.type)
               )
             }
             onClick={handleClickUseAllParameters}
@@ -602,22 +602,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           />
         </ButtonGroup>
 
-        <IAIIconButton
-          onClick={handleInitiateDelete}
-          icon={<FaTrash />}
-          tooltip={`${t('gallery.deleteImage')} (Del)`}
-          aria-label={`${t('gallery.deleteImage')} (Del)`}
-          isDisabled={!image || !isConnected}
-          colorScheme="error"
-        />
+        <ButtonGroup isAttached={true}>
+          <DeleteImageButton image={image} />
+        </ButtonGroup>
       </Flex>
-      {image && (
-        <DeleteImageModal
-          isOpen={isDeleteDialogOpen}
-          onClose={onDeleteDialogClose}
-          handleDelete={handleDelete}
-        />
-      )}
     </>
   );
 };

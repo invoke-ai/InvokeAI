@@ -2,6 +2,13 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import {
+  setActiveTab,
+  toggleGalleryPanel,
+  toggleParametersPanel,
+  togglePinGalleryPanel,
+  togglePinParametersPanel,
+} from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
@@ -36,4 +43,36 @@ export const useGlobalHotkeys = () => {
     { keyup: true, keydown: true },
     [shift]
   );
+
+  useHotkeys('o', () => {
+    dispatch(toggleParametersPanel());
+  });
+
+  useHotkeys(['shift+o'], () => {
+    dispatch(togglePinParametersPanel());
+  });
+
+  useHotkeys('g', () => {
+    dispatch(toggleGalleryPanel());
+  });
+
+  useHotkeys(['shift+g'], () => {
+    dispatch(togglePinGalleryPanel());
+  });
+
+  useHotkeys('1', () => {
+    dispatch(setActiveTab('txt2img'));
+  });
+
+  useHotkeys('2', () => {
+    dispatch(setActiveTab('img2img'));
+  });
+
+  useHotkeys('3', () => {
+    dispatch(setActiveTab('unifiedCanvas'));
+  });
+
+  useHotkeys('4', () => {
+    dispatch(setActiveTab('nodes'));
+  });
 };

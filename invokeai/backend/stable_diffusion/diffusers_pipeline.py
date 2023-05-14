@@ -509,10 +509,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         run_id=None,
         callback: Callable[[PipelineIntermediateState], None] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+        if self.scheduler.config.get("cpu_only", False):
+            scheduler_device = torch.device('cpu')
+        else:
+            scheduler_device = self._model_group.device_for(self.unet)
+
         if timesteps is None:
-            self.scheduler.set_timesteps(
-                num_inference_steps, device=self._model_group.device_for(self.unet)
-            )
+            self.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(
             self.generate_latents_from_embeddings, PipelineIntermediateState
@@ -725,12 +728,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         run_id=None,
         callback=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        timesteps, _ = self.get_img2img_timesteps(
-            num_inference_steps,
-            strength,
-            device=self._model_group.device_for(self.unet),
-        )
+    ) -> InvokeAIStableDiffusionPipelineOutput:        
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
         result_latents, result_attention_maps = self.latents_from_embeddings(
             latents=initial_latents if strength < 1.0 else torch.zeros_like(
                 initial_latents, device=initial_latents.device, dtype=initial_latents.dtype
@@ -756,13 +755,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             return self.check_for_safety(output, dtype=conditioning_data.dtype)
 
     def get_img2img_timesteps(
-        self, num_inference_steps: int, strength: float, device
+        self, num_inference_steps: int, strength: float, device=None
     ) -> (torch.Tensor, int):
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         assert img2img_pipeline.scheduler is self.scheduler
-        img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
+
+        if self.scheduler.config.get("cpu_only", False):
+            scheduler_device = torch.device('cpu')
+        else:
+            scheduler_device = self._model_group.device_for(self.unet)
+
+        img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
         timesteps, adjusted_steps = img2img_pipeline.get_timesteps(
-            num_inference_steps, strength, device=device
+            num_inference_steps, strength, device=scheduler_device
         )
         # Workaround for low strength resulting in zero timesteps.
         # TODO: submit upstream fix for zero-step img2img
@@ -796,9 +801,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if init_image.dim() == 3:
             init_image = init_image.unsqueeze(0)
 
-        timesteps, _ = self.get_img2img_timesteps(
-            num_inference_steps, strength, device=device
-        )
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
 
         # 6. Prepare latent variables
         # can't quite use upstream StableDiffusionImg2ImgPipeline.prepare_latents

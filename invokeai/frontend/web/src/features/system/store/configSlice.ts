@@ -3,11 +3,12 @@ import { createSlice } from '@reduxjs/toolkit';
 import { AppConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
 
-const initialConfigState: AppConfig = {
+export const initialConfigState: AppConfig = {
   shouldTransformUrls: false,
   shouldFetchImages: false,
   disabledTabs: [],
   disabledFeatures: [],
+  disabledSDFeatures: [],
   canRestoreDeletedImagesFromBin: true,
   sd: {
     iterations: {

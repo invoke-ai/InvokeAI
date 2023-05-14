@@ -1,23 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
-import { configSelector } from 'features/system/store/configSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
+
 import {
   activeTabNameSelector,
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
-import {
-  selectResultsAll,
-  selectResultsById,
-  selectResultsEntities,
-} from './resultsSlice';
-import {
-  selectUploadsAll,
-  selectUploadsById,
-  selectUploadsEntities,
-} from './uploadsSlice';
+import { selectResultsById, selectResultsEntities } from './resultsSlice';
+import { selectUploadsAll, selectUploadsById } from './uploadsSlice';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
@@ -44,6 +35,11 @@ export const imageGallerySelector = createSelector(
 
     const { isLightboxOpen } = lightbox;
 
+    const images =
+      currentCategory === 'results'
+        ? selectResultsEntities(state)
+        : selectUploadsAll(state);
+
     return {
       shouldPinGallery,
       galleryImageMinimumWidth,
@@ -53,7 +49,7 @@ export const imageGallerySelector = createSelector(
         : `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       shouldAutoSwitchToNewImages,
       currentCategory,
-      images: state[currentCategory].entities,
+      images,
       galleryWidth,
       shouldEnableResize:
         isLightboxOpen ||

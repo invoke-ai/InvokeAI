@@ -3,7 +3,8 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import Backend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
 
-import translationEN from '../dist/locales/en.json';
+import translationEN from '../public/locales/en.json';
+import { LOCALSTORAGE_PREFIX } from 'app/store/constants';
 
 if (import.meta.env.MODE === 'package') {
   i18n.use(initReactI18next).init({
@@ -20,7 +21,11 @@ if (import.meta.env.MODE === 'package') {
 } else {
   i18n
     .use(Backend)
-    .use(LanguageDetector)
+    // .use(
+    //   new LanguageDetector(null, {
+    //     lookupLocalStorage: `${LOCALSTORAGE_PREFIX}lng`,
+    //   })
+    // )
     .use(initReactI18next)
     .init({
       fallbackLng: 'en',

@@ -2,10 +2,11 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { ConditioningField } from './ConditioningField';
 import type { LatentsField } from './LatentsField';
 
 /**
- * Generates latents from a prompt.
+ * Generates latents from conditionings.
  */
 export type TextToLatentsInvocation = {
   /**
@@ -14,9 +15,13 @@ export type TextToLatentsInvocation = {
   id: string;
   type?: 't2l';
   /**
-   * The prompt to generate an image from
+   * Positive conditioning for generation
    */
-  prompt?: string;
+  positive_conditioning?: ConditioningField;
+  /**
+   * Negative conditioning for generation
+   */
+  negative_conditioning?: ConditioningField;
   /**
    * The noise to use
    */
@@ -32,7 +37,11 @@ export type TextToLatentsInvocation = {
   /**
    * The scheduler to use
    */
-  scheduler?: 'ddim' | 'dpmpp_2' | 'k_dpm_2' | 'k_dpm_2_a' | 'k_dpmpp_2' | 'k_euler' | 'k_euler_a' | 'k_heun' | 'k_lms' | 'plms';
+  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'pndm' | 'heun' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'unipc';
+  /**
+   * The model to use (currently ignored)
+   */
+  model?: string;
   /**
    * Whether or not to generate an image that can tile without seams
    */
@@ -41,13 +50,5 @@ export type TextToLatentsInvocation = {
    * The axes to tile the image on, 'x' and/or 'y'
    */
   seamless_axes?: string;
-  /**
-   * The model to use (currently ignored)
-   */
-  model?: string;
-  /**
-   * Whether or not to produce progress images during generation
-   */
-  progress_images?: boolean;
 };
 

@@ -37,7 +37,7 @@ From `invokeai/frontend/web/` run `yarn install` to get everything set up.
 Start everything in dev mode:
 
 1. Start the dev server: `yarn dev`
-2. Start the InvokeAI UI per usual: `invokeai --web`
+2. Start the InvokeAI Nodes backend: `python scripts/invokeai-new.py --web # run from the repo root`
 3. Point your browser to the dev server address e.g. <http://localhost:5173/>
 
 ### Production builds

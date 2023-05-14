@@ -23,6 +23,8 @@ import { textareaTheme } from './components/textarea';
 export const theme: ThemeOverride = {
   config: {
     cssVarPrefix: 'invokeai',
+    initialColorMode: 'dark',
+    useSystemColorMode: false,
   },
   styles: {
     global: (_props: StyleFunctionProps) => ({
@@ -39,7 +41,7 @@ export const theme: ThemeOverride = {
   },
   direction: 'ltr',
   fonts: {
-    body: `'Inter', sans-serif`,
+    body: `'InterVariable', sans-serif`,
   },
   breakpoints: {
     base: '0em', // 0px and onwards

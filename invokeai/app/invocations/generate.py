@@ -1,15 +1,17 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from functools import partial
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, get_args
 
 import numpy as np
 from torch import Tensor
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.image import ImageField, ImageType
+from invokeai.app.models.image import ColorField, ImageField, ImageType
 from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.backend.generator.inpaint import infill_methods
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput, build_image_output
 from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
@@ -17,7 +19,8 @@ from ...backend.stable_diffusion import PipelineIntermediateState
 from ..util.step_callback import stable_diffusion_step_callback
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
-
+INFILL_METHODS = Literal[tuple(infill_methods())]
+DEFAULT_INFILL_METHOD = 'patchmatch' if 'patchmatch' in get_args(INFILL_METHODS) else 'tile'
 
 class SDImageInvocation(BaseModel):
     """Helper class to provide all Stable Diffusion raster image invocations with additional config"""
@@ -44,15 +47,13 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
     prompt: Optional[str] = Field(description="The prompt to generate an image from")
-    seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
-    steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
+    seed:        int = Field(ge=0, le=SEED_MAX, description="The seed to use (omit for random)", default_factory=get_random_seed)
+    steps:       int = Field(default=30, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
-    cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The scheduler to use" )
-    seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
-    progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
     # fmt: on
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
@@ -148,7 +149,6 @@ class ImageToImageInvocation(TextToImageInvocation):
                 self.image.image_type, self.image.image_name
             )
         )
-        mask = None
 
         if self.fit:
             image = image.resize((self.width, self.height))
@@ -165,7 +165,6 @@ class ImageToImageInvocation(TextToImageInvocation):
         outputs = Img2Img(model).generate(
             prompt=self.prompt,
             init_image=image,
-            init_mask=mask,
             step_callback=partial(self.dispatch_progress, context, source_node_id),
             **self.dict(
                 exclude={"prompt", "image", "mask"}
@@ -197,7 +196,6 @@ class ImageToImageInvocation(TextToImageInvocation):
             image=result_image,
         )
 
-
 class InpaintInvocation(ImageToImageInvocation):
     """Generates an image using inpaint."""
 
@@ -205,6 +203,17 @@ class InpaintInvocation(ImageToImageInvocation):
 
     # Inputs
     mask: Union[ImageField, None] = Field(description="The mask")
+    seam_size: int = Field(default=96, ge=1, description="The seam inpaint size (px)")
+    seam_blur: int = Field(default=16, ge=0, description="The seam inpaint blur radius (px)")
+    seam_strength: float = Field(
+        default=0.75, gt=0, le=1, description="The seam inpaint strength"
+    )
+    seam_steps: int = Field(default=30, ge=1, description="The number of steps to use for seam inpaint")
+    tile_size: int = Field(default=32, ge=1, description="The tile infill method size (px)")
+    infill_method: INFILL_METHODS = Field(default=DEFAULT_INFILL_METHOD, description="The method used to infill empty regions (px)")
+    inpaint_width:       Optional[int] = Field(default=None, multiple_of=8, gt=0, description="The width of the inpaint region (px)")
+    inpaint_height:      Optional[int] = Field(default=None, multiple_of=8, gt=0, description="The height of the inpaint region (px)")
+    inpaint_fill: Optional[ColorField] = Field(default=ColorField(r=127, g=127, b=127, a=255), description="The solid infill method color")
     inpaint_replace: float = Field(
         default=0.0,
         ge=0.0,

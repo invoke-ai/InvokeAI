@@ -270,4 +270,5 @@ class DiskImageStorage(ImageStorageBase):
             )  # TODO: this should refresh position for LRU cache
             if len(self.__cache) > self.__max_cache_size:
                 cache_id = self.__cache_ids.get()
-                del self.__cache[cache_id]
+                if cache_id in self.__cache:
+                    del self.__cache[cache_id]

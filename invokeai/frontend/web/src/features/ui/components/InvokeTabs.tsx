@@ -1,5 +1,4 @@
 import {
-  ChakraProps,
   Icon,
   Tab,
   TabList,
@@ -14,42 +13,55 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import { memo, ReactNode, useMemo } from 'react';
+import { memo, ReactNode, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
-import { activeTabIndexSelector } from '../store/uiSelectors';
-import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
+import { GoTextSize } from 'react-icons/go';
+import {
+  activeTabIndexSelector,
+  activeTabNameSelector,
+} from '../store/uiSelectors';
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import NodeEditor from 'features/nodes/components/NodeEditor';
-import GenerateWorkspace from './tabs/Generate/GenerateWorkspace';
 import { createSelector } from '@reduxjs/toolkit';
-import { BsLightningChargeFill } from 'react-icons/bs';
 import { configSelector } from 'features/system/store/configSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
+import { Panel, PanelGroup } from 'react-resizable-panels';
+import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
+import TextToImageTab from './tabs/TextToImage/TextToImageTab';
+import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
+import NodesTab from './tabs/Nodes/NodesTab';
+import { FaImage } from 'react-icons/fa';
+import ResizeHandle from './tabs/ResizeHandle';
+import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
   icon: ReactNode;
-  workarea: ReactNode;
+  content: ReactNode;
 }
 
 const tabs: InvokeTabInfo[] = [
   {
-    id: 'generate',
-    icon: <Icon as={BsLightningChargeFill} sx={{ boxSize: 5 }} />,
-    workarea: <GenerateWorkspace />,
+    id: 'txt2img',
+    icon: <Icon as={GoTextSize} sx={{ boxSize: 6 }} />,
+    content: <TextToImageTab />,
+  },
+  {
+    id: 'img2img',
+    icon: <Icon as={FaImage} sx={{ boxSize: 6 }} />,
+    content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
     icon: <Icon as={MdGridOn} sx={{ boxSize: 6 }} />,
-    workarea: <UnifiedCanvasWorkarea />,
+    content: <UnifiedCanvasTab />,
   },
   {
     id: 'nodes',
     icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6 }} />,
-    workarea: <NodeEditor />,
+    content: <NodesTab />,
   },
 ];
 
@@ -67,30 +79,18 @@ const enabledTabsSelector = createSelector(
 
 const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const { shouldPinGallery, shouldPinParametersPanel } = useAppSelector(
-    (state: RootState) => state.ui
-  );
+  const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
+    useAppSelector((state: RootState) => state.ui);
 
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-
-  useHotkeys('1', () => {
-    dispatch(setActiveTab('generate'));
-  });
-
-  useHotkeys('2', () => {
-    dispatch(setActiveTab('unifiedCanvas'));
-  });
-
-  useHotkeys('3', () => {
-    dispatch(setActiveTab('nodes'));
-  });
 
   // Lightbox Hotkey
   useHotkeys(
@@ -110,6 +110,12 @@ const InvokeTabs = () => {
     },
     [shouldPinGallery, shouldPinParametersPanel]
   );
+
+  const handleResizeGallery = useCallback(() => {
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
+  }, [dispatch, activeTabName]);
 
   const tabs = useMemo(
     () =>
@@ -133,9 +139,7 @@ const InvokeTabs = () => {
 
   const tabPanels = useMemo(
     () =>
-      enabledTabs.map((tab) => (
-        <TabPanel key={tab.id}>{tab.workarea}</TabPanel>
-      )),
+      enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
     [enabledTabs]
   );
 
@@ -159,7 +163,32 @@ const InvokeTabs = () => {
       >
         {tabs}
       </TabList>
-      <TabPanels>{tabPanels}</TabPanels>
+      <PanelGroup
+        autoSaveId="app"
+        direction="horizontal"
+        style={{ height: '100%', width: '100%' }}
+      >
+        <Panel id="main">
+          <TabPanels style={{ height: '100%', width: '100%' }}>
+            {tabPanels}
+          </TabPanels>
+        </Panel>
+        {shouldPinGallery && shouldShowGallery && (
+          <>
+            <ResizeHandle />
+            <Panel
+              onResize={handleResizeGallery}
+              id="gallery"
+              order={3}
+              defaultSize={10}
+              minSize={10}
+              maxSize={50}
+            >
+              <ImageGalleryContent />
+            </Panel>
+          </>
+        )}
+      </PanelGroup>
     </Tabs>
   );
 };
