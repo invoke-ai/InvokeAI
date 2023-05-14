@@ -237,8 +237,8 @@ class ModelCache(object):
         if subfolder and not submodel:
             possible_parent_key = self._model_key(
                 repo_id_or_path,
-                None,
                 revision,
+                None,
                 SDModelType.Diffusers
             )
             if possible_parent_key in self.models:
