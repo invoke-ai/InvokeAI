@@ -52,6 +52,7 @@ export type CommonGeneratedImageMetadata = {
     | 'lms'
     | 'pndm'
     | 'heun'
+    | 'heun_k'
     | 'euler'
     | 'euler_k'
     | 'euler_a'

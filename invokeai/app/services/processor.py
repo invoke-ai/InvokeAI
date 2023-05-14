@@ -1,3 +1,4 @@
+import time
 import traceback
 from threading import Event, Thread, BoundedSemaphore
 
@@ -6,6 +7,7 @@ from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
 from ..models.exceptions import CanceledException
 
+import invokeai.backend.util.logging as logger
 class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker_thread: Thread
     __stop_event: Event
@@ -34,8 +36,14 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
         try:
             self.__threadLimit.acquire()
             while not stop_event.is_set():
-                queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
+                try:
+                    queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
+                except Exception as e:
+                    logger.debug("Exception while getting from queue: %s" % e)
+
                 if not queue_item:  # Probably stopping
+                    # do not hammer the queue
+                    time.sleep(0.5)
                     continue
 
                 graph_execution_state = (
@@ -124,7 +132,16 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 # Queue any further commands if invoking all
                 is_complete = graph_execution_state.is_complete()
                 if queue_item.invoke_all and not is_complete:
-                    self.__invoker.invoke(graph_execution_state, invoke_all=True)
+                    try:
+                        self.__invoker.invoke(graph_execution_state, invoke_all=True)
+                    except Exception as e:
+                        logger.error("Error while invoking: %s" % e)
+                        self.__invoker.services.events.emit_invocation_error(
+                            graph_execution_state_id=graph_execution_state.id,
+                            node=invocation.dict(),
+                            source_node_id=source_node_id,
+                            error=traceback.format_exc()
+                        )
                 elif is_complete:
                     self.__invoker.services.events.emit_graph_execution_complete(
                         graph_execution_state.id

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -9,11 +9,10 @@ import ParamSteps from 'features/parameters/components/Parameters/Core/ParamStep
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
 import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
 import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
-import ParamSampler from 'features/parameters/components/Parameters/Core/ParamSampler';
-import ModelSelect from 'features/system/components/ModelSelect';
 import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
+import ParamSchedulerAndModel from 'features/parameters/components/Parameters/Core/ParamSchedulerAndModel';
 
 const selector = createSelector(
   [uiSelector, generationSelector],
@@ -48,14 +47,7 @@ const ImageToImageTabCoreParameters = () => {
           <ParamHeight isDisabled={!shouldFitToWidthHeight} />
           <ImageToImageStrength />
           <ImageToImageFit />
-          <Flex gap={3} w="full">
-            <Box flexGrow={2}>
-              <ParamSampler />
-            </Box>
-            <Box flexGrow={3}>
-              <ModelSelect />
-            </Box>
-          </Flex>
+          <ParamSchedulerAndModel />
         </Flex>
       ) : (
         <Flex sx={{ gap: 2, flexDirection: 'column' }}>
@@ -64,14 +56,7 @@ const ImageToImageTabCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <Flex gap={3} w="full">
-            <Box flexGrow={2}>
-              <ParamSampler />
-            </Box>
-            <Box flexGrow={3}>
-              <ModelSelect />
-            </Box>
-          </Flex>
+          <ParamSchedulerAndModel />
           <ParamWidth isDisabled={!shouldFitToWidthHeight} />
           <ParamHeight isDisabled={!shouldFitToWidthHeight} />
           <ImageToImageStrength />

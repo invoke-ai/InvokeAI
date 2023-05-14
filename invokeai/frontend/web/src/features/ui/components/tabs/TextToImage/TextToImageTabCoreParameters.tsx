@@ -3,14 +3,13 @@ import ParamSteps from 'features/parameters/components/Parameters/Core/ParamStep
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
 import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
 import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
-import ParamSampler from 'features/parameters/components/Parameters/Core/ParamSampler';
-import ModelSelect from 'features/system/components/ModelSelect';
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { createSelector } from '@reduxjs/toolkit';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo } from 'react';
+import ParamSchedulerAndModel from 'features/parameters/components/Parameters/Core/ParamSchedulerAndModel';
 
 const selector = createSelector(
   uiSelector,
@@ -42,14 +41,7 @@ const TextToImageTabCoreParameters = () => {
           <ParamCFGScale />
           <ParamWidth />
           <ParamHeight />
-          <Flex gap={3} w="full">
-            <Box flexGrow={2}>
-              <ParamSampler />
-            </Box>
-            <Box flexGrow={3}>
-              <ModelSelect />
-            </Box>
-          </Flex>
+          <ParamSchedulerAndModel />
         </Flex>
       ) : (
         <Flex sx={{ gap: 2, flexDirection: 'column' }}>
@@ -58,14 +50,7 @@ const TextToImageTabCoreParameters = () => {
             <ParamSteps />
             <ParamCFGScale />
           </Flex>
-          <Flex gap={3} w="full">
-            <Box flexGrow={2}>
-              <ParamSampler />
-            </Box>
-            <Box flexGrow={3}>
-              <ModelSelect />
-            </Box>
-          </Flex>
+          <ParamSchedulerAndModel />
           <ParamWidth />
           <ParamHeight />
         </Flex>
