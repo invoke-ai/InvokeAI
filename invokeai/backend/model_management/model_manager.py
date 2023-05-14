@@ -133,6 +133,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import textwrap
 from contextlib import suppress
 from dataclasses import dataclass
@@ -318,11 +319,18 @@ class ModelManager(object):
         # raises an InvalidModelError
 
         """
+        
+        # This is a temporary workaround for callers that use "type/name" as the model name
+        # because they haven't adjusted to the new return format of `list_models()`
+        if "/" in model_name:
+            model_key = model_name
+        else:
+            model_key = self.create_key(model_name, model_type)
+            
         # TODO: delete default model or add check that this stable diffusion model
         # if not model_name:
         #     model_name = self.default_model()
 
-        model_key = self.create_key(model_name, model_type)
         if model_key not in self.config:
             raise InvalidModelError(
                 f'"{model_key}" is not a known model name. Please check your models.yaml file'
@@ -350,19 +358,29 @@ class ModelManager(object):
         revision = mconfig.get('revision')
         hash = self.cache.model_hash(location, revision)
 
-        # to support the traditional way of attaching a VAE
-        # to a model, we hacked in `attach_model_part`
-        vae = (None, None)
-        with suppress(Exception):
-            vae_id = mconfig.vae.repo_id
-            vae = (SDModelType.Vae, vae_id)
+        # If the caller is asking for part of the model and the config indicates
+        # an external replacement for that field, then we fetch the replacement
+        if submodel and mconfig.get(submodel):
+            location = mconfig.get(submodel).get('path') \
+                or mconfig.get(submodel).get('repo_id')
+            model_type = submodel
+            submodel = None
 
-        # optimization - don't load whole model if the user
-        # is asking for just a piece of it
-        if model_type == SDModelType.Diffusers and submodel and not subfolder:
+        # We don't need to load whole model if the user is asking for just a piece of it
+        elif model_type == SDModelType.Diffusers and submodel and not subfolder:
             model_type = submodel
             subfolder = submodel.value
             submodel = None
+
+        # to support the traditional way of attaching a VAE
+        # to a model, we hacked in `attach_model_part`
+        # TODO: generalize this
+        vae = (None, None)
+        if model_type == SDModelType.Diffusers:
+            with suppress(Exception):
+                vae_id = mconfig.vae.get('path') or mconfig.vae.get('repo_id')
+                vae_subfolder = mconfig.vae.get('subfolder')
+                vae = (SDModelType.Vae, vae_id, vae_subfolder)
 
         model_context = self.cache.get_model(
             location,

@@ -73,7 +73,8 @@
         "postprocessing": "Post Elaborazione",
         "txt2img": "Testo a Immagine",
         "accept": "Accetta",
-        "cancel": "Annulla"
+        "cancel": "Annulla",
+        "linear": "Lineare"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -483,7 +484,9 @@
         },
         "hSymmetryStep": "Passi Simmetria Orizzontale",
         "vSymmetryStep": "Passi Simmetria Verticale",
-        "symmetry": "Simmetria"
+        "symmetry": "Simmetria",
+        "hidePreview": "Nascondi l'anteprima",
+        "showPreview": "Mostra l'anteprima"
     },
     "settings": {
         "models": "Modelli",
@@ -529,7 +532,11 @@
         "metadataLoadFailed": "Impossibile caricare i metadati",
         "initialImageSet": "Immagine iniziale impostata",
         "initialImageNotSet": "Immagine iniziale non impostata",
-        "initialImageNotSetDesc": "Impossibile caricare l'immagine iniziale"
+        "initialImageNotSetDesc": "Impossibile caricare l'immagine iniziale",
+        "serverError": "Errore del Server",
+        "disconnected": "Disconnesso dal Server",
+        "connected": "Connesso al Server",
+        "canceled": "Elaborazione annullata"
     },
     "tooltip": {
         "feature": {
@@ -625,6 +632,7 @@
         "showOptionsPanel": "Mostra il pannello opzioni",
         "flipVertically": "Capovolgi verticalmente",
         "toggleAutoscroll": "Attiva/disattiva lo scorrimento automatico",
-        "modifyConfig": "Modifica configurazione"
+        "modifyConfig": "Modifica configurazione",
+        "menu": "Menu"
     }
 }

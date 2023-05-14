@@ -267,16 +267,16 @@ class ModelCache(object):
                 subfolder=subfolder,
                 revision=revision,
             )
-            
+
             if mem_used := self.calc_model_size(model):
                 logger.debug(f'CPU RAM used for load: {(mem_used/GIG):.2f} GB')
                 self.model_sizes[key] = mem_used      # remember size of this model for cache cleansing
                 self.current_cache_size += mem_used   # increment size of the cache
-            
+
             # this is a bit of legacy work needed to support the old-style "load this diffuser with custom VAE"
             if model_type == SDModelType.Diffusers and attach_model_part[0]:
                 self.attach_part(model, *attach_model_part)
-                
+
             self.stack.append(key)          # add to LRU cache
             self.models[key] = model          # keep copy of model in dict
             
@@ -352,6 +352,7 @@ class ModelCache(object):
         diffusers_model: StableDiffusionPipeline,
         part_type: SDModelType,
         part_id: str,
+        subfolder: Optional[str] = None
     ):
         '''
         Attach a diffusers model part to a diffusers model. This can be
@@ -362,7 +363,8 @@ class ModelCache(object):
         '''
         part = self._load_diffusers_from_storage(
             part_id,
-            model_class=MODEL_CLASSES[part_type],
+            model_type=part_type,
+            subfolder=subfolder,
         )
         part.to(diffusers_model.device)
         setattr(diffusers_model, part_type, part)
