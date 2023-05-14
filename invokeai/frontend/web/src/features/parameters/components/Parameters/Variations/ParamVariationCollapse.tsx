@@ -7,6 +7,7 @@ import { setShouldGenerateVariations } from 'features/parameters/store/generatio
 import { Flex } from '@chakra-ui/react';
 import IAICollapse from 'common/components/IAICollapse';
 import { memo } from 'react';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const ParamVariationCollapse = () => {
   const { t } = useTranslation();
@@ -14,10 +15,16 @@ const ParamVariationCollapse = () => {
     (state: RootState) => state.generation.shouldGenerateVariations
   );
 
+  const isVariationEnabled = useFeatureStatus('variation').isFeatureEnabled;
+
   const dispatch = useAppDispatch();
 
   const handleToggle = () =>
     dispatch(setShouldGenerateVariations(!shouldGenerateVariations));
+
+  if (!isVariationEnabled) {
+    return null;
+  }
 
   return (
     <IAICollapse

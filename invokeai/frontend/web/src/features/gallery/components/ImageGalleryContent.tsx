@@ -54,11 +54,7 @@ import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
-import ProgressImagePreview from 'features/parameters/components/_ProgressImagePreview';
-import ProgressImage from 'features/parameters/components/ProgressImage';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { Image as ImageType } from 'app/types/invokeai';
-import { ProgressImage as ProgressImageType } from 'services/events/types';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import GalleryProgressImage from './GalleryProgressImage';
 
@@ -71,13 +67,13 @@ const selector = createSelector(
     const { results, uploads, system, gallery } = state;
     const { currentCategory } = gallery;
 
-    const tempImages: (ImageType | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
-
-    if (system.progressImage) {
-      tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
-    }
-
     if (currentCategory === 'results') {
+      const tempImages: (ImageType | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
+
+      if (system.progressImage) {
+        tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
+      }
+
       return {
         images: tempImages.concat(
           resultsAdapter.getSelectors().selectAll(results)
@@ -88,9 +84,7 @@ const selector = createSelector(
     }
 
     return {
-      images: tempImages.concat(
-        uploadsAdapter.getSelectors().selectAll(uploads)
-      ),
+      images: uploadsAdapter.getSelectors().selectAll(uploads),
       isLoading: uploads.isLoading,
       areMoreImagesAvailable: uploads.page < uploads.pages - 1,
     };

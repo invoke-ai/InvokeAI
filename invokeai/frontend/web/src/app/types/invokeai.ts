@@ -47,15 +47,20 @@ export type CommonGeneratedImageMetadata = {
   postprocessing: null | Array<ESRGANMetadata | FacetoolMetadata>;
   sampler:
     | 'ddim'
-    | 'k_dpm_2_a'
-    | 'k_dpm_2'
-    | 'k_dpmpp_2_a'
-    | 'k_dpmpp_2'
-    | 'k_euler_a'
-    | 'k_euler'
-    | 'k_heun'
-    | 'k_lms'
-    | 'plms';
+    | 'ddpm'
+    | 'deis'
+    | 'lms'
+    | 'pndm'
+    | 'heun'
+    | 'euler'
+    | 'euler_k'
+    | 'euler_a'
+    | 'kdpm_2'
+    | 'kdpm_2_a'
+    | 'dpmpp_2s'
+    | 'dpmpp_2m'
+    | 'dpmpp_2m_k'
+    | 'unipc';
   prompt: Prompt;
   seed: number;
   variations: SeedWeights;
@@ -321,11 +326,11 @@ export type AppFeature =
 /**
  * A disable-able Stable Diffusion feature
  */
-export type StableDiffusionFeature =
-  | 'noiseConfig'
-  | 'variations'
+export type SDFeature =
+  | 'noise'
+  | 'variation'
   | 'symmetry'
-  | 'tiling'
+  | 'seamless'
   | 'hires';
 
 /**
@@ -343,6 +348,7 @@ export type AppConfig = {
   shouldFetchImages: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
+  disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     iterations: {

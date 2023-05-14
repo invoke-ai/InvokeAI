@@ -48,6 +48,7 @@ from diffusers import (
     LDMTextToImagePipeline,
     LMSDiscreteScheduler,
     PNDMScheduler,
+    UniPCMultistepScheduler,
     StableDiffusionPipeline,
     UNet2DConditionModel,
 )
@@ -1210,6 +1211,8 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             scheduler = EulerAncestralDiscreteScheduler.from_config(scheduler.config)
         elif scheduler_type == "dpm":
             scheduler = DPMSolverMultistepScheduler.from_config(scheduler.config)
+        elif scheduler_type == 'unipc':
+            scheduler = UniPCMultistepScheduler.from_config(scheduler.config)
         elif scheduler_type == "ddim":
             scheduler = scheduler
         else:

@@ -31,6 +31,7 @@ from ..util.util import rand_perlin_2d
 from ..safety_checker import SafetyChecker
 from ..prompting.conditioning import get_uc_and_c_and_ec
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ..stable_diffusion.schedulers import SCHEDULER_MAP
 
 downsampling = 8
 
@@ -71,19 +72,6 @@ class InvokeAIGeneratorOutput:
 # we are interposing a wrapper around the original Generator classes so that
 # old code that calls Generate will continue to work.
 class InvokeAIGenerator(metaclass=ABCMeta):
-    scheduler_map = dict(
-        ddim=diffusers.DDIMScheduler,
-        dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-        k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-        k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
-        k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-        k_euler=diffusers.EulerDiscreteScheduler,
-        k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-        k_heun=diffusers.HeunDiscreteScheduler,
-        k_lms=diffusers.LMSDiscreteScheduler,
-        plms=diffusers.PNDMScheduler,
-    )
-
     def __init__(self,
                  model_info: dict,
                  params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
@@ -175,14 +163,20 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         '''
         Return list of all the schedulers that we currently handle.
         '''
-        return list(self.scheduler_map.keys())
+        return list(SCHEDULER_MAP.keys())
 
     def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
         return generator_class(model, self.params.precision)
 
     def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-        scheduler_class = self.scheduler_map.get(scheduler_name,'ddim')
-        scheduler = scheduler_class.from_config(model.scheduler.config)
+        scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
+        
+        scheduler_config = model.scheduler.config
+        if "_backup" in scheduler_config:
+            scheduler_config = scheduler_config["_backup"]
+        scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
+        scheduler = scheduler_class.from_config(scheduler_config)
+        
         # hack copied over from generate.py
         if not hasattr(scheduler, 'uses_inpainting_model'):
             scheduler.uses_inpainting_model = lambda: False

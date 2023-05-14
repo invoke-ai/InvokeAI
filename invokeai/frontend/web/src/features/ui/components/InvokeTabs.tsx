@@ -45,12 +45,12 @@ export interface InvokeTabInfo {
 const tabs: InvokeTabInfo[] = [
   {
     id: 'txt2img',
-    icon: <Icon as={GoTextSize} sx={{ boxSize: 5 }} />,
+    icon: <Icon as={GoTextSize} sx={{ boxSize: 6 }} />,
     content: <TextToImageTab />,
   },
   {
     id: 'img2img',
-    icon: <Icon as={FaImage} sx={{ boxSize: 5 }} />,
+    icon: <Icon as={FaImage} sx={{ boxSize: 6 }} />,
     content: <ImageTab />,
   },
   {
