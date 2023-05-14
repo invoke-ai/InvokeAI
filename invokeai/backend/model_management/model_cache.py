@@ -332,12 +332,16 @@ class ModelCache(object):
                 if cache.lazy_offloading:
                    cache._offload_unlocked_models()
                    
-                if  model.device != cache.execution_device:
+                if  model.device != cache.execution_device and \
+                    not (self.cache.sequential_offload \
+                         and isinstance(model, StableDiffusionGeneratorPipeline)
+                         ):
+                    
                     cache.logger.debug(f'Moving {key} into {cache.execution_device}')
                     with VRAMUsage() as mem:
                         self._to(model,cache.execution_device)
-                        # model.to(cache.execution_device)  # move into GPU
 
+                    self.cache.logger.debug(f'Locked {key} in {cache.execution_device}')                
                     cache.logger.debug(f'GPU VRAM used for load: {(mem.vram_used/GIG):.2f} GB')
                     cache.model_sizes[key] = mem.vram_used   # more accurate size
                     
@@ -348,7 +352,7 @@ class ModelCache(object):
                 # move it into CPU if it is in GPU and not locked
                 if hasattr(model, 'to') and (key in cache.loaded_models
                                             and cache.locked_models[key] == 0):
-                    self._go(model,cache.storage_device)
+                    self._to(model,cache.storage_device)
                     # model.to(cache.storage_device)
                     cache.loaded_models.remove(key)
             return model
@@ -365,11 +369,6 @@ class ModelCache(object):
                 cache._print_cuda_stats()
 
         def _to(self, model, device):
-            # if set, sequential offload will take care of GPU management for diffusers
-            if self.cache.sequential_offload and isinstance(model, StableDiffusionGeneratorPipeline):
-                return
-
-            self.cache.logger.debug(f'Moving {key} into {cache.execution_device}')                
             model.to(device)
             if isinstance(model,MODEL_CLASSES[SDModelType.Diffusers]):
                 for part in DIFFUSERS_PARTS:
@@ -476,9 +475,10 @@ class ModelCache(object):
     def _print_cuda_stats(self):
         vram = "%4.2fG" % (torch.cuda.memory_allocated() / GIG)
         ram = "%4.2fG" % (self.current_cache_size / GIG)
+        cached_models = len(self.models)
         loaded_models = len(self.loaded_models)
         locked_models = len([x for x in self.locked_models if self.locked_models[x]>0])
-        logger.debug(f"Current VRAM/RAM usage: {vram}/{ram}; locked_models/loaded_models = {locked_models}/{loaded_models}")
+        logger.debug(f"Current VRAM/RAM usage: {vram}/{ram}; cached_models/loaded_models/locked_models = {cached_models}/{loaded_models}/{locked_models}")
 
     def _make_cache_room(self, key, model_type):
         # calculate how much memory this model will require
