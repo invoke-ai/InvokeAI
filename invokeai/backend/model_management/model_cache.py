@@ -112,7 +112,7 @@ SIZE_GUESSTIMATE = {
         
 # The list of model classes we know how to fetch, for typechecking
 ModelClass = Union[tuple([x for x in MODEL_CLASSES.values()])]
-DiffusionClasses = (StableDiffusionGeneratorPipeline, AutoencoderKL, EmptyScheduler, UNet2DConditionModel)
+DiffusionClasses = (StableDiffusionGeneratorPipeline, AutoencoderKL, EmptyScheduler, UNet2DConditionModel, CLIPTextModel)
 
 class UnsafeModelException(Exception):
     "Raised when a legacy model file fails the picklescan test"
@@ -320,7 +320,7 @@ class ModelCache(object):
                 if  model.device != cache.execution_device:
                     cache.logger.debug(f'Moving {key} into {cache.execution_device}')
                     with VRAMUsage() as mem:
-                        model.to(cache.execution_device, dtype=cache.precision)  # move into GPU
+                        model.to(cache.execution_device)  # move into GPU
                     cache.logger.debug(f'GPU VRAM used for load: {(mem.vram_used/GIG):.2f} GB')
                     cache.model_sizes[key] = mem.vram_used   # more accurate size
                     
@@ -534,11 +534,14 @@ class ModelCache(object):
 
         extra_args = dict()
         if model_class in DiffusionClasses:
-            extra_args = dict(
+            extra_args.update(
                 torch_dtype=self.precision,
+            )
+        if model_class == StableDiffusionGeneratorPipeline:
+            extra_args.update(
                 safety_checker=None,
             )
-        
+
         for rev in revisions:
             try:
                 model = model_class.from_pretrained(
