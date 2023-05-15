@@ -33,4 +33,5 @@ export interface UIState {
   shouldShowProgressImages: boolean;
   shouldShowProgressInViewer: boolean;
   shouldShowImageParameters: boolean;
+  schedulers: string[];
 }

@@ -2,8 +2,9 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 import promptToString from 'common/util/promptToString';
-import { clamp } from 'lodash-es';
+import { clamp, sample } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
+import { receivedModels } from 'services/thunks/model';
 
 export interface GenerationState {
   cfgScale: number;
@@ -235,6 +236,16 @@ export const generationSlice = createSlice({
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(receivedModels.fulfilled, (state, action) => {
+      if (!state.model) {
+        const randomModel = sample(action.payload);
+        if (randomModel) {
+          state.model = randomModel.name;
+        }
+      }
+    });
   },
 });
 

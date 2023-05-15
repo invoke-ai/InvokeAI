@@ -1,4 +1,4 @@
-import { Flex, Image } from '@chakra-ui/react';
+import { Flex, Icon, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
@@ -13,6 +13,7 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinner';
+import { FaImage } from 'react-icons/fa';
 
 const selector = createSelector(
   [generationSelector],
@@ -83,7 +84,15 @@ const InitialImagePreview = () => {
           <ImageMetadataOverlay image={initialImage} />
         </>
       )}
-      {!initialImage?.url && <SelectImagePlaceholder />}
+      {!initialImage?.url && (
+        <Icon
+          as={FaImage}
+          sx={{
+            boxSize: 24,
+            color: 'base.500',
+          }}
+        />
+      )}
     </Flex>
   );
 };

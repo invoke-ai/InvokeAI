@@ -4,10 +4,10 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 
-import { MdPhoto } from 'react-icons/md';
 import { selectedImageSelector } from '../store/gallerySelectors';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
+import { FaImage } from 'react-icons/fa';
 
 export const currentImageDisplaySelector = createSelector(
   [systemSelector, selectedImageSelector],
@@ -61,7 +61,7 @@ const CurrentImageDisplay = () => {
           </>
         ) : (
           <Icon
-            as={MdPhoto}
+            as={FaImage}
             sx={{
               boxSize: 24,
               color: 'base.500',
