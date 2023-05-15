@@ -100,8 +100,6 @@ const App = ({
         <GalleryDrawer />
         <ParametersDrawer />
 
-        {/* <AuxiliaryProgressIndicator /> */}
-
         <AnimatePresence>
           {!isApplicationReady && !loadingOverridden && (
             <motion.div
