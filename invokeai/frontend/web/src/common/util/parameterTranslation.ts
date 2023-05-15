@@ -8,7 +8,7 @@ import {
   CanvasState,
   isCanvasMaskLine,
 } from 'features/canvas/store/canvasTypes';
-import generateMask from 'features/canvas/util/generateMask';
+import createMaskStage from 'features/canvas/util/generateMask';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import type {
   FacetoolType,
@@ -257,7 +257,7 @@ export const frontendToBackendParameters = (
       ...boundingBoxDimensions,
     };
 
-    const { dataURL: maskDataURL, imageData: maskImageData } = generateMask(
+    const { dataURL: maskDataURL, imageData: maskImageData } = createMaskStage(
       isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
       boundingBox
     );

@@ -15,6 +15,10 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
+import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
+import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
+import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
+import { addCanvasMergedListener } from './listeners/canvasMerged';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -43,3 +47,8 @@ addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
 addUserInvokedTextToImageListener();
 addUserInvokedImageToImageListener();
+
+addCanvasSavedToGalleryListener();
+addCanvasDownloadedAsImageListener();
+addCanvasCopiedToClipboardListener();
+addCanvasMergedListener();

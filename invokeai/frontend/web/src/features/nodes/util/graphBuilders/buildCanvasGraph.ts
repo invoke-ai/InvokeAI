@@ -14,9 +14,11 @@ import { buildRangeNode } from '../nodeBuilders/buildRangeNode';
 import { buildIterateNode } from '../nodeBuilders/buildIterateNode';
 import { buildEdges } from '../edgeBuilders/buildEdges';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
-import { getGenerationMode } from '../getGenerationMode';
 import { log } from 'app/logging/useLogger';
 import { buildInpaintNode } from '../nodeBuilders/buildInpaintNode';
+import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
+import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
+import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 
 const moduleLog = log.child({ namespace: 'buildCanvasGraph' });
 
@@ -61,37 +63,25 @@ export const buildCanvasGraphAndBlobs = async (
     }
   | undefined
 > => {
-  const c = await getCanvasData(state);
+  const canvasData = await getCanvasData(state);
 
-  if (!c) {
-    moduleLog.error('Unable to create canvas graph');
+  if (!canvasData) {
+    moduleLog.error('Unable to create canvas data');
     return;
   }
 
-  const {
-    baseBlob,
-    maskBlob,
-    baseIsPartiallyTransparent,
-    baseIsFullyTransparent,
-    doesMaskHaveBlackPixels,
-  } = c;
+  const { baseBlob, baseImageData, maskBlob, maskImageData } = canvasData;
 
-  moduleLog.debug(
-    {
-      data: {
-        baseIsPartiallyTransparent,
-        baseIsFullyTransparent,
-        doesMaskHaveBlackPixels,
-      },
-    },
-    'Built canvas data'
-  );
+  const generationMode = getCanvasGenerationMode(baseImageData, maskImageData);
 
-  const generationMode = getGenerationMode(
-    baseIsPartiallyTransparent,
-    baseIsFullyTransparent,
-    doesMaskHaveBlackPixels
-  );
+  if (state.system.enableImageDebugging) {
+    const baseDataURL = await blobToDataURL(baseBlob);
+    const maskDataURL = await blobToDataURL(maskBlob);
+    openBase64ImageInTab([
+      { base64: maskDataURL, caption: 'mask b64' },
+      { base64: baseDataURL, caption: 'image b64' },
+    ]);
+  }
 
   moduleLog.debug(`Generation mode: ${generationMode}`);
 
@@ -104,8 +94,14 @@ export const buildCanvasGraphAndBlobs = async (
   }
 
   if (baseNode.type === 'inpaint') {
-    const { seamSize, seamBlur, seamSteps, seamStrength, tileSize } =
-      state.generation;
+    const {
+      seamSize,
+      seamBlur,
+      seamSteps,
+      seamStrength,
+      tileSize,
+      infillMethod,
+    } = state.generation;
 
     // generationParameters.invert_mask = shouldPreserveMaskedArea;
     // if (boundingBoxScale !== 'none') {
@@ -117,7 +113,7 @@ export const buildCanvasGraphAndBlobs = async (
     baseNode.seam_strength = seamStrength;
     baseNode.seam_steps = seamSteps;
     baseNode.tile_size = tileSize;
-    // baseNode.infill_method = infillMethod;
+    baseNode.infill_method = infillMethod as InpaintInvocation['infill_method'];
     // baseNode.force_outpaint = false;
   }
 
