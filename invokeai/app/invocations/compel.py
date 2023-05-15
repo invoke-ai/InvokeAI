@@ -100,7 +100,8 @@ class CompelInvocation(BaseInvocation):
 
         # TODO: support legacy blend?
 
-        prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(prompt_str)
+        conjunction = Compel.parse_prompt_string(prompt_str)
+        prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
         if getattr(Globals, "log_tokenization", False):
             log_tokenization_for_prompt_object(prompt, tokenizer)

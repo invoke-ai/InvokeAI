@@ -10,6 +10,7 @@ import diffusers
 import psutil
 import torch
 from compel.cross_attention_control import Arguments
+from diffusers.models.unet_2d_condition import UNet2DConditionModel
 from diffusers.models.attention_processor import AttentionProcessor
 from torch import nn
 
@@ -352,8 +353,7 @@ def restore_default_cross_attention(
     else:
         remove_attention_function(model)
 
-
-def override_cross_attention(model, context: Context, is_running_diffusers=False):
+def setup_cross_attention_control_attention_processors(unet: UNet2DConditionModel, context: Context):
     """
     Inject attention parameters and functions into the passed in model to enable cross attention editing.
 
@@ -372,37 +372,22 @@ def override_cross_attention(model, context: Context, is_running_diffusers=False
     indices = torch.arange(max_length, dtype=torch.long)
     for name, a0, a1, b0, b1 in context.arguments.edit_opcodes:
         if b0 < max_length:
-            if name == "equal":  # or (name == "replace" and a1 - a0 == b1 - b0):
+            if name == "equal":# or (name == "replace" and a1 - a0 == b1 - b0):
                 # these tokens have not been edited
                 indices[b0:b1] = indices_target[a0:a1]
                 mask[b0:b1] = 1
 
     context.cross_attention_mask = mask.to(device)
     context.cross_attention_index_map = indices.to(device)
-    if is_running_diffusers:
-        unet = model
-        old_attn_processors = unet.attn_processors
-        if torch.backends.mps.is_available():
-            # see note in StableDiffusionGeneratorPipeline.__init__ about borked slicing on MPS
-            unet.set_attn_processor(SwapCrossAttnProcessor())
-        else:
-            # try to re-use an existing slice size
-            default_slice_size = 4
-            slice_size = next(
-                (
-                    p.slice_size
-                    for p in old_attn_processors.values()
-                    if type(p) is SlicedAttnProcessor
-                ),
-                default_slice_size,
-            )
-            unet.set_attn_processor(SlicedSwapCrossAttnProcesser(slice_size=slice_size))
-        return old_attn_processors
+    old_attn_processors = unet.attn_processors
+    if torch.backends.mps.is_available():
+        # see note in StableDiffusionGeneratorPipeline.__init__ about borked slicing on MPS
+        unet.set_attn_processor(SwapCrossAttnProcessor())
     else:
-        context.register_cross_attention_modules(model)
-        inject_attention_function(model, context)
-        return None
-
+        # try to re-use an existing slice size
+        default_slice_size = 4
+        slice_size = next((p.slice_size for p in old_attn_processors.values() if type(p) is SlicedAttnProcessor), default_slice_size)
+        unet.set_attn_processor(SlicedSwapCrossAttnProcesser(slice_size=slice_size))
 
 def get_cross_attention_modules(
     model, which: CrossAttentionType
