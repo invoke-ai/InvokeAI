@@ -1,4 +1,4 @@
-import { Box, useToast } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
@@ -16,6 +16,7 @@ import { FileRejection, useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { imageUploaded } from 'services/thunks/image';
 import ImageUploadOverlay from './ImageUploadOverlay';
+import { useAppToaster } from 'app/components/Toaster';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -25,7 +26,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const toast = useToast({});
+  const toaster = useAppToaster();
   const { t } = useTranslation();
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const { setOpenUploader } = useImageUploader();
@@ -37,14 +38,14 @@ const ImageUploader = (props: ImageUploaderProps) => {
         (acc: string, cur: { message: string }) => `${acc}\n${cur.message}`,
         ''
       );
-      toast({
+      toaster({
         title: t('toast.uploadFailed'),
         description: msg,
         status: 'error',
         isClosable: true,
       });
     },
-    [t, toast]
+    [t, toaster]
   );
 
   const fileAcceptedCallback = useCallback(
@@ -105,7 +106,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
       e.stopImmediatePropagation();
 
       if (imageItems.length > 1) {
-        toast({
+        toaster({
           description: t('toast.uploadFailedMultipleImagesDesc'),
           status: 'error',
           isClosable: true,
@@ -116,7 +117,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
       const file = imageItems[0].getAsFile();
 
       if (!file) {
-        toast({
+        toaster({
           description: t('toast.uploadFailedUnableToLoadDesc'),
           status: 'error',
           isClosable: true,
@@ -130,7 +131,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     return () => {
       document.removeEventListener('paste', pasteImageListener);
     };
-  }, [t, dispatch, toast, activeTabName]);
+  }, [t, dispatch, toaster, activeTabName]);
 
   const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(
     activeTabName

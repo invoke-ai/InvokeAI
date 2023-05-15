@@ -10,6 +10,7 @@ import {
   togglePinParametersPanel,
 } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
+import React, { memo } from 'react';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
 const globalHotkeysSelector = createSelector(
@@ -27,7 +28,11 @@ const globalHotkeysSelector = createSelector(
 
 // TODO: Does not catch keypresses while focused in an input. Maybe there is a way?
 
-export const useGlobalHotkeys = () => {
+/**
+ * Logical component. Handles app-level global hotkeys.
+ * @returns null
+ */
+const GlobalHotkeys: React.FC = () => {
   const dispatch = useAppDispatch();
   const { shift } = useAppSelector(globalHotkeysSelector);
 
@@ -75,4 +80,8 @@ export const useGlobalHotkeys = () => {
   useHotkeys('4', () => {
     dispatch(setActiveTab('nodes'));
   });
+
+  return null;
 };
+
+export default memo(GlobalHotkeys);
