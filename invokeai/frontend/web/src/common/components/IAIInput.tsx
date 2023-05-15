@@ -5,6 +5,7 @@ import {
   Input,
   InputProps,
 } from '@chakra-ui/react';
+import { stopPastePropagation } from 'common/util/stopPastePropagation';
 import { ChangeEvent, memo } from 'react';
 
 interface IAIInputProps extends InputProps {
@@ -31,7 +32,7 @@ const IAIInput = (props: IAIInputProps) => {
       {...formControlProps}
     >
       {label !== '' && <FormLabel>{label}</FormLabel>}
-      <Input {...rest} />
+      <Input {...rest} onPaste={stopPastePropagation} />
     </FormControl>
   );
 };

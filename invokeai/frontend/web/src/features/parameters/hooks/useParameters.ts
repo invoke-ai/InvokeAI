@@ -1,4 +1,3 @@
-import { useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { isFinite, isString } from 'lodash-es';
 import { useCallback } from 'react';
@@ -10,10 +9,11 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { initialImageSelected } from '../store/actions';
 import { Image } from 'app/types/invokeai';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useAppToaster } from 'app/components/Toaster';
 
 export const useParameters = () => {
   const dispatch = useAppDispatch();
-  const toast = useToast();
+  const toaster = useAppToaster();
   const { t } = useTranslation();
   const setBothPrompts = useSetBothPrompts();
 
@@ -23,7 +23,7 @@ export const useParameters = () => {
   const recallPrompt = useCallback(
     (prompt: unknown) => {
       if (!isString(prompt)) {
-        toast({
+        toaster({
           title: t('toast.promptNotSet'),
           description: t('toast.promptNotSetDesc'),
           status: 'warning',
@@ -34,14 +34,14 @@ export const useParameters = () => {
       }
 
       setBothPrompts(prompt);
-      toast({
+      toaster({
         title: t('toast.promptSet'),
         status: 'info',
         duration: 2500,
         isClosable: true,
       });
     },
-    [t, toast, setBothPrompts]
+    [t, toaster, setBothPrompts]
   );
 
   /**
@@ -51,7 +51,7 @@ export const useParameters = () => {
     (seed: unknown) => {
       const s = Number(seed);
       if (!isFinite(s) || (isFinite(s) && !(s >= 0 && s <= NUMPY_RAND_MAX))) {
-        toast({
+        toaster({
           title: t('toast.seedNotSet'),
           description: t('toast.seedNotSetDesc'),
           status: 'warning',
@@ -62,14 +62,14 @@ export const useParameters = () => {
       }
 
       dispatch(setSeed(s));
-      toast({
+      toaster({
         title: t('toast.seedSet'),
         status: 'info',
         duration: 2500,
         isClosable: true,
       });
     },
-    [t, toast, dispatch]
+    [t, toaster, dispatch]
   );
 
   /**
@@ -78,7 +78,7 @@ export const useParameters = () => {
   const recallInitialImage = useCallback(
     async (image: unknown) => {
       if (!isImageField(image)) {
-        toast({
+        toaster({
           title: t('toast.initialImageNotSet'),
           description: t('toast.initialImageNotSetDesc'),
           status: 'warning',
@@ -91,14 +91,14 @@ export const useParameters = () => {
       dispatch(
         initialImageSelected({ name: image.image_name, type: image.image_type })
       );
-      toast({
+      toaster({
         title: t('toast.initialImageSet'),
         status: 'info',
         duration: 2500,
         isClosable: true,
       });
     },
-    [t, toast, dispatch]
+    [t, toaster, dispatch]
   );
 
   /**
@@ -123,14 +123,14 @@ export const useParameters = () => {
           dispatch(setActiveTab('txt2img'));
         }
 
-        toast({
+        toaster({
           title: t('toast.parametersSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
-        toast({
+        toaster({
           title: t('toast.parametersNotSet'),
           description: t('toast.parametersNotSetDesc'),
           status: 'error',
@@ -139,7 +139,7 @@ export const useParameters = () => {
         });
       }
     },
-    [t, toast, dispatch]
+    [t, toaster, dispatch]
   );
 
   return {

@@ -90,12 +90,6 @@ type SettingsModalProps = {
   children: ReactElement;
 };
 
-/**
- * Modal for app settings. Also provides Reset functionality in which the
- * app's localstorage is wiped via redux-persist.
- *
- * Secondary post-reset modal is included here.
- */
 const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

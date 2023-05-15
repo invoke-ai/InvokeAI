@@ -1,5 +1,6 @@
 import {
   Icon,
+  Spacer,
   Tab,
   TabList,
   TabPanel,
@@ -35,6 +36,7 @@ import NodesTab from './tabs/Nodes/NodesTab';
 import { FaImage } from 'react-icons/fa';
 import ResizeHandle from './tabs/ResizeHandle';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
+import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -162,6 +164,8 @@ const InvokeTabs = () => {
         justifyContent={{ base: 'center', xl: 'start' }}
       >
         {tabs}
+        <Spacer />
+        <AuxiliaryProgressIndicator />
       </TabList>
       <PanelGroup
         autoSaveId="app"
