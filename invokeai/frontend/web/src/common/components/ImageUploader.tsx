@@ -66,9 +66,15 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   const fileAcceptedCallback = useCallback(
     async (file: File) => {
-      dispatch(imageUploaded({ imageType: 'uploads', formData: { file } }));
+      dispatch(
+        imageUploaded({
+          imageType: 'uploads',
+          formData: { file },
+          activeTabName,
+        })
+      );
     },
-    [dispatch]
+    [dispatch, activeTabName]
   );
 
   const onDrop = useCallback(
@@ -111,18 +117,24 @@ const ImageUploader = (props: ImageUploaderProps) => {
   });
 
   useEffect(() => {
+    // This is a hack to allow pasting images into the uploader
     const handlePaste = async (e: ClipboardEvent) => {
       if (!inputRef.current) {
         return;
       }
 
       if (e.clipboardData?.files) {
+        // Set the files on the inputRef
         inputRef.current.files = e.clipboardData.files;
+        // Dispatch the change event, dropzone catches this and we get to use its own validation
         inputRef.current?.dispatchEvent(new Event('change', { bubbles: true }));
       }
     };
 
+    // Set the open function so we can open the uploader from anywhere
     setOpenUploaderFunction(open);
+
+    // Add the paste event listener
     document.addEventListener('paste', handlePaste);
 
     return () => {

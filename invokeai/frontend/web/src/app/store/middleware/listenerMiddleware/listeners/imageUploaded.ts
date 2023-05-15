@@ -4,6 +4,8 @@ import { uploadAdded } from 'features/gallery/store/uploadsSlice';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imageUploaded } from 'services/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 
 export const addImageUploadedListener = () => {
   startAppListening({
@@ -22,6 +24,14 @@ export const addImageUploadedListener = () => {
 
       if (state.gallery.shouldAutoSwitchToNewImages) {
         dispatch(imageSelected(image));
+      }
+
+      if (action.meta.arg.activeTabName === 'img2img') {
+        dispatch(initialImageSelected(image));
+      }
+
+      if (action.meta.arg.activeTabName === 'unifiedCanvas') {
+        dispatch(setInitialCanvasImage(image));
       }
     },
   });
