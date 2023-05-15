@@ -24,7 +24,6 @@ const Loading = () => {
         height="24px !important"
         right="1.5rem"
         bottom="1.5rem"
-        speed="1.2s"
       />
     </Flex>
   );

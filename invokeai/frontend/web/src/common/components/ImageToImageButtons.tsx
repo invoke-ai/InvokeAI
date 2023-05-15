@@ -6,10 +6,12 @@ import { FaUndo, FaUpload } from 'react-icons/fa';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import useImageUploader from 'common/hooks/useImageUploader';
 
 const InitialImageButtons = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const { openUploader } = useImageUploader();
 
   const handleResetInitialImage = useCallback(() => {
     dispatch(clearInitialImage());
@@ -27,7 +29,11 @@ const InitialImageButtons = () => {
           aria-label={t('accessibility.reset')}
           onClick={handleResetInitialImage}
         />
-        <IAIIconButton icon={<FaUpload />} aria-label={t('common.upload')} />
+        <IAIIconButton
+          icon={<FaUpload />}
+          onClick={openUploader}
+          aria-label={t('common.upload')}
+        />
       </ButtonGroup>
     </Flex>
   );

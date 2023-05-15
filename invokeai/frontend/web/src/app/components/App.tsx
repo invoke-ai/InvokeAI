@@ -22,6 +22,7 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import i18n from 'i18n';
 import Toaster from './Toaster';
 import GlobalHotkeys from './GlobalHotkeys';
+import AuxiliaryProgressIndicator from './AuxiliaryProgressIndicator';
 
 const DEFAULT_CONFIG = {};
 
@@ -98,6 +99,8 @@ const App = ({
 
         <GalleryDrawer />
         <ParametersDrawer />
+
+        {/* <AuxiliaryProgressIndicator /> */}
 
         <AnimatePresence>
           {!isApplicationReady && !loadingOverridden && (
