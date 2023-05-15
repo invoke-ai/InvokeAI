@@ -15,7 +15,7 @@ import {
 } from 'services/events/actions';
 
 import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../hooks/useToastWatcher';
+import { makeToast } from '../../../app/components/Toaster';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';

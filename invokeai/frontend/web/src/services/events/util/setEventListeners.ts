@@ -22,7 +22,7 @@ import {
 } from 'services/thunks/gallery';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
-import { makeToast } from '../../../features/system/hooks/useToastWatcher';
+import { makeToast } from '../../../app/components/Toaster';
 import { addToast } from '../../../features/system/store/systemSlice';
 
 type SetEventListenersArg = {
