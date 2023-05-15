@@ -21,7 +21,6 @@ import {
   CanvasLayer,
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
-import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';

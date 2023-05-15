@@ -13,12 +13,8 @@ import { buildTxt2ImgNode } from '../nodeBuilders/buildTextToImageNode';
 import { buildRangeNode } from '../nodeBuilders/buildRangeNode';
 import { buildIterateNode } from '../nodeBuilders/buildIterateNode';
 import { buildEdges } from '../edgeBuilders/buildEdges';
-import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { log } from 'app/logging/useLogger';
 import { buildInpaintNode } from '../nodeBuilders/buildInpaintNode';
-import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
-import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
-import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 
 const moduleLog = log.child({ namespace: 'buildCanvasGraph' });
 
@@ -46,8 +42,9 @@ const buildBaseNode = (
 /**
  * Builds the Canvas workflow graph and image blobs.
  */
-export const buildCanvasGraphAndBlobs = async (
-  state: RootState
+export const buildCanvasGraphComponents = async (
+  state: RootState,
+  generationMode: 'txt2img' | 'img2img' | 'inpaint' | 'outpaint'
 ): Promise<
   | {
       rangeNode: RangeInvocation | RandomRangeInvocation;
@@ -57,34 +54,9 @@ export const buildCanvasGraphAndBlobs = async (
         | ImageToImageInvocation
         | InpaintInvocation;
       edges: Edge[];
-      baseBlob: Blob;
-      maskBlob: Blob;
-      generationMode: 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
     }
   | undefined
 > => {
-  const canvasData = await getCanvasData(state);
-
-  if (!canvasData) {
-    moduleLog.error('Unable to create canvas data');
-    return;
-  }
-
-  const { baseBlob, baseImageData, maskBlob, maskImageData } = canvasData;
-
-  const generationMode = getCanvasGenerationMode(baseImageData, maskImageData);
-
-  if (state.system.enableImageDebugging) {
-    const baseDataURL = await blobToDataURL(baseBlob);
-    const maskDataURL = await blobToDataURL(maskBlob);
-    openBase64ImageInTab([
-      { base64: maskDataURL, caption: 'mask b64' },
-      { base64: baseDataURL, caption: 'image b64' },
-    ]);
-  }
-
-  moduleLog.debug(`Generation mode: ${generationMode}`);
-
   // The base node is a txt2img, img2img or inpaint node
   const baseNode = buildBaseNode(generationMode, state);
 
@@ -130,8 +102,5 @@ export const buildCanvasGraphAndBlobs = async (
     iterateNode,
     baseNode,
     edges,
-    baseBlob,
-    maskBlob,
-    generationMode,
   };
 };
