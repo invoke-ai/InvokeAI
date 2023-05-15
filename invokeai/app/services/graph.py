@@ -20,6 +20,7 @@ from pydantic import BaseModel, root_validator, validator
 from pydantic.fields import Field
 
 from ..invocations import *
+from ..extensions import *
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
