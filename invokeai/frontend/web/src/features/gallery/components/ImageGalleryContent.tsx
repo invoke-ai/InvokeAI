@@ -15,10 +15,7 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
-import {
-  gallerySelector,
-  imageGallerySelector,
-} from 'features/gallery/store/gallerySelectors';
+import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   setCurrentCategory,
   setGalleryImageMinimumWidth,
@@ -57,11 +54,12 @@ import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { Image as ImageType } from 'app/types/invokeai';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import GalleryProgressImage from './GalleryProgressImage';
+import { uiSelector } from 'features/ui/store/uiSelectors';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
 
-const selector = createSelector(
+const categorySelector = createSelector(
   [(state: RootState) => state],
   (state) => {
     const { results, uploads, system, gallery } = state;
@@ -92,6 +90,33 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
+const mainSelector = createSelector(
+  [gallerySelector, uiSelector],
+  (gallery, ui) => {
+    const {
+      currentCategory,
+      galleryImageMinimumWidth,
+      galleryImageObjectFit,
+      shouldAutoSwitchToNewImages,
+      shouldUseSingleGalleryColumn,
+      selectedImage,
+    } = gallery;
+
+    const { shouldPinGallery } = ui;
+
+    return {
+      currentCategory,
+      shouldPinGallery,
+      galleryImageMinimumWidth,
+      galleryImageObjectFit,
+      shouldAutoSwitchToNewImages,
+      shouldUseSingleGalleryColumn,
+      selectedImage,
+    };
+  },
+  defaultSelectorOptions
+);
+
 const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -113,7 +138,6 @@ const ImageGalleryContent = () => {
   });
 
   const {
-    // images,
     currentCategory,
     shouldPinGallery,
     galleryImageMinimumWidth,
@@ -121,10 +145,10 @@ const ImageGalleryContent = () => {
     shouldAutoSwitchToNewImages,
     shouldUseSingleGalleryColumn,
     selectedImage,
-  } = useAppSelector(imageGallerySelector);
+  } = useAppSelector(mainSelector);
 
   const { images, areMoreImagesAvailable, isLoading } =
-    useAppSelector(selector);
+    useAppSelector(categorySelector);
 
   const handleClickLoadMore = () => {
     if (currentCategory === 'results') {

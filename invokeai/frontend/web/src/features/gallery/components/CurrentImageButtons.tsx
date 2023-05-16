@@ -47,10 +47,7 @@ import {
   FaTrash,
   FaWrench,
 } from 'react-icons/fa';
-import {
-  gallerySelector,
-  selectedImageSelector,
-} from '../store/gallerySelectors';
+import { gallerySelector } from '../store/gallerySelectors';
 import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
@@ -73,15 +70,15 @@ const currentImageButtonsSelector = createSelector(
     uiSelector,
     lightboxSelector,
     activeTabNameSelector,
-    selectedImageSelector,
   ],
-  (system, gallery, postprocessing, ui, lightbox, activeTabName, image) => {
+  (system, gallery, postprocessing, ui, lightbox, activeTabName) => {
     const {
       isProcessing,
       isConnected,
       isGFPGANAvailable,
       isESRGANAvailable,
       shouldConfirmOnDelete,
+      progressImage,
     } = system;
 
     const { upscalingLevel, facetoolStrength } = postprocessing;
@@ -90,7 +87,7 @@ const currentImageButtonsSelector = createSelector(
 
     const { shouldShowImageDetails, shouldHidePreview } = ui;
 
-    const { intermediateImage, currentImage } = gallery;
+    const { selectedImage } = gallery;
 
     return {
       canDeleteImage: isConnected && !isProcessing,
@@ -101,15 +98,14 @@ const currentImageButtonsSelector = createSelector(
       isESRGANAvailable,
       upscalingLevel,
       facetoolStrength,
-      shouldDisableToolbarButtons: Boolean(intermediateImage) || !currentImage,
-      currentImage,
+      shouldDisableToolbarButtons: Boolean(progressImage) || !selectedImage,
       shouldShowImageDetails,
       activeTabName,
       isLightboxOpen,
       shouldHidePreview,
-      image,
-      seed: image?.metadata?.invokeai?.node?.seed,
-      prompt: image?.metadata?.invokeai?.node?.prompt,
+      image: selectedImage,
+      seed: selectedImage?.metadata?.invokeai?.node?.seed,
+      prompt: selectedImage?.metadata?.invokeai?.node?.prompt,
     };
   },
   {
