@@ -5,6 +5,7 @@ import promptToString from 'common/util/promptToString';
 import { clamp, sample } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
 import { receivedModels } from 'services/thunks/model';
+import { Scheduler } from 'app/constants';
 
 export interface GenerationState {
   cfgScale: number;
@@ -16,7 +17,7 @@ export interface GenerationState {
   perlin: number;
   prompt: string;
   negativePrompt: string;
-  sampler: string;
+  scheduler: Scheduler;
   seamBlur: number;
   seamSize: number;
   seamSteps: number;
@@ -50,7 +51,7 @@ export const initialGenerationState: GenerationState = {
   perlin: 0,
   prompt: '',
   negativePrompt: '',
-  sampler: 'lms',
+  scheduler: 'lms',
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,
@@ -133,8 +134,8 @@ export const generationSlice = createSlice({
     setWidth: (state, action: PayloadAction<number>) => {
       state.width = action.payload;
     },
-    setSampler: (state, action: PayloadAction<string>) => {
-      state.sampler = action.payload;
+    setScheduler: (state, action: PayloadAction<Scheduler>) => {
+      state.scheduler = action.payload;
     },
     setSeed: (state, action: PayloadAction<number>) => {
       state.seed = action.payload;
@@ -244,7 +245,7 @@ export const {
   setPerlin,
   setPrompt,
   setNegativePrompt,
-  setSampler,
+  setScheduler,
   setSeamBlur,
   setSeamSize,
   setSeamSteps,
