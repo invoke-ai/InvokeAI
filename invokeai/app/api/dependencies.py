@@ -1,6 +1,8 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
+from invokeai.app.models.image import ImageField
+from invokeai.app.services.outputs_sqlite import OutputsSqliteItemStorage
 
 import invokeai.backend.util.logging as logger
 from typing import types
@@ -76,6 +78,7 @@ class ApiDependencies:
             latents=latents,
             images=images,
             metadata=metadata,
+            outputs=OutputsSqliteItemStorage(filename=db_location),
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"

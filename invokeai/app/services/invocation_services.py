@@ -1,6 +1,8 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
 from typing import types
+
+from invokeai.app.services.outputs_session_storage import OutputsSessionStorageABC
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.backend import ModelManager
 
@@ -17,6 +19,7 @@ class InvocationServices:
     events: EventServiceBase
     latents: LatentsStorageBase
     images: ImageStorageBase
+    outputs: OutputsSessionStorageABC
     metadata: MetadataServiceBase
     queue: InvocationQueueABC
     model_manager: ModelManager
@@ -34,6 +37,7 @@ class InvocationServices:
             logger: types.ModuleType,
             latents: LatentsStorageBase,
             images: ImageStorageBase,
+            outputs: OutputsSessionStorageABC,
             metadata: MetadataServiceBase,
             queue: InvocationQueueABC,
             graph_library: ItemStorageABC["LibraryGraph"],
@@ -46,6 +50,7 @@ class InvocationServices:
         self.logger = logger
         self.latents = latents
         self.images = images
+        self.outputs = outputs
         self.metadata = metadata
         self.queue = queue
         self.graph_library = graph_library

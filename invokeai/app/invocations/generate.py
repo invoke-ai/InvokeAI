@@ -106,6 +106,11 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         context.services.images.save(
             image_type, image_name, generate_output.image, metadata
         )
+
+        context.services.outputs.set(image_name, context.graph_execution_state_id)
+        
+        s = context.services.outputs.get(image_name)
+        print(s)
         return build_image_output(
             image_type=image_type,
             image_name=image_name,
