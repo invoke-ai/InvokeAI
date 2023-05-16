@@ -11,9 +11,8 @@ export interface GenerationState {
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI.Image; // can be an Image or url
+  initialImage?: InvokeAI.Image;
   iterations: number;
-  maskPath: string;
   perlin: number;
   prompt: string;
   negativePrompt: string;
@@ -48,7 +47,6 @@ export const initialGenerationState: GenerationState = {
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   iterations: 1,
-  maskPath: '',
   perlin: 0,
   prompt: '',
   negativePrompt: '',
@@ -145,9 +143,6 @@ export const generationSlice = createSlice({
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
     },
-    setMaskPath: (state, action: PayloadAction<string>) => {
-      state.maskPath = action.payload;
-    },
     setSeamless: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSeamless = action.payload;
     },
@@ -162,19 +157,6 @@ export const generationSlice = createSlice({
     },
     resetSeed: (state) => {
       state.seed = -1;
-    },
-    setParameter: (
-      state,
-      action: PayloadAction<{ key: string; value: string | number | boolean }>
-    ) => {
-      // TODO: This probably needs to be refactored.
-      // TODO: This probably also needs to be fixed after the reorg.
-      const { key, value } = action.payload;
-      const temp = { ...state, [key]: value };
-      if (key === 'seed') {
-        temp.shouldRandomizeSeed = false;
-      }
-      return temp;
     },
     setShouldGenerateVariations: (state, action: PayloadAction<boolean>) => {
       state.shouldGenerateVariations = action.payload;
@@ -258,10 +240,7 @@ export const {
   setHeight,
   setImg2imgStrength,
   setInfillMethod,
-  // setInitialImage,
   setIterations,
-  setMaskPath,
-  setParameter,
   setPerlin,
   setPrompt,
   setNegativePrompt,
