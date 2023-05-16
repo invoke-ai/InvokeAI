@@ -498,7 +498,7 @@ class ModelManager(object):
             # don't include VAEs in listing (legacy style)
             if "config" in stanza and "/VAE/" in stanza["config"]:
                 continue
-            if model_key == 'config_file_version':
+            if model_key.startswith('_'):
                 continue
 
             model_name, stanza_type = self.parse_key(model_key)
@@ -521,7 +521,7 @@ class ModelManager(object):
             description = stanza.get("description", None)
             models[stanza_type][model_name].update(
                 model_name=model_name,
-                model_type=model_type,
+                model_type=stanza_type,
                 format=model_format,
                 description=description,
                 status=status.value,
@@ -1209,16 +1209,18 @@ class ModelManager(object):
         from older versions of the config file to new ones
         as necessary.
         """
-        current_version = self.config.get("config_file_version","1.0.0")
+        current_version = self.config.get("_version","1.0.0")
         if version.parse(current_version) < version.parse(CONFIG_FILE_VERSION):
             self.logger.info(f'models.yaml version {current_version} detected. Updating to {CONFIG_FILE_VERSION}')
             
             new_config = OmegaConf.create()
-            new_config["config_file_version"] = CONFIG_FILE_VERSION
+            new_config["_version"] = CONFIG_FILE_VERSION
             
             for model_key in self.config:
 
                 old_stanza = self.config[model_key]
+                if not isinstance(old_stanza,DictConfig):
+                    continue
 
                 # ignore old and ugly way of associating a legacy
                 # vae with a legacy checkpont model
@@ -1237,6 +1239,8 @@ class ModelManager(object):
                     model_format = 'ckpt'
                 elif old_stanza.get('weights') and Path(old_stanza.get('weights')).suffix == '.safetensors':
                     model_format = 'safetensors'
+                else:
+                    model_format = old_stanza.get('format')
 
                 # copy fields over manually rather than doing a copy() or deepcopy()
                 # in order to avoid bringing in unwanted fields.
