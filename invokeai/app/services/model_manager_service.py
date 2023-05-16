@@ -99,16 +99,21 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def list_models(self) -> dict:
+    def list_models(self, model_type: SDModelType=None) -> dict:
         """
         Return a dict of models in the format:
-        { model_key1: {'status': 'active'|'cached'|'not loaded',
-                       'model_name' : name,
-                       'model_type' : SDModelType,
-                       'description': description,
-                       'format': 'folder'|'safetensors'|'ckpt'
-                       },
-          model_key2: { etc }
+        { model_type1:
+          { model_name1: {'status': 'active'|'cached'|'not loaded',
+                         'model_name' : name,
+                         'model_type' : SDModelType,
+                         'description': description,
+                         'format': 'folder'|'safetensors'|'ckpt'
+                         },
+            model_name2: { etc }
+          },
+          model_type2:
+            { model_name_n: etc
+        }
         """
         pass
 
@@ -385,15 +390,21 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         return self.mgr.model_names()
 
-    def list_models(self) -> dict:
+    def list_models(self, model_type: SDModelType=None) -> dict:
         """
         Return a dict of models in the format:
-        { model_key: {'status': 'active'|'cached'|'not loaded',
-                        'model_name' : name,
-                        'model_type' : SDModelType,
-                        'description': description,
-                        'format': 'folder'|'safetensors'|'ckpt'
-                       },
+        { model_type1:
+          { model_name1: {'status': 'active'|'cached'|'not loaded',
+                         'model_name' : name,
+                         'model_type' : SDModelType,
+                         'description': description,
+                         'format': 'folder'|'safetensors'|'ckpt'
+                         },
+            model_name2: { etc }
+          },
+          model_type2:
+            { model_name_n: etc
+        }
         """
         return self.mgr.list_models()
 

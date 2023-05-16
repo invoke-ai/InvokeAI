@@ -2,9 +2,11 @@
 
 from typing import Annotated, Literal, Optional, Union
 
+from fastapi import Query
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from ..dependencies import ApiDependencies
+from invokeai.backend import SDModelType
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -58,7 +60,7 @@ class ConvertedModelResponse(BaseModel):
     info: DiffusersModelInfo = Field(description="The converted model info")
 
 class ModelsList(BaseModel):
-    models: dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]
+    models: dict[str, dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]]
 
 
 @models_router.get(
@@ -66,9 +68,13 @@ class ModelsList(BaseModel):
     operation_id="list_models",
     responses={200: {"model": ModelsList }},
 )
-async def list_models() -> ModelsList:
+async def list_models(
+        model_type: SDModelType = Query(
+            default=SDModelType.Diffusers, description="The type of model to get"
+        ),
+) -> ModelsList:
     """Gets a list of models"""
-    models_raw = ApiDependencies.invoker.services.model_manager.list_models()
+    models_raw = ApiDependencies.invoker.services.model_manager.list_models(model_type)
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
 
