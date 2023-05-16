@@ -19,10 +19,10 @@ import warnings
 from argparse import Namespace
 from pathlib import Path
 from shutil import get_terminal_size
+from typing import get_type_hints
 from urllib import request
 
 import npyscreen
-import torch
 import transformers
 from diffusers import AutoencoderKL
 from huggingface_hub import HfFolder
@@ -36,21 +36,27 @@ from transformers import (
     CLIPTokenizer,
 )
 
+
 import invokeai.configs as configs
 
-from ...frontend.install.model_install import addModelsForm, process_and_execute
-from ...frontend.install.widgets import (
+from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
 )
-from .model_install_backend import (
+from invokeai.backend.config.legacy_arg_parsing import legacy_parser
+from invokeai.backend.config.model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,
     recommended_datasets,
 )
-from invokeai.app.services.config import get_invokeai_config()
+from invokeai.app.services.config import (
+    get_invokeai_config,
+    InvokeAIWebConfig,
+    InvokeAIAppConfig,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -298,7 +304,7 @@ def download_vaes():
         # first the diffusers version
         repo_id = "stabilityai/sd-vae-ft-mse"
         args = dict(
-            cache_dir=global_cache_dir("hub"),
+            cache_dir=config.cache_dir,
         )
         if not AutoencoderKL.from_pretrained(repo_id, **args):
             raise Exception(f"download of {repo_id} failed")
@@ -622,7 +628,7 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = InvokeAIAppConfig(argv=[])
+    opts = InvokeAIWebConfig(argv=[])
     outdir = Path(opts.outdir)
     if not outdir.is_absolute():
         opts.outdir = str(config.root / opts.outdir)
@@ -744,7 +750,42 @@ def write_default_options(program_opts: Namespace, initfile: Path):
     opt.hf_token = HfFolder.get_token()
     write_opts(opt, initfile)
 
+# -------------------------------------
+# This is ugly. We're going to bring in
+# the legacy Args object in order to parse
+# the old init file and write out the new
+# yaml format.
+def migrate_init_file(legacy_format:Path):
+    
+    old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
+    new = OmegaConf.create()
+    
+    new.web = dict()
+    for attr in ['host','port']:
+        if hasattr(old,attr):
+            setattr(new.web,attr,getattr(old,attr))
+    # change of name
+    new.web.allow_origins = old.cors or []
 
+    new.globals = dict()
+    globals = new.globals
+    fields = list(get_type_hints(InvokeAIAppConfig).keys())
+    for attr in fields:
+        if hasattr(old,attr):
+            setattr(globals,attr,getattr(old,attr))
+
+    # a few places where the names have changed
+    globals.nsfw_checker = old.safety_checker
+    globals.xformers_enabled = old.xformers
+    globals.conf_path = old.conf
+    globals.embedding_dir = old.embedding_path
+
+    new.globals = {key: globals[key] for key in sorted(globals)}
+
+    invokeai_yaml = legacy_format.parent / 'invokeai.yaml'
+    with open(invokeai_yaml,"w", encoding="utf-8") as outfile:
+        outfile.write(OmegaConf.to_yaml(new))
+    
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
@@ -800,6 +841,7 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
+    global config
     config.root = Path(os.path.expanduser(get_root(opt.root) or ""))
 
     errors = set()
@@ -808,9 +850,15 @@ def main():
         models_to_download = default_user_selections(opt)
 
         # We check for to see if the runtime directory is correctly initialized.
-        print('** invokeai.init init file is no longer supported. Migrate this code to invokeai.yaml **')
-        init_file = Path(config.root, 'invokeai.init')
-        if not init_file.exists() or not config.model_conf_path.exists():
+        old_init_file = Path(config.root, 'invokeai.init')
+        new_init_file = Path(config.root, 'invokeai.yaml')
+        if old_init_file.exists() and not new_init_file.exists():
+            print('** MIGRATING OLD invokeai.init FILE TO NEW invokeai.yaml FORMAT')
+            migrate_init_file(old_init_file)
+            # is it a good idea to re-read invokeai.yaml?
+            config = get_invokeai_config()            
+            
+        if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)
 
         if opt.yes_to_all:
@@ -819,7 +867,7 @@ def main():
                 precision="float32" if opt.full_precision else "float16"
             )
         else:
-            init_options, models_to_download = run_console_ui(opt, init_file)
+            init_options, models_to_download = run_console_ui(opt, new_init_file)
             if init_options:
                 write_opts(init_options, init_file)
             else:

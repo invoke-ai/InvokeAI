@@ -390,6 +390,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         """Return true if xformers_enabled is false"""
         return not self.xformers_enabled
 
+    @property
+    def try_patchmatch(self)->bool:
+        """Return true if patchmatch true"""
+        return self.patchmatch
+
     @staticmethod
     def find_root()->Path:
         '''
