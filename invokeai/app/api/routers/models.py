@@ -70,7 +70,7 @@ class ModelsList(BaseModel):
 )
 async def list_models(
         model_type: SDModelType = Query(
-            default=SDModelType.Diffusers, description="The type of model to get"
+            default=None, description="The type of model to get"
         ),
 ) -> ModelsList:
     """Gets a list of models"""
