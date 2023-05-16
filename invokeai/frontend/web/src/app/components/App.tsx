@@ -6,7 +6,7 @@ import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton'
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import { Box, Flex, Grid, Portal } from '@chakra-ui/react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
-import GalleryDrawer from 'features/gallery/components/ImageGalleryPanel';
+import GalleryDrawer from 'features/gallery/components/GalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, ReactNode, useCallback, useEffect, useState } from 'react';
@@ -22,7 +22,6 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import i18n from 'i18n';
 import Toaster from './Toaster';
 import GlobalHotkeys from './GlobalHotkeys';
-import AuxiliaryProgressIndicator from './AuxiliaryProgressIndicator';
 
 const DEFAULT_CONFIG = {};
 
