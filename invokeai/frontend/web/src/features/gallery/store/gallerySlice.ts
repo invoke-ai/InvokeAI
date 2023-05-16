@@ -10,14 +10,10 @@ import {
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export interface GalleryState {
-  /**
-   * The selected image
-   */
   selectedImage?: Image;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
-  galleryWidth: number;
   shouldUseSingleGalleryColumn: boolean;
   currentCategory: 'results' | 'uploads';
 }
@@ -26,7 +22,6 @@ export const initialGalleryState: GalleryState = {
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
-  galleryWidth: 300,
   shouldUseSingleGalleryColumn: false,
   currentCategory: 'results',
 };
@@ -57,9 +52,6 @@ export const gallerySlice = createSlice({
       action: PayloadAction<'results' | 'uploads'>
     ) => {
       state.currentCategory = action.payload;
-    },
-    setGalleryWidth: (state, action: PayloadAction<number>) => {
-      state.galleryWidth = action.payload;
     },
     setShouldUseSingleGalleryColumn: (
       state,
@@ -93,24 +85,28 @@ export const gallerySlice = createSlice({
     builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
       // rehydrate selectedImage URL when results list comes in
       // solves case when outdated URL is in local storage
-      if (state.selectedImage) {
+      const selectedImage = state.selectedImage;
+      if (selectedImage) {
         const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === state.selectedImage!.name
+          (image) => image.image_name === selectedImage.name
         );
         if (selectedImageInResults) {
-          state.selectedImage.url = selectedImageInResults.image_url;
+          selectedImage.url = selectedImageInResults.image_url;
+          state.selectedImage = selectedImage;
         }
       }
     });
     builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
       // rehydrate selectedImage URL when results list comes in
       // solves case when outdated URL is in local storage
-      if (state.selectedImage) {
+      const selectedImage = state.selectedImage;
+      if (selectedImage) {
         const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === state.selectedImage!.name
+          (image) => image.image_name === selectedImage.name
         );
         if (selectedImageInResults) {
-          state.selectedImage.url = selectedImageInResults.image_url;
+          selectedImage.url = selectedImageInResults.image_url;
+          state.selectedImage = selectedImage;
         }
       }
     });
@@ -122,7 +118,6 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
-  setGalleryWidth,
   setShouldUseSingleGalleryColumn,
   setCurrentCategory,
 } = gallerySlice.actions;

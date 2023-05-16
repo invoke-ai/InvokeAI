@@ -5,14 +5,12 @@ import { SystemState } from './systemSlice';
  */
 export const systemPersistDenylist: (keyof SystemState)[] = [
   'currentIteration',
-  'currentStatus',
   'currentStep',
   'isCancelable',
   'isConnected',
   'isESRGANAvailable',
   'isGFPGANAvailable',
   'isProcessing',
-  'socketId',
   'totalIterations',
   'totalSteps',
   'openModel',

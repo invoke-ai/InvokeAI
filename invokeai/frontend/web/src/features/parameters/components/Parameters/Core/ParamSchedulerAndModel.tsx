@@ -1,13 +1,13 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import ParamSampler from './ParamSampler';
 import ModelSelect from 'features/system/components/ModelSelect';
+import ParamScheduler from './ParamScheduler';
 
 const ParamSchedulerAndModel = () => {
   return (
     <Flex gap={3} w="full">
       <Box w="16rem">
-        <ParamSampler />
+        <ParamScheduler />
       </Box>
       <Box w="full">
         <ModelSelect />
