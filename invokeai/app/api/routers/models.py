@@ -60,7 +60,7 @@ class ConvertedModelResponse(BaseModel):
     info: DiffusersModelInfo = Field(description="The converted model info")
 
 class ModelsList(BaseModel):
-    models: dict[str, dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]]
+    models: dict[SDModelType, dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]]
 
 
 @models_router.get(
