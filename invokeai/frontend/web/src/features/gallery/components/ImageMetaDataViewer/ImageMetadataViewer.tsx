@@ -19,7 +19,7 @@ import {
   setHeight,
   setImg2imgStrength,
   setPerlin,
-  setSampler,
+  setScheduler,
   setSeamless,
   setSeed,
   setSeedWeights,
@@ -202,9 +202,9 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           )}
           {node.scheduler && (
             <MetadataItem
-              label="Sampler"
+              label="Scheduler"
               value={node.scheduler}
-              onClick={() => dispatch(setSampler(node.scheduler))}
+              onClick={() => dispatch(setScheduler(node.scheduler))}
             />
           )}
           {node.steps && (

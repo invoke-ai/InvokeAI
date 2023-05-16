@@ -65,6 +65,7 @@ export type { PaginatedResults_ImageResponse_ } from './models/PaginatedResults_
 export type { ParamIntInvocation } from './models/ParamIntInvocation';
 export type { PasteImageInvocation } from './models/PasteImageInvocation';
 export type { PromptOutput } from './models/PromptOutput';
+export type { RandomIntInvocation } from './models/RandomIntInvocation';
 export type { RandomRangeInvocation } from './models/RandomRangeInvocation';
 export type { RangeInvocation } from './models/RangeInvocation';
 export type { ResizeLatentsInvocation } from './models/ResizeLatentsInvocation';
@@ -137,6 +138,7 @@ export { $PaginatedResults_ImageResponse_ } from './schemas/$PaginatedResults_Im
 export { $ParamIntInvocation } from './schemas/$ParamIntInvocation';
 export { $PasteImageInvocation } from './schemas/$PasteImageInvocation';
 export { $PromptOutput } from './schemas/$PromptOutput';
+export { $RandomIntInvocation } from './schemas/$RandomIntInvocation';
 export { $RandomRangeInvocation } from './schemas/$RandomRangeInvocation';
 export { $RangeInvocation } from './schemas/$RangeInvocation';
 export { $ResizeLatentsInvocation } from './schemas/$ResizeLatentsInvocation';

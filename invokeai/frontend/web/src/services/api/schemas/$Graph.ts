@@ -50,6 +50,8 @@ export const $Graph = {
         }, {
           type: 'DivideInvocation',
         }, {
+          type: 'RandomIntInvocation',
+        }, {
           type: 'ParamIntInvocation',
         }, {
           type: 'CvInpaintInvocation',

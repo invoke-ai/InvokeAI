@@ -450,7 +450,7 @@
         "cfgScale": "CFG Scale",
         "width": "Width",
         "height": "Height",
-        "sampler": "Sampler",
+        "scheduler": "Scheduler",
         "seed": "Seed",
         "imageToImage": "Image to Image",
         "randomizeSeed": "Randomize Seed",
