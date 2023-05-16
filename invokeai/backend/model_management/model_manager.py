@@ -467,7 +467,7 @@ class ModelManager(object):
             return True
         return False
 
-    def list_models(self, model_type: SDModelType=SDModelType.Diffusers) -> dict[str,dict[str,str]]:
+    def list_models(self, model_type: SDModelType=None) -> dict[str,dict[str,str]]:
         """
         Return a dict of models, in format [model_type][model_name], with
         following fields:
