@@ -1,6 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
@@ -13,7 +13,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import ImageFallbackSpinner from './ImageFallbackSpinner';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { configSelector } from '../../system/store/configSelectors';
-import { addToast } from '../../system/store/systemSlice';
+import { useAppToaster } from 'app/components/Toaster';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -52,7 +52,7 @@ const CurrentImagePreview = () => {
   } = useAppSelector(imagesSelector);
   const { shouldFetchImages } = useAppSelector(configSelector);
   const { getUrl } = useGetUrl();
-  const dispatch = useAppDispatch();
+  const toaster = useAppToaster();
 
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -109,13 +109,11 @@ const CurrentImagePreview = () => {
               }}
               onError={(e) => {
                 if (shouldFetchImages) {
-                  dispatch(
-                    addToast({
-                      title: 'Something went wrong, please refresh',
-                      status: 'error',
-                      isClosable: true,
-                    })
-                  );
+                  toaster({
+                    title: 'Something went wrong, please refresh',
+                    status: 'error',
+                    isClosable: true,
+                  });
                 }
               }}
             />

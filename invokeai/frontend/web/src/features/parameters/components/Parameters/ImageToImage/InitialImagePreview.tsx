@@ -1,10 +1,8 @@
 import { Flex, Icon, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { addToast } from 'features/system/store/systemSlice';
 import { DragEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageType } from 'services/api';
@@ -15,6 +13,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinner';
 import { FaImage } from 'react-icons/fa';
 import { configSelector } from '../../../../system/store/configSelectors';
+import { useAppToaster } from 'app/components/Toaster';
 
 const selector = createSelector(
   [generationSelector],
@@ -33,25 +32,22 @@ const InitialImagePreview = () => {
   const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const toaster = useAppToaster();
 
   const onError = () => {
     if (shouldFetchImages) {
-      dispatch(
-        addToast({
-          title: 'Something went wrong, please refresh',
-          status: 'error',
-          isClosable: true,
-        })
-      );
+      toaster({
+        title: 'Something went wrong, please refresh',
+        status: 'error',
+        isClosable: true,
+      });
     } else {
-      dispatch(
-        addToast({
-          title: t('toast.parametersFailed'),
-          description: t('toast.parametersFailedDesc'),
-          status: 'error',
-          isClosable: true,
-        })
-      );
+      toaster({
+        title: t('toast.parametersFailed'),
+        description: t('toast.parametersFailedDesc'),
+        status: 'error',
+        isClosable: true,
+      });
       dispatch(clearInitialImage());
     }
   };
