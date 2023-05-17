@@ -36,7 +36,6 @@ from transformers import (
     CLIPTokenizer,
 )
 
-
 import invokeai.configs as configs
 
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
@@ -54,13 +53,13 @@ from invokeai.backend.config.model_install_backend import (
 )
 from invokeai.app.services.config import (
     get_invokeai_config,
-    InvokeAIWebConfig,
     InvokeAIAppConfig,
 )
 
 warnings.filterwarnings("ignore")
 
 transformers.logging.set_verbosity_error()
+
 
 # --------------------------globals-----------------------
 config = get_invokeai_config()
@@ -86,13 +85,6 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
 # or renaming it and then running invokeai-configure again.
-# Place  frequently-used startup commands here, one or more per line.
-# Examples:
-# --outdir=D:\data\images
-# --no-nsfw_checker
-# --web --host=0.0.0.0
-# --steps=20
-# -Ak_euler_a -C10.0
 """
 
 
@@ -105,10 +97,9 @@ If you installed manually from source or with 'pip install': activate the virtua
 then run one of the following commands to start InvokeAI.
 
 Web UI:
-   invokeai --web # (connect to http://localhost:9090)
-   invokeai --web --host 0.0.0.0 # (connect to http://your-lan-ip:9090 from another computer on the local network)
+   invokeai-web
 
-Command-line interface:
+Command-line client:
    invokeai
 
 If you installed using an installation script, run:
@@ -340,7 +331,7 @@ class editOptsForm(npyscreen.FormMultiPage):
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
-        first_time = not (config.root / 'invokeai.init').exists()
+        first_time = not (config.root / 'invokeai.yaml').exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
         for i in [
@@ -374,7 +365,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.outdir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
             name="(<tab> autocompletes, ctrl-N advances):",
-            value=old_opts.outdir or str(default_output_dir()),
+            value=str(old_opts.outdir) or str(default_output_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -389,7 +380,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             editable=False,
             color="CONTROL",
         )
-        self.safety_checker = self.add_widget_intelligent(
+        self.nsfw_checker = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="NSFW checker",
             value=old_opts.nsfw_checker,
@@ -443,7 +434,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             relx=5,
             scroll_exit=True,
         )
-        self.xformers = self.add_widget_intelligent(
+        self.xformers_enabled = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Enable xformers support if available",
             value=old_opts.xformers_enabled,
@@ -578,10 +569,10 @@ class editOptsForm(npyscreen.FormMultiPage):
 
         for attr in [
             "outdir",
-            "safety_checker",
+            "nsfw_checker",
             "free_gpu_mem",
             "max_loaded_models",
-            "xformers",
+            "xformers_enabled",
             "always_use_cpu",
             "embedding_path",
         ]:
@@ -628,7 +619,7 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = InvokeAIWebConfig(argv=[])
+    opts = InvokeAIAppConfig(argv=[])
     outdir = Path(opts.outdir)
     if not outdir.is_absolute():
         opts.outdir = str(config.root / opts.outdir)
@@ -689,51 +680,29 @@ def run_console_ui(
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):
     """
-    Update the invokeai.init file with values from opts Namespace
+    Update the invokeai.init file with values from current settings.
     """
-    # touch file if it doesn't exist
-    if not init_file.exists():
-        with open(init_file, "w") as f:
-            f.write(INIT_FILE_PREAMBLE)
 
-    # We want to write in the changed arguments without clobbering
-    # any other initialization values the user has entered. There is
-    # no good way to do this because of the one-way nature of
-    # argparse: i.e. --outdir could be --outdir, --out, or -o
-    # initfile needs to be replaced with a fully structured format
-    # such as yaml; this is a hack that will work much of the time
-    args_to_skip = re.compile(
-        "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
-    )
-    # fix windows paths
-    opts.outdir = opts.outdir.replace("\\", "/")
-    opts.embedding_path = opts.embedding_path.replace("\\", "/")
-    new_file = f"{init_file}.new"
-    try:
-        lines = [x.strip() for x in open(init_file, "r").readlines()]
-        with open(new_file, "w") as out_file:
-            for line in lines:
-                if len(line) > 0 and not args_to_skip.match(line):
-                    out_file.write(line + "\n")
-            out_file.write(
-                f"""
---outdir={opts.outdir}
---embedding_path={opts.embedding_path}
---precision={opts.precision}
---max_loaded_models={int(opts.max_loaded_models)}
---{'no-' if not opts.safety_checker else ''}nsfw_checker
---{'no-' if not opts.xformers else ''}xformers
-{'--free_gpu_mem' if opts.free_gpu_mem else ''}
-{'--always_use_cpu' if opts.always_use_cpu else ''}
-"""
-            )
-    except OSError as e:
-        print(f"** An error occurred while writing the init file: {str(e)}")
+    if Path(init_file).exists():
+        config = OmegaConf.load(init_file)
+    else:
+        config = OmegaConf.create()
 
-    os.replace(new_file, init_file)
+    if not config.globals:
+        config.globals = dict()
+        
+    globals = config.globals
+    fields = list(get_type_hints(InvokeAIAppConfig).keys())
+    for attr in fields:
+        if hasattr(opts,attr):
+            setattr(globals,attr,getattr(opts,attr))
 
+    with open(init_file,'w', encoding='utf-8') as file:
+        file.write(OmegaConf.to_yaml(config))
+        
     if opts.hf_token:
         HfLogin(opts.hf_token)
+
 
 
 # -------------------------------------
@@ -751,7 +720,7 @@ def write_default_options(program_opts: Namespace, initfile: Path):
     write_opts(opt, initfile)
 
 # -------------------------------------
-# This is ugly. We're going to bring in
+# Here we bring in
 # the legacy Args object in order to parse
 # the old init file and write out the new
 # yaml format.
@@ -760,22 +729,21 @@ def migrate_init_file(legacy_format:Path):
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
     new = OmegaConf.create()
     
-    new.web = dict()
-    for attr in ['host','port']:
-        if hasattr(old,attr):
-            setattr(new.web,attr,getattr(old,attr))
-    # change of name
-    new.web.allow_origins = old.cors or []
-
     new.globals = dict()
     globals = new.globals
+    for attr in ['host','port']:
+        if hasattr(old,attr):
+            setattr(globals,attr,getattr(old,attr))
+    # change of name
+    globals.allow_origins = old.cors or []
+
     fields = list(get_type_hints(InvokeAIAppConfig).keys())
     for attr in fields:
         if hasattr(old,attr):
             setattr(globals,attr,getattr(old,attr))
 
     # a few places where the names have changed
-    globals.nsfw_checker = old.safety_checker
+    globals.nsfw_checker = old.nsfw_checker
     globals.xformers_enabled = old.xformers
     globals.conf_path = old.conf
     globals.embedding_dir = old.embedding_path
@@ -862,14 +830,14 @@ def main():
             initialize_rootdir(config.root, opt.yes_to_all)
 
         if opt.yes_to_all:
-            write_default_options(opt, init_file)
+            write_default_options(opt, new_init_file)
             init_options = Namespace(
                 precision="float32" if opt.full_precision else "float16"
             )
         else:
             init_options, models_to_download = run_console_ui(opt, new_init_file)
             if init_options:
-                write_opts(init_options, init_file)
+                write_opts(init_options, new_init_file)
             else:
                 print(
                     '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'

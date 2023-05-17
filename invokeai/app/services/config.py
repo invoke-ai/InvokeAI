@@ -137,7 +137,6 @@ class InvokeAISettings(BaseSettings):
                     field.default = os.environ[env_name]
                 cls.add_field_argument(parser, name, field)
 
-
     @classmethod
     def cmd_name(self, command_field: str='type')->str:
         hints = get_type_hints(self)
@@ -267,6 +266,12 @@ class InvokeAIAppConfig(InvokeAISettings):
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
     internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
+    allow_origins       : List = Field(default=[], description="Allowed CORS origins", category='Cross-Origin Resource Sharing')
+    allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", category='Cross-Origin Resource Sharing')
+    allow_methods       : List = Field(default=["*"], description="Methods allowed for CORS", category='Cross-Origin Resource Sharing')
+    allow_headers       : List = Field(default=["*"], description="Headers allowed for CORS", category='Cross-Origin Resource Sharing')
+    host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
+    port                : int = Field(default=9090, description="Port to bind to", category='Web Server')
     #fmt: on
 
     def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
@@ -402,21 +407,6 @@ class InvokeAIAppConfig(InvokeAISettings):
         init file.
         '''
         return _find_root()
-
-class InvokeAIWebConfig(InvokeAIAppConfig):
-    '''
-    Web-specific settings
-    '''
-    #fmt: off
-    type               : Literal["web"] = "web"
-    allow_origins      : List = Field(default=[], description="Allowed CORS origins", category='Cross-Origin Resource Sharing')
-    allow_credentials  : bool = Field(default=True, description="Allow CORS credentials", category='Cross-Origin Resource Sharing')
-    allow_methods      : List = Field(default=["*"], description="Methods allowed for CORS", category='Cross-Origin Resource Sharing')
-    allow_headers      : List = Field(default=["*"], description="Headers allowed for CORS", category='Cross-Origin Resource Sharing')
-    host               : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
-    port               : int = Field(default=9090, description="Port to bind to", category='Web Server')
-    #fmt: on
-
 
 def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig)->InvokeAISettings:
     '''

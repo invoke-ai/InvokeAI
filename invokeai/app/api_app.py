@@ -17,7 +17,7 @@ from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
-from .services.config import InvokeAIWebConfig
+from .services.config import InvokeAIAppConfig
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -38,7 +38,7 @@ socket_io = SocketIO(app)
 # parse command-line settings, environment and the init file
 # (this is a module global)
 global web_config
-web_config = InvokeAIWebConfig()
+web_config = InvokeAIAppConfig()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
