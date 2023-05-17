@@ -7,7 +7,6 @@ from typing import types
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.config import InvokeAIWebConfig
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph

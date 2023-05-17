@@ -102,7 +102,7 @@ a Path object:
  conf               - alias for the above
  embedding_path     - path to the embeddings directory
  lora_path          - path to the LoRA directory
- 
+
 In most cases, you will want to create a single InvokeAIAppConfig
 object for the entire application. The get_invokeai_config() function
 does this:
@@ -200,7 +200,7 @@ class InvokeAISettings(BaseSettings):
             settings_stanza = get_args(get_type_hints(cls)['type'])[0]
         else:
             settings_stanza = "Uncategorized"
-            
+
         env_prefix = cls.Config.env_prefix if hasattr(cls.Config,'env_prefix') else settings_stanza.upper()
 
         initconf = cls.initconf.get(settings_stanza) \
@@ -212,7 +212,7 @@ class InvokeAISettings(BaseSettings):
         for name, field in fields.items():
             if name not in cls._excluded():
                 current_default = field.default
-                
+
                 category = field.field_info.extra.get("category","Uncategorized")
                 env_name = env_prefix + '_' + name
                 if category in initconf and name in initconf.get(category):
@@ -247,7 +247,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self)->List[str]:
         return ['type','initconf']
-    
+
     class Config:
         env_file_encoding = 'utf-8'
         arbitrary_types_allowed = True
@@ -263,7 +263,7 @@ class InvokeAISettings(BaseSettings):
             argparse_group = cls.argparse_groups[category]
         else:
             argparse_group = command_parser
-        
+
         if get_origin(field_type) == Literal:
             allowed_values = get_args(field.type_)
             allowed_types = set()
@@ -367,7 +367,7 @@ setting environment variables INVOKEAI_<setting>.
         :param **kwargs: attributes to initialize with
         '''
         super().__init__(**kwargs)
-        
+
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
         self.parse_args(argv)
@@ -447,7 +447,7 @@ setting environment variables INVOKEAI_<setting>.
         Path to the textual inversion embeddings directory.
         '''
         return self._resolve(self.embedding_dir) if self.embedding_dir else None
-    
+
     @property
     def lora_path(self)->Path:
         '''
