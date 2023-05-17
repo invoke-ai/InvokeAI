@@ -35,24 +35,23 @@ app.add_middleware(
 
 socket_io = SocketIO(app)
 
-# parse command-line settings, environment and the init file
-# (this is a module global)
-global web_config
-web_config = InvokeAIAppConfig()
+# initialize config
+# this is a module global
+app_config = InvokeAIAppConfig()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=web_config.allow_origins,
-        allow_credentials=web_config.allow_credentials,
-        allow_methods=web_config.allow_methods,
-        allow_headers=web_config.allow_headers,
+        allow_origins=app_config.allow_origins,
+        allow_credentials=app_config.allow_credentials,
+        allow_methods=app_config.allow_methods,
+        allow_headers=app_config.allow_headers,
     )
 
     ApiDependencies.initialize(
-        config=web_config, event_handler_id=event_handler_id, logger=logger
+        config=app_config, event_handler_id=event_handler_id, logger=logger
     )
 
 
@@ -143,10 +142,9 @@ def overridden_redoc():
 app.mount("/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui")
 
 def invoke_api():
-    global web_config
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host=web_config.host, port=web_config.port, loop=loop)
+    config = uvicorn.Config(app=app, host=app_config.host, port=app_config.port, loop=loop)
     # Use access_log to turn off logging
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
