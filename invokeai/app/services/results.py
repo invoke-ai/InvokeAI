@@ -41,7 +41,7 @@ class ResultsServiceABC(ABC):
         pass
 
     @abstractmethod
-    def list(
+    def get_many(
         self, result_type: ResultType, page: int = 0, per_page: int = 10
     ) -> PaginatedResults[ResultWithSession]:
         pass
@@ -131,7 +131,7 @@ class SqliteResultsService(ResultsServiceABC):
 
         return ResultWithSession(result=result, session=graph_execution_state)
 
-    def list(
+    def get_many(
         self,
         result_type: ResultType,
         page: int = 0,
