@@ -143,6 +143,7 @@ two configs are kept in separate sections of the config file:
      ...
 '''
 import argparse
+import pydoc
 import typing
 import os
 import sys
@@ -232,7 +233,7 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def get_parser(cls)->ArgumentParser:
-        parser = ArgumentParser(
+        parser = PagingArgumentParser(
             prog=cls.cmd_name(),
             description=cls.__doc__,
         )
@@ -316,38 +317,46 @@ def _find_root()->Path:
 
 class InvokeAIAppConfig(InvokeAISettings):
     '''
-    Application-wide settings.
-    '''
+Generate images using Stable Diffusion. Use "invokeai" to launch
+the command-line client (recommended for experts only), or
+"invokeai-web" to launch the web server. Global options
+can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
+setting environment variables INVOKEAI_<setting>.
+     '''
     #fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
-    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
-    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
-    legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
-    model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
-    outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
-    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory', category='Paths')
-    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
-    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
-    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
-    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
-    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
-    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
-    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
-    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
-    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
-    free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
-    restore             : bool = Field(default=True, description="Enable/disable face restoration code", category='Features')
-    esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", category='Features')
-    patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
-    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
-    log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
-    allow_origins       : List[str] = Field(default=[], description="Allowed CORS origins", category='Cross-Origin Resource Sharing')
-    allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", category='Cross-Origin Resource Sharing')
-    allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", category='Cross-Origin Resource Sharing')
-    allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", category='Cross-Origin Resource Sharing')
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
     port                : int = Field(default=9090, description="Port to bind to", category='Web Server')
+    allow_origins       : List[str] = Field(default=[], description="Allowed CORS origins", category='Web Server')
+    allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", category='Web Server')
+    allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", category='Web Server')
+    allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", category='Web Server')
+
+    esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", category='Features')
+    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
+    log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
+    nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
+    patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
+    restore             : bool = Field(default=True, description="Enable/disable face restoration code", category='Features')
+
+    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
+    free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
+    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
+    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
+    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
+
+    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
+    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
+    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
+    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory', category='Paths')
+    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
+    legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
+    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
+    outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
+
+    model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
+    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
     #fmt: on
 
     def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
@@ -483,6 +492,16 @@ class InvokeAIAppConfig(InvokeAISettings):
         init file.
         '''
         return _find_root()
+
+
+class PagingArgumentParser(argparse.ArgumentParser):
+    '''
+    A custom ArgumentParser that uses pydoc to page its output.
+    It also supports reading defaults from an init file.
+    '''
+    def print_help(self, file=None):
+        text = self.format_help()
+        pydoc.pager(text)
 
 def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig)->InvokeAISettings:
     '''
