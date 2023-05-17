@@ -34,7 +34,8 @@ const InitialImagePreview = () => {
   const { t } = useTranslation();
   const toaster = useAppToaster();
 
-  const onError = () => {
+  const handleError = useCallback(() => {
+    dispatch(clearInitialImage());
     if (shouldFetchImages) {
       toaster({
         title: 'Something went wrong, please refresh',
@@ -48,9 +49,8 @@ const InitialImagePreview = () => {
         status: 'error',
         isClosable: true,
       });
-      dispatch(clearInitialImage());
     }
-  };
+  }, [dispatch, t, toaster, shouldFetchImages]);
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -79,7 +79,7 @@ const InitialImagePreview = () => {
             src={getUrl(initialImage?.url)}
             fallbackStrategy="beforeLoadOrError"
             fallback={<ImageFallbackSpinner />}
-            onError={onError}
+            onError={handleError}
             sx={{
               objectFit: 'contain',
               maxWidth: '100%',

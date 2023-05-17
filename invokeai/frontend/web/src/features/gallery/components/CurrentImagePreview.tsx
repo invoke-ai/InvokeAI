@@ -1,6 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
@@ -14,6 +14,7 @@ import ImageFallbackSpinner from './ImageFallbackSpinner';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { configSelector } from '../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
+import { imageSelected } from '../store/gallerySlice';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -53,6 +54,7 @@ const CurrentImagePreview = () => {
   const { shouldFetchImages } = useAppSelector(configSelector);
   const { getUrl } = useGetUrl();
   const toaster = useAppToaster();
+  const dispatch = useAppDispatch();
 
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -65,6 +67,17 @@ const CurrentImagePreview = () => {
     },
     [image]
   );
+
+  const handleError = useCallback(() => {
+    dispatch(imageSelected());
+    if (shouldFetchImages) {
+      toaster({
+        title: 'Something went wrong, please refresh',
+        status: 'error',
+        isClosable: true,
+      });
+    }
+  }, [dispatch, toaster, shouldFetchImages]);
 
   return (
     <Flex
@@ -107,15 +120,7 @@ const CurrentImagePreview = () => {
                 position: 'absolute',
                 borderRadius: 'base',
               }}
-              onError={(e) => {
-                if (shouldFetchImages) {
-                  toaster({
-                    title: 'Something went wrong, please refresh',
-                    status: 'error',
-                    isClosable: true,
-                  });
-                }
-              }}
+              onError={handleError}
             />
             <ImageMetadataOverlay image={image} />
           </>
