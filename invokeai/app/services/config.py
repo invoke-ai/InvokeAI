@@ -36,16 +36,15 @@ InvokeAI:
     patchmatch: true
     internet_available: true
     log_tokenization: false
-  Cross-Origin Resource Sharing:
+  Web Server:
+    host: 127.0.0.1
+    port: 8081
     allow_origins: []
     allow_credentials: true
     allow_methods:
     - '*'
     allow_headers:
     - '*'
-  Web Server:
-    host: 127.0.0.1
-    port: 8081
 
 The default name of the configuration file is `invokeai.yaml`, located
 in INVOKEAI_ROOT. You can replace supersede this by providing any
