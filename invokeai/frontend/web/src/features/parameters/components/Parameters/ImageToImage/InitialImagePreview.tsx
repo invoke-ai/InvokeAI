@@ -14,6 +14,12 @@ import { initialImageSelected } from 'features/parameters/store/actions';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinner';
 import { FaImage } from 'react-icons/fa';
+import {
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
+} from '../../../../../services/thunks/gallery';
+import configSlice from '../../../../system/store/configSlice';
+import { configSelector } from '../../../../system/store/configSelectors';
 
 const selector = createSelector(
   [generationSelector],
@@ -28,20 +34,31 @@ const selector = createSelector(
 
 const InitialImagePreview = () => {
   const { initialImage } = useAppSelector(selector);
+  const { shouldFetchImages } = useAppSelector(configSelector);
   const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const onError = () => {
-    dispatch(
-      addToast({
-        title: t('toast.parametersFailed'),
-        description: t('toast.parametersFailedDesc'),
-        status: 'error',
-        isClosable: true,
-      })
-    );
-    dispatch(clearInitialImage());
+    if (shouldFetchImages) {
+      dispatch(
+        addToast({
+          title: 'Something went wrong, please refresh',
+          status: 'error',
+          isClosable: true,
+        })
+      );
+    } else {
+      dispatch(
+        addToast({
+          title: t('toast.parametersFailed'),
+          description: t('toast.parametersFailedDesc'),
+          status: 'error',
+          isClosable: true,
+        })
+      );
+      dispatch(clearInitialImage());
+    }
   };
 
   const handleDrop = useCallback(

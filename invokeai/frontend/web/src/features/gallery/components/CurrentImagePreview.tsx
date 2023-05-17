@@ -8,16 +8,12 @@ import { isEqual } from 'lodash-es';
 import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import CurrentImageHidden from './CurrentImageHidden';
 import { DragEvent, memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import ImageFallbackSpinner from './ImageFallbackSpinner';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { configSelector } from '../../system/store/configSelectors';
-import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
-} from '../../../services/thunks/gallery';
+import { addToast } from '../../system/store/systemSlice';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -69,7 +65,7 @@ const CurrentImagePreview = () => {
     },
     [image]
   );
-  console.log('mpunted');
+
   return (
     <Flex
       sx={{
@@ -113,8 +109,13 @@ const CurrentImagePreview = () => {
               }}
               onError={(e) => {
                 if (shouldFetchImages) {
-                  dispatch(receivedResultImagesPage());
-                  dispatch(receivedUploadImagesPage());
+                  dispatch(
+                    addToast({
+                      title: 'Something went wrong, please refresh',
+                      status: 'error',
+                      isClosable: true,
+                    })
+                  );
                 }
               }}
             />
