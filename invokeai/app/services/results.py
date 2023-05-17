@@ -7,9 +7,9 @@ from threading import Lock
 from typing import Union
 
 from pydantic import BaseModel, Field, parse_raw_as
+from invokeai.app.invocations.image import ImageOutput
 from invokeai.app.services.graph import GraphExecutionState
-from invokeai.app.models.image import ImageField
-from invokeai.app.invocations.latent import LatentsField
+from invokeai.app.invocations.latent import LatentsOutput
 from invokeai.app.services.item_storage import PaginatedResults
 
 
@@ -22,7 +22,7 @@ class Result(BaseModel):
     id: str = Field(description="Result ID")
     session_id: str = Field(description="Session ID")
     node_id: str = Field(description="Node ID")
-    data: Union[LatentsField, ImageField] = Field(description="The result data")
+    data: Union[LatentsOutput, ImageOutput] = Field(description="The result data")
 
 
 class ResultWithSession(BaseModel):
