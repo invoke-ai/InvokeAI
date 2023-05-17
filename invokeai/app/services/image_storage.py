@@ -27,7 +27,25 @@ from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 
 class ImageStorageBase(ABC):
-    """Responsible for storing and retrieving images."""
+    """Low-level service responsible for storing and retrieving images."""
+
+    class ImageFileNotFoundException(Exception):
+        """Raised when an image file is not found in storage."""
+
+        def __init__(self, message="Image file not found"):
+            super().__init__(message)
+
+    class ImageFileSaveException(Exception):
+        """Raised when an image cannot be saved."""
+
+        def __init__(self, message="Image file not saved"):
+            super().__init__(message)
+
+    class ImageFileDeleteException(Exception):
+        """Raised when an image cannot be deleted."""
+
+        def __init__(self, message="Image file not deleted"):
+            super().__init__(message)
 
     @abstractmethod
     def get(self, image_type: ImageType, image_name: str) -> Image:
@@ -136,7 +154,7 @@ class DiskImageStorage(ImageStorageBase):
 
             page_of_images.append(
                 ImageResponse(
-                    image_type=image_type.value,
+                    image_type=image_type,
                     image_name=filename,
                     # TODO: DiskImageStorage should not be building URLs...?
                     image_url=self.get_uri(image_type, filename),
@@ -164,14 +182,17 @@ class DiskImageStorage(ImageStorageBase):
         )
 
     def get(self, image_type: ImageType, image_name: str) -> Image:
-        image_path = self.get_path(image_type, image_name)
-        cache_item = self.__get_cache(image_path)
-        if cache_item:
-            return cache_item
+        try:
+            image_path = self.get_path(image_type, image_name)
+            cache_item = self.__get_cache(image_path)
+            if cache_item:
+                return cache_item
 
-        image = PILImage.open(image_path)
-        self.__set_cache(image_path, image)
-        return image
+            image = PILImage.open(image_path)
+            self.__set_cache(image_path, image)
+            return image
+        except Exception as e:
+            raise ImageStorageBase.ImageFileNotFoundException from e
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(
@@ -209,8 +230,10 @@ class DiskImageStorage(ImageStorageBase):
         try:
             os.stat(path)
             return True
-        except Exception:
+        except FileNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     def save(
         self,
@@ -219,45 +242,53 @@ class DiskImageStorage(ImageStorageBase):
         image: Image,
         metadata: InvokeAIMetadata | None = None,
     ) -> SavedImage:
-        image_path = self.get_path(image_type, image_name)
+        try:
+            image_path = self.get_path(image_type, image_name)
 
-        # TODO: Reading the image and then saving it strips the metadata...
-        if metadata:
-            pnginfo = build_invokeai_metadata_pnginfo(metadata=metadata)
-            image.save(image_path, "PNG", pnginfo=pnginfo)
-        else:
-            image.save(image_path)  # this saved image has an empty info
+            # TODO: Reading the image and then saving it strips the metadata...
+            if metadata:
+                pnginfo = build_invokeai_metadata_pnginfo(metadata=metadata)
+                image.save(image_path, "PNG", pnginfo=pnginfo)
+            else:
+                image.save(image_path)  # this saved image has an empty info
 
-        thumbnail_name = get_thumbnail_name(image_name)
-        thumbnail_path = self.get_path(image_type, thumbnail_name, is_thumbnail=True)
-        thumbnail_image = make_thumbnail(image)
-        thumbnail_image.save(thumbnail_path)
+            thumbnail_name = get_thumbnail_name(image_name)
+            thumbnail_path = self.get_path(
+                image_type, thumbnail_name, is_thumbnail=True
+            )
+            thumbnail_image = make_thumbnail(image)
+            thumbnail_image.save(thumbnail_path)
 
-        self.__set_cache(image_path, image)
-        self.__set_cache(thumbnail_path, thumbnail_image)
+            self.__set_cache(image_path, image)
+            self.__set_cache(thumbnail_path, thumbnail_image)
 
-        return SavedImage(
-            image_name=image_name,
-            thumbnail_name=thumbnail_name,
-            created=int(os.path.getctime(image_path)),
-        )
+            return SavedImage(
+                image_name=image_name,
+                thumbnail_name=thumbnail_name,
+                created=int(os.path.getctime(image_path)),
+            )
+        except Exception as e:
+            raise ImageStorageBase.ImageFileSaveException from e
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
-        basename = os.path.basename(image_name)
-        image_path = self.get_path(image_type, basename)
+        try:
+            basename = os.path.basename(image_name)
+            image_path = self.get_path(image_type, basename)
 
-        if os.path.exists(image_path):
-            send2trash(image_path)
-        if image_path in self.__cache:
-            del self.__cache[image_path]
+            if os.path.exists(image_path):
+                send2trash(image_path)
+            if image_path in self.__cache:
+                del self.__cache[image_path]
 
-        thumbnail_name = get_thumbnail_name(image_name)
-        thumbnail_path = self.get_path(image_type, thumbnail_name, True)
+            thumbnail_name = get_thumbnail_name(image_name)
+            thumbnail_path = self.get_path(image_type, thumbnail_name, True)
 
-        if os.path.exists(thumbnail_path):
-            send2trash(thumbnail_path)
-        if thumbnail_path in self.__cache:
-            del self.__cache[thumbnail_path]
+            if os.path.exists(thumbnail_path):
+                send2trash(thumbnail_path)
+            if thumbnail_path in self.__cache:
+                del self.__cache[thumbnail_path]
+        except Exception as e:
+            raise ImageStorageBase.ImageFileDeleteException from e
 
     def __get_cache(self, image_name: str) -> Image | None:
         return None if image_name not in self.__cache else self.__cache[image_name]

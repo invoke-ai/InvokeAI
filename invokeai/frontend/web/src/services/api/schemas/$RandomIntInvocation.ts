@@ -12,5 +12,13 @@ export const $RandomIntInvocation = {
     type: {
       type: 'Enum',
     },
+    low: {
+      type: 'number',
+      description: `The inclusive low value`,
+    },
+    high: {
+      type: 'number',
+      description: `The exclusive high value`,
+    },
   },
 } as const;

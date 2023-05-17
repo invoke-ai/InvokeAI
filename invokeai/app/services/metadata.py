@@ -22,16 +22,24 @@ class MetadataLatentsField(TypedDict):
 
 class MetadataColorField(TypedDict):
     """Pydantic-less ColorField, used for metadata parsing"""
+
     r: int
     g: int
     b: int
     a: int
 
 
-
 # TODO: This is a placeholder for `InvocationsUnion` pending resolution of circular imports
 NodeMetadata = Dict[
-    str, None | str | int | float | bool | MetadataImageField | MetadataLatentsField | MetadataColorField
+    str,
+    None
+    | str
+    | int
+    | float
+    | bool
+    | MetadataImageField
+    | MetadataLatentsField
+    | MetadataColorField,
 ]
 
 
@@ -65,6 +73,11 @@ class MetadataServiceBase(ABC):
         self, session_id: str, node: BaseModel
     ) -> InvokeAIMetadata | None:
         """Builds an InvokeAIMetadata object"""
+        pass
+
+    @abstractmethod
+    def create_metadata(self, session_id: str, node_id: str) -> dict:
+        """Creates metadata for a result"""
         pass
 
 
