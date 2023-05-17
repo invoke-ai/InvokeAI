@@ -11,5 +11,13 @@ export type RandomIntInvocation = {
    */
   id: string;
   type?: 'rand_int';
+  /**
+   * The inclusive low value
+   */
+  low?: number;
+  /**
+   * The exclusive high value
+   */
+  high?: number;
 };
 
