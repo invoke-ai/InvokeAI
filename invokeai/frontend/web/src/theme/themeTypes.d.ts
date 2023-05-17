@@ -1,4 +1,4 @@
-export declare type InvokeAIThemeColors = {
+export type InvokeAIThemeColors = {
   base: Partial<InvokeAIPaletteSteps>;
   accent: Partial<InvokeAIPaletteSteps>;
   working: Partial<InvokeAIPaletteSteps>;
@@ -8,7 +8,7 @@ export declare type InvokeAIThemeColors = {
   gridLineColor: string;
 };
 
-export declare type InvokeAIPaletteSteps = {
+export type InvokeAIPaletteSteps = {
   0: string;
   50: string;
   100: string;

@@ -1,6 +1,6 @@
 import { startAppListening } from '..';
 import { sessionCreated, sessionInvoked } from 'services/thunks/session';
-import { buildCanvasGraphAndBlobs } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
+import { buildCanvasGraphComponents } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { log } from 'app/logging/useLogger';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { imageUploaded } from 'services/thunks/image';
@@ -11,9 +11,17 @@ import {
   stagingAreaInitialized,
 } from 'features/canvas/store/canvasSlice';
 import { userInvoked } from 'app/store/actions';
+import { getCanvasData } from 'features/canvas/util/getCanvasData';
+import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
+import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
+import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 
 const moduleLog = log.child({ namespace: 'invoke' });
 
+/**
+ * This listener is responsible for building the canvas graph and blobs when the user invokes the canvas.
+ * It is also responsible for uploading the base and mask layers to the server.
+ */
 export const addUserInvokedCanvasListener = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof userInvoked> =>
@@ -21,25 +29,49 @@ export const addUserInvokedCanvasListener = () => {
     effect: async (action, { getState, dispatch, take }) => {
       const state = getState();
 
-      const data = await buildCanvasGraphAndBlobs(state);
+      // Build canvas blobs
+      const canvasBlobsAndImageData = await getCanvasData(state);
 
-      if (!data) {
+      if (!canvasBlobsAndImageData) {
+        moduleLog.error('Unable to create canvas data');
+        return;
+      }
+
+      const { baseBlob, baseImageData, maskBlob, maskImageData } =
+        canvasBlobsAndImageData;
+
+      // Determine the generation mode
+      const generationMode = getCanvasGenerationMode(
+        baseImageData,
+        maskImageData
+      );
+
+      if (state.system.enableImageDebugging) {
+        const baseDataURL = await blobToDataURL(baseBlob);
+        const maskDataURL = await blobToDataURL(maskBlob);
+        openBase64ImageInTab([
+          { base64: maskDataURL, caption: 'mask b64' },
+          { base64: baseDataURL, caption: 'image b64' },
+        ]);
+      }
+
+      moduleLog.debug(`Generation mode: ${generationMode}`);
+
+      // Build the canvas graph
+      const graphComponents = await buildCanvasGraphComponents(
+        state,
+        generationMode
+      );
+
+      if (!graphComponents) {
         moduleLog.error('Problem building graph');
         return;
       }
 
-      const {
-        rangeNode,
-        iterateNode,
-        baseNode,
-        edges,
-        baseBlob,
-        maskBlob,
-        generationMode,
-      } = data;
+      const { rangeNode, iterateNode, baseNode, edges } = graphComponents;
 
+      // Upload the base layer, to be used as init image
       const baseFilename = `${uuidv4()}.png`;
-      const maskFilename = `${uuidv4()}.png`;
 
       dispatch(
         imageUploaded({
@@ -65,6 +97,9 @@ export const addUserInvokedCanvasListener = () => {
           image_type: baseType,
         };
       }
+
+      // Upload the mask layer image
+      const maskFilename = `${uuidv4()}.png`;
 
       if (baseNode.type === 'inpaint') {
         dispatch(
@@ -103,9 +138,12 @@ export const addUserInvokedCanvasListener = () => {
       dispatch(canvasGraphBuilt(graph));
       moduleLog({ data: graph }, 'Canvas graph built');
 
+      // Actually create the session
       dispatch(sessionCreated({ graph }));
 
+      // Wait for the session to be invoked (this is just the HTTP request to start processing)
       const [{ meta }] = await take(sessionInvoked.fulfilled.match);
+
       const { sessionId } = meta.arg;
 
       if (!state.canvas.layerState.stagingArea.boundingBox) {

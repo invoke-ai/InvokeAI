@@ -25,7 +25,7 @@ export const buildImg2ImgNode = (
     width,
     height,
     cfgScale,
-    sampler,
+    scheduler,
     model,
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
@@ -43,14 +43,14 @@ export const buildImg2ImgNode = (
     width,
     height,
     cfg_scale: cfgScale,
-    scheduler: sampler as ImageToImageInvocation['scheduler'],
+    scheduler,
     model,
     strength,
     fit,
   };
 
   // on Canvas tab, we do not manually specific init image
-  if (activeTabName === 'img2img') {
+  if (activeTabName !== 'unifiedCanvas') {
     if (!initialImage) {
       // TODO: handle this more better
       throw 'no initial image';

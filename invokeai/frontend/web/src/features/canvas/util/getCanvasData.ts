@@ -2,17 +2,15 @@ import { RootState } from 'app/store/store';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { isCanvasMaskLine } from '../store/canvasTypes';
 import { log } from 'app/logging/useLogger';
-import {
-  areAnyPixelsBlack,
-  getImageDataTransparency,
-} from 'common/util/arrayBuffer';
-import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import generateMask from './generateMask';
-import { dataURLToImageData } from './dataURLToImageData';
-import { canvasToBlob } from './canvasToBlob';
+import createMaskStage from './createMaskStage';
+import { konvaNodeToImageData } from './konvaNodeToImageData';
+import { konvaNodeToBlob } from './konvaNodeToBlob';
 
 const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
 
+/**
+ * Gets Blob and ImageData objects for the base and mask layers
+ */
 export const getCanvasData = async (state: RootState) => {
   const canvasBaseLayer = getCanvasBaseLayer();
   const canvasStage = getCanvasStage();
@@ -26,11 +24,7 @@ export const getCanvasData = async (state: RootState) => {
     layerState: { objects },
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    stageScale,
     isMaskEnabled,
-    shouldPreserveMaskedArea,
-    boundingBoxScaleMethod: boundingBoxScale,
-    scaledBoundingBoxDimensions,
   } = state.canvas;
 
   const boundingBox = {
@@ -38,22 +32,14 @@ export const getCanvasData = async (state: RootState) => {
     ...boundingBoxDimensions,
   };
 
-  // generationParameters.fit = false;
+  // Clone the base layer so we don't affect the visible base layer
+  const clonedBaseLayer = canvasBaseLayer.clone();
 
-  // generationParameters.strength = img2imgStrength;
+  // Scale it to 100% so we get full resolution
+  clonedBaseLayer.scale({ x: 1, y: 1 });
 
-  // generationParameters.invert_mask = shouldPreserveMaskedArea;
-
-  // generationParameters.bounding_box = boundingBox;
-
-  const tempScale = canvasBaseLayer.scale();
-
-  canvasBaseLayer.scale({
-    x: 1 / stageScale,
-    y: 1 / stageScale,
-  });
-
-  const absPos = canvasBaseLayer.getAbsolutePosition();
+  // absolute position is needed to get the bounding box coords relative to the base layer
+  const absPos = clonedBaseLayer.getAbsolutePosition();
 
   const offsetBoundingBox = {
     x: boundingBox.x + absPos.x,
@@ -62,67 +48,25 @@ export const getCanvasData = async (state: RootState) => {
     height: boundingBox.height,
   };
 
-  const baseDataURL = canvasBaseLayer.toDataURL(offsetBoundingBox);
-  const baseBlob = await canvasToBlob(
-    canvasBaseLayer.toCanvas(offsetBoundingBox)
+  // For the base layer, use the offset boundingBox
+  const baseBlob = await konvaNodeToBlob(clonedBaseLayer, offsetBoundingBox);
+  const baseImageData = await konvaNodeToImageData(
+    clonedBaseLayer,
+    offsetBoundingBox
   );
 
-  canvasBaseLayer.scale(tempScale);
-
-  const { maskDataURL, maskBlob } = await generateMask(
-    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
+  // For the mask layer, use the normal boundingBox
+  const maskStage = await createMaskStage(
+    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [], // only include mask lines, and only if mask is enabled
     boundingBox
   );
-
-  const baseImageData = await dataURLToImageData(
-    baseDataURL,
-    boundingBox.width,
-    boundingBox.height
-  );
-
-  const maskImageData = await dataURLToImageData(
-    maskDataURL,
-    boundingBox.width,
-    boundingBox.height
-  );
-
-  const {
-    isPartiallyTransparent: baseIsPartiallyTransparent,
-    isFullyTransparent: baseIsFullyTransparent,
-  } = getImageDataTransparency(baseImageData.data);
-
-  const doesMaskHaveBlackPixels = areAnyPixelsBlack(maskImageData.data);
-
-  if (state.system.enableImageDebugging) {
-    openBase64ImageInTab([
-      { base64: maskDataURL, caption: 'mask b64' },
-      { base64: baseDataURL, caption: 'image b64' },
-    ]);
-  }
-
-  // generationParameters.init_img = imageDataURL;
-  // generationParameters.progress_images = false;
-
-  // if (boundingBoxScale !== 'none') {
-  //   generationParameters.inpaint_width = scaledBoundingBoxDimensions.width;
-  //   generationParameters.inpaint_height = scaledBoundingBoxDimensions.height;
-  // }
-
-  // generationParameters.seam_size = seamSize;
-  // generationParameters.seam_blur = seamBlur;
-  // generationParameters.seam_strength = seamStrength;
-  // generationParameters.seam_steps = seamSteps;
-  // generationParameters.tile_size = tileSize;
-  // generationParameters.infill_method = infillMethod;
-  // generationParameters.force_outpaint = false;
+  const maskBlob = await konvaNodeToBlob(maskStage, boundingBox);
+  const maskImageData = await konvaNodeToImageData(maskStage, boundingBox);
 
   return {
-    baseDataURL,
     baseBlob,
-    maskDataURL,
+    baseImageData,
     maskBlob,
-    baseIsPartiallyTransparent,
-    baseIsFullyTransparent,
-    doesMaskHaveBlackPixels,
+    maskImageData,
   };
 };

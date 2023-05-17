@@ -15,7 +15,7 @@ import {
 } from 'services/events/actions';
 
 import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../hooks/useToastWatcher';
+import { makeToast } from '../../../app/components/Toaster';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
@@ -25,6 +25,7 @@ import { TFuncKey } from 'i18next';
 import { t } from 'i18next';
 import { userInvoked } from 'app/store/actions';
 import { LANGUAGES } from '../components/LanguagePicker';
+import { imageUploaded } from 'services/thunks/image';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -93,6 +94,7 @@ export interface SystemState {
   isPersisted: boolean;
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
+  isUploading: boolean;
 }
 
 export const initialSystemState: SystemState = {
@@ -128,6 +130,7 @@ export const initialSystemState: SystemState = {
   infillMethods: ['tile', 'patchmatch'],
   isPersisted: false,
   language: 'en',
+  isUploading: false,
 };
 
 export const systemSlice = createSlice({
@@ -140,72 +143,14 @@ export const systemSlice = createSlice({
     setCurrentStatus: (state, action: PayloadAction<TFuncKey>) => {
       state.statusTranslationKey = action.payload;
     },
-    errorOccurred: (state) => {
-      state.isProcessing = false;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.statusTranslationKey = 'common.statusError';
-    },
-    setIsConnected: (state, action: PayloadAction<boolean>) => {
-      state.isConnected = action.payload;
-      state.isProcessing = false;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-    },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
     },
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
     },
-    processingCanceled: (state) => {
-      state.isProcessing = false;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.statusTranslationKey = 'common.statusProcessingCanceled';
-    },
-    generationRequested: (state) => {
-      state.isProcessing = true;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.statusTranslationKey = 'common.statusPreparing';
-    },
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
-    },
-    modelChangeRequested: (state) => {
-      state.statusTranslationKey = 'common.statusLoadingModel';
-      state.isCancelable = false;
-      state.isProcessing = true;
-      state.currentStatusHasSteps = false;
-    },
-    modelConvertRequested: (state) => {
-      state.statusTranslationKey = 'common.statusConvertingModel';
-      state.isCancelable = false;
-      state.isProcessing = true;
-      state.currentStatusHasSteps = false;
-    },
-    modelMergingRequested: (state) => {
-      state.statusTranslationKey = 'common.statusMergingModels';
-      state.isCancelable = false;
-      state.isProcessing = true;
-      state.currentStatusHasSteps = false;
     },
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
@@ -215,14 +160,6 @@ export const systemSlice = createSlice({
     },
     clearToastQueue: (state) => {
       state.toastQueue = [];
-    },
-    setProcessingIndeterminateTask: (
-      state,
-      action: PayloadAction<TFuncKey>
-    ) => {
-      state.isProcessing = true;
-      state.statusTranslationKey = action.payload;
-      state.currentStatusHasSteps = false;
     },
     setSearchFolder: (state, action: PayloadAction<string | null>) => {
       state.searchFolder = action.payload;
@@ -456,26 +393,39 @@ export const systemSlice = createSlice({
     builder.addCase(parsedOpenAPISchema, (state) => {
       state.wasSchemaParsed = true;
     });
+
+    /**
+     * Image Uploading Started
+     */
+    builder.addCase(imageUploaded.pending, (state) => {
+      state.isUploading = true;
+    });
+
+    /**
+     * Image Uploading Complete
+     */
+    builder.addCase(imageUploaded.rejected, (state) => {
+      state.isUploading = false;
+    });
+
+    /**
+     * Image Uploading Complete
+     */
+    builder.addCase(imageUploaded.fulfilled, (state) => {
+      state.isUploading = false;
+    });
   },
 });
 
 export const {
   setIsProcessing,
-  setIsConnected,
   setShouldConfirmOnDelete,
   setCurrentStatus,
   setShouldDisplayGuides,
-  processingCanceled,
-  errorOccurred,
   setIsCancelable,
-  modelChangeRequested,
-  modelConvertRequested,
-  modelMergingRequested,
   setEnableImageDebugging,
-  generationRequested,
   addToast,
   clearToastQueue,
-  setProcessingIndeterminateTask,
   setSearchFolder,
   setFoundModels,
   setOpenModel,
