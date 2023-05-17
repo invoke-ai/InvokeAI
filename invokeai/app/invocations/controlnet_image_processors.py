@@ -211,7 +211,8 @@ class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig)
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    safe: bool = Field(default=False, description="whether to use safe mode")
+    # safe not supported in controlnet_aux v0.0.3
+    # safe: bool = Field(default=False, description="whether to use safe mode")
     scribble: bool = Field(default=False, description="whether to use scribble mode")
     # fmt: on
 
@@ -220,7 +221,8 @@ class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig)
         processed_image = hed_processor(image,
                                         detect_resolution=self.detect_resolution,
                                         image_resolution=self.image_resolution,
-                                        safe=self.safe,
+                                        # safe not supported in controlnet_aux v0.0.3
+                                        # safe=self.safe,
                                         scribble=self.scribble,
                                         )
         return processed_image
@@ -290,7 +292,8 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocation
     # Inputs
     a_mult: float = Field(default=2.0, ge=0, description="Midas parameter a = amult * PI")
     bg_th: float = Field(default=0.1, ge=0, description="Midas parameter bg_th")
-    depth_and_normal: bool = Field(default=False, description="whether to use depth and normal mode")
+    # depth_and_normal not supported in controlnet_aux v0.0.3
+    # depth_and_normal: bool = Field(default=False, description="whether to use depth and normal mode")
     # fmt: on
 
     def run_processor(self, image):
@@ -298,7 +301,9 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocation
         processed_image = midas_processor(image,
                                           a=np.pi * self.a_mult,
                                           bg_th=self.bg_th,
-                                          depth_and_normal=self.depth_and_normal)
+                                          # dept_and_normal not supported in controlnet_aux v0.0.3
+                                          # depth_and_normal=self.depth_and_normal,
+                                          )
         return processed_image
 
 
@@ -368,9 +373,9 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    h: Union[int | None] = Field(default=None, ge=0, description="content shuffle h parameter")
-    w: Union[int | None] = Field(default=None, ge=0, description="content shuffle w parameter")
-    f: Union[int | None] = Field(default=None, ge=0, description="cont")
+    h: Union[int | None] = Field(default=512, ge=0, description="content shuffle h parameter")
+    w: Union[int | None] = Field(default=512, ge=0, description="content shuffle w parameter")
+    f: Union[int | None] = Field(default=256, ge=0, description="cont")
     # fmt: on
 
     def run_processor(self, image):
