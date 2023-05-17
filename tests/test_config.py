@@ -60,6 +60,7 @@ def test_env_override():
 
     conf = InvokeAIAppConfig(conf=init1,argv=['--no-nsfw_checker','--max_loaded=10'])
     assert conf.nsfw_checker==False
+    assert conf.max_loaded_models==10
 
     conf = InvokeAIAppConfig(conf=init1,argv=[],max_loaded_models=20)
     assert conf.max_loaded_models==20

@@ -47,8 +47,7 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
-from ..args import ArgFormatter, PagingArgumentParser
-from ..globals import Globals, global_cache_dir
+from invokeai.app.services.config import InvokeAIAppConfig
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
     PIL_INTERPOLATION = {
@@ -90,6 +89,8 @@ def save_progress(
 
 
 def parse_args():
+    config = InvokeAIAppConfig()
+    
     parser = PagingArgumentParser(
         description="Textual inversion training", formatter_class=ArgFormatter
     )
@@ -112,7 +113,7 @@ def parse_args():
         "--root_dir",
         "--root",
         type=Path,
-        default=Globals.root,
+        default=config.root,
         help="Path to the invokeai runtime directory",
     )
     general_group.add_argument(
@@ -127,7 +128,7 @@ def parse_args():
     general_group.add_argument(
         "--output_dir",
         type=Path,
-        default=f"{Globals.root}/text-inversion-model",
+        default=f"{config.root}/text-inversion-model",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     model_group.add_argument(
@@ -580,7 +581,7 @@ def do_textual_inversion_training(
 
     # setting up things the way invokeai expects them
     if not os.path.isabs(output_dir):
-        output_dir = os.path.join(Globals.root, output_dir)
+        output_dir = os.path.join(config.root, output_dir)
 
     logging_dir = output_dir / logging_dir
 
@@ -628,7 +629,7 @@ def do_textual_inversion_training(
         elif output_dir is not None:
             os.makedirs(output_dir, exist_ok=True)
 
-    models_conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
+    models_conf = OmegaConf.load(os.path.join(config.root, "configs/models.yaml"))
     model_conf = models_conf.get(model, None)
     assert model_conf is not None, f"Unknown model: {model}"
     assert (
@@ -640,7 +641,7 @@ def do_textual_inversion_training(
     assert (
         pretrained_model_name_or_path
     ), f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
-    pipeline_args = dict(cache_dir=global_cache_dir("hub"))
+    pipeline_args = dict(cache_dir=config.cache_dir())
 
     # Load tokenizer
     if tokenizer_name:

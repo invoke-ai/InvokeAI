@@ -10,7 +10,7 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
 
 
@@ -188,7 +188,14 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
+    # this gets the basic configuration
     config = get_invokeai_config()
+
+    # get the optional list of invocations to execute on the command line
+    parser = config.get_parser()
+    parser.add_argument('commands',nargs='*')
+    invocation_commands = parser.parse_args().commands
+    
     model_manager = get_model_manager(config,logger=logger)
     
     events = EventServiceBase()
@@ -232,9 +239,16 @@ def invoke_cli():
     context = CliContext(invoker, session, parser)
     set_autocompleter(services)
 
-    while True:
+    command_line_args_exist = len(invocation_commands) > 0
+    done = False
+    
+    while not done:
         try:
-            cmd_input = input("invoke> ")
+            if command_line_args_exist:
+                cmd_input = invocation_commands.pop(0)
+                done = len(invocation_commands) == 0
+            else:
+                cmd_input = input("invoke> ")
         except (KeyboardInterrupt, EOFError):
             # Ctrl-c exits
             break
@@ -357,6 +371,9 @@ def invoke_cli():
         except InvalidArgs:
             invoker.services.logger.warning('Invalid command, use "help" to list commands')
             continue
+
+        except ValidationError:
+            invoker.services.logger.warning('Invalid command arguments, run "<command> --help" for summary')
 
         except SessionError:
             # Start a new session

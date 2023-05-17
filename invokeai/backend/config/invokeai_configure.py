@@ -472,19 +472,30 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Directory containing embedding/textual inversion files:",
+            value="Directories containing textual inversion and LoRA models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
         )
-        self.embedding_path = self.add_widget_intelligent(
+        self.embedding_dir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
-            name="(<tab> autocompletes, ctrl-N advances):",
+            name=" Textual Inversion Embeddings:",
             value=str(default_embedding_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
             labelColor="GOOD",
-            begin_entry_at=40,
+            begin_entry_at=32,
+            scroll_exit=True,
+        )
+        self.lora_dir = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name="             LoRA and LyCORIS:",
+            value=str(default_lora_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=32,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -551,9 +562,9 @@ class editOptsForm(npyscreen.FormMultiPage):
             bad_fields.append(
                 f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
             )
-        if not Path(opt.embedding_path).parent.exists():
+        if not Path(opt.embedding_dir).parent.exists():
             bad_fields.append(
-                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_path).parent)} is an existing directory."
+                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_dir).parent)} is an existing directory."
             )
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:\n"
@@ -568,13 +579,14 @@ class editOptsForm(npyscreen.FormMultiPage):
         new_opts = Namespace()
 
         for attr in [
-            "outdir",
-            "nsfw_checker",
-            "free_gpu_mem",
-            "max_loaded_models",
-            "xformers_enabled",
-            "always_use_cpu",
-            "embedding_path",
+                "outdir",
+                "nsfw_checker",
+                "free_gpu_mem",
+                "max_loaded_models",
+                "xformers_enabled",
+                "always_use_cpu",
+                "embedding_dir",
+                "lora_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
@@ -680,30 +692,20 @@ def run_console_ui(
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):
     """
-    Update the invokeai.init file with values from current settings.
+    Update the invokeai.yaml file with values from current settings.
     """
 
-    if Path(init_file).exists():
-        config = OmegaConf.load(init_file)
-    else:
-        config = OmegaConf.create()
-
-    if not config.globals:
-        config.globals = dict()
-        
-    globals = config.globals
-    fields = list(get_type_hints(InvokeAIAppConfig).keys())
-    for attr in fields:
-        if hasattr(opts,attr):
-            setattr(globals,attr,getattr(opts,attr))
-
+    # this will load current settings
+    config = InvokeAIAppConfig()
+    for key,value in opts.__dict__.items():
+        if hasattr(config,key):
+            setattr(config,key,value)
+            
     with open(init_file,'w', encoding='utf-8') as file:
-        file.write(OmegaConf.to_yaml(config))
+        file.write(config.to_yaml())
         
     if opts.hf_token:
         HfLogin(opts.hf_token)
-
-
 
 # -------------------------------------
 def default_output_dir() -> Path:
@@ -712,6 +714,10 @@ def default_output_dir() -> Path:
 # -------------------------------------
 def default_embedding_dir() -> Path:
     return config.root / "embeddings"
+
+# -------------------------------------
+def default_lora_dir() -> Path:
+    return config.root / "loras"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
@@ -725,35 +731,26 @@ def write_default_options(program_opts: Namespace, initfile: Path):
 # the old init file and write out the new
 # yaml format.
 def migrate_init_file(legacy_format:Path):
-    
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
-    new = 
-    new = OmegaConf.create()
+    new = InvokeAIAppConfig(conf={})
     
-    new.globals = dict()
-    globals = new.globals
-    for attr in ['host','port']:
-        if hasattr(old,attr):
-            setattr(globals,attr,getattr(old,attr))
-    # change of name
-    globals.allow_origins = old.cors or []
-
     fields = list(get_type_hints(InvokeAIAppConfig).keys())
     for attr in fields:
         if hasattr(old,attr):
-            setattr(globals,attr,getattr(old,attr))
+            setattr(new,attr,getattr(old,attr))
 
-    # a few places where the names have changed
-    globals.nsfw_checker = old.nsfw_checker
-    globals.xformers_enabled = old.xformers
-    globals.conf_path = old.conf
-    globals.embedding_dir = old.embedding_path
-
-    new.globals = {key: globals[key] for key in sorted(globals)}
+    # a few places where the field names have changed and we have to
+    # manually add in the new names/values
+    new.nsfw_checker = old.safety_checker
+    new.xformers_enabled = old.xformers
+    new.conf_path = old.conf
+    new.embedding_dir = old.embedding_path
 
     invokeai_yaml = legacy_format.parent / 'invokeai.yaml'
     with open(invokeai_yaml,"w", encoding="utf-8") as outfile:
-        outfile.write(OmegaConf.to_yaml(new))
+        outfile.write(new.to_yaml())
+
+    legacy_format.replace(legacy_format.parent / 'invokeai.init.old')
     
 # -------------------------------------
 def main():
@@ -822,10 +819,10 @@ def main():
         old_init_file = Path(config.root, 'invokeai.init')
         new_init_file = Path(config.root, 'invokeai.yaml')
         if old_init_file.exists() and not new_init_file.exists():
-            print('** MIGRATING OLD invokeai.init FILE TO NEW invokeai.yaml FORMAT')
+            print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-            # is it a good idea to re-read invokeai.yaml?
-            config = get_invokeai_config()            
+            config = get_invokeai_config()  # reread defaults
+            
             
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)

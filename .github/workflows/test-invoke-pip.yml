@@ -133,8 +133,10 @@ jobs:
           invokeai
           --no-patchmatch
           --no-nsfw_checker
-          --from_file ${{ env.TEST_PROMPTS }}
+	  --precision=float32
+	  --always_use_cpu
           --outdir ${{ env.INVOKEAI_OUTDIR }}/${{ matrix.python-version }}/${{ matrix.pytorch }}
+	  < ${{ env.TEST_PROMPTS }}
 
       - name: Archive results
         id: archive-results
