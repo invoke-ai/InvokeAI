@@ -10,11 +10,16 @@ import {
   CollectInvocationOutput,
   ImageType,
   ImageField,
+  LatentsOutput,
 } from 'services/api';
 
 export const isImageOutput = (
   output: GraphExecutionState['results'][string]
-): output is ImageOutput => output.type === 'image';
+): output is ImageOutput => output.type === 'image_output';
+
+export const isLatentsOutput = (
+  output: GraphExecutionState['results'][string]
+): output is LatentsOutput => output.type === 'latents_output';
 
 export const isMaskOutput = (
   output: GraphExecutionState['results'][string]
