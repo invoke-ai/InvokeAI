@@ -727,6 +727,7 @@ def write_default_options(program_opts: Namespace, initfile: Path):
 def migrate_init_file(legacy_format:Path):
     
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
+    new = 
     new = OmegaConf.create()
     
     new.globals = dict()

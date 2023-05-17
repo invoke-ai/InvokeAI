@@ -10,17 +10,21 @@ from invokeai.app.invocations.generate import TextToImageInvocation
 
 init1 = OmegaConf.create(
 '''
-globals:
-  nsfw_checker: False
-  max_loaded_models: 5
+InvokeAI:
+  Features:
+    nsfw_checker: False
+  Memory/Performance:
+    max_loaded_models: 5
 '''
 )
 
 init2 = OmegaConf.create(
 '''
- globals:
-   nsfw_checker: True
-   max_loaded_models: 2
+InvokeAI:
+  Features:
+    nsfw_checker: true
+  Memory/Performance:
+    max_loaded_models: 2
 '''
 )
 
@@ -50,7 +54,7 @@ def test_env_override():
     conf = InvokeAIAppConfig(conf=init1,argv=['--max_loaded=10'])
     assert conf.nsfw_checker==False
     
-    os.environ['INVOKEAI_globals_nsfw_checker'] = 'True'
+    os.environ['INVOKEAI_nsfw_checker'] = 'True'
     conf = InvokeAIAppConfig(conf=init1,argv=['--max_loaded=10'])
     assert conf.nsfw_checker==True
 
