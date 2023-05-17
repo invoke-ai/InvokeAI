@@ -1,6 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
@@ -13,6 +13,11 @@ import { DragEvent, memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import ImageFallbackSpinner from './ImageFallbackSpinner';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
+import { configSelector } from '../../system/store/configSelectors';
+import {
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
+} from '../../../services/thunks/gallery';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -49,7 +54,9 @@ const CurrentImagePreview = () => {
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
+  const { shouldFetchImages } = useAppSelector(configSelector);
   const { getUrl } = useGetUrl();
+  const dispatch = useAppDispatch();
 
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -62,7 +69,7 @@ const CurrentImagePreview = () => {
     },
     [image]
   );
-
+  console.log('mpunted');
   return (
     <Flex
       sx={{
@@ -103,6 +110,12 @@ const CurrentImagePreview = () => {
                 height: 'auto',
                 position: 'absolute',
                 borderRadius: 'base',
+              }}
+              onError={(e) => {
+                if (shouldFetchImages) {
+                  dispatch(receivedResultImagesPage());
+                  dispatch(receivedUploadImagesPage());
+                }
               }}
             />
             <ImageMetadataOverlay image={image} />
