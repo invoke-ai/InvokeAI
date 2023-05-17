@@ -1,7 +1,4 @@
-from __future__ import annotations
 from enum import Enum
-
-from typing import TYPE_CHECKING
 
 from abc import ABC, abstractmethod
 import json
@@ -10,12 +7,10 @@ from threading import Lock
 from typing import Union
 
 from pydantic import BaseModel, Field, parse_raw_as
-
-if TYPE_CHECKING:
-    from invokeai.app.models.image import ImageField
-    from invokeai.app.invocations.latent import LatentsField
-    from invokeai.app.services.graph import GraphExecutionState
-    from invokeai.app.services.item_storage import PaginatedResults
+from invokeai.app.services.graph import GraphExecutionState
+from invokeai.app.models.image import ImageField
+from invokeai.app.invocations.latent import LatentsField
+from invokeai.app.services.item_storage import PaginatedResults
 
 
 class ResultType(str, Enum):
@@ -37,7 +32,9 @@ class ResultWithSession(BaseModel):
 
 class ResultsServiceABC(ABC):
     @abstractmethod
-    def get(self, result_id: str, result_type: ResultType) -> Union[ResultWithSession, None]:
+    def get(
+        self, result_id: str, result_type: ResultType
+    ) -> Union[ResultWithSession, None]:
         pass
 
     @abstractmethod
@@ -98,7 +95,9 @@ class SqliteResultsService(ResultsServiceABC):
         finally:
             self._lock.release()
 
-    def get(self, result_id: str, result_type: ResultType) -> Union[ResultWithSession, None]:
+    def get(
+        self, result_id: str, result_type: ResultType
+    ) -> Union[ResultWithSession, None]:
         try:
             self._lock.acquire()
             self._cursor.execute(

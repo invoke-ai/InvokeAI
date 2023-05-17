@@ -15,9 +15,10 @@ from pydantic.schema import schema
 
 from ..backend import Args
 from .api.dependencies import ApiDependencies
-from .api.routers import images, sessions, models
+from .api.routers import images, sessions, models, results
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
+
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -77,6 +78,8 @@ app.include_router(sessions.session_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 
 app.include_router(models.models_router, prefix="/api")
+
+app.include_router(results.results_router, prefix="/api")
 
 
 # Build a custom OpenAPI to include all outputs
