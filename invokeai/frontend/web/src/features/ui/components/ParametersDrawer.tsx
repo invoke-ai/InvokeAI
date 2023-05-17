@@ -21,11 +21,7 @@ import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameter
 const selector = createSelector(
   [uiSelector, activeTabNameSelector, lightboxSelector],
   (ui, activeTabName, lightbox) => {
-    const {
-      shouldPinParametersPanel,
-      shouldShowParametersPanel,
-      shouldShowImageParameters,
-    } = ui;
+    const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;
 
     const { isLightboxOpen } = lightbox;
 
@@ -33,7 +29,6 @@ const selector = createSelector(
       activeTabName,
       shouldPinParametersPanel,
       shouldShowParametersPanel,
-      shouldShowImageParameters,
     };
   },
   defaultSelectorOptions

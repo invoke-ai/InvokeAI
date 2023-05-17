@@ -13,10 +13,9 @@ import { nodeAdded } from '../store/nodesSlice';
 import { map } from 'lodash-es';
 import { RootState } from 'app/store/store';
 import { useBuildInvocation } from '../hooks/useBuildInvocation';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/hooks/useToastWatcher';
 import { AnyInvocationType } from 'services/events/types';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useAppToaster } from 'app/components/Toaster';
 
 const AddNodeMenu = () => {
   const dispatch = useAppDispatch();
@@ -27,22 +26,23 @@ const AddNodeMenu = () => {
 
   const buildInvocation = useBuildInvocation();
 
+  const toaster = useAppToaster();
+
   const addNode = useCallback(
     (nodeType: AnyInvocationType) => {
       const invocation = buildInvocation(nodeType);
 
       if (!invocation) {
-        const toast = makeToast({
+        toaster({
           status: 'error',
           title: `Unknown Invocation type ${nodeType}`,
         });
-        dispatch(addToast(toast));
         return;
       }
 
       dispatch(nodeAdded(invocation));
     },
-    [dispatch, buildInvocation]
+    [dispatch, buildInvocation, toaster]
   );
 
   return (

@@ -1,6 +1,7 @@
-import { FormControl, Textarea } from '@chakra-ui/react';
+import { FormControl } from '@chakra-ui/react';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAITextarea from 'common/components/IAITextarea';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +15,7 @@ const ParamNegativeConditioning = () => {
 
   return (
     <FormControl>
-      <Textarea
+      <IAITextarea
         id="negativePrompt"
         name="negativePrompt"
         value={negativePrompt}

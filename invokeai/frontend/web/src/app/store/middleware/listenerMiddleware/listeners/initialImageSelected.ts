@@ -2,11 +2,11 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { Image, isInvokeAIImage } from 'app/types/invokeai';
 import { selectResultsById } from 'features/gallery/store/resultsSlice';
 import { selectUploadsById } from 'features/gallery/store/uploadsSlice';
-import { makeToast } from 'features/system/hooks/useToastWatcher';
 import { t } from 'i18next';
 import { addToast } from 'features/system/store/systemSlice';
 import { startAppListening } from '..';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { makeToast } from 'app/components/Toaster';
 
 export const addInitialImageSelectedListener = () => {
   startAppListening({
