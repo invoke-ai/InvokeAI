@@ -76,6 +76,7 @@ class ApiDependencies:
             filename=db_location, table_name="graph_executions"
         )
 
+        # register event handler to update the `results` table when a graph execution state is inserted or updated
         graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
 
         services = InvocationServices(
