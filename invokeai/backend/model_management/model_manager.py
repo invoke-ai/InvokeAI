@@ -1211,7 +1211,12 @@ class ModelManager(object):
         """
         current_version = self.config.get("_version","1.0.0")
         if version.parse(current_version) < version.parse(CONFIG_FILE_VERSION):
-            self.logger.info(f'models.yaml version {current_version} detected. Updating to {CONFIG_FILE_VERSION}')
+            self.logger.warning(f'models.yaml version {current_version} detected. Updating to {CONFIG_FILE_VERSION}')
+            self.logger.warning(f'The original file will be renamed models.yaml.orig')
+            if self.config_path:
+                old_file = Path(self.config_path)
+                new_name = old_file.parent / 'models.yaml.orig'
+                old_file.replace(new_name)
             
             new_config = OmegaConf.create()
             new_config["_version"] = CONFIG_FILE_VERSION
