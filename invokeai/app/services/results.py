@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,11 @@ if TYPE_CHECKING:
     from invokeai.app.services.item_storage import PaginatedResults
 
 
+class ResultType(str, Enum):
+    image_output = "image_output"
+    latents_output = "latents_output"
+
+
 class Result(BaseModel):
     id: str = Field(description="Result ID")
     session_id: str = Field(description="Session ID")
@@ -31,12 +37,12 @@ class ResultWithSession(BaseModel):
 
 class ResultsServiceABC(ABC):
     @abstractmethod
-    def get(self, output_id: str) -> str:
+    def get(self, result_id: str, result_type: ResultType) -> Union[ResultWithSession, None]:
         pass
 
     @abstractmethod
     def list(
-        self, page: int = 0, per_page: int = 10
+        self, result_type: ResultType, page: int = 0, per_page: int = 10
     ) -> PaginatedResults[ResultWithSession]:
         pass
 
@@ -76,10 +82,11 @@ class SqliteResultsService(ResultsServiceABC):
             self._cursor.execute(
                 """--sql
                 CREATE TABLE IF NOT EXISTS results (
-                  id TEXT PRIMARY KEY,
-                  node_id TEXT,
-                  session_id TEXT,
-                  data TEXT
+                  id TEXT PRIMARY KEY, -- the result's name
+                  result_type TEXT, -- `image_output` | `latents_output`
+                  node_id TEXT, -- the node that produced this result
+                  session_id TEXT, -- the session that produced this result
+                  data TEXT -- the result itself
                 );
                 """
             )
@@ -91,7 +98,7 @@ class SqliteResultsService(ResultsServiceABC):
         finally:
             self._lock.release()
 
-    def get(self, id: str) -> Union[ResultWithSession, None]:
+    def get(self, result_id: str, result_type: ResultType) -> Union[ResultWithSession, None]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -99,9 +106,9 @@ class SqliteResultsService(ResultsServiceABC):
                 SELECT results.data, graph_executions.item
                 FROM results
                 JOIN graph_executions ON results.session_id = graph_executions.id
-                WHERE results.id = ?
+                WHERE results.id = ? AND results.result_type = ?
                 """,
-                (id,),
+                (result_id, result_type),
             )
 
             result_row = self._cursor.fetchone()
@@ -110,6 +117,8 @@ class SqliteResultsService(ResultsServiceABC):
                 return None
 
             result_raw, graph_execution_state_raw = result_row
+
+            # TODO: Handle invalid graphs with graceful parsing
             result = parse_raw_as(Result, result_raw)
             graph_execution_state = parse_raw_as(
                 GraphExecutionState, graph_execution_state_raw
@@ -123,18 +132,23 @@ class SqliteResultsService(ResultsServiceABC):
         return ResultWithSession(result=result, session=graph_execution_state)
 
     def list(
-        self, page: int = 0, per_page: int = 10
+        self,
+        result_type: ResultType,
+        page: int = 0,
+        per_page: int = 10,
     ) -> PaginatedResults[ResultWithSession]:
         try:
             self._lock.acquire()
+
             self._cursor.execute(
-                """--sql
+                f"""--sql
                 SELECT results.data, graph_executions.item
                 FROM results
                 JOIN graph_executions ON results.session_id = graph_executions.id
+                WHERE results.result_type = ?
                 LIMIT ? OFFSET ?;
                 """,
-                (per_page, page * per_page),
+                (result_type.value, per_page, page * per_page),
             )
 
             result_rows = self._cursor.fetchall()
@@ -161,7 +175,10 @@ class SqliteResultsService(ResultsServiceABC):
         )
 
     def search(
-        self, query: str, page: int = 0, per_page: int = 10
+        self,
+        query: str,
+        page: int = 0,
+        per_page: int = 10,
     ) -> PaginatedResults[ResultWithSession]:
         try:
             self._lock.acquire()
@@ -213,8 +230,10 @@ class SqliteResultsService(ResultsServiceABC):
                 # The id depends on the result type
                 if result.type == "image_output":
                     id = result.image.image_name
-                else:  # 'latents_output'
+                    result_type = "image_output"
+                else:
                     id = result.latents.latents_name
+                    result_type = "latents_output"
 
                 # Stringify the entire result object for the data column
                 data = json.dumps(result.dict())
@@ -222,8 +241,8 @@ class SqliteResultsService(ResultsServiceABC):
                 # Insert the result into the results table, ignoring if it already exists
                 conn.execute(
                     """--sql
-                    INSERT OR IGNORE INTO results (id, node_id, session_id, data)
-                    VALUES (?, ?, ?, ?)
+                    INSERT OR IGNORE INTO results (id, result_type, node_id, session_id, data)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (id, node_id, session.id, data),
+                    (id, result_type, node_id, session.id, data),
                 )
