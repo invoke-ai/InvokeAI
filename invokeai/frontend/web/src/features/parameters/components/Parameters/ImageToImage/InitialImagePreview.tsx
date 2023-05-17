@@ -14,11 +14,6 @@ import { initialImageSelected } from 'features/parameters/store/actions';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinner';
 import { FaImage } from 'react-icons/fa';
-import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
-} from '../../../../../services/thunks/gallery';
-import configSlice from '../../../../system/store/configSlice';
 import { configSelector } from '../../../../system/store/configSelectors';
 
 const selector = createSelector(
