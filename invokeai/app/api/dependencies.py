@@ -1,9 +1,13 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
+from types import ModuleType
+from invokeai.app.services.database.images.sqlite_images_db_service import (
+    SqliteImageDb,
+)
+from invokeai.app.services.urls import LocalUrlService
 
 import invokeai.backend.util.logging as logger
-from typing import types
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -17,6 +21,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.metadata import PngMetadataService
+from ..services.results import SqliteResultsService
 from .events import FastAPIEventService
 
 
@@ -50,28 +55,41 @@ class ApiDependencies:
             os.path.join(os.path.dirname(__file__), "../../../../outputs")
         )
 
-        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
+        latents = ForwardCacheLatentsStorage(
+            DiskLatentsStorage(f"{output_folder}/latents")
+        )
 
         metadata = PngMetadataService()
 
-        images = DiskImageStorage(f'{output_folder}/images', metadata_service=metadata)
+        urls = LocalUrlService()
+
+        images = DiskImageStorage(f"{output_folder}/images", metadata_service=metadata)
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
 
+        graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+            filename=db_location, table_name="graph_executions"
+        )
+
+        images_db = SqliteImageDb(filename=db_location)
+
+        # register event handler to update the `results` table when a graph execution state is inserted or updated
+        # graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
+
         services = InvocationServices(
-            model_manager=get_model_manager(config,logger),
+            model_manager=get_model_manager(config, logger),
             events=events,
             latents=latents,
             images=images,
             metadata=metadata,
+            images_db=images_db,
+            urls=urls,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"
             ),
-            graph_execution_manager=SqliteItemStorage[GraphExecutionState](
-                filename=db_location, table_name="graph_executions"
-            ),
+            graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             restoration=RestorationServices(config,logger),
             configuration=config,

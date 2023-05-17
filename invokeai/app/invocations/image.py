@@ -31,7 +31,7 @@ class ImageOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
 
     # fmt: off
-    type: Literal["image"] = "image"
+    type: Literal["image_output"] = "image_output"
     image:      ImageField = Field(default=None, description="The output image")
     width:             int = Field(description="The width of the image in pixels")
     height:            int = Field(description="The height of the image in pixels")
