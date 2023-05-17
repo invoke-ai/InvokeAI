@@ -10,6 +10,7 @@ from .image_storage import ImageStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
 from .item_storage import ItemStorageABC
+from invokeai.app.services.results import ResultsServiceABC
 
 class InvocationServices:
     """Services that can be used by invocations"""
@@ -21,6 +22,7 @@ class InvocationServices:
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
+    results: ResultsServiceABC
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: ItemStorageABC["LibraryGraph"]
@@ -36,6 +38,7 @@ class InvocationServices:
             images: ImageStorageBase,
             metadata: MetadataServiceBase,
             queue: InvocationQueueABC,
+            results: ResultsServiceABC,
             graph_library: ItemStorageABC["LibraryGraph"],
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
             processor: "InvocationProcessorABC",
@@ -48,6 +51,7 @@ class InvocationServices:
         self.images = images
         self.metadata = metadata
         self.queue = queue
+        self.results = results
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager
         self.processor = processor

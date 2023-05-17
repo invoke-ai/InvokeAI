@@ -18,6 +18,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.metadata import PngMetadataService
+from ..services.results import SqliteResultsService
 from .events import FastAPIEventService
 
 
@@ -69,6 +70,14 @@ class ApiDependencies:
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
 
+        results = SqliteResultsService(filename=db_location)
+
+        graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+            filename=db_location, table_name="graph_executions"
+        )
+
+        graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
+
         services = InvocationServices(
             model_manager=get_model_manager(config,logger),
             events=events,
@@ -76,13 +85,12 @@ class ApiDependencies:
             latents=latents,
             images=images,
             metadata=metadata,
+            results=results,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"
             ),
-            graph_execution_manager=SqliteItemStorage[GraphExecutionState](
-                filename=db_location, table_name="graph_executions"
-            ),
+            graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             restoration=RestorationServices(config,logger),
         )
