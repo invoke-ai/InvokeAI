@@ -700,12 +700,9 @@ def write_opts(opts: Namespace, init_file: Path):
     for key,value in opts.__dict__.items():
         if hasattr(config,key):
             setattr(config,key,value)
-            
+
     with open(init_file,'w', encoding='utf-8') as file:
         file.write(config.to_yaml())
-        
-    if opts.hf_token:
-        HfLogin(opts.hf_token)
 
 # -------------------------------------
 def default_output_dir() -> Path:
@@ -722,7 +719,6 @@ def default_lora_dir() -> Path:
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
     opt = default_startup_options(initfile)
-    opt.hf_token = HfFolder.get_token()
     write_opts(opt, initfile)
 
 # -------------------------------------
@@ -733,7 +729,7 @@ def write_default_options(program_opts: Namespace, initfile: Path):
 def migrate_init_file(legacy_format:Path):
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
     new = InvokeAIAppConfig(conf={})
-    
+
     fields = list(get_type_hints(InvokeAIAppConfig).keys())
     for attr in fields:
         if hasattr(old,attr):
@@ -751,7 +747,7 @@ def migrate_init_file(legacy_format:Path):
         outfile.write(new.to_yaml())
 
     legacy_format.replace(legacy_format.parent / 'invokeai.init.old')
-    
+
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
@@ -822,8 +818,8 @@ def main():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
             config = get_invokeai_config()  # reread defaults
-            
-            
+
+
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)
 
