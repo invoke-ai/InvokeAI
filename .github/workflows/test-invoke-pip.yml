@@ -105,12 +105,6 @@ jobs:
         id: run-pytest
         run: pytest
 
-      - name: set INVOKEAI_OUTDIR
-        run: >
-          python -c
-          "import os;from invokeai.backend.globals import Globals;OUTDIR=os.path.join(Globals.root,str('outputs'));print(f'INVOKEAI_OUTDIR={OUTDIR}')"
-          >> ${{ matrix.github-env }}
-
       - name: run invokeai-configure
         id: run-preload-models
         env:
@@ -129,6 +123,7 @@ jobs:
           HF_HUB_OFFLINE: 1
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
+          INVOKEAI_OUTDIR: ${{ github.workspace }}/results
         run: >
           invokeai
           --no-patchmatch
@@ -140,6 +135,8 @@ jobs:
 
       - name: Archive results
         id: archive-results
+        env:
+          INVOKEAI_OUTDIR: ${{ github.workspace }}/results
         uses: actions/upload-artifact@v3
         with:
           name: results
