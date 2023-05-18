@@ -65,6 +65,7 @@ import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/U
 import { allParametersSet } from 'features/parameters/store/generationSlice';
 import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 import { useAppToaster } from 'app/components/Toaster';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -335,7 +336,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     dispatch(sentImageToCanvas());
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
-    // dispatch(setInitialCanvasImage(selectedImage));
+    dispatch(setInitialCanvasImage(image));
     dispatch(requestCanvasRescale());
 
     if (activeTabName !== 'unifiedCanvas') {
