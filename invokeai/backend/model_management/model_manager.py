@@ -224,8 +224,8 @@ class ModelManager(object):
             raise ValueError('config argument must be an OmegaConf object, a Path or a string')
 
         # check config version number and update on disk/RAM if necessary
-        self._update_config_file_version()
         self.globals = get_invokeai_config()
+        self._update_config_file_version()
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,

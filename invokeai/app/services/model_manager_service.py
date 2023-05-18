@@ -14,7 +14,7 @@ from invokeai.backend.model_management.model_manager import (
     SDModelInfo,
 )
 from invokeai.app.models.exceptions import CanceledException
-from ...backend import Args, Globals # this must go when pr 3340 merged
+from .config import InvokeAIAppConfig
 from ...backend.util import choose_precision, choose_torch_device
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class ModelManagerServiceBase(ABC):
     @abstractmethod
     def __init__(
         self,
-        config: Args,
+        config: InvokeAIAppConfig,
         logger: types.ModuleType,
     ):
         """
@@ -248,7 +248,7 @@ class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory"""
     def __init__(
         self,
-        config: Args,
+        config: InvokeAIAppConfig,
         logger: types.ModuleType,
     ):
         """
@@ -257,10 +257,10 @@ class ModelManagerService(ModelManagerServiceBase):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-        if config.conf and Path(config.conf).exists():
-            config_file = config.conf
+        if config.model_conf_path and config.model_conf_path.exists():
+            config_file = config.model_conf_path
         else:
-            config_file = Path(Globals.root, "configs", "models.yaml")
+            config_file = config.root_dir / "configs/models.yaml"
         if not config_file.exists():
             raise IOError(f"The file {config_file} could not be found.")
 

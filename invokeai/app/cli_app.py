@@ -204,7 +204,6 @@ def invoke_cli():
         sys.stdin = open(infile,"r")
     
     model_manager = ModelManagerService(config,logger)
-    set_autocompleter(model_manager)
 
     events = EventServiceBase()
     output_folder = config.output_path
@@ -231,9 +230,11 @@ def invoke_cli():
         logger=logger,
         configuration=config,
     )
+    
 
     system_graphs = create_system_graphs(services.graph_library)
     system_graph_names = set([g.name for g in system_graphs])
+    set_autocompleter(services)
 
     invoker = Invoker(services)
     session: GraphExecutionState = invoker.create_execution_state()
