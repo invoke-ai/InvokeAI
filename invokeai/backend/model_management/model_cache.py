@@ -232,7 +232,7 @@ class DiffusersModelInfo(ModelInfoBase):
                 model = self.child_types[child_type].from_pretrained(
                     self.repo_id_or_path,
                     subfolder=child_type.value,
-                    cache_dir=get_invokeai_config.cache_dir('hub'),
+                    cache_dir=get_invokeai_config().cache_dir,
                     torch_dtype=torch_dtype,
                     variant=variant,
                 )
@@ -347,7 +347,7 @@ class ClassifierModelInfo(ModelInfoBase):
         model = self.child_types[child_type].from_pretrained(
             self.repo_id_or_path,
             subfolder=child_type.value,
-            cache_dir=get_invokeai_config().cache_dir('hub'),
+            cache_dir=get_invokeai_config().cache_dir,
             torch_dtype=torch_dtype,
         )
         # calc more accurate size
@@ -392,7 +392,7 @@ class VaeModelInfo(ModelInfoBase):
 
         model = self.vae_type.from_pretrained(
             self.repo_id_or_path,
-            cache_dir=get_invokeai_config().cache_dir('hub'),
+            cache_dir=get_invokeai_config().cache_dir,
             torch_dtype=torch_dtype,
         )
         # calc more accurate size
