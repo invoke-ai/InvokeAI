@@ -5,12 +5,17 @@
 import type { AddInvocation } from './AddInvocation';
 import type { BlurInvocation } from './BlurInvocation';
 import type { CollectInvocation } from './CollectInvocation';
+import type { CompelInvocation } from './CompelInvocation';
 import type { CropImageInvocation } from './CropImageInvocation';
 import type { CvInpaintInvocation } from './CvInpaintInvocation';
 import type { DivideInvocation } from './DivideInvocation';
 import type { Edge } from './Edge';
 import type { GraphInvocation } from './GraphInvocation';
 import type { ImageToImageInvocation } from './ImageToImageInvocation';
+import type { ImageToLatentsInvocation } from './ImageToLatentsInvocation';
+import type { InfillColorInvocation } from './InfillColorInvocation';
+import type { InfillPatchMatchInvocation } from './InfillPatchMatchInvocation';
+import type { InfillTileInvocation } from './InfillTileInvocation';
 import type { InpaintInvocation } from './InpaintInvocation';
 import type { InverseLerpInvocation } from './InverseLerpInvocation';
 import type { IterateInvocation } from './IterateInvocation';
@@ -23,6 +28,7 @@ import type { MultiplyInvocation } from './MultiplyInvocation';
 import type { NoiseInvocation } from './NoiseInvocation';
 import type { ParamIntInvocation } from './ParamIntInvocation';
 import type { PasteImageInvocation } from './PasteImageInvocation';
+import type { RandomIntInvocation } from './RandomIntInvocation';
 import type { RandomRangeInvocation } from './RandomRangeInvocation';
 import type { RangeInvocation } from './RangeInvocation';
 import type { ResizeLatentsInvocation } from './ResizeLatentsInvocation';
@@ -42,7 +48,7 @@ export type Graph = {
   /**
    * The nodes in this graph
    */
-  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
+  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | CompelInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
   /**
    * The connections between nodes and their fields in this graph
    */

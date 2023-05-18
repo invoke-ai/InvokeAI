@@ -15,7 +15,6 @@ export type Rect = Coordinates & Dimensions;
 export interface UIState {
   activeTab: number;
   currentTheme: string;
-  parametersPanelScrollPosition: number;
   shouldPinParametersPanel: boolean;
   shouldShowParametersPanel: boolean;
   shouldShowImageDetails: boolean;
@@ -26,10 +25,6 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
-  openLinearAccordionItems: number[];
-  openGenerateAccordionItems: number[];
-  openUnifiedCanvasAccordionItems: number[];
-  floatingProgressImageRect: Rect;
-  shouldShowProgressImages: boolean;
-  shouldAutoShowProgressImages: boolean;
+  shouldShowProgressInViewer: boolean;
+  schedulers: string[];
 }

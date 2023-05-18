@@ -1,17 +1,28 @@
 // TODO: use Enums?
 
-export const DIFFUSERS_SCHEDULERS: Array<string> = [
+export const SCHEDULERS = [
   'ddim',
-  'plms',
-  'k_lms',
-  'dpmpp_2',
-  'k_dpm_2',
-  'k_dpm_2_a',
-  'k_dpmpp_2',
-  'k_euler',
-  'k_euler_a',
-  'k_heun',
-];
+  'lms',
+  'euler',
+  'euler_k',
+  'euler_a',
+  'dpmpp_2s',
+  'dpmpp_2m',
+  'dpmpp_2m_k',
+  'kdpm_2',
+  'kdpm_2_a',
+  'deis',
+  'ddpm',
+  'pndm',
+  'heun',
+  'heun_k',
+  'unipc',
+] as const;
+
+export type Scheduler = (typeof SCHEDULERS)[number];
+
+export const isScheduler = (x: string): x is Scheduler =>
+  SCHEDULERS.includes(x as Scheduler);
 
 // Valid image widths
 export const WIDTHS: Array<number> = Array.from(Array(64)).map(

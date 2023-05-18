@@ -3,16 +3,14 @@ import { SystemState } from './systemSlice';
 /**
  * System slice persist denylist
  */
-const itemsToDenylist: (keyof SystemState)[] = [
+export const systemPersistDenylist: (keyof SystemState)[] = [
   'currentIteration',
-  'currentStatus',
   'currentStep',
   'isCancelable',
   'isConnected',
   'isESRGANAvailable',
   'isGFPGANAvailable',
   'isProcessing',
-  'socketId',
   'totalIterations',
   'totalSteps',
   'openModel',
@@ -20,8 +18,6 @@ const itemsToDenylist: (keyof SystemState)[] = [
   'progressImage',
   'wereModelsReceived',
   'wasSchemaParsed',
+  'isPersisted',
+  'isUploading',
 ];
-
-export const systemDenylist = itemsToDenylist.map(
-  (denylistItem) => `system.${denylistItem}`
-);

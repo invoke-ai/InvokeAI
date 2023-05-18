@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Tuple
 from pydantic import BaseModel, Field
 
 
@@ -27,3 +27,13 @@ class ImageField(BaseModel):
 
     class Config:
         schema_extra = {"required": ["image_type", "image_name"]}
+
+
+class ColorField(BaseModel):
+    r: int = Field(ge=0, le=255, description="The red component")
+    g: int = Field(ge=0, le=255, description="The green component")
+    b: int = Field(ge=0, le=255, description="The blue component")
+    a: int = Field(ge=0, le=255, description="The alpha component")
+
+    def tuple(self) -> Tuple[int, int, int, int]:
+        return (self.r, self.g, self.b, self.a)

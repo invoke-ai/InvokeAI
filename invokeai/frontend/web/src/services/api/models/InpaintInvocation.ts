@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { ColorField } from './ColorField';
 import type { ImageField } from './ImageField';
 
 /**
@@ -18,7 +19,7 @@ export type InpaintInvocation = {
    */
   prompt?: string;
   /**
-   * The seed to use (-1 for a random seed)
+   * The seed to use (omit for random)
    */
   seed?: number;
   /**
@@ -40,19 +41,11 @@ export type InpaintInvocation = {
   /**
    * The scheduler to use
    */
-  scheduler?: 'ddim' | 'dpmpp_2' | 'k_dpm_2' | 'k_dpm_2_a' | 'k_dpmpp_2' | 'k_euler' | 'k_euler_a' | 'k_heun' | 'k_lms' | 'plms';
-  /**
-   * Whether or not to generate an image that can tile without seams
-   */
-  seamless?: boolean;
+  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'pndm' | 'heun' | 'heun_k' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'unipc';
   /**
    * The model to use (currently ignored)
    */
   model?: string;
-  /**
-   * Whether or not to produce progress images during generation
-   */
-  progress_images?: boolean;
   /**
    * The input image
    */
@@ -69,6 +62,42 @@ export type InpaintInvocation = {
    * The mask
    */
   mask?: ImageField;
+  /**
+   * The seam inpaint size (px)
+   */
+  seam_size?: number;
+  /**
+   * The seam inpaint blur radius (px)
+   */
+  seam_blur?: number;
+  /**
+   * The seam inpaint strength
+   */
+  seam_strength?: number;
+  /**
+   * The number of steps to use for seam inpaint
+   */
+  seam_steps?: number;
+  /**
+   * The tile infill method size (px)
+   */
+  tile_size?: number;
+  /**
+   * The method used to infill empty regions (px)
+   */
+  infill_method?: 'patchmatch' | 'tile' | 'solid';
+  /**
+   * The width of the inpaint region (px)
+   */
+  inpaint_width?: number;
+  /**
+   * The height of the inpaint region (px)
+   */
+  inpaint_height?: number;
+  /**
+   * The solid infill method color
+   */
+  inpaint_fill?: ColorField;
   /**
    * The amount by which to replace masked areas with latent noise
    */

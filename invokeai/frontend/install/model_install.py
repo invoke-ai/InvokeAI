@@ -23,7 +23,6 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals, global_config_dir
 
 from ...backend.config.model_install_backend import (
     Dataset_path,
@@ -41,11 +40,13 @@ from .widgets import (
     TextBox,
     set_min_terminal_size,
 )
+from invokeai.app.services.config import get_invokeai_config
 
 # minimum size for the UI
 MIN_COLS = 120
 MIN_LINES = 45
 
+config = get_invokeai_config()
 
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
@@ -453,9 +454,9 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
-    Globals.root = os.path.expanduser(get_root(opt.root) or "")
+    config.root = os.path.expanduser(get_root(opt.root) or "")
 
-    if not global_config_dir().exists():
+    if not (config.conf_path / '..' ).exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )

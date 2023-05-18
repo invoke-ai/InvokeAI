@@ -28,6 +28,8 @@ export const $Graph = {
         }, {
           type: 'InverseLerpInvocation',
         }, {
+          type: 'CompelInvocation',
+        }, {
           type: 'NoiseInvocation',
         }, {
           type: 'TextToLatentsInvocation',
@@ -38,6 +40,8 @@ export const $Graph = {
         }, {
           type: 'ScaleLatentsInvocation',
         }, {
+          type: 'ImageToLatentsInvocation',
+        }, {
           type: 'AddInvocation',
         }, {
           type: 'SubtractInvocation',
@@ -45,6 +49,8 @@ export const $Graph = {
           type: 'MultiplyInvocation',
         }, {
           type: 'DivideInvocation',
+        }, {
+          type: 'RandomIntInvocation',
         }, {
           type: 'ParamIntInvocation',
         }, {
@@ -59,6 +65,12 @@ export const $Graph = {
           type: 'RestoreFaceInvocation',
         }, {
           type: 'TextToImageInvocation',
+        }, {
+          type: 'InfillColorInvocation',
+        }, {
+          type: 'InfillTileInvocation',
+        }, {
+          type: 'InfillPatchMatchInvocation',
         }, {
           type: 'GraphInvocation',
         }, {

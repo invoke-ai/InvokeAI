@@ -1,44 +1,36 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { invocationComplete } from 'services/events/actions';
-import { isImageOutput } from 'services/types/guards';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
-import { imageUploaded } from 'services/thunks/image';
-import { SelectedImage } from 'features/parameters/store/generationSlice';
+import { Image } from 'app/types/invokeai';
+import { imageReceived, thumbnailReceived } from 'services/thunks/image';
+import {
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
+} from '../../../services/thunks/gallery';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export interface GalleryState {
-  /**
-   * The selected image
-   */
-  selectedImage?: SelectedImage;
+  selectedImage?: Image;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
-  galleryWidth: number;
   shouldUseSingleGalleryColumn: boolean;
   currentCategory: 'results' | 'uploads';
 }
 
-const initialState: GalleryState = {
-  selectedImage: undefined,
+export const initialGalleryState: GalleryState = {
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
-  galleryWidth: 300,
   shouldUseSingleGalleryColumn: false,
   currentCategory: 'results',
 };
 
 export const gallerySlice = createSlice({
   name: 'gallery',
-  initialState,
+  initialState: initialGalleryState,
   reducers: {
-    imageSelected: (
-      state,
-      action: PayloadAction<SelectedImage | undefined>
-    ) => {
+    imageSelected: (state, action: PayloadAction<Image | undefined>) => {
       state.selectedImage = action.payload;
       // TODO: if the user selects an image, disable the auto switch?
       // state.shouldAutoSwitchToNewImages = false;
@@ -61,9 +53,6 @@ export const gallerySlice = createSlice({
     ) => {
       state.currentCategory = action.payload;
     },
-    setGalleryWidth: (state, action: PayloadAction<number>) => {
-      state.galleryWidth = action.payload;
-    },
     setShouldUseSingleGalleryColumn: (
       state,
       action: PayloadAction<boolean>
@@ -72,27 +61,54 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers(builder) {
-    /**
-     * Invocation Complete
-     */
-    builder.addCase(invocationComplete, (state, action) => {
-      const { data } = action.payload;
-      if (isImageOutput(data.result) && state.shouldAutoSwitchToNewImages) {
-        state.selectedImage = {
-          name: data.result.image.image_name,
-          type: 'results',
-        };
+    builder.addCase(imageReceived.fulfilled, (state, action) => {
+      // When we get an updated URL for an image, we need to update the selectedImage in gallery,
+      // which is currently its own object (instead of a reference to an image in results/uploads)
+      const { imagePath } = action.payload;
+      const { imageName } = action.meta.arg;
+
+      if (state.selectedImage?.name === imageName) {
+        state.selectedImage.url = imagePath;
       }
     });
 
-    /**
-     * Upload Image - FULFILLED
-     */
-    builder.addCase(imageUploaded.fulfilled, (state, action) => {
-      const { response } = action.payload;
+    builder.addCase(thumbnailReceived.fulfilled, (state, action) => {
+      // When we get an updated URL for an image, we need to update the selectedImage in gallery,
+      // which is currently its own object (instead of a reference to an image in results/uploads)
+      const { thumbnailPath } = action.payload;
+      const { thumbnailName } = action.meta.arg;
 
-      const uploadedImage = deserializeImageResponse(response);
-      state.selectedImage = { name: uploadedImage.name, type: 'uploads' };
+      if (state.selectedImage?.name === thumbnailName) {
+        state.selectedImage.thumbnail = thumbnailPath;
+      }
+    });
+    builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
+      // rehydrate selectedImage URL when results list comes in
+      // solves case when outdated URL is in local storage
+      const selectedImage = state.selectedImage;
+      if (selectedImage) {
+        const selectedImageInResults = action.payload.items.find(
+          (image) => image.image_name === selectedImage.name
+        );
+        if (selectedImageInResults) {
+          selectedImage.url = selectedImageInResults.image_url;
+          state.selectedImage = selectedImage;
+        }
+      }
+    });
+    builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
+      // rehydrate selectedImage URL when results list comes in
+      // solves case when outdated URL is in local storage
+      const selectedImage = state.selectedImage;
+      if (selectedImage) {
+        const selectedImageInResults = action.payload.items.find(
+          (image) => image.image_name === selectedImage.name
+        );
+        if (selectedImageInResults) {
+          selectedImage.url = selectedImageInResults.image_url;
+          state.selectedImage = selectedImage;
+        }
+      }
     });
   },
 });
@@ -102,7 +118,6 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
-  setGalleryWidth,
   setShouldUseSingleGalleryColumn,
   setCurrentCategory,
 } = gallerySlice.actions;

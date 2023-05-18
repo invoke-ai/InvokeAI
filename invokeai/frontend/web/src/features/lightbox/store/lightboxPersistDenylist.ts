@@ -3,8 +3,6 @@ import { LightboxState } from './lightboxSlice';
 /**
  * Lightbox slice persist denylist
  */
-const itemsToDenylist: (keyof LightboxState)[] = ['isLightboxOpen'];
-
-export const lightboxDenylist = itemsToDenylist.map(
-  (denylistItem) => `lightbox.${denylistItem}`
-);
+export const lightboxPersistDenylist: (keyof LightboxState)[] = [
+  'isLightboxOpen',
+];

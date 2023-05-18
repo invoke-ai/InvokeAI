@@ -2,7 +2,6 @@ import { Box, Flex } from '@chakra-ui/layout';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInput from 'common/components/IAIInput';
-import { Panel } from 'reactflow';
 import { map } from 'lodash-es';
 import {
   ChangeEvent,
@@ -17,11 +16,11 @@ import {
 import { Tooltip } from '@chakra-ui/tooltip';
 import { AnyInvocationType } from 'services/events/types';
 import { useBuildInvocation } from 'features/nodes/hooks/useBuildInvocation';
-import { makeToast } from 'features/system/hooks/useToastWatcher';
 import { addToast } from 'features/system/store/systemSlice';
 import { nodeAdded } from '../../store/nodesSlice';
 import Fuse from 'fuse.js';
 import { InvocationTemplate } from 'features/nodes/types/types';
+import { useAppToaster } from 'app/components/Toaster';
 
 interface NodeListItemProps {
   title: string;
@@ -64,6 +63,7 @@ const NodeSearch = () => {
 
   const buildInvocation = useBuildInvocation();
   const dispatch = useAppDispatch();
+  const toaster = useAppToaster();
 
   const [searchText, setSearchText] = useState<string>('');
   const [showNodeList, setShowNodeList] = useState<boolean>(false);
@@ -90,17 +90,16 @@ const NodeSearch = () => {
       const invocation = buildInvocation(nodeType);
 
       if (!invocation) {
-        const toast = makeToast({
+        toaster({
           status: 'error',
           title: `Unknown Invocation type ${nodeType}`,
         });
-        dispatch(addToast(toast));
         return;
       }
 
       dispatch(nodeAdded(invocation));
     },
-    [dispatch, buildInvocation]
+    [dispatch, buildInvocation, toaster]
   );
 
   const renderNodeList = () => {
@@ -192,19 +191,17 @@ const NodeSearch = () => {
   };
 
   return (
-    <Panel position="top-left">
-      <Flex
-        flexDirection="column"
-        tabIndex={1}
-        onKeyDown={searchKeyHandler}
-        onFocus={() => setShowNodeList(true)}
-        onBlur={searchInputBlurHandler}
-        ref={nodeSearchRef}
-      >
-        <IAIInput value={searchText} onChange={findNode} />
-        {showNodeList && renderNodeList()}
-      </Flex>
-    </Panel>
+    <Flex
+      flexDirection="column"
+      tabIndex={1}
+      onKeyDown={searchKeyHandler}
+      onFocus={() => setShowNodeList(true)}
+      onBlur={searchInputBlurHandler}
+      ref={nodeSearchRef}
+    >
+      <IAIInput value={searchText} onChange={findNode} />
+      {showNodeList && renderNodeList()}
+    </Flex>
   );
 };
 

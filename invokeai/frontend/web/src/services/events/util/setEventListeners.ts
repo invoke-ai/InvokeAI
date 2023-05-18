@@ -22,18 +22,18 @@ import {
 } from 'services/thunks/gallery';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
-import { makeToast } from '../../../features/system/hooks/useToastWatcher';
+import { makeToast } from '../../../app/components/Toaster';
 import { addToast } from '../../../features/system/store/systemSlice';
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;
-  store: MiddlewareAPI<AppDispatch, RootState>;
+  storeApi: MiddlewareAPI<AppDispatch, RootState>;
   log: Logger<JsonObject>;
 };
 
 export const setEventListeners = (arg: SetEventListenersArg) => {
-  const { socket, store, log } = arg;
-  const { dispatch, getState } = store;
+  const { socket, storeApi, log } = arg;
+  const { dispatch, getState } = storeApi;
 
   /**
    * Connect
@@ -82,11 +82,18 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('connect_error', (error) => {
     if (error && error.message) {
-      dispatch(
-        addToast(
-          makeToast({ title: error.message, status: 'error', duration: 10000 })
-        )
-      );
+      const data: string | undefined = (error as any).data;
+      if (data === 'ERR_UNAUTHENTICATED') {
+        dispatch(
+          addToast(
+            makeToast({
+              title: error.message,
+              status: 'error',
+              duration: 10000,
+            })
+          )
+        );
+      }
     }
   });
 

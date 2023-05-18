@@ -1,6 +1,5 @@
 import { Flex, Heading, Icon } from '@chakra-ui/react';
-import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
-import { useContext } from 'react';
+import useImageUploader from 'common/hooks/useImageUploader';
 import { FaUpload } from 'react-icons/fa';
 
 type ImageUploaderButtonProps = {
@@ -9,11 +8,7 @@ type ImageUploaderButtonProps = {
 
 const ImageUploaderButton = (props: ImageUploaderButtonProps) => {
   const { styleClass } = props;
-  const open = useContext(ImageUploaderTriggerContext);
-
-  const handleClickUpload = () => {
-    open && open();
-  };
+  const { openUploader } = useImageUploader();
 
   return (
     <Flex
@@ -26,7 +21,7 @@ const ImageUploaderButton = (props: ImageUploaderButtonProps) => {
       className={styleClass}
     >
       <Flex
-        onClick={handleClickUpload}
+        onClick={openUploader}
         sx={{
           display: 'flex',
           flexDirection: 'column',

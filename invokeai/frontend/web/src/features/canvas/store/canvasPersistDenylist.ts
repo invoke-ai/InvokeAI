@@ -3,12 +3,8 @@ import { CanvasState } from './canvasTypes';
 /**
  * Canvas slice persist denylist
  */
-const itemsToDenylist: (keyof CanvasState)[] = [
+export const canvasPersistDenylist: (keyof CanvasState)[] = [
   'cursorPosition',
   'isCanvasInitialized',
   'doesCanvasNeedScaling',
 ];
-
-export const canvasDenylist = itemsToDenylist.map(
-  (denylistItem) => `canvas.${denylistItem}`
-);

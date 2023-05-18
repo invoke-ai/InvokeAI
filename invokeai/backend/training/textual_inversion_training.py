@@ -7,7 +7,6 @@
 This is the backend to "textual_inversion.py"
 """
 
-import argparse
 import logging
 import math
 import os
@@ -45,8 +44,25 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
-from ..args import ArgFormatter, PagingArgumentParser
-from ..globals import Globals, global_cache_dir
+from invokeai.app.services.config import InvokeAIAppConfig,PagingArgumentParser
+
+if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
+    PIL_INTERPOLATION = {
+        "linear": PIL.Image.Resampling.BILINEAR,
+        "bilinear": PIL.Image.Resampling.BILINEAR,
+        "bicubic": PIL.Image.Resampling.BICUBIC,
+        "lanczos": PIL.Image.Resampling.LANCZOS,
+        "nearest": PIL.Image.Resampling.NEAREST,
+    }
+else:
+    PIL_INTERPOLATION = {
+        "linear": PIL.Image.LINEAR,
+        "bilinear": PIL.Image.BILINEAR,
+        "bicubic": PIL.Image.BICUBIC,
+        "lanczos": PIL.Image.LANCZOS,
+        "nearest": PIL.Image.NEAREST,
+    }
+
 # ------------------------------------------------------------------------------
 
 
@@ -71,8 +87,9 @@ def save_progress(
 
 
 def parse_args():
+    config = InvokeAIAppConfig(argv=[])
     parser = PagingArgumentParser(
-        description="Textual inversion training", formatter_class=ArgFormatter
+        description="Textual inversion training"
     )
     general_group = parser.add_argument_group("General")
     model_group = parser.add_argument_group("Models and Paths")
@@ -93,7 +110,7 @@ def parse_args():
         "--root_dir",
         "--root",
         type=Path,
-        default=Globals.root,
+        default=config.root,
         help="Path to the invokeai runtime directory",
     )
     general_group.add_argument(
@@ -108,7 +125,7 @@ def parse_args():
     general_group.add_argument(
         "--output_dir",
         type=Path,
-        default=f"{Globals.root}/text-inversion-model",
+        default=f"{config.root}/text-inversion-model",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     model_group.add_argument(
@@ -504,6 +521,7 @@ def get_full_repo_name(
 
 
 def do_textual_inversion_training(
+    config: InvokeAIAppConfig,
     model: str,
     train_data_dir: Path,
     output_dir: Path,
@@ -556,7 +574,7 @@ def do_textual_inversion_training(
 
     # setting up things the way invokeai expects them
     if not os.path.isabs(output_dir):
-        output_dir = os.path.join(Globals.root, output_dir)
+        output_dir = os.path.join(config.root, output_dir)
 
     logging_dir = output_dir / logging_dir
 
@@ -604,7 +622,7 @@ def do_textual_inversion_training(
         elif output_dir is not None:
             os.makedirs(output_dir, exist_ok=True)
 
-    models_conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
+    models_conf = OmegaConf.load(config.model_conf_path)
     model_conf = models_conf.get(model, None)
     assert model_conf is not None, f"Unknown model: {model}"
     assert (
@@ -616,7 +634,7 @@ def do_textual_inversion_training(
     assert (
         pretrained_model_name_or_path
     ), f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
-    pipeline_args = dict(cache_dir=global_cache_dir("hub"))
+    pipeline_args = dict(cache_dir=config.cache_dir)
 
     # Load tokenizer
     if tokenizer_name:

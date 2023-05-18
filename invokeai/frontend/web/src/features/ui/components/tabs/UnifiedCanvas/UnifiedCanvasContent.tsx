@@ -1,6 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-// import IAICanvas from 'features/canvas/components/IAICanvas';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
@@ -9,7 +8,7 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { isEqual } from 'lodash-es';
 
-import { useLayoutEffect } from 'react';
+import { memo, useLayoutEffect } from 'react';
 
 const selector = createSelector(
   [canvasSelector],
@@ -80,4 +79,4 @@ const UnifiedCanvasContent = () => {
   );
 };
 
-export default UnifiedCanvasContent;
+export default memo(UnifiedCanvasContent);

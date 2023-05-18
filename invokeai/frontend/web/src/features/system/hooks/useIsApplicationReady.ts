@@ -1,5 +1,4 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
 import { configSelector } from '../store/configSelectors';

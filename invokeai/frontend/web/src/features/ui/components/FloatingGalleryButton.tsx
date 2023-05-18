@@ -16,7 +16,7 @@ const floatingGalleryButtonSelector = createSelector(
 
     return {
       shouldPinGallery,
-      shouldShowGalleryButton: !shouldPinGallery || !shouldShowGallery,
+      shouldShowGalleryButton: !shouldShowGallery,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }
@@ -44,7 +44,6 @@ const FloatingGalleryButton = () => {
         pos: 'absolute',
         top: '50%',
         transform: 'translate(0, -50%)',
-        zIndex: 31,
         p: 0,
         insetInlineEnd: 0,
         px: 3,

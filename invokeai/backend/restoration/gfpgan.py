@@ -7,14 +7,13 @@ import torch
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals
+from invokeai.app.services.config import get_invokeai_config
 
 class GFPGAN:
     def __init__(self, gfpgan_model_path="models/gfpgan/GFPGANv1.4.pth") -> None:
+        self.globals = get_invokeai_config()
         if not os.path.isabs(gfpgan_model_path):
-            gfpgan_model_path = os.path.abspath(
-                os.path.join(Globals.root, gfpgan_model_path)
-            )
+            gfpgan_model_path = self.globals.root_dir / gfpgan_model_path
         self.model_path = gfpgan_model_path
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
 
@@ -33,7 +32,7 @@ class GFPGAN:
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
             cwd = os.getcwd()
-            os.chdir(os.path.join(Globals.root, "models"))
+            os.chdir(self.globals.root_dir / 'models')
             try:
                 from gfpgan import GFPGANer
 

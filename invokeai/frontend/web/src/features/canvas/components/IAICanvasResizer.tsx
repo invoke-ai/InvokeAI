@@ -81,7 +81,7 @@ const IAICanvasResizer = () => {
         height: '100%',
       }}
     >
-      <Spinner thickness="2px" speed="1s" size="xl" />
+      <Spinner thickness="2px" size="xl" />
     </Flex>
   );
 };

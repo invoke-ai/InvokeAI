@@ -12,12 +12,10 @@
  * 'gfpgan'.
  */
 
-import { GalleryCategory } from 'features/gallery/store/gallerySlice';
-import { FacetoolType } from 'features/parameters/store/postprocessingSlice';
+import { SelectedImage } from 'features/parameters/store/actions';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 import { ImageResponseMetadata, ImageType } from 'services/api';
-import { AnyInvocation } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
 /**
@@ -49,15 +47,21 @@ export type CommonGeneratedImageMetadata = {
   postprocessing: null | Array<ESRGANMetadata | FacetoolMetadata>;
   sampler:
     | 'ddim'
-    | 'k_dpm_2_a'
-    | 'k_dpm_2'
-    | 'k_dpmpp_2_a'
-    | 'k_dpmpp_2'
-    | 'k_euler_a'
-    | 'k_euler'
-    | 'k_heun'
-    | 'k_lms'
-    | 'plms';
+    | 'ddpm'
+    | 'deis'
+    | 'lms'
+    | 'pndm'
+    | 'heun'
+    | 'heun_k'
+    | 'euler'
+    | 'euler_k'
+    | 'euler_a'
+    | 'kdpm_2'
+    | 'kdpm_2_a'
+    | 'dpmpp_2s'
+    | 'dpmpp_2m'
+    | 'dpmpp_2m_k'
+    | 'unipc';
   prompt: Prompt;
   seed: number;
   variations: SeedWeights;
@@ -124,6 +128,14 @@ export type Image = {
   url: string;
   thumbnail: string;
   metadata: ImageResponseMetadata;
+};
+
+export const isInvokeAIImage = (obj: Image | SelectedImage): obj is Image => {
+  if ('url' in obj && 'thumbnail' in obj) {
+    return true;
+  }
+
+  return false;
 };
 
 /**
@@ -270,7 +282,7 @@ export type FoundModelResponse = {
 
 // export type SystemConfigResponse = SystemConfig;
 
-export type ImageResultResponse = Omit<_Image, 'uuid'> & {
+export type ImageResultResponse = Omit<Image, 'uuid'> & {
   boundingBox?: IRect;
   generationMode: InvokeTabName;
 };
@@ -315,11 +327,11 @@ export type AppFeature =
 /**
  * A disable-able Stable Diffusion feature
  */
-export type StableDiffusionFeature =
-  | 'noiseConfig'
-  | 'variations'
+export type SDFeature =
+  | 'noise'
+  | 'variation'
   | 'symmetry'
-  | 'tiling'
+  | 'seamless'
   | 'hires';
 
 /**
@@ -337,6 +349,7 @@ export type AppConfig = {
   shouldFetchImages: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
+  disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     iterations: {

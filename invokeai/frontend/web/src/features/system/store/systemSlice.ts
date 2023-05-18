@@ -15,8 +15,7 @@ import {
 } from 'services/events/actions';
 
 import { ProgressImage } from 'services/events/types';
-import { initialImageSelected } from 'features/parameters/store/generationSlice';
-import { makeToast } from '../hooks/useToastWatcher';
+import { makeToast } from '../../../app/components/Toaster';
 import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
@@ -24,8 +23,13 @@ import { LogLevelName } from 'roarr';
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { TFuncKey } from 'i18next';
 import { t } from 'i18next';
+import { userInvoked } from 'app/store/actions';
+import { LANGUAGES } from '../components/LanguagePicker';
+import { imageUploaded } from 'services/thunks/image';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
+
+export type InfillMethod = 'tile' | 'patchmatch';
 
 export interface SystemState {
   isGFPGANAvailable: boolean;
@@ -79,10 +83,21 @@ export interface SystemState {
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
   statusTranslationKey: TFuncKey;
+  /**
+   * When a session is canceled, its ID is stored here until a new session is created.
+   */
   canceledSession: string;
+  /**
+   * TODO: get this from backend
+   */
+  infillMethods: InfillMethod[];
+  isPersisted: boolean;
+  shouldAntialiasProgressImage: boolean;
+  language: keyof typeof LANGUAGES;
+  isUploading: boolean;
 }
 
-const initialSystemState: SystemState = {
+export const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
   shouldDisplayGuides: true,
@@ -101,6 +116,7 @@ const initialSystemState: SystemState = {
   foundModels: null,
   openModel: null,
   progressImage: null,
+  shouldAntialiasProgressImage: false,
   sessionId: null,
   cancelType: 'immediate',
   isCancelScheduled: false,
@@ -111,6 +127,10 @@ const initialSystemState: SystemState = {
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
+  infillMethods: ['tile', 'patchmatch'],
+  isPersisted: false,
+  language: 'en',
+  isUploading: false,
 };
 
 export const systemSlice = createSlice({
@@ -123,72 +143,14 @@ export const systemSlice = createSlice({
     setCurrentStatus: (state, action: PayloadAction<TFuncKey>) => {
       state.statusTranslationKey = action.payload;
     },
-    errorOccurred: (state) => {
-      state.isProcessing = false;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.statusTranslationKey = 'common.statusError';
-    },
-    setIsConnected: (state, action: PayloadAction<boolean>) => {
-      state.isConnected = action.payload;
-      state.isProcessing = false;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-    },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
     },
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
     },
-    processingCanceled: (state) => {
-      state.isProcessing = false;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.statusTranslationKey = 'common.statusProcessingCanceled';
-    },
-    generationRequested: (state) => {
-      state.isProcessing = true;
-      state.isCancelable = true;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.currentIteration = 0;
-      state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.statusTranslationKey = 'common.statusPreparing';
-    },
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
-    },
-    modelChangeRequested: (state) => {
-      state.statusTranslationKey = 'common.statusLoadingModel';
-      state.isCancelable = false;
-      state.isProcessing = true;
-      state.currentStatusHasSteps = false;
-    },
-    modelConvertRequested: (state) => {
-      state.statusTranslationKey = 'common.statusConvertingModel';
-      state.isCancelable = false;
-      state.isProcessing = true;
-      state.currentStatusHasSteps = false;
-    },
-    modelMergingRequested: (state) => {
-      state.statusTranslationKey = 'common.statusMergingModels';
-      state.isCancelable = false;
-      state.isProcessing = true;
-      state.currentStatusHasSteps = false;
     },
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
@@ -198,14 +160,6 @@ export const systemSlice = createSlice({
     },
     clearToastQueue: (state) => {
       state.toastQueue = [];
-    },
-    setProcessingIndeterminateTask: (
-      state,
-      action: PayloadAction<TFuncKey>
-    ) => {
-      state.isProcessing = true;
-      state.statusTranslationKey = action.payload;
-      state.currentStatusHasSteps = false;
     },
     setSearchFolder: (state, action: PayloadAction<string | null>) => {
       state.searchFolder = action.payload;
@@ -249,6 +203,18 @@ export const systemSlice = createSlice({
     shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldLogToConsole = action.payload;
     },
+    shouldAntialiasProgressImageChanged: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldAntialiasProgressImage = action.payload;
+    },
+    isPersistedChanged: (state, action: PayloadAction<boolean>) => {
+      state.isPersisted = action.payload;
+    },
+    languageChanged: (state, action: PayloadAction<keyof typeof LANGUAGES>) => {
+      state.language = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -269,8 +235,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Connected
      */
-    builder.addCase(socketConnected, (state, action) => {
-      const { timestamp } = action.payload;
+    builder.addCase(socketConnected, (state) => {
       state.isConnected = true;
       state.isCancelable = true;
       state.isProcessing = false;
@@ -285,9 +250,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Disconnected
      */
-    builder.addCase(socketDisconnected, (state, action) => {
-      const { timestamp } = action.payload;
-
+    builder.addCase(socketDisconnected, (state) => {
       state.isConnected = false;
       state.isProcessing = false;
       state.isCancelable = true;
@@ -302,7 +265,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(invocationStarted, (state, action) => {
+    builder.addCase(invocationStarted, (state) => {
       state.isCancelable = true;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
@@ -317,14 +280,7 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(generatorProgress, (state, action) => {
-      const {
-        step,
-        total_steps,
-        progress_image,
-        node,
-        source_node_id,
-        graph_execution_state_id,
-      } = action.payload.data;
+      const { step, total_steps, progress_image } = action.payload.data;
 
       state.isProcessing = true;
       state.isCancelable = true;
@@ -341,7 +297,7 @@ export const systemSlice = createSlice({
      * Invocation Complete
      */
     builder.addCase(invocationComplete, (state, action) => {
-      const { data, timestamp } = action.payload;
+      const { data } = action.payload;
 
       // state.currentIteration = 0;
       // state.totalIterations = 0;
@@ -349,6 +305,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusProcessingComplete';
+      state.progressImage = null;
 
       if (state.canceledSession === data.graph_execution_state_id) {
         state.isProcessing = false;
@@ -359,9 +316,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Error
      */
-    builder.addCase(invocationError, (state, action) => {
-      const { data, timestamp } = action.payload;
-
+    builder.addCase(invocationError, (state) => {
       state.isProcessing = false;
       state.isCancelable = true;
       // state.currentIteration = 0;
@@ -370,6 +325,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusError';
+      state.progressImage = null;
 
       state.toastQueue.push(
         makeToast({ title: t('toast.serverError'), status: 'error' })
@@ -380,7 +336,10 @@ export const systemSlice = createSlice({
      * Session Invoked - PENDING
      */
 
-    builder.addCase(sessionInvoked.pending, (state) => {
+    builder.addCase(userInvoked, (state) => {
+      state.isProcessing = true;
+      state.isCancelable = true;
+      state.currentStatusHasSteps = false;
       state.statusTranslationKey = 'common.statusPreparing';
     });
 
@@ -395,8 +354,6 @@ export const systemSlice = createSlice({
      * Session Canceled
      */
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
-      const { timestamp } = action.payload;
-
       state.canceledSession = action.meta.arg.sessionId;
       state.isProcessing = false;
       state.isCancelable = false;
@@ -404,6 +361,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusConnected';
+      state.progressImage = null;
 
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
@@ -413,22 +371,13 @@ export const systemSlice = createSlice({
     /**
      * Session Canceled
      */
-    builder.addCase(graphExecutionStateComplete, (state, action) => {
-      const { timestamp } = action.payload;
-
+    builder.addCase(graphExecutionStateComplete, (state) => {
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusConnected';
-    });
-
-    /**
-     * Initial Image Selected
-     */
-    builder.addCase(initialImageSelected, (state) => {
-      state.toastQueue.push(makeToast(t('toast.sentToImageToImage')));
     });
 
     /**
@@ -444,26 +393,39 @@ export const systemSlice = createSlice({
     builder.addCase(parsedOpenAPISchema, (state) => {
       state.wasSchemaParsed = true;
     });
+
+    /**
+     * Image Uploading Started
+     */
+    builder.addCase(imageUploaded.pending, (state) => {
+      state.isUploading = true;
+    });
+
+    /**
+     * Image Uploading Complete
+     */
+    builder.addCase(imageUploaded.rejected, (state) => {
+      state.isUploading = false;
+    });
+
+    /**
+     * Image Uploading Complete
+     */
+    builder.addCase(imageUploaded.fulfilled, (state) => {
+      state.isUploading = false;
+    });
   },
 });
 
 export const {
   setIsProcessing,
-  setIsConnected,
   setShouldConfirmOnDelete,
   setCurrentStatus,
   setShouldDisplayGuides,
-  processingCanceled,
-  errorOccurred,
   setIsCancelable,
-  modelChangeRequested,
-  modelConvertRequested,
-  modelMergingRequested,
   setEnableImageDebugging,
-  generationRequested,
   addToast,
   clearToastQueue,
-  setProcessingIndeterminateTask,
   setSearchFolder,
   setFoundModels,
   setOpenModel,
@@ -473,6 +435,9 @@ export const {
   subscribedNodeIdsSet,
   consoleLogLevelChanged,
   shouldLogToConsoleChanged,
+  isPersistedChanged,
+  shouldAntialiasProgressImageChanged,
+  languageChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

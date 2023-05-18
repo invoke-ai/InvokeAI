@@ -16,8 +16,6 @@ from compel.prompt_parser import (
     Fragment,
 )
 
-from invokeai.backend.globals import Globals
-
 
 class ConditioningField(BaseModel):
     conditioning_name: Optional[str] = Field(default=None, description="The name of conditioning data")
@@ -100,9 +98,10 @@ class CompelInvocation(BaseInvocation):
 
         # TODO: support legacy blend?
 
-        prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(prompt_str)
+        conjunction = Compel.parse_prompt_string(prompt_str)
+        prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
-        if getattr(Globals, "log_tokenization", False):
+        if context.services.configuration.log_tokenization:
             log_tokenization_for_prompt_object(prompt, tokenizer)
 
         c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
