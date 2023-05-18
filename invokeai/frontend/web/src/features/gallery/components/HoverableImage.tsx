@@ -250,11 +250,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <MenuItem
               icon={<FaShare />}
               onClickCapture={handleSendToImageToImage}
+              id="send-to-img2img"
             >
               {t('parameters.sendToImg2Img')}
             </MenuItem>
             {isCanvasEnabled && (
-              <MenuItem icon={<FaShare />} onClickCapture={handleSendToCanvas}>
+              <MenuItem
+                icon={<FaShare />}
+                onClickCapture={handleSendToCanvas}
+                id="send-to-canvas"
+              >
                 {t('parameters.sendToUnifiedCanvas')}
               </MenuItem>
             )}
