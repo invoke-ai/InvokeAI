@@ -32,8 +32,6 @@ ModelForwardCallback: TypeAlias = Union[
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
 
-config = get_invokeai_config()
-
 @dataclass(frozen=True)
 class PostprocessingSettings:
     threshold: float
@@ -74,6 +72,7 @@ class InvokeAIDiffuserComponent:
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
+        config = get_invokeai_config()
         self.conditioning = None
         self.model = model
         self.is_running_diffusers = is_running_diffusers

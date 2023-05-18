@@ -58,6 +58,11 @@ def test_env_override():
     conf = InvokeAIAppConfig(conf=init1,argv=['--max_loaded=10'])
     assert conf.nsfw_checker==True
 
+    # environment variables should be case insensitive
+    os.environ['InvokeAI_Max_Loaded_Models'] = '15'
+    conf = InvokeAIAppConfig(conf=init1)
+    assert conf.max_loaded_models == 15
+
     conf = InvokeAIAppConfig(conf=init1,argv=['--no-nsfw_checker','--max_loaded=10'])
     assert conf.nsfw_checker==False
     assert conf.max_loaded_models==10

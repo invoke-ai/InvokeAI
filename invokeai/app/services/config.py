@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Lincoln Stein (https://github.com/lstein)
+# Copyright (c) 2023 Lincoln Stein (https://github.com/lstein) and the InvokeAI Development Team
 
 '''Invokeai configuration system.
 
@@ -206,8 +206,16 @@ class InvokeAISettings(BaseSettings):
             if cls.initconf and settings_stanza in cls.initconf \
                else OmegaConf.create()
 
+        # create an upcase version of the environment in
+        # order to achieve case-insensitive environment
+        # variables (the way Windows does)
+        upcase_environ = dict()
+        for key,value in os.environ.items():
+            upcase_environ[key.upper()] = value
+        
         fields = cls.__fields__
         cls.argparse_groups = {}
+        
         for name, field in fields.items():
             if name not in cls._excluded():
                 current_default = field.default
@@ -216,8 +224,8 @@ class InvokeAISettings(BaseSettings):
                 env_name = env_prefix + '_' + name
                 if category in initconf and name in initconf.get(category):
                     field.default = initconf.get(category).get(name)
-                if env_name in os.environ:
-                    field.default = os.environ[env_name]
+                if env_name.upper() in upcase_environ:
+                    field.default = upcase_environ[env_name.upper()]
                 cls.add_field_argument(parser, name, field)
 
                 field.default = current_default
@@ -353,6 +361,7 @@ setting environment variables INVOKEAI_<setting>.
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
+    from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
 
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
     embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
@@ -502,11 +511,11 @@ class PagingArgumentParser(argparse.ArgumentParser):
         text = self.format_help()
         pydoc.pager(text)
 
-def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig)->InvokeAISettings:
+def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig,**kwargs)->InvokeAISettings:
     '''
     This returns a singleton InvokeAIAppConfig configuration object.
     '''
     global global_config
     if global_config is None or type(global_config)!=cls:
-        global_config = cls()
+        global_config = cls(**kwargs)
     return global_config

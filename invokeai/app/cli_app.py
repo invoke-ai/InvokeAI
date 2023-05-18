@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import shlex
+import sys
 import time
 from typing import (
     Union,
@@ -195,6 +196,11 @@ def invoke_cli():
     parser = config.get_parser()
     parser.add_argument('commands',nargs='*')
     invocation_commands = parser.parse_args().commands
+
+    # get the optional file to read commands from.
+    # Simplest is to use it for STDIN
+    if infile := config.from_file:
+        sys.stdin = open(infile,"r")
     
     model_manager = get_model_manager(config,logger=logger)
     

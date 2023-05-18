@@ -7,7 +7,6 @@
 This is the backend to "textual_inversion.py"
 """
 
-import argparse
 import logging
 import math
 import os
@@ -47,7 +46,7 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import InvokeAIAppConfig,PagingArgumentParser
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
     PIL_INTERPOLATION = {
@@ -89,10 +88,9 @@ def save_progress(
 
 
 def parse_args():
-    config = InvokeAIAppConfig()
-    
+    config = InvokeAIAppConfig(argv=[])
     parser = PagingArgumentParser(
-        description="Textual inversion training", formatter_class=ArgFormatter
+        description="Textual inversion training"
     )
     general_group = parser.add_argument_group("General")
     model_group = parser.add_argument_group("Models and Paths")
@@ -529,6 +527,7 @@ def get_full_repo_name(
 
 
 def do_textual_inversion_training(
+    config: InvokeAIAppConfig,
     model: str,
     train_data_dir: Path,
     output_dir: Path,
@@ -629,7 +628,7 @@ def do_textual_inversion_training(
         elif output_dir is not None:
             os.makedirs(output_dir, exist_ok=True)
 
-    models_conf = OmegaConf.load(os.path.join(config.root, "configs/models.yaml"))
+    models_conf = OmegaConf.load(config.model_conf_path)
     model_conf = models_conf.get(model, None)
     assert model_conf is not None, f"Unknown model: {model}"
     assert (
@@ -641,7 +640,7 @@ def do_textual_inversion_training(
     assert (
         pretrained_model_name_or_path
     ), f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
-    pipeline_args = dict(cache_dir=config.cache_dir())
+    pipeline_args = dict(cache_dir=config.cache_dir)
 
     # Load tokenizer
     if tokenizer_name:

@@ -68,7 +68,6 @@ class SDModelComponent(Enum):
     feature_extractor="feature_extractor"
 
 DEFAULT_MAX_MODELS = 2
-config = get_invokeai_config()
 
 class ModelManager(object):
     """
@@ -99,6 +98,7 @@ class ModelManager(object):
         if not isinstance(config, DictConfig):
             config = OmegaConf.load(config)
         self.config = config
+        self.globals = get_invokeai_config()
         self.precision = precision
         self.device = torch.device(device_type)
         self.max_loaded_models = max_loaded_models
@@ -291,7 +291,7 @@ class ModelManager(object):
         """
         # if we are converting legacy files automatically, then
         # there are no legacy ckpts!
-        if config.ckpt_convert:
+        if self.globals.ckpt_convert:
             return False
         info = self.model_info(model_name)
         if "weights" in info and info["weights"].endswith((".ckpt", ".safetensors")):
@@ -501,13 +501,13 @@ class ModelManager(object):
 
         # TODO: scan weights maybe?
         pipeline_args: dict[str, Any] = dict(
-            safety_checker=None, local_files_only=not config.internet_available
+            safety_checker=None, local_files_only=not self.globals.internet_available
         )
         if "vae" in mconfig and mconfig["vae"] is not None:
             if vae := self._load_vae(mconfig["vae"]):
                 pipeline_args.update(vae=vae)
         if not isinstance(name_or_path, Path):
-            pipeline_args.update(cache_dir=config.cache_dir)
+            pipeline_args.update(cache_dir=self.globals.cache_dir)
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{"revision": "fp16"}, {}]
@@ -559,10 +559,9 @@ class ModelManager(object):
         width = mconfig.width
         height = mconfig.height
 
-        if not os.path.isabs(config):
-            config = os.path.join(config.root, config)
-        if not os.path.isabs(weights):
-            weights = os.path.normpath(os.path.join(config.root, weights))
+        root_dir = self.globals.root_dir
+        config = str(root_dir / config)
+        weights = str(root_dir / weights)
 
         # Convert to diffusers and return a diffusers pipeline
         self.logger.info(f"Converting legacy checkpoint {model_name} into a diffusers model...")
@@ -577,11 +576,7 @@ class ModelManager(object):
 
         vae_path = None
         if vae:
-            vae_path = (
-                vae
-                if os.path.isabs(vae)
-                else os.path.normpath(os.path.join(config.root, vae))
-            )
+            vae_path = str(root_dir / vae)
         if self._has_cuda():
             torch.cuda.empty_cache()
         pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
@@ -613,9 +608,7 @@ class ModelManager(object):
             )
 
         if "path" in mconfig and mconfig["path"] is not None:
-            path = Path(mconfig["path"])
-            if not path.is_absolute():
-                path = Path(config.root, path).resolve()
+            path = self.globals.root_dir / Path(mconfig["path"])
             return path
         elif "repo_id" in mconfig:
             return mconfig["repo_id"]
@@ -863,16 +856,16 @@ class ModelManager(object):
                 model_type = self.probe_model_type(checkpoint)
                 if model_type == SDLegacyType.V1:
                     self.logger.debug("SD-v1 model detected")
-                    model_config_file = config.legacy_conf_path / "v1-inference.yaml"
+                    model_config_file = self.globals.legacy_conf_path / "v1-inference.yaml"
                 elif model_type == SDLegacyType.V1_INPAINT:
                     self.logger.debug("SD-v1 inpainting model detected")
-                    model_config_file = config.legacy_conf_path / "v1-inpainting-inference.yaml",
+                    model_config_file = self.globals.legacy_conf_path / "v1-inpainting-inference.yaml",
                 elif model_type == SDLegacyType.V2_v:
                     self.logger.debug("SD-v2-v model detected")
-                    model_config_file = config.legacy_conf_path / "v2-inference-v.yaml"
+                    model_config_file = self.globals.legacy_conf_path / "v2-inference-v.yaml"
                 elif model_type == SDLegacyType.V2_e:
                     self.logger.debug("SD-v2-e model detected")
-                    model_config_file = config.legacy_conf_path / "v2-inference.yaml"
+                    model_config_file = self.globals.legacy_conf_path / "v2-inference.yaml"
                 elif model_type == SDLegacyType.V2:
                     self.logger.warning(
                         f"{thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
@@ -899,7 +892,7 @@ class ModelManager(object):
                 self.logger.debug(f"Using VAE file {vae_path.name}")
         vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
 
-        diffuser_path = config.root / "models/converted_ckpts" / model_path.stem
+        diffuser_path = self.globals.root_dir / "models/converted_ckpts" / model_path.stem
         model_name = self.convert_and_import(
             model_path,
             diffusers_path=diffuser_path,
@@ -1032,7 +1025,7 @@ class ModelManager(object):
         """
         yaml_str = OmegaConf.to_yaml(self.config)
         if not os.path.isabs(config_file_path):
-            config_file_path = config.model_conf_path
+            config_file_path = self.globals.model_conf_path
         tmpfile = os.path.join(os.path.dirname(config_file_path), "new_config.tmp")
         with open(tmpfile, "w", encoding="utf-8") as outfile:
             outfile.write(self.preamble())
@@ -1064,7 +1057,8 @@ class ModelManager(object):
         """
         # Three transformer models to check: bert, clip and safety checker, and
         # the diffusers as well
-        models_dir = config.root / "models"
+        config = get_invokeai_config()
+        models_dir = config.root_dir / "models"
         legacy_locations = [
             Path(
                 models_dir,
@@ -1138,13 +1132,12 @@ class ModelManager(object):
         if str(source).startswith(("http:", "https:", "ftp:")):
             dest_directory = Path(dest_directory)
             if not dest_directory.is_absolute():
-                dest_directory = config.root / dest_directory
+                dest_directory = self.globals.root_dir / dest_directory
             dest_directory.mkdir(parents=True, exist_ok=True)
             resolved_path = download_with_resume(str(source), dest_directory)
         else:
-            if not os.path.isabs(source):
-                source = config.root / source
-            resolved_path = Path(source)
+            source = self.globals.root_dir / source
+            resolved_path = source
         return resolved_path
 
     def _invalidate_cached_model(self, model_name: str) -> None:
@@ -1194,7 +1187,7 @@ class ModelManager(object):
             path = name_or_path
         else:
             owner, repo = name_or_path.split("/")
-            path = Path(config.cache_dir / f"models--{owner}--{repo}")
+            path = self.globals.cache_dir / f"models--{owner}--{repo}"
         if not path.exists():
             return None
         hashpath = path / "checksum.sha256"
@@ -1255,8 +1248,8 @@ class ModelManager(object):
         using_fp16 = self.precision == "float16"
 
         vae_args.update(
-            cache_dir=config.cache_dir,
-            local_files_only=not config.internet_available,
+            cache_dir=self.globals.cache_dir,
+            local_files_only=not self.globals.internet_available,
         )
 
         self.logger.debug(f"Loading diffusers VAE from {name_or_path}")
@@ -1294,7 +1287,7 @@ class ModelManager(object):
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):
-        cache_info = scan_cache_dir(config.cache_dir)
+        cache_info = scan_cache_dir(get_invokeai_config().cache_dir)
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!
@@ -1311,9 +1304,10 @@ class ModelManager(object):
 
     @staticmethod
     def _abs_path(path: str | Path) -> Path:
+        globals = get_invokeai_config()
         if path is None or Path(path).is_absolute():
             return path
-        return Path(config.root, path).resolve()
+        return Path(globals.root_dir, path).resolve()
 
     @staticmethod
     def _is_huggingface_hub_directory_present() -> bool:

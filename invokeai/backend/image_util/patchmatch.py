@@ -8,8 +8,6 @@ import numpy as np
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import get_invokeai_config
 
-config = get_invokeai_config()
-
 class PatchMatch:
     """
     Thin class wrapper around the patchmatch function.
@@ -23,6 +21,7 @@ class PatchMatch:
 
     @classmethod
     def _load_patch_match(self):
+        config = get_invokeai_config()
         if self.tried_load:
             return
         if config.try_patchmatch:

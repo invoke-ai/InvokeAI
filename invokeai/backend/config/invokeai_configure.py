@@ -389,8 +389,8 @@ class editOptsForm(npyscreen.FormMultiPage):
         )
         self.nextrely += 1
         for i in [
-            "If you have an account at HuggingFace you may paste your access token here",
-            'to allow InvokeAI to download styles & subjects from the "Concept Library".',
+            "If you have an account at HuggingFace you may optionally paste your access token here",
+            'to allow InvokeAI to download restricted styles & subjects from the "Concept Library".',
             "See https://huggingface.co/settings/tokens",
         ]:
             self.add_widget_intelligent(
@@ -593,6 +593,9 @@ class editOptsForm(npyscreen.FormMultiPage):
         new_opts.hf_token = self.hf_token.value
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
+        
+        # widget library workaround to make max_loaded_models an int rather than a float
+        new_opts.max_loaded_models = int(new_opts.max_loaded_models)
 
         return new_opts
 

@@ -43,8 +43,6 @@ from .diffusion import (
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
 from .textual_inversion_manager import TextualInversionManager
 
-config = get_invokeai_config()
-
 @dataclass
 class PipelineIntermediateState:
     run_id: str
@@ -348,6 +346,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+        config = get_invokeai_config()
         if (
             torch.cuda.is_available()
             and is_xformers_available()

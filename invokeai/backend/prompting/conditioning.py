@@ -25,8 +25,6 @@ from invokeai.app.services.config import get_invokeai_config
 from ..stable_diffusion import InvokeAIDiffuserComponent
 from ..util import torch_dtype
 
-config = get_invokeai_config()
-
 def get_uc_and_c_and_ec(prompt_string,
                         model: InvokeAIDiffuserComponent,
                         log_tokens=False, skip_normalize_legacy_blend=False):
@@ -40,6 +38,8 @@ def get_uc_and_c_and_ec(prompt_string,
                     dtype_for_device_getter=torch_dtype,
                     truncate_long_prompts=False,
                     )
+    
+    config = get_invokeai_config()
 
     # get rid of any newline characters
     prompt_string = prompt_string.replace("\n", " ")
