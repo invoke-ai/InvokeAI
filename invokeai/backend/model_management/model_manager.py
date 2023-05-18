@@ -318,8 +318,10 @@ class ModelManager(object):
             # with the equivalent diffusers model
             if mconfig.format in ["ckpt", "safetensors"]:
                 location = self.convert_ckpt_and_cache(mconfig)
+            elif mconfig.get('path'):
+                location = self.globals.root_dir / mconfig.get('path')
             else:
-                location = self.globals.root_dir / mconfig.get('path') or mconfig.get('repo_id')
+                location = mconfig.get('repo_id')
         elif p := mconfig.get('path'):
             location = self.globals.root_dir / p
         elif r := mconfig.get('repo_id'):
