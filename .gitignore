@@ -9,6 +9,8 @@ models/ldm/stable-diffusion-v1/model.ckpt
 configs/models.user.yaml
 config/models.user.yml
 invokeai.init
+.version
+.last_model
 
 # ignore the Anaconda/Miniconda installer used while building Docker image
 anaconda.sh
@@ -198,6 +200,8 @@ testtube
 checkpoints
 # If it's a Mac
 .DS_Store
+
+invokeai/frontend/web/dist/*
 
 # Let the frontend manage its own gitignore
 !invokeai/frontend/web/*

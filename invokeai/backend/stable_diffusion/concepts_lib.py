@@ -17,15 +17,16 @@ from huggingface_hub import (
     hf_hub_url,
 )
 
-from invokeai.backend.globals import Globals
-
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import get_invokeai_config
 
 class HuggingFaceConceptsLibrary(object):
     def __init__(self, root=None):
         """
         Initialize the Concepts object. May optionally pass a root directory.
         """
-        self.root = root or Globals.root
+        self.config = get_invokeai_config()
+        self.root = root or self.config.root
         self.hf_api = HfApi()
         self.local_concepts = dict()
         self.concept_list = None
@@ -57,7 +58,7 @@ class HuggingFaceConceptsLibrary(object):
                 self.concept_list.extend(list(local_concepts_to_add))
                 return self.concept_list
             return self.concept_list
-        else:
+        elif self.config.internet_available is True:
             try:
                 models = self.hf_api.list_models(
                     filter=ModelFilter(model_name="sd-concepts-library/")
@@ -66,12 +67,14 @@ class HuggingFaceConceptsLibrary(object):
                 # when init, add all in dir. when not init, add only concepts added between init and now
                 self.concept_list.extend(list(local_concepts_to_add))
             except Exception as e:
-                print(
-                    f" ** WARNING: Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}."
+                logger.warning(
+                    f"Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}."
                 )
-                print(
-                    " ** You may load .bin and .pt file(s) manually using the --embedding_directory argument."
+                logger.warning(
+                    "You may load .bin and .pt file(s) manually using the --embedding_directory argument."
                 )
+            return self.concept_list
+        else: 
             return self.concept_list
 
     def get_concept_model_path(self, concept_name: str) -> str:
@@ -81,7 +84,7 @@ class HuggingFaceConceptsLibrary(object):
         be downloaded.
         """
         if not concept_name in self.list_concepts():
-            print(
+            logger.warning(
                 f"{concept_name} is not a local embedding trigger, nor is it a HuggingFace concept. Generation will continue without the concept."
             )
             return None
@@ -219,7 +222,7 @@ class HuggingFaceConceptsLibrary(object):
             if chunk == 0:
                 bytes += total
 
-        print(f">> Downloading {repo_id}...", end="")
+        logger.info(f"Downloading {repo_id}...", end="")
         try:
             for file in (
                 "README.md",
@@ -233,22 +236,22 @@ class HuggingFaceConceptsLibrary(object):
                 )
         except ul_error.HTTPError as e:
             if e.code == 404:
-                print(
+                logger.warning(
                     f"Concept {concept_name} is not known to the Hugging Face library. Generation will continue without the concept."
                 )
             else:
-                print(
+                logger.warning(
                     f"Failed to download {concept_name}/{file} ({str(e)}. Generation will continue without the concept.)"
                 )
             os.rmdir(dest)
             return False
         except ul_error.URLError as e:
-            print(
-                f"ERROR while downloading {concept_name}: {str(e)}. This may reflect a network issue. Generation will continue without the concept."
+            logger.error(
+                f"an error occurred while downloading {concept_name}: {str(e)}. This may reflect a network issue. Generation will continue without the concept."
             )
             os.rmdir(dest)
             return False
-        print("...{:.2f}Kb".format(bytes / 1024))
+        logger.info("...{:.2f}Kb".format(bytes / 1024))
         return succeeded
 
     def _concept_id(self, concept_name: str) -> str:

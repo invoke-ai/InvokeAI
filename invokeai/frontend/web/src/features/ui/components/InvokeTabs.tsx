@@ -1,6 +1,6 @@
 import {
-  ChakraProps,
   Icon,
+  Spacer,
   Tab,
   TabList,
   TabPanel,
@@ -9,117 +9,90 @@ import {
   Tooltip,
   VisuallyHidden,
 } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
-import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
-import TrainingWIP from 'common/components/WorkInProgress/Training';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import { ReactNode, useMemo } from 'react';
+import { memo, ReactNode, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { MdDeviceHub, MdGridOn } from 'react-icons/md';
+import { GoTextSize } from 'react-icons/go';
 import {
-  MdDeviceHub,
-  MdFlashOn,
-  MdGridOn,
-  MdPhotoFilter,
-  MdPhotoLibrary,
-  MdTextFields,
-} from 'react-icons/md';
-import { activeTabIndexSelector } from '../store/uiSelectors';
-import ImageToImageWorkarea from 'features/ui/components/tabs/ImageToImage/ImageToImageWorkarea';
-import TextToImageWorkarea from 'features/ui/components/tabs/TextToImage/TextToImageWorkarea';
-import UnifiedCanvasWorkarea from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasWorkarea';
+  activeTabIndexSelector,
+  activeTabNameSelector,
+} from '../store/uiSelectors';
 import { useTranslation } from 'react-i18next';
 import { ResourceKey } from 'i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { createSelector } from '@reduxjs/toolkit';
+import { configSelector } from 'features/system/store/configSelectors';
+import { isEqual } from 'lodash-es';
+import { Panel, PanelGroup } from 'react-resizable-panels';
+import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
+import TextToImageTab from './tabs/TextToImage/TextToImageTab';
+import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
+import NodesTab from './tabs/Nodes/NodesTab';
+import { FaImage } from 'react-icons/fa';
+import ResizeHandle from './tabs/ResizeHandle';
+import ImageTab from './tabs/ImageToImage/ImageToImageTab';
+import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
   icon: ReactNode;
-  workarea: ReactNode;
+  content: ReactNode;
 }
 
-const tabIconStyles: ChakraProps['sx'] = {
-  boxSize: 6,
-};
-
-const tabInfo: InvokeTabInfo[] = [
+const tabs: InvokeTabInfo[] = [
   {
     id: 'txt2img',
-    icon: <Icon as={MdTextFields} sx={tabIconStyles} />,
-    workarea: <TextToImageWorkarea />,
+    icon: <Icon as={GoTextSize} sx={{ boxSize: 6 }} />,
+    content: <TextToImageTab />,
   },
   {
     id: 'img2img',
-    icon: <Icon as={MdPhotoLibrary} sx={tabIconStyles} />,
-    workarea: <ImageToImageWorkarea />,
+    icon: <Icon as={FaImage} sx={{ boxSize: 6 }} />,
+    content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
-    icon: <Icon as={MdGridOn} sx={tabIconStyles} />,
-    workarea: <UnifiedCanvasWorkarea />,
+    icon: <Icon as={MdGridOn} sx={{ boxSize: 6 }} />,
+    content: <UnifiedCanvasTab />,
   },
   {
     id: 'nodes',
-    icon: <Icon as={MdDeviceHub} sx={tabIconStyles} />,
-    workarea: <NodesWIP />,
-  },
-  {
-    id: 'postprocessing',
-    icon: <Icon as={MdPhotoFilter} sx={tabIconStyles} />,
-    workarea: <PostProcessingWIP />,
-  },
-  {
-    id: 'training',
-    icon: <Icon as={MdFlashOn} sx={tabIconStyles} />,
-    workarea: <TrainingWIP />,
+    icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6 }} />,
+    content: <NodesTab />,
   },
 ];
 
-export default function InvokeTabs() {
-  const activeTab = useAppSelector(activeTabIndexSelector);
+const enabledTabsSelector = createSelector(
+  configSelector,
+  (config) => {
+    const { disabledTabs } = config;
 
+    return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+  },
+  {
+    memoizeOptions: { resultEqualityCheck: isEqual },
+  }
+);
+
+const InvokeTabs = () => {
+  const activeTab = useAppSelector(activeTabIndexSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const enabledTabs = useAppSelector(enabledTabsSelector);
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
 
-  const shouldPinGallery = useAppSelector(
-    (state: RootState) => state.ui.shouldPinGallery
-  );
-
-  const shouldPinParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldPinParametersPanel
-  );
+  const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
+    useAppSelector((state: RootState) => state.ui);
 
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-
-  useHotkeys('1', () => {
-    dispatch(setActiveTab(0));
-  });
-
-  useHotkeys('2', () => {
-    dispatch(setActiveTab(1));
-  });
-
-  useHotkeys('3', () => {
-    dispatch(setActiveTab(2));
-  });
-
-  useHotkeys('4', () => {
-    dispatch(setActiveTab(3));
-  });
-
-  useHotkeys('5', () => {
-    dispatch(setActiveTab(4));
-  });
-
-  useHotkeys('6', () => {
-    dispatch(setActiveTab(5));
-  });
 
   // Lightbox Hotkey
   useHotkeys(
@@ -140,9 +113,15 @@ export default function InvokeTabs() {
     [shouldPinGallery, shouldPinParametersPanel]
   );
 
+  const handleResizeGallery = useCallback(() => {
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
+  }, [dispatch, activeTabName]);
+
   const tabs = useMemo(
     () =>
-      tabInfo.map((tab) => (
+      enabledTabs.map((tab) => (
         <Tooltip
           key={tab.id}
           hasArrow
@@ -157,13 +136,13 @@ export default function InvokeTabs() {
           </Tab>
         </Tooltip>
       )),
-    [t]
+    [t, enabledTabs]
   );
 
   const tabPanels = useMemo(
     () =>
-      tabInfo.map((tab) => <TabPanel key={tab.id}>{tab.workarea}</TabPanel>),
-    []
+      enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
+    [enabledTabs]
   );
 
   return (
@@ -174,9 +153,48 @@ export default function InvokeTabs() {
         dispatch(setActiveTab(index));
       }}
       flexGrow={1}
+      flexDir={{ base: 'column', xl: 'row' }}
+      gap={{ base: 4 }}
+      isLazy
     >
-      <TabList>{tabs}</TabList>
-      <TabPanels>{tabPanels}</TabPanels>
+      <TabList
+        pt={2}
+        gap={4}
+        flexDir={{ base: 'row', xl: 'column' }}
+        justifyContent={{ base: 'center', xl: 'start' }}
+      >
+        {tabs}
+        <Spacer />
+        <AuxiliaryProgressIndicator />
+      </TabList>
+      <PanelGroup
+        autoSaveId="app"
+        direction="horizontal"
+        style={{ height: '100%', width: '100%' }}
+      >
+        <Panel id="main">
+          <TabPanels style={{ height: '100%', width: '100%' }}>
+            {tabPanels}
+          </TabPanels>
+        </Panel>
+        {shouldPinGallery && shouldShowGallery && (
+          <>
+            <ResizeHandle />
+            <Panel
+              onResize={handleResizeGallery}
+              id="gallery"
+              order={3}
+              defaultSize={10}
+              minSize={10}
+              maxSize={50}
+            >
+              <ImageGalleryContent />
+            </Panel>
+          </>
+        )}
+      </PanelGroup>
     </Tabs>
   );
-}
+};
+
+export default memo(InvokeTabs);

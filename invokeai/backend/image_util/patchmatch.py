@@ -5,9 +5,8 @@ wraps the actual patchmatch object. It respects the global
 be suppressed or deferred
 """
 import numpy as np
-
-from invokeai.backend.globals import Globals
-
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import get_invokeai_config
 
 class PatchMatch:
     """
@@ -22,18 +21,19 @@ class PatchMatch:
 
     @classmethod
     def _load_patch_match(self):
+        config = get_invokeai_config()
         if self.tried_load:
             return
-        if Globals.try_patchmatch:
+        if config.try_patchmatch:
             from patchmatch import patch_match as pm
 
             if pm.patchmatch_available:
-                print(">> Patchmatch initialized")
+                logger.info("Patchmatch initialized")
             else:
-                print(">> Patchmatch not loaded (nonfatal)")
+                logger.info("Patchmatch not loaded (nonfatal)")
             self.patch_match = pm
         else:
-            print(">> Patchmatch loading disabled")
+            logger.info("Patchmatch loading disabled")
         self.tried_load = True
 
     @classmethod

@@ -20,13 +20,11 @@ import {
   getMinMaxDimensions,
   getSlideDirection,
   getStyles,
-  parseAndPadSize,
 } from './util';
 
 type ResizableDrawerProps = ResizableProps & {
   children: ReactNode;
   isResizable: boolean;
-  isPinned: boolean;
   isOpen: boolean;
   onClose: () => void;
   direction?: SlideDirection;
@@ -51,7 +49,6 @@ const ChakraResizeable = chakra(Resizable, {
 const ResizableDrawer = ({
   direction = 'left',
   isResizable,
-  isPinned,
   isOpen,
   onClose,
   children,
@@ -74,7 +71,7 @@ const ResizableDrawer = ({
     () =>
       initialWidth ??
       minWidth ??
-      (['left', 'right'].includes(direction) ? 500 : '100%'),
+      (['left', 'right'].includes(direction) ? 'auto' : '100%'),
     [initialWidth, minWidth, direction]
   );
 
@@ -82,7 +79,7 @@ const ResizableDrawer = ({
     () =>
       initialHeight ??
       minHeight ??
-      (['top', 'bottom'].includes(direction) ? 500 : '100%'),
+      (['top', 'bottom'].includes(direction) ? 'auto' : '100%'),
     [initialHeight, minHeight, direction]
   );
 
@@ -95,7 +92,7 @@ const ResizableDrawer = ({
     handler: () => {
       onClose();
     },
-    enabled: isOpen && !isPinned,
+    enabled: isOpen,
   });
 
   const handleEnables = useMemo(
@@ -107,30 +104,21 @@ const ResizableDrawer = ({
     () =>
       getMinMaxDimensions({
         direction,
-        minWidth: isResizable
-          ? parseAndPadSize(minWidth, 18)
-          : parseAndPadSize(minWidth),
-        maxWidth: isResizable
-          ? parseAndPadSize(maxWidth, 18)
-          : parseAndPadSize(maxWidth),
-        minHeight: isResizable
-          ? parseAndPadSize(minHeight, 18)
-          : parseAndPadSize(minHeight),
-        maxHeight: isResizable
-          ? parseAndPadSize(maxHeight, 18)
-          : parseAndPadSize(maxHeight),
+        minWidth,
+        maxWidth,
+        minHeight,
+        maxHeight,
       }),
-    [minWidth, maxWidth, minHeight, maxHeight, direction, isResizable]
+    [minWidth, maxWidth, minHeight, maxHeight, direction]
   );
 
   const { containerStyles, handleStyles } = useMemo(
     () =>
       getStyles({
-        isPinned,
         isResizable,
         direction,
       }),
-    [isPinned, isResizable, direction]
+    [isResizable, direction]
   );
 
   const slideDirection = useMemo(
@@ -140,34 +128,21 @@ const ResizableDrawer = ({
 
   useEffect(() => {
     if (['left', 'right'].includes(direction)) {
-      setHeight(isPinned ? '100%' : '100vh');
+      setHeight('100vh');
+      // setHeight(isPinned ? '100%' : '100vh');
     }
     if (['top', 'bottom'].includes(direction)) {
-      setWidth(isPinned ? '100%' : '100vw');
+      setWidth('100vw');
+      // setWidth(isPinned ? '100%' : '100vw');
     }
-  }, [isPinned, direction]);
+  }, [direction]);
 
   return (
     <Slide
       direction={slideDirection}
       in={isOpen}
-      unmountOnExit={isPinned}
-      motionProps={{ initial: isPinned }}
-      {...(isPinned
-        ? {
-            style: {
-              position: undefined,
-              left: undefined,
-              right: undefined,
-              top: undefined,
-              bottom: undefined,
-              width: undefined,
-            },
-          }
-        : {
-            // transition: { enter: { duration: 0.15 }, exit: { duration: 0.15 } },
-            style: { zIndex: 99, width: 'full' },
-          })}
+      motionProps={{ initial: false }}
+      style={{ width: 'full' }}
     >
       <Box
         ref={outsideClickRef}
@@ -186,10 +161,10 @@ const ResizableDrawer = ({
           {...minMaxDimensions}
           sx={{
             borderColor: 'base.800',
-            p: isPinned ? 0 : 4,
+            p: 4,
             bg: 'base.900',
             height: 'full',
-            boxShadow: !isPinned ? '0 0 4rem 0 rgba(0, 0, 0, 0.8)' : '',
+            boxShadow: '0 0 4rem 0 rgba(0, 0, 0, 0.8)',
             ...containerStyles,
             ...sx,
           }}

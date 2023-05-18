@@ -4,17 +4,21 @@ from .parse_seed_weights import parse_seed_weights
 
 SAMPLER_CHOICES = [
     "ddim",
-    "k_dpm_2_a",
-    "k_dpm_2",
-    "k_dpmpp_2_a",
-    "k_dpmpp_2",
-    "k_euler_a",
-    "k_euler",
-    "k_heun",
-    "k_lms",
-    "plms",
-    # diffusers:
+    "ddpm",
+    "deis",
+    "lms",
     "pndm",
+    "heun",
+    'heun_k',
+    "euler",
+    "euler_k",
+    "euler_a",
+    "kdpm_2",
+    "kdpm_2_a",
+    "dpmpp_2s",
+    "dpmpp_2m",
+    "dpmpp_2m_k",
+    "unipc",
 ]
 
 

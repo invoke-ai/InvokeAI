@@ -1,12 +1,12 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
+import * as InvokeAI from 'app/types/invokeai';
 import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
 import { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash';
+import { clamp, cloneDeep } from 'lodash-es';
 //
 import { RgbaColor } from 'react-colorful';
 import calculateCoordinates from '../util/calculateCoordinates';
@@ -38,7 +38,7 @@ export const initialLayerState: CanvasLayerState = {
   },
 };
 
-const initialCanvasState: CanvasState = {
+export const initialCanvasState: CanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
@@ -66,6 +66,7 @@ const initialCanvasState: CanvasState = {
   minimumStageScale: 1,
   pastLayerStates: [],
   scaledBoundingBoxDimensions: { width: 512, height: 512 },
+  shouldAntialias: true,
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
@@ -158,20 +159,18 @@ export const canvasSlice = createSlice({
     },
     setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       const image = action.payload;
+      const { width, height } = image.metadata;
       const { stageDimensions } = state;
 
       const newBoundingBoxDimensions = {
-        width: roundDownToMultiple(clamp(image.width, 64, 512), 64),
-        height: roundDownToMultiple(clamp(image.height, 64, 512), 64),
+        width: roundDownToMultiple(clamp(width, 64, 512), 64),
+        height: roundDownToMultiple(clamp(height, 64, 512), 64),
       };
 
       const newBoundingBoxCoordinates = {
-        x: roundToMultiple(
-          image.width / 2 - newBoundingBoxDimensions.width / 2,
-          64
-        ),
+        x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, 64),
         y: roundToMultiple(
-          image.height / 2 - newBoundingBoxDimensions.height / 2,
+          height / 2 - newBoundingBoxDimensions.height / 2,
           64
         ),
       };
@@ -196,8 +195,8 @@ export const canvasSlice = createSlice({
             layer: 'base',
             x: 0,
             y: 0,
-            width: image.width,
-            height: image.height,
+            width: width,
+            height: height,
             image: image,
           },
         ],
@@ -208,8 +207,8 @@ export const canvasSlice = createSlice({
       const newScale = calculateScale(
         stageDimensions.width,
         stageDimensions.height,
-        image.width,
-        image.height,
+        width,
+        height,
         STAGE_PADDING_PERCENTAGE
       );
 
@@ -218,8 +217,8 @@ export const canvasSlice = createSlice({
         stageDimensions.height,
         0,
         0,
-        image.width,
-        image.height,
+        width,
+        height,
         newScale
       );
       state.stageScale = newScale;
@@ -287,16 +286,28 @@ export const canvasSlice = createSlice({
     setIsMoveStageKeyHeld: (state, action: PayloadAction<boolean>) => {
       state.isMoveStageKeyHeld = action.payload;
     },
-    addImageToStagingArea: (
+    canvasSessionIdChanged: (state, action: PayloadAction<string>) => {
+      state.layerState.stagingArea.sessionId = action.payload;
+    },
+    stagingAreaInitialized: (
       state,
-      action: PayloadAction<{
-        boundingBox: IRect;
-        image: InvokeAI.Image;
-      }>
+      action: PayloadAction<{ sessionId: string; boundingBox: IRect }>
     ) => {
-      const { boundingBox, image } = action.payload;
+      const { sessionId, boundingBox } = action.payload;
 
-      if (!boundingBox || !image) return;
+      state.layerState.stagingArea = {
+        boundingBox,
+        sessionId,
+        images: [],
+        selectedImageIndex: -1,
+      };
+    },
+    addImageToStagingArea: (state, action: PayloadAction<InvokeAI.Image>) => {
+      const image = action.payload;
+
+      if (!image || !state.layerState.stagingArea.boundingBox) {
+        return;
+      }
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
@@ -307,7 +318,7 @@ export const canvasSlice = createSlice({
       state.layerState.stagingArea.images.push({
         kind: 'image',
         layer: 'base',
-        ...boundingBox,
+        ...state.layerState.stagingArea.boundingBox,
         image,
       });
 
@@ -323,9 +334,7 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.stagingArea = {
-        ...initialLayerState.stagingArea,
-      };
+      state.layerState.stagingArea = { ...initialLayerState.stagingArea };
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
@@ -663,6 +672,10 @@ export const canvasSlice = createSlice({
       }
     },
     nextStagingAreaImage: (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        return;
+      }
+
       const currentIndex = state.layerState.stagingArea.selectedImageIndex;
       const length = state.layerState.stagingArea.images.length;
 
@@ -672,6 +685,10 @@ export const canvasSlice = createSlice({
       );
     },
     prevStagingAreaImage: (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        return;
+      }
+
       const currentIndex = state.layerState.stagingArea.selectedImageIndex;
 
       state.layerState.stagingArea.selectedImageIndex = Math.max(
@@ -680,6 +697,10 @@ export const canvasSlice = createSlice({
       );
     },
     commitStagingAreaImage: (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        return;
+      }
+
       const { images, selectedImageIndex } = state.layerState.stagingArea;
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
@@ -775,6 +796,9 @@ export const canvasSlice = createSlice({
     },
     setShouldRestrictStrokesToBox: (state, action: PayloadAction<boolean>) => {
       state.shouldRestrictStrokesToBox = action.payload;
+    },
+    setShouldAntialias: (state, action: PayloadAction<boolean>) => {
+      state.shouldAntialias = action.payload;
     },
     setShouldCropToBoundingBoxOnSave: (
       state,
@@ -885,6 +909,9 @@ export const {
   undo,
   setScaledBoundingBoxDimensions,
   setShouldRestrictStrokesToBox,
+  stagingAreaInitialized,
+  canvasSessionIdChanged,
+  setShouldAntialias,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

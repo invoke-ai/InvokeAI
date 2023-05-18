@@ -23,12 +23,21 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { clamp } from 'lodash';
+import { clamp } from 'lodash-es';
 
 import { useTranslation } from 'react-i18next';
-import { FocusEvent, memo, useEffect, useMemo, useState } from 'react';
+import {
+  FocusEvent,
+  memo,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 
 export type IAIFullSliderProps = {
   label: string;
@@ -44,12 +53,10 @@ export type IAIFullSliderProps = {
   inputReadOnly?: boolean;
   withReset?: boolean;
   handleReset?: () => void;
-  isResetDisabled?: boolean;
-  isSliderDisabled?: boolean;
-  isInputDisabled?: boolean;
   tooltipSuffix?: string;
   hideTooltip?: boolean;
   isCompact?: boolean;
+  isDisabled?: boolean;
   sliderFormControlProps?: FormControlProps;
   sliderFormLabelProps?: FormLabelProps;
   sliderMarkProps?: Omit<SliderMarkProps, 'value'>;
@@ -80,10 +87,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
     withReset = false,
     hideTooltip = false,
     isCompact = false,
+    isDisabled = false,
     handleReset,
-    isResetDisabled,
-    isSliderDisabled,
-    isInputDisabled,
     sliderFormControlProps,
     sliderFormLabelProps,
     sliderMarkProps,
@@ -112,31 +117,52 @@ const IAISlider = (props: IAIFullSliderProps) => {
     [max, sliderNumberInputProps?.max]
   );
 
-  const handleSliderChange = (v: number) => {
-    onChange(v);
-  };
+  const handleSliderChange = useCallback(
+    (v: number) => {
+      onChange(v);
+    },
+    [onChange]
+  );
 
-  const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
-    if (e.target.value === '') e.target.value = String(min);
-    const clamped = clamp(
-      isInteger ? Math.floor(Number(e.target.value)) : Number(localInputValue),
-      min,
-      numberInputMax
-    );
-    onChange(clamped);
-  };
+  const handleInputBlur = useCallback(
+    (e: FocusEvent<HTMLInputElement>) => {
+      if (e.target.value === '') {
+        e.target.value = String(min);
+      }
+      const clamped = clamp(
+        isInteger
+          ? Math.floor(Number(e.target.value))
+          : Number(localInputValue),
+        min,
+        numberInputMax
+      );
+      const quantized = roundDownToMultiple(clamped, step);
+      onChange(quantized);
+      setLocalInputValue(quantized);
+    },
+    [isInteger, localInputValue, min, numberInputMax, onChange, step]
+  );
 
-  const handleInputChange = (v: number | string) => {
+  const handleInputChange = useCallback((v: number | string) => {
     setLocalInputValue(v);
-  };
+  }, []);
 
-  const handleResetDisable = () => {
-    if (!handleReset) return;
+  const handleResetDisable = useCallback(() => {
+    if (!handleReset) {
+      return;
+    }
     handleReset();
-  };
+  }, [handleReset]);
+
+  const forceInputBlur = useCallback((e: MouseEvent) => {
+    if (e.target instanceof HTMLDivElement) {
+      e.target.focus();
+    }
+  }, []);
 
   return (
     <FormControl
+      onClick={forceInputBlur}
       sx={
         isCompact
           ? {
@@ -149,6 +175,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             }
           : {}
       }
+      isDisabled={isDisabled}
       {...sliderFormControlProps}
     >
       <FormLabel {...sliderFormLabelProps} mb={-1}>
@@ -166,15 +193,13 @@ const IAISlider = (props: IAIFullSliderProps) => {
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
           focusThumbOnChange={false}
-          isDisabled={isSliderDisabled}
-          // width={width}
+          isDisabled={isDisabled}
           {...rest}
         >
           {withSliderMarks && (
             <>
               <SliderMark
                 value={min}
-                // insetInlineStart={0}
                 sx={{
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
@@ -185,7 +210,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
               </SliderMark>
               <SliderMark
                 value={max}
-                // insetInlineEnd={0}
                 sx={{
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
@@ -209,7 +233,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             hidden={hideTooltip}
             {...sliderTooltipProps}
           >
-            <SliderThumb {...sliderThumbProps} />
+            <SliderThumb {...sliderThumbProps} zIndex={0} />
           </Tooltip>
         </Slider>
 
@@ -221,7 +245,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
             value={localInputValue}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
-            isDisabled={isInputDisabled}
+            focusInputOnChange={false}
             {...sliderNumberInputProps}
           >
             <NumberInputField
@@ -244,10 +268,10 @@ const IAISlider = (props: IAIFullSliderProps) => {
           <IAIIconButton
             size="sm"
             aria-label={t('accessibility.reset')}
-            tooltip="Reset"
+            tooltip={t('accessibility.reset')}
             icon={<BiReset />}
+            isDisabled={isDisabled}
             onClick={handleResetDisable}
-            isDisabled={isResetDisabled}
             {...sliderIAIIconButtonProps}
           />
         )}

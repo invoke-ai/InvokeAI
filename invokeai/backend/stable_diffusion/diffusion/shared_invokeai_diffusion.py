@@ -5,10 +5,12 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
-from diffusers.models.cross_attention import AttnProcessor
+from diffusers import UNet2DConditionModel
+from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
-from invokeai.backend.globals import Globals
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import get_invokeai_config
 
 from .cross_attention_control import (
     Arguments,
@@ -16,8 +18,8 @@ from .cross_attention_control import (
     CrossAttentionType,
     SwapCrossAttnContext,
     get_cross_attention_modules,
-    override_cross_attention,
     restore_default_cross_attention,
+    setup_cross_attention_control_attention_processors,
 )
 from .cross_attention_map_saving import AttentionMapSaver
 
@@ -29,7 +31,6 @@ ModelForwardCallback: TypeAlias = Union[
     ],
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
-
 
 @dataclass(frozen=True)
 class PostprocessingSettings:
@@ -71,37 +72,49 @@ class InvokeAIDiffuserComponent:
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
+        config = get_invokeai_config()
         self.conditioning = None
         self.model = model
         self.is_running_diffusers = is_running_diffusers
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
-        self.sequential_guidance = Globals.sequential_guidance
+        self.sequential_guidance = config.sequential_guidance
 
+    @classmethod
     @contextmanager
     def custom_attention_context(
-        self, extra_conditioning_info: Optional[ExtraConditioningInfo], step_count: int
+        cls,
+        unet: UNet2DConditionModel, # note: also may futz with the text encoder depending on requested LoRAs
+        extra_conditioning_info: Optional[ExtraConditioningInfo],
+        step_count: int
     ):
-        do_swap = (
-            extra_conditioning_info is not None
-            and extra_conditioning_info.wants_cross_attention_control
-        )
-        old_attn_processor = None
-        if do_swap:
-            old_attn_processor = self.override_cross_attention(
-                extra_conditioning_info, step_count=step_count
-            )
+        old_attn_processors = None
+        if extra_conditioning_info and (
+            extra_conditioning_info.wants_cross_attention_control
+        ):
+            old_attn_processors = unet.attn_processors
+            # Load lora conditions into the model
+            if extra_conditioning_info.wants_cross_attention_control:
+                cross_attention_control_context = Context(
+                    arguments=extra_conditioning_info.cross_attention_control_args,
+                    step_count=step_count,
+                )
+                setup_cross_attention_control_attention_processors(
+                    unet,
+                    cross_attention_control_context,
+                )
+
         try:
             yield None
         finally:
-            if old_attn_processor is not None:
-                self.restore_default_cross_attention(old_attn_processor)
+            if old_attn_processors is not None:
+                unet.set_attn_processor(old_attn_processors)
             # TODO resuscitate attention map saving
             # self.remove_attention_map_saving()
 
     def override_cross_attention(
         self, conditioning: ExtraConditioningInfo, step_count: int
-    ) -> Dict[str, AttnProcessor]:
+    ) -> Dict[str, AttentionProcessor]:
         """
         setup cross attention .swap control. for diffusers this replaces the attention processor, so
         the previous attention processor is returned so that the caller can restore it later.
@@ -118,7 +131,7 @@ class InvokeAIDiffuserComponent:
         )
 
     def restore_default_cross_attention(
-        self, restore_attention_processor: Optional["AttnProcessor"] = None
+        self, restore_attention_processor: Optional["AttentionProcessor"] = None
     ):
         self.conditioning = None
         self.cross_attention_control_context = None
@@ -262,7 +275,7 @@ class InvokeAIDiffuserComponent:
             # TODO remove when compvis codepath support is dropped
             if step_index is None and sigma is None:
                 raise ValueError(
-                    f"Either step_index or sigma is required when doing cross attention control, but both are None."
+                    "Either step_index or sigma is required when doing cross attention control, but both are None."
                 )
             percent_through = self.estimate_percent_through(step_index, sigma)
         return percent_through
@@ -466,10 +479,14 @@ class InvokeAIDiffuserComponent:
             outside = torch.count_nonzero(
                 (latents < -current_threshold) | (latents > current_threshold)
             )
-            print(
-                f"\nThreshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
-                f"  | min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}\n"
-                f"  | {outside / latents.numel() * 100:.2f}% values outside threshold"
+            logger.info(
+                f"Threshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})"
+                )
+            logger.debug(
+                f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}"
+            )
+            logger.debug(   
+                f"{outside / latents.numel() * 100:.2f}% values outside threshold"
             )
 
         if maxval < current_threshold and minval > -current_threshold:
@@ -496,9 +513,11 @@ class InvokeAIDiffuserComponent:
             )
 
         if self.debug_thresholding:
-            print(
-                f"  | min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})\n"
-                f"  | {num_altered / latents.numel() * 100:.2f}% values altered"
+            logger.debug(
+                f"min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})"
+            )
+            logger.debug(
+                f"{num_altered / latents.numel() * 100:.2f}% values altered"
             )
 
         return latents
@@ -599,7 +618,6 @@ class InvokeAIDiffuserComponent:
         )
 
         # below is fugly omg
-        num_actual_conditionings = len(c_or_weighted_c_list)
         conditionings = [uc] + [c for c, weight in weighted_cond_list]
         weights = [1] + [weight for c, weight in weighted_cond_list]
         chunk_count = ceil(len(conditionings) / 2)

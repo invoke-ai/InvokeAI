@@ -1,6 +1,6 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISelect from 'common/components/IAISelect';
 import useImageUploader from 'common/hooks/useImageUploader';
@@ -21,10 +21,9 @@ import {
   CanvasLayer,
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
-import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -44,6 +43,12 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
+import {
+  canvasCopiedToClipboard,
+  canvasDownloadedAsImage,
+  canvasMerged,
+  canvasSavedToGallery,
+} from 'features/canvas/store/actions';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -70,14 +75,8 @@ export const selector = createSelector(
 
 const IAICanvasToolbar = () => {
   const dispatch = useAppDispatch();
-  const {
-    isProcessing,
-    isStaging,
-    isMaskEnabled,
-    layer,
-    tool,
-    shouldCropToBoundingBoxOnSave,
-  } = useAppSelector(selector);
+  const { isProcessing, isStaging, isMaskEnabled, layer, tool } =
+    useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
 
   const { t } = useTranslation();
@@ -183,42 +182,19 @@ const IAICanvasToolbar = () => {
   };
 
   const handleMergeVisible = () => {
-    dispatch(
-      mergeAndUploadCanvas({
-        cropVisible: false,
-        shouldSetAsInitialImage: true,
-      })
-    );
+    dispatch(canvasMerged());
   };
 
   const handleSaveToGallery = () => {
-    dispatch(
-      mergeAndUploadCanvas({
-        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
-        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
-        shouldSaveToGallery: true,
-      })
-    );
+    dispatch(canvasSavedToGallery());
   };
 
   const handleCopyImageToClipboard = () => {
-    dispatch(
-      mergeAndUploadCanvas({
-        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
-        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
-        shouldCopy: true,
-      })
-    );
+    dispatch(canvasCopiedToClipboard());
   };
 
   const handleDownloadAsImage = () => {
-    dispatch(
-      mergeAndUploadCanvas({
-        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
-        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
-        shouldDownload: true,
-      })
-    );
+    dispatch(canvasDownloadedAsImage());
   };
 
   const handleChangeLayer = (e: ChangeEvent<HTMLSelectElement>) => {

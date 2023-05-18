@@ -32,7 +32,7 @@ turned on and off on the command line using `--nsfw_checker` and
 At installation time, InvokeAI will ask whether the checker should be
 activated by default (neither argument given on the command line). The
 response is stored in the InvokeAI initialization file (usually
-`.invokeai` in your home directory). You can change the default at any
+`invokeai.init` in your home directory). You can change the default at any
 time by opening this file in a text editor and commenting or
 uncommenting the line `--nsfw_checker`.
 

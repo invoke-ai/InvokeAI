@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { isEqual, reduce, pickBy } from 'lodash';
+import { RootState } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { reduce, pickBy } from 'lodash-es';
 
 export const systemSelector = (state: RootState) => state.system;
 
@@ -22,11 +23,7 @@ export const activeModelSelector = createSelector(
     );
     return { ...model_list[activeModel], name: activeModel };
   },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
+  defaultSelectorOptions
 );
 
 export const diffusersModelsSelector = createSelector(
@@ -42,9 +39,11 @@ export const diffusersModelsSelector = createSelector(
 
     return diffusersModels;
   },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
+  defaultSelectorOptions
+);
+
+export const languageSelector = createSelector(
+  systemSelector,
+  (system) => system.language,
+  defaultSelectorOptions
 );

@@ -10,9 +10,11 @@ import shlex
 from pathlib import Path
 from typing import List, Dict, Literal, get_args, get_type_hints, get_origin
 
-from ...backend import ModelManager, Globals
+import invokeai.backend.util.logging as logger
+from ...backend import ModelManager
 from ..invocations.baseinvocation import BaseInvocation
 from .commands import BaseCommand
+from ..services.invocation_services import InvocationServices
 
 # singleton object, class variable
 completer = None
@@ -130,13 +132,13 @@ class Completer(object):
             readline.redisplay()
             self.linebuffer = None
     
-def set_autocompleter(model_manager: ModelManager) -> Completer:
+def set_autocompleter(services: InvocationServices) -> Completer:
     global completer
     
     if completer:
         return completer
     
-    completer = Completer(model_manager)
+    completer = Completer(services.model_manager)
 
     readline.set_completer(completer.complete)
     # pyreadline3 does not have a set_auto_history() method
@@ -152,7 +154,7 @@ def set_autocompleter(model_manager: ModelManager) -> Completer:
     readline.parse_and_bind("set skip-completed-text on")
     readline.parse_and_bind("set show-all-if-ambiguous on")
 
-    histfile = Path(Globals.root, ".invoke_history")
+    histfile = Path(services.configuration.root_dir / ".invoke_history")
     try:
         readline.read_history_file(histfile)
         readline.set_history_length(1000)
@@ -160,8 +162,8 @@ def set_autocompleter(model_manager: ModelManager) -> Completer:
         pass
     except OSError:  # file likely corrupted
         newname = f"{histfile}.old"
-        print(
-            f"## Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}"
+        logger.error(
+            f"Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}"
         )
         histfile.replace(Path(newname))
     atexit.register(readline.write_history_file, histfile)

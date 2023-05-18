@@ -1,20 +1,24 @@
-import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { requestModelChange } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import IAISelect from 'common/components/IAISelect';
-import { isEqual, map } from 'lodash';
-
-import { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
-import { activeModelSelector, systemSelector } from '../store/systemSelectors';
+
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectModelsById, selectModelsIds } from '../store/modelSlice';
+import { RootState } from 'app/store/store';
+import { modelSelected } from 'features/parameters/store/generationSlice';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
+import IAICustomSelect from 'common/components/IAICustomSelect';
 
 const selector = createSelector(
-  [systemSelector],
-  (system) => {
-    const { isProcessing, model_list } = system;
-    const models = map(model_list, (model, key) => key);
-    return { models, isProcessing };
+  [(state: RootState) => state, generationSelector],
+  (state, generation) => {
+    const selectedModel = selectModelsById(state, generation.model);
+    const allModelNames = selectModelsIds(state).map((id) => String(id));
+    return {
+      allModelNames,
+      selectedModel,
+    };
   },
   {
     memoizeOptions: {
@@ -26,29 +30,28 @@ const selector = createSelector(
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { models, isProcessing } = useAppSelector(selector);
-  const activeModel = useAppSelector(activeModelSelector);
-  const handleChangeModel = (e: ChangeEvent<HTMLSelectElement>) => {
-    dispatch(requestModelChange(e.target.value));
-  };
+  const { allModelNames, selectedModel } = useAppSelector(selector);
+  const handleChangeModel = useCallback(
+    (v: string | null | undefined) => {
+      if (!v) {
+        return;
+      }
+      dispatch(modelSelected(v));
+    },
+    [dispatch]
+  );
 
   return (
-    <Flex
-      style={{
-        paddingInlineStart: 1.5,
-      }}
-    >
-      <IAISelect
-        style={{ fontSize: 'sm' }}
-        aria-label={t('accessibility.modelSelect')}
-        tooltip={activeModel.description}
-        isDisabled={isProcessing}
-        value={activeModel.name}
-        validValues={models}
-        onChange={handleChangeModel}
-      />
-    </Flex>
+    <IAICustomSelect
+      label={t('modelManager.model')}
+      tooltip={selectedModel?.description}
+      items={allModelNames}
+      selectedItem={selectedModel?.name ?? ''}
+      setSelectedItem={handleChangeModel}
+      withCheckIcon={true}
+      tooltipProps={{ placement: 'top', hasArrow: true }}
+    />
   );
 };
 
-export default ModelSelect;
+export default memo(ModelSelect);

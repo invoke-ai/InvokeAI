@@ -1,4 +1,3 @@
-import os
 import warnings
 
 import numpy as np
@@ -6,17 +5,13 @@ import torch
 from PIL import Image
 from PIL.Image import Image as ImageType
 
-from invokeai.backend.globals import Globals
-
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import get_invokeai_config
+config = get_invokeai_config()
 
 class ESRGAN:
     def __init__(self, bg_tile_size=400) -> None:
         self.bg_tile_size = bg_tile_size
-
-        if not torch.cuda.is_available():  # CPU or MPS on M1
-            use_half_precision = False
-        else:
-            use_half_precision = True
 
     def load_esrgan_bg_upsampler(self, denoise_str):
         if not torch.cuda.is_available():  # CPU or MPS on M1
@@ -35,12 +30,8 @@ class ESRGAN:
             upscale=4,
             act_type="prelu",
         )
-        model_path = os.path.join(
-            Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
-        )
-        wdn_model_path = os.path.join(
-            Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
-        )
+        model_path = config.root_dir / "models/realesrgan/realesr-general-x4v3.pth"
+        wdn_model_path = config.root_dir / "models/realesrgan/realesr-general-wdn-x4v3.pth"
         scale = 4
 
         bg_upsampler = RealESRGANer(
@@ -74,16 +65,16 @@ class ESRGAN:
                 import sys
                 import traceback
 
-                print(">> Error loading Real-ESRGAN:", file=sys.stderr)
+                logger.error("Error loading Real-ESRGAN:")
                 print(traceback.format_exc(), file=sys.stderr)
 
         if upsampler_scale == 0:
-            print(">> Real-ESRGAN: Invalid scaling option. Image not upscaled.")
+            logger.warning("Real-ESRGAN: Invalid scaling option. Image not upscaled.")
             return image
 
         if seed is not None:
-            print(
-                f">> Real-ESRGAN Upscaling seed:{seed}, scale:{upsampler_scale}x, tile:{self.bg_tile_size}, denoise:{denoise_str}"
+            logger.info(
+                f"Real-ESRGAN Upscaling seed:{seed}, scale:{upsampler_scale}x, tile:{self.bg_tile_size}, denoise:{denoise_str}"
             )
         # ESRGAN outputs images with partial transparency if given RGBA images; convert to RGB
         image = image.convert("RGB")

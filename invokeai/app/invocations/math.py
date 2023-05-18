@@ -1,68 +1,100 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Literal
 
-import numpy
-from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
+import numpy as np
 
-from ..services.image_storage import ImageType
-from ..services.invocation_services import InvocationServices
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    InvocationContext,
+    InvocationConfig,
+)
+
+
+class MathInvocationConfig(BaseModel):
+    """Helper class to provide all math invocations with additional config"""
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["math"],
+            }
+        }
 
 
 class IntOutput(BaseInvocationOutput):
     """An integer output"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["int_output"] = "int_output"
     a: int = Field(default=None, description="The output integer")
-    #fmt: on
+    # fmt: on
 
 
-class AddInvocation(BaseInvocation):
+class AddInvocation(BaseInvocation, MathInvocationConfig):
     """Adds two numbers"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["add"] = "add"
     a: int = Field(default=0, description="The first number")
     b: int = Field(default=0, description="The second number")
-    #fmt: on
+    # fmt: on
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=self.a + self.b)
 
 
-class SubtractInvocation(BaseInvocation):
+class SubtractInvocation(BaseInvocation, MathInvocationConfig):
     """Subtracts two numbers"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["sub"] = "sub"
     a: int = Field(default=0, description="The first number")
     b: int = Field(default=0, description="The second number")
-    #fmt: on
+    # fmt: on
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=self.a - self.b)
 
 
-class MultiplyInvocation(BaseInvocation):
+class MultiplyInvocation(BaseInvocation, MathInvocationConfig):
     """Multiplies two numbers"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["mul"] = "mul"
     a: int = Field(default=0, description="The first number")
     b: int = Field(default=0, description="The second number")
-    #fmt: on
+    # fmt: on
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=self.a * self.b)
 
 
-class DivideInvocation(BaseInvocation):
+class DivideInvocation(BaseInvocation, MathInvocationConfig):
     """Divides two numbers"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["div"] = "div"
     a: int = Field(default=0, description="The first number")
     b: int = Field(default=0, description="The second number")
-    #fmt: on
+    # fmt: on
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=int(self.a / self.b))
+
+
+class RandomIntInvocation(BaseInvocation):
+    """Outputs a single random integer."""
+
+    # fmt: off
+    type: Literal["rand_int"] = "rand_int"
+    low: int = Field(default=0, description="The inclusive low value")
+    high: int = Field(
+        default=np.iinfo(np.int32).max, description="The exclusive high value"
+    )
+    # fmt: on
+    def invoke(self, context: InvocationContext) -> IntOutput:
+        return IntOutput(a=np.random.randint(self.low, self.high))

@@ -1,8 +1,8 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { canvasCopiedToClipboard } from 'features/canvas/store/actions';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -14,10 +14,6 @@ export default function UnifiedCanvasCopyToClipboard() {
 
   const isProcessing = useAppSelector(
     (state: RootState) => state.system.isProcessing
-  );
-
-  const shouldCropToBoundingBoxOnSave = useAppSelector(
-    (state: RootState) => state.canvas.shouldCropToBoundingBoxOnSave
   );
 
   const dispatch = useAppDispatch();
@@ -36,13 +32,7 @@ export default function UnifiedCanvasCopyToClipboard() {
   );
 
   const handleCopyImageToClipboard = () => {
-    dispatch(
-      mergeAndUploadCanvas({
-        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
-        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
-        shouldCopy: true,
-      })
-    );
+    dispatch(canvasCopiedToClipboard());
   };
 
   return (

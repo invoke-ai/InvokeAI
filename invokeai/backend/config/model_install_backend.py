@@ -19,13 +19,15 @@ from tqdm import tqdm
 
 import invokeai.configs as configs
 
-from ..globals import Globals, global_cache_dir, global_config_dir
+from invokeai.app.services.config import get_invokeai_config
 from ..model_management import ModelManager
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
+
 
 warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
+config = get_invokeai_config()
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
@@ -47,12 +49,11 @@ Config_preamble = """
 
 
 def default_config_file():
-    return Path(global_config_dir()) / "models.yaml"
+    return config.model_conf_path
 
 
 def sd_configs():
-    return Path(global_config_dir()) / "stable-diffusion"
-
+    return config.legacy_conf_path
 
 def initial_models():
     global Datasets
@@ -121,8 +122,9 @@ def install_requested_models(
 
     if scan_at_startup and scan_directory.is_dir():
         argument = "--autoconvert"
-        initfile = Path(Globals.root, Globals.initfile)
-        replacement = Path(Globals.root, f"{Globals.initfile}.new")
+        print('** The global initfile is no longer supported; rewrite to support new yaml format **')
+        initfile = Path(config.root, 'invokeai.init')
+        replacement = Path(config.root, f"invokeai.init.new")
         directory = str(scan_directory).replace("\\", "/")
         with open(initfile, "r") as input:
             with open(replacement, "w") as output:
@@ -150,7 +152,7 @@ def get_root(root: str = None) -> str:
     elif os.environ.get("INVOKEAI_ROOT"):
         return os.environ.get("INVOKEAI_ROOT")
     else:
-        return Globals.root
+        return config.root
 
 
 # ---------------------------------------------
@@ -183,7 +185,7 @@ def all_datasets() -> dict:
 # look for legacy model.ckpt in models directory and offer to
 # normalize its name
 def migrate_models_ckpt():
-    model_path = os.path.join(Globals.root, Model_dir, Weights_dir)
+    model_path = os.path.join(config.root, Model_dir, Weights_dir)
     if not os.path.exists(os.path.join(model_path, "model.ckpt")):
         return
     new_name = initial_models()["stable-diffusion-1.4"]["file"]
@@ -228,7 +230,7 @@ def _download_repo_or_file(
 def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
     repo_id = mconfig["repo_id"]
     filename = mconfig["file"]
-    cache_dir = os.path.join(Globals.root, Model_dir, Weights_dir)
+    cache_dir = os.path.join(config.root, Model_dir, Weights_dir)
     return hf_download_with_resume(
         repo_id=repo_id,
         model_dir=cache_dir,
@@ -239,9 +241,9 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
 
 # ---------------------------------------------
 def download_from_hf(
-    model_class: object, model_name: str, cache_subdir: Path = Path("hub"), **kwargs
+    model_class: object, model_name: str, **kwargs
 ):
-    path = global_cache_dir(cache_subdir)
+    path = config.cache_dir
     model = model_class.from_pretrained(
         model_name,
         cache_dir=path,
@@ -417,7 +419,7 @@ def new_config_file_contents(
             stanza["height"] = mod["height"]
         if "file" in mod:
             stanza["weights"] = os.path.relpath(
-                successfully_downloaded[model], start=Globals.root
+                successfully_downloaded[model], start=config.root
             )
             stanza["config"] = os.path.normpath(
                 os.path.join(sd_configs(), mod["config"])
@@ -456,7 +458,7 @@ def delete_weights(model_name: str, conf_stanza: dict):
 
     weights = Path(weights)
     if not weights.is_absolute():
-        weights = Path(Globals.root) / weights
+        weights = Path(config.root) / weights
         try:
             weights.unlink()
         except OSError as e:

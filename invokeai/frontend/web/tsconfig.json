@@ -14,9 +14,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": "src",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": "./",
+    "paths": {
+      "*": ["./src/*"]
+    }
   },
-  "include": ["src", "index.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.d.ts"],
+  "exclude": ["src/services/fixtures/*", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

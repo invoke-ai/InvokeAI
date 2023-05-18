@@ -1,9 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { ImageConfig } from 'konva/lib/shapes/Image';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
@@ -25,7 +26,7 @@ type Props = Omit<ImageConfig, 'image'>;
 const IAICanvasIntermediateImage = (props: Props) => {
   const { ...rest } = props;
   const intermediateImage = useAppSelector(selector);
-
+  const { getUrl } = useGetUrl();
   const [loadedImageElement, setLoadedImageElement] =
     useState<HTMLImageElement | null>(null);
 
@@ -36,8 +37,8 @@ const IAICanvasIntermediateImage = (props: Props) => {
     tempImage.onload = () => {
       setLoadedImageElement(tempImage);
     };
-    tempImage.src = intermediateImage.url;
-  }, [intermediateImage]);
+    tempImage.src = getUrl(intermediateImage.url);
+  }, [intermediateImage, getUrl]);
 
   if (!intermediateImage?.boundingBox) return null;
 

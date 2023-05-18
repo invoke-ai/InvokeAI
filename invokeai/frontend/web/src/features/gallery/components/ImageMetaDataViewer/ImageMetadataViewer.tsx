@@ -3,14 +3,14 @@ import {
   Box,
   Center,
   Flex,
-  Heading,
   IconButton,
   Link,
   Text,
   Tooltip,
 } from '@chakra-ui/react';
-import * as InvokeAI from 'app/invokeai';
-import { useAppDispatch } from 'app/storeHooks';
+import * as InvokeAI from 'app/types/invokeai';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import useSetBothPrompts from 'features/parameters/hooks/usePrompt';
@@ -18,10 +18,8 @@ import {
   setCfgScale,
   setHeight,
   setImg2imgStrength,
-  setInitialImage,
-  setMaskPath,
   setPerlin,
-  setSampler,
+  setScheduler,
   setSeamless,
   setSeed,
   setSeedWeights,
@@ -30,21 +28,14 @@ import {
   setThreshold,
   setWidth,
 } from 'features/parameters/store/generationSlice';
-import {
-  setCodeformerFidelity,
-  setFacetoolStrength,
-  setFacetoolType,
-  setHiresFix,
-  setUpscalingDenoising,
-  setUpscalingLevel,
-  setUpscalingStrength,
-} from 'features/parameters/store/postprocessingSlice';
+import { setHiresFix } from 'features/parameters/store/postprocessingSlice';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -120,7 +111,7 @@ type ImageMetadataViewerProps = {
 const memoEqualityCheck = (
   prev: ImageMetadataViewerProps,
   next: ImageMetadataViewerProps
-) => prev.image.uuid === next.image.uuid;
+) => prev.image.name === next.image.name;
 
 // TODO: Show more interesting information in this component.
 
@@ -137,34 +128,13 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     dispatch(setShouldShowImageDetails(false));
   });
 
-  const metadata = image?.metadata?.image || {};
-  const dreamPrompt = image?.dreamPrompt;
-
-  const {
-    cfg_scale,
-    fit,
-    height,
-    hires_fix,
-    init_image_path,
-    mask_image_path,
-    orig_path,
-    perlin,
-    postprocessing,
-    prompt,
-    sampler,
-    seamless,
-    seed,
-    steps,
-    strength,
-    threshold,
-    type,
-    variations,
-    width,
-  } = metadata;
+  const sessionId = image.metadata.invokeai?.session_id;
+  const node = image.metadata.invokeai?.node as Record<string, any>;
 
   const { t } = useTranslation();
+  const { getUrl } = useGetUrl();
 
-  const metadataJSON = JSON.stringify(image.metadata, null, 2);
+  const metadataJSON = JSON.stringify(image, null, 2);
 
   return (
     <Flex
@@ -179,266 +149,139 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
         _dark: {
           bg: 'blackAlpha.600',
         },
+        overflow: 'scroll',
       }}
     >
       <Flex gap={2}>
         <Text fontWeight="semibold">File:</Text>
-        <Link href={image.url} isExternal maxW="calc(100% - 3rem)">
+        <Link href={getUrl(image.url)} isExternal maxW="calc(100% - 3rem)">
           {image.url.length > 64
             ? image.url.substring(0, 64).concat('...')
             : image.url}
           <ExternalLinkIcon mx="2px" />
         </Link>
       </Flex>
-      {Object.keys(metadata).length > 0 ? (
+      {node && Object.keys(node).length > 0 ? (
         <>
-          {type && <MetadataItem label="Generation type" value={type} />}
-          {image.metadata?.model_weights && (
-            <MetadataItem label="Model" value={image.metadata.model_weights} />
+          {node.type && (
+            <MetadataItem label="Invocation type" value={node.type} />
           )}
-          {['esrgan', 'gfpgan'].includes(type) && (
-            <MetadataItem label="Original image" value={orig_path} />
-          )}
-          {prompt && (
+          {node.model && <MetadataItem label="Model" value={node.model} />}
+          {node.prompt && (
             <MetadataItem
               label="Prompt"
               labelPosition="top"
               value={
-                typeof prompt === 'string' ? prompt : promptToString(prompt)
+                typeof node.prompt === 'string'
+                  ? node.prompt
+                  : promptToString(node.prompt)
               }
-              onClick={() => setBothPrompts(prompt)}
+              onClick={() => setBothPrompts(node.prompt)}
             />
           )}
-          {seed !== undefined && (
+          {node.seed !== undefined && (
             <MetadataItem
               label="Seed"
-              value={seed}
-              onClick={() => dispatch(setSeed(seed))}
+              value={node.seed}
+              onClick={() => dispatch(setSeed(Number(node.seed)))}
             />
           )}
-          {threshold !== undefined && (
+          {node.threshold !== undefined && (
             <MetadataItem
               label="Noise Threshold"
-              value={threshold}
-              onClick={() => dispatch(setThreshold(threshold))}
+              value={node.threshold}
+              onClick={() => dispatch(setThreshold(Number(node.threshold)))}
             />
           )}
-          {perlin !== undefined && (
+          {node.perlin !== undefined && (
             <MetadataItem
               label="Perlin Noise"
-              value={perlin}
-              onClick={() => dispatch(setPerlin(perlin))}
+              value={node.perlin}
+              onClick={() => dispatch(setPerlin(Number(node.perlin)))}
             />
           )}
-          {sampler && (
+          {node.scheduler && (
             <MetadataItem
-              label="Sampler"
-              value={sampler}
-              onClick={() => dispatch(setSampler(sampler))}
+              label="Scheduler"
+              value={node.scheduler}
+              onClick={() => dispatch(setScheduler(node.scheduler))}
             />
           )}
-          {steps && (
+          {node.steps && (
             <MetadataItem
               label="Steps"
-              value={steps}
-              onClick={() => dispatch(setSteps(steps))}
+              value={node.steps}
+              onClick={() => dispatch(setSteps(Number(node.steps)))}
             />
           )}
-          {cfg_scale !== undefined && (
+          {node.cfg_scale !== undefined && (
             <MetadataItem
               label="CFG scale"
-              value={cfg_scale}
-              onClick={() => dispatch(setCfgScale(cfg_scale))}
+              value={node.cfg_scale}
+              onClick={() => dispatch(setCfgScale(Number(node.cfg_scale)))}
             />
           )}
-          {variations && variations.length > 0 && (
+          {node.variations && node.variations.length > 0 && (
             <MetadataItem
               label="Seed-weight pairs"
-              value={seedWeightsToString(variations)}
+              value={seedWeightsToString(node.variations)}
               onClick={() =>
-                dispatch(setSeedWeights(seedWeightsToString(variations)))
+                dispatch(setSeedWeights(seedWeightsToString(node.variations)))
               }
             />
           )}
-          {seamless && (
+          {node.seamless && (
             <MetadataItem
               label="Seamless"
-              value={seamless}
-              onClick={() => dispatch(setSeamless(seamless))}
+              value={node.seamless}
+              onClick={() => dispatch(setSeamless(node.seamless))}
             />
           )}
-          {hires_fix && (
+          {node.hires_fix && (
             <MetadataItem
               label="High Resolution Optimization"
-              value={hires_fix}
-              onClick={() => dispatch(setHiresFix(hires_fix))}
+              value={node.hires_fix}
+              onClick={() => dispatch(setHiresFix(node.hires_fix))}
             />
           )}
-          {width && (
+          {node.width && (
             <MetadataItem
               label="Width"
-              value={width}
-              onClick={() => dispatch(setWidth(width))}
+              value={node.width}
+              onClick={() => dispatch(setWidth(Number(node.width)))}
             />
           )}
-          {height && (
+          {node.height && (
             <MetadataItem
               label="Height"
-              value={height}
-              onClick={() => dispatch(setHeight(height))}
+              value={node.height}
+              onClick={() => dispatch(setHeight(Number(node.height)))}
             />
           )}
-          {init_image_path && (
+          {/* {init_image_path && (
             <MetadataItem
               label="Initial image"
               value={init_image_path}
               isLink
               onClick={() => dispatch(setInitialImage(init_image_path))}
             />
-          )}
-          {mask_image_path && (
-            <MetadataItem
-              label="Mask image"
-              value={mask_image_path}
-              isLink
-              onClick={() => dispatch(setMaskPath(mask_image_path))}
-            />
-          )}
-          {type === 'img2img' && strength && (
+          )} */}
+          {node.strength && (
             <MetadataItem
               label="Image to image strength"
-              value={strength}
-              onClick={() => dispatch(setImg2imgStrength(strength))}
+              value={node.strength}
+              onClick={() =>
+                dispatch(setImg2imgStrength(Number(node.strength)))
+              }
             />
           )}
-          {fit && (
+          {node.fit && (
             <MetadataItem
               label="Image to image fit"
-              value={fit}
-              onClick={() => dispatch(setShouldFitToWidthHeight(fit))}
+              value={node.fit}
+              onClick={() => dispatch(setShouldFitToWidthHeight(node.fit))}
             />
           )}
-          {postprocessing && postprocessing.length > 0 && (
-            <>
-              <Heading size="sm">Postprocessing</Heading>
-              {postprocessing.map(
-                (
-                  postprocess: InvokeAI.PostProcessedImageMetadata,
-                  i: number
-                ) => {
-                  if (postprocess.type === 'esrgan') {
-                    const { scale, strength, denoise_str } = postprocess;
-                    return (
-                      <Flex key={i} pl={8} gap={1} direction="column">
-                        <Text size="md">{`${i + 1}: Upscale (ESRGAN)`}</Text>
-                        <MetadataItem
-                          label="Scale"
-                          value={scale}
-                          onClick={() => dispatch(setUpscalingLevel(scale))}
-                        />
-                        <MetadataItem
-                          label="Strength"
-                          value={strength}
-                          onClick={() =>
-                            dispatch(setUpscalingStrength(strength))
-                          }
-                        />
-                        {denoise_str !== undefined && (
-                          <MetadataItem
-                            label="Denoising strength"
-                            value={denoise_str}
-                            onClick={() =>
-                              dispatch(setUpscalingDenoising(denoise_str))
-                            }
-                          />
-                        )}
-                      </Flex>
-                    );
-                  } else if (postprocess.type === 'gfpgan') {
-                    const { strength } = postprocess;
-                    return (
-                      <Flex key={i} pl={8} gap={1} direction="column">
-                        <Text size="md">{`${
-                          i + 1
-                        }: Face restoration (GFPGAN)`}</Text>
-
-                        <MetadataItem
-                          label="Strength"
-                          value={strength}
-                          onClick={() => {
-                            dispatch(setFacetoolStrength(strength));
-                            dispatch(setFacetoolType('gfpgan'));
-                          }}
-                        />
-                      </Flex>
-                    );
-                  } else if (postprocess.type === 'codeformer') {
-                    const { strength, fidelity } = postprocess;
-                    return (
-                      <Flex key={i} pl={8} gap={1} direction="column">
-                        <Text size="md">{`${
-                          i + 1
-                        }: Face restoration (Codeformer)`}</Text>
-
-                        <MetadataItem
-                          label="Strength"
-                          value={strength}
-                          onClick={() => {
-                            dispatch(setFacetoolStrength(strength));
-                            dispatch(setFacetoolType('codeformer'));
-                          }}
-                        />
-                        {fidelity && (
-                          <MetadataItem
-                            label="Fidelity"
-                            value={fidelity}
-                            onClick={() => {
-                              dispatch(setCodeformerFidelity(fidelity));
-                              dispatch(setFacetoolType('codeformer'));
-                            }}
-                          />
-                        )}
-                      </Flex>
-                    );
-                  }
-                }
-              )}
-            </>
-          )}
-          {dreamPrompt && (
-            <MetadataItem withCopy label="Dream Prompt" value={dreamPrompt} />
-          )}
-          <Flex gap={2} direction="column">
-            <Flex gap={2}>
-              <Tooltip label="Copy metadata JSON">
-                <IconButton
-                  aria-label={t('accessibility.copyMetadataJson')}
-                  icon={<FaCopy />}
-                  size="xs"
-                  variant="ghost"
-                  fontSize={14}
-                  onClick={() => navigator.clipboard.writeText(metadataJSON)}
-                />
-              </Tooltip>
-              <Text fontWeight="semibold">Metadata JSON:</Text>
-            </Flex>
-            <Box
-              sx={{
-                mt: 0,
-                mr: 2,
-                mb: 4,
-                ml: 2,
-                padding: 4,
-                borderRadius: 'base',
-                overflowX: 'scroll',
-                wordBreak: 'break-all',
-                bg: 'whiteAlpha.500',
-                _dark: { bg: 'blackAlpha.500' },
-              }}
-            >
-              <pre>{metadataJSON}</pre>
-            </Box>
-          </Flex>
         </>
       ) : (
         <Center width="100%" pt={10}>
@@ -447,6 +290,34 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           </Text>
         </Center>
       )}
+      <Flex gap={2} direction="column" overflow="auto">
+        <Flex gap={2}>
+          <Tooltip label="Copy metadata JSON">
+            <IconButton
+              aria-label={t('accessibility.copyMetadataJson')}
+              icon={<FaCopy />}
+              size="xs"
+              variant="ghost"
+              fontSize={14}
+              onClick={() => navigator.clipboard.writeText(metadataJSON)}
+            />
+          </Tooltip>
+          <Text fontWeight="semibold">Metadata JSON:</Text>
+        </Flex>
+        <OverlayScrollbarsComponent defer>
+          <Box
+            sx={{
+              padding: 4,
+              borderRadius: 'base',
+              bg: 'whiteAlpha.500',
+              _dark: { bg: 'blackAlpha.500' },
+              w: 'max-content',
+            }}
+          >
+            <pre>{metadataJSON}</pre>
+          </Box>
+        </OverlayScrollbarsComponent>
+      </Flex>
     </Flex>
   );
 }, memoEqualityCheck);

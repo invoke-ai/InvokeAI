@@ -1,8 +1,8 @@
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { canvasMerged } from 'features/canvas/store/actions';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -30,12 +30,7 @@ export default function UnifiedCanvasMergeVisible() {
   );
 
   const handleMergeVisible = () => {
-    dispatch(
-      mergeAndUploadCanvas({
-        cropVisible: false,
-        shouldSetAsInitialImage: true,
-      })
-    );
+    dispatch(canvasMerged());
   };
   return (
     <IAIIconButton

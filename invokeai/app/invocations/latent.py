@@ -1,25 +1,30 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal, Optional
+import random
+from typing import Literal, Optional, Union
+import einops
 from pydantic import BaseModel, Field
-from torch import Tensor
 import torch
+
+from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
+
+from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
-from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline, image_resized_to_grid_as_tensor
+from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
-from accelerate.utils import set_seed
 from ..services.image_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
-from ...backend.generator import Generator
+from .image import ImageField, ImageOutput, build_image_output
+from .compel import ConditioningField
 from ...backend.stable_diffusion import PipelineIntermediateState
-from ...backend.util.util import image_to_dataURL
 from diffusers.schedulers import SchedulerMixin as Scheduler
 import diffusers
 from diffusers import DiffusionPipeline
@@ -30,45 +35,61 @@ class LatentsField(BaseModel):
 
     latents_name: Optional[str] = Field(default=None, description="The name of the latents")
 
+    class Config:
+        schema_extra = {"required": ["latents_name"]}
 
 class LatentsOutput(BaseInvocationOutput):
     """Base class for invocations that output latents"""
     #fmt: off
-    type: Literal["latent_output"] = "latent_output"
-    latents: LatentsField            = Field(default=None, description="The output latents")
+    type: Literal["latents_output"] = "latents_output"
+
+    # Inputs
+    latents: LatentsField          = Field(default=None, description="The output latents")
+    width:                     int = Field(description="The width of the latents in pixels")
+    height:                    int = Field(description="The height of the latents in pixels")
     #fmt: on
+
+
+def build_latents_output(latents_name: str, latents: torch.Tensor):
+      return LatentsOutput(
+          latents=LatentsField(latents_name=latents_name),
+          width=latents.size()[3] * 8,
+          height=latents.size()[2] * 8,
+      )
 
 class NoiseOutput(BaseInvocationOutput):
     """Invocation noise output"""
     #fmt: off
-    type: Literal["noise_output"] = "noise_output"
+    type:  Literal["noise_output"] = "noise_output"
+
+    # Inputs
     noise: LatentsField            = Field(default=None, description="The output noise")
+    width:                     int = Field(description="The width of the noise in pixels")
+    height:                    int = Field(description="The height of the noise in pixels")
     #fmt: on
 
-
-# TODO: this seems like a hack
-scheduler_map = dict(
-    ddim=diffusers.DDIMScheduler,
-    dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-    k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-    k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
-    k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-    k_euler=diffusers.EulerDiscreteScheduler,
-    k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-    k_heun=diffusers.HeunDiscreteScheduler,
-    k_lms=diffusers.LMSDiscreteScheduler,
-    plms=diffusers.PNDMScheduler,
-)
+def build_noise_output(latents_name: str, latents: torch.Tensor):
+      return NoiseOutput(
+          noise=LatentsField(latents_name=latents_name),
+          width=latents.size()[3] * 8,
+          height=latents.size()[2] * 8,
+      )
 
 
 SAMPLER_NAME_VALUES = Literal[
-    tuple(list(scheduler_map.keys()))
+    tuple(list(SCHEDULER_MAP.keys()))
 ]
 
 
 def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-    scheduler_class = scheduler_map.get(scheduler_name,'ddim')
-    scheduler = scheduler_class.from_config(model.scheduler.config)
+    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
+    
+    scheduler_config = model.scheduler.config
+    if "_backup" in scheduler_config:
+        scheduler_config = scheduler_config["_backup"]
+    scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
+    scheduler = scheduler_class.from_config(scheduler_config)
+    
     # hack copied over from generate.py
     if not hasattr(scheduler, 'uses_inpainting_model'):
         scheduler.uses_inpainting_model = lambda: False
@@ -105,9 +126,18 @@ class NoiseInvocation(BaseInvocation):
     type: Literal["noise"] = "noise"
 
     # Inputs
-    seed:        int = Field(default=0, ge=0, le=np.iinfo(np.uint32).max, description="The seed to use", )
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting noise", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting noise", )
+    seed:       int = Field(ge=0, le=SEED_MAX, description="The seed to use", default_factory=get_random_seed)
+    width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting noise", )
+    height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting noise", )
+
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents", "noise"],
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
         device = torch.device(choose_torch_device())
@@ -115,69 +145,60 @@ class NoiseInvocation(BaseInvocation):
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, noise)
-        return NoiseOutput(
-            noise=LatentsField(latents_name=name)
-        )
+        return build_noise_output(latents_name=name, latents=noise)
 
 
 # Text to image
 class TextToLatentsInvocation(BaseInvocation):
-    """Generates latents from a prompt."""
+    """Generates latents from conditionings."""
 
     type: Literal["t2l"] = "t2l"
 
     # Inputs
-    # TODO: consider making prompt optional to enable providing prompt through a link
     # fmt: off
-    prompt: Optional[str] = Field(description="The prompt to generate an image from")
-    seed:        int = Field(default=-1,ge=-1, le=np.iinfo(np.uint32).max, description="The seed to use (-1 for a random seed)", )
+    positive_conditioning: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
+    negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    width:       int = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image", )
-    height:      int = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    sampler_name: SAMPLER_NAME_VALUES = Field(default="k_lms", description="The sampler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
+    model:       str = Field(default="", description="The model to use (currently ignored)")
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
-    model:       str = Field(default="", description="The model to use (currently ignored)")
-    progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
     # fmt: on
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents", "image"],
+                "type_hints": {
+                  "model": "model"
+                }
+            },
+        }
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
     def dispatch_progress(
-        self, context: InvocationContext, sample: Tensor, step: int
-    ) -> None:  
-        # TODO: only output a preview image when requested
-        image = Generator.sample_to_lowres_estimated_image(sample)
-
-        (width, height) = image.size
-        width *= 8
-        height *= 8
-
-        dataURL = image_to_dataURL(image, image_format="JPEG")
-
-        context.services.events.emit_generator_progress(
-            context.graph_execution_state_id,
-            self.id,
-            {
-                "width": width,
-                "height": height,
-                "dataURL": dataURL
-            },
-            step,
-            self.steps,
+        self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
+    ) -> None:
+        stable_diffusion_step_callback(
+            context=context,
+            intermediate_state=intermediate_state,
+            node=self.dict(),
+            source_node_id=source_node_id,
         )
-    
+
     def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
-        model_info = model_manager.get_model(self.model)
+        model_info = choose_model(model_manager, self.model)
         model_name = model_info['model_name']
         model_hash = model_info['hash']
         model: StableDiffusionGeneratorPipeline = model_info['model']
         model.scheduler = get_scheduler(
             model=model,
-            scheduler_name=self.sampler_name
+            scheduler_name=self.scheduler
         )
-        
+
         if isinstance(model, DiffusionPipeline):
             for component in [model.unet, model.vae]:
                 configure_model_padding(component,
@@ -193,8 +214,10 @@ class TextToLatentsInvocation(BaseInvocation):
         return model
 
 
-    def get_conditioning_data(self, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
-        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(self.prompt, model=model)
+    def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
+        c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
+        uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
+
         conditioning_data = ConditioningData(
             uc,
             c,
@@ -206,18 +229,22 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(model.scheduler, eta=None)#ddim_eta)
+        ).add_scheduler_args_if_applicable(model.scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state.latents, state.step)
+            self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        conditioning_data = self.get_conditioning_data(context, model)
 
         # TODO: Verify the noise is the right size
 
@@ -234,9 +261,7 @@ class TextToLatentsInvocation(BaseInvocation):
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, result_latents)
-        return LatentsOutput(
-            latents=LatentsField(latents_name=name)
-        )
+        return build_latents_output(latents_name=name, latents=result_latents)
 
 
 class LatentsToLatentsInvocation(TextToLatentsInvocation):
@@ -248,27 +273,38 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
     strength: float = Field(default=0.5, description="The strength of the latents to use")
 
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents"],
+                "type_hints": {
+                    "model": "model"
+                }
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
         latent = context.services.latents.get(self.latents.latents_name)
 
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
         def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, state.latents, state.step)
+            self.dispatch_progress(context, source_node_id, state)
 
         model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(model)
+        conditioning_data = self.get_conditioning_data(context, model)
 
         # TODO: Verify the noise is the right size
 
         initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
             latent, device=model.device, dtype=latent.dtype
         )
-        
-        timesteps, _ = model.get_img2img_timesteps(
-            self.steps,
-            self.strength,
-            device=model.device,
-        )
+
+        timesteps, _ = model.get_img2img_timesteps(self.steps, self.strength)
 
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=initial_latents,
@@ -284,9 +320,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.set(name, result_latents)
-        return LatentsOutput(
-            latents=LatentsField(latents_name=name)
-        )
+        return build_latents_output(latents_name=name, latents=result_latents)
 
 
 # Latent to image
@@ -299,12 +333,23 @@ class LatentsToImageInvocation(BaseInvocation):
     latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     model: str = Field(default="", description="The model to use")
 
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents", "image"],
+                "type_hints": {
+                  "model": "model"
+                }
+            },
+        }
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
         # TODO: this only really needs the vae
-        model_info = context.services.model_manager.get_model(self.model)
+        model_info = choose_model(context.services.model_manager, self.model)
         model: StableDiffusionGeneratorPipeline = model_info['model']
 
         with torch.inference_mode():
@@ -315,7 +360,123 @@ class LatentsToImageInvocation(BaseInvocation):
             image_name = context.services.images.create_name(
                 context.graph_execution_state_id, self.id
             )
-            context.services.images.save(image_type, image_name, image)
-            return ImageOutput(
-                image=ImageField(image_type=image_type, image_name=image_name)
+
+            metadata = context.services.metadata.build_metadata(
+                session_id=context.graph_execution_state_id, node=self
             )
+
+            torch.cuda.empty_cache()
+
+            context.services.images.save(image_type, image_name, image, metadata)
+            return build_image_output(
+                image_type=image_type, image_name=image_name, image=image
+            )
+
+
+LATENTS_INTERPOLATION_MODE = Literal[
+    "nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"
+]
+
+
+class ResizeLatentsInvocation(BaseInvocation):
+    """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
+
+    type: Literal["lresize"] = "lresize"
+
+    # Inputs
+    latents:    Optional[LatentsField] = Field(description="The latents to resize")
+    width:                         int = Field(ge=64, multiple_of=8, description="The width to resize to (px)")
+    height:                        int = Field(ge=64, multiple_of=8, description="The height to resize to (px)")
+    mode:   LATENTS_INTERPOLATION_MODE = Field(default="bilinear", description="The interpolation mode")
+    antialias:                    bool = Field(default=False, description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents = context.services.latents.get(self.latents.latents_name)
+
+        resized_latents = torch.nn.functional.interpolate(
+            latents,
+            size=(self.height // 8, self.width // 8),
+            mode=self.mode,
+            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.set(name, resized_latents)
+        return build_latents_output(latents_name=name, latents=resized_latents)
+
+
+class ScaleLatentsInvocation(BaseInvocation):
+    """Scales latents by a given factor."""
+
+    type: Literal["lscale"] = "lscale"
+
+    # Inputs
+    latents:   Optional[LatentsField] = Field(description="The latents to scale")
+    scale_factor:               float = Field(gt=0, description="The factor by which to scale the latents")
+    mode:  LATENTS_INTERPOLATION_MODE = Field(default="bilinear", description="The interpolation mode")
+    antialias:                   bool = Field(default=False, description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents = context.services.latents.get(self.latents.latents_name)
+
+        # resizing
+        resized_latents = torch.nn.functional.interpolate(
+            latents,
+            scale_factor=self.scale_factor,
+            mode=self.mode,
+            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
+        )
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        torch.cuda.empty_cache()
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.set(name, resized_latents)
+        return build_latents_output(latents_name=name, latents=resized_latents)
+
+
+class ImageToLatentsInvocation(BaseInvocation):
+    """Encodes an image into latents."""
+
+    type: Literal["i2l"] = "i2l"
+
+    # Inputs
+    image: Union[ImageField, None] = Field(description="The image to encode")
+    model: str = Field(default="", description="The model to use")
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents", "image"],
+                "type_hints": {"model": "model"},
+            },
+        }
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        image = context.services.images.get(
+            self.image.image_type, self.image.image_name
+        )
+
+        # TODO: this only really needs the vae
+        model_info = choose_model(context.services.model_manager, self.model)
+        model: StableDiffusionGeneratorPipeline = model_info["model"]
+
+        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+
+        if image_tensor.dim() == 3:
+            image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
+
+        latents = model.non_noised_latents_from_image(
+            image_tensor,
+            device=model._model_group.device_for(model.unet),
+            dtype=model.unet.dtype,
+        )
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.set(name, latents)
+        return build_latents_output(latents_name=name, latents=latents)

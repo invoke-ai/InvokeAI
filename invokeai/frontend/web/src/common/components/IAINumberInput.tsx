@@ -14,7 +14,8 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { clamp } from 'lodash';
+import { stopPastePropagation } from 'common/util/stopPastePropagation';
+import { clamp } from 'lodash-es';
 
 import { FocusEvent, memo, useEffect, useState } from 'react';
 
@@ -125,6 +126,7 @@ const IAINumberInput = (props: Props) => {
           onChange={handleOnChange}
           onBlur={handleBlur}
           {...rest}
+          onPaste={stopPastePropagation}
         >
           <NumberInputField {...numberInputFieldProps} />
           {showStepper && (

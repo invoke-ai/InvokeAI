@@ -3,6 +3,7 @@ import asyncio
 from inspect import signature
 
 import uvicorn
+import invokeai.backend.util.logging as logger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -12,12 +13,11 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 
-from ..backend import Args
 from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
-from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
+from .services.config import InvokeAIAppConfig
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -33,30 +33,25 @@ app.add_middleware(
     middleware_id=event_handler_id,
 )
 
-# Add CORS
-# TODO: use configuration for this
-origins = []
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 socket_io = SocketIO(app)
 
-config = {}
-
+# initialize config
+# this is a module global
+app_config = InvokeAIAppConfig()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    config = Args()
-    config.parse_args()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_config.allow_origins,
+        allow_credentials=app_config.allow_credentials,
+        allow_methods=app_config.allow_methods,
+        allow_headers=app_config.allow_headers,
+    )
 
     ApiDependencies.initialize(
-        config=config, event_handler_id=event_handler_id
+        config=app_config, event_handler_id=event_handler_id, logger=logger
     )
 
 
@@ -126,7 +121,6 @@ app.openapi = custom_openapi
 # Override API doc favicons
 app.mount("/static", StaticFiles(directory="static/dream_web"), name="static")
 
-
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(
@@ -144,17 +138,16 @@ def overridden_redoc():
         redoc_favicon_url="/static/favicon.ico",
     )
 
+# Must mount *after* the other routes else it borks em
+app.mount("/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui")
 
 def invoke_api():
     # Start our own event loop for eventing usage
-    # TODO: determine if there's a better way to do this
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host="0.0.0.0", port=9090, loop=loop)
+    config = uvicorn.Config(app=app, host=app_config.host, port=app_config.port, loop=loop)
     # Use access_log to turn off logging
-
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
-
 
 if __name__ == "__main__":
     invoke_api()

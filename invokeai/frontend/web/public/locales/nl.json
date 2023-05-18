@@ -62,7 +62,18 @@
         "statusConvertingModel": "Omzetten van model",
         "statusModelConverted": "Model omgezet",
         "statusMergingModels": "Samenvoegen van modellen",
-        "statusMergedModels": "Modellen samengevoegd"
+        "statusMergedModels": "Modellen samengevoegd",
+        "cancel": "Annuleer",
+        "accept": "Akkoord",
+        "langPortuguese": "Português",
+        "pinOptionsPanel": "Zet deelscherm Opties vast",
+        "loading": "Bezig met laden",
+        "loadingInvokeAI": "Bezig met laden van Invoke AI",
+        "oceanTheme": "Oceaan",
+        "langHebrew": "עברית",
+        "langKorean": "한국어",
+        "txt2img": "Tekst naar afbeelding",
+        "postprocessing": "Nabewerking"
     },
     "gallery": {
         "generations": "Gegenereerde afbeeldingen",
@@ -301,7 +312,7 @@
         "name": "Naam",
         "nameValidationMsg": "Geef een naam voor je model",
         "description": "Beschrijving",
-        "descriptionValidationMsg": "Voeg een beschrijving toe voor je model.",
+        "descriptionValidationMsg": "Voeg een beschrijving toe voor je model",
         "config": "Configuratie",
         "configValidationMsg": "Pad naar het configuratiebestand van je model.",
         "modelLocation": "Locatie model",
@@ -391,7 +402,13 @@
         "modelMergeInterpAddDifferenceHelp": "In deze stand wordt model 3 eerst van model 2 afgehaald. Wat daar uitkomt wordt gemengd met model 1, gebruikmakend van de hierboven ingestelde alfawaarde.",
         "inverseSigmoid": "Keer Sigmoid om",
         "sigmoid": "Sigmoid",
-        "weightedSum": "Gewogen som"
+        "weightedSum": "Gewogen som",
+        "v2_base": "v2 (512px)",
+        "v2_768": "v2 (768px)",
+        "none": "geen",
+        "addDifference": "Voeg verschil toe",
+        "scanForModels": "Scan naar modellen",
+        "pickModelType": "Kies modelsoort"
     },
     "parameters": {
         "images": "Afbeeldingen",
@@ -561,7 +578,7 @@
         "autoSaveToGallery": "Bewaar automatisch naar galerij",
         "saveBoxRegionOnly": "Bewaar alleen tekengebied",
         "limitStrokesToBox": "Beperk streken tot tekenvak",
-        "showCanvasDebugInfo": "Toon foutopsporingsgegevens canvas",
+        "showCanvasDebugInfo": "Toon aanvullende canvasgegevens",
         "clearCanvasHistory": "Wis canvasgeschiedenis",
         "clearHistory": "Wis geschiedenis",
         "clearCanvasHistoryMessage": "Het wissen van de canvasgeschiedenis laat het huidige canvas ongemoeid, maar wist onherstelbaar de geschiedenis voor het ongedaan maken en herhalen.",
@@ -587,5 +604,27 @@
         "betaDarkenOutside": "Verduister buiten tekenvak",
         "betaLimitToBox": "Beperk tot tekenvak",
         "betaPreserveMasked": "Behoud masker"
+    },
+    "accessibility": {
+        "exitViewer": "Stop viewer",
+        "zoomIn": "Zoom in",
+        "rotateCounterClockwise": "Draai tegen de klok in",
+        "modelSelect": "Modelkeuze",
+        "invokeProgressBar": "Voortgangsbalk Invoke",
+        "reset": "Herstel",
+        "uploadImage": "Upload afbeelding",
+        "previousImage": "Vorige afbeelding",
+        "nextImage": "Volgende afbeelding",
+        "useThisParameter": "Gebruik deze parameter",
+        "copyMetadataJson": "Kopieer metagegevens-JSON",
+        "zoomOut": "Zoom uit",
+        "rotateClockwise": "Draai met de klok mee",
+        "flipHorizontally": "Spiegel horizontaal",
+        "flipVertically": "Spiegel verticaal",
+        "modifyConfig": "Wijzig configuratie",
+        "toggleAutoscroll": "Autom. scrollen aan/uit",
+        "toggleLogViewer": "Logboekviewer aan/uit",
+        "showGallery": "Toon galerij",
+        "showOptionsPanel": "Toon deelscherm Opties"
     }
 }

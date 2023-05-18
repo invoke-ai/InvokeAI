@@ -1,6 +1,6 @@
 import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
-import type { RootState } from 'app/store';
+import * as InvokeAI from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,
@@ -12,7 +12,6 @@ import {
   removeImage,
 } from 'features/gallery/store/gallerySlice';
 import {
-  addLogEntry,
   generationRequested,
   modelChangeRequested,
   modelConvertRequested,
@@ -91,7 +90,7 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
+    emitRunESRGAN: (imageToProcess: InvokeAI._Image) => {
       dispatch(setIsProcessing(true));
 
       const {
@@ -119,7 +118,7 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
+    emitRunFacetool: (imageToProcess: InvokeAI._Image) => {
       dispatch(setIsProcessing(true));
 
       const {
@@ -150,7 +149,7 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
+    emitDeleteImage: (imageToDelete: InvokeAI._Image) => {
       const { url, uuid, category, thumbnail } = imageToDelete;
       dispatch(removeImage(imageToDelete));
       socketio.emit('deleteImage', url, thumbnail, uuid, category);
@@ -206,3 +205,5 @@ const makeSocketIOEmitters = (
 };
 
 export default makeSocketIOEmitters;
+
+export default {};

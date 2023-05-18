@@ -8,7 +8,7 @@
         "nextImage": "Next Image",
         "useThisParameter": "Use this parameter",
         "copyMetadataJson": "Copy metadata JSON",
-        "exitViewer": "ExitViewer",
+        "exitViewer": "Exit Viewer",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "rotateCounterClockwise": "Rotate Counter-Clockwise",
@@ -19,12 +19,13 @@
         "toggleAutoscroll": "Toggle autoscroll",
         "toggleLogViewer": "Toggle Log Viewer",
         "showGallery": "Show Gallery",
-        "showOptionsPanel": "Show Options Panel"
+        "showOptionsPanel": "Show Options Panel",
+        "menu": "Menu"
     },
     "common": {
         "hotkeysLabel": "Hotkeys",
         "themeLabel": "Theme",
-        "languagePickerLabel": "Language Picker",
+        "languagePickerLabel": "Language",
         "reportBugLabel": "Report Bug",
         "githubLabel": "Github",
         "discordLabel": "Discord",
@@ -52,7 +53,8 @@
         "txt2img": "Text To Image",
         "img2img": "Image To Image",
         "unifiedCanvas": "Unified Canvas",
-        "nodes": "Nodes",
+        "linear": "Linear",
+        "nodes": "Node Editor",
         "postprocessing": "Post Processing",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "postProcessing": "Post Processing",
@@ -61,7 +63,7 @@
         "postProcessDesc3": "The Invoke AI Command Line Interface offers various other features including Embiggen.",
         "training": "Training",
         "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
-        "trainingDesc2": "InvokeAI already supports training custom embeddings using Textual Inversion using the main script.",
+        "trainingDesc2": "InvokeAI already supports training custom embeddourings using Textual Inversion using the main script.",
         "upload": "Upload",
         "close": "Close",
         "cancel": "Cancel",
@@ -95,7 +97,13 @@
         "statusMergedModels": "Models Merged",
         "pinOptionsPanel": "Pin Options Panel",
         "loading": "Loading",
-        "loadingInvokeAI": "Loading Invoke AI"
+        "loadingInvokeAI": "Loading Invoke AI",
+        "random": "Random",
+        "generate": "Generate",
+        "openInNewTab": "Open in New Tab",
+        "dontAskMeAgain": "Don't ask me again",
+        "areYouSure": "Are you sure?",
+        "imagePrompt": "Image Prompt"
     },
     "gallery": {
         "generations": "Generations",
@@ -111,7 +119,10 @@
         "pinGallery": "Pin Gallery",
         "allImagesLoaded": "All Images Loaded",
         "loadMore": "Load More",
-        "noImagesInGallery": "No Images In Gallery"
+        "noImagesInGallery": "No Images In Gallery",
+        "deleteImage": "Delete Image",
+        "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
+        "deleteImagePermanent": "Deleted images cannot be restored."
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",
@@ -439,13 +450,14 @@
         "cfgScale": "CFG Scale",
         "width": "Width",
         "height": "Height",
-        "sampler": "Sampler",
+        "scheduler": "Scheduler",
         "seed": "Seed",
         "imageToImage": "Image to Image",
         "randomizeSeed": "Randomize Seed",
-        "shuffle": "Shuffle",
+        "shuffle": "Shuffle Seed",
         "noiseThreshold": "Noise Threshold",
         "perlinNoise": "Perlin Noise",
+        "noiseSettings": "Noise",
         "variations": "Variations",
         "variationAmount": "Variation Amount",
         "seedWeights": "Seed Weights",
@@ -460,6 +472,8 @@
         "scale": "Scale",
         "otherOptions": "Other Options",
         "seamlessTiling": "Seamless Tiling",
+        "seamlessXAxis": "X Axis",
+        "seamlessYAxis": "Y Axis",
         "hiresOptim": "High Res Optimization",
         "hiresStrength": "High Res Strength",
         "imageFit": "Fit Initial Image To Output Size",
@@ -503,9 +517,10 @@
         "useAll": "Use All",
         "useInitImg": "Use Initial Image",
         "info": "Info",
-        "deleteImage": "Delete Image",
         "initialImage": "Initial Image",
-        "showOptionsPanel": "Show Options Panel"
+        "showOptionsPanel": "Show Options Panel",
+        "hidePreview": "Hide Preview",
+        "showPreview": "Show Preview"
     },
     "settings": {
         "models": "Models",
@@ -516,21 +531,35 @@
         "useCanvasBeta": "Use Canvas Beta Layout",
         "enableImageDebugging": "Enable Image Debugging",
         "useSlidersForAll": "Use Sliders For All Options",
+        "showProgressInViewer": "Show Progress Images in Viewer",
+        "antialiasProgressImages": "Antialias Progress Images",
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
-        "resetComplete": "Web UI has been reset. Refresh the page to reload."
+        "resetComplete": "Web UI has been reset. Refresh the page to reload.",
+        "consoleLogLevel": "Log Level",
+        "shouldLogToConsole": "Console Logging",
+        "developer": "Developer",
+        "general": "General",
+        "generation": "Generation",
+        "ui": "User Interface",
+        "availableSchedulers": "Available Schedulers"
     },
     "toast": {
+        "serverError": "Server Error",
+        "disconnected": "Disconnected from Server",
+        "connected": "Connected to Server",
+        "canceled": "Processing Canceled",
         "tempFoldersEmptied": "Temp Folder Emptied",
         "uploadFailed": "Upload failed",
-        "uploadFailedMultipleImagesDesc": "Multiple images pasted, may only upload one image at a time",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
+        "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "downloadImageStarted": "Image Download Started",
         "imageCopied": "Image Copied",
         "imageLinkCopied": "Image Link Copied",
+        "problemCopyingImageLink": "Unable to Copy Image Link",
         "imageNotLoaded": "No Image Loaded",
-        "imageNotLoadedDesc": "No image found to send to image to image module",
+        "imageNotLoadedDesc": "Could not find image",
         "imageSavedToGallery": "Image Saved to Gallery",
         "canvasMerged": "Canvas Merged",
         "sentToImageToImage": "Sent To Image To Image",
@@ -625,6 +654,11 @@
         "betaClear": "Clear",
         "betaDarkenOutside": "Darken Outside",
         "betaLimitToBox": "Limit To Box",
-        "betaPreserveMasked": "Preserve Masked"
+        "betaPreserveMasked": "Preserve Masked",
+        "antialiasing": "Antialiasing"
+    },
+    "ui": {
+        "showProgressImages": "Show Progress Images",
+        "hideProgressImages": "Hide Progress Images"
     }
 }

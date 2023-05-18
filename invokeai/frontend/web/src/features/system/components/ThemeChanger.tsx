@@ -1,13 +1,26 @@
-import { VStack } from '@chakra-ui/react';
-import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
+import {
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuItemOption,
+  MenuList,
+  MenuOptionGroup,
+  Tooltip,
+} from '@chakra-ui/react';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setCurrentTheme } from 'features/ui/store/uiSlice';
-import type { ReactNode } from 'react';
+import i18n from 'i18n';
+import { map } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
-import { FaCheck, FaPalette } from 'react-icons/fa';
+import { FaPalette } from 'react-icons/fa';
+
+export const THEMES = {
+  dark: i18n.t('common.darkTheme'),
+  light: i18n.t('common.lightTheme'),
+  green: i18n.t('common.greenTheme'),
+  ocean: i18n.t('common.oceanTheme'),
+};
 
 export default function ThemeChanger() {
   const { t } = useTranslation();
@@ -17,51 +30,31 @@ export default function ThemeChanger() {
     (state: RootState) => state.ui.currentTheme
   );
 
-  const THEMES = {
-    dark: t('common.darkTheme'),
-    light: t('common.lightTheme'),
-    green: t('common.greenTheme'),
-    ocean: t('common.oceanTheme'),
-  };
-
-  const handleChangeTheme = (theme: string) => {
-    dispatch(setCurrentTheme(theme));
-  };
-
-  const renderThemeOptions = () => {
-    const themesToRender: ReactNode[] = [];
-
-    Object.keys(THEMES).forEach((theme) => {
-      themesToRender.push(
-        <IAIButton
-          isChecked={currentTheme === theme}
-          leftIcon={currentTheme === theme ? <FaCheck /> : undefined}
-          size="sm"
-          onClick={() => handleChangeTheme(theme)}
-          key={theme}
-        >
-          {THEMES[theme as keyof typeof THEMES]}
-        </IAIButton>
-      );
-    });
-
-    return themesToRender;
-  };
-
   return (
-    <IAIPopover
-      triggerComponent={
-        <IAIIconButton
-          aria-label={t('common.themeLabel')}
-          size="sm"
-          variant="link"
-          data-variant="link"
-          fontSize={20}
+    <Menu closeOnSelect={false}>
+      <Tooltip label={t('common.themeLabel')} hasArrow>
+        <MenuButton
+          as={IconButton}
           icon={<FaPalette />}
+          variant="link"
+          aria-label={t('common.themeLabel')}
+          fontSize={20}
+          minWidth={8}
         />
-      }
-    >
-      <VStack align="stretch">{renderThemeOptions()}</VStack>
-    </IAIPopover>
+      </Tooltip>
+      <MenuList>
+        <MenuOptionGroup value={currentTheme}>
+          {map(THEMES, (themeName, themeKey: keyof typeof THEMES) => (
+            <MenuItemOption
+              key={themeKey}
+              value={themeKey}
+              onClick={() => dispatch(setCurrentTheme(themeKey))}
+            >
+              {themeName}
+            </MenuItemOption>
+          ))}
+        </MenuOptionGroup>
+      </MenuList>
+    </Menu>
   );
 }

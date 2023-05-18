@@ -5,7 +5,7 @@ import IAIInput from 'common/components/IAIInput';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { useEffect, useState } from 'react';
 
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
 import {
@@ -17,14 +17,14 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
-import { addNewModel } from 'app/socketio/actions';
+// import { addNewModel } from 'app/socketio/actions';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { InvokeModelConfigProps } from 'app/invokeai';
-import type { RootState } from 'app/store';
+import type { InvokeModelConfigProps } from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
 import type { FieldInputProps, FormikProps } from 'formik';
-import { isEqual, pickBy } from 'lodash';
+import { isEqual, pickBy } from 'lodash-es';
 import ModelConvert from './ModelConvert';
 import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
 import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';

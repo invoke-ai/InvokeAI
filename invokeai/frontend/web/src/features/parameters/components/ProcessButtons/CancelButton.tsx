@@ -1,24 +1,33 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { cancelProcessing } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   SystemState,
-  setCancelAfter,
-  setCancelType,
+  cancelScheduled,
+  cancelTypeChanged,
+  CancelStrategy,
 } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash';
-import { useEffect, useCallback, memo } from 'react';
-import { ButtonSpinner, ButtonGroup } from '@chakra-ui/react';
+import { isEqual } from 'lodash-es';
+import { useCallback, memo, useMemo } from 'react';
+import {
+  ButtonSpinner,
+  ButtonGroup,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuOptionGroup,
+  MenuItemOption,
+} from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
-import IAISimpleMenu from 'common/components/IAISimpleMenu';
+import { sessionCanceled } from 'services/thunks/session';
+import { ChevronDownIcon } from '@chakra-ui/icons';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -29,8 +38,9 @@ const cancelButtonSelector = createSelector(
       isCancelable: system.isCancelable,
       currentIteration: system.currentIteration,
       totalIterations: system.totalIterations,
-      cancelType: system.cancelOptions.cancelType,
-      cancelAfter: system.cancelOptions.cancelAfter,
+      sessionId: system.sessionId,
+      cancelType: system.cancelType,
+      isCancelScheduled: system.isCancelScheduled,
     };
   },
   {
@@ -53,19 +63,33 @@ const CancelButton = (
     isProcessing,
     isConnected,
     isCancelable,
-    currentIteration,
-    totalIterations,
     cancelType,
-    cancelAfter,
+    isCancelScheduled,
+    sessionId,
   } = useAppSelector(cancelButtonSelector);
+
   const handleClickCancel = useCallback(() => {
-    dispatch(cancelProcessing());
-    dispatch(setCancelAfter(null));
-  }, [dispatch]);
+    if (!sessionId) {
+      return;
+    }
+
+    if (cancelType === 'scheduled') {
+      dispatch(cancelScheduled());
+      return;
+    }
+
+    dispatch(sessionCanceled({ sessionId }));
+  }, [dispatch, sessionId, cancelType]);
 
   const { t } = useTranslation();
 
-  const isCancelScheduled = cancelAfter === null ? false : true;
+  const handleCancelTypeChanged = useCallback(
+    (value: string | string[]) => {
+      const newCancelType = Array.isArray(value) ? value[0] : value;
+      dispatch(cancelTypeChanged(newCancelType as CancelStrategy));
+    },
+    [dispatch]
+  );
 
   useHotkeys(
     'shift+x',
@@ -77,73 +101,66 @@ const CancelButton = (
     [isConnected, isProcessing, isCancelable]
   );
 
-  useEffect(() => {
-    if (cancelAfter !== null && cancelAfter < currentIteration) {
-      handleClickCancel();
+  const cancelLabel = useMemo(() => {
+    if (isCancelScheduled) {
+      return t('parameters.cancel.isScheduled');
     }
-  }, [cancelAfter, currentIteration, handleClickCancel]);
+    if (cancelType === 'immediate') {
+      return t('parameters.cancel.immediate');
+    }
 
-  const cancelMenuItems = [
-    {
-      item: t('parameters.cancel.immediate'),
-      onClick: () => dispatch(setCancelType('immediate')),
-    },
-    {
-      item: t('parameters.cancel.schedule'),
-      onClick: () => dispatch(setCancelType('scheduled')),
-    },
-  ];
+    return t('parameters.cancel.schedule');
+  }, [t, cancelType, isCancelScheduled]);
+
+  const cancelIcon = useMemo(() => {
+    if (isCancelScheduled) {
+      return <ButtonSpinner />;
+    }
+    if (cancelType === 'immediate') {
+      return <MdCancel />;
+    }
+
+    return <MdCancelScheduleSend />;
+  }, [cancelType, isCancelScheduled]);
 
   return (
     <ButtonGroup isAttached width={btnGroupWidth}>
-      {cancelType === 'immediate' ? (
-        <IAIIconButton
-          icon={<MdCancel />}
-          tooltip={t('parameters.cancel.immediate')}
-          aria-label={t('parameters.cancel.immediate')}
-          isDisabled={!isConnected || !isProcessing || !isCancelable}
-          onClick={handleClickCancel}
-          colorScheme="error"
-          {...rest}
-        />
-      ) : (
-        <IAIIconButton
-          icon={
-            isCancelScheduled ? <ButtonSpinner /> : <MdCancelScheduleSend />
-          }
-          tooltip={
-            isCancelScheduled
-              ? t('parameters.cancel.isScheduled')
-              : t('parameters.cancel.schedule')
-          }
-          aria-label={
-            isCancelScheduled
-              ? t('parameters.cancel.isScheduled')
-              : t('parameters.cancel.schedule')
-          }
-          isDisabled={
-            !isConnected ||
-            !isProcessing ||
-            !isCancelable ||
-            currentIteration === totalIterations
-          }
-          onClick={() => {
-            // If a cancel request has already been made, and the user clicks again before the next iteration has been processed, stop the request.
-            if (isCancelScheduled) dispatch(setCancelAfter(null));
-            else dispatch(setCancelAfter(currentIteration));
-          }}
-          colorScheme="error"
-          {...rest}
-        />
-      )}
-      <IAISimpleMenu
-        menuItems={cancelMenuItems}
-        iconTooltip={t('parameters.cancel.setType')}
-        menuButtonProps={{
-          colorScheme: 'error',
-          minWidth: 5,
-        }}
+      <IAIIconButton
+        icon={cancelIcon}
+        tooltip={cancelLabel}
+        aria-label={cancelLabel}
+        isDisabled={!isConnected || !isProcessing || !isCancelable}
+        onClick={handleClickCancel}
+        colorScheme="error"
+        {...rest}
       />
+      <Menu closeOnSelect={false}>
+        <MenuButton
+          as={IAIIconButton}
+          tooltip={t('parameters.cancel.setType')}
+          aria-label={t('parameters.cancel.setType')}
+          icon={<ChevronDownIcon w="1em" h="1em" />}
+          paddingX={0}
+          paddingY={0}
+          colorScheme="error"
+          minWidth={5}
+        />
+        <MenuList minWidth="240px">
+          <MenuOptionGroup
+            value={cancelType}
+            title="Cancel Type"
+            type="radio"
+            onChange={handleCancelTypeChanged}
+          >
+            <MenuItemOption value="immediate">
+              {t('parameters.cancel.immediate')}
+            </MenuItemOption>
+            <MenuItemOption value="scheduled">
+              {t('parameters.cancel.schedule')}
+            </MenuItemOption>
+          </MenuOptionGroup>
+        </MenuList>
+      </Menu>
     </ButtonGroup>
   );
 };

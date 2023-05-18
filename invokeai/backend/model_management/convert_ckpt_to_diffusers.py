@@ -25,7 +25,8 @@ from typing import Union
 import torch
 from safetensors.torch import load_file
 
-from invokeai.backend.globals import global_cache_dir, global_config_dir
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import get_invokeai_config
 
 from .model_manager import ModelManager, SDLegacyType
 
@@ -46,6 +47,7 @@ from diffusers import (
     LDMTextToImagePipeline,
     LMSDiscreteScheduler,
     PNDMScheduler,
+    UniPCMultistepScheduler,
     StableDiffusionPipeline,
     UNet2DConditionModel,
 )
@@ -71,7 +73,6 @@ from transformers import (
 )
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
-
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """
@@ -372,9 +373,9 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     unet_key = "model.diffusion_model."
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100:
-        print(f"   | Checkpoint {path} has both EMA and non-EMA weights.")
+        logger.debug(f"Checkpoint {path} has both EMA and non-EMA weights.")
         if extract_ema:
-            print("   | Extracting EMA weights (usually better for inference)")
+            logger.debug("Extracting EMA weights (usually better for inference)")
             for key in keys:
                 if key.startswith("model.diffusion_model"):
                     flat_ema_key = "model_ema." + "".join(key.split(".")[1:])
@@ -392,8 +393,8 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                             key
                         )
         else:
-            print(
-                "   | Extracting only the non-EMA weights (usually better for fine-tuning)"
+            logger.debug(
+                "Extracting only the non-EMA weights (usually better for fine-tuning)"
             )
 
     for key in keys:
@@ -841,7 +842,7 @@ def convert_ldm_bert_checkpoint(checkpoint, config):
 
 def convert_ldm_clip_checkpoint(checkpoint):
     text_model = CLIPTextModel.from_pretrained(
-        "openai/clip-vit-large-patch14", cache_dir=global_cache_dir("hub")
+        "openai/clip-vit-large-patch14", cache_dir=get_invokeai_config().cache_dir
     )
 
     keys = list(checkpoint.keys())
@@ -896,7 +897,7 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 
 
 def convert_paint_by_example_checkpoint(checkpoint):
-    cache_dir = global_cache_dir("hub")
+    cache_dir = get_invokeai_config().cache_dir
     config = CLIPVisionConfig.from_pretrained(
         "openai/clip-vit-large-patch14", cache_dir=cache_dir
     )
@@ -968,7 +969,7 @@ def convert_paint_by_example_checkpoint(checkpoint):
 
 
 def convert_open_clip_checkpoint(checkpoint):
-    cache_dir = global_cache_dir("hub")
+    cache_dir = get_invokeai_config().cache_dir
     text_model = CLIPTextModel.from_pretrained(
         "stabilityai/stable-diffusion-2", subfolder="text_encoder", cache_dir=cache_dir
     )
@@ -1091,7 +1092,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param vae: A diffusers VAE to load into the pipeline.
     :param vae_path: Path to a checkpoint VAE that will be converted into diffusers and loaded into the pipeline.
     """
-
+    config = get_invokeai_config()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         verbosity = dlogging.get_verbosity()
@@ -1104,7 +1105,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         else:
             checkpoint = load_file(checkpoint_path)
 
-        cache_dir = global_cache_dir("hub")
+        cache_dir = config.cache_dir
         pipeline_class = (
             StableDiffusionGeneratorPipeline
             if return_generator_pipeline
@@ -1115,7 +1116,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         if "global_step" in checkpoint:
             global_step = checkpoint["global_step"]
         else:
-            print("   | global_step key not found in model")
+            logger.debug("global_step key not found in model")
             global_step = None
 
         # sometimes there is a state_dict key and sometimes not
@@ -1128,25 +1129,23 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
             if model_type == SDLegacyType.V2_v:
                 original_config_file = (
-                    global_config_dir() / "stable-diffusion" / "v2-inference-v.yaml"
+                    config.legacy_conf_path / "v2-inference-v.yaml"
                 )
                 if global_step == 110000:
                     # v2.1 needs to upcast attention
                     upcast_attention = True
             elif model_type == SDLegacyType.V2_e:
                 original_config_file = (
-                    global_config_dir() / "stable-diffusion" / "v2-inference.yaml"
+                    config.legacy_conf_path / "v2-inference.yaml"
                 )
             elif model_type == SDLegacyType.V1_INPAINT:
                 original_config_file = (
-                    global_config_dir()
-                    / "stable-diffusion"
-                    / "v1-inpainting-inference.yaml"
+                    config.legacy_conf_path / "v1-inpainting-inference.yaml"
                 )
 
             elif model_type == SDLegacyType.V1:
                 original_config_file = (
-                    global_config_dir() / "stable-diffusion" / "v1-inference.yaml"
+                    config.legacy_conf_path / "v1-inference.yaml"
                 )
 
             else:
@@ -1208,6 +1207,8 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             scheduler = EulerAncestralDiscreteScheduler.from_config(scheduler.config)
         elif scheduler_type == "dpm":
             scheduler = DPMSolverMultistepScheduler.from_config(scheduler.config)
+        elif scheduler_type == 'unipc':
+            scheduler = UniPCMultistepScheduler.from_config(scheduler.config)
         elif scheduler_type == "ddim":
             scheduler = scheduler
         else:
@@ -1229,15 +1230,15 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         # If a replacement VAE path was specified, we'll incorporate that into
         # the checkpoint model and then convert it
         if vae_path:
-            print(f"   | Converting VAE {vae_path}")
+            logger.debug(f"Converting VAE {vae_path}")
             replace_checkpoint_vae(checkpoint,vae_path)
         # otherwise we use the original VAE, provided that
         # an externally loaded diffusers VAE was not passed
         elif not vae:
-            print("   | Using checkpoint model's original VAE")
+            logger.debug("Using checkpoint model's original VAE")
 
         if vae:
-            print("   | Using replacement diffusers VAE")
+            logger.debug("Using replacement diffusers VAE")
         else:  # convert the original or replacement VAE
             vae_config = create_vae_diffusers_config(
                 original_config, image_size=image_size
@@ -1296,7 +1297,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             )
             safety_checker = StableDiffusionSafetyChecker.from_pretrained(
                 "CompVis/stable-diffusion-safety-checker",
-                cache_dir=global_cache_dir("hub"),
+                cache_dir=config.cache_dir,
             )
             feature_extractor = AutoFeatureExtractor.from_pretrained(
                 "CompVis/stable-diffusion-safety-checker", cache_dir=cache_dir

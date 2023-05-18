@@ -14,7 +14,8 @@ from PIL import Image, ImageFilter
 from transformers import AutoFeatureExtractor
 
 import invokeai.assets.web as web_assets
-from .globals import global_cache_dir
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import get_invokeai_config
 from .util import CPU_DEVICE
 
 class SafetyChecker(object):
@@ -25,10 +26,11 @@ class SafetyChecker(object):
         caution = Image.open(path)
         self.caution_img = caution.resize((caution.width // 2, caution.height // 2))
         self.device = device
-        
+        config = get_invokeai_config()
+
         try:
             safety_model_id = "CompVis/stable-diffusion-safety-checker"
-            safety_model_path = global_cache_dir("hub")
+            safety_model_path = config.cache_dir
             self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
                 safety_model_id,
                 local_files_only=True,
@@ -40,8 +42,8 @@ class SafetyChecker(object):
                 cache_dir=safety_model_path,
             )
         except Exception:
-            print(
-                "** An error was encountered while installing the safety checker:"
+            logger.error(
+                "An error was encountered while installing the safety checker:"
             )
             print(traceback.format_exc())
 
@@ -65,8 +67,8 @@ class SafetyChecker(object):
         )
         self.safety_checker.to(CPU_DEVICE) # offload
         if has_nsfw_concept[0]:
-            print(
-                "** An image with potential non-safe content has been detected. A blurred image will be returned. **"
+            logger.warning(
+                "An image with potential non-safe content has been detected. A blurred image will be returned."
             )
             return self.blur(image)
         else:

@@ -1,7 +1,7 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+// import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
@@ -12,7 +12,7 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

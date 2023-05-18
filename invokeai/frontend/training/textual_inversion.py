@@ -20,14 +20,18 @@ import npyscreen
 from npyscreen import widget
 from omegaconf import OmegaConf
 
-from invokeai.backend.globals import Globals, global_set_root
+import invokeai.backend.util.logging as logger
 
-from ...backend.training import do_textual_inversion_training, parse_args
+from invokeai.app.services.config import get_invokeai_config
+from ...backend.training import (
+    do_textual_inversion_training,
+    parse_args
+)
 
 TRAINING_DATA = "text-inversion-training-data"
 TRAINING_DIR = "text-inversion-output"
 CONF_FILE = "preferences.conf"
-
+config = None
 
 class textualInversionForm(npyscreen.FormMultiPageAction):
     resolutions = [512, 768, 1024]
@@ -121,7 +125,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             value=str(
                 saved_args.get(
                     "train_data_dir",
-                    Path(Globals.root) / TRAINING_DATA / default_placeholder_token,
+                    config.root_dir / TRAINING_DATA / default_placeholder_token,
                 )
             ),
             scroll_exit=True,
@@ -134,7 +138,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             value=str(
                 saved_args.get(
                     "output_dir",
-                    Path(Globals.root) / TRAINING_DIR / default_placeholder_token,
+                    config.root_dir / TRAINING_DIR / default_placeholder_token,
                 )
             ),
             scroll_exit=True,
@@ -240,9 +244,9 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         placeholder = self.placeholder_token.value
         self.prompt_token.value = f"(Trigger by using <{placeholder}> in your prompts)"
         self.train_data_dir.value = str(
-            Path(Globals.root) / TRAINING_DATA / placeholder
+            config.root_dir / TRAINING_DATA / placeholder
         )
-        self.output_dir.value = str(Path(Globals.root) / TRAINING_DIR / placeholder)
+        self.output_dir.value = str(config.root_dir / TRAINING_DIR / placeholder)
         self.resume_from_checkpoint.value = Path(self.output_dir.value).exists()
 
     def on_ok(self):
@@ -283,7 +287,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             return True
 
     def get_model_names(self) -> Tuple[List[str], int]:
-        conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
+        conf = OmegaConf.load(config.root_dir / "configs/models.yaml")
         model_names = [
             idx
             for idx in sorted(list(conf.keys()))
@@ -366,23 +370,23 @@ def copy_to_embeddings_folder(args: dict):
     """
     source = Path(args["output_dir"], "learned_embeds.bin")
     dest_dir_name = args["placeholder_token"].strip("<>")
-    destination = Path(Globals.root, "embeddings", dest_dir_name)
+    destination = config.root_dir / "embeddings" / dest_dir_name
     os.makedirs(destination, exist_ok=True)
-    print(f">> Training completed. Copying learned_embeds.bin into {str(destination)}")
+    logger.info(f"Training completed. Copying learned_embeds.bin into {str(destination)}")
     shutil.copy(source, destination)
     if (
         input("Delete training logs and intermediate checkpoints? [y] ") or "y"
     ).startswith(("y", "Y")):
         shutil.rmtree(Path(args["output_dir"]))
     else:
-        print(f'>> Keeping {args["output_dir"]}')
+        logger.info(f'Keeping {args["output_dir"]}')
 
 
 def save_args(args: dict):
     """
     Save the current argument values to an omegaconf file
     """
-    dest_dir = Path(Globals.root) / TRAINING_DIR
+    dest_dir = config.root_dir / TRAINING_DIR
     os.makedirs(dest_dir, exist_ok=True)
     conf_file = dest_dir / CONF_FILE
     conf = OmegaConf.create(args)
@@ -393,7 +397,7 @@ def previous_args() -> dict:
     """
     Get the previous arguments used.
     """
-    conf_file = Path(Globals.root) / TRAINING_DIR / CONF_FILE
+    conf_file = config.root_dir / TRAINING_DIR / CONF_FILE
     try:
         conf = OmegaConf.load(conf_file)
         conf["placeholder_token"] = conf["placeholder_token"].strip("<>")
@@ -419,39 +423,46 @@ def do_front_end(args: Namespace):
         save_args(args)
 
         try:
-            do_textual_inversion_training(**args)
+            do_textual_inversion_training(get_invokeai_config(),**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
-            print("** An exception occurred during training. The exception was:")
-            print(str(e))
-            print("** DETAILS:")
-            print(traceback.format_exc())
+            logger.error("An exception occurred during training. The exception was:")
+            logger.error(str(e))
+            logger.error("DETAILS:")
+            logger.error(traceback.format_exc())
 
 
 def main():
+    global config
+    
     args = parse_args()
-    global_set_root(args.root_dir or Globals.root)
+    config = get_invokeai_config(argv=[])
+
+    # change root if needed
+    if args.root_dir:
+        config.root = args.root_dir
+    
     try:
         if args.front_end:
             do_front_end(args)
         else:
-            do_textual_inversion_training(**vars(args))
+            do_textual_inversion_training(config,**vars(args))
     except AssertionError as e:
-        print(str(e))
+        logger.error(e)
         sys.exit(-1)
     except KeyboardInterrupt:
         pass
     except (widget.NotEnoughSpaceForWidget, Exception) as e:
         if str(e).startswith("Height of 1 allocated"):
-            print(
-                "** You need to have at least one diffusers models defined in models.yaml in order to train"
+            logger.error(
+                "You need to have at least one diffusers models defined in models.yaml in order to train"
             )
         elif str(e).startswith("addwstr"):
-            print(
-                "** Not enough window space for the interface. Please make your window larger and try again."
+            logger.error(
+                "Not enough window space for the interface. Please make your window larger and try again."
             )
         else:
-            print(f"** An error has occurred: {str(e)}")
+            logger.error(e)
         sys.exit(-1)
 
 

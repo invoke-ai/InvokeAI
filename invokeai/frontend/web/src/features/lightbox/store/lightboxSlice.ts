@@ -5,7 +5,7 @@ export interface LightboxState {
   isLightboxOpen: boolean;
 }
 
-const initialLightboxState: LightboxState = {
+export const initialLightboxState: LightboxState = {
   isLightboxOpen: false,
 };
 

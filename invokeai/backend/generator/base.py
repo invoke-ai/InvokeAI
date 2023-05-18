@@ -25,11 +25,13 @@ from typing import Callable, List, Iterator, Optional, Type
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
+import invokeai.backend.util.logging as logger
 from ..image_util import configure_model_padding
 from ..util.util import rand_perlin_2d
 from ..safety_checker import SafetyChecker
 from ..prompting.conditioning import get_uc_and_c_and_ec
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ..stable_diffusion.schedulers import SCHEDULER_MAP
 
 downsampling = 8
 
@@ -70,19 +72,6 @@ class InvokeAIGeneratorOutput:
 # we are interposing a wrapper around the original Generator classes so that
 # old code that calls Generate will continue to work.
 class InvokeAIGenerator(metaclass=ABCMeta):
-    scheduler_map = dict(
-        ddim=diffusers.DDIMScheduler,
-        dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-        k_dpm_2=diffusers.KDPM2DiscreteScheduler,
-        k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
-        k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
-        k_euler=diffusers.EulerDiscreteScheduler,
-        k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
-        k_heun=diffusers.HeunDiscreteScheduler,
-        k_lms=diffusers.LMSDiscreteScheduler,
-        plms=diffusers.PNDMScheduler,
-    )
-
     def __init__(self,
                  model_info: dict,
                  params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
@@ -174,14 +163,20 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         '''
         Return list of all the schedulers that we currently handle.
         '''
-        return list(self.scheduler_map.keys())
+        return list(SCHEDULER_MAP.keys())
 
     def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
         return generator_class(model, self.params.precision)
 
     def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-        scheduler_class = self.scheduler_map.get(scheduler_name,'ddim')
-        scheduler = scheduler_class.from_config(model.scheduler.config)
+        scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
+        
+        scheduler_config = model.scheduler.config
+        if "_backup" in scheduler_config:
+            scheduler_config = scheduler_config["_backup"]
+        scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
+        scheduler = scheduler_class.from_config(scheduler_config)
+        
         # hack copied over from generate.py
         if not hasattr(scheduler, 'uses_inpainting_model'):
             scheduler.uses_inpainting_model = lambda: False
@@ -225,10 +220,10 @@ class Inpaint(Img2Img):
     def generate(self,
                  mask_image: Image.Image | torch.FloatTensor,
                  # Seam settings - when 0, doesn't fill seam
-                 seam_size: int = 0,
-                 seam_blur: int = 0,
+                 seam_size: int = 96,
+                 seam_blur: int = 16,
                  seam_strength: float = 0.7,
-                 seam_steps: int = 10,
+                 seam_steps: int = 30,
                  tile_size: int = 32,
                  inpaint_replace=False,
                  infill_method=None,
@@ -372,7 +367,7 @@ class Generator:
                     try:
                         x_T = self.get_noise(width, height)
                     except:
-                        print("** An error occurred while getting initial noise **")
+                        logger.error("An error occurred while getting initial noise")
                         print(traceback.format_exc())
 
                 # Pass on the seed in case a layer beneath us needs to generate noise on its own.
@@ -607,7 +602,7 @@ class Generator:
         image = self.sample_to_image(sample)
         dirname = os.path.dirname(filepath) or "."
         if not os.path.exists(dirname):
-            print(f"** creating directory {dirname}")
+            logger.info(f"creating directory {dirname}")
             os.makedirs(dirname, exist_ok=True)
         image.save(filepath, "PNG")
 

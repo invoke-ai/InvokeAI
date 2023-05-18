@@ -1,8 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useGetUrl } from 'common/util/getUrl';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 import { Group, Rect } from 'react-konva';
 import IAICanvasImage from './IAICanvasImage';
@@ -11,18 +12,20 @@ const selector = createSelector(
   [canvasSelector],
   (canvas) => {
     const {
-      layerState: {
-        stagingArea: { images, selectedImageIndex },
-      },
+      layerState,
       shouldShowStagingImage,
       shouldShowStagingOutline,
       boundingBoxCoordinates: { x, y },
       boundingBoxDimensions: { width, height },
     } = canvas;
 
+    const { selectedImageIndex, images } = layerState.stagingArea;
+
     return {
       currentStagingAreaImage:
-        images.length > 0 ? images[selectedImageIndex] : undefined,
+        images.length > 0 && selectedImageIndex !== undefined
+          ? images[selectedImageIndex]
+          : undefined,
       isOnFirstImage: selectedImageIndex === 0,
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
@@ -53,11 +56,16 @@ const IAICanvasStagingArea = (props: Props) => {
     width,
     height,
   } = useAppSelector(selector);
+  const { getUrl } = useGetUrl();
 
   return (
     <Group {...rest}>
       {shouldShowStagingImage && currentStagingAreaImage && (
-        <IAICanvasImage url={currentStagingAreaImage.image.url} x={x} y={y} />
+        <IAICanvasImage
+          url={getUrl(currentStagingAreaImage.image.url)}
+          x={x}
+          y={y}
+        />
       )}
       {shouldShowStagingOutline && (
         <Group>

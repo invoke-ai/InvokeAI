@@ -33,8 +33,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
-from invokeai.backend.globals import Globals
-
+from invokeai.app.services.config import get_invokeai_config
 from ..util import CPU_DEVICE, normalize_device
 from .diffusion import (
     AttentionMapSaver,
@@ -43,7 +42,6 @@ from .diffusion import (
 )
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
 from .textual_inversion_manager import TextualInversionManager
-
 
 @dataclass
 class PipelineIntermediateState:
@@ -348,10 +346,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+        config = get_invokeai_config()
         if (
             torch.cuda.is_available()
             and is_xformers_available()
-            and not Globals.disable_xformers
+            and not config.disable_xformers
         ):
             self.enable_xformers_memory_efficient_attention()
         else:
@@ -445,8 +444,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     @property
     def _submodels(self) -> Sequence[torch.nn.Module]:
         module_names, _, _ = self.extract_init_dict(dict(self.config))
-        values = [getattr(self, name) for name in module_names.keys()]
-        return [m for m in values if isinstance(m, torch.nn.Module)]
+        submodels = []
+        for name in module_names.keys():
+            if hasattr(self, name):
+                value = getattr(self, name)
+            else:
+                value = getattr(self.config, name)
+            if isinstance(value, torch.nn.Module):
+                submodels.append(value)
+        return submodels
 
     def image_from_embeddings(
         self,
@@ -502,10 +508,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         run_id=None,
         callback: Callable[[PipelineIntermediateState], None] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+        if self.scheduler.config.get("cpu_only", False):
+            scheduler_device = torch.device('cpu')
+        else:
+            scheduler_device = self._model_group.device_for(self.unet)
+
         if timesteps is None:
-            self.scheduler.set_timesteps(
-                num_inference_steps, device=self._model_group.device_for(self.unet)
-            )
+            self.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(
             self.generate_latents_from_embeddings, PipelineIntermediateState
@@ -538,13 +547,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
         with self.invokeai_diffuser.custom_attention_context(
-            extra_conditioning_info=extra_conditioning_info,
-            step_count=len(self.scheduler.timesteps),
+                self.invokeai_diffuser.model,
+                extra_conditioning_info=extra_conditioning_info,
+                step_count=len(self.scheduler.timesteps),
         ):
             yield PipelineIntermediateState(
                 run_id=run_id,
                 step=-1,
-                timestep=self.scheduler.num_train_timesteps,
+                timestep=self.scheduler.config.num_train_timesteps,
                 latents=latents,
             )
 
@@ -718,12 +728,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         run_id=None,
         callback=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        timesteps, _ = self.get_img2img_timesteps(
-            num_inference_steps,
-            strength,
-            device=self._model_group.device_for(self.unet),
-        )
+    ) -> InvokeAIStableDiffusionPipelineOutput:        
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
         result_latents, result_attention_maps = self.latents_from_embeddings(
             latents=initial_latents if strength < 1.0 else torch.zeros_like(
                 initial_latents, device=initial_latents.device, dtype=initial_latents.dtype
@@ -749,13 +755,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             return self.check_for_safety(output, dtype=conditioning_data.dtype)
 
     def get_img2img_timesteps(
-        self, num_inference_steps: int, strength: float, device
+        self, num_inference_steps: int, strength: float, device=None
     ) -> (torch.Tensor, int):
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         assert img2img_pipeline.scheduler is self.scheduler
-        img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
+
+        if self.scheduler.config.get("cpu_only", False):
+            scheduler_device = torch.device('cpu')
+        else:
+            scheduler_device = self._model_group.device_for(self.unet)
+
+        img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
         timesteps, adjusted_steps = img2img_pipeline.get_timesteps(
-            num_inference_steps, strength, device=device
+            num_inference_steps, strength, device=scheduler_device
         )
         # Workaround for low strength resulting in zero timesteps.
         # TODO: submit upstream fix for zero-step img2img
@@ -789,9 +801,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if init_image.dim() == 3:
             init_image = init_image.unsqueeze(0)
 
-        timesteps, _ = self.get_img2img_timesteps(
-            num_inference_steps, strength, device=device
-        )
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
 
         # 6. Prepare latent variables
         # can't quite use upstream StableDiffusionImg2ImgPipeline.prepare_latents
@@ -915,7 +925,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     @property
     def channels(self) -> int:
         """Compatible with DiffusionWrapper"""
-        return self.unet.in_channels
+        return self.unet.config.in_channels
 
     def decode_latents(self, latents):
         # Explicit call to get the vae loaded, since `decode` isn't the forward method.

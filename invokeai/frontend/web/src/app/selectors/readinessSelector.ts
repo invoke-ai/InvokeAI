@@ -1,19 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
-import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash';
+import { isEqual } from 'lodash-es';
 
 export const readinessSelector = createSelector(
-  [
-    generationSelector,
-    systemSelector,
-    initialCanvasImageSelector,
-    activeTabNameSelector,
-  ],
-  (generation, system, initialCanvasImage, activeTabName) => {
+  [generationSelector, systemSelector, activeTabNameSelector],
+  (generation, system, activeTabName) => {
     const {
       prompt,
       shouldGenerateVariations,
@@ -63,10 +58,5 @@ export const readinessSelector = createSelector(
     // All good
     return { isReady, reasonsWhyNotReady };
   },
-  {
-    memoizeOptions: {
-      equalityCheck: isEqual,
-      resultEqualityCheck: isEqual,
-    },
-  }
+  defaultSelectorOptions
 );

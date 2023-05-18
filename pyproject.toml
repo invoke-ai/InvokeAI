@@ -38,9 +38,9 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "compel==1.0.5",
+  "compel~=1.1.5",
   "datasets",
-  "diffusers[torch]~=0.14",
+  "diffusers[torch]~=0.16.1",
   "dnspython==2.2.1",
   "einops",
   "eventlet",
@@ -72,7 +72,7 @@ dependencies = [
   "scikit-image>=0.19",
   "send2trash",
   "test-tube>=0.7.5",
-  "torch>=1.13.1",
+  "torch~=2.0.0",
   "torchvision>=0.14.1",
   "torchmetrics",
   "transformers~=4.26",
@@ -92,24 +92,26 @@ dependencies = [
 ]
 "test" = ["pytest>6.0.0", "pytest-cov"]
 "xformers" = [
-	   "xformers~=0.0.16; sys_platform!='darwin'",
+	   "xformers~=0.0.19; sys_platform!='darwin'",
 	   "triton; sys_platform=='linux'",
 ]
 
 [project.scripts]
 
 # legacy entrypoints; provided for backwards compatibility
-"invoke.py" = "invokeai.frontend.CLI:invokeai_command_line_interface"
 "configure_invokeai.py" = "invokeai.frontend.install:invokeai_configure"
 "textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
-# modern entrypoints
-"invokeai" = "invokeai.frontend.CLI:invokeai_command_line_interface"
+# shortcut commands to start cli and web
+"invokeai" = "invokeai.app.cli_app:invoke_cli"
+"invokeai-web" = "invokeai.app.api_app:invoke_api"
+
+# full commands
 "invokeai-configure" = "invokeai.frontend.install:invokeai_configure"
 "invokeai-merge" = "invokeai.frontend.merge:invokeai_merge_diffusers"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install:invokeai_model_install"
-"invokeai-update" = "invokeai.frontend.config:invokeai_update"
+"invokeai-update" = "invokeai.frontend.install:invokeai_update"
 "invokeai-metadata" = "invokeai.frontend.CLI.sd_metadata:print_metadata"
 "invokeai-node-cli" = "invokeai.app.cli_app:invoke_cli"
 "invokeai-node-web" = "invokeai.app.api_app:invoke_api"

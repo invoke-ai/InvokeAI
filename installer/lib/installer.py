@@ -247,8 +247,8 @@ class InvokeAiInstance:
             pip[
                 "install",
                 "--require-virtualenv",
-                "torch",
-                "torchvision",
+                "torch~=2.0.0",
+                "torchvision>=0.14.1",
                 "--force-reinstall",
                 "--find-links" if find_links is not None else None,
                 find_links,

@@ -1,6 +1,6 @@
 import { Flex, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   canvasSelector,
   initialCanvasImageSelector,
@@ -81,7 +81,7 @@ const IAICanvasResizer = () => {
         height: '100%',
       }}
     >
-      <Spinner thickness="2px" speed="1s" size="xl" />
+      <Spinner thickness="2px" size="xl" />
     </Flex>
   );
 };

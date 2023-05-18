@@ -1,12 +1,21 @@
-import { ButtonGroup, Flex, Grid, Icon, Text } from '@chakra-ui/react';
-import { requestImages } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import {
+  Box,
+  ButtonGroup,
+  Flex,
+  FlexProps,
+  Grid,
+  Icon,
+  Image,
+  Text,
+  forwardRef,
+} from '@chakra-ui/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
-import { imageGallerySelector } from 'features/gallery/store/gallerySelectors';
+import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   setCurrentCategory,
   setGalleryImageMinimumWidth,
@@ -15,40 +24,140 @@ import {
   setShouldUseSingleGalleryColumn,
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
+import { useOverlayScrollbars } from 'overlayscrollbars-react';
 
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  PropsWithChildren,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
-import Scrollable from 'features/ui/components/common/Scrollable';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { resultsAdapter } from '../store/resultsSlice';
+import {
+  receivedResultImagesPage,
+  receivedUploadImagesPage,
+} from 'services/thunks/gallery';
+import { uploadsAdapter } from '../store/uploadsSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store/store';
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
+import { Image as ImageType } from 'app/types/invokeai';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import GalleryProgressImage from './GalleryProgressImage';
+import { uiSelector } from 'features/ui/store/uiSelectors';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
+const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
+
+const categorySelector = createSelector(
+  [(state: RootState) => state],
+  (state) => {
+    const { results, uploads, system, gallery } = state;
+    const { currentCategory } = gallery;
+
+    if (currentCategory === 'results') {
+      const tempImages: (ImageType | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
+
+      if (system.progressImage) {
+        tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
+      }
+
+      return {
+        images: tempImages.concat(
+          resultsAdapter.getSelectors().selectAll(results)
+        ),
+        isLoading: results.isLoading,
+        areMoreImagesAvailable: results.page < results.pages - 1,
+      };
+    }
+
+    return {
+      images: uploadsAdapter.getSelectors().selectAll(uploads),
+      isLoading: uploads.isLoading,
+      areMoreImagesAvailable: uploads.page < uploads.pages - 1,
+    };
+  },
+  defaultSelectorOptions
+);
+
+const mainSelector = createSelector(
+  [gallerySelector, uiSelector],
+  (gallery, ui) => {
+    const {
+      currentCategory,
+      galleryImageMinimumWidth,
+      galleryImageObjectFit,
+      shouldAutoSwitchToNewImages,
+      shouldUseSingleGalleryColumn,
+      selectedImage,
+    } = gallery;
+
+    const { shouldPinGallery } = ui;
+
+    return {
+      currentCategory,
+      shouldPinGallery,
+      galleryImageMinimumWidth,
+      galleryImageObjectFit,
+      shouldAutoSwitchToNewImages,
+      shouldUseSingleGalleryColumn,
+      selectedImage,
+    };
+  },
+  defaultSelectorOptions
+);
 
 const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
+  const rootRef = useRef(null);
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  const [initialize, osInstance] = useOverlayScrollbars({
+    defer: true,
+    options: {
+      scrollbars: {
+        visibility: 'auto',
+        autoHide: 'leave',
+        autoHideDelay: 1300,
+        theme: 'os-theme-dark',
+      },
+      overflow: { x: 'hidden' },
+    },
+  });
 
   const {
-    images,
     currentCategory,
-    currentImageUuid,
     shouldPinGallery,
     galleryImageMinimumWidth,
-    galleryGridTemplateColumns,
     galleryImageObjectFit,
     shouldAutoSwitchToNewImages,
-    areMoreImagesAvailable,
     shouldUseSingleGalleryColumn,
-  } = useAppSelector(imageGallerySelector);
+    selectedImage,
+  } = useAppSelector(mainSelector);
+
+  const { images, areMoreImagesAvailable, isLoading } =
+    useAppSelector(categorySelector);
 
   const handleClickLoadMore = () => {
-    dispatch(requestImages(currentCategory));
+    if (currentCategory === 'results') {
+      dispatch(receivedResultImagesPage());
+    }
+
+    if (currentCategory === 'uploads') {
+      dispatch(receivedUploadImagesPage());
+    }
   };
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -82,8 +191,43 @@ const ImageGalleryContent = () => {
     return () => resizeObserver.disconnect(); // clean up
   }, []);
 
+  useEffect(() => {
+    const { current: root } = rootRef;
+    if (scroller && root) {
+      initialize({
+        target: root,
+        elements: {
+          viewport: scroller,
+        },
+      });
+    }
+    return () => osInstance()?.destroy();
+  }, [scroller, initialize, osInstance]);
+
+  const setScrollerRef = useCallback((ref: HTMLElement | Window | null) => {
+    if (ref instanceof HTMLElement) {
+      setScroller(ref);
+    }
+  }, []);
+
+  const handleEndReached = useCallback(() => {
+    if (currentCategory === 'results') {
+      dispatch(receivedResultImagesPage());
+    } else if (currentCategory === 'uploads') {
+      dispatch(receivedUploadImagesPage());
+    }
+  }, [dispatch, currentCategory]);
+
   return (
-    <Flex flexDirection="column" w="full" h="full" gap={4}>
+    <Flex
+      sx={{
+        gap: 2,
+        flexDirection: 'column',
+        h: 'full',
+        w: 'full',
+        borderRadius: 'base',
+      }}
+    >
       <Flex
         ref={resizeObserverRef}
         alignItems="center"
@@ -100,34 +244,34 @@ const ImageGalleryContent = () => {
               <IAIIconButton
                 aria-label={t('gallery.showGenerations')}
                 tooltip={t('gallery.showGenerations')}
-                isChecked={currentCategory === 'result'}
+                isChecked={currentCategory === 'results'}
                 role="radio"
                 icon={<FaImage />}
-                onClick={() => dispatch(setCurrentCategory('result'))}
+                onClick={() => dispatch(setCurrentCategory('results'))}
               />
               <IAIIconButton
                 aria-label={t('gallery.showUploads')}
                 tooltip={t('gallery.showUploads')}
                 role="radio"
-                isChecked={currentCategory === 'user'}
+                isChecked={currentCategory === 'uploads'}
                 icon={<FaUser />}
-                onClick={() => dispatch(setCurrentCategory('user'))}
+                onClick={() => dispatch(setCurrentCategory('uploads'))}
               />
             </>
           ) : (
             <>
               <IAIButton
                 size="sm"
-                isChecked={currentCategory === 'result'}
-                onClick={() => dispatch(setCurrentCategory('result'))}
+                isChecked={currentCategory === 'results'}
+                onClick={() => dispatch(setCurrentCategory('results'))}
                 flexGrow={1}
               >
                 {t('gallery.generations')}
               </IAIButton>
               <IAIButton
                 size="sm"
-                isChecked={currentCategory === 'user'}
-                onClick={() => dispatch(setCurrentCategory('user'))}
+                isChecked={currentCategory === 'uploads'}
+                onClick={() => dispatch(setCurrentCategory('uploads'))}
                 flexGrow={1}
               >
                 {t('gallery.uploads')}
@@ -194,64 +338,134 @@ const ImageGalleryContent = () => {
           />
         </Flex>
       </Flex>
-      <Scrollable>
-        <Flex direction="column" gap={2} h="full">
-          {images.length || areMoreImagesAvailable ? (
-            <>
-              <Grid
-                gap={2}
-                style={{ gridTemplateColumns: galleryGridTemplateColumns }}
-              >
-                {images.map((image) => {
-                  const { uuid } = image;
-                  const isSelected = currentImageUuid === uuid;
-                  return (
-                    <HoverableImage
-                      key={uuid}
-                      image={image}
-                      isSelected={isSelected}
-                    />
-                  );
-                })}
-              </Grid>
-              <IAIButton
-                onClick={handleClickLoadMore}
-                isDisabled={!areMoreImagesAvailable}
-                flexShrink={0}
-              >
-                {areMoreImagesAvailable
-                  ? t('gallery.loadMore')
-                  : t('gallery.allImagesLoaded')}
-              </IAIButton>
-            </>
-          ) : (
-            <Flex
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 2,
-                padding: 8,
-                h: '100%',
-                w: '100%',
-                color: 'base.500',
-              }}
+      <Flex direction="column" gap={2} h="full">
+        {images.length || areMoreImagesAvailable ? (
+          <>
+            <Box ref={rootRef} data-overlayscrollbars="" h="100%">
+              {shouldUseSingleGalleryColumn ? (
+                <Virtuoso
+                  style={{ height: '100%' }}
+                  data={images}
+                  endReached={handleEndReached}
+                  scrollerRef={(ref) => setScrollerRef(ref)}
+                  itemContent={(index, image) => {
+                    const isSelected =
+                      image === PROGRESS_IMAGE_PLACEHOLDER
+                        ? false
+                        : selectedImage?.name === image?.name;
+
+                    return (
+                      <Flex sx={{ pb: 2 }}>
+                        {image === PROGRESS_IMAGE_PLACEHOLDER ? (
+                          <GalleryProgressImage
+                            key={PROGRESS_IMAGE_PLACEHOLDER}
+                          />
+                        ) : (
+                          <HoverableImage
+                            key={`${image.name}-${image.thumbnail}`}
+                            image={image}
+                            isSelected={isSelected}
+                          />
+                        )}
+                      </Flex>
+                    );
+                  }}
+                />
+              ) : (
+                <VirtuosoGrid
+                  style={{ height: '100%' }}
+                  data={images}
+                  endReached={handleEndReached}
+                  components={{
+                    Item: ItemContainer,
+                    List: ListContainer,
+                  }}
+                  scrollerRef={setScroller}
+                  itemContent={(index, image) => {
+                    const isSelected =
+                      image === PROGRESS_IMAGE_PLACEHOLDER
+                        ? false
+                        : selectedImage?.name === image?.name;
+
+                    return image === PROGRESS_IMAGE_PLACEHOLDER ? (
+                      <GalleryProgressImage key={PROGRESS_IMAGE_PLACEHOLDER} />
+                    ) : (
+                      <HoverableImage
+                        key={`${image.name}-${image.thumbnail}`}
+                        image={image}
+                        isSelected={isSelected}
+                      />
+                    );
+                  }}
+                />
+              )}
+            </Box>
+            <IAIButton
+              onClick={handleClickLoadMore}
+              isDisabled={!areMoreImagesAvailable}
+              isLoading={isLoading}
+              loadingText="Loading"
+              flexShrink={0}
             >
-              <Icon
-                as={MdPhotoLibrary}
-                sx={{
-                  w: 16,
-                  h: 16,
-                }}
-              />
-              <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
-            </Flex>
-          )}
-        </Flex>
-      </Scrollable>
+              {areMoreImagesAvailable
+                ? t('gallery.loadMore')
+                : t('gallery.allImagesLoaded')}
+            </IAIButton>
+          </>
+        ) : (
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              padding: 8,
+              h: '100%',
+              w: '100%',
+              color: 'base.500',
+            }}
+          >
+            <Icon
+              as={MdPhotoLibrary}
+              sx={{
+                w: 16,
+                h: 16,
+              }}
+            />
+            <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
+          </Flex>
+        )}
+      </Flex>
     </Flex>
   );
 };
 
-ImageGalleryContent.displayName = 'ImageGalleryContent';
-export default ImageGalleryContent;
+type ItemContainerProps = PropsWithChildren & FlexProps;
+const ItemContainer = forwardRef((props: ItemContainerProps, ref) => (
+  <Box className="item-container" ref={ref}>
+    {props.children}
+  </Box>
+));
+
+type ListContainerProps = PropsWithChildren & FlexProps;
+const ListContainer = forwardRef((props: ListContainerProps, ref) => {
+  const galleryImageMinimumWidth = useAppSelector(
+    (state: RootState) => state.gallery.galleryImageMinimumWidth
+  );
+
+  return (
+    <Grid
+      {...props}
+      className="list-container"
+      ref={ref}
+      sx={{
+        gap: 2,
+        gridTemplateColumns: `repeat(auto-fit, minmax(${galleryImageMinimumWidth}px, 1fr));`,
+      }}
+    >
+      {props.children}
+    </Grid>
+  );
+});
+
+export default memo(ImageGalleryContent);
