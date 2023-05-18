@@ -11,6 +11,7 @@ from tempfile import TemporaryFile
 
 import requests
 from diffusers import AutoencoderKL
+from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -110,7 +111,6 @@ def install_requested_models(
     if len(external_models)>0:
         print("== INSTALLING EXTERNAL MODELS ==")
         for path_url_or_repo in external_models:
-            print(f'DEBUG: path_url_or_repo = {path_url_or_repo}')
             try:
                 model_manager.heuristic_import(
                     path_url_or_repo,
@@ -295,13 +295,21 @@ def _download_diffusion_weights(
     mconfig: DictConfig, access_token: str, precision: str = "float32"
 ):
     repo_id = mconfig["repo_id"]
+    revision = mconfig.get('revision',None)
     model_class = (
         StableDiffusionGeneratorPipeline
         if mconfig.get("format", None) == "diffusers"
         else AutoencoderKL
     )
-    extra_arg_list = [{"revision": "fp16"}, {}] if precision == "float16" else [{}]
+    extra_arg_list = [{"revision": revision}] if revision \
+        else [{"revision": "fp16"}, {}] if precision == "float16" \
+             else [{}]
     path = None
+
+    # quench safety checker warnings
+    verbosity = dlogging.get_verbosity()
+    dlogging.set_verbosity_error()
+    
     for extra_args in extra_arg_list:
         try:
             path = download_from_hf(
@@ -317,6 +325,7 @@ def _download_diffusion_weights(
                 print(f"An unexpected error occurred while downloading the model: {e})")
         if path:
             break
+    dlogging.set_verbosity(verbosity)
     return path
 
 
@@ -447,6 +456,8 @@ def new_config_file_contents(
         stanza["description"] = mod["description"]
         stanza["repo_id"] = mod["repo_id"]
         stanza["format"] = mod["format"]
+        if "revision" in mod:
+            stanza["revision"] = mod["revision"]
         # diffusers don't need width and height (probably .ckpt doesn't either)
         # so we no longer require these in INITIAL_MODELS.yaml
         if "width" in mod:
@@ -471,10 +482,9 @@ def new_config_file_contents(
 
         conf[model] = stanza
 
-    # if no default model was chosen, then we select the first
-    # one in the list
+    # if no default model was chosen, then we select the first one in the list
     if not default_selected:
-        conf[list(successfully_downloaded.keys())[0]]["default"] = True
+        conf[list(conf.keys())[0]]["default"] = True
 
     return OmegaConf.to_yaml(conf)
 

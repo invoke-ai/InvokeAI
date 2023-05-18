@@ -38,15 +38,6 @@ class CFGDenoiser(nn.Module):
                                                            model_forward_callback=lambda x, sigma, cond: self.inner_model(x, sigma, cond=cond))
 
 
-    def prepare_to_sample(self, t_enc, **kwargs):
-
-        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
-
-        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.override_attention_processors(extra_conditioning_info, step_count = t_enc)
-        else:
-            self.invokeai_diffuser.restore_default_cross_attention()
-
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
         next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale)

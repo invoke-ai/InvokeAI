@@ -41,6 +41,16 @@ Windows systems). If the `loras` folder does not already exist, just
 create it. The vast majority of LoRA models use the Kohya file format,
 which is a type of `.safetensors` file.
 
+!!! warning "LoRA Naming Restrictions"
+
+    InvokeAI will only recognize LoRA files that contain the
+    characters a-z, A-Z, 0-9 and the underscore character
+    _. Other characters, including the hyphen, will cause the
+    LoRA file not to load. These naming restrictions may be
+    relaxed in the future, but for now you will need to rename
+    files that contain hyphens, commas, brackets, and other
+    non-word characters.
+
 You may change where InvokeAI looks for the `loras` folder by passing the
 `--lora_directory` option to the `invoke.sh`/`invoke.bat` launcher, or
 by placing the option in `invokeai.init`. For example:

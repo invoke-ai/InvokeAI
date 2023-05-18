@@ -12,6 +12,14 @@ from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
 
+singleton = None
+
+def get_hf_concepts_lib():
+    global singleton
+    if singleton is None:
+        singleton = HuggingFaceConceptsLibrary()
+    return singleton
+
 class HuggingFaceConceptsLibrary(object):
     def __init__(self, root=None):
         '''

@@ -13,11 +13,16 @@ import time
 import traceback
 from typing import List
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=UserWarning)
+    import torch
+    
 import cv2
 import diffusers
 import numpy as np
 import skimage
-import torch
+
 import transformers
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
@@ -633,9 +638,8 @@ class Generate:
         except RuntimeError:
             # Clear the CUDA cache on an exception
             self.clear_cuda_cache()
-
-            print(traceback.format_exc(), file=sys.stderr)
-            print(">> Could not generate image.")
+            print("** Could not generate image.")
+            raise
 
         toc = time.time()
         print("\n>> Usage stats:")
@@ -980,13 +984,15 @@ class Generate:
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path and not model_data.get("ti_embeddings_loaded"):
             print(f'>> Loading embeddings from {self.embedding_path}')
-            for root, _, files in os.walk(self.embedding_path):
-                for name in files:
-                    ti_path = os.path.join(root, name)
-                    self.model.textual_inversion_manager.load_textual_inversion(
-                        ti_path, defer_injecting_tokens=True
-                    )
-            model_data["ti_embeddings_loaded"] = True
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                for root, _, files in os.walk(self.embedding_path):
+                    for name in files:
+                        ti_path = os.path.join(root, name)
+                        self.model.textual_inversion_manager.load_textual_inversion(
+                            ti_path, defer_injecting_tokens=True
+                        )
+                model_data["ti_embeddings_loaded"] = True
         print(
             f'>> Textual inversion triggers: {", ".join(sorted(self.model.textual_inversion_manager.get_all_trigger_strings()))}'
         )

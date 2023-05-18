@@ -243,16 +243,15 @@ class InvokeAiInstance:
 
         # Note that we're installing pinned versions of torch and
         # torchvision here, which *should* correspond to what is
-        # in pyproject.toml. This is to prevent torch 2.0 from
-        # being installed and immediately uninstalled and replaced with 1.13
+        # in pyproject.toml.
         pip = local[self.pip]
 
         (
             pip[
                 "install",
                 "--require-virtualenv",
-                "torch~=1.13.1",
-                "torchvision~=0.14.1",
+                "torch~=2.0.0",
+                "torchvision>=0.14.1",
                 "--force-reinstall",
                 "--find-links" if find_links is not None else None,
                 find_links,
