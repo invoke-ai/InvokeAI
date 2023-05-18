@@ -417,6 +417,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 size="sm"
                 onClick={handleSendToImageToImage}
                 leftIcon={<FaShare />}
+                id="send-to-img2img"
               >
                 {t('parameters.sendToImg2Img')}
               </IAIButton>
@@ -425,6 +426,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                   size="sm"
                   onClick={handleSendToCanvas}
                   leftIcon={<FaShare />}
+                  id="send-to-canvas"
                 >
                   {t('parameters.sendToUnifiedCanvas')}
                 </IAIButton>
