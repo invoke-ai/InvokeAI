@@ -2,27 +2,25 @@ import os
 import sys
 import torch
 from argparse import Namespace
-from invokeai.backend import Args
 from omegaconf import OmegaConf
 from pathlib import Path
 from typing import types
 
 import invokeai.version
+from .config import InvokeAISettings
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
-from ...backend import Globals
 
 # TODO: Replace with an abstract class base ModelManagerBase
-def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
-    if not config.conf:
-        config_file = os.path.join(Globals.root, "configs", "models.yaml")
-        if not os.path.exists(config_file):
-            report_model_error(
-                config, FileNotFoundError(f"The file {config_file} could not be found."), logger
-            )
+def get_model_manager(config: InvokeAISettings, logger: types.ModuleType) -> ModelManager:
+    model_config = config.model_conf_path
+    if not model_config.exists():
+        report_model_error(
+            config, FileNotFoundError(f"The file {model_config} could not be found."), logger
+        )
 
     logger.info(f"{invokeai.version.__app_name__}, version {invokeai.version.__version__}")
-    logger.info(f'InvokeAI runtime directory is "{Globals.root}"')
+    logger.info(f'InvokeAI runtime directory is "{config.root}"')
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -32,20 +30,7 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
     import diffusers
 
     diffusers.logging.set_verbosity_error()
-
-    # normalize the config directory relative to root
-    if not os.path.isabs(config.conf):
-        config.conf = os.path.normpath(os.path.join(Globals.root, config.conf))
-
-    if config.embeddings:
-        if not os.path.isabs(config.embedding_path):
-            embedding_path = os.path.normpath(
-                os.path.join(Globals.root, config.embedding_path)
-            )
-        else:
-            embedding_path = config.embedding_path
-    else:
-        embedding_path = None
+    embedding_path = config.embedding_path
 
     # migrate legacy models
     ModelManager.migrate_models()
@@ -58,11 +43,11 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
         else choose_precision(device)
         
         model_manager = ModelManager(
-            OmegaConf.load(config.conf),
+            OmegaConf.load(config.model_conf_path),
             precision=precision,
             device_type=device,
             max_loaded_models=config.max_loaded_models,
-            embedding_path = Path(embedding_path),
+            embedding_path = embedding_path,
             logger = logger,
         )
     except (FileNotFoundError, TypeError, AssertionError) as e:
@@ -73,12 +58,10 @@ def get_model_manager(config: Args, logger: types.ModuleType) -> ModelManager:
 
     # try to autoconvert new models
     # autoimport new .ckpt files
-    if path := config.autoconvert:
-        model_manager.autoconvert_weights(
-            conf_path=config.conf,
-            weights_directory=path,
+    if config.autoconvert_path:
+        model_manager.heuristic_import(
+            config.autoconvert_path,
         )
-    logger.info('Model manager initialized')
     return model_manager
 
 def report_model_error(opt: Namespace, e: Exception, logger: types.ModuleType):

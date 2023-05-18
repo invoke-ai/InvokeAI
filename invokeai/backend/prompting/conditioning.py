@@ -20,11 +20,10 @@ from compel.prompt_parser import (
 )
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals
 
+from invokeai.app.services.config import get_invokeai_config
 from ..stable_diffusion import InvokeAIDiffuserComponent
 from ..util import torch_dtype
-
 
 def get_uc_and_c_and_ec(prompt_string,
                         model: InvokeAIDiffuserComponent,
@@ -39,6 +38,8 @@ def get_uc_and_c_and_ec(prompt_string,
                     dtype_for_device_getter=torch_dtype,
                     truncate_long_prompts=False,
                     )
+    
+    config = get_invokeai_config()
 
     # get rid of any newline characters
     prompt_string = prompt_string.replace("\n", " ")
@@ -56,7 +57,7 @@ def get_uc_and_c_and_ec(prompt_string,
     negative_prompt: FlattenedPrompt | Blend = negative_conjunction.prompts[0]
 
     tokens_count = get_max_token_count(model.tokenizer, positive_prompt)
-    if log_tokens or getattr(Globals, "log_tokenization", False):
+    if log_tokens or config.log_tokenization:
         log_tokenization(positive_prompt, negative_prompt, tokenizer=model.tokenizer)
 
     c, options = compel.build_conditioning_tensor_for_prompt_object(positive_prompt)

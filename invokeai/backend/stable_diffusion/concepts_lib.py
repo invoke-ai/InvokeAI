@@ -18,15 +18,15 @@ from huggingface_hub import (
 )
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals
-
+from invokeai.app.services.config import get_invokeai_config
 
 class HuggingFaceConceptsLibrary(object):
     def __init__(self, root=None):
         """
         Initialize the Concepts object. May optionally pass a root directory.
         """
-        self.root = root or Globals.root
+        self.config = get_invokeai_config()
+        self.root = root or self.config.root
         self.hf_api = HfApi()
         self.local_concepts = dict()
         self.concept_list = None
@@ -58,7 +58,7 @@ class HuggingFaceConceptsLibrary(object):
                 self.concept_list.extend(list(local_concepts_to_add))
                 return self.concept_list
             return self.concept_list
-        elif Globals.internet_available is True:
+        elif self.config.internet_available is True:
             try:
                 models = self.hf_api.list_models(
                     filter=ModelFilter(model_name="sd-concepts-library/")

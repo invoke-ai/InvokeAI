@@ -10,7 +10,7 @@ from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals
+from invokeai.app.services.config import get_invokeai_config
 
 from .cross_attention_control import (
     Arguments,
@@ -31,7 +31,6 @@ ModelForwardCallback: TypeAlias = Union[
     ],
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
-
 
 @dataclass(frozen=True)
 class PostprocessingSettings:
@@ -73,12 +72,13 @@ class InvokeAIDiffuserComponent:
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
+        config = get_invokeai_config()
         self.conditioning = None
         self.model = model
         self.is_running_diffusers = is_running_diffusers
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
-        self.sequential_guidance = Globals.sequential_guidance
+        self.sequential_guidance = config.sequential_guidance
 
     @classmethod
     @contextmanager

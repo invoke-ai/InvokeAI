@@ -13,11 +13,11 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 
-from ..backend import Args
 from .api.dependencies import ApiDependencies
 from .api.routers import images, sessions, models
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
+from .services.config import InvokeAIAppConfig
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -33,30 +33,25 @@ app.add_middleware(
     middleware_id=event_handler_id,
 )
 
-# Add CORS
-# TODO: use configuration for this
-origins = []
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 socket_io = SocketIO(app)
 
-config = {}
-
+# initialize config
+# this is a module global
+app_config = InvokeAIAppConfig()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    config = Args()
-    config.parse_args()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_config.allow_origins,
+        allow_credentials=app_config.allow_credentials,
+        allow_methods=app_config.allow_methods,
+        allow_headers=app_config.allow_headers,
+    )
 
     ApiDependencies.initialize(
-        config=config, event_handler_id=event_handler_id, logger=logger
+        config=app_config, event_handler_id=event_handler_id, logger=logger
     )
 
 
@@ -148,14 +143,11 @@ app.mount("/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), n
 
 def invoke_api():
     # Start our own event loop for eventing usage
-    # TODO: determine if there's a better way to do this
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host="0.0.0.0", port=9090, loop=loop)
+    config = uvicorn.Config(app=app, host=app_config.host, port=app_config.port, loop=loop)
     # Use access_log to turn off logging
-
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
-
 
 if __name__ == "__main__":
     invoke_api()
