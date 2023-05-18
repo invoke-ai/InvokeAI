@@ -131,9 +131,7 @@ from __future__ import annotations
 
 import os
 import re
-import sys
 import textwrap
-from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, auto
 from packaging import version
@@ -145,6 +143,7 @@ import safetensors
 import safetensors.torch
 import torch
 from diffusers import AutoencoderKL
+from diffusers.utils import is_safetensors_available
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -157,7 +156,6 @@ from invokeai.backend.util import download_with_resume
 from ..util import CUDA_DEVICE
 from .model_cache import (ModelCache, ModelLocker, SDModelType,
                           SilenceWarnings)
-
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
 # reduce confusion.
@@ -307,17 +305,12 @@ class ModelManager(object):
 
         """
         
-        # This is a temporary workaround for callers that use "type/name" as the model name
+        # Commented-out workaround for callers that use "type/name" as the model name
         # because they haven't adjusted to the new return format of `list_models()`
-        if "/" in model_name:
-            model_key = model_name
-        else:
-            model_key = self.create_key(model_name, model_type)
-            
-        # TODO: delete default model or add check that this stable diffusion model
-        # if not model_name:
-        #     model_name = self.default_model()
-
+        # if "/" in model_name:
+        #     model_key = model_name
+        # else:
+        model_key = self.create_key(model_name, model_type)
         if model_key not in self.config:
             raise InvalidModelError(
                 f'"{model_key}" is not a known model name. Please check your models.yaml file'
@@ -357,7 +350,6 @@ class ModelManager(object):
         # TODO:
         if model_type == SDModelType.Vae and "vae" in mconfig:
             print("NOT_IMPLEMENTED - RETURN CUSTOM VAE")
-
 
         model_context = self.cache.get_model(
             location,
@@ -414,7 +406,7 @@ class ModelManager(object):
         """
         Given a model name returns the OmegaConf (dict-like) object describing it.
         """
-        if not self.exists(model_name, model_type):
+        if not self.model_exists(model_name, model_type):
             return None
         return self.config[self.create_key(model_name, model_type)]
 
@@ -962,6 +954,44 @@ class ModelManager(object):
             )
         return diffusers_path
 
+    def convert_vae_ckpt_and_cache(self, mconfig: DictConfig) -> Path:
+        """
+        Convert the VAE indicated in mconfig into a diffusers AutoencoderKL
+        object, cache it to disk, and return Path to converted
+        file. If already on disk then just returns Path.
+        """
+        weights_file = global_resolve_path(mconfig.weights)
+        config_file = global_resolve_path(mconfig.config)
+        diffusers_path = global_resolve_path(Path('models',Globals.converted_ckpts_dir)) / weights_file.stem
+        image_size = mconfig.get('width') or mconfig.get('height') or 512
+        
+        # return cached version if it exists
+        if diffusers_path.exists():
+            return diffusers_path
+
+        # this avoids circular import error
+        from .convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
+        checkpoint =  torch.load(weights_file, map_location="cpu")\
+            if weights_file.suffix in ['.ckpt','.pt'] \
+               else  safetensors.torch.load_file(weights_file)
+
+        # sometimes weights are hidden under "state_dict", and sometimes not
+        if "state_dict" in checkpoint:
+            checkpoint = checkpoint["state_dict"]
+
+        config = OmegaConf.load(config_file)
+
+        vae_model = convert_ldm_vae_to_diffusers(
+            checkpoint = checkpoint,
+            vae_config = config,
+            image_size = image_size
+        )
+        vae_model.save_pretrained(
+            diffusers_path,
+            safe_serialization=is_safetensors_available()
+        )
+        return diffusers_path
+
     def _get_vae_for_conversion(
         self,
         weights: Path,
@@ -1130,7 +1160,7 @@ class ModelManager(object):
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):
-        cache_info = scan_cache_dir(global_cache_dir("hub"))
+        cache_info =  scan_cache_dir(global_cache_dir("hub"))
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!
@@ -1178,7 +1208,7 @@ class ModelManager(object):
         current_version = self.config.get("_version","1.0.0")
         if version.parse(current_version) < version.parse(CONFIG_FILE_VERSION):
             self.logger.warning(f'models.yaml version {current_version} detected. Updating to {CONFIG_FILE_VERSION}')
-            self.logger.warning(f'The original file will be renamed models.yaml.orig')
+            self.logger.warning('The original file will be renamed models.yaml.orig')
             if self.config_path:
                 old_file = Path(self.config_path)
                 new_name = old_file.parent / 'models.yaml.orig'

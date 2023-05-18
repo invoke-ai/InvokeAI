@@ -32,7 +32,7 @@ import safetensors.torch
     
 from diffusers import DiffusionPipeline, SchedulerMixin, ConfigMixin
 from diffusers import logging as diffusers_logging
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, scan_cache_dir
 from picklescan.scanner import scan_file_path
 from pydantic import BaseModel
 from transformers import logging as transformers_logging

@@ -33,6 +33,7 @@ from .model_cache import ModelCache
 
 try:
     from omegaconf import OmegaConf
+    from omegaconf.dictconfig import DictConfig
 except ImportError:
     raise ImportError(
         "OmegaConf is required to convert the LDM checkpoints. Please install it with `pip install OmegaConf`."
@@ -614,16 +615,29 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
 
     return new_checkpoint
 
-
 def convert_ldm_vae_checkpoint(checkpoint, config):
-    # extract state dict for VAE
-    vae_state_dict = {}
-    vae_key = "first_stage_model."
-    keys = list(checkpoint.keys())
-    for key in keys:
-        if key.startswith(vae_key):
-            vae_state_dict[key.replace(vae_key, "")] = checkpoint.get(key)
+    # Extract state dict for VAE. Works both with burnt-in
+    # VAEs, and with standalone VAEs.
 
+    # checkpoint can either be a all-in-one stable diffusion
+    # model, or an isolated vae .ckpt. This tests for
+    # a key that will be present in the all-in-one model
+    # that isn't present in the isolated ckpt.
+    probe_key = "first_stage_model.encoder.conv_in.weight"
+    if probe_key in checkpoint:
+        vae_state_dict = {}
+        vae_key = "first_stage_model."
+        keys = list(checkpoint.keys())
+        for key in keys:
+            if key.startswith(vae_key):
+                vae_state_dict[key.replace(vae_key, "")] = checkpoint.get(key)
+    else:
+        vae_state_dict = checkpoint
+        
+    new_checkpoint = convert_ldm_vae_state_dict(vae_state_dict,config)
+    return new_checkpoint
+
+def convert_ldm_vae_state_dict(vae_state_dict, config):
     new_checkpoint = {}
 
     new_checkpoint["encoder.conv_in.weight"] = vae_state_dict["encoder.conv_in.weight"]
@@ -1049,6 +1063,19 @@ def replace_checkpoint_vae(checkpoint, vae_path:str):
         new_key = f'first_stage_model.{vae_key}'
         checkpoint[new_key] = state_dict[vae_key]
 
+def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size: int)->AutoencoderKL:
+    vae_config = create_vae_diffusers_config(
+        vae_config, image_size=image_size
+    )
+
+    converted_vae_checkpoint = convert_ldm_vae_checkpoint(
+        checkpoint, vae_config
+    )
+
+    vae = AutoencoderKL(**vae_config)
+    vae.load_state_dict(converted_vae_checkpoint)
+    return vae
+
 def load_pipeline_from_original_stable_diffusion_ckpt(
     checkpoint_path: str,
     original_config_file: str = None,
@@ -1244,15 +1271,10 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         if vae:
             logger.debug("Using replacement diffusers VAE")
         else:  # convert the original or replacement VAE
-            vae_config = create_vae_diffusers_config(
-                original_config, image_size=image_size
-            )
-            converted_vae_checkpoint = convert_ldm_vae_checkpoint(
-                checkpoint, vae_config
-            )
-
-            vae = AutoencoderKL(**vae_config)
-            vae.load_state_dict(converted_vae_checkpoint)
+            vae = convert_ldm_vae_to_diffusers(
+                checkpoint,
+                original_config,
+                image_size)
 
         # Convert the text model.
         model_type = pipeline_type
