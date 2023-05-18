@@ -329,8 +329,8 @@ class TextToLatentsInvocation(BaseInvocation):
             noise=noise,
             num_inference_steps=self.steps,
             conditioning_data=conditioning_data,
-            callback=step_callback,
             control_data=control_data,  # list[ControlNetData]
+            callback=step_callback,
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
@@ -375,6 +375,11 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(context, model)
 
+        print("type of control input: ", type(self.control))
+        control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
+                                              latents_shape=noise.shape,
+                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+
         # TODO: Verify the noise is the right size
 
         initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
@@ -389,6 +394,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             noise=noise,
             num_inference_steps=self.steps,
             conditioning_data=conditioning_data,
+            control_data=control_data,  # list[ControlNetData]
             callback=step_callback
         )
 
