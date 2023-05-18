@@ -1,5 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import { ImagesService } from 'services/api';
 import { getHeaders } from 'services/util/getHeaders';
 
@@ -39,7 +40,11 @@ export const thumbnailReceived = createAppAsyncThunk(
   }
 );
 
-type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
+type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0] & {
+  // extra arg to determine post-upload actions - we check for this when the image is uploaded
+  // to determine if we should set the init image
+  activeTabName?: InvokeTabName;
+};
 
 /**
  * `ImagesService.uploadImage()` thunk
@@ -47,7 +52,9 @@ type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
 export const imageUploaded = createAppAsyncThunk(
   'api/imageUploaded',
   async (arg: ImageUploadedArg) => {
-    const response = await ImagesService.uploadImage(arg);
+    // strip out `activeTabName` from arg - the route does not need it
+    const { activeTabName, ...rest } = arg;
+    const response = await ImagesService.uploadImage(rest);
     const { location } = getHeaders(response);
 
     imagesLog.info(

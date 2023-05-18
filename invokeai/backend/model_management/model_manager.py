@@ -149,8 +149,7 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import (Globals, global_cache_dir,
-                                      global_resolve_path)
+from invokeai.app.services.config import get_invokeai_config
 from invokeai.backend.util import download_with_resume
 
 from ..util import CUDA_DEVICE
@@ -226,7 +225,8 @@ class ModelManager(object):
 
         # check config version number and update on disk/RAM if necessary
         self._update_config_file_version()
-
+        self.globals = get_invokeai_config()
+        self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
             execution_device = device_type,
@@ -235,7 +235,6 @@ class ModelManager(object):
             logger = logger,
         )
         self.cache_keys = dict()
-        self.logger = logger
 
     def model_exists(
         self,
@@ -304,12 +303,6 @@ class ModelManager(object):
         # raises an InvalidModelError
 
         """
-        
-        # Commented-out workaround for callers that use "type/name" as the model name
-        # because they haven't adjusted to the new return format of `list_models()`
-        # if "/" in model_name:
-        #     model_key = model_name
-        # else:
         model_key = self.create_key(model_name, model_type)
         if model_key not in self.config:
             raise InvalidModelError(
@@ -326,13 +319,15 @@ class ModelManager(object):
             if mconfig.format in ["ckpt", "safetensors"]:
                 location = self.convert_ckpt_and_cache(mconfig)
             else:
-                location = global_resolve_path(mconfig.get('path')) or mconfig.get('repo_id')
+                location = self.globals.root_dir / mconfig.get('path') or mconfig.get('repo_id')
+        elif p := mconfig.get('path'):
+            location = self.globals.root_dir / p
+        elif r := mconfig.get('repo_id'):
+            location = r
+        elif w := mconfig.get('weights'):
+            location = self.globals.root_dir / w
         else:
-            location = global_resolve_path(
-                mconfig.get('path')) \
-                or mconfig.get('repo_id') \
-                or global_resolve_path(mconfig.get('weights')
-            )
+            location = None
         
         revision = mconfig.get('revision')
         hash = self.cache.model_hash(location, revision)
@@ -423,7 +418,7 @@ class ModelManager(object):
         """
         # if we are converting legacy files automatically, then
         # there are no legacy ckpts!
-        if Globals.ckpt_convert:
+        if self.globals.ckpt_convert:
             return False
         info = self.model_info(model_name, model_type)
         if "weights" in info and info["weights"].endswith((".ckpt", ".safetensors")):
@@ -862,25 +857,16 @@ class ModelManager(object):
                 model_type = self.probe_model_type(checkpoint)
                 if model_type == SDLegacyType.V1:
                     self.logger.debug("SD-v1 model detected")
-                    model_config_file = Path(
-                        Globals.root, "configs/stable-diffusion/v1-inference.yaml"
-                    )
+                    model_config_file = self.globals.legacy_conf_path / "v1-inference.yaml"
                 elif model_type == SDLegacyType.V1_INPAINT:
                     self.logger.debug("SD-v1 inpainting model detected")
-                    model_config_file = Path(
-                        Globals.root,
-                        "configs/stable-diffusion/v1-inpainting-inference.yaml",
-                    )
+                    model_config_file = self.globals.legacy_conf_path / "v1-inpainting-inference.yaml",
                 elif model_type == SDLegacyType.V2_v:
                     self.logger.debug("SD-v2-v model detected")
-                    model_config_file = Path(
-                        Globals.root, "configs/stable-diffusion/v2-inference-v.yaml"
-                    )
+                    model_config_file = self.globals.legacy_conf_path / "v2-inference-v.yaml"
                 elif model_type == SDLegacyType.V2_e:
                     self.logger.debug("SD-v2-e model detected")
-                    model_config_file = Path(
-                        Globals.root, "configs/stable-diffusion/v2-inference.yaml"
-                    )
+                    model_config_file = self.globals.legacy_conf_path / "v2-inference.yaml"
                 elif model_type == SDLegacyType.V2:
                     self.logger.warning(
                         f"{thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
@@ -907,9 +893,7 @@ class ModelManager(object):
                 self.logger.debug(f"Using VAE file {vae_path.name}")
         vae = None if vae_path else dict(repo_id="stabilityai/sd-vae-ft-mse")
 
-        diffuser_path = Path(
-            Globals.root, "models", Globals.converted_ckpts_dir, model_path.stem
-        )
+        diffuser_path = self.globals.converted_ckpts_dir / model_path.stem
         with SilenceWarnings():
             model_name = self.convert_and_import(
                 model_path,
@@ -930,9 +914,9 @@ class ModelManager(object):
         diffusers, cache it to disk, and return Path to converted
         file. If already on disk then just returns Path.
         """
-        weights = global_resolve_path(mconfig.weights)
-        config_file = global_resolve_path(mconfig.config)
-        diffusers_path = global_resolve_path(Path('models',Globals.converted_ckpts_dir)) / weights.stem
+        weights = self.globals.root_dir / mconfig.weights
+        config_file = self.globals.root_dir / mconfig.config
+        diffusers_path = self.globals.converted_ckpts_dir / weights.stem
 
         # return cached version if it exists
         if diffusers_path.exists():
@@ -949,7 +933,7 @@ class ModelManager(object):
                 extract_ema=True,
                 original_config_file=config_file,
                 vae=vae_model,
-                vae_path=str(global_resolve_path(vae_ckpt_path)) if vae_ckpt_path else None,
+                vae_path=str(self.globals.root_dir / vae_ckpt_path) if vae_ckpt_path else None,
                 scan_needed=True,
             )
         return diffusers_path
@@ -960,9 +944,10 @@ class ModelManager(object):
         object, cache it to disk, and return Path to converted
         file. If already on disk then just returns Path.
         """
-        weights_file = global_resolve_path(mconfig.weights)
-        config_file = global_resolve_path(mconfig.config)
-        diffusers_path = global_resolve_path(Path('models',Globals.converted_ckpts_dir)) / weights_file.stem
+        root = self.globals.root_dir
+        weights_file = root / mconfig.weights
+        config_file = root / mconfig.config
+        diffusers_path = self.globals.converted_ckpts_dir / weights_file.stem
         image_size = mconfig.get('width') or mconfig.get('height') or 512
         
         # return cached version if it exists
@@ -1018,7 +1003,9 @@ class ModelManager(object):
             
         # 3. If mconfig has a vae dict, then we use it as the diffusers-style vae
         if vae_config and isinstance(vae_config,DictConfig):
-            vae_diffusers_location = global_resolve_path(vae_config.get('path')) or vae_config.get('repo_id')
+            vae_diffusers_location = self.globals.root_dir / vae_config.get('path') \
+                if vae_config.get('path') \
+                   else vae_config.get('repo_id')
 
         # 4. Otherwise, we use stabilityai/sd-vae-ft-mse "because it works"
         else:
@@ -1072,7 +1059,9 @@ class ModelManager(object):
             # will be built into the model rather than tacked on afterward via the config file
             vae_model = None
             if vae:
-                vae_location = global_resolve_path(vae.get('path')) or vae.get('repo_id')
+                vae_location = self.globals.root_dir / vae.get('path') \
+                    if vae.get('path') \
+                       else vae.get('repo_id')
                 vae_model = self.cache.get_model(vae_location, SDModelType.Vae).model
                 vae_path = None
             convert_ckpt_to_diffusers(
@@ -1140,6 +1129,7 @@ class ModelManager(object):
         yaml_str = OmegaConf.to_yaml(self.config)
         config_file_path = conf_file or self.config_path
         assert config_file_path is not None,'no config file path to write to'
+        config_file_path = self.globals.root_dir / config_file_path
         tmpfile = os.path.join(os.path.dirname(config_file_path), "new_config.tmp")
         with open(tmpfile, "w", encoding="utf-8") as outfile:
             outfile.write(self.preamble())
@@ -1160,7 +1150,7 @@ class ModelManager(object):
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):
-        cache_info =  scan_cache_dir(global_cache_dir("hub"))
+        cache_info = scan_cache_dir(get_invokeai_config().cache_dir)
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!
@@ -1177,9 +1167,10 @@ class ModelManager(object):
 
     @staticmethod
     def _abs_path(path: str | Path) -> Path:
+        globals = get_invokeai_config()
         if path is None or Path(path).is_absolute():
             return path
-        return Path(Globals.root, path).resolve()
+        return Path(globals.root_dir, path).resolve()
 
     # This is not the same as global_resolve_path(), which prepends
     # Globals.root.
@@ -1188,15 +1179,11 @@ class ModelManager(object):
     ) -> Optional[Path]:
         resolved_path = None
         if str(source).startswith(("http:", "https:", "ftp:")):
-            dest_directory = Path(dest_directory)
-            if not dest_directory.is_absolute():
-                dest_directory = Globals.root / dest_directory
+            dest_directory = self.globals.root_dir / dest_directory
             dest_directory.mkdir(parents=True, exist_ok=True)
             resolved_path = download_with_resume(str(source), dest_directory)
         else:
-            if not os.path.isabs(source):
-                source = os.path.join(Globals.root, source)
-            resolved_path = Path(source)
+            resolved_path = self.globals.root_dir / source
         return resolved_path
 
     def _update_config_file_version(self):

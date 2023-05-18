@@ -25,27 +25,25 @@ import warnings
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Sequence, Union, Tuple, types, Optional, List, Type, Any
+from typing import Dict, Sequence, Union, types, Optional, List, Type, Any
 
 import torch
-import safetensors.torch
-    
+
 from diffusers import DiffusionPipeline, SchedulerMixin, ConfigMixin
 from diffusers import logging as diffusers_logging
 from huggingface_hub import HfApi, scan_cache_dir
-from picklescan.scanner import scan_file_path
-from pydantic import BaseModel
 from transformers import logging as transformers_logging
 
 import invokeai.backend.util.logging as logger
-from ..globals import global_cache_dir
-
+from invokeai.app.services.config import get_invokeai_config
 
 def get_model_path(repo_id_or_path: str):
+    globals = get_invokeai_config()
+    
     if os.path.exists(repo_id_or_path):
         return repo_id_or_path
 
-    cache = scan_cache_dir(global_cache_dir("hub"))
+    cache = scan_cache_dir(globals.cache_dir)
     for repo in cache.repos:
         if repo.repo_id != repo_id_or_path:
             continue
@@ -234,7 +232,7 @@ class DiffusersModelInfo(ModelInfoBase):
                 model = self.child_types[child_type].from_pretrained(
                     self.repo_id_or_path,
                     subfolder=child_type.value,
-                    cache_dir=global_cache_dir('hub'),
+                    cache_dir=get_invokeai_config.cache_dir('hub'),
                     torch_dtype=torch_dtype,
                     variant=variant,
                 )
@@ -248,7 +246,7 @@ class DiffusersModelInfo(ModelInfoBase):
         return model
 
 
-    def get_pipeline(self, **kwrags):
+    def get_pipeline(self, **kwargs):
         return DiffusionPipeline.from_pretrained(
             self.repo_id_or_path,
             **kwargs,
@@ -349,7 +347,7 @@ class ClassifierModelInfo(ModelInfoBase):
         model = self.child_types[child_type].from_pretrained(
             self.repo_id_or_path,
             subfolder=child_type.value,
-            cache_dir=global_cache_dir('hub'),
+            cache_dir=get_invokeai_config().cache_dir('hub'),
             torch_dtype=torch_dtype,
         )
         # calc more accurate size
@@ -394,7 +392,7 @@ class VaeModelInfo(ModelInfoBase):
 
         model = self.vae_type.from_pretrained(
             self.repo_id_or_path,
-            cache_dir=global_cache_dir('hub'),
+            cache_dir=get_invokeai_config().cache_dir('hub'),
             torch_dtype=torch_dtype,
         )
         # calc more accurate size

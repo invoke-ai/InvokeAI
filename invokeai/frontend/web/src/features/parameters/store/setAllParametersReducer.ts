@@ -2,6 +2,7 @@ import { Draft, PayloadAction } from '@reduxjs/toolkit';
 import { Image } from 'app/types/invokeai';
 import { GenerationState } from './generationSlice';
 import { ImageToImageInvocation } from 'services/api';
+import { isScheduler } from 'app/constants';
 
 export const setAllParametersReducer = (
   state: Draft<GenerationState>,
@@ -34,7 +35,10 @@ export const setAllParametersReducer = (
       state.prompt = String(prompt);
     }
     if (scheduler !== undefined) {
-      state.sampler = String(scheduler);
+      const schedulerString = String(scheduler);
+      if (isScheduler(schedulerString)) {
+        state.scheduler = schedulerString;
+      }
     }
     if (seed !== undefined) {
       state.seed = Number(seed);

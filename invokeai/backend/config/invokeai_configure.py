@@ -19,10 +19,10 @@ import warnings
 from argparse import Namespace
 from pathlib import Path
 from shutil import get_terminal_size
+from typing import get_type_hints
 from urllib import request
 
 import npyscreen
-import torch
 import transformers
 from diffusers import AutoencoderKL
 from huggingface_hub import HfFolder
@@ -38,34 +38,40 @@ from transformers import (
 
 import invokeai.configs as configs
 
-from ...frontend.install.model_install import addModelsForm, process_and_execute
-from ...frontend.install.widgets import (
+from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
 )
-from ..args import PRECISION_CHOICES, Args
-from ..globals import Globals, global_cache_dir, global_config_dir, global_config_file
-from .model_install_backend import (
+from invokeai.backend.config.legacy_arg_parsing import legacy_parser
+from invokeai.backend.config.model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,
     recommended_datasets,
+)
+from invokeai.app.services.config import (
+    get_invokeai_config,
+    InvokeAIAppConfig,
 )
 
 warnings.filterwarnings("ignore")
 
 transformers.logging.set_verbosity_error()
 
+
 # --------------------------globals-----------------------
+config = get_invokeai_config()
+
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
 Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
 
-Default_config_file = Path(global_config_dir()) / "models.yaml"
-SD_Configs = Path(global_config_dir()) / "stable-diffusion"
+Default_config_file = config.model_conf_path
+SD_Configs = config.legacy_conf_path
 
 Datasets = OmegaConf.load(Dataset_path)
 
@@ -73,17 +79,12 @@ Datasets = OmegaConf.load(Dataset_path)
 MIN_COLS = 135
 MIN_LINES = 45
 
+PRECISION_CHOICES = ['auto','float16','float32','autocast']
+
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
 # or renaming it and then running invokeai-configure again.
-# Place  frequently-used startup commands here, one or more per line.
-# Examples:
-# --outdir=D:\data\images
-# --no-nsfw_checker
-# --web --host=0.0.0.0
-# --steps=20
-# -Ak_euler_a -C10.0
 """
 
 
@@ -96,14 +97,13 @@ If you installed manually from source or with 'pip install': activate the virtua
 then run one of the following commands to start InvokeAI.
 
 Web UI:
-   invokeai --web # (connect to http://localhost:9090)
-   invokeai --web --host 0.0.0.0 # (connect to http://your-lan-ip:9090 from another computer on the local network)
+   invokeai-web
 
-Command-line interface:
+Command-line client:
    invokeai
 
 If you installed using an installation script, run:
-  {Globals.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+  {config.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
 
 Add the '--help' argument to see all of the command-line switches available for use.
 """
@@ -216,11 +216,11 @@ def download_realesrgan():
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
     model_dest = os.path.join(
-        Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
+        config.root, "models/realesrgan/realesr-general-x4v3.pth"
     )
 
     wdn_model_dest = os.path.join(
-        Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
+        config.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
     )
 
     download_with_progress_bar(model_url, model_dest, "RealESRGAN")
@@ -243,7 +243,7 @@ def download_gfpgan():
             "./models/gfpgan/weights/parsing_parsenet.pth",
         ],
     ):
-        model_url, model_dest = model[0], os.path.join(Globals.root, model[1])
+        model_url, model_dest = model[0], os.path.join(config.root, model[1])
         download_with_progress_bar(model_url, model_dest, "GFPGAN weights")
 
 
@@ -253,7 +253,7 @@ def download_codeformer():
     model_url = (
         "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     )
-    model_dest = os.path.join(Globals.root, "models/codeformer/codeformer.pth")
+    model_dest = os.path.join(config.root, "models/codeformer/codeformer.pth")
     download_with_progress_bar(model_url, model_dest, "CodeFormer")
 
 
@@ -295,7 +295,7 @@ def download_vaes():
         # first the diffusers version
         repo_id = "stabilityai/sd-vae-ft-mse"
         args = dict(
-            cache_dir=global_cache_dir("hub"),
+            cache_dir=config.cache_dir,
         )
         if not AutoencoderKL.from_pretrained(repo_id, **args):
             raise Exception(f"download of {repo_id} failed")
@@ -306,7 +306,7 @@ def download_vaes():
         if not hf_download_with_resume(
             repo_id=repo_id,
             model_name=model_name,
-            model_dir=str(Globals.root / Model_dir / Weights_dir),
+            model_dir=str(config.root / Model_dir / Weights_dir),
         ):
             raise Exception(f"download of {model_name} failed")
     except Exception as e:
@@ -321,8 +321,7 @@ def get_root(root: str = None) -> str:
     elif os.environ.get("INVOKEAI_ROOT"):
         return os.environ.get("INVOKEAI_ROOT")
     else:
-        return Globals.root
-
+        return config.root
 
 # -------------------------------------
 class editOptsForm(npyscreen.FormMultiPage):
@@ -332,7 +331,7 @@ class editOptsForm(npyscreen.FormMultiPage):
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
-        first_time = not (Globals.root / Globals.initfile).exists()
+        first_time = not (config.root / 'invokeai.yaml').exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
         for i in [
@@ -366,7 +365,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.outdir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
             name="(<tab> autocompletes, ctrl-N advances):",
-            value=old_opts.outdir or str(default_output_dir()),
+            value=str(old_opts.outdir) or str(default_output_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -381,17 +380,17 @@ class editOptsForm(npyscreen.FormMultiPage):
             editable=False,
             color="CONTROL",
         )
-        self.safety_checker = self.add_widget_intelligent(
+        self.nsfw_checker = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="NSFW checker",
-            value=old_opts.safety_checker,
+            value=old_opts.nsfw_checker,
             relx=5,
             scroll_exit=True,
         )
         self.nextrely += 1
         for i in [
-            "If you have an account at HuggingFace you may paste your access token here",
-            'to allow InvokeAI to download styles & subjects from the "Concept Library".',
+            "If you have an account at HuggingFace you may optionally paste your access token here",
+            'to allow InvokeAI to download restricted styles & subjects from the "Concept Library".',
             "See https://huggingface.co/settings/tokens",
         ]:
             self.add_widget_intelligent(
@@ -435,17 +434,10 @@ class editOptsForm(npyscreen.FormMultiPage):
             relx=5,
             scroll_exit=True,
         )
-        self.xformers = self.add_widget_intelligent(
+        self.xformers_enabled = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Enable xformers support if available",
-            value=old_opts.xformers,
-            relx=5,
-            scroll_exit=True,
-        )
-        self.ckpt_convert = self.add_widget_intelligent(
-            npyscreen.Checkbox,
-            name="Load legacy checkpoint models into memory as diffusers models",
-            value=old_opts.ckpt_convert,
+            value=old_opts.xformers_enabled,
             relx=5,
             scroll_exit=True,
         )
@@ -480,19 +472,30 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Directory containing embedding/textual inversion files:",
+            value="Directories containing textual inversion and LoRA models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
         )
-        self.embedding_path = self.add_widget_intelligent(
+        self.embedding_dir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
-            name="(<tab> autocompletes, ctrl-N advances):",
+            name=" Textual Inversion Embeddings:",
             value=str(default_embedding_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
             labelColor="GOOD",
-            begin_entry_at=40,
+            begin_entry_at=32,
+            scroll_exit=True,
+        )
+        self.lora_dir = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name="             LoRA and LyCORIS:",
+            value=str(default_lora_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=32,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -559,9 +562,9 @@ class editOptsForm(npyscreen.FormMultiPage):
             bad_fields.append(
                 f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
             )
-        if not Path(opt.embedding_path).parent.exists():
+        if not Path(opt.embedding_dir).parent.exists():
             bad_fields.append(
-                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_path).parent)} is an existing directory."
+                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_dir).parent)} is an existing directory."
             )
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:\n"
@@ -576,20 +579,23 @@ class editOptsForm(npyscreen.FormMultiPage):
         new_opts = Namespace()
 
         for attr in [
-            "outdir",
-            "safety_checker",
-            "free_gpu_mem",
-            "max_loaded_models",
-            "xformers",
-            "always_use_cpu",
-            "embedding_path",
-            "ckpt_convert",
+                "outdir",
+                "nsfw_checker",
+                "free_gpu_mem",
+                "max_loaded_models",
+                "xformers_enabled",
+                "always_use_cpu",
+                "embedding_dir",
+                "lora_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
         new_opts.hf_token = self.hf_token.value
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
+        
+        # widget library workaround to make max_loaded_models an int rather than a float
+        new_opts.max_loaded_models = int(new_opts.max_loaded_models)
 
         return new_opts
 
@@ -628,14 +634,13 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = Args().parse_args([])
+    opts = InvokeAIAppConfig(argv=[])
     outdir = Path(opts.outdir)
     if not outdir.is_absolute():
-        opts.outdir = str(Globals.root / opts.outdir)
+        opts.outdir = str(config.root / opts.outdir)
     if not init_file.exists():
-        opts.safety_checker = True
+        opts.nsfw_checker = True
     return opts
-
 
 def default_user_selections(program_opts: Namespace) -> Namespace:
     return Namespace(
@@ -690,70 +695,61 @@ def run_console_ui(
 # -------------------------------------
 def write_opts(opts: Namespace, init_file: Path):
     """
-    Update the invokeai.init file with values from opts Namespace
+    Update the invokeai.yaml file with values from current settings.
     """
-    # touch file if it doesn't exist
-    if not init_file.exists():
-        with open(init_file, "w") as f:
-            f.write(INIT_FILE_PREAMBLE)
 
-    # We want to write in the changed arguments without clobbering
-    # any other initialization values the user has entered. There is
-    # no good way to do this because of the one-way nature of
-    # argparse: i.e. --outdir could be --outdir, --out, or -o
-    # initfile needs to be replaced with a fully structured format
-    # such as yaml; this is a hack that will work much of the time
-    args_to_skip = re.compile(
-        "^--?(o|out|no-xformer|xformer|no-ckpt|ckpt|free|no-nsfw|nsfw|prec|max_load|embed|always|ckpt|free_gpu)"
-    )
-    # fix windows paths
-    opts.outdir = opts.outdir.replace("\\", "/")
-    opts.embedding_path = opts.embedding_path.replace("\\", "/")
-    new_file = f"{init_file}.new"
-    try:
-        lines = [x.strip() for x in open(init_file, "r").readlines()]
-        with open(new_file, "w") as out_file:
-            for line in lines:
-                if len(line) > 0 and not args_to_skip.match(line):
-                    out_file.write(line + "\n")
-            out_file.write(
-                f"""
---outdir={opts.outdir}
---embedding_path={opts.embedding_path}
---precision={opts.precision}
---max_loaded_models={int(opts.max_loaded_models)}
---{'no-' if not opts.safety_checker else ''}nsfw_checker
---{'no-' if not opts.xformers else ''}xformers
---{'no-' if not opts.ckpt_convert else ''}ckpt_convert
-{'--free_gpu_mem' if opts.free_gpu_mem else ''}
-{'--always_use_cpu' if opts.always_use_cpu else ''}
-"""
-            )
-    except OSError as e:
-        print(f"** An error occurred while writing the init file: {str(e)}")
+    # this will load current settings
+    config = InvokeAIAppConfig()
+    for key,value in opts.__dict__.items():
+        if hasattr(config,key):
+            setattr(config,key,value)
 
-    os.replace(new_file, init_file)
-
-    if opts.hf_token:
-        HfLogin(opts.hf_token)
-
+    with open(init_file,'w', encoding='utf-8') as file:
+        file.write(config.to_yaml())
 
 # -------------------------------------
 def default_output_dir() -> Path:
-    return Globals.root / "outputs"
-
+    return config.root / "outputs"
 
 # -------------------------------------
 def default_embedding_dir() -> Path:
-    return Globals.root / "embeddings"
+    return config.root / "embeddings"
 
+# -------------------------------------
+def default_lora_dir() -> Path:
+    return config.root / "loras"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
     opt = default_startup_options(initfile)
-    opt.hf_token = HfFolder.get_token()
     write_opts(opt, initfile)
 
+# -------------------------------------
+# Here we bring in
+# the legacy Args object in order to parse
+# the old init file and write out the new
+# yaml format.
+def migrate_init_file(legacy_format:Path):
+    old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
+    new = InvokeAIAppConfig(conf={})
+
+    fields = list(get_type_hints(InvokeAIAppConfig).keys())
+    for attr in fields:
+        if hasattr(old,attr):
+            setattr(new,attr,getattr(old,attr))
+
+    # a few places where the field names have changed and we have to
+    # manually add in the new names/values
+    new.nsfw_checker = old.safety_checker
+    new.xformers_enabled = old.xformers
+    new.conf_path = old.conf
+    new.embedding_dir = old.embedding_path
+
+    invokeai_yaml = legacy_format.parent / 'invokeai.yaml'
+    with open(invokeai_yaml,"w", encoding="utf-8") as outfile:
+        outfile.write(new.to_yaml())
+
+    legacy_format.replace(legacy_format.parent / 'invokeai.init.old')
 
 # -------------------------------------
 def main():
@@ -810,7 +806,8 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
-    Globals.root = Path(os.path.expanduser(get_root(opt.root) or ""))
+    global config
+    config.root = Path(os.path.expanduser(get_root(opt.root) or ""))
 
     errors = set()
 
@@ -818,19 +815,26 @@ def main():
         models_to_download = default_user_selections(opt)
 
         # We check for to see if the runtime directory is correctly initialized.
-        init_file = Path(Globals.root, Globals.initfile)
-        if not init_file.exists() or not global_config_file().exists():
-            initialize_rootdir(Globals.root, opt.yes_to_all)
+        old_init_file = Path(config.root, 'invokeai.init')
+        new_init_file = Path(config.root, 'invokeai.yaml')
+        if old_init_file.exists() and not new_init_file.exists():
+            print('** Migrating invokeai.init to invokeai.yaml')
+            migrate_init_file(old_init_file)
+            config = get_invokeai_config()  # reread defaults
+
+
+        if not config.model_conf_path.exists():
+            initialize_rootdir(config.root, opt.yes_to_all)
 
         if opt.yes_to_all:
-            write_default_options(opt, init_file)
+            write_default_options(opt, new_init_file)
             init_options = Namespace(
                 precision="float32" if opt.full_precision else "float16"
             )
         else:
-            init_options, models_to_download = run_console_ui(opt, init_file)
+            init_options, models_to_download = run_console_ui(opt, new_init_file)
             if init_options:
-                write_opts(init_options, init_file)
+                write_opts(init_options, new_init_file)
             else:
                 print(
                     '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'

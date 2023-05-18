@@ -1,4 +1,3 @@
-import os
 import warnings
 
 import numpy as np
@@ -7,7 +6,8 @@ from PIL import Image
 from PIL.Image import Image as ImageType
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import Globals
+from invokeai.app.services.config import get_invokeai_config
+config = get_invokeai_config()
 
 class ESRGAN:
     def __init__(self, bg_tile_size=400) -> None:
@@ -30,12 +30,8 @@ class ESRGAN:
             upscale=4,
             act_type="prelu",
         )
-        model_path = os.path.join(
-            Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
-        )
-        wdn_model_path = os.path.join(
-            Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
-        )
+        model_path = config.root_dir / "models/realesrgan/realesr-general-x4v3.pth"
+        wdn_model_path = config.root_dir / "models/realesrgan/realesr-general-wdn-x4v3.pth"
         scale = 4
 
         bg_upsampler = RealESRGANer(

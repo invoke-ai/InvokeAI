@@ -16,11 +16,11 @@ import {
 import { Tooltip } from '@chakra-ui/tooltip';
 import { AnyInvocationType } from 'services/events/types';
 import { useBuildInvocation } from 'features/nodes/hooks/useBuildInvocation';
-import { makeToast } from 'features/system/hooks/useToastWatcher';
 import { addToast } from 'features/system/store/systemSlice';
 import { nodeAdded } from '../../store/nodesSlice';
 import Fuse from 'fuse.js';
 import { InvocationTemplate } from 'features/nodes/types/types';
+import { useAppToaster } from 'app/components/Toaster';
 
 interface NodeListItemProps {
   title: string;
@@ -63,6 +63,7 @@ const NodeSearch = () => {
 
   const buildInvocation = useBuildInvocation();
   const dispatch = useAppDispatch();
+  const toaster = useAppToaster();
 
   const [searchText, setSearchText] = useState<string>('');
   const [showNodeList, setShowNodeList] = useState<boolean>(false);
@@ -89,17 +90,16 @@ const NodeSearch = () => {
       const invocation = buildInvocation(nodeType);
 
       if (!invocation) {
-        const toast = makeToast({
+        toaster({
           status: 'error',
           title: `Unknown Invocation type ${nodeType}`,
         });
-        dispatch(addToast(toast));
         return;
       }
 
       dispatch(nodeAdded(invocation));
     },
-    [dispatch, buildInvocation]
+    [dispatch, buildInvocation, toaster]
   );
 
   const renderNodeList = () => {

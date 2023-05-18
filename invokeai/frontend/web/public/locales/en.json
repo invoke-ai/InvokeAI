@@ -450,7 +450,7 @@
         "cfgScale": "CFG Scale",
         "width": "Width",
         "height": "Height",
-        "sampler": "Sampler",
+        "scheduler": "Scheduler",
         "seed": "Seed",
         "imageToImage": "Image to Image",
         "randomizeSeed": "Randomize Seed",
@@ -540,7 +540,10 @@
         "consoleLogLevel": "Log Level",
         "shouldLogToConsole": "Console Logging",
         "developer": "Developer",
-        "general": "General"
+        "general": "General",
+        "generation": "Generation",
+        "ui": "User Interface",
+        "availableSchedulers": "Available Schedulers"
     },
     "toast": {
         "serverError": "Server Error",
@@ -549,8 +552,8 @@
         "canceled": "Processing Canceled",
         "tempFoldersEmptied": "Temp Folder Emptied",
         "uploadFailed": "Upload failed",
-        "uploadFailedMultipleImagesDesc": "Multiple images pasted, may only upload one image at a time",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
+        "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "downloadImageStarted": "Image Download Started",
         "imageCopied": "Image Copied",
         "imageLinkCopied": "Image Link Copied",

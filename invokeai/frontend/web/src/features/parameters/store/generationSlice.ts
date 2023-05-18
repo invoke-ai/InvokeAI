@@ -2,21 +2,22 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 import promptToString from 'common/util/promptToString';
-import { clamp } from 'lodash-es';
+import { clamp, sample } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
+import { receivedModels } from 'services/thunks/model';
+import { Scheduler } from 'app/constants';
 
 export interface GenerationState {
   cfgScale: number;
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI.Image; // can be an Image or url
+  initialImage?: InvokeAI.Image;
   iterations: number;
-  maskPath: string;
   perlin: number;
   prompt: string;
   negativePrompt: string;
-  sampler: string;
+  scheduler: Scheduler;
   seamBlur: number;
   seamSize: number;
   seamSteps: number;
@@ -47,11 +48,10 @@ export const initialGenerationState: GenerationState = {
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   iterations: 1,
-  maskPath: '',
   perlin: 0,
   prompt: '',
   negativePrompt: '',
-  sampler: 'lms',
+  scheduler: 'lms',
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,
@@ -134,8 +134,8 @@ export const generationSlice = createSlice({
     setWidth: (state, action: PayloadAction<number>) => {
       state.width = action.payload;
     },
-    setSampler: (state, action: PayloadAction<string>) => {
-      state.sampler = action.payload;
+    setScheduler: (state, action: PayloadAction<Scheduler>) => {
+      state.scheduler = action.payload;
     },
     setSeed: (state, action: PayloadAction<number>) => {
       state.seed = action.payload;
@@ -143,9 +143,6 @@ export const generationSlice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
-    },
-    setMaskPath: (state, action: PayloadAction<string>) => {
-      state.maskPath = action.payload;
     },
     setSeamless: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSeamless = action.payload;
@@ -161,19 +158,6 @@ export const generationSlice = createSlice({
     },
     resetSeed: (state) => {
       state.seed = -1;
-    },
-    setParameter: (
-      state,
-      action: PayloadAction<{ key: string; value: string | number | boolean }>
-    ) => {
-      // TODO: This probably needs to be refactored.
-      // TODO: This probably also needs to be fixed after the reorg.
-      const { key, value } = action.payload;
-      const temp = { ...state, [key]: value };
-      if (key === 'seed') {
-        temp.shouldRandomizeSeed = false;
-      }
-      return temp;
     },
     setShouldGenerateVariations: (state, action: PayloadAction<boolean>) => {
       state.shouldGenerateVariations = action.payload;
@@ -236,6 +220,16 @@ export const generationSlice = createSlice({
       state.model = action.payload;
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase(receivedModels.fulfilled, (state, action) => {
+      if (!state.model) {
+        const randomModel = sample(action.payload);
+        if (randomModel) {
+          state.model = randomModel.name;
+        }
+      }
+    });
+  },
 });
 
 export const {
@@ -247,14 +241,11 @@ export const {
   setHeight,
   setImg2imgStrength,
   setInfillMethod,
-  // setInitialImage,
   setIterations,
-  setMaskPath,
-  setParameter,
   setPerlin,
   setPrompt,
   setNegativePrompt,
-  setSampler,
+  setScheduler,
   setSeamBlur,
   setSeamSize,
   setSeamSteps,

@@ -1,4 +1,0 @@
-banana sushi -Ak_lms -W640 -H480 -S42 -s20
-banana sushi -Ak_lms -S42 -G1 -U 2 0.5 -s20
-banana sushi -Ak_lms -S42 -v0.2 -n3 -s20
-banana sushi -Ak_lms -S42 -V1349749425:0.1,4145759947:0.1 -s20

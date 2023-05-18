@@ -1,4 +1,4 @@
-import { Box, FormControl, Textarea } from '@chakra-ui/react';
+import { Box, FormControl } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
@@ -16,6 +16,7 @@ import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { userInvoked } from 'app/store/actions';
+import IAITextarea from 'common/components/IAITextarea';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -72,7 +73,7 @@ const ParamPositiveConditioning = () => {
       <FormControl
         isInvalid={prompt.length === 0 || Boolean(prompt.match(/^[\s\r\n]+$/))}
       >
-        <Textarea
+        <IAITextarea
           id="prompt"
           name="prompt"
           placeholder={t('parameters.promptPlaceholder')}

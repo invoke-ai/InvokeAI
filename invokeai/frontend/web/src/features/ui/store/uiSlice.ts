@@ -1,15 +1,14 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { setActiveTabReducer } from './extraReducers';
-import { InvokeTabName, tabMap } from './tabMap';
-import { AddNewModelType, Coordinates, Rect, UIState } from './uiTypes';
-import { initialImageSelected } from 'features/parameters/store/actions';
+import { InvokeTabName } from './tabMap';
+import { AddNewModelType, UIState } from './uiTypes';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { SCHEDULERS } from 'app/constants';
 
 export const initialUIState: UIState = {
   activeTab: 0,
   currentTheme: 'dark',
-  parametersPanelScrollPosition: 0,
   shouldPinParametersPanel: true,
   shouldShowParametersPanel: true,
   shouldShowImageDetails: false,
@@ -20,13 +19,8 @@ export const initialUIState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
-  textTabAccordionState: [],
-  imageTabAccordionState: [],
-  canvasTabAccordionState: [],
-  floatingProgressImageRect: { x: 0, y: 0, width: 0, height: 0 },
-  shouldShowProgressImages: false,
   shouldShowProgressInViewer: false,
-  shouldShowImageParameters: false,
+  schedulers: SCHEDULERS,
 };
 
 export const uiSlice = createSlice({
@@ -38,12 +32,6 @@ export const uiSlice = createSlice({
     },
     setCurrentTheme: (state, action: PayloadAction<string>) => {
       state.currentTheme = action.payload;
-    },
-    setParametersPanelScrollPosition: (
-      state,
-      action: PayloadAction<number>
-    ) => {
-      state.parametersPanelScrollPosition = action.payload;
     },
     setShouldPinParametersPanel: (state, action: PayloadAction<boolean>) => {
       state.shouldPinParametersPanel = action.payload;
@@ -72,9 +60,6 @@ export const uiSlice = createSlice({
     },
     setAddNewModelUIOption: (state, action: PayloadAction<AddNewModelType>) => {
       state.addNewModelUIOption = action.payload;
-    },
-    setShouldPinGallery: (state, action: PayloadAction<boolean>) => {
-      state.shouldPinGallery = action.payload;
     },
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
@@ -106,45 +91,12 @@ export const uiSlice = createSlice({
         state.shouldShowParametersPanel = true;
       }
     },
-    openAccordionItemsChanged: (state, action: PayloadAction<number[]>) => {
-      if (tabMap[state.activeTab] === 'txt2img') {
-        state.textTabAccordionState = action.payload;
-      }
-
-      if (tabMap[state.activeTab] === 'img2img') {
-        state.imageTabAccordionState = action.payload;
-      }
-
-      if (tabMap[state.activeTab] === 'unifiedCanvas') {
-        state.canvasTabAccordionState = action.payload;
-      }
-    },
-    floatingProgressImageMoved: (state, action: PayloadAction<Coordinates>) => {
-      state.floatingProgressImageRect = {
-        ...state.floatingProgressImageRect,
-        ...action.payload,
-      };
-    },
-    floatingProgressImageResized: (
-      state,
-      action: PayloadAction<Partial<Rect>>
-    ) => {
-      state.floatingProgressImageRect = {
-        ...state.floatingProgressImageRect,
-        ...action.payload,
-      };
-    },
-    setShouldShowProgressImages: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowProgressImages = action.payload;
-    },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    shouldShowImageParametersChanged: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
-      state.shouldShowImageParameters = action.payload;
+    setSchedulers: (state, action: PayloadAction<string[]>) => {
+      state.schedulers = [];
+      state.schedulers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -157,7 +109,6 @@ export const uiSlice = createSlice({
 export const {
   setActiveTab,
   setCurrentTheme,
-  setParametersPanelScrollPosition,
   setShouldPinParametersPanel,
   setShouldShowParametersPanel,
   setShouldShowImageDetails,
@@ -166,19 +117,14 @@ export const {
   setShouldUseSliders,
   setAddNewModelUIOption,
   setShouldHidePreview,
-  setShouldPinGallery,
   setShouldShowGallery,
   togglePanels,
   togglePinGalleryPanel,
   togglePinParametersPanel,
   toggleParametersPanel,
   toggleGalleryPanel,
-  openAccordionItemsChanged,
-  floatingProgressImageMoved,
-  floatingProgressImageResized,
-  setShouldShowProgressImages,
   setShouldShowProgressInViewer,
-  shouldShowImageParametersChanged,
+  setSchedulers,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

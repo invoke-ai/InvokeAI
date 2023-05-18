@@ -40,6 +40,7 @@ import { useTranslation } from 'react-i18next';
 import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
 import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
+import SettingsSchedulers from './SettingsSchedulers';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -89,12 +90,6 @@ type SettingsModalProps = {
   children: ReactElement;
 };
 
-/**
- * Modal for app settings. Also provides Reset functionality in which the
- * app's localstorage is wiped via redux-persist.
- *
- * Secondary post-reset modal is included here.
- */
 const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -171,7 +166,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
               <Flex sx={modalSectionStyles}>
                 <Heading size="sm">{t('settings.general')}</Heading>
-
                 <IAISwitch
                   label={t('settings.confirmOnDelete')}
                   isChecked={shouldConfirmOnDelete}
@@ -179,6 +173,15 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
+              </Flex>
+
+              <Flex sx={modalSectionStyles}>
+                <Heading size="sm">{t('settings.generation')}</Heading>
+                <SettingsSchedulers />
+              </Flex>
+
+              <Flex sx={modalSectionStyles}>
+                <Heading size="sm">{t('settings.ui')}</Heading>
                 <IAISwitch
                   label={t('settings.displayHelpIcons')}
                   isChecked={shouldDisplayGuides}

@@ -5,10 +5,8 @@ from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationCont
 
 from .model import ClipField
 
-from ...backend.util.devices import choose_torch_device, torch_dtype
+from ...backend.util.devices import torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
-from ...backend.model_management import SDModelType
 
 from compel import Compel
 from compel.prompt_parser import (
@@ -17,8 +15,6 @@ from compel.prompt_parser import (
     FlattenedPrompt,
     Fragment,
 )
-
-from invokeai.backend.globals import Globals
 
 
 class ConditioningField(BaseModel):
@@ -91,7 +87,7 @@ class CompelInvocation(BaseInvocation):
 
             prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.prompt)
 
-            if getattr(Globals, "log_tokenization", False):
+            if context.services.configuration.log_tokenization:
                 log_tokenization_for_prompt_object(prompt, tokenizer)
 
             c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)

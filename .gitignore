@@ -201,6 +201,8 @@ checkpoints
 # If it's a Mac
 .DS_Store
 
+invokeai/frontend/web/dist/*
+
 # Let the frontend manage its own gitignore
 !invokeai/frontend/web/*
 

@@ -1,13 +1,22 @@
-let openFunction: () => void;
+import { useCallback } from 'react';
+
+let openUploader = () => {
+  return;
+};
 
 const useImageUploader = () => {
-  return {
-    setOpenUploader: (open?: () => void) => {
-      if (open) {
-        openFunction = open;
+  const setOpenUploaderFunction = useCallback(
+    (openUploaderFunction?: () => void) => {
+      if (openUploaderFunction) {
+        openUploader = openUploaderFunction;
       }
     },
-    openUploader: openFunction,
+    []
+  );
+
+  return {
+    setOpenUploaderFunction,
+    openUploader,
   };
 };
 

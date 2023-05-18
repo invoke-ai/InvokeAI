@@ -62,7 +62,10 @@ const GalleryProgressImage = () => {
           imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
         }}
       />
-      <Spinner sx={{ position: 'absolute', top: 1, right: 1, opacity: 0.7 }} />
+      <Spinner
+        sx={{ position: 'absolute', top: 1, right: 1, opacity: 0.7 }}
+        speed="1.2s"
+      />
     </Flex>
   );
 };
