@@ -56,6 +56,7 @@ export default function InvokeButton(props: InvokeButton) {
           tooltip={t('parameters.invoke')}
           tooltipProps={{ placement: 'bottom' }}
           colorScheme="accent"
+          id="invoke-button"
           {...rest}
         />
       ) : (
@@ -67,6 +68,7 @@ export default function InvokeButton(props: InvokeButton) {
           flexGrow={1}
           w="100%"
           colorScheme="accent"
+          id="invoke-button"
           fontWeight={700}
           {...rest}
         >
