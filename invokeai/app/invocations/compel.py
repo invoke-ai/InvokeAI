@@ -5,8 +5,9 @@ from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationCont
 
 from .model import ClipField
 
-from ...backend.util.devices import torch_dtype
+from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
+from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
 
 from compel import Compel
 from compel.prompt_parser import (
@@ -78,14 +79,15 @@ class CompelInvocation(BaseInvocation):
             compel = Compel(
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
-                textual_inversion_manager=None, # TODO:
+                textual_inversion_manager=None,
                 dtype_for_device_getter=torch_dtype,
                 truncate_long_prompts=True, # TODO:
             )
 
             # TODO: support legacy blend?
 
-            prompt: Union[FlattenedPrompt, Blend] = Compel.parse_prompt_string(self.prompt)
+            conjunction = Compel.parse_prompt_string(self.prompt)
+            prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
             if context.services.configuration.log_tokenization:
                 log_tokenization_for_prompt_object(prompt, tokenizer)
