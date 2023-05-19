@@ -96,6 +96,7 @@ class UIConfig(TypedDict, total=False):
             "image",
             "latents",
             "model",
+            "control",
         ],
     ]
     tags: List[str]
