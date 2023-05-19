@@ -14,5 +14,15 @@ export const $NoiseOutput = {
         type: 'LatentsField',
       }],
     },
+    width: {
+      type: 'number',
+      description: `The width of the noise in pixels`,
+      isRequired: true,
+    },
+    height: {
+      type: 'number',
+      description: `The height of the noise in pixels`,
+      isRequired: true,
+    },
   },
 } as const;

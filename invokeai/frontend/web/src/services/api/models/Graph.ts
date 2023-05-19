@@ -4,13 +4,18 @@
 
 import type { AddInvocation } from './AddInvocation';
 import type { BlurInvocation } from './BlurInvocation';
+import type { CannyImageProcessorInvocation } from './CannyImageProcessorInvocation';
 import type { CollectInvocation } from './CollectInvocation';
 import type { CompelInvocation } from './CompelInvocation';
+import type { ContentShuffleImageProcessorInvocation } from './ContentShuffleImageProcessorInvocation';
+import type { ControlNetInvocation } from './ControlNetInvocation';
 import type { CropImageInvocation } from './CropImageInvocation';
 import type { CvInpaintInvocation } from './CvInpaintInvocation';
 import type { DivideInvocation } from './DivideInvocation';
 import type { Edge } from './Edge';
 import type { GraphInvocation } from './GraphInvocation';
+import type { HedImageprocessorInvocation } from './HedImageprocessorInvocation';
+import type { ImageProcessorInvocation } from './ImageProcessorInvocation';
 import type { ImageToImageInvocation } from './ImageToImageInvocation';
 import type { ImageToLatentsInvocation } from './ImageToLatentsInvocation';
 import type { InfillColorInvocation } from './InfillColorInvocation';
@@ -22,12 +27,20 @@ import type { IterateInvocation } from './IterateInvocation';
 import type { LatentsToImageInvocation } from './LatentsToImageInvocation';
 import type { LatentsToLatentsInvocation } from './LatentsToLatentsInvocation';
 import type { LerpInvocation } from './LerpInvocation';
+import type { LineartAnimeImageProcessorInvocation } from './LineartAnimeImageProcessorInvocation';
+import type { LineartImageProcessorInvocation } from './LineartImageProcessorInvocation';
 import type { LoadImageInvocation } from './LoadImageInvocation';
 import type { MaskFromAlphaInvocation } from './MaskFromAlphaInvocation';
+import type { MidasDepthImageProcessorInvocation } from './MidasDepthImageProcessorInvocation';
+import type { MlsdImageProcessorInvocation } from './MlsdImageProcessorInvocation';
 import type { MultiplyInvocation } from './MultiplyInvocation';
 import type { NoiseInvocation } from './NoiseInvocation';
+import type { NormalbaeImageProcessorInvocation } from './NormalbaeImageProcessorInvocation';
+import type { OpenposeImageProcessorInvocation } from './OpenposeImageProcessorInvocation';
 import type { ParamIntInvocation } from './ParamIntInvocation';
 import type { PasteImageInvocation } from './PasteImageInvocation';
+import type { PidiImageProcessorInvocation } from './PidiImageProcessorInvocation';
+import type { RandomIntInvocation } from './RandomIntInvocation';
 import type { RandomRangeInvocation } from './RandomRangeInvocation';
 import type { RangeInvocation } from './RangeInvocation';
 import type { ResizeLatentsInvocation } from './ResizeLatentsInvocation';
@@ -47,7 +60,7 @@ export type Graph = {
   /**
    * The nodes in this graph
    */
-  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | CompelInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
+  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | CropImageInvocation | PasteImageInvocation | MaskFromAlphaInvocation | BlurInvocation | LerpInvocation | InverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | CompelInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | CvInpaintInvocation | RangeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageprocessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
   /**
    * The connections between nodes and their fields in this graph
    */

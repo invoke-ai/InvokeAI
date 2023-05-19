@@ -56,6 +56,22 @@ export const $LatentsToLatentsInvocation = {
       type: 'string',
       description: `The axes to tile the image on, 'x' and/or 'y'`,
     },
+    progress_images: {
+      type: 'boolean',
+      description: `Whether or not to produce progress images during generation`,
+    },
+    control: {
+      type: 'any-of',
+      description: `The controlnet(s) to use`,
+      contains: [{
+        type: 'ControlField',
+      }, {
+        type: 'array',
+        contains: {
+          type: 'ControlField',
+        },
+      }],
+    },
     latents: {
       type: 'all-of',
       description: `The latents to use as a base image`,
