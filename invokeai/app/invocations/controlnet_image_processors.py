@@ -110,7 +110,7 @@ class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
     # fmt: off
     type: Literal["control_output"] = "control_output"
-    control: Optional[ControlField] = Field(default=None, description="The control info dict")
+    control: ControlField = Field(default=None, description="The control info dict")
     # fmt: on
 
 
