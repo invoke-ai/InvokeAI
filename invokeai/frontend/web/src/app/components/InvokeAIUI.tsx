@@ -16,7 +16,6 @@ import { PartialAppConfig } from 'app/types/invokeai';
 import '../../i18n';
 import { socketMiddleware } from 'services/events/middleware';
 import { Middleware } from '@reduxjs/toolkit';
-import { P } from 'ts-toolbelt/out/Object/_api';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
