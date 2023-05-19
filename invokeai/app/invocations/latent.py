@@ -181,9 +181,10 @@ class TextToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["latents", "image"],
+                "tags": ["latents"],
                 "type_hints": {
-                  "model": "model"
+                  "model": "model",
+                  "control": "control",
                 }
             },
         }
@@ -349,17 +350,6 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
     strength: float = Field(default=0.5, description="The strength of the latents to use")
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["latents"],
-                "type_hints": {
-                    "model": "model"
-                }
-            },
-        }
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
