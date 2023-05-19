@@ -180,6 +180,7 @@ export type LatentsInputFieldValue = FieldValueBase & {
 
 export type ConditioningInputFieldValue = FieldValueBase & {
   type: 'conditioning';
+  value?: string;
 };
 
 export type ControlInputFieldValue = FieldValueBase & {
