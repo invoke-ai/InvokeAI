@@ -16,6 +16,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   item: 'item',
   ColorField: 'color',
   ControlField: 'control',
+  control: 'control',
 };
 
 const COLOR_TOKEN_VALUE = 500;
