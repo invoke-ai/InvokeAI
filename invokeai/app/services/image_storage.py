@@ -30,7 +30,7 @@ class ImageStorageBase(ABC):
     """Responsible for storing and retrieving images."""
 
     @abstractmethod
-    def get(self, image_type: ImageType, image_name: str) -> Image:
+    def get(self, image_type: ImageType, image_id: str) -> Image:
         """Retrieves an image as PIL Image."""
         pass
 
@@ -44,7 +44,7 @@ class ImageStorageBase(ABC):
     # TODO: make this a bit more flexible for e.g. cloud storage
     @abstractmethod
     def get_path(
-        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+        self, image_type: ImageType, image_id: str, is_thumbnail: bool = False
     ) -> str:
         """Gets the internal path to an image or its thumbnail."""
         pass
@@ -136,7 +136,7 @@ class DiskImageStorage(ImageStorageBase):
 
             page_of_images.append(
                 ImageResponse(
-                    image_type=image_type.value,
+                    image_type=image_type,
                     image_name=filename,
                     # TODO: DiskImageStorage should not be building URLs...?
                     image_url=self.get_uri(image_type, filename),
@@ -163,8 +163,8 @@ class DiskImageStorage(ImageStorageBase):
             total=count,
         )
 
-    def get(self, image_type: ImageType, image_name: str) -> Image:
-        image_path = self.get_path(image_type, image_name)
+    def get(self, image_type: ImageType, image_id: str) -> Image:
+        image_path = self.get_path(image_type, image_id)
         cache_item = self.__get_cache(image_path)
         if cache_item:
             return cache_item
@@ -175,10 +175,10 @@ class DiskImageStorage(ImageStorageBase):
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(
-        self, image_type: ImageType, image_name: str, is_thumbnail: bool = False
+        self, image_type: ImageType, image_id: str, is_thumbnail: bool = False
     ) -> str:
         # strip out any relative path shenanigans
-        basename = os.path.basename(image_name)
+        basename = os.path.basename(image_id)
 
         if is_thumbnail:
             path = os.path.join(

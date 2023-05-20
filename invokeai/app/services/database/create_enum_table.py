@@ -1,6 +1,5 @@
 from enum import Enum
 import sqlite3
-import threading
 from typing import Type
 
 

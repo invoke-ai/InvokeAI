@@ -4,7 +4,7 @@ from invokeai.app.models.metadata import (
     GeneratedImageOrLatentsMetadata,
     UploadedImageOrLatentsMetadata,
 )
-from invokeai.app.models.resources import ImageKind, ResourceOrigin
+from invokeai.app.models.image import ImageType, ImageCategory
 from invokeai.app.services.database.images.models import ImageEntity
 from invokeai.app.services.item_storage import PaginatedResults
 
@@ -20,8 +20,8 @@ class ImagesDbServiceBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        origin: ResourceOrigin,
-        image_kind: ImageKind,
+        image_type: ImageType,
+        image_category: ImageCategory,
         page: int = 0,
         per_page: int = 10,
     ) -> PaginatedResults[ImageEntity]:
@@ -37,8 +37,8 @@ class ImagesDbServiceBase(ABC):
     def set(
         self,
         id: str,
-        origin: ResourceOrigin,
-        image_kind: ImageKind,
+        image_type: ImageType,
+        image_category: ImageCategory,
         session_id: Optional[str],
         node_id: Optional[str],
         metadata: Optional[GeneratedImageOrLatentsMetadata | UploadedImageOrLatentsMetadata],

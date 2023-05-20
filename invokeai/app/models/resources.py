@@ -11,20 +11,13 @@ class ResourceType(str, Enum, metaclass=MetaEnum):
     TENSORS = "tensors"
 
 
-class ResourceOrigin(str, Enum, metaclass=MetaEnum):
-    """The origin of a resource (eg image or tensor)."""
+# class ResourceOrigin(str, Enum, metaclass=MetaEnum):
+#     """The origin of a resource (eg image or tensor)."""
 
-    RESULTS = "results"
-    UPLOADS = "uploads"
-    INTERMEDIATES = "intermediates"
+#     RESULTS = "results"
+#     UPLOADS = "uploads"
+#     INTERMEDIATES = "intermediates"
 
-
-class ImageKind(str, Enum, metaclass=MetaEnum):
-    """The kind of an image. Use ImageKind.OTHER for non-default kinds."""
-
-    IMAGE = "image"
-    CONTROL_IMAGE = "control_image"
-    OTHER = "other"
 
 
 class TensorKind(str, Enum, metaclass=MetaEnum):

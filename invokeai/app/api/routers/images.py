@@ -14,23 +14,39 @@ from invokeai.app.api.models.images import (
     ImageResponse,
     ImageResponseMetadata,
 )
+from invokeai.app.models.image import ImageType
 from invokeai.app.services.item_storage import PaginatedResults
 
-from ...services.image_storage import ImageType
 from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 
-@images_router.get("/{image_type}/{image_name}", operation_id="get_image")
+# @images_router.get("/{image_type}/{image_name}", operation_id="get_image")
+# async def get_image(
+#     image_type: ImageType = Path(description="The type of image to get"),
+#     image_name: str = Path(description="The name of the image to get"),
+# ) -> FileResponse:
+#     """Gets an image"""
+
+#     path = ApiDependencies.invoker.services.images.get_path(
+#         image_type=image_type, image_name=image_name
+#     )
+
+#     if ApiDependencies.invoker.services.images.validate_path(path):
+#         return FileResponse(path)
+#     else:
+#         raise HTTPException(status_code=404)
+
+@images_router.get("/{image_type}/{image_id}", operation_id="get_image")
 async def get_image(
-    image_type: ImageType = Path(description="The type of image to get"),
-    image_name: str = Path(description="The name of the image to get"),
+    image_type: ImageType = Path(description="The type of the image to get"),
+    image_id: str = Path(description="The id of the image to get"),
 ) -> FileResponse:
     """Gets an image"""
 
     path = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_name=image_name
+        image_type=image_type, image_id=image_id
     )
 
     if ApiDependencies.invoker.services.images.validate_path(path):
@@ -41,7 +57,7 @@ async def get_image(
 
 @images_router.delete("/{image_type}/{image_name}", operation_id="delete_image")
 async def delete_image(
-    image_type: ImageType = Path(description="The type of image to delete"),
+    image_type: ImageType = Path(description="The type of the image to delete"),
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
     """Deletes an image and its thumbnail"""
@@ -52,16 +68,16 @@ async def delete_image(
 
 
 @images_router.get(
-    "/{thumbnail_type}/thumbnails/{thumbnail_name}", operation_id="get_thumbnail"
+    "/{image_type}/thumbnails/{thumbnail_id}", operation_id="get_thumbnail"
 )
 async def get_thumbnail(
-    thumbnail_type: ImageType = Path(description="The type of thumbnail to get"),
-    thumbnail_name: str = Path(description="The name of the thumbnail to get"),
+    image_type: ImageType = Path(description="The type of the thumbnail to get"),
+    thumbnail_id: str = Path(description="The id of the thumbnail to get"),
 ) -> FileResponse | Response:
     """Gets a thumbnail"""
 
     path = ApiDependencies.invoker.services.images.get_path(
-        image_type=thumbnail_type, image_name=thumbnail_name, is_thumbnail=True
+        image_type=image_type, image_id=thumbnail_id, is_thumbnail=True
     )
 
     if ApiDependencies.invoker.services.images.validate_path(path):

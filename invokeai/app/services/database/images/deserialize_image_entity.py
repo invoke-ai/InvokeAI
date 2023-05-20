@@ -2,31 +2,31 @@ from invokeai.app.models.metadata import (
     GeneratedImageOrLatentsMetadata,
     UploadedImageOrLatentsMetadata,
 )
-from invokeai.app.models.resources import ImageKind, ResourceOrigin
+from invokeai.app.models.image import ImageCategory, ImageType
 from invokeai.app.services.database.images.models import ImageEntity
 
 
 def deserialize_image_entity(image: dict) -> ImageEntity:
     """Deserializes an image entity from the database."""
 
-    origin = ResourceOrigin(image["origin"])
+    image_type = ImageType(image["image_type"])
 
-    if origin is ResourceOrigin.UPLOADS:
+    if image_type is ImageType.UPLOAD:
         return ImageEntity(
             id=image["id"],
-            origin=ResourceOrigin.UPLOADS,
-            image_kind=ImageKind(image["image_kind"]),
+            image_type=ImageType.UPLOAD,
+            image_category=ImageCategory(image["image_category"]),
             created_at=image["created_at"],
             metadata=UploadedImageOrLatentsMetadata.parse_raw(image["metadata"]),
         )
 
-    if origin is ResourceOrigin.INTERMEDIATES:
+    if image_type is ImageType.INTERMEDIATE:
         return ImageEntity(
             id=image["id"],
             session_id=image["session_id"],
             node_id=image["node_id"],
-            origin=ResourceOrigin.INTERMEDIATES,
-            image_kind=ImageKind(image["image_kind"]),
+            image_type=ImageType.INTERMEDIATE,
+            image_category=ImageCategory(image["image_category"]),
             created_at=image["created_at"],
             metadata=GeneratedImageOrLatentsMetadata.parse_raw(image["metadata"]),
         )
@@ -35,8 +35,8 @@ def deserialize_image_entity(image: dict) -> ImageEntity:
         id=image["id"],
         session_id=image["session_id"],
         node_id=image["node_id"],
-        origin=ResourceOrigin.RESULTS,
-        image_kind=ImageKind(image["image_kind"]),
+        image_type=ImageType.RESULT,
+        image_category=ImageCategory(image["image_category"]),
         created_at=image["created_at"],
         metadata=GeneratedImageOrLatentsMetadata.parse_raw(image["metadata"]),
     )

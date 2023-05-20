@@ -2,11 +2,23 @@ from enum import Enum
 from typing import Optional, Tuple
 from pydantic import BaseModel, Field
 
+from invokeai.app.util.enum import MetaEnum
 
-class ImageType(str, Enum):
+
+class ImageType(str, Enum, metaclass=MetaEnum):
+    """The type of an image."""
+
     RESULT = "results"
-    INTERMEDIATE = "intermediates"
     UPLOAD = "uploads"
+    INTERMEDIATE = "intermediates"
+
+
+class ImageCategory(str, Enum, metaclass=MetaEnum):
+    """The category of an image. Use ImageCategory.OTHER for non-default categories."""
+
+    IMAGE = "image"
+    CONTROL_IMAGE = "control_image"
+    OTHER = "other"
 
 
 def is_image_type(obj):

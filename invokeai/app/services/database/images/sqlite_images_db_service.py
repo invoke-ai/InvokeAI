@@ -5,7 +5,10 @@ from invokeai.app.models.metadata import (
     GeneratedImageOrLatentsMetadata,
     UploadedImageOrLatentsMetadata,
 )
-from invokeai.app.models.resources import ImageKind, ResourceOrigin, TensorKind
+from invokeai.app.models.image import (
+    ImageCategory,
+    ImageType,
+)
 from invokeai.app.services.database.create_enum_table import create_enum_table
 from invokeai.app.services.database.images.images_db_service_base import (
     ImagesDbServiceBase,
@@ -29,6 +32,7 @@ class SqliteImagesDbService(ImagesDbServiceBase):
 
         self._filename = filename
         self._conn = sqlite3.connect(filename, check_same_thread=False)
+        # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
         self._lock = threading.Lock()
@@ -37,52 +41,30 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             self._lock.acquire()
             # Enable foreign keys
             self._conn.execute("PRAGMA foreign_keys = ON;")
-            # Enable row factory to get rows as dictionaries
-            self._create_table()
-
-            # TODO: Create these elsewhere
-            create_enum_table(
-                enum=ResourceOrigin,
-                table_name="resource_origins",
-                primary_key_name="origin_name",
-                cursor=self._cursor,
-            )
-
-            create_enum_table(
-                enum=ImageKind,
-                table_name="image_kinds",
-                primary_key_name="kind_name",
-                cursor=self._cursor,
-            )
-
-            create_enum_table(
-                enum=TensorKind,
-                table_name="tensor_kinds",
-                primary_key_name="kind_name",
-                cursor=self._cursor,
-            )
-
+            self._create_tables()
             self._conn.commit()
         finally:
             self._lock.release()
 
-    def _create_table(self) -> None:
-        # Create the `images` table and its indicies.
+    def _create_tables(self) -> None:
+        # Create the `images` table.
         self._cursor.execute(
-            """--sql
+            f"""--sql
             CREATE TABLE IF NOT EXISTS images (
                 id TEXT PRIMARY KEY, -- The unique identifier for the image.
-                origin TEXT,
-                image_kind TEXT,
+                image_type TEXT,
+                image_category TEXT,
                 session_id TEXT,
                 node_id TEXT,
                 metadata TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(origin) REFERENCES resource_origins(origin_name),
-                FOREIGN KEY(image_kind) REFERENCES image_kinds(kind_name)
+                FOREIGN KEY(image_type) REFERENCES image_types(type_name),
+                FOREIGN KEY(image_category) REFERENCES image_categories(category_name)
             );
             """
         )
+
+        # Create the `images` table indices.
         self._cursor.execute(
             """--sql
             CREATE UNIQUE INDEX IF NOT EXISTS idx_images_id ON images(id);
@@ -90,12 +72,61 @@ class SqliteImagesDbService(ImagesDbServiceBase):
         )
         self._cursor.execute(
             """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_origin ON images(origin);
+            CREATE INDEX IF NOT EXISTS idx_images_image_type ON images(image_type);
             """
         )
         self._cursor.execute(
             """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_image_kind ON images(image_kind);
+            CREATE INDEX IF NOT EXISTS idx_images_image_category ON images(image_category);
+            """
+        )
+
+        # Create the tables for image-related enums
+        create_enum_table(
+            enum=ImageType,
+            table_name="image_types",
+            primary_key_name="type_name",
+            cursor=self._cursor,
+        )
+
+        create_enum_table(
+            enum=ImageCategory,
+            table_name="image_categories",
+            primary_key_name="category_name",
+            cursor=self._cursor,
+        )
+
+        # Create the `tags` table. TODO: do this elsewhere, shouldn't be in images db service
+        self._cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tag_name TEXT UNIQUE NOT NULL
+            );
+            """
+        )
+
+        # Create the `images_tags` junction table.
+        self._cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS images_tags (
+                image_id TEXT,
+                tag_id INTEGER,
+                PRIMARY KEY (image_id, tag_id),
+                FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE,
+                FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+            );
+            """
+        )
+
+        # Create the `images_favorites` table.
+        self._cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS images_favorites (
+                image_id TEXT PRIMARY KEY,
+                favorited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+            );
             """
         )
 
@@ -122,8 +153,8 @@ class SqliteImagesDbService(ImagesDbServiceBase):
 
     def get_many(
         self,
-        origin: ResourceOrigin,
-        image_kind: ImageKind,
+        image_type: ImageType,
+        image_category: ImageCategory,
         page: int = 0,
         per_page: int = 10,
     ) -> PaginatedResults[ImageEntity]:
@@ -133,10 +164,10 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             self._cursor.execute(
                 f"""--sql
                 SELECT * FROM images
-                WHERE origin = ? AND image_kind = ?
+                WHERE image_type = ? AND image_category = ?
                 LIMIT ? OFFSET ?;
                 """,
-                (origin.value, image_kind.value, per_page, page * per_page),
+                (image_type.value, image_category.value, per_page, page * per_page),
             )
 
             result = self._cursor.fetchall()
@@ -146,9 +177,9 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             self._cursor.execute(
                 """--sql
                 SELECT count(*) FROM images
-                WHERE origin = ? AND image_kind = ?
+                WHERE image_type = ? AND image_category = ?
                 """,
-                (origin.value, image_kind.value),
+                (image_type.value, image_category.value),
             )
 
             count = self._cursor.fetchone()[0]
@@ -178,8 +209,8 @@ class SqliteImagesDbService(ImagesDbServiceBase):
     def set(
         self,
         id: str,
-        origin: ResourceOrigin,
-        image_kind: ImageKind,
+        image_type: ImageType,
+        image_category: ImageCategory,
         session_id: Optional[str],
         node_id: Optional[str],
         metadata: Union[
@@ -195,8 +226,8 @@ class SqliteImagesDbService(ImagesDbServiceBase):
                 """--sql
                 INSERT OR IGNORE INTO images (
                     id,
-                    origin,
-                    image_kind,
+                    image_type,
+                    image_category,
                     node_id,
                     session_id,
                     metadata
@@ -205,8 +236,8 @@ class SqliteImagesDbService(ImagesDbServiceBase):
                 """,
                 (
                     id,
-                    origin.value,
-                    image_kind.value,
+                    image_type.value,
+                    image_category.value,
                     node_id,
                     session_id,
                     metadata_json,

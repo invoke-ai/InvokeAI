@@ -1,10 +1,8 @@
 from fastapi import HTTPException, Path, Query
 from fastapi.routing import APIRouter
-from invokeai.app.models.resources import (
-    ImageKind,
-    ResourceOrigin,
-    ResourceType,
-    TensorKind,
+from invokeai.app.models.image import (
+    ImageCategory,
+    ImageType,
 )
 from invokeai.app.services.database.images.models import ImageEntity
 from invokeai.app.services.item_storage import PaginatedResults
@@ -38,8 +36,10 @@ async def get_image_resource(
     operation_id="list_image_resources",
 )
 async def list_image_resources(
-    origin: ResourceOrigin = Query(description="The origin of image resources to get"),
-    image_kind: ImageKind = Query(description="The kind of image resources to get"),
+    image_type: ImageType = Query(description="The origin of image resources to get"),
+    image_category: ImageCategory = Query(
+        description="The kind of image resources to get"
+    ),
     page: int = Query(default=0, description="The page of image resources to get"),
     per_page: int = Query(
         default=10, description="The number of image resources per page"
@@ -48,7 +48,10 @@ async def list_image_resources(
     """Gets a list of image resources"""
 
     images = ApiDependencies.invoker.services.images_db.get_many(
-        image_kind=image_kind, origin=origin, page=page, per_page=per_page
+        image_type=image_type,
+        image_category=image_category,
+        page=page,
+        per_page=per_page,
     )
 
     for i in images.items:

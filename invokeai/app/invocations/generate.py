@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.models.image import ColorField, ImageField, ImageType
 from invokeai.app.invocations.util.choose_model import choose_model
 from invokeai.app.models.metadata import GeneratedImageOrLatentsMetadata
-from invokeai.app.models.resources import ImageKind, ResourceOrigin
+from invokeai.app.models.image import ImageCategory, ImageType
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
@@ -111,8 +111,8 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
         context.services.images_db.set(
             id=image_name,
-            origin=ResourceOrigin.RESULTS,
-            image_kind=ImageKind.IMAGE,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.IMAGE,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
             metadata=GeneratedImageOrLatentsMetadata(),
