@@ -3,6 +3,7 @@ import asyncio
 from inspect import signature
 
 import uvicorn
+from invokeai.app.models import resources
 import invokeai.backend.util.logging as logger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,7 @@ from pydantic.schema import schema
 
 from ..backend import Args
 from .api.dependencies import ApiDependencies
-from .api.routers import images, sessions, models, results
+from .api.routers import images, sessions, models, resources
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
 
@@ -79,7 +80,7 @@ app.include_router(images.images_router, prefix="/api")
 
 app.include_router(models.models_router, prefix="/api")
 
-app.include_router(results.results_router, prefix="/api")
+app.include_router(resources.resources_router, prefix="/api")
 
 
 # Build a custom OpenAPI to include all outputs
@@ -129,6 +130,7 @@ app.openapi = custom_openapi
 # Override API doc favicons
 app.mount("/static", StaticFiles(directory="static/dream_web"), name="static")
 
+
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(
@@ -146,8 +148,12 @@ def overridden_redoc():
         redoc_favicon_url="/static/favicon.ico",
     )
 
+
 # Must mount *after* the other routes else it borks em
-app.mount("/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui")
+app.mount(
+    "/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui"
+)
+
 
 def invoke_api():
     # Start our own event loop for eventing usage

@@ -1,9 +1,10 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
+from types import ModuleType
+from invokeai.app.services.database.images.sqlite_images_db_service import SqliteImagesDbService
 
 import invokeai.backend.util.logging as logger
-from typing import types
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -44,7 +45,7 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(config, event_handler_id: int, logger: types.ModuleType=logger):
+    def initialize(config, event_handler_id: int, logger: ModuleType=logger):
         Globals.try_patchmatch = config.patchmatch
         Globals.always_use_cpu = config.always_use_cpu
         Globals.internet_available = config.internet_available and check_internet()
@@ -70,14 +71,14 @@ class ApiDependencies:
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
 
-        results = SqliteResultsService(filename=db_location)
-
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
         )
 
+        images_db = SqliteImagesDbService(filename=db_location)
+
         # register event handler to update the `results` table when a graph execution state is inserted or updated
-        graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
+        # graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
 
         services = InvocationServices(
             model_manager=get_model_manager(config,logger),
@@ -86,7 +87,8 @@ class ApiDependencies:
             latents=latents,
             images=images,
             metadata=metadata,
-            results=results,
+            # results=results,
+            images_db=images_db,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"

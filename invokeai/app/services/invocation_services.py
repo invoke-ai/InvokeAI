@@ -1,6 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-from typing import types
+from types import ModuleType
+from invokeai.app.services.database.images.images_db_service_base import ImagesDbServiceBase
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.backend import ModelManager
 
@@ -10,7 +11,6 @@ from .image_storage import ImageStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
 from .item_storage import ItemStorageABC
-from invokeai.app.services.results import ResultsServiceABC
 
 class InvocationServices:
     """Services that can be used by invocations"""
@@ -22,7 +22,7 @@ class InvocationServices:
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
-    results: ResultsServiceABC
+    images_db: ImagesDbServiceBase
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: ItemStorageABC["LibraryGraph"]
@@ -33,12 +33,12 @@ class InvocationServices:
             self,
             model_manager: ModelManager,
             events: EventServiceBase,
-            logger: types.ModuleType,
+            logger: ModuleType,
             latents: LatentsStorageBase,
             images: ImageStorageBase,
             metadata: MetadataServiceBase,
             queue: InvocationQueueABC,
-            results: ResultsServiceABC,
+            images_db: ImagesDbServiceBase,
             graph_library: ItemStorageABC["LibraryGraph"],
             graph_execution_manager: ItemStorageABC["GraphExecutionState"],
             processor: "InvocationProcessorABC",
@@ -51,8 +51,10 @@ class InvocationServices:
         self.images = images
         self.metadata = metadata
         self.queue = queue
-        self.results = results
+        self.images_db = images_db
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager
         self.processor = processor
         self.restoration = restoration
+
+
