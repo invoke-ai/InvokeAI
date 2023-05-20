@@ -2,7 +2,10 @@
 
 import os
 from types import ModuleType
-from invokeai.app.services.database.images.sqlite_images_db_service import SqliteImagesDbService
+from invokeai.app.services.database.images.sqlite_images_db_service import (
+    SqliteImagesDbService,
+)
+from invokeai.app.services.urls import LocalURLService
 
 import invokeai.backend.util.logging as logger
 
@@ -45,7 +48,7 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(config, event_handler_id: int, logger: ModuleType=logger):
+    def initialize(config, event_handler_id: int, logger: ModuleType = logger):
         Globals.try_patchmatch = config.patchmatch
         Globals.always_use_cpu = config.always_use_cpu
         Globals.internet_available = config.internet_available and check_internet()
@@ -62,11 +65,15 @@ class ApiDependencies:
             os.path.join(os.path.dirname(__file__), "../../../../outputs")
         )
 
-        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
+        latents = ForwardCacheLatentsStorage(
+            DiskLatentsStorage(f"{output_folder}/latents")
+        )
 
         metadata = PngMetadataService()
 
-        images = DiskImageStorage(f'{output_folder}/images', metadata_service=metadata)
+        urls = LocalURLService()
+
+        images = DiskImageStorage(f"{output_folder}/images", metadata_service=metadata)
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
@@ -81,21 +88,21 @@ class ApiDependencies:
         # graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
 
         services = InvocationServices(
-            model_manager=get_model_manager(config,logger),
+            model_manager=get_model_manager(config, logger),
             events=events,
             logger=logger,
             latents=latents,
             images=images,
             metadata=metadata,
-            # results=results,
             images_db=images_db,
+            urls=urls,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"
             ),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config,logger),
+            restoration=RestorationServices(config, logger),
         )
 
         create_system_graphs(services.graph_library)

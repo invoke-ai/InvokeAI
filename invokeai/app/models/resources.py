@@ -7,8 +7,8 @@ from invokeai.app.util.enum import MetaEnum
 class ResourceType(str, Enum, metaclass=MetaEnum):
     """The type of a resource."""
 
-    IMAGE = "image"
-    TENSOR = "tensor"
+    IMAGES = "images"
+    TENSORS = "tensors"
 
 
 class ResourceOrigin(str, Enum, metaclass=MetaEnum):
