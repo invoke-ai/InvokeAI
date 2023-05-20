@@ -216,7 +216,7 @@ manager, please follow these steps:
 9.  Run the command-line- or the web- interface:
 
     From within INVOKEAI_ROOT, activate the environment
-    (with `source .venv/bin/activate` or `.venv\scripts\activate), and then run
+    (with `source .venv/bin/activate` or `.venv\scripts\activate`), and then run
     the script `invokeai`. If the virtual environment you selected is NOT inside
     INVOKEAI_ROOT, then you must specify the path to the root directory by adding
     `--root_dir \path\to\invokeai` to the commands below:
