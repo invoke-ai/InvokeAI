@@ -1,15 +1,20 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-
+from typing import TYPE_CHECKING
 from logging import Logger
+
 from invokeai.app.services.images import ImageService
 from invokeai.backend import ModelManager
-
 from .events import EventServiceBase
 from .latent_storage import LatentsStorageBase
 from .image_file_storage import ImageFileStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
 from .item_storage import ItemStorageABC
+
+
+if TYPE_CHECKING:
+    from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
+    from invokeai.app.services.invoker import InvocationProcessorABC
 
 
 class InvocationServices:
