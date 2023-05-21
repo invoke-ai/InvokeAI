@@ -2,7 +2,6 @@
 
 from logging import Logger
 import os
-from types import ModuleType
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.urls import LocalUrlService
@@ -21,7 +20,6 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.metadata import PngMetadataService
-from ..services.results import SqliteResultsService
 from .events import FastAPIEventService
 
 
@@ -93,20 +91,16 @@ class ApiDependencies:
             image_file_storage=image_file_storage,
             metadata=metadata,
             url=urls,
+            logger=logger,
         )
-
-        # register event handler to update the `results` table when a graph execution state is inserted or updated
-        # graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
 
         services = InvocationServices(
             model_manager=get_model_manager(config, logger),
             events=events,
             logger=logger,
             latents=latents,
-            images=images,
+            images=image_file_storage,
             images_new=images_new,
-            metadata=metadata,
-            urls=urls,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"
