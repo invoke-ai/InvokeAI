@@ -1,11 +1,12 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
 from types import ModuleType
-from invokeai.app.services.database.images.images_db_service_base import (
-    ImagesDbServiceBase,
+from invokeai.app.services.image_db import (
+    ImageRecordServiceBase,
 )
+from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import MetadataServiceBase
-from invokeai.app.services.urls import URLServiceBase
+from invokeai.app.services.urls import UrlServiceBase
 from invokeai.backend import ModelManager
 
 from .events import EventServiceBase
@@ -26,8 +27,9 @@ class InvocationServices:
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
-    images_db: ImagesDbServiceBase
-    urls: URLServiceBase
+    images_db: ImageRecordServiceBase
+    urls: UrlServiceBase
+    images_new: ImageService
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: ItemStorageABC["LibraryGraph"]
@@ -43,8 +45,9 @@ class InvocationServices:
         images: ImageStorageBase,
         metadata: MetadataServiceBase,
         queue: InvocationQueueABC,
-        images_db: ImagesDbServiceBase,
-        urls: URLServiceBase,
+        images_db: ImageRecordServiceBase,
+        images_new: ImageService,
+        urls: UrlServiceBase,
         graph_library: ItemStorageABC["LibraryGraph"],
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
         processor: "InvocationProcessorABC",
@@ -58,6 +61,7 @@ class InvocationServices:
         self.metadata = metadata
         self.queue = queue
         self.images_db = images_db
+        self.images_new = images_new
         self.urls = urls
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager

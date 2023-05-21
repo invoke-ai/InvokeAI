@@ -4,73 +4,71 @@ from invokeai.app.models.image import (
     ImageCategory,
     ImageType,
 )
-from invokeai.app.services.database.images.models import ImageEntity
+from invokeai.app.services.image_db import ImageRecordServiceBase
+from invokeai.app.services.image_storage import ImageStorageBase
+from invokeai.app.services.models.image_record import ImageRecord
 from invokeai.app.services.item_storage import PaginatedResults
 
 from ..dependencies import ApiDependencies
 
-image_resources_router = APIRouter(prefix="/v1/resources/images", tags=["resources"])
+image_records_router = APIRouter(prefix="/v1/records/images", tags=["records"])
 
 
-@image_resources_router.get("/{image_id}", operation_id="get_image_resource")
-async def get_image_resource(
-    image_id: str = Path(description="The id of the image resource to get"),
-) -> ImageEntity:
-    """Gets an image resource by id"""
+@image_records_router.get("/{image_type}/{image_name}", operation_id="get_image_record")
+async def get_image_record(
+    image_type: ImageType = Path(description="The type of the image record to get"),
+    image_name: str = Path(description="The id of the image record to get"),
+) -> ImageRecord:
+    """Gets an image record by id"""
 
-    image = ApiDependencies.invoker.services.images_db.get(id=image_id)
-
-    if image is None:
+    try:
+        return ApiDependencies.invoker.services.images_new.get_record(
+            image_type=image_type, image_name=image_name
+        )
+    except ImageRecordServiceBase.ImageRecordNotFoundException:
         raise HTTPException(status_code=404)
 
-    image.image_url = ApiDependencies.invoker.services.urls.get_image_url(
-        image_type=image.image_type, image_id=image.id, thumbnail=False
-    )
-    image.thumbnail_url = ApiDependencies.invoker.services.urls.get_image_url(
-        image_type=image.image_type, image_id=image.id, thumbnail=True
-    )
 
-    return image
-
-
-@image_resources_router.get(
+@image_records_router.get(
     "/",
-    operation_id="list_image_resources",
+    operation_id="list_image_records",
 )
-async def list_image_resources(
-    image_type: ImageType = Query(description="The origin of image resources to get"),
+async def list_image_records(
+    image_type: ImageType = Query(description="The type of image records to get"),
     image_category: ImageCategory = Query(
-        description="The kind of image resources to get"
+        description="The kind of image records to get"
     ),
-    page: int = Query(default=0, description="The page of image resources to get"),
+    page: int = Query(default=0, description="The page of image records to get"),
     per_page: int = Query(
-        default=10, description="The number of image resources per page"
+        default=10, description="The number of image records per page"
     ),
-) -> PaginatedResults[ImageEntity]:
-    """Gets a list of image resources by type and category"""
+) -> PaginatedResults[ImageRecord]:
+    """Gets a list of image records by type and category"""
 
-    images = ApiDependencies.invoker.services.images_db.get_many(
+    images = ApiDependencies.invoker.services.images_new.get_many(
         image_type=image_type,
         image_category=image_category,
         page=page,
         per_page=per_page,
     )
 
-    for i in images.items:
-        i.image_url = ApiDependencies.invoker.services.urls.get_image_url(
-            image_type=i.image_type, image_id=i.id, thumbnail=False
-        )
-        i.thumbnail_url = ApiDependencies.invoker.services.urls.get_image_url(
-            image_type=i.image_type, image_id=i.id, thumbnail=True
-        )
-
     return images
 
 
-@image_resources_router.delete("/{image_id}", operation_id="delete_image_resource")
-async def delete_image_resource(
-    image_id: str = Path(description="The id of the image resource to delete"),
+@image_records_router.delete("/{image_type}/{image_name}", operation_id="delete_image")
+async def delete_image_record(
+    image_type: ImageType = Query(description="The type of image records to get"),
+    image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
-    """Deletes an image resource"""
+    """Deletes an image record"""
 
-    ApiDependencies.invoker.services.images_db.delete(id=image_id)
+    try:
+        ApiDependencies.invoker.services.images_new.delete(
+            image_type=image_type, image_name=image_name
+        )
+    except ImageStorageBase.ImageFileDeleteException:
+        # TODO: log this
+        pass
+    except ImageRecordServiceBase.ImageRecordDeleteException:
+        # TODO: log this
+        pass

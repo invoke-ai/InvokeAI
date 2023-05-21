@@ -1,3 +1,11 @@
+from abc import ABC, abstractmethod
+import datetime
+from typing import Optional
+from invokeai.app.models.metadata import (
+    GeneratedImageOrLatentsMetadata,
+    UploadedImageOrLatentsMetadata,
+)
+
 import sqlite3
 import threading
 from typing import Optional, Union
@@ -9,19 +17,75 @@ from invokeai.app.models.image import (
     ImageCategory,
     ImageType,
 )
-from invokeai.app.services.database.create_enum_table import create_enum_table
-from invokeai.app.services.database.images.images_db_service_base import (
-    ImagesDbServiceBase,
-)
-from invokeai.app.services.database.images.models import ImageEntity
-from invokeai.app.services.database.images.deserialize_image_entity import (
-    deserialize_image_entity,
+from invokeai.app.services.util.create_enum_table import create_enum_table
+from invokeai.app.services.models.image_record import ImageRecord
+from invokeai.app.services.util.deserialize_image_record import (
+    deserialize_image_record,
 )
 
 from invokeai.app.services.item_storage import PaginatedResults
 
 
-class SqliteImagesDbService(ImagesDbServiceBase):
+class ImageRecordServiceBase(ABC):
+    """Low-level service responsible for interfacing with the image record store."""
+
+    class ImageRecordNotFoundException(Exception):
+        """Raised when an image record is not found."""
+
+        def __init__(self, message="Image record not found"):
+            super().__init__(message)
+
+    class ImageRecordSaveException(Exception):
+        """Raised when an image record cannot be saved."""
+
+        def __init__(self, message="Image record not saved"):
+            super().__init__(message)
+
+    class ImageRecordDeleteException(Exception):
+        """Raised when an image record cannot be deleted."""
+
+        def __init__(self, message="Image record not deleted"):
+            super().__init__(message)
+
+    @abstractmethod
+    def get(self, image_type: ImageType, image_name: str) -> ImageRecord:
+        """Gets an image record."""
+        pass
+
+    @abstractmethod
+    def get_many(
+        self,
+        image_type: ImageType,
+        image_category: ImageCategory,
+        page: int = 0,
+        per_page: int = 10,
+    ) -> PaginatedResults[ImageRecord]:
+        """Gets a page of image records."""
+        pass
+
+    @abstractmethod
+    def delete(self, image_type: ImageType, image_name: str) -> None:
+        """Deletes an image record."""
+        pass
+
+    @abstractmethod
+    def save(
+        self,
+        image_name: str,
+        image_type: ImageType,
+        image_category: ImageCategory,
+        session_id: Optional[str],
+        node_id: Optional[str],
+        metadata: Optional[
+            GeneratedImageOrLatentsMetadata | UploadedImageOrLatentsMetadata
+        ],
+        created_at: str = datetime.datetime.utcnow().isoformat(),
+    ) -> None:
+        """Saves an image record."""
+        pass
+
+
+class SqliteImageRecordService(ImageRecordServiceBase):
     _filename: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
@@ -47,17 +111,19 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             self._lock.release()
 
     def _create_tables(self) -> None:
+        """Creates the tables for the `images` database."""
+
         # Create the `images` table.
         self._cursor.execute(
             f"""--sql
             CREATE TABLE IF NOT EXISTS images (
-                id TEXT PRIMARY KEY, -- The unique identifier for the image.
-                image_type TEXT,
-                image_category TEXT,
-                session_id TEXT,
-                node_id TEXT,
-                metadata TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                id TEXT PRIMARY KEY,
+                image_type TEXT, -- non-nullable via foreign key constraint
+                image_category TEXT, -- non-nullable via foreign key constraint
+                session_id TEXT, -- nullable
+                node_id TEXT, -- nullable
+                metadata TEXT, -- nullable
+                created_at TEXT NOT NULL,
                 FOREIGN KEY(image_type) REFERENCES image_types(type_name),
                 FOREIGN KEY(image_category) REFERENCES image_categories(category_name)
             );
@@ -130,7 +196,7 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             """
         )
 
-    def get(self, id: str) -> Union[ImageEntity, None]:
+    def get(self, image_type: ImageType, image_name: str) -> Union[ImageRecord, None]:
         try:
             self._lock.acquire()
 
@@ -139,17 +205,20 @@ class SqliteImagesDbService(ImagesDbServiceBase):
                 SELECT * FROM images
                 WHERE id = ?;
                 """,
-                (id,),
+                (image_name,),
             )
 
             result = self._cursor.fetchone()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise self.ImageRecordNotFoundException from e
         finally:
             self._lock.release()
 
         if not result:
-            return None
+            raise self.ImageRecordNotFoundException
 
-        return deserialize_image_entity(result)
+        return deserialize_image_record(result)
 
     def get_many(
         self,
@@ -157,7 +226,7 @@ class SqliteImagesDbService(ImagesDbServiceBase):
         image_category: ImageCategory,
         page: int = 0,
         per_page: int = 10,
-    ) -> PaginatedResults[ImageEntity]:
+    ) -> PaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
 
@@ -172,7 +241,7 @@ class SqliteImagesDbService(ImagesDbServiceBase):
 
             result = self._cursor.fetchall()
 
-            images = list(map(lambda r: deserialize_image_entity(r), result))
+            images = list(map(lambda r: deserialize_image_record(r), result))
 
             self._cursor.execute(
                 """--sql
@@ -183,6 +252,9 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             )
 
             count = self._cursor.fetchone()[0]
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise e
         finally:
             self._lock.release()
 
@@ -192,7 +264,7 @@ class SqliteImagesDbService(ImagesDbServiceBase):
             items=images, page=page, pages=pageCount, per_page=per_page, total=count
         )
 
-    def delete(self, id: str) -> None:
+    def delete(self, image_type: ImageType, image_name: str) -> None:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -200,15 +272,18 @@ class SqliteImagesDbService(ImagesDbServiceBase):
                 DELETE FROM images
                 WHERE id = ?;
                 """,
-                (id,),
+                (image_name,),
             )
             self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordServiceBase.ImageRecordDeleteException from e
         finally:
             self._lock.release()
 
-    def set(
+    def save(
         self,
-        id: str,
+        image_name: str,
         image_type: ImageType,
         image_category: ImageCategory,
         session_id: Optional[str],
@@ -216,6 +291,7 @@ class SqliteImagesDbService(ImagesDbServiceBase):
         metadata: Union[
             GeneratedImageOrLatentsMetadata, UploadedImageOrLatentsMetadata, None
         ],
+        created_at: str,
     ) -> None:
         try:
             metadata_json = (
@@ -231,18 +307,23 @@ class SqliteImagesDbService(ImagesDbServiceBase):
                     node_id,
                     session_id,
                     metadata
+                    created_at
                     )
-                VALUES (?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    id,
+                    image_name,
                     image_type.value,
                     image_category.value,
                     node_id,
                     session_id,
                     metadata_json,
+                    created_at,
                 ),
             )
             self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordServiceBase.ImageRecordNotFoundException from e
         finally:
             self._lock.release()

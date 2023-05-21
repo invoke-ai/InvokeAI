@@ -3,9 +3,9 @@
 import os
 from types import ModuleType
 from invokeai.app.services.database.images.sqlite_images_db_service import (
-    SqliteImagesDbService,
+    SqliteImageDb,
 )
-from invokeai.app.services.urls import LocalURLService
+from invokeai.app.services.urls import LocalUrlService
 
 import invokeai.backend.util.logging as logger
 
@@ -71,7 +71,7 @@ class ApiDependencies:
 
         metadata = PngMetadataService()
 
-        urls = LocalURLService()
+        urls = LocalUrlService()
 
         images = DiskImageStorage(f"{output_folder}/images", metadata_service=metadata)
 
@@ -82,7 +82,7 @@ class ApiDependencies:
             filename=db_location, table_name="graph_executions"
         )
 
-        images_db = SqliteImagesDbService(filename=db_location)
+        images_db = SqliteImageDb(filename=db_location)
 
         # register event handler to update the `results` table when a graph execution state is inserted or updated
         # graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
