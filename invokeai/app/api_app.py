@@ -76,7 +76,7 @@ async def shutdown_event():
 
 app.include_router(sessions.session_router, prefix="/api")
 
-app.include_router(image_files.images_router, prefix="/api")
+app.include_router(image_files.image_files_router, prefix="/api")
 
 app.include_router(models.models_router, prefix="/api")
 

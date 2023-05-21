@@ -73,9 +73,7 @@ class ApiDependencies:
 
         urls = LocalUrlService()
 
-        image_file_storage = DiskImageFileStorage(
-            f"{output_folder}/images", metadata_service=metadata
-        )
+        image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")

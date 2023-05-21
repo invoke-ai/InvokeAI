@@ -1,25 +1,18 @@
 from abc import ABC, abstractmethod
 import datetime
 from typing import Optional
-from invokeai.app.models.metadata import (
-    GeneratedImageOrLatentsMetadata,
-    UploadedImageOrLatentsMetadata,
-)
-
 import sqlite3
 import threading
 from typing import Optional, Union
-from invokeai.app.models.metadata import (
-    GeneratedImageOrLatentsMetadata,
-    UploadedImageOrLatentsMetadata,
-)
+
+from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.models.image import (
     ImageCategory,
     ImageType,
 )
 from invokeai.app.services.util.create_enum_table import create_enum_table
-from invokeai.app.services.models.image_record import ImageRecord
-from invokeai.app.services.util.deserialize_image_record import (
+from invokeai.app.services.models.image_record import (
+    ImageRecord,
     deserialize_image_record,
 )
 
@@ -76,9 +69,7 @@ class ImageRecordStorageBase(ABC):
         image_category: ImageCategory,
         session_id: Optional[str],
         node_id: Optional[str],
-        metadata: Optional[
-            GeneratedImageOrLatentsMetadata | UploadedImageOrLatentsMetadata
-        ],
+        metadata: Optional[ImageMetadata],
         created_at: str = datetime.datetime.utcnow().isoformat(),
     ) -> None:
         """Saves an image record."""
@@ -288,9 +279,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_category: ImageCategory,
         session_id: Optional[str],
         node_id: Optional[str],
-        metadata: Union[
-            GeneratedImageOrLatentsMetadata, UploadedImageOrLatentsMetadata, None
-        ],
+        metadata: Optional[ImageMetadata],
         created_at: str,
     ) -> None:
         try:
@@ -306,7 +295,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     image_category,
                     node_id,
                     session_id,
-                    metadata
+                    metadata,
                     created_at
                     )
                 VALUES (?, ?, ?, ?, ?, ?, ?);
