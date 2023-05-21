@@ -1,3 +1,4 @@
+from logging import Logger
 from typing import Optional, Union
 import uuid
 from PIL.Image import Image as PILImageType
@@ -28,6 +29,7 @@ class ImageServiceDependencies:
     files: ImageFileStorageBase
     metadata: MetadataServiceBase
     urls: UrlServiceBase
+    logger: Logger
 
     def __init__(
         self,
@@ -35,11 +37,13 @@ class ImageServiceDependencies:
         image_file_storage: ImageFileStorageBase,
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
+        logger: Logger,
     ):
         self.records = image_record_storage
         self.files = image_file_storage
         self.metadata = metadata
         self.urls = url
+        self.logger = logger
 
 
 class ImageService:
@@ -53,12 +57,14 @@ class ImageService:
         image_file_storage: ImageFileStorageBase,
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
+        logger: Logger,
     ):
         self._services = ImageServiceDependencies(
             image_record_storage=image_record_storage,
             image_file_storage=image_file_storage,
             metadata=metadata,
             url=url,
+            logger=logger,
         )
 
     def _create_image_name(
@@ -117,7 +123,9 @@ class ImageService:
             )
 
             image_url = self._services.urls.get_image_url(image_type, image_name)
-            thumbnail_url = self._services.urls.get_thumbnail_url(image_type, image_name)
+            thumbnail_url = self._services.urls.get_thumbnail_url(
+                image_type, image_name
+            )
 
             return ImageDTO(
                 image_name=image_name,
@@ -131,10 +139,10 @@ class ImageService:
                 thumbnail_url=thumbnail_url,
             )
         except ImageRecordStorageBase.ImageRecordSaveException:
-            # TODO: log this
+            self._services.logger.error("Failed to save image record")
             raise
         except ImageFileStorageBase.ImageFileSaveException:
-            # TODO: log this
+            self._services.logger.error("Failed to save image file")
             raise
 
     def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
@@ -142,7 +150,7 @@ class ImageService:
         try:
             return self._services.files.get(image_type, image_name)
         except ImageFileStorageBase.ImageFileNotFoundException:
-            # TODO: log this
+            self._services.logger.error("Failed to get image file")
             raise
 
     def get_record(self, image_type: ImageType, image_name: str) -> ImageRecord:
@@ -150,7 +158,7 @@ class ImageService:
         try:
             return self._services.records.get(image_type, image_name)
         except ImageRecordStorageBase.ImageRecordNotFoundException:
-            # TODO: log this
+            self._services.logger.error("Failed to get image record")
             raise
 
     def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
@@ -166,7 +174,7 @@ class ImageService:
 
             return image_dto
         except ImageRecordStorageBase.ImageRecordNotFoundException:
-            # TODO: log this
+            self._services.logger.error("Failed to get image DTO")
             raise
 
     def delete(self, image_type: ImageType, image_name: str):
@@ -176,10 +184,10 @@ class ImageService:
             self._services.files.delete(image_type, image_name)
             self._services.records.delete(image_type, image_name)
         except ImageRecordStorageBase.ImageRecordDeleteException:
-            # TODO: log this
+            self._services.logger.error(f"Failed to delete image record")
             raise
         except ImageFileStorageBase.ImageFileDeleteException:
-            # TODO: log this
+            self._services.logger.error(f"Failed to delete image file")
             raise
 
     def get_many(
@@ -217,6 +225,7 @@ class ImageService:
                 total=results.total,
             )
         except Exception as e:
+            self._services.logger.error("Failed to get paginated image DTOs")
             raise e
 
     def add_tag(self, image_type: ImageType, image_id: str, tag: str) -> None:
