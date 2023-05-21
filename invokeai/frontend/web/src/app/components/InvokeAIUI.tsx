@@ -26,7 +26,7 @@ interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
   setIsReady?: (isReady: boolean) => void;
-  middleware?: Middleware;
+  middleware?: Middleware[];
 }
 
 const InvokeAIUI = ({
@@ -57,8 +57,8 @@ const InvokeAIUI = ({
     // the `apiUrl`/`token` dynamically.
 
     // rebuild socket middleware with token and apiUrl
-    if (middleware) {
-      addMiddleware(socketMiddleware(), middleware);
+    if (middleware && middleware.length > 0) {
+      addMiddleware(socketMiddleware(), ...middleware);
     } else {
       addMiddleware(socketMiddleware());
     }
