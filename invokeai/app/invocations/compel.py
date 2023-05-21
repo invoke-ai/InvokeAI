@@ -118,7 +118,7 @@ class CompelInvocation(BaseInvocation):
         conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
         # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.set(conditioning_name, (c, ec))
+        context.services.latents.save(conditioning_name, (c, ec))
 
         return CompelOutput(
             conditioning=ConditioningField(

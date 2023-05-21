@@ -20,7 +20,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, Sta
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
-from ..services.image_storage import ImageType
+from ..services.image_file_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput, build_image_output
 from .compel import ConditioningField
@@ -144,7 +144,7 @@ class NoiseInvocation(BaseInvocation):
         noise = get_noise(self.width, self.height, device, self.seed)
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, noise)
+        context.services.latents.save(name, noise)
         return build_noise_output(latents_name=name, latents=noise)
 
 
@@ -260,7 +260,7 @@ class TextToLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, result_latents)
+        context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -319,7 +319,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, result_latents)
+        context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -404,7 +404,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
 
@@ -434,7 +434,7 @@ class ScaleLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
 
@@ -478,5 +478,5 @@ class ImageToLatentsInvocation(BaseInvocation):
         )
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, latents)
+        context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents)
