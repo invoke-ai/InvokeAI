@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 import uuid
 from PIL.Image import Image as PILImageType
 from invokeai.app.models.image import ImageCategory, ImageType
@@ -6,11 +6,15 @@ from invokeai.app.models.metadata import (
     GeneratedImageOrLatentsMetadata,
     UploadedImageOrLatentsMetadata,
 )
-from invokeai.app.services.image_db import (
-    ImageRecordServiceBase,
+from invokeai.app.services.image_record_storage import (
+    ImageRecordStorageBase,
 )
-from invokeai.app.services.models.image_record import ImageRecord
-from invokeai.app.services.image_storage import ImageStorageBase
+from invokeai.app.services.models.image_record import (
+    ImageRecord,
+    ImageDTO,
+    image_record_to_dto,
+)
+from invokeai.app.services.image_file_storage import ImageFileStorageBase
 from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.app.services.urls import UrlServiceBase
@@ -20,22 +24,22 @@ from invokeai.app.util.misc import get_iso_timestamp
 class ImageServiceDependencies:
     """Service dependencies for the ImageManagementService."""
 
-    db: ImageRecordServiceBase
-    storage: ImageStorageBase
+    records: ImageRecordStorageBase
+    files: ImageFileStorageBase
     metadata: MetadataServiceBase
     urls: UrlServiceBase
 
     def __init__(
         self,
-        image_db_service: ImageRecordServiceBase,
-        image_storage_service: ImageStorageBase,
-        image_metadata_service: MetadataServiceBase,
-        url_service: UrlServiceBase,
+        image_record_storage: ImageRecordStorageBase,
+        image_file_storage: ImageFileStorageBase,
+        metadata: MetadataServiceBase,
+        url: UrlServiceBase,
     ):
-        self.db = image_db_service
-        self.storage = image_storage_service
-        self.metadata = image_metadata_service
-        self.url = url_service
+        self.records = image_record_storage
+        self.files = image_file_storage
+        self.metadata = metadata
+        self.urls = url
 
 
 class ImageService:
@@ -45,24 +49,24 @@ class ImageService:
 
     def __init__(
         self,
-        image_db_service: ImageRecordServiceBase,
-        image_storage_service: ImageStorageBase,
-        image_metadata_service: MetadataServiceBase,
-        url_service: UrlServiceBase,
+        image_record_storage: ImageRecordStorageBase,
+        image_file_storage: ImageFileStorageBase,
+        metadata: MetadataServiceBase,
+        url: UrlServiceBase,
     ):
         self._services = ImageServiceDependencies(
-            image_db_service=image_db_service,
-            image_storage_service=image_storage_service,
-            image_metadata_service=image_metadata_service,
-            url_service=url_service,
+            image_record_storage=image_record_storage,
+            image_file_storage=image_file_storage,
+            metadata=metadata,
+            url=url,
         )
 
     def _create_image_name(
         self,
         image_type: ImageType,
         image_category: ImageCategory,
-        node_id: Union[str, None],
-        session_id: Union[str, None],
+        node_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> str:
         """Creates an image name."""
         uuid_str = str(uuid.uuid4())
@@ -77,12 +81,12 @@ class ImageService:
         image: PILImageType,
         image_type: ImageType,
         image_category: ImageCategory,
-        node_id: Union[str, None],
-        session_id: Union[str, None],
-        metadata: Union[
-            GeneratedImageOrLatentsMetadata, UploadedImageOrLatentsMetadata, None
-        ],
-    ) -> ImageRecord:
+        node_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        metadata: Optional[
+            Union[GeneratedImageOrLatentsMetadata, UploadedImageOrLatentsMetadata]
+        ] = None,
+    ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         image_name = self._create_image_name(
             image_type=image_type,
@@ -95,14 +99,14 @@ class ImageService:
 
         try:
             # TODO: Consider using a transaction here to ensure consistency between storage and database
-            self._services.storage.save(
+            self._services.files.save(
                 image_type=image_type,
                 image_name=image_name,
                 image=image,
                 metadata=metadata,
             )
 
-            self._services.db.save(
+            self._services.records.save(
                 image_name=image_name,
                 image_type=image_type,
                 image_category=image_category,
@@ -112,15 +116,10 @@ class ImageService:
                 created_at=timestamp,
             )
 
-            image_url = self._services.url.get_image_url(
-                image_type=image_type, image_name=image_name
-            )
+            image_url = self._services.urls.get_image_url(image_type, image_name)
+            thumbnail_url = self._services.urls.get_thumbnail_url(image_type, image_name)
 
-            thumbnail_url = self._services.url.get_thumbnail_url(
-                image_type=image_type, image_name=image_name
-            )
-
-            return ImageRecord(
+            return ImageDTO(
                 image_name=image_name,
                 image_type=image_type,
                 image_category=image_category,
@@ -131,32 +130,42 @@ class ImageService:
                 image_url=image_url,
                 thumbnail_url=thumbnail_url,
             )
-        except ImageRecordServiceBase.ImageRecordSaveException:
+        except ImageRecordStorageBase.ImageRecordSaveException:
             # TODO: log this
             raise
-        except ImageStorageBase.ImageFileSaveException:
+        except ImageFileStorageBase.ImageFileSaveException:
             # TODO: log this
             raise
 
     def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
         """Gets an image as a PIL image."""
         try:
-            pil_image = self._services.storage.get(
-                image_type=image_type, image_name=image_name
-            )
-            return pil_image
-        except ImageStorageBase.ImageFileNotFoundException:
+            return self._services.files.get(image_type, image_name)
+        except ImageFileStorageBase.ImageFileNotFoundException:
             # TODO: log this
             raise
 
     def get_record(self, image_type: ImageType, image_name: str) -> ImageRecord:
         """Gets an image record."""
         try:
-            image_record = self._services.db.get(
-                image_type=image_type, image_name=image_name
+            return self._services.records.get(image_type, image_name)
+        except ImageRecordStorageBase.ImageRecordNotFoundException:
+            # TODO: log this
+            raise
+
+    def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
+        """Gets an image DTO."""
+        try:
+            image_record = self._services.records.get(image_type, image_name)
+
+            image_dto = image_record_to_dto(
+                image_record,
+                self._services.urls.get_image_url(image_type, image_name),
+                self._services.urls.get_thumbnail_url(image_type, image_name),
             )
-            return image_record
-        except ImageRecordServiceBase.ImageRecordNotFoundException:
+
+            return image_dto
+        except ImageRecordStorageBase.ImageRecordNotFoundException:
             # TODO: log this
             raise
 
@@ -164,12 +173,12 @@ class ImageService:
         """Deletes an image."""
         # TODO: Consider using a transaction here to ensure consistency between storage and database
         try:
-            self._services.storage.delete(image_type=image_type, image_name=image_name)
-            self._services.db.delete(image_type=image_type, image_name=image_name)
-        except ImageRecordServiceBase.ImageRecordDeleteException:
+            self._services.files.delete(image_type, image_name)
+            self._services.records.delete(image_type, image_name)
+        except ImageRecordStorageBase.ImageRecordDeleteException:
             # TODO: log this
             raise
-        except ImageStorageBase.ImageFileDeleteException:
+        except ImageFileStorageBase.ImageFileDeleteException:
             # TODO: log this
             raise
 
@@ -179,26 +188,34 @@ class ImageService:
         image_category: ImageCategory,
         page: int = 0,
         per_page: int = 10,
-    ) -> PaginatedResults[ImageRecord]:
-        """Gets a paginated list of image records."""
+    ) -> PaginatedResults[ImageDTO]:
+        """Gets a paginated list of image DTOs."""
         try:
-            results = self._services.db.get_many(
-                image_type=image_type,
-                image_category=image_category,
-                page=page,
-                per_page=per_page,
+            results = self._services.records.get_many(
+                image_type,
+                image_category,
+                page,
+                per_page,
             )
 
-            for r in results.items:
-                r.image_url = self._services.url.get_image_url(
-                    image_type=image_type, image_name=r.image_name
+            image_dtos = list(
+                map(
+                    lambda r: image_record_to_dto(
+                        r,
+                        self._services.urls.get_image_url(image_type, r.image_name),
+                        self._services.urls.get_thumbnail_url(image_type, r.image_name),
+                    ),
+                    results.items,
                 )
+            )
 
-                r.thumbnail_url = self._services.url.get_thumbnail_url(
-                    image_type=image_type, image_name=r.image_name
-                )
-
-            return results
+            return PaginatedResults[ImageDTO](
+                items=image_dtos,
+                page=results.page,
+                pages=results.pages,
+                per_page=results.per_page,
+                total=results.total,
+            )
         except Exception as e:
             raise e
 
