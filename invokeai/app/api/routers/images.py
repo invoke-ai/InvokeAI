@@ -19,7 +19,7 @@ from invokeai.app.services.item_storage import PaginatedResults
 
 from ..dependencies import ApiDependencies
 
-images_router = APIRouter(prefix="/v1/images", tags=["images"])
+images_router = APIRouter(prefix="/v1/files/images", tags=["images", "files"])
 
 
 # @images_router.get("/{image_type}/{image_name}", operation_id="get_image")
@@ -38,15 +38,16 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 #     else:
 #         raise HTTPException(status_code=404)
 
-@images_router.get("/{image_type}/{image_id}", operation_id="get_image")
+
+@images_router.get("/{image_type}/{image_name}", operation_id="get_image")
 async def get_image(
     image_type: ImageType = Path(description="The type of the image to get"),
-    image_id: str = Path(description="The id of the image to get"),
+    image_name: str = Path(description="The id of the image to get"),
 ) -> FileResponse:
     """Gets an image"""
 
     path = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_id=image_id
+        image_type=image_type, image_name=image_name
     )
 
     if ApiDependencies.invoker.services.images.validate_path(path):
@@ -77,7 +78,7 @@ async def get_thumbnail(
     """Gets a thumbnail"""
 
     path = ApiDependencies.invoker.services.images.get_path(
-        image_type=image_type, image_id=thumbnail_id, is_thumbnail=True
+        image_type=image_type, image_name=thumbnail_id, is_thumbnail=True
     )
 
     if ApiDependencies.invoker.services.images.validate_path(path):

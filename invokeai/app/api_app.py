@@ -15,7 +15,7 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 
 from .api.dependencies import ApiDependencies
-from .api.routers import image_resources, images, sessions, models
+from .api.routers import image_records, images, sessions, models
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
 from .services.config import InvokeAIAppConfig
@@ -75,7 +75,7 @@ app.include_router(images.images_router, prefix="/api")
 
 app.include_router(models.models_router, prefix="/api")
 
-app.include_router(image_resources.image_resources_router, prefix="/api")
+app.include_router(image_records.image_records_router, prefix="/api")
 
 
 # Build a custom OpenAPI to include all outputs
