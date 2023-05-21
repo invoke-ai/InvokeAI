@@ -1,7 +1,10 @@
 import time
 import traceback
 from threading import Event, Thread, BoundedSemaphore
+from typing import Any, TypeGuard
 
+from invokeai.app.invocations.image import ImageOutput
+from invokeai.app.models.image import ImageType
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
@@ -88,12 +91,30 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         graph_execution_state
                     )
 
+                    def is_image_output(obj: Any) -> TypeGuard[ImageOutput]:
+                        return obj.__class__ == ImageOutput
+                    
+                    outputs_dict = outputs.dict()
+
+                    if is_image_output(outputs):
+                        image_url = self.__invoker.services.images_new.get_url(
+                            ImageType.RESULT, outputs.image.image_name
+                        )
+                        thumbnail_url = self.__invoker.services.images_new.get_url(
+                            ImageType.RESULT, outputs.image.image_name, True
+                        )
+                    else:
+                        image_url = None
+                        thumbnail_url = None
+
                     # Send complete event
                     self.__invoker.services.events.emit_invocation_complete(
                         graph_execution_state_id=graph_execution_state.id,
                         node=invocation.dict(),
                         source_node_id=source_node_id,
-                        result=outputs.dict(),
+                        result=outputs_dict,
+                        image_url=image_url,
+                        thumbnail_url=thumbnail_url,
                     )
 
                 except KeyboardInterrupt:
