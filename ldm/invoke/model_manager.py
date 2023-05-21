@@ -1229,12 +1229,16 @@ class ModelManager(object):
         return vae_path
                                
     def _load_vae(self, vae_config) -> AutoencoderKL:
-
+        using_fp16 = self.precision == "float16"
+        dtype = torch.float16 if using_fp16 else torch.float32
+        
         # Handle the common case of a user shoving a VAE .ckpt into
         # the vae field for a diffusers. We convert it into diffusers
         # format and use it.
-        if type(vae_config) in [str,Path]:
-            return self.convert_vae(vae_config)
+        if isinstance(vae_config,(str,Path)):
+            return self.convert_vae(vae_config).to(dtype=dtype)
+        elif isinstance(vae_config,DictConfig) and (vae_path := vae_config.get('path')):
+            return self.convert_vae(vae_path).to(dtype=dtype)
             
         vae_args = {}
         try:
@@ -1243,7 +1247,6 @@ class ModelManager(object):
             return None
         if name_or_path is None:
             return None
-        using_fp16 = self.precision == "float16"
 
         vae_args.update(
             cache_dir=global_cache_dir("hub"),
@@ -1285,7 +1288,7 @@ class ModelManager(object):
 
     @staticmethod
     def convert_vae(vae_path: Union[Path,str])->AutoencoderKL:
-        print(f"   | A checkpoint VAE was detected. Converting to diffusers format.")
+        print("   | A checkpoint VAE was detected. Converting to diffusers format.")
         vae_path = Path(Globals.root,vae_path).resolve()
         
         from .ckpt_to_diffuser import (
