@@ -1,11 +1,10 @@
 import datetime
+import sqlite3
 from typing import Optional, Union
 from pydantic import BaseModel, Field
-from invokeai.app.models.metadata import (
-    GeneratedImageOrLatentsMetadata,
-    UploadedImageOrLatentsMetadata,
-)
 from invokeai.app.models.image import ImageCategory, ImageType
+from invokeai.app.models.metadata import ImageMetadata
+from invokeai.app.util.misc import get_iso_timestamp
 
 
 class ImageRecord(BaseModel):
@@ -19,9 +18,9 @@ class ImageRecord(BaseModel):
     )
     session_id: Optional[str] = Field(default=None, description="The session ID.")
     node_id: Optional[str] = Field(default=None, description="The node ID.")
-    metadata: Optional[
-        Union[GeneratedImageOrLatentsMetadata, UploadedImageOrLatentsMetadata]
-    ] = Field(default=None, description="The image's metadata.")
+    metadata: Optional[ImageMetadata] = Field(
+        default=None, description="The image's metadata."
+    )
 
 
 class ImageDTO(ImageRecord):
@@ -45,4 +44,28 @@ def image_record_to_dto(
         metadata=image_record.metadata,
         image_url=image_url,
         thumbnail_url=thumbnail_url,
+    )
+
+
+def deserialize_image_record(image_row: sqlite3.Row) -> ImageRecord:
+    """Deserializes an image record."""
+
+    image_dict = dict(image_row)
+
+    image_type = ImageType(image_dict.get("image_type", ImageType.RESULT.value))
+
+    raw_metadata = image_dict.get("metadata", "{}")
+
+    metadata = ImageMetadata.parse_raw(raw_metadata)
+
+    return ImageRecord(
+        image_name=image_dict.get("id", "unknown"),
+        session_id=image_dict.get("session_id", None),
+        node_id=image_dict.get("node_id", None),
+        metadata=metadata,
+        image_type=image_type,
+        image_category=ImageCategory(
+            image_dict.get("image_category", ImageCategory.IMAGE.value)
+        ),
+        created_at=image_dict.get("created_at", get_iso_timestamp()),
     )

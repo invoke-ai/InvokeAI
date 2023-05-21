@@ -93,34 +93,42 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         # each time it is called. We only need the first one.
         generate_output = next(outputs)
 
-        # Results are image and seed, unwrap for now and ignore the seed
-        # TODO: pre-seed?
-        # TODO: can this return multiple results? Should it?
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
-        )
-
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(
-            image_type, image_name, generate_output.image, metadata
-        )
-
-        context.services.images_db.set(
-            id=image_name,
+        image_dto = context.services.images_new.create(
+            image=generate_output.image,
             image_type=ImageType.RESULT,
             image_category=ImageCategory.IMAGE,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
-            metadata=GeneratedImageOrLatentsMetadata(),
         )
 
+        # Results are image and seed, unwrap for now and ignore the seed
+        # TODO: pre-seed?
+        # TODO: can this return multiple results? Should it?
+        # image_type = ImageType.RESULT
+        # image_name = context.services.images.create_name(
+        #     context.graph_execution_state_id, self.id
+        # )
+
+        # metadata = context.services.metadata.build_metadata(
+        #     session_id=context.graph_execution_state_id, node=self
+        # )
+
+        # context.services.images.save(
+        #     image_type, image_name, generate_output.image, metadata
+        # )
+
+        # context.services.images_db.set(
+        #     id=image_name,
+        #     image_type=ImageType.RESULT,
+        #     image_category=ImageCategory.IMAGE,
+        #     session_id=context.graph_execution_state_id,
+        #     node_id=self.id,
+        #     metadata=GeneratedImageOrLatentsMetadata(),
+        # )
+
         return build_image_output(
-            image_type=image_type,
-            image_name=image_name,
+            image_type=image_dto.image_type,
+            image_name=image_dto.image_name,
             image=generate_output.image,
         )
 

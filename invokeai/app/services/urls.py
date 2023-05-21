@@ -25,8 +25,8 @@ class LocalUrlService(UrlServiceBase):
 
     def get_image_url(self, image_type: ImageType, image_name: str) -> str:
         image_basename = os.path.basename(image_name)
-        return f"{self._base_url}/images/{image_type.value}/{image_basename}"
+        return f"{self._base_url}/files/images/{image_type.value}/{image_basename}"
 
     def get_thumbnail_url(self, image_type: ImageType, image_name: str) -> str:
-        thumbnail_basename = get_thumbnail_name(os.path.basename(image_name))
-        return f"{self._base_url}/images/{image_type.value}/thumbnails/{thumbnail_basename}"
+        image_basename = os.path.basename(image_name)
+        return f"{self._base_url}/files/images/{image_type.value}/{image_basename}/thumbnail"
