@@ -1,9 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-from types import ModuleType
-from invokeai.app.services.image_record_storage import (
-    ImageRecordStorageBase,
-)
+from logging import Logger
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.app.services.urls import UrlServiceBase
@@ -39,7 +36,7 @@ class InvocationServices:
         self,
         model_manager: ModelManager,
         events: EventServiceBase,
-        logger: ModuleType,
+        logger: Logger,
         latents: LatentsStorageBase,
         images: ImageFileStorageBase,
         metadata: MetadataServiceBase,
