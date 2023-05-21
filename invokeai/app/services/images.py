@@ -59,13 +59,8 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_image_url(self, image_type: ImageType, image_name: str) -> str:
-        """Gets an image's URL"""
-        pass
-
-    @abstractmethod
-    def get_thumbnail_url(self, image_type: ImageType, image_name: str) -> str:
-        """Gets an image's URL"""
+    def get_url(self, image_type: ImageType, image_name: str, thumbnail: bool = False) -> str:
+        """Gets an image's or thumbnail's URL"""
         pass
 
     @abstractmethod
@@ -197,8 +192,8 @@ class ImageService(ImageServiceABC):
             )
 
             image_url = self._services.urls.get_image_url(image_type, image_name)
-            thumbnail_url = self._services.urls.get_thumbnail_url(
-                image_type, image_name
+            thumbnail_url = self._services.urls.get_image_url(
+                image_type, image_name, True
             )
 
             return ImageDTO(
@@ -251,6 +246,15 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image path")
             raise e
 
+    def get_url(
+        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+    ) -> str:
+        try:
+            return self._services.urls.get_image_url(image_type, image_name, thumbnail)
+        except Exception as e:
+            self._services.logger.error("Problem getting image path")
+            raise e
+
     def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
         try:
             image_record = self._services.records.get(image_type, image_name)
@@ -258,7 +262,7 @@ class ImageService(ImageServiceABC):
             image_dto = image_record_to_dto(
                 image_record,
                 self._services.urls.get_image_url(image_type, image_name),
-                self._services.urls.get_thumbnail_url(image_type, image_name),
+                self._services.urls.get_image_url(image_type, image_name, True),
             )
 
             return image_dto
@@ -289,7 +293,9 @@ class ImageService(ImageServiceABC):
                     lambda r: image_record_to_dto(
                         r,
                         self._services.urls.get_image_url(image_type, r.image_name),
-                        self._services.urls.get_thumbnail_url(image_type, r.image_name),
+                        self._services.urls.get_image_url(
+                            image_type, r.image_name, True
+                        ),
                     ),
                     results.items,
                 )
