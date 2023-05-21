@@ -11,7 +11,7 @@ from invokeai.app.services.item_storage import PaginatedResults
 
 from ..dependencies import ApiDependencies
 
-image_records_router = APIRouter(prefix="/v1/records/images", tags=["records"])
+image_records_router = APIRouter(prefix="/v1/images", tags=["images", "records"])
 
 
 @image_records_router.get("/{image_type}/{image_name}", operation_id="get_image_record")
@@ -57,7 +57,7 @@ async def list_image_records(
 
 @image_records_router.delete("/{image_type}/{image_name}", operation_id="delete_image")
 async def delete_image_record(
-    image_type: ImageType = Query(description="The type of image records to get"),
+    image_type: ImageType = Query(description="The type of image to delete"),
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
     """Deletes an image record"""
