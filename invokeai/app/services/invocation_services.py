@@ -2,8 +2,6 @@
 
 from logging import Logger
 from invokeai.app.services.images import ImageService
-from invokeai.app.services.metadata import MetadataServiceBase
-from invokeai.app.services.urls import UrlServiceBase
 from invokeai.backend import ModelManager
 
 from .events import EventServiceBase
@@ -21,12 +19,10 @@ class InvocationServices:
     events: EventServiceBase
     latents: LatentsStorageBase
     images: ImageFileStorageBase
-    metadata: MetadataServiceBase
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
     configuration: InvokeAISettings
-    urls: UrlServiceBase
     images_new: ImageService
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
@@ -41,10 +37,8 @@ class InvocationServices:
         logger: Logger,
         latents: LatentsStorageBase,
         images: ImageFileStorageBase,
-        metadata: MetadataServiceBase,
         queue: InvocationQueueABC,
         images_new: ImageService,
-        urls: UrlServiceBase,
         graph_library: ItemStorageABC["LibraryGraph"],
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
         processor: "InvocationProcessorABC",
@@ -56,10 +50,8 @@ class InvocationServices:
         self.logger = logger
         self.latents = latents
         self.images = images
-        self.metadata = metadata
         self.queue = queue
         self.images_new = images_new
-        self.urls = urls
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager
         self.processor = processor
