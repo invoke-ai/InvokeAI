@@ -16,17 +16,19 @@ image_resources_router = APIRouter(prefix="/v1/resources/images", tags=["resourc
 async def get_image_resource(
     image_id: str = Path(description="The id of the image resource to get"),
 ) -> ImageEntity:
-    """Gets a resource (eg image or tensor)"""
+    """Gets an image resource by id"""
 
     image = ApiDependencies.invoker.services.images_db.get(id=image_id)
 
     if image is None:
         raise HTTPException(status_code=404)
 
-    urls = ApiDependencies.invoker.services.urls.get_image_urls(image_id=image_id)
-
-    image.image_url = urls.image_url
-    image.thumbnail_url = urls.thumbnail_url
+    image.image_url = ApiDependencies.invoker.services.urls.get_image_url(
+        image_type=image.image_type, image_id=image.id, thumbnail=False
+    )
+    image.thumbnail_url = ApiDependencies.invoker.services.urls.get_image_url(
+        image_type=image.image_type, image_id=image.id, thumbnail=True
+    )
 
     return image
 
@@ -45,7 +47,7 @@ async def list_image_resources(
         default=10, description="The number of image resources per page"
     ),
 ) -> PaginatedResults[ImageEntity]:
-    """Gets a list of image resources"""
+    """Gets a list of image resources by type and category"""
 
     images = ApiDependencies.invoker.services.images_db.get_many(
         image_type=image_type,
@@ -55,10 +57,12 @@ async def list_image_resources(
     )
 
     for i in images.items:
-        urls = ApiDependencies.invoker.services.urls.get_image_urls(image_id=i.id)
-
-        i.image_url = urls.image_url
-        i.thumbnail_url = urls.thumbnail_url
+        i.image_url = ApiDependencies.invoker.services.urls.get_image_url(
+            image_type=i.image_type, image_id=i.id, thumbnail=False
+        )
+        i.thumbnail_url = ApiDependencies.invoker.services.urls.get_image_url(
+            image_type=i.image_type, image_id=i.id, thumbnail=True
+        )
 
     return images
 
