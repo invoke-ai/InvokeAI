@@ -1,12 +1,12 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from logging import Logger
 import os
 from types import ModuleType
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.urls import LocalUrlService
-
-import invokeai.backend.util.logging as logger
+from invokeai.backend.util.logging import InvokeAILogger
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -38,6 +38,9 @@ def check_internet() -> bool:
         return True
     except:
         return False
+
+
+logger = InvokeAILogger.getLogger()
 
 
 class ApiDependencies:

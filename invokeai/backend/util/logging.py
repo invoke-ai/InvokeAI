@@ -76,16 +76,16 @@ class InvokeAILogFormatter(logging.Formatter):
     reset = "\x1b[0m"
 
     # Log Format
-    format = "[%(asctime)s]::[%(name)s]::%(levelname)s --> %(message)s"
+    log_format = "[%(asctime)s]::[%(name)s]::%(levelname)s --> %(message)s"
     ## More Formatting Options: %(pathname)s, %(filename)s, %(module)s, %(lineno)d
 
     # Format Map
     FORMATS = {
-        logging.DEBUG: cyan + format + reset,
-        logging.INFO: grey + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
+        logging.DEBUG: cyan + log_format + reset,
+        logging.INFO: grey + log_format + reset,
+        logging.WARNING: yellow + log_format + reset,
+        logging.ERROR: red + log_format + reset,
+        logging.CRITICAL: bold_red + log_format + reset
     }
 
     def format(self, record):
@@ -98,13 +98,13 @@ class InvokeAILogger(object):
     loggers = dict()
 
     @classmethod
-    def getLogger(self, name: str = 'InvokeAI') -> logging.Logger:
-        if name not in self.loggers:
+    def getLogger(cls, name: str = 'InvokeAI') -> logging.Logger:
+        if name not in cls.loggers:
             logger = logging.getLogger(name)
             logger.setLevel(logging.DEBUG)
             ch = logging.StreamHandler()
             fmt = InvokeAILogFormatter()
             ch.setFormatter(fmt)
             logger.addHandler(ch)
-            self.loggers[name] = logger
-        return self.loggers[name]
+            cls.loggers[name] = logger
+        return cls.loggers[name]
