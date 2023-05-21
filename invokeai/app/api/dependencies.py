@@ -2,9 +2,8 @@
 
 import os
 from types import ModuleType
-from invokeai.app.services.database.images.sqlite_images_db_service import (
-    SqliteImageDb,
-)
+from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
+from invokeai.app.services.images import ImageService
 from invokeai.app.services.urls import LocalUrlService
 
 import invokeai.backend.util.logging as logger
@@ -14,7 +13,7 @@ from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsSto
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
-from ..services.image_storage import DiskImageStorage
+from ..services.image_file_storage import DiskImageFileStorage
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker
@@ -63,7 +62,9 @@ class ApiDependencies:
 
         urls = LocalUrlService()
 
-        images = DiskImageStorage(f"{output_folder}/images", metadata_service=metadata)
+        image_file_storage = DiskImageFileStorage(
+            f"{output_folder}/images", metadata_service=metadata
+        )
 
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
@@ -72,7 +73,14 @@ class ApiDependencies:
             filename=db_location, table_name="graph_executions"
         )
 
-        images_db = SqliteImageDb(filename=db_location)
+        image_record_storage = SqliteImageRecordStorage(db_location)
+
+        images_new = ImageService(
+            image_record_storage=image_record_storage,
+            image_file_storage=image_file_storage,
+            metadata=metadata,
+            url=urls,
+        )
 
         # register event handler to update the `results` table when a graph execution state is inserted or updated
         # graph_execution_manager.on_changed(results.handle_graph_execution_state_change)
@@ -82,8 +90,8 @@ class ApiDependencies:
             events=events,
             latents=latents,
             images=images,
+            images_new=images_new,
             metadata=metadata,
-            images_db=images_db,
             urls=urls,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](

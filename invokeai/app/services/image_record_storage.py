@@ -26,7 +26,7 @@ from invokeai.app.services.util.deserialize_image_record import (
 from invokeai.app.services.item_storage import PaginatedResults
 
 
-class ImageRecordServiceBase(ABC):
+class ImageRecordStorageBase(ABC):
     """Low-level service responsible for interfacing with the image record store."""
 
     class ImageRecordNotFoundException(Exception):
@@ -85,7 +85,7 @@ class ImageRecordServiceBase(ABC):
         pass
 
 
-class SqliteImageRecordService(ImageRecordServiceBase):
+class SqliteImageRecordStorage(ImageRecordStorageBase):
     _filename: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
@@ -277,7 +277,7 @@ class SqliteImageRecordService(ImageRecordServiceBase):
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
-            raise ImageRecordServiceBase.ImageRecordDeleteException from e
+            raise ImageRecordStorageBase.ImageRecordDeleteException from e
         finally:
             self._lock.release()
 
@@ -324,6 +324,6 @@ class SqliteImageRecordService(ImageRecordServiceBase):
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
-            raise ImageRecordServiceBase.ImageRecordNotFoundException from e
+            raise ImageRecordStorageBase.ImageRecordNotFoundException from e
         finally:
             self._lock.release()

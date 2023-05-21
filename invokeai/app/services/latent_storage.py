@@ -48,7 +48,7 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
         return latent
 
     def save(self, name: str, data: torch.Tensor) -> None:
-        self.__underlying_storage.set(name, data)
+        self.__underlying_storage.save(name, data)
         self.__set_cache(name, data)
 
     def delete(self, name: str) -> None:
