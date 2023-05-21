@@ -74,6 +74,20 @@ class ImageStorageBase(ABC):
     ) -> str:
         """Gets the external URI to an image or its thumbnail."""
         pass
+    
+    @abstractmethod
+    def get_image_location(
+        self, image_type: ImageType, image_name: str
+    ) -> str:
+        """Gets the location of an image."""
+        pass
+    
+    @abstractmethod
+    def get_thumbnail_location(
+        self, image_type: ImageType, image_name: str
+    ) -> str:
+        """Gets the location of an image's thumbnail."""
+        pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     @abstractmethod
