@@ -26,8 +26,8 @@ from invokeai.app.util.misc import get_timestamp
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 
-class ImageStorageBase(ABC):
-    """Low-level service responsible for storing and retrieving images."""
+class ImageFileStorageBase(ABC):
+    """Low-level service responsible for storing and retrieving image files."""
 
     class ImageFileNotFoundException(Exception):
         """Raised when an image file is not found in storage."""
@@ -75,19 +75,19 @@ class ImageStorageBase(ABC):
         """Gets the external URI to an image or its thumbnail."""
         pass
     
-    @abstractmethod
-    def get_image_location(
-        self, image_type: ImageType, image_name: str
-    ) -> str:
-        """Gets the location of an image."""
-        pass
+    # @abstractmethod
+    # def get_image_location(
+    #     self, image_type: ImageType, image_name: str
+    # ) -> str:
+    #     """Gets the location of an image."""
+    #     pass
     
-    @abstractmethod
-    def get_thumbnail_location(
-        self, image_type: ImageType, image_name: str
-    ) -> str:
-        """Gets the location of an image's thumbnail."""
-        pass
+    # @abstractmethod
+    # def get_thumbnail_location(
+    #     self, image_type: ImageType, image_name: str
+    # ) -> str:
+    #     """Gets the location of an image's thumbnail."""
+    #     pass
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     @abstractmethod
@@ -116,7 +116,7 @@ class ImageStorageBase(ABC):
         return f"{context_id}_{node_id}_{str(get_timestamp())}.png"
 
 
-class DiskImageStorage(ImageStorageBase):
+class DiskImageFileStorage(ImageFileStorageBase):
     """Stores images on disk"""
 
     __output_folder: str
@@ -206,7 +206,7 @@ class DiskImageStorage(ImageStorageBase):
             self.__set_cache(image_path, image)
             return image
         except Exception as e:
-            raise ImageStorageBase.ImageFileNotFoundException from e
+            raise ImageFileStorageBase.ImageFileNotFoundException from e
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(
@@ -282,7 +282,7 @@ class DiskImageStorage(ImageStorageBase):
                 created=int(os.path.getctime(image_path)),
             )
         except Exception as e:
-            raise ImageStorageBase.ImageFileSaveException from e
+            raise ImageFileStorageBase.ImageFileSaveException from e
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         try:
@@ -302,7 +302,7 @@ class DiskImageStorage(ImageStorageBase):
             if thumbnail_path in self.__cache:
                 del self.__cache[thumbnail_path]
         except Exception as e:
-            raise ImageStorageBase.ImageFileDeleteException from e
+            raise ImageFileStorageBase.ImageFileDeleteException from e
 
     def __get_cache(self, image_name: str) -> Image | None:
         return None if image_name not in self.__cache else self.__cache[image_name]

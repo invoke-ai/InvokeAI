@@ -75,10 +75,10 @@ class MetadataServiceBase(ABC):
         """Builds an InvokeAIMetadata object"""
         pass
 
-    @abstractmethod
-    def create_metadata(self, session_id: str, node_id: str) -> dict:
-        """Creates metadata for a result"""
-        pass
+    # @abstractmethod
+    # def create_metadata(self, session_id: str, node_id: str) -> dict:
+    #     """Creates metadata for a result"""
+    #     pass
 
 
 class PngMetadataService(MetadataServiceBase):

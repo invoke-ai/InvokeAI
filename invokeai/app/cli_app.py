@@ -28,7 +28,7 @@ from .services.model_manager_initializer import get_model_manager
 from .services.restoration_services import RestorationServices
 from .services.graph import Edge, EdgeConnection, GraphExecutionState, GraphInvocation, LibraryGraph, are_connection_types_compatible
 from .services.default_graphs import default_text_to_image_graph_id
-from .services.image_storage import DiskImageStorage
+from .services.image_file_storage import DiskImageFileStorage
 from .services.invocation_queue import MemoryInvocationQueue
 from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
@@ -214,7 +214,7 @@ def invoke_cli():
         model_manager=model_manager,
         events=events,
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
-        images=DiskImageStorage(f'{output_folder}/images', metadata_service=metadata),
+        images=DiskImageFileStorage(f'{output_folder}/images', metadata_service=metadata),
         metadata=metadata,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
