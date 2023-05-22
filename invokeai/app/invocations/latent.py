@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 import torch
 
 from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.models.image import ImageCategory
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
@@ -356,20 +357,30 @@ class LatentsToImageInvocation(BaseInvocation):
             np_image = model.decode_latents(latents)
             image = model.numpy_to_pil(np_image)[0]
 
-            image_type = ImageType.RESULT
-            image_name = context.services.images.create_name(
-                context.graph_execution_state_id, self.id
+            # image_type = ImageType.RESULT
+            # image_name = context.services.images.create_name(
+            #     context.graph_execution_state_id, self.id
+            # )
+
+            # metadata = context.services.metadata.build_metadata(
+            #     session_id=context.graph_execution_state_id, node=self
+            # )
+
+            # torch.cuda.empty_cache()
+
+            # context.services.images.save(image_type, image_name, image, metadata)
+            image_dto = context.services.images_new.create(
+                image=image,
+                image_type=ImageType.RESULT,
+                image_category=ImageCategory.IMAGE,
+                session_id=context.graph_execution_state_id,
+                node_id=self.id,
             )
 
-            metadata = context.services.metadata.build_metadata(
-                session_id=context.graph_execution_state_id, node=self
-            )
-
-            torch.cuda.empty_cache()
-
-            context.services.images.save(image_type, image_name, image, metadata)
             return build_image_output(
-                image_type=image_type, image_name=image_name, image=image
+                image_type=image_dto.image_type,
+                image_name=image_dto.image_name,
+                image=image,
             )
 
 

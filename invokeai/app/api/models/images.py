@@ -2,7 +2,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import ImageType
-from invokeai.app.services.metadata import InvokeAIMetadata
 
 
 class ImageResponseMetadata(BaseModel):
@@ -11,9 +10,9 @@ class ImageResponseMetadata(BaseModel):
     created: int = Field(description="The creation timestamp of the image")
     width: int = Field(description="The width of the image in pixels")
     height: int = Field(description="The height of the image in pixels")
-    invokeai: Optional[InvokeAIMetadata] = Field(
-        description="The image's InvokeAI-specific metadata"
-    )
+    # invokeai: Optional[InvokeAIMetadata] = Field(
+    #     description="The image's InvokeAI-specific metadata"
+    # )
 
 
 class ImageResponse(BaseModel):

@@ -6,11 +6,11 @@ from queue import Queue
 from typing import Dict, Optional
 
 from PIL.Image import Image as PILImageType
-from PIL import Image
-from PIL.PngImagePlugin import PngInfo
+from PIL import Image, PngImagePlugin
 from send2trash import send2trash
 
 from invokeai.app.models.image import ImageType
+from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 
@@ -54,7 +54,7 @@ class ImageFileStorageBase(ABC):
         image: PILImageType,
         image_type: ImageType,
         image_name: str,
-        pnginfo: Optional[PngInfo] = None,
+        metadata: Optional[ImageMetadata] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
@@ -109,12 +109,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
         image: PILImageType,
         image_type: ImageType,
         image_name: str,
-        pnginfo: Optional[PngInfo] = None,
+        metadata: Optional[ImageMetadata] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
             image_path = self.get_path(image_type, image_name)
-            image.save(image_path, "PNG", pnginfo=pnginfo)
+
+            if metadata is not None:
+                pnginfo = PngImagePlugin.PngInfo()
+                pnginfo.add_text("invokeai", metadata.json())
+                image.save(image_path, "PNG", pnginfo=pnginfo)
+            else:
+                image.save(image_path, "PNG")
 
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(image_type, thumbnail_name, thumbnail=True)

@@ -4,6 +4,7 @@ from logging import Logger
 import os
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
+from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -18,7 +19,6 @@ from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
-from ..services.metadata import PngMetadataService
 from .events import FastAPIEventService
 
 
@@ -59,7 +59,7 @@ class ApiDependencies:
             DiskLatentsStorage(f"{output_folder}/latents")
         )
 
-        metadata = PngMetadataService()
+        metadata = CoreMetadataService()
 
         urls = LocalUrlService()
 
@@ -80,6 +80,7 @@ class ApiDependencies:
             metadata=metadata,
             url=urls,
             logger=logger,
+            graph_execution_manager=graph_execution_manager,
         )
 
         services = InvocationServices(
