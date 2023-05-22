@@ -15,6 +15,7 @@ import { PartialAppConfig } from 'app/types/invokeai';
 
 import '../../i18n';
 import { socketMiddleware } from 'services/events/middleware';
+import { Middleware } from '@reduxjs/toolkit';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -25,6 +26,7 @@ interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
   setIsReady?: (isReady: boolean) => void;
+  middleware?: Middleware[];
 }
 
 const InvokeAIUI = ({
@@ -33,6 +35,7 @@ const InvokeAIUI = ({
   config,
   headerComponent,
   setIsReady,
+  middleware,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -54,8 +57,12 @@ const InvokeAIUI = ({
     // the `apiUrl`/`token` dynamically.
 
     // rebuild socket middleware with token and apiUrl
-    addMiddleware(socketMiddleware());
-  }, [apiUrl, token]);
+    if (middleware && middleware.length > 0) {
+      addMiddleware(socketMiddleware(), ...middleware);
+    } else {
+      addMiddleware(socketMiddleware());
+    }
+  }, [apiUrl, token, middleware]);
 
   return (
     <React.StrictMode>

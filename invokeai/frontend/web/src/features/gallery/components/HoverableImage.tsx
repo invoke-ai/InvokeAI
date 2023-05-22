@@ -33,7 +33,11 @@ import { isEqual } from 'lodash-es';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
-import { requestedImageDeletion } from '../store/actions';
+import {
+  requestedImageDeletion,
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
 
 export const selector = createSelector(
@@ -157,6 +161,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   }, [image, recallSeed]);
 
   const handleSendToImageToImage = useCallback(() => {
+    dispatch(sentImageToImg2Img());
     dispatch(initialImageSelected(image));
   }, [dispatch, image]);
 
@@ -168,6 +173,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
    * TODO: the rest of these
    */
   const handleSendToCanvas = () => {
+    dispatch(sentImageToCanvas());
     dispatch(setInitialCanvasImage(image));
 
     dispatch(resizeAndScaleCanvas());
