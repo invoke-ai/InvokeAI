@@ -61,8 +61,8 @@ const CurrentImagePreview = () => {
       if (!image) {
         return;
       }
-      e.dataTransfer.setData('invokeai/imageName', image.name);
-      e.dataTransfer.setData('invokeai/imageType', image.type);
+      e.dataTransfer.setData('invokeai/imageName', image.image_name);
+      e.dataTransfer.setData('invokeai/imageType', image.image_type);
       e.dataTransfer.effectAllowed = 'move';
     },
     [image]
@@ -108,7 +108,7 @@ const CurrentImagePreview = () => {
         image && (
           <>
             <Image
-              src={getUrl(image.url)}
+              src={getUrl(image.image_url)}
               fallbackStrategy="beforeLoadOrError"
               fallback={<ImageFallbackSpinner />}
               onDragStart={handleDragStart}

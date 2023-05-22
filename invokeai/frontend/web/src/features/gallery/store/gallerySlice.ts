@@ -1,16 +1,15 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
-import { imageReceived, thumbnailReceived } from 'services/thunks/image';
 import {
   receivedResultImagesPage,
   receivedUploadImagesPage,
 } from '../../../services/thunks/gallery';
+import { ImageDTO } from 'services/api';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export interface GalleryState {
-  selectedImage?: Image;
+  selectedImage?: ImageDTO;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
@@ -30,7 +29,7 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageSelected: (state, action: PayloadAction<Image | undefined>) => {
+    imageSelected: (state, action: PayloadAction<ImageDTO | undefined>) => {
       state.selectedImage = action.payload;
       // TODO: if the user selects an image, disable the auto switch?
       // state.shouldAutoSwitchToNewImages = false;
@@ -61,37 +60,18 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(imageReceived.fulfilled, (state, action) => {
-      // When we get an updated URL for an image, we need to update the selectedImage in gallery,
-      // which is currently its own object (instead of a reference to an image in results/uploads)
-      const { imagePath } = action.payload;
-      const { imageName } = action.meta.arg;
-
-      if (state.selectedImage?.name === imageName) {
-        state.selectedImage.url = imagePath;
-      }
-    });
-
-    builder.addCase(thumbnailReceived.fulfilled, (state, action) => {
-      // When we get an updated URL for an image, we need to update the selectedImage in gallery,
-      // which is currently its own object (instead of a reference to an image in results/uploads)
-      const { thumbnailPath } = action.payload;
-      const { thumbnailName } = action.meta.arg;
-
-      if (state.selectedImage?.name === thumbnailName) {
-        state.selectedImage.thumbnail = thumbnailPath;
-      }
-    });
     builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
       // rehydrate selectedImage URL when results list comes in
       // solves case when outdated URL is in local storage
       const selectedImage = state.selectedImage;
       if (selectedImage) {
         const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === selectedImage.name
+          (image) => image.image_name === selectedImage.image_name
         );
+
         if (selectedImageInResults) {
-          selectedImage.url = selectedImageInResults.image_url;
+          selectedImage.image_url = selectedImageInResults.image_url;
+          selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
           state.selectedImage = selectedImage;
         }
       }
@@ -102,10 +82,12 @@ export const gallerySlice = createSlice({
       const selectedImage = state.selectedImage;
       if (selectedImage) {
         const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === selectedImage.name
+          (image) => image.image_name === selectedImage.image_name
         );
+
         if (selectedImageInResults) {
-          selectedImage.url = selectedImageInResults.image_url;
+          selectedImage.image_url = selectedImageInResults.image_url;
+          selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
           state.selectedImage = selectedImage;
         }
       }

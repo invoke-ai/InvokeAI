@@ -6,12 +6,7 @@ import {
 } from 'services/util/deserializeImageField';
 import { Image } from 'app/types/invokeai';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
-import {
-  imageReceived,
-  imageRecordReceived,
-  imageUrlsReceived,
-  thumbnailReceived,
-} from 'services/thunks/image';
+import { imageMetadataReceived } from 'services/thunks/image';
 import { startAppListening } from '..';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
@@ -41,75 +36,75 @@ export const addImageResultReceivedListener = () => {
         const name = result.image.image_name;
         const type = result.image.image_type;
 
-        dispatch(imageUrlsReceived({ imageName: name, imageType: type }));
+        // dispatch(imageUrlsReceived({ imageName: name, imageType: type }));
 
-        const [{ payload }] = await take(
-          (action): action is ReturnType<typeof imageUrlsReceived.fulfilled> =>
-            imageUrlsReceived.fulfilled.match(action) &&
-            action.payload.image_name === name
-        );
+        // const [{ payload }] = await take(
+        //   (action): action is ReturnType<typeof imageUrlsReceived.fulfilled> =>
+        //     imageUrlsReceived.fulfilled.match(action) &&
+        //     action.payload.image_name === name
+        // );
 
-        console.log(payload);
+        // console.log(payload);
 
-        dispatch(imageRecordReceived({ imageName: name, imageType: type }));
+        dispatch(imageMetadataReceived({ imageName: name, imageType: type }));
 
-        const [x] = await take(
-          (
-            action
-          ): action is ReturnType<typeof imageRecordReceived.fulfilled> =>
-            imageRecordReceived.fulfilled.match(action) &&
-            action.payload.image_name === name
-        );
+        // const [x] = await take(
+        //   (
+        //     action
+        //   ): action is ReturnType<typeof imageMetadataReceived.fulfilled> =>
+        //     imageMetadataReceived.fulfilled.match(action) &&
+        //     action.payload.image_name === name
+        // );
 
-        console.log(x);
+        // console.log(x);
 
-        const state = getState();
+        // const state = getState();
 
-        // if we need to refetch, set URLs to placeholder for now
-        const { url, thumbnail } = shouldFetchImages
-          ? { url: '', thumbnail: '' }
-          : buildImageUrls(type, name);
+        // // if we need to refetch, set URLs to placeholder for now
+        // const { url, thumbnail } = shouldFetchImages
+        //   ? { url: '', thumbnail: '' }
+        //   : buildImageUrls(type, name);
 
-        const timestamp = extractTimestampFromImageName(name);
+        // const timestamp = extractTimestampFromImageName(name);
 
-        const image: Image = {
-          name,
-          type,
-          url,
-          thumbnail,
-          metadata: {
-            created: timestamp,
-            width: result.width,
-            height: result.height,
-            invokeai: {
-              session_id: graph_execution_state_id,
-              ...(node ? { node } : {}),
-            },
-          },
-        };
+        // const image: Image = {
+        //   name,
+        //   type,
+        //   url,
+        //   thumbnail,
+        //   metadata: {
+        //     created: timestamp,
+        //     width: result.width,
+        //     height: result.height,
+        //     invokeai: {
+        //       session_id: graph_execution_state_id,
+        //       ...(node ? { node } : {}),
+        //     },
+        //   },
+        // };
 
-        dispatch(resultAdded(image));
+        // dispatch(resultAdded(image));
 
-        if (state.gallery.shouldAutoSwitchToNewImages) {
-          dispatch(imageSelected(image));
-        }
+        // if (state.gallery.shouldAutoSwitchToNewImages) {
+        //   dispatch(imageSelected(image));
+        // }
 
-        if (state.config.shouldFetchImages) {
-          dispatch(imageReceived({ imageName: name, imageType: type }));
-          dispatch(
-            thumbnailReceived({
-              thumbnailName: name,
-              thumbnailType: type,
-            })
-          );
-        }
+        // if (state.config.shouldFetchImages) {
+        //   dispatch(imageReceived({ imageName: name, imageType: type }));
+        //   dispatch(
+        //     thumbnailReceived({
+        //       thumbnailName: name,
+        //       thumbnailType: type,
+        //     })
+        //   );
+        // }
 
-        if (
-          graph_execution_state_id ===
-          state.canvas.layerState.stagingArea.sessionId
-        ) {
-          dispatch(addImageToStagingArea(image));
-        }
+        // if (
+        //   graph_execution_state_id ===
+        //   state.canvas.layerState.stagingArea.sessionId
+        // ) {
+        //   dispatch(addImageToStagingArea(image));
+        // }
       }
     },
   });
