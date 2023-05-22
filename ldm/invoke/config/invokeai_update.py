@@ -86,6 +86,7 @@ def main():
     versions = get_versions()
     if invokeai_is_running():
         print(f':exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]')
+        input('Press any key to continue...')
         return
 
     welcome(versions)
