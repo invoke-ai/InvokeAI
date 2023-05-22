@@ -7,7 +7,6 @@ from typing import types
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ...backend import Globals
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
@@ -42,17 +41,8 @@ class ApiDependencies:
 
     invoker: Invoker = None
 
-    @staticmethod
     def initialize(config, event_handler_id: int, logger: types.ModuleType=logger):
-        Globals.try_patchmatch = config.patchmatch
-        Globals.always_use_cpu = config.always_use_cpu
-        Globals.internet_available = config.internet_available and check_internet()
-        Globals.disable_xformers = not config.xformers
-        Globals.ckpt_convert = config.ckpt_convert
-
-        # TO DO: Use the config to select the logger rather than use the default
-        # invokeai logging module
-        logger.info(f"Internet connectivity is {Globals.internet_available}")
+        logger.info(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
 
@@ -72,7 +62,6 @@ class ApiDependencies:
         services = InvocationServices(
             model_manager=get_model_manager(config,logger),
             events=events,
-            logger=logger,
             latents=latents,
             images=images,
             metadata=metadata,
@@ -85,6 +74,8 @@ class ApiDependencies:
             ),
             processor=DefaultInvocationProcessor(),
             restoration=RestorationServices(config,logger),
+            configuration=config,
+            logger=logger,
         )
 
         create_system_graphs(services.graph_library)

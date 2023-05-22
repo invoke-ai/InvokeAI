@@ -3,12 +3,14 @@
 /* eslint-disable */
 
 /**
+ * DO NOT DELETE EVEN THOUGH IT IS NOT USED!
+ *
  * Custom `request.ts` file for OpenAPI code generator.
  *
  * Patches the request logic in such a way that we can extract headers from requests.
  *
  * Copied from https://github.com/ferdikoomen/openapi-typescript-codegen/issues/829#issuecomment-1228224477
- * 
+ *
  * This file should be excluded in `tsconfig.json` and ignored by prettier/eslint!
  */
 

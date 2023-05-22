@@ -5,15 +5,8 @@ import {
   ButtonGroup,
   Flex,
   FlexProps,
-  IconButton,
   Link,
-  Menu,
-  MenuButton,
-  MenuItemOption,
-  MenuList,
-  MenuOptionGroup,
   useDisclosure,
-  useToast,
 } from '@chakra-ui/react';
 // import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -54,10 +47,7 @@ import {
   FaTrash,
   FaWrench,
 } from 'react-icons/fa';
-import {
-  gallerySelector,
-  selectedImageSelector,
-} from '../store/gallerySelectors';
+import { gallerySelector } from '../store/gallerySelectors';
 import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
@@ -70,6 +60,7 @@ import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceR
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
 import { allParametersSet } from 'features/parameters/store/generationSlice';
 import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
+import { useAppToaster } from 'app/components/Toaster';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -79,15 +70,15 @@ const currentImageButtonsSelector = createSelector(
     uiSelector,
     lightboxSelector,
     activeTabNameSelector,
-    selectedImageSelector,
   ],
-  (system, gallery, postprocessing, ui, lightbox, activeTabName, image) => {
+  (system, gallery, postprocessing, ui, lightbox, activeTabName) => {
     const {
       isProcessing,
       isConnected,
       isGFPGANAvailable,
       isESRGANAvailable,
       shouldConfirmOnDelete,
+      progressImage,
     } = system;
 
     const { upscalingLevel, facetoolStrength } = postprocessing;
@@ -96,7 +87,7 @@ const currentImageButtonsSelector = createSelector(
 
     const { shouldShowImageDetails, shouldHidePreview } = ui;
 
-    const { intermediateImage, currentImage } = gallery;
+    const { selectedImage } = gallery;
 
     return {
       canDeleteImage: isConnected && !isProcessing,
@@ -107,15 +98,14 @@ const currentImageButtonsSelector = createSelector(
       isESRGANAvailable,
       upscalingLevel,
       facetoolStrength,
-      shouldDisableToolbarButtons: Boolean(intermediateImage) || !currentImage,
-      currentImage,
+      shouldDisableToolbarButtons: Boolean(progressImage) || !selectedImage,
       shouldShowImageDetails,
       activeTabName,
       isLightboxOpen,
       shouldHidePreview,
-      image,
-      seed: image?.metadata?.invokeai?.node?.seed,
-      prompt: image?.metadata?.invokeai?.node?.prompt,
+      image: selectedImage,
+      seed: selectedImage?.metadata?.invokeai?.node?.seed,
+      prompt: selectedImage?.metadata?.invokeai?.node?.prompt,
     };
   },
   {
@@ -164,7 +154,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     onClose: onDeleteDialogClose,
   } = useDisclosure();
 
-  const toast = useToast();
+  const toaster = useAppToaster();
   const { t } = useTranslation();
 
   const { recallPrompt, recallSeed, recallAllParameters } = useParameters();
@@ -213,7 +203,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     const url = getImageUrl();
 
     if (!url) {
-      toast({
+      toaster({
         title: t('toast.problemCopyingImageLink'),
         status: 'error',
         duration: 2500,
@@ -224,14 +214,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     }
 
     navigator.clipboard.writeText(url).then(() => {
-      toast({
+      toaster({
         title: t('toast.imageLinkCopied'),
         status: 'success',
         duration: 2500,
         isClosable: true,
       });
     });
-  }, [toast, shouldTransformUrls, getUrl, t, image]);
+  }, [toaster, shouldTransformUrls, getUrl, t, image]);
 
   const handlePreviewVisibility = useCallback(() => {
     dispatch(setShouldHidePreview(!shouldHidePreview));
@@ -346,13 +336,13 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       dispatch(setActiveTab('unifiedCanvas'));
     }
 
-    toast({
+    toaster({
       title: t('toast.sentToUnifiedCanvas'),
       status: 'success',
       duration: 2500,
       isClosable: true,
     });
-  }, [image, isLightboxOpen, dispatch, activeTabName, toast, t]);
+  }, [image, isLightboxOpen, dispatch, activeTabName, toaster, t]);
 
   useHotkeys(
     'i',
@@ -360,7 +350,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       if (image) {
         handleClickShowImageDetails();
       } else {
-        toast({
+        toaster({
           title: t('toast.metadataLoadFailed'),
           status: 'error',
           duration: 2500,
@@ -368,7 +358,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image, shouldShowImageDetails]
+    [image, shouldShowImageDetails, toaster]
   );
 
   const handleDelete = useCallback(() => {
@@ -427,6 +417,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 size="sm"
                 onClick={handleSendToImageToImage}
                 leftIcon={<FaShare />}
+                id="send-to-img2img"
               >
                 {t('parameters.sendToImg2Img')}
               </IAIButton>
@@ -435,6 +426,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                   size="sm"
                   onClick={handleSendToCanvas}
                   leftIcon={<FaShare />}
+                  id="send-to-canvas"
                 >
                   {t('parameters.sendToUnifiedCanvas')}
                 </IAIButton>

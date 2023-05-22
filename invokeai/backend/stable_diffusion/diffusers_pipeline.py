@@ -33,8 +33,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
-from invokeai.backend.globals import Globals
-
+from invokeai.app.services.config import get_invokeai_config
 from ..util import CPU_DEVICE, normalize_device
 from .diffusion import (
     AttentionMapSaver,
@@ -43,7 +42,6 @@ from .diffusion import (
 )
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
 from .textual_inversion_manager import TextualInversionManager
-
 
 @dataclass
 class PipelineIntermediateState:
@@ -348,10 +346,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+        config = get_invokeai_config()
         if (
             torch.cuda.is_available()
             and is_xformers_available()
-            and not Globals.disable_xformers
+            and not config.disable_xformers
         ):
             self.enable_xformers_memory_efficient_attention()
         else:
@@ -548,8 +547,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
         with self.invokeai_diffuser.custom_attention_context(
-            extra_conditioning_info=extra_conditioning_info,
-            step_count=len(self.scheduler.timesteps),
+                self.invokeai_diffuser.model,
+                extra_conditioning_info=extra_conditioning_info,
+                step_count=len(self.scheduler.timesteps),
         ):
             yield PipelineIntermediateState(
                 run_id=run_id,

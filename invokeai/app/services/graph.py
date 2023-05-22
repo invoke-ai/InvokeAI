@@ -136,6 +136,7 @@ class GraphInvocationOutput(BaseInvocationOutput):
 
 # TODO: Fill this out and move to invocations
 class GraphInvocation(BaseInvocation):
+    """Execute a graph"""
     type: Literal["graph"] = "graph"
 
     # TODO: figure out how to create a default here
@@ -163,6 +164,7 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
 # TODO: Fill this out and move to invocations
 class IterateInvocation(BaseInvocation):
+    """Iterates over a list of items"""
     type: Literal["iterate"] = "iterate"
 
     collection: list[Any] = Field(

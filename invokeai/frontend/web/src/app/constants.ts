@@ -1,6 +1,6 @@
 // TODO: use Enums?
 
-export const SCHEDULERS: Array<string> = [
+export const SCHEDULERS = [
   'ddim',
   'lms',
   'euler',
@@ -17,7 +17,12 @@ export const SCHEDULERS: Array<string> = [
   'heun',
   'heun_k',
   'unipc',
-];
+] as const;
+
+export type Scheduler = (typeof SCHEDULERS)[number];
+
+export const isScheduler = (x: string): x is Scheduler =>
+  SCHEDULERS.includes(x as Scheduler);
 
 // Valid image widths
 export const WIDTHS: Array<number> = Array.from(Array(64)).map(

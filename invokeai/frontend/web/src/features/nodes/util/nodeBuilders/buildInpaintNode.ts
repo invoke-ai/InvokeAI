@@ -1,17 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store/store';
 import { InpaintInvocation } from 'services/api';
-import { initialImageSelector } from 'features/parameters/store/generationSelectors';
 import { O } from 'ts-toolbelt';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
 export const buildInpaintNode = (
   state: RootState,
   overrides: O.Partial<InpaintInvocation, 'deep'> = {}
 ): InpaintInvocation => {
   const nodeId = uuidv4();
-  const { generation, models } = state;
-
-  const { selectedModelName } = models;
+  const { generation } = state;
+  const activeTabName = activeTabNameSelector(state);
 
   const {
     prompt,
@@ -21,21 +20,15 @@ export const buildInpaintNode = (
     width,
     height,
     cfgScale,
-    sampler,
-    seamless,
+    scheduler,
+    model,
     img2imgStrength: strength,
     shouldFitToWidthHeight: fit,
     shouldRandomizeSeed,
+    initialImage,
   } = generation;
 
-  const initialImage = initialImageSelector(state);
-
-  if (!initialImage) {
-    // TODO: handle this
-    // throw 'no initial image';
-  }
-
-  const imageToImageNode: InpaintInvocation = {
+  const inpaintNode: InpaintInvocation = {
     id: nodeId,
     type: 'inpaint',
     prompt: `${prompt} [${negativePrompt}]`,
@@ -43,25 +36,30 @@ export const buildInpaintNode = (
     width,
     height,
     cfg_scale: cfgScale,
-    scheduler: sampler as InpaintInvocation['scheduler'],
-    seamless,
-    model: selectedModelName,
-    progress_images: true,
-    image: initialImage
-      ? {
-          image_name: initialImage.name,
-          image_type: initialImage.type,
-        }
-      : undefined,
+    scheduler,
+    model,
     strength,
     fit,
   };
 
-  if (!shouldRandomizeSeed) {
-    imageToImageNode.seed = seed;
+  // on Canvas tab, we do not manually specific init image
+  if (activeTabName !== 'unifiedCanvas') {
+    if (!initialImage) {
+      // TODO: handle this more better
+      throw 'no initial image';
+    }
+
+    inpaintNode.image = {
+      image_name: initialImage.name,
+      image_type: initialImage.type,
+    };
   }
 
-  Object.assign(imageToImageNode, overrides);
+  if (!shouldRandomizeSeed) {
+    inpaintNode.seed = seed;
+  }
 
-  return imageToImageNode;
+  Object.assign(inpaintNode, overrides);
+
+  return inpaintNode;
 };

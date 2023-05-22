@@ -4,18 +4,18 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 
-import { selectedImageSelector } from '../store/gallerySelectors';
+import { gallerySelector } from '../store/gallerySelectors';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
 import { FaImage } from 'react-icons/fa';
 
 export const currentImageDisplaySelector = createSelector(
-  [systemSelector, selectedImageSelector],
-  (system, selectedImage) => {
+  [systemSelector, gallerySelector],
+  (system, gallery) => {
     const { progressImage } = system;
 
     return {
-      hasAnImageToDisplay: selectedImage || progressImage,
+      hasAnImageToDisplay: gallery.selectedImage || progressImage,
     };
   },
   {

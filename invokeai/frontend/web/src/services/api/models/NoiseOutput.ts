@@ -13,5 +13,13 @@ export type NoiseOutput = {
    * The output noise
    */
   noise?: LatentsField;
+  /**
+   * The width of the noise in pixels
+   */
+  width: number;
+  /**
+   * The height of the noise in pixels
+   */
+  height: number;
 };
 

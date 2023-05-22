@@ -132,6 +132,7 @@ const CancelButton = (
         isDisabled={!isConnected || !isProcessing || !isCancelable}
         onClick={handleClickCancel}
         colorScheme="error"
+        id="cancel-button"
         {...rest}
       />
       <Menu closeOnSelect={false}>

@@ -6,7 +6,6 @@ import {
   MenuItem,
   MenuList,
   useDisclosure,
-  useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
@@ -35,6 +34,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { requestedImageDeletion } from '../store/actions';
+import { useAppToaster } from 'app/components/Toaster';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -101,7 +101,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
-  const toast = useToast();
+  const toaster = useAppToaster();
 
   const { t } = useTranslation();
 
@@ -176,7 +176,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       dispatch(setActiveTab('unifiedCanvas'));
     }
 
-    toast({
+    toaster({
       title: t('toast.sentToUnifiedCanvas'),
       status: 'success',
       duration: 2500,
@@ -250,11 +250,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <MenuItem
               icon={<FaShare />}
               onClickCapture={handleSendToImageToImage}
+              id="send-to-img2img"
             >
               {t('parameters.sendToImg2Img')}
             </MenuItem>
             {isCanvasEnabled && (
-              <MenuItem icon={<FaShare />} onClickCapture={handleSendToCanvas}>
+              <MenuItem
+                icon={<FaShare />}
+                onClickCapture={handleSendToCanvas}
+                id="send-to-canvas"
+              >
                 {t('parameters.sendToUnifiedCanvas')}
               </MenuItem>
             )}

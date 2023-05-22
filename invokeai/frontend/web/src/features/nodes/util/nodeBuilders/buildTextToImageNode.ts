@@ -18,7 +18,7 @@ export const buildTxt2ImgNode = (
     width,
     height,
     cfgScale: cfg_scale,
-    sampler,
+    scheduler,
     shouldRandomizeSeed,
     model,
   } = generation;
@@ -31,7 +31,7 @@ export const buildTxt2ImgNode = (
     width,
     height,
     cfg_scale,
-    scheduler: sampler as TextToImageInvocation['scheduler'],
+    scheduler,
     model,
   };
 

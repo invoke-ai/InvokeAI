@@ -26,7 +26,7 @@ import torch
 from safetensors.torch import load_file
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.globals import global_cache_dir, global_config_dir
+from invokeai.app.services.config import get_invokeai_config
 
 from .model_manager import ModelManager, SDLegacyType
 
@@ -73,7 +73,6 @@ from transformers import (
 )
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
-
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """
@@ -843,7 +842,7 @@ def convert_ldm_bert_checkpoint(checkpoint, config):
 
 def convert_ldm_clip_checkpoint(checkpoint):
     text_model = CLIPTextModel.from_pretrained(
-        "openai/clip-vit-large-patch14", cache_dir=global_cache_dir("hub")
+        "openai/clip-vit-large-patch14", cache_dir=get_invokeai_config().cache_dir
     )
 
     keys = list(checkpoint.keys())
@@ -898,7 +897,7 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 
 
 def convert_paint_by_example_checkpoint(checkpoint):
-    cache_dir = global_cache_dir("hub")
+    cache_dir = get_invokeai_config().cache_dir
     config = CLIPVisionConfig.from_pretrained(
         "openai/clip-vit-large-patch14", cache_dir=cache_dir
     )
@@ -970,7 +969,7 @@ def convert_paint_by_example_checkpoint(checkpoint):
 
 
 def convert_open_clip_checkpoint(checkpoint):
-    cache_dir = global_cache_dir("hub")
+    cache_dir = get_invokeai_config().cache_dir
     text_model = CLIPTextModel.from_pretrained(
         "stabilityai/stable-diffusion-2", subfolder="text_encoder", cache_dir=cache_dir
     )
@@ -1093,7 +1092,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param vae: A diffusers VAE to load into the pipeline.
     :param vae_path: Path to a checkpoint VAE that will be converted into diffusers and loaded into the pipeline.
     """
-
+    config = get_invokeai_config()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         verbosity = dlogging.get_verbosity()
@@ -1106,7 +1105,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         else:
             checkpoint = load_file(checkpoint_path)
 
-        cache_dir = global_cache_dir("hub")
+        cache_dir = config.cache_dir
         pipeline_class = (
             StableDiffusionGeneratorPipeline
             if return_generator_pipeline
@@ -1130,25 +1129,23 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
             if model_type == SDLegacyType.V2_v:
                 original_config_file = (
-                    global_config_dir() / "stable-diffusion" / "v2-inference-v.yaml"
+                    config.legacy_conf_path / "v2-inference-v.yaml"
                 )
                 if global_step == 110000:
                     # v2.1 needs to upcast attention
                     upcast_attention = True
             elif model_type == SDLegacyType.V2_e:
                 original_config_file = (
-                    global_config_dir() / "stable-diffusion" / "v2-inference.yaml"
+                    config.legacy_conf_path / "v2-inference.yaml"
                 )
             elif model_type == SDLegacyType.V1_INPAINT:
                 original_config_file = (
-                    global_config_dir()
-                    / "stable-diffusion"
-                    / "v1-inpainting-inference.yaml"
+                    config.legacy_conf_path / "v1-inpainting-inference.yaml"
                 )
 
             elif model_type == SDLegacyType.V1:
                 original_config_file = (
-                    global_config_dir() / "stable-diffusion" / "v1-inference.yaml"
+                    config.legacy_conf_path / "v1-inference.yaml"
                 )
 
             else:
@@ -1300,7 +1297,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             )
             safety_checker = StableDiffusionSafetyChecker.from_pretrained(
                 "CompVis/stable-diffusion-safety-checker",
-                cache_dir=global_cache_dir("hub"),
+                cache_dir=config.cache_dir,
             )
             feature_extractor = AutoFeatureExtractor.from_pretrained(
                 "CompVis/stable-diffusion-safety-checker", cache_dir=cache_dir
