@@ -23,6 +23,7 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
         415: {"description": "Image upload failed"},
     },
     status_code=201,
+    response_model=ImageDTO,
 )
 async def upload_image(
     file: UploadFile,
@@ -73,15 +74,15 @@ async def delete_image(
 
 
 @images_router.get(
-    "/{image_type}/{image_name}/record",
-    operation_id="get_image_record",
+    "/{image_type}/{image_name}/metadata",
+    operation_id="get_image_metadata",
     response_model=ImageDTO,
 )
-async def get_image_record(
-    image_type: ImageType = Path(description="The type of the image record to get"),
-    image_name: str = Path(description="The id of the image record to get"),
+async def get_image_metadata(
+    image_type: ImageType = Path(description="The type of image to get"),
+    image_name: str = Path(description="The name of image to get"),
 ) -> ImageDTO:
-    """Gets an image record by id"""
+    """Gets an image's metadata"""
 
     try:
         return ApiDependencies.invoker.services.images_new.get_dto(
@@ -91,38 +92,60 @@ async def get_image_record(
         raise HTTPException(status_code=404)
 
 
-@images_router.get("/{image_type}/{image_name}/image", operation_id="get_image")
-async def get_image(
-    image_type: ImageType = Path(description="The type of the image to get"),
-    image_name: str = Path(description="The id of the image to get"),
+@images_router.get(
+    "/{image_type}/{image_name}/full",
+    operation_id="get_image_full",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the full-resolution image",
+            "content": {"image/png": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+async def get_image_full(
+    image_type: ImageType = Path(
+        description="The type of full-resolution image file to get"
+    ),
+    image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> FileResponse:
-    """Gets an image"""
+    """Gets a full-resolution image file"""
 
     try:
         path = ApiDependencies.invoker.services.images_new.get_path(
             image_type, image_name
         )
 
-        return FileResponse(path)
+        return FileResponse(path, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code=404)
 
 
-@images_router.get("/{image_type}/{image_name}/thumbnail", operation_id="get_thumbnail")
-async def get_thumbnail(
-    image_type: ImageType = Path(
-        description="The type of the image whose thumbnail to get"
-    ),
-    image_name: str = Path(description="The id of the image whose thumbnail to get"),
+@images_router.get(
+    "/{image_type}/{image_name}/thumbnail",
+    operation_id="get_image_thumbnail",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the image thumbnail",
+            "content": {"image/webp": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+async def get_image_thumbnail(
+    image_type: ImageType = Path(description="The type of thumbnail image file to get"),
+    image_name: str = Path(description="The name of thumbnail image file to get"),
 ) -> FileResponse:
-    """Gets a thumbnail"""
+    """Gets a thumbnail image file"""
 
     try:
         path = ApiDependencies.invoker.services.images_new.get_path(
             image_type, image_name, thumbnail=True
         )
 
-        return FileResponse(path)
+        return FileResponse(path, media_type="image/webp")
     except Exception as e:
         raise HTTPException(status_code=404)
 
@@ -134,7 +157,7 @@ async def get_thumbnail(
 )
 async def get_image_urls(
     image_type: ImageType = Path(description="The type of the image whose URL to get"),
-    image_name: str = Path(description="The id of the image whose URL to get"),
+    image_name: str = Path(description="The name of the image whose URL to get"),
 ) -> ImageUrlsDTO:
     """Gets an image and thumbnail URL"""
 
@@ -157,20 +180,18 @@ async def get_image_urls(
 
 @images_router.get(
     "/",
-    operation_id="list_image_records",
+    operation_id="list_images_with_metadata",
     response_model=PaginatedResults[ImageDTO],
 )
-async def list_image_records(
-    image_type: ImageType = Query(description="The type of image records to get"),
-    image_category: ImageCategory = Query(
-        description="The kind of image records to get"
-    ),
-    page: int = Query(default=0, description="The page of image records to get"),
+async def list_images_with_metadata(
+    image_type: ImageType = Query(description="The type of images to list"),
+    image_category: ImageCategory = Query(description="The kind of images to list"),
+    page: int = Query(default=0, description="The page of image metadata to get"),
     per_page: int = Query(
-        default=10, description="The number of image records per page"
+        default=10, description="The number of image metadata per page"
     ),
 ) -> PaginatedResults[ImageDTO]:
-    """Gets a list of image records by type and category"""
+    """Gets a list of images with metadata"""
 
     image_dtos = ApiDependencies.invoker.services.images_new.get_many(
         image_type,
