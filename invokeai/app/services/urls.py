@@ -27,4 +27,4 @@ class LocalUrlService(UrlServiceBase):
         if thumbnail:
             return f"{self._base_url}/images/{image_type.value}/{image_basename}/thumbnail"
 
-        return f"{self._base_url}/images/{image_type.value}/{image_basename}/image"
+        return f"{self._base_url}/images/{image_type.value}/{image_basename}/full"
