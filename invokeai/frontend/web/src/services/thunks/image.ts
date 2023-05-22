@@ -6,6 +6,38 @@ import { getHeaders } from 'services/util/getHeaders';
 
 const imagesLog = log.child({ namespace: 'image' });
 
+type imageUrlsReceivedArg = Parameters<
+  (typeof ImagesService)['getImageUrls']
+>[0];
+
+/**
+ * `ImagesService.getImageUrls()` thunk
+ */
+export const imageUrlsReceived = createAppAsyncThunk(
+  'api/imageUrlsReceived',
+  async (arg: imageUrlsReceivedArg) => {
+    const response = await ImagesService.getImageUrls(arg);
+    imagesLog.info({ arg, response }, 'Received image urls');
+    return response;
+  }
+);
+
+type imageRecordReceivedArg = Parameters<
+  (typeof ImagesService)['getImageUrls']
+>[0];
+
+/**
+ * `ImagesService.getImageUrls()` thunk
+ */
+export const imageRecordReceived = createAppAsyncThunk(
+  'api/imageUrlsReceived',
+  async (arg: imageRecordReceivedArg) => {
+    const response = await ImagesService.getImageRecord(arg);
+    imagesLog.info({ arg, response }, 'Received image record');
+    return response;
+  }
+);
+
 type ImageReceivedArg = Parameters<(typeof ImagesService)['getImage']>[0];
 
 /**
