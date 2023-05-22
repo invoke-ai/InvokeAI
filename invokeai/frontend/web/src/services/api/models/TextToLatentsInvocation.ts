@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ConditioningField } from './ConditioningField';
+import type { ControlField } from './ControlField';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -50,5 +51,13 @@ export type TextToLatentsInvocation = {
    * The axes to tile the image on, 'x' and/or 'y'
    */
   seamless_axes?: string;
+  /**
+   * Whether or not to produce progress images during generation
+   */
+  progress_images?: boolean;
+  /**
+   * The controlnet(s) to use
+   */
+  control?: (ControlField | Array<ControlField>);
 };
 

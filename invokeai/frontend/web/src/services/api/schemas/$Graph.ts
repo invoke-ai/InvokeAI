@@ -28,6 +28,10 @@ export const $Graph = {
         }, {
           type: 'InverseLerpInvocation',
         }, {
+          type: 'ControlNetInvocation',
+        }, {
+          type: 'ImageProcessorInvocation',
+        }, {
           type: 'CompelInvocation',
         }, {
           type: 'NoiseInvocation',
@@ -77,6 +81,26 @@ export const $Graph = {
           type: 'IterateInvocation',
         }, {
           type: 'CollectInvocation',
+        }, {
+          type: 'CannyImageProcessorInvocation',
+        }, {
+          type: 'HedImageprocessorInvocation',
+        }, {
+          type: 'LineartImageProcessorInvocation',
+        }, {
+          type: 'LineartAnimeImageProcessorInvocation',
+        }, {
+          type: 'OpenposeImageProcessorInvocation',
+        }, {
+          type: 'MidasDepthImageProcessorInvocation',
+        }, {
+          type: 'NormalbaeImageProcessorInvocation',
+        }, {
+          type: 'MlsdImageProcessorInvocation',
+        }, {
+          type: 'PidiImageProcessorInvocation',
+        }, {
+          type: 'ContentShuffleImageProcessorInvocation',
         }, {
           type: 'LatentsToLatentsInvocation',
         }, {

@@ -47,6 +47,18 @@ export type InpaintInvocation = {
    */
   model?: string;
   /**
+   * Whether or not to produce progress images during generation
+   */
+  progress_images?: boolean;
+  /**
+   * The control model to use
+   */
+  control_model?: string;
+  /**
+   * The processed control image
+   */
+  control_image?: ImageField;
+  /**
    * The input image
    */
   image?: ImageField;

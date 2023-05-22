@@ -47,5 +47,20 @@ export const $TextToImageInvocation = {
       type: 'string',
       description: `The model to use (currently ignored)`,
     },
+    progress_images: {
+      type: 'boolean',
+      description: `Whether or not to produce progress images during generation`,
+    },
+    control_model: {
+      type: 'string',
+      description: `The control model to use`,
+    },
+    control_image: {
+      type: 'all-of',
+      description: `The processed control image`,
+      contains: [{
+        type: 'ImageField',
+      }],
+    },
   },
 } as const;
