@@ -50,8 +50,6 @@ class EventServiceBase:
         result: dict,
         node: dict,
         source_node_id: str,
-        image_url: Optional[str] = None,
-        thumbnail_url: Optional[str] = None,
     ) -> None:
         """Emitted when an invocation has completed"""
         self.__emit_session_event(
@@ -61,8 +59,6 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 result=result,
-                image_url=image_url,
-                thumbnail_url=thumbnail_url
             ),
         )
 
