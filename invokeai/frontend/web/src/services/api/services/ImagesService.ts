@@ -15,31 +15,31 @@ import { request as __request } from '../core/request';
 export class ImagesService {
 
   /**
-   * List Image Records
-   * Gets a list of image records by type and category
+   * List Images With Metadata
+   * Gets a list of images with metadata
    * @returns PaginatedResults_ImageDTO_ Successful Response
    * @throws ApiError
    */
-  public static listImageRecords({
+  public static listImagesWithMetadata({
     imageType,
     imageCategory,
     page,
     perPage = 10,
   }: {
     /**
-     * The type of image records to get
+     * The type of images to list
      */
     imageType: ImageType,
     /**
-     * The kind of image records to get
+     * The kind of images to list
      */
     imageCategory: ImageCategory,
     /**
-     * The page of image records to get
+     * The page of image metadata to get
      */
     page?: number,
     /**
-     * The number of image records per page
+     * The number of image metadata per page
      */
     perPage?: number,
   }): CancelablePromise<PaginatedResults_ImageDTO_> {
@@ -61,7 +61,7 @@ export class ImagesService {
   /**
    * Upload Image
    * Uploads an image
-   * @returns any The image was uploaded successfully
+   * @returns ImageDTO The image was uploaded successfully
    * @throws ApiError
    */
   public static uploadImage({
@@ -72,7 +72,7 @@ export class ImagesService {
     imageType: ImageType,
     formData: Body_upload_image,
     imageCategory?: ImageCategory,
-  }): CancelablePromise<any> {
+  }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/images/',
@@ -119,27 +119,27 @@ export class ImagesService {
   }
 
   /**
-   * Get Image Record
-   * Gets an image record by id
+   * Get Image Metadata
+   * Gets an image's metadata
    * @returns ImageDTO Successful Response
    * @throws ApiError
    */
-  public static getImageRecord({
+  public static getImageMetadata({
     imageType,
     imageName,
   }: {
     /**
-     * The type of the image record to get
+     * The type of image to get
      */
     imageType: ImageType,
     /**
-     * The id of the image record to get
+     * The name of image to get
      */
     imageName: string,
   }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}/record',
+      url: '/api/v1/images/{image_type}/{image_name}/metadata',
       path: {
         'image_type': imageType,
         'image_name': imageName,
@@ -151,53 +151,54 @@ export class ImagesService {
   }
 
   /**
-   * Get Image
-   * Gets an image
-   * @returns any Successful Response
+   * Get Image Full
+   * Gets a full-resolution image file
+   * @returns any Return the full-resolution image
    * @throws ApiError
    */
-  public static getImage({
+  public static getImageFull({
     imageType,
     imageName,
   }: {
     /**
-     * The type of the image to get
+     * The type of full-resolution image file to get
      */
     imageType: ImageType,
     /**
-     * The id of the image to get
+     * The name of full-resolution image file to get
      */
     imageName: string,
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}/image',
+      url: '/api/v1/images/{image_type}/{image_name}/full',
       path: {
         'image_type': imageType,
         'image_name': imageName,
       },
       errors: {
+        404: `Image not found`,
         422: `Validation Error`,
       },
     });
   }
 
   /**
-   * Get Thumbnail
-   * Gets a thumbnail
-   * @returns any Successful Response
+   * Get Image Thumbnail
+   * Gets a thumbnail image file
+   * @returns any Return the image thumbnail
    * @throws ApiError
    */
-  public static getThumbnail({
+  public static getImageThumbnail({
     imageType,
     imageName,
   }: {
     /**
-     * The type of the image whose thumbnail to get
+     * The type of thumbnail image file to get
      */
     imageType: ImageType,
     /**
-     * The id of the image whose thumbnail to get
+     * The name of thumbnail image file to get
      */
     imageName: string,
   }): CancelablePromise<any> {
@@ -209,6 +210,7 @@ export class ImagesService {
         'image_name': imageName,
       },
       errors: {
+        404: `Image not found`,
         422: `Validation Error`,
       },
     });
@@ -229,7 +231,7 @@ export class ImagesService {
      */
     imageType: ImageType,
     /**
-     * The id of the image whose URL to get
+     * The name of the image whose URL to get
      */
     imageName: string,
   }): CancelablePromise<ImageUrlsDTO> {
