@@ -1,4 +1,3 @@
-import { Image } from 'app/types/invokeai';
 import { get, isObject, isString } from 'lodash-es';
 import {
   GraphExecutionState,

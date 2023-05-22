@@ -1,12 +1,11 @@
 import { Draft, PayloadAction } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
 import { GenerationState } from './generationSlice';
-import { ImageToImageInvocation } from 'services/api';
+import { ImageDTO, ImageToImageInvocation } from 'services/api';
 import { isScheduler } from 'app/constants';
 
 export const setAllParametersReducer = (
   state: Draft<GenerationState>,
-  action: PayloadAction<Image | undefined>
+  action: PayloadAction<ImageDTO | undefined>
 ) => {
   const node = action.payload?.metadata.invokeai?.node;
 

@@ -5,7 +5,6 @@ import {
   FlexProps,
   Grid,
   Icon,
-  Image,
   Text,
   forwardRef,
 } from '@chakra-ui/react';
@@ -51,7 +50,6 @@ import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
-import { Image as ImageType } from 'app/types/invokeai';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import GalleryProgressImage from './GalleryProgressImage';
 import { uiSelector } from 'features/ui/store/uiSelectors';
