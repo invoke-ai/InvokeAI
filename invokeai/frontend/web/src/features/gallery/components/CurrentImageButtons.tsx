@@ -55,7 +55,11 @@ import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
-import { requestedImageDeletion } from '../store/actions';
+import {
+  requestedImageDeletion,
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
 import { allParametersSet } from 'features/parameters/store/generationSlice';
@@ -252,6 +256,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('p', handleUsePrompt, [image]);
 
   const handleSendToImageToImage = useCallback(() => {
+    dispatch(sentImageToImg2Img());
     dispatch(initialImageSelected(image));
   }, [dispatch, image]);
 
@@ -327,6 +332,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
   const handleSendToCanvas = useCallback(() => {
     if (!image) return;
+    dispatch(sentImageToCanvas());
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
     // dispatch(setInitialCanvasImage(selectedImage));
@@ -417,6 +423,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 size="sm"
                 onClick={handleSendToImageToImage}
                 leftIcon={<FaShare />}
+                id="send-to-img2img"
               >
                 {t('parameters.sendToImg2Img')}
               </IAIButton>
@@ -425,6 +432,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                   size="sm"
                   onClick={handleSendToCanvas}
                   leftIcon={<FaShare />}
+                  id="send-to-canvas"
                 >
                   {t('parameters.sendToUnifiedCanvas')}
                 </IAIButton>
