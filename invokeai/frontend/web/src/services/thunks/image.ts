@@ -1,3 +1,4 @@
+import { AnyAction } from '@reduxjs/toolkit';
 import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -22,52 +23,18 @@ export const imageUrlsReceived = createAppAsyncThunk(
   }
 );
 
-type imageRecordReceivedArg = Parameters<
-  (typeof ImagesService)['getImageUrls']
+type imageMetadataReceivedArg = Parameters<
+  (typeof ImagesService)['getImageMetadata']
 >[0];
 
 /**
  * `ImagesService.getImageUrls()` thunk
  */
-export const imageRecordReceived = createAppAsyncThunk(
-  'api/imageUrlsReceived',
-  async (arg: imageRecordReceivedArg) => {
-    const response = await ImagesService.getImageRecord(arg);
+export const imageMetadataReceived = createAppAsyncThunk(
+  'api/imageMetadataReceived',
+  async (arg: imageMetadataReceivedArg) => {
+    const response = await ImagesService.getImageMetadata(arg);
     imagesLog.info({ arg, response }, 'Received image record');
-    return response;
-  }
-);
-
-type ImageReceivedArg = Parameters<(typeof ImagesService)['getImage']>[0];
-
-/**
- * `ImagesService.getImage()` thunk
- */
-export const imageReceived = createAppAsyncThunk(
-  'api/imageReceived',
-  async (arg: ImageReceivedArg) => {
-    const response = await ImagesService.getImage(arg);
-
-    imagesLog.info({ arg, response }, 'Received image');
-
-    return response;
-  }
-);
-
-type ThumbnailReceivedArg = Parameters<
-  (typeof ImagesService)['getThumbnail']
->[0];
-
-/**
- * `ImagesService.getThumbnail()` thunk
- */
-export const thumbnailReceived = createAppAsyncThunk(
-  'api/thumbnailReceived',
-  async (arg: ThumbnailReceivedArg) => {
-    const response = await ImagesService.getThumbnail(arg);
-
-    imagesLog.info({ arg, response }, 'Received thumbnail');
-
     return response;
   }
 );
