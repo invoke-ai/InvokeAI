@@ -23,11 +23,19 @@ class ImageRecord(BaseModel):
     )
 
 
-class ImageDTO(ImageRecord):
-    """Deserialized image record with URLs."""
+class ImageUrlsDTO(BaseModel):
+    """The URLs for an image and its thumbnaill"""
 
+    image_name: str = Field(description="The name of the image.")
+    image_type: ImageType = Field(description="The type of the image.")
     image_url: str = Field(description="The URL of the image.")
     thumbnail_url: str = Field(description="The thumbnail URL of the image.")
+
+
+class ImageDTO(ImageRecord, ImageUrlsDTO):
+    """Deserialized image record with URLs."""
+
+    pass
 
 
 def image_record_to_dto(

@@ -25,6 +25,6 @@ class LocalUrlService(UrlServiceBase):
     ) -> str:
         image_basename = os.path.basename(image_name)
         if thumbnail:
-            return f"{self._base_url}/files/images/{image_type.value}/{image_basename}/thumbnail"
+            return f"{self._base_url}/images/{image_type.value}/{image_basename}/thumbnail"
 
-        return f"{self._base_url}/files/images/{image_type.value}/{image_basename}"
+        return f"{self._base_url}/images/{image_type.value}/{image_basename}/image"
