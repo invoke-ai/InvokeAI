@@ -456,7 +456,7 @@ def main():
     # setting a global here
     config.root = os.path.expanduser(get_root(opt.root) or "")
 
-    if not (config.conf_path / '..' ).exists():
+    if not (config.root_dir / config.conf_path.parent).exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )

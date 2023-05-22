@@ -46,9 +46,7 @@ class ApiDependencies:
 
         events = FastAPIEventService(event_handler_id)
 
-        output_folder = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../../../outputs")
-        )
+        output_folder = config.output_path
 
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
 

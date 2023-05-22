@@ -14,6 +14,7 @@ import re
 import sys
 import textwrap
 import time
+import traceback
 import warnings
 from enum import Enum, auto
 from pathlib import Path
@@ -974,6 +975,7 @@ class ModelManager(object):
             self.logger.debug("Conversion succeeded")
         except Exception as e:
             self.logger.warning(f"Conversion failed: {str(e)}")
+            self.logger.warning(traceback.format_exc())
             self.logger.warning(
                 "If you are trying to convert an inpainting or 2.X model, please indicate the correct config file (e.g. v1-inpainting-inference.yaml)"
             )

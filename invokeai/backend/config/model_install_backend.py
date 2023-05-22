@@ -123,8 +123,8 @@ def install_requested_models(
     if scan_at_startup and scan_directory.is_dir():
         argument = "--autoconvert"
         print('** The global initfile is no longer supported; rewrite to support new yaml format **')
-        initfile = Path(config.root, 'invokeai.init')
-        replacement = Path(config.root, f"invokeai.init.new")
+        initfile = Path(config.root_dir, 'invokeai.init')
+        replacement = Path(config.root_dir, f"invokeai.init.new")
         directory = str(scan_directory).replace("\\", "/")
         with open(initfile, "r") as input:
             with open(replacement, "w") as output:
@@ -149,10 +149,8 @@ def yes_or_no(prompt: str, default_yes=True):
 def get_root(root: str = None) -> str:
     if root:
         return root
-    elif os.environ.get("INVOKEAI_ROOT"):
-        return os.environ.get("INVOKEAI_ROOT")
     else:
-        return config.root
+        return config.root_dir
 
 
 # ---------------------------------------------
@@ -185,7 +183,7 @@ def all_datasets() -> dict:
 # look for legacy model.ckpt in models directory and offer to
 # normalize its name
 def migrate_models_ckpt():
-    model_path = os.path.join(config.root, Model_dir, Weights_dir)
+    model_path = os.path.join(config.root_dir, Model_dir, Weights_dir)
     if not os.path.exists(os.path.join(model_path, "model.ckpt")):
         return
     new_name = initial_models()["stable-diffusion-1.4"]["file"]
@@ -230,7 +228,7 @@ def _download_repo_or_file(
 def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
     repo_id = mconfig["repo_id"]
     filename = mconfig["file"]
-    cache_dir = os.path.join(config.root, Model_dir, Weights_dir)
+    cache_dir = os.path.join(config.root_dir, Model_dir, Weights_dir)
     return hf_download_with_resume(
         repo_id=repo_id,
         model_dir=cache_dir,
@@ -419,7 +417,7 @@ def new_config_file_contents(
             stanza["height"] = mod["height"]
         if "file" in mod:
             stanza["weights"] = os.path.relpath(
-                successfully_downloaded[model], start=config.root
+                successfully_downloaded[model], start=config.root_dir
             )
             stanza["config"] = os.path.normpath(
                 os.path.join(sd_configs(), mod["config"])
@@ -458,7 +456,7 @@ def delete_weights(model_name: str, conf_stanza: dict):
 
     weights = Path(weights)
     if not weights.is_absolute():
-        weights = Path(config.root) / weights
+        weights = config.root_dir / weights
         try:
             weights.unlink()
         except OSError as e:
