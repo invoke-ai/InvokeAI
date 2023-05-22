@@ -1,5 +1,4 @@
 import { Badge, Flex } from '@chakra-ui/react';
-import { Image } from 'app/types/invokeai';
 import { isNumber, isString } from 'lodash-es';
 import { useMemo } from 'react';
 import { ImageDTO } from 'services/api';

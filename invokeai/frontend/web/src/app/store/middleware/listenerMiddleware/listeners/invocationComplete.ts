@@ -1,15 +1,10 @@
 import { invocationComplete } from 'services/events/actions';
 import { isImageOutput } from 'services/types/guards';
 import {
-  buildImageUrls,
-  extractTimestampFromImageName,
-} from 'services/util/deserializeImageField';
-import { Image } from 'app/types/invokeai';
-import { resultAdded } from 'features/gallery/store/resultsSlice';
-import { imageMetadataReceived } from 'services/thunks/image';
+  imageMetadataReceived,
+  imageUrlsReceived,
+} from 'services/thunks/image';
 import { startAppListening } from '..';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 
 const nodeDenylist = ['dataURL_image'];
 
@@ -33,20 +28,18 @@ export const addImageResultReceivedListener = () => {
       const { result, node, graph_execution_state_id } = data;
 
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
-        const name = result.image.image_name;
-        const type = result.image.image_type;
+        const { image_name, image_type } = result.image;
 
-        // dispatch(imageUrlsReceived({ imageName: name, imageType: type }));
+        dispatch(
+          imageUrlsReceived({ imageName: image_name, imageType: image_type })
+        );
 
-        // const [{ payload }] = await take(
-        //   (action): action is ReturnType<typeof imageUrlsReceived.fulfilled> =>
-        //     imageUrlsReceived.fulfilled.match(action) &&
-        //     action.payload.image_name === name
-        // );
-
-        // console.log(payload);
-
-        dispatch(imageMetadataReceived({ imageName: name, imageType: type }));
+        dispatch(
+          imageMetadataReceived({
+            imageName: image_name,
+            imageType: image_type,
+          })
+        );
 
         // const [x] = await take(
         //   (

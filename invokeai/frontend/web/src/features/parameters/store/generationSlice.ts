@@ -6,13 +6,14 @@ import { clamp, sample } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
 import { receivedModels } from 'services/thunks/model';
 import { Scheduler } from 'app/constants';
+import { ImageDTO } from 'services/api';
 
 export interface GenerationState {
   cfgScale: number;
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI.Image;
+  initialImage?: ImageDTO;
   iterations: number;
   perlin: number;
   prompt: string;
@@ -213,7 +214,7 @@ export const generationSlice = createSlice({
     setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
       state.shouldUseNoiseSettings = action.payload;
     },
-    initialImageChanged: (state, action: PayloadAction<InvokeAI.Image>) => {
+    initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       state.initialImage = action.payload;
     },
     modelSelected: (state, action: PayloadAction<string>) => {

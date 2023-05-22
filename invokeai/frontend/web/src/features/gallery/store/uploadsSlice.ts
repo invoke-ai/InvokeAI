@@ -1,5 +1,4 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
 
 import { RootState } from 'app/store/store';
 import {
@@ -7,7 +6,6 @@ import {
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
 import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
