@@ -6,7 +6,12 @@ import {
 } from 'services/util/deserializeImageField';
 import { Image } from 'app/types/invokeai';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
-import { imageReceived, thumbnailReceived } from 'services/thunks/image';
+import {
+  imageReceived,
+  imageRecordReceived,
+  imageUrlsReceived,
+  thumbnailReceived,
+} from 'services/thunks/image';
 import { startAppListening } from '..';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
@@ -24,7 +29,7 @@ export const addImageResultReceivedListener = () => {
       }
       return false;
     },
-    effect: (action, { getState, dispatch }) => {
+    effect: async (action, { getState, dispatch, take }) => {
       if (!invocationComplete.match(action)) {
         return;
       }
@@ -35,6 +40,29 @@ export const addImageResultReceivedListener = () => {
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
         const name = result.image.image_name;
         const type = result.image.image_type;
+
+        dispatch(imageUrlsReceived({ imageName: name, imageType: type }));
+
+        const [{ payload }] = await take(
+          (action): action is ReturnType<typeof imageUrlsReceived.fulfilled> =>
+            imageUrlsReceived.fulfilled.match(action) &&
+            action.payload.image_name === name
+        );
+
+        console.log(payload);
+
+        dispatch(imageRecordReceived({ imageName: name, imageType: type }));
+
+        const [x] = await take(
+          (
+            action
+          ): action is ReturnType<typeof imageRecordReceived.fulfilled> =>
+            imageRecordReceived.fulfilled.match(action) &&
+            action.payload.image_name === name
+        );
+
+        console.log(x);
+
         const state = getState();
 
         // if we need to refetch, set URLs to placeholder for now
