@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import json
 from logging import Logger
 from typing import Optional, TYPE_CHECKING, Union
 import uuid
@@ -21,17 +20,12 @@ from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
 
-
 if TYPE_CHECKING:
     from invokeai.app.services.graph import GraphExecutionState
 
 
 class ImageServiceABC(ABC):
-    """
-    High-level service for image management.
-
-    Provides methods for creating, retrieving, and deleting images.
-    """
+    """High-level service for image management."""
 
     @abstractmethod
     def create(
