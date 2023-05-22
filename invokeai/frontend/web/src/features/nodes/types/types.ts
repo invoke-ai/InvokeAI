@@ -1,6 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { ImageField } from 'services/api';
+import { ImageDTO } from 'services/api';
 import { AnyInvocationType } from 'services/events/types';
 
 export type InvocationValue = {
@@ -179,7 +179,7 @@ export type ConditioningInputFieldValue = FieldValueBase & {
 
 export type ImageInputFieldValue = FieldValueBase & {
   type: 'image';
-  value?: Pick<ImageField, 'image_name' | 'image_type'>;
+  value?: ImageDTO;
 };
 
 export type ModelInputFieldValue = FieldValueBase & {
@@ -245,7 +245,7 @@ export type BooleanInputFieldTemplate = InputFieldTemplateBase & {
 };
 
 export type ImageInputFieldTemplate = InputFieldTemplateBase & {
-  default: Pick<ImageField, 'image_name' | 'image_type'>;
+  default: ImageDTO;
   type: 'image';
 };
 
