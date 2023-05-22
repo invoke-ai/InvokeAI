@@ -62,9 +62,12 @@ def deserialize_image_record(image_row: sqlite3.Row) -> ImageRecord:
 
     image_type = ImageType(image_dict.get("image_type", ImageType.RESULT.value))
 
-    raw_metadata = image_dict.get("metadata", "{}")
+    raw_metadata = image_dict.get("metadata")
 
-    metadata = ImageMetadata.parse_raw(raw_metadata)
+    if raw_metadata is not None:
+        metadata = ImageMetadata.parse_raw(raw_metadata)
+    else:
+        metadata = None
 
     return ImageRecord(
         image_name=image_dict.get("id", "unknown"),

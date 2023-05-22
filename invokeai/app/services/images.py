@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 import json
 from logging import Logger
-from typing import Optional, Union
+from typing import Optional, TYPE_CHECKING, Union
 import uuid
 from PIL.Image import Image as PILImageType
-from PIL import PngImagePlugin
 
 from invokeai.app.models.image import ImageCategory, ImageType
 from invokeai.app.models.metadata import ImageMetadata
@@ -17,10 +16,14 @@ from invokeai.app.services.models.image_record import (
     image_record_to_dto,
 )
 from invokeai.app.services.image_file_storage import ImageFileStorageBase
-from invokeai.app.services.item_storage import PaginatedResults
+from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
+
+
+if TYPE_CHECKING:
+    from invokeai.app.services.graph import GraphExecutionState
 
 
 class ImageServiceABC(ABC):
@@ -59,7 +62,9 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_url(self, image_type: ImageType, image_name: str, thumbnail: bool = False) -> str:
+    def get_url(
+        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+    ) -> str:
         """Gets an image's or thumbnail's URL"""
         pass
 
@@ -113,6 +118,7 @@ class ImageServiceDependencies:
     metadata: MetadataServiceBase
     urls: UrlServiceBase
     logger: Logger
+    graph_execution_manager: ItemStorageABC["GraphExecutionState"]
 
     def __init__(
         self,
@@ -121,12 +127,14 @@ class ImageServiceDependencies:
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
+        graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
         self.records = image_record_storage
         self.files = image_file_storage
         self.metadata = metadata
         self.urls = url
         self.logger = logger
+        self.graph_execution_manager = graph_execution_manager
 
 
 class ImageService(ImageServiceABC):
@@ -139,6 +147,7 @@ class ImageService(ImageServiceABC):
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
+        graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
         self._services = ImageServiceDependencies(
             image_record_storage=image_record_storage,
@@ -146,6 +155,7 @@ class ImageService(ImageServiceABC):
             metadata=metadata,
             url=url,
             logger=logger,
+            graph_execution_manager=graph_execution_manager,
         )
 
     def create(
@@ -155,7 +165,6 @@ class ImageService(ImageServiceABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        metadata: Optional[ImageMetadata] = None,
     ) -> ImageDTO:
         image_name = self._create_image_name(
             image_type=image_type,
@@ -165,12 +174,7 @@ class ImageService(ImageServiceABC):
         )
 
         timestamp = get_iso_timestamp()
-
-        if metadata is not None:
-            pnginfo = PngImagePlugin.PngInfo()
-            pnginfo.add_text("invokeai", json.dumps(metadata))
-        else:
-            pnginfo = None
+        metadata = self._get_metadata(session_id, node_id)
 
         try:
             # TODO: Consider using a transaction here to ensure consistency between storage and database
@@ -178,7 +182,7 @@ class ImageService(ImageServiceABC):
                 image_type=image_type,
                 image_name=image_name,
                 image=image,
-                pnginfo=pnginfo,
+                metadata=metadata,
             )
 
             self._services.records.save(
@@ -237,24 +241,6 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image record")
             raise e
 
-    def get_path(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
-    ) -> str:
-        try:
-            return self._services.files.get_path(image_type, image_name, thumbnail)
-        except Exception as e:
-            self._services.logger.error("Problem getting image path")
-            raise e
-
-    def get_url(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
-    ) -> str:
-        try:
-            return self._services.urls.get_image_url(image_type, image_name, thumbnail)
-        except Exception as e:
-            self._services.logger.error("Problem getting image path")
-            raise e
-
     def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
         try:
             image_record = self._services.records.get(image_type, image_name)
@@ -271,6 +257,24 @@ class ImageService(ImageServiceABC):
             raise
         except Exception as e:
             self._services.logger.error("Problem getting image DTO")
+            raise e
+
+    def get_path(
+        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+    ) -> str:
+        try:
+            return self._services.files.get_path(image_type, image_name, thumbnail)
+        except Exception as e:
+            self._services.logger.error("Problem getting image path")
+            raise e
+
+    def get_url(
+        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+    ) -> str:
+        try:
+            return self._services.urls.get_image_url(image_type, image_name, thumbnail)
+        except Exception as e:
+            self._services.logger.error("Problem getting image path")
             raise e
 
     def get_many(
@@ -353,3 +357,15 @@ class ImageService(ImageServiceABC):
             return f"{image_type.value}_{image_category.value}_{session_id}_{node_id}_{uuid_str}.png"
 
         return f"{image_type.value}_{image_category.value}_{uuid_str}.png"
+
+    def _get_metadata(
+        self, session_id: Optional[str] = None, node_id: Optional[str] = None
+    ) -> Union[ImageMetadata, None]:
+        """Get the metadata for a node."""
+        metadata = None
+
+        if node_id is not None and session_id is not None:
+            session = self._services.graph_execution_manager.get(session_id)
+            metadata = self._services.metadata.create_image_metadata(session, node_id)
+
+        return metadata

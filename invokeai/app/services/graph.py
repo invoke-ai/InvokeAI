@@ -713,6 +713,13 @@ class Graph(BaseModel):
         g.add_edges_from(set([(e.source.node_id, e.destination.node_id) for e in self.edges]))
         return g
 
+    def nx_graph_with_data(self) -> nx.DiGraph:
+        """Returns a NetworkX DiGraph representing the data and layout of this graph"""
+        g = nx.DiGraph()
+        g.add_nodes_from([n for n in self.nodes.items()])
+        g.add_edges_from(set([(e.source.node_id, e.destination.node_id) for e in self.edges]))
+        return g
+
     def nx_graph_flat(
         self, nx_graph: Optional[nx.DiGraph] = None, prefix: Optional[str] = None
     ) -> nx.DiGraph:
