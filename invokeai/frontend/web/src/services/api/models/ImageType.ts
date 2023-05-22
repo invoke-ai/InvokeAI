@@ -3,6 +3,6 @@
 /* eslint-disable */
 
 /**
- * An enumeration.
+ * The type of an image.
  */
-export type ImageType = 'results' | 'intermediates' | 'uploads';
+export type ImageType = 'results' | 'uploads' | 'intermediates';

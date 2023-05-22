@@ -2,9 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Body_upload_image } from '../models/Body_upload_image';
-import type { ImageResponse } from '../models/ImageResponse';
+import type { ImageCategory } from '../models/ImageCategory';
 import type { ImageType } from '../models/ImageType';
-import type { PaginatedResults_ImageResponse_ } from '../models/PaginatedResults_ImageResponse_';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -23,49 +22,17 @@ export class ImagesService {
     imageName,
   }: {
     /**
-     * The type of image to get
+     * The type of the image to get
      */
     imageType: ImageType,
     /**
-     * The name of the image to get
+     * The id of the image to get
      */
     imageName: string,
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}',
-      path: {
-        'image_type': imageType,
-        'image_name': imageName,
-      },
-      errors: {
-        422: `Validation Error`,
-      },
-    });
-  }
-
-  /**
-   * Delete Image
-   * Deletes an image and its thumbnail
-   * @returns any Successful Response
-   * @throws ApiError
-   */
-  public static deleteImage({
-    imageType,
-    imageName,
-  }: {
-    /**
-     * The type of image to delete
-     */
-    imageType: ImageType,
-    /**
-     * The name of the image to delete
-     */
-    imageName: string,
-  }): CancelablePromise<any> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/v1/images/{image_type}/{image_name}',
+      url: '/api/v1/files/images/{image_type}/{image_name}',
       path: {
         'image_type': imageType,
         'image_name': imageName,
@@ -83,24 +50,100 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getThumbnail({
-    thumbnailType,
-    thumbnailName,
+    imageType,
+    imageName,
   }: {
     /**
-     * The type of thumbnail to get
+     * The type of the image whose thumbnail to get
      */
-    thumbnailType: ImageType,
+    imageType: ImageType,
     /**
-     * The name of the thumbnail to get
+     * The id of the image whose thumbnail to get
      */
-    thumbnailName: string,
+    imageName: string,
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{thumbnail_type}/thumbnails/{thumbnail_name}',
+      url: '/api/v1/files/images/{image_type}/{image_name}/thumbnail',
       path: {
-        'thumbnail_type': thumbnailType,
-        'thumbnail_name': thumbnailName,
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Get Image Record
+   * Gets an image record by id
+   * @returns any Successful Response
+   * @throws ApiError
+   */
+  public static getImageRecord({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of the image record to get
+     */
+    imageType: ImageType,
+    /**
+     * The id of the image record to get
+     */
+    imageName: string,
+  }): CancelablePromise<any> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/images/records/{image_type}/{image_name}',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * List Image Records
+   * Gets a list of image records by type and category
+   * @returns any Successful Response
+   * @throws ApiError
+   */
+  public static listImageRecords({
+    imageType,
+    imageCategory,
+    page,
+    perPage = 10,
+  }: {
+    /**
+     * The type of image records to get
+     */
+    imageType: ImageType,
+    /**
+     * The kind of image records to get
+     */
+    imageCategory: ImageCategory,
+    /**
+     * The page of image records to get
+     */
+    page?: number,
+    /**
+     * The number of image records per page
+     */
+    perPage?: number,
+  }): CancelablePromise<any> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/images/records/',
+      query: {
+        'image_type': imageType,
+        'image_category': imageCategory,
+        'page': page,
+        'per_page': perPage,
       },
       errors: {
         422: `Validation Error`,
@@ -110,21 +153,25 @@ export class ImagesService {
 
   /**
    * Upload Image
-   * @returns ImageResponse The image was uploaded successfully
+   * Uploads an image
+   * @returns any The image was uploaded successfully
    * @throws ApiError
    */
   public static uploadImage({
     imageType,
     formData,
+    imageCategory,
   }: {
     imageType: ImageType,
     formData: Body_upload_image,
-  }): CancelablePromise<ImageResponse> {
+    imageCategory?: ImageCategory,
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'POST',
-      url: '/api/v1/images/uploads/',
+      url: '/api/v1/images/',
       query: {
         'image_type': imageType,
+        'image_category': imageCategory,
       },
       formData: formData,
       mediaType: 'multipart/form-data',
@@ -136,36 +183,27 @@ export class ImagesService {
   }
 
   /**
-   * List Images
-   * Gets a list of images
-   * @returns PaginatedResults_ImageResponse_ Successful Response
+   * Delete Image
+   * Deletes an image
+   * @returns any Successful Response
    * @throws ApiError
    */
-  public static listImages({
+  public static deleteImage({
     imageType,
-    page,
-    perPage = 10,
+    imageName,
   }: {
+    imageType: ImageType,
     /**
-     * The type of images to get
+     * The name of the image to delete
      */
-    imageType?: ImageType,
-    /**
-     * The page of images to get
-     */
-    page?: number,
-    /**
-     * The number of images per page
-     */
-    perPage?: number,
-  }): CancelablePromise<PaginatedResults_ImageResponse_> {
+    imageName: string,
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/v1/images/',
-      query: {
+      method: 'DELETE',
+      url: '/api/v1/images/{image_type}/{image_name}',
+      path: {
         'image_type': imageType,
-        'page': page,
-        'per_page': perPage,
+        'image_name': imageName,
       },
       errors: {
         422: `Validation Error`,
