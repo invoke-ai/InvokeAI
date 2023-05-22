@@ -1,0 +1,246 @@
+<html lang="en">
+  <head>
+    <title>InvokeAI Test</title>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/x-icon" href="static/dream_web/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--<script src="config.js"></script>-->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+      integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+      crossorigin="anonymous"
+    ></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fslightbox/3.0.9/index.js"></script>
+
+    <style>
+      body {
+        background: #334;
+      }
+
+      #gallery > a.image {
+        display: inline-block;
+        width: 128px;
+        height: 128px;
+        margin: 8px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+
+      .results {
+        border-color: green;
+        border-width: 1px;
+        border-style: solid;
+      }
+
+      .intermediates {
+        border-color: yellow;
+        border-width: 1px;
+        border-style: solid;
+      }
+    </style>
+  </head>
+
+  <body>
+    <button onclick="dostuff();">Test Invoke</button>
+    <div id="gallery"></div>
+    <div id="textlog">
+      <textarea id="log" rows="10" cols="60" autofocus> </textarea>
+    </div>
+
+    <script type="text/javascript">
+      const socket_url = `ws://${window.location.host}`;
+      const socket = io(socket_url, {
+        path: '/ws/socket.io',
+      });
+      socket.on('connect', (data) => {
+        //socket.emit('subscribe', { 'session': 'WcBtYATwT92Mrb9zLgeyNw==' });
+      });
+
+      function addGalleryImage(src, className) {
+        let gallery = document.getElementById('gallery');
+        let div = document.createElement('a');
+        div.href = src;
+        div.setAttribute('data-fslightbox', '');
+        div.classList.add('image');
+        div.classList.add(className);
+        div.style.backgroundImage = `url('${src}')`;
+        gallery.appendChild(div);
+
+        refreshFsLightbox();
+      }
+
+      function log(event, data) {
+        document.getElementById('log').value += `${event} => ${JSON.stringify(
+          data
+        )}\n`;
+
+        if (data.result?.image?.image_type) {
+          addGalleryImage(
+            `/api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}`,
+            data.result.image.image_type
+          );
+        }
+        if (data.result?.mask?.image_type) {
+          addGalleryImage(
+            `/api/v1/images/${data.result.mask.image_type}/${data.result.mask.image_name}`,
+            data.result.mask.image_type
+          );
+        }
+
+        console.log(`${event} => ${JSON.stringify(data)}`);
+      }
+
+      socket.on('generator_progress', (data) =>
+        log('generator_progress', data)
+      );
+      socket.on('invocation_complete', (data) =>
+        log('invocation_complete', data)
+      );
+      socket.on('invocation_started', (data) =>
+        log('invocation_started', data)
+      );
+      socket.on('session_complete', (data) => {
+        log('session_complete', data);
+
+        // NOTE: you may not want to unsubscribe if you plan to continue using this session,
+        //       just make sure you unsubscribe eventually
+        socket.emit('unsubscribe', { session: data.session_id });
+      });
+
+      function dostuff() {
+        let prompt =
+          'hyper detailed 4k cryengine 3D render of a cat in a dune buggy, trending on artstation, soft atmospheric lighting, volumetric lighting, cinematic still, golden hour, crepuscular rays, smooth [grainy]';
+        let strength = 0.95;
+        let sampler = 'keuler_a';
+        let steps = 50;
+        let seed = -1;
+
+        // Start building nodes
+        var id = 1;
+        var initialNode = {
+          id: id.toString(),
+          type: 'txt2img',
+          prompt: prompt,
+          model: 'stable-diffusion-1-5',
+          sampler: sampler,
+          steps: steps,
+          seed: seed,
+        };
+        id++;
+        var i2iNode = {
+          id: id.toString(),
+          type: 'img2img',
+          prompt: prompt,
+          model: 'stable-diffusion-1-5',
+          sampler: sampler,
+          steps: steps,
+          seed: Math.floor(Math.random() * 10000),
+        };
+        id++;
+        var upscaleNode = { id: id.toString(), type: 'show_image' };
+        id++;
+
+        nodes = {};
+        nodes[initialNode.id] = initialNode;
+        nodes[i2iNode.id] = i2iNode;
+        nodes[upscaleNode.id] = upscaleNode;
+        links = [
+          {
+            source: { node_id: initialNode.id, field: 'image' },
+            destination: { node_id: i2iNode.id, field: 'image' },
+          },
+          {
+            source: { node_id: i2iNode.id, field: 'image' },
+            destination: { node_id: upscaleNode.id, field: 'image' },
+          },
+        ];
+        // expandSize = 128;
+        // for (var i = 0; i < 6; ++i) {
+        //     var i_seed = (seed == -1) ? -1 : seed + i + 1;
+        //     var startid = id - 1;
+        //     var offset = (i < 3) ? -expandSize : (3 * expandSize) + ((i - 3 + 1) * expandSize);
+        //     nodes.push({"id": id.toString(), "type": "crop", "x": offset, "y": 0, "width": 512, "height": 512});
+        //     let id_gen = id;
+        //     links.push({"from_node": {"id": startid.toString(), "field": "image"},"to_node": {"id": id_gen.toString(),"field": "image"}});
+        //     id++;
+
+        //     nodes.push({"id": id.toString(), "type": "tomask"});
+        //     let id_mask = id;
+        //     links.push({"from_node": {"id": id_gen.toString(), "field": "image"},"to_node": {"id": id_mask.toString(),"field": "image"}});
+        //     id++;
+
+        //     nodes.push({"id": id.toString(), "type": "blur", "radius": 32});
+        //     let id_mask_blur = id;
+        //     links.push({"from_node": {"id": id_mask.toString(), "field": "mask"},"to_node": {"id": id_mask_blur.toString(),"field": "image"}});
+        //     id++
+
+        //     nodes.push({"id": id.toString(), "type": "ilerp", "min": 128, "max": 255});
+        //     let id_ilerp = id;
+        //     links.push({"from_node": {"id": id_mask_blur.toString(), "field": "image"},"to_node": {"id": id_ilerp.toString(),"field": "image"}});
+        //     id++
+
+        //     nodes.push({"id": id.toString(), "type": "cv_inpaint"});
+        //     let id_cv_inpaint = id;
+        //     links.push({"from_node": {"id": id_gen.toString(), "field": "image"},"to_node": {"id": id_cv_inpaint.toString(),"field": "image"}});
+        //     links.push({"from_node": {"id": id_mask.toString(), "field": "mask"},"to_node": {"id": id_cv_inpaint.toString(),"field": "mask"}});
+        //     id++;
+
+        //     nodes.push({"id": id.toString(), "type": "img2img", "prompt": prompt, "strength": strength, "sampler": sampler, "steps": steps, "seed": i_seed, "color_match": true, "inpaint_replace": inpaint_replace});
+        //     let id_i2i = id;
+        //     links.push({"from_node": {"id": id_cv_inpaint.toString(), "field": "image"},"to_node": {"id": id_i2i.toString(),"field": "image"}});
+        //     links.push({"from_node": {"id": id_ilerp.toString(), "field": "image"},"to_node": {"id": id_i2i.toString(),"field": "mask"}});
+        //     id++;
+
+        //     nodes.push({"id": id.toString(), "type": "paste", "x": offset, "y": 0});
+        //     let id_paste = id;
+        //     links.push({"from_node": {"id": startid.toString(), "field": "image"},"to_node": {"id": id_paste.toString(),"field": "base_image"}});
+        //     links.push({"from_node": {"id": id_i2i.toString(), "field": "image"},"to_node": {"id": id_paste.toString(),"field": "image"}});
+        //     links.push({"from_node": {"id": id_ilerp.toString(), "field": "image"},"to_node": {"id": id_paste.toString(),"field": "mask"}});
+        //     id++;
+        // }
+
+        var graph = {
+          nodes: nodes,
+          edges: links,
+        };
+
+        // var defaultGraph = {"nodes": [
+        //     {"id": "1", "type": "txt2img", "prompt": prompt},
+        //     {"id": "2", "type": "crop", "x": -256, "y": 128, "width": 512, "height": 512},
+        //     {"id": "3", "type": "tomask"},
+        //     {"id": "4", "type": "cv_inpaint"},
+        //     {"id": "5", "type": "img2img", "prompt": prompt, "strength": 0.9},
+        //     {"id": "6", "type": "paste", "x": -256, "y": 128},
+        // ],
+        // "links": [
+        //     {"from_node": {"id": "1","field": "image"},"to_node": {"id": "2","field": "image"}},
+        //     {"from_node": {"id": "2","field": "image"},"to_node": {"id": "3","field": "image"}},
+        //     {"from_node": {"id": "2","field": "image"},"to_node": {"id": "4","field": "image"}},
+        //     {"from_node": {"id": "3","field": "mask"},"to_node": {"id": "4","field": "mask"}},
+        //     {"from_node": {"id": "4","field": "image"},"to_node": {"id": "5","field": "image"}},
+        //     {"from_node": {"id": "3","field": "mask"},"to_node": {"id": "5","field": "mask"}},
+        //     {"from_node": {"id": "1","field": "image"},"to_node": {"id": "6","field": "base_image"}},
+        //     {"from_node": {"id": "5","field": "image"},"to_node": {"id": "6","field": "image"}}
+        // ]};
+        fetch('/api/v1/sessions/', {
+          method: 'POST',
+          headers: new Headers({ 'content-type': 'application/json' }),
+          body: JSON.stringify(graph),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            sessionId = data.id;
+            socket.emit('subscribe', { session: sessionId });
+            fetch(`/api/v1/sessions/${sessionId}/invoke?all=true`, {
+              method: 'PUT',
+              headers: new Headers({ 'content-type': 'application/json' }),
+              body: '',
+            });
+          });
+      }
+    </script>
+  </body>
+</html>

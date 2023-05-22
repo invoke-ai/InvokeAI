@@ -49,7 +49,7 @@ if [ "$0" != "bash" ]; then
             ;;
         2)
             echo "Starting the InvokeAI browser-based UI..."
-            invokeai --web $@
+            invokeai-web $@
             ;;
         3)
             echo "Starting Textual Inversion:"

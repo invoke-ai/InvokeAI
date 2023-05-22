@@ -26,7 +26,7 @@ IF /I "%restore%" == "1" (
     python .venv\Scripts\invokeai.exe %*
 ) ELSE IF /I "%restore%" == "2" (
     echo Starting the InvokeAI browser-based UI..
-    python .venv\Scripts\invokeai.exe --web %*
+    python .venv\Scripts\invokeai-web.exe %*
 ) ELSE IF /I "%restore%" == "3" (
     echo Starting textual inversion training..
     python .venv\Scripts\invokeai-ti.exe --gui
