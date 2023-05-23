@@ -5,11 +5,11 @@
 import type { ImageType } from './ImageType';
 
 /**
- * The URLs for an image and its thumbnaill
+ * The URLs for an image and its thumbnail.
  */
 export type ImageUrlsDTO = {
   /**
-   * The name of the image.
+   * The unique name of the image.
    */
   image_name: string;
   /**
@@ -21,7 +21,7 @@ export type ImageUrlsDTO = {
    */
   image_url: string;
   /**
-   * The thumbnail URL of the image.
+   * The URL of the image's thumbnail.
    */
   thumbnail_url: string;
 };
