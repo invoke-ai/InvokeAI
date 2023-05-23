@@ -267,10 +267,10 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.debug(f'config file={config_file}')
 
         device = torch.device(choose_torch_device())
-        if config.precision == "auto":
+        precision = config.precision
+        if precision == "auto":
             precision = choose_precision(device)
-        dtype = torch.float32 if precision=='float32' \
-                 else torch.float16
+        dtype = torch.float32 if precision == 'float32' else torch.float16
 
         # this is transitional backward compatibility
         # support for the deprecated `max_loaded_models`

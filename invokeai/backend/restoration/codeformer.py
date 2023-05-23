@@ -24,7 +24,7 @@ class CodeFormerRestoration:
         self.codeformer_model_exists = self.model_path.exists()
 
         if not self.codeformer_model_exists:
-            logger.error("NOT FOUND: CodeFormer model not found at " + self.model_path)
+            logger.error(f"NOT FOUND: CodeFormer model not found at {self.model_path}")
         sys.path.append(os.path.abspath(codeformer_dir))
 
     def process(self, image, strength, device, seed=None, fidelity=0.75):
