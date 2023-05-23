@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-import datetime
-from enum import Enum
-from typing import Optional, Type
+from datetime import datetime
+from typing import Optional, cast
 import sqlite3
 import threading
 from typing import Optional, Union
@@ -18,62 +17,32 @@ from invokeai.app.services.models.image_record import (
 from invokeai.app.services.item_storage import PaginatedResults
 
 
-def create_sql_values_string_from_string_enum(enum: Type[Enum]):
-    """
-    Creates a string of the form "('value1'), ('value2'), ..., ('valueN')" from a StrEnum.
-    """
+# TODO: Should these excpetions subclass existing python exceptions?
+class ImageRecordNotFoundException(Exception):
+    """Raised when an image record is not found."""
 
-    delimiter = ", "
-    values = [f"('{e.value}')" for e in enum]
-    return delimiter.join(values)
+    def __init__(self, message="Image record not found"):
+        super().__init__(message)
 
 
-def create_enum_table(
-    enum: Type[Enum],
-    table_name: str,
-    primary_key_name: str,
-    cursor: sqlite3.Cursor,
-):
-    """
-    Creates and populates a table to be used as a functional enum.
-    """
+class ImageRecordSaveException(Exception):
+    """Raised when an image record cannot be saved."""
 
-    values_string = create_sql_values_string_from_string_enum(enum)
+    def __init__(self, message="Image record not saved"):
+        super().__init__(message)
 
-    cursor.execute(
-        f"""--sql
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            {primary_key_name} TEXT PRIMARY KEY
-        );
-        """
-    )
-    cursor.execute(
-        f"""--sql
-        INSERT OR IGNORE INTO {table_name} ({primary_key_name}) VALUES {values_string};
-        """
-    )
+
+class ImageRecordDeleteException(Exception):
+    """Raised when an image record cannot be deleted."""
+
+    def __init__(self, message="Image record not deleted"):
+        super().__init__(message)
 
 
 class ImageRecordStorageBase(ABC):
     """Low-level service responsible for interfacing with the image record store."""
 
-    class ImageRecordNotFoundException(Exception):
-        """Raised when an image record is not found."""
-
-        def __init__(self, message="Image record not found"):
-            super().__init__(message)
-
-    class ImageRecordSaveException(Exception):
-        """Raised when an image record cannot be saved."""
-
-        def __init__(self, message="Image record not saved"):
-            super().__init__(message)
-
-    class ImageRecordDeleteException(Exception):
-        """Raised when an image record cannot be deleted."""
-
-        def __init__(self, message="Image record not deleted"):
-            super().__init__(message)
+    # TODO: Implement an `update()` method
 
     @abstractmethod
     def get(self, image_type: ImageType, image_name: str) -> ImageRecord:
@@ -91,6 +60,8 @@ class ImageRecordStorageBase(ABC):
         """Gets a page of image records."""
         pass
 
+    # TODO: The database has a nullable `deleted_at` column, currently unused.
+    # Should we implement soft deletes? Would need coordination with ImageFileStorage.
     @abstractmethod
     def delete(self, image_type: ImageType, image_name: str) -> None:
         """Deletes an image record."""
@@ -102,11 +73,12 @@ class ImageRecordStorageBase(ABC):
         image_name: str,
         image_type: ImageType,
         image_category: ImageCategory,
+        width: int,
+        height: int,
         session_id: Optional[str],
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
-        created_at: str = datetime.datetime.utcnow().isoformat(),
-    ) -> None:
+    ) -> datetime:
         """Saves an image record."""
         pass
 
@@ -141,17 +113,23 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         # Create the `images` table.
         self._cursor.execute(
-            f"""--sql
+            """--sql
             CREATE TABLE IF NOT EXISTS images (
-                id TEXT PRIMARY KEY,
-                image_type TEXT, -- non-nullable via foreign key constraint
-                image_category TEXT, -- non-nullable via foreign key constraint
-                session_id TEXT, -- nullable
-                node_id TEXT, -- nullable
-                metadata TEXT, -- nullable
-                created_at TEXT NOT NULL,
-                FOREIGN KEY(image_type) REFERENCES image_types(type_name),
-                FOREIGN KEY(image_category) REFERENCES image_categories(category_name)
+                image_name TEXT NOT NULL PRIMARY KEY,
+                -- This is an enum in python, unrestricted string here for flexibility
+                image_type TEXT NOT NULL,
+                -- This is an enum in python, unrestricted string here for flexibility
+                image_category TEXT NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                session_id TEXT,
+                node_id TEXT,
+                metadata TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                -- Updated via trigger
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                -- Soft delete, currently unused
+                deleted_at DATETIME
             );
             """
         )
@@ -159,7 +137,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         # Create the `images` table indices.
         self._cursor.execute(
             """--sql
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_images_id ON images(id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_images_image_name ON images(image_name);
             """
         )
         self._cursor.execute(
@@ -172,53 +150,22 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             CREATE INDEX IF NOT EXISTS idx_images_image_category ON images(image_category);
             """
         )
-
-        # Create the tables for image-related enums
-        create_enum_table(
-            enum=ImageType,
-            table_name="image_types",
-            primary_key_name="type_name",
-            cursor=self._cursor,
-        )
-
-        create_enum_table(
-            enum=ImageCategory,
-            table_name="image_categories",
-            primary_key_name="category_name",
-            cursor=self._cursor,
-        )
-
-        # Create the `tags` table. TODO: do this elsewhere, shouldn't be in images db service
         self._cursor.execute(
             """--sql
-            CREATE TABLE IF NOT EXISTS tags (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tag_name TEXT UNIQUE NOT NULL
-            );
+            CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
             """
         )
 
-        # Create the `images_tags` junction table.
+        # Add trigger for `updated_at`.
         self._cursor.execute(
             """--sql
-            CREATE TABLE IF NOT EXISTS images_tags (
-                image_id TEXT,
-                tag_id INTEGER,
-                PRIMARY KEY (image_id, tag_id),
-                FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE,
-                FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
-            );
-            """
-        )
-
-        # Create the `images_favorites` table.
-        self._cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS images_favorites (
-                image_id TEXT PRIMARY KEY,
-                favorited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
-            );
+            CREATE TRIGGER IF NOT EXISTS tg_images_updated_at
+            AFTER UPDATE
+            ON images FOR EACH ROW
+            BEGIN
+                UPDATE images SET updated_at = current_timestamp
+                    WHERE image_name = old.image_name;
+            END;
             """
         )
 
@@ -229,22 +176,22 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(
                 f"""--sql
                 SELECT * FROM images
-                WHERE id = ?;
+                WHERE image_name = ?;
                 """,
                 (image_name,),
             )
 
-            result = self._cursor.fetchone()
+            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
         except sqlite3.Error as e:
             self._conn.rollback()
-            raise self.ImageRecordNotFoundException from e
+            raise ImageRecordNotFoundException from e
         finally:
             self._lock.release()
 
         if not result:
-            raise self.ImageRecordNotFoundException
+            raise ImageRecordNotFoundException
 
-        return deserialize_image_record(result)
+        return deserialize_image_record(dict(result))
 
     def get_many(
         self,
@@ -260,14 +207,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 f"""--sql
                 SELECT * FROM images
                 WHERE image_type = ? AND image_category = ?
+                ORDER BY created_at DESC
                 LIMIT ? OFFSET ?;
                 """,
                 (image_type.value, image_category.value, per_page, page * per_page),
             )
 
-            result = self._cursor.fetchall()
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
 
-            images = list(map(lambda r: deserialize_image_record(r), result))
+            images = list(map(lambda r: deserialize_image_record(dict(r)), result))
 
             self._cursor.execute(
                 """--sql
@@ -296,14 +244,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 DELETE FROM images
-                WHERE id = ?;
+                WHERE image_name = ?;
                 """,
                 (image_name,),
             )
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
-            raise ImageRecordStorageBase.ImageRecordDeleteException from e
+            raise ImageRecordDeleteException from e
         finally:
             self._lock.release()
 
@@ -313,10 +261,11 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_type: ImageType,
         image_category: ImageCategory,
         session_id: Optional[str],
+        width: int,
+        height: int,
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
-        created_at: str,
-    ) -> None:
+    ) -> datetime:
         try:
             metadata_json = (
                 None if metadata is None else metadata.json(exclude_none=True)
@@ -325,29 +274,44 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO images (
-                    id,
+                    image_name,
                     image_type,
                     image_category,
+                    width,
+                    height,
                     node_id,
                     session_id,
-                    metadata,
-                    created_at
+                    metadata
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
                     image_type.value,
                     image_category.value,
+                    width,
+                    height,
                     node_id,
                     session_id,
                     metadata_json,
-                    created_at,
                 ),
             )
             self._conn.commit()
+
+            self._cursor.execute(
+                """--sql
+                SELECT created_at
+                FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+
+            created_at = datetime.fromisoformat(self._cursor.fetchone()[0])
+
+            return created_at
         except sqlite3.Error as e:
             self._conn.rollback()
-            raise ImageRecordStorageBase.ImageRecordNotFoundException from e
+            raise ImageRecordSaveException from e
         finally:
             self._lock.release()

@@ -4,9 +4,17 @@ from typing import Optional, TYPE_CHECKING, Union
 import uuid
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.models.image import ImageCategory, ImageType
+from invokeai.app.models.image import (
+    ImageCategory,
+    ImageType,
+    InvalidImageCategoryException,
+    InvalidImageTypeException,
+)
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.services.image_record_storage import (
+    ImageRecordDeleteException,
+    ImageRecordNotFoundException,
+    ImageRecordSaveException,
     ImageRecordStorageBase,
 )
 from invokeai.app.services.models.image_record import (
@@ -14,7 +22,12 @@ from invokeai.app.services.models.image_record import (
     ImageDTO,
     image_record_to_dto,
 )
-from invokeai.app.services.image_file_storage import ImageFileStorageBase
+from invokeai.app.services.image_file_storage import (
+    ImageFileDeleteException,
+    ImageFileNotFoundException,
+    ImageFileSaveException,
+    ImageFileStorageBase,
+)
 from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.app.services.urls import UrlServiceBase
@@ -51,6 +64,11 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
+        """Gets an image DTO."""
+        pass
+
+    @abstractmethod
     def get_path(self, image_type: ImageType, image_name: str) -> str:
         """Gets an image's path"""
         pass
@@ -60,11 +78,6 @@ class ImageServiceABC(ABC):
         self, image_type: ImageType, image_name: str, thumbnail: bool = False
     ) -> str:
         """Gets an image's or thumbnail's URL"""
-        pass
-
-    @abstractmethod
-    def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
-        """Gets an image DTO."""
         pass
 
     @abstractmethod
@@ -81,26 +94,6 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def delete(self, image_type: ImageType, image_name: str):
         """Deletes an image."""
-        pass
-
-    @abstractmethod
-    def add_tag(self, image_type: ImageType, image_id: str, tag: str) -> None:
-        """Adds a tag to an image."""
-        pass
-
-    @abstractmethod
-    def remove_tag(self, image_type: ImageType, image_id: str, tag: str) -> None:
-        """Removes a tag from an image."""
-        pass
-
-    @abstractmethod
-    def favorite(self, image_type: ImageType, image_id: str) -> None:
-        """Favorites an image."""
-        pass
-
-    @abstractmethod
-    def unfavorite(self, image_type: ImageType, image_id: str) -> None:
-        """Unfavorites an image."""
         pass
 
 
@@ -160,6 +153,12 @@ class ImageService(ImageServiceABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
     ) -> ImageDTO:
+        if image_type not in ImageType:
+            raise InvalidImageTypeException
+
+        if image_category not in ImageCategory:
+            raise InvalidImageCategoryException
+
         image_name = self._create_image_name(
             image_type=image_type,
             image_category=image_category,
@@ -167,26 +166,30 @@ class ImageService(ImageServiceABC):
             session_id=session_id,
         )
 
-        timestamp = get_iso_timestamp()
         metadata = self._get_metadata(session_id, node_id)
+
+        (width, height) = image.size
 
         try:
             # TODO: Consider using a transaction here to ensure consistency between storage and database
+            created_at = self._services.records.save(
+                # Non-nullable fields
+                image_name=image_name,
+                image_type=image_type,
+                image_category=image_category,
+                width=width,
+                height=height,
+                # Nullable fields
+                node_id=node_id,
+                session_id=session_id,
+                metadata=metadata,
+            )
+
             self._services.files.save(
                 image_type=image_type,
                 image_name=image_name,
                 image=image,
                 metadata=metadata,
-            )
-
-            self._services.records.save(
-                image_name=image_name,
-                image_type=image_type,
-                image_category=image_category,
-                node_id=node_id,
-                session_id=session_id,
-                metadata=metadata,
-                created_at=timestamp,
             )
 
             image_url = self._services.urls.get_image_url(image_type, image_name)
@@ -195,20 +198,28 @@ class ImageService(ImageServiceABC):
             )
 
             return ImageDTO(
+                # Non-nullable fields
                 image_name=image_name,
                 image_type=image_type,
                 image_category=image_category,
+                width=width,
+                height=height,
+                # Nullable fields
                 node_id=node_id,
                 session_id=session_id,
                 metadata=metadata,
-                created_at=timestamp,
+                # Meta fields
+                created_at=created_at,
+                updated_at=created_at,  # this is always the same as the created_at at this time
+                deleted_at=None,
+                # Extra non-nullable fields for DTO
                 image_url=image_url,
                 thumbnail_url=thumbnail_url,
             )
-        except ImageRecordStorageBase.ImageRecordSaveException:
+        except ImageRecordSaveException:
             self._services.logger.error("Failed to save image record")
             raise
-        except ImageFileStorageBase.ImageFileSaveException:
+        except ImageFileSaveException:
             self._services.logger.error("Failed to save image file")
             raise
         except Exception as e:
@@ -218,7 +229,7 @@ class ImageService(ImageServiceABC):
     def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
         try:
             return self._services.files.get(image_type, image_name)
-        except ImageFileStorageBase.ImageFileNotFoundException:
+        except ImageFileNotFoundException:
             self._services.logger.error("Failed to get image file")
             raise
         except Exception as e:
@@ -228,7 +239,7 @@ class ImageService(ImageServiceABC):
     def get_record(self, image_type: ImageType, image_name: str) -> ImageRecord:
         try:
             return self._services.records.get(image_type, image_name)
-        except ImageRecordStorageBase.ImageRecordNotFoundException:
+        except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
             raise
         except Exception as e:
@@ -246,7 +257,7 @@ class ImageService(ImageServiceABC):
             )
 
             return image_dto
-        except ImageRecordStorageBase.ImageRecordNotFoundException:
+        except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
             raise
         except Exception as e:
@@ -311,31 +322,18 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete(self, image_type: ImageType, image_name: str):
-        # TODO: Consider using a transaction here to ensure consistency between storage and database
         try:
             self._services.files.delete(image_type, image_name)
             self._services.records.delete(image_type, image_name)
-        except ImageRecordStorageBase.ImageRecordDeleteException:
+        except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image record")
             raise
-        except ImageFileStorageBase.ImageFileDeleteException:
+        except ImageFileDeleteException:
             self._services.logger.error(f"Failed to delete image file")
             raise
         except Exception as e:
             self._services.logger.error("Problem deleting image record and file")
             raise e
-
-    def add_tag(self, image_type: ImageType, image_id: str, tag: str) -> None:
-        raise NotImplementedError("The 'add_tag' method is not implemented yet.")
-
-    def remove_tag(self, image_type: ImageType, image_id: str, tag: str) -> None:
-        raise NotImplementedError("The 'remove_tag' method is not implemented yet.")
-
-    def favorite(self, image_type: ImageType, image_id: str) -> None:
-        raise NotImplementedError("The 'favorite' method is not implemented yet.")
-
-    def unfavorite(self, image_type: ImageType, image_id: str) -> None:
-        raise NotImplementedError("The 'unfavorite' method is not implemented yet.")
 
     def _create_image_name(
         self,
