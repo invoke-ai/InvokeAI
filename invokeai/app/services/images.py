@@ -70,14 +70,19 @@ class ImageServiceABC(ABC):
 
     @abstractmethod
     def get_path(self, image_type: ImageType, image_name: str) -> str:
-        """Gets an image's path"""
+        """Gets an image's path."""
+        pass
+
+    @abstractmethod
+    def validate_path(self, path: str) -> bool:
+        """Validates an image's path."""
         pass
 
     @abstractmethod
     def get_url(
         self, image_type: ImageType, image_name: str, thumbnail: bool = False
     ) -> str:
-        """Gets an image's or thumbnail's URL"""
+        """Gets an image's or thumbnail's URL."""
         pass
 
     @abstractmethod
@@ -271,6 +276,13 @@ class ImageService(ImageServiceABC):
             return self._services.files.get_path(image_type, image_name, thumbnail)
         except Exception as e:
             self._services.logger.error("Problem getting image path")
+            raise e
+
+    def validate_path(self, path: str) -> bool:
+        try:
+            return self._services.files.validate_path(path)
+        except Exception as e:
+            self._services.logger.error("Problem validating image path")
             raise e
 
     def get_url(

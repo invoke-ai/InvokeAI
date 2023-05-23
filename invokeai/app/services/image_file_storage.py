@@ -44,12 +44,18 @@ class ImageFileStorageBase(ABC):
         """Retrieves an image as PIL Image."""
         pass
 
-    # # TODO: make this a bit more flexible for e.g. cloud storage
     @abstractmethod
     def get_path(
         self, image_type: ImageType, image_name: str, thumbnail: bool = False
     ) -> str:
         """Gets the internal path to an image or thumbnail."""
+        pass
+
+    # TODO: We need to validate paths before starlette makes the FileResponse, else we get a
+    # 500 internal server error. I don't like having this method on the service.
+    @abstractmethod
+    def validate_path(self, path: str) -> bool:
+        """Validates the path given for an image or thumbnail."""
         pass
 
     @abstractmethod
@@ -174,6 +180,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
         abspath = os.path.abspath(path)
 
         return abspath
+
+    def validate_path(self, path: str) -> bool:
+        """Validates the path given for an image or thumbnail."""
+        try:
+            os.stat(path)
+            return True
+        except:
+            return False
 
     def __get_cache(self, image_name: str) -> PILImageType | None:
         return None if image_name not in self.__cache else self.__cache[image_name]
