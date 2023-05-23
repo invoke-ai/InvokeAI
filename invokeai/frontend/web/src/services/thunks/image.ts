@@ -1,4 +1,3 @@
-import { AnyAction } from '@reduxjs/toolkit';
 import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -56,10 +55,7 @@ export const imageUploaded = createAppAsyncThunk(
     const response = await ImagesService.uploadImage(rest);
     const { location } = getHeaders(response);
 
-    imagesLog.info(
-      { arg: '<Blob>', response, location },
-      `Image uploaded (${response.image_name})`
-    );
+    imagesLog.debug({ arg: '<Blob>', response, location }, 'Image uploaded');
 
     return { response, location };
   }
@@ -75,10 +71,7 @@ export const imageDeleted = createAppAsyncThunk(
   async (arg: ImageDeletedArg) => {
     const response = await ImagesService.deleteImage(arg);
 
-    imagesLog.info(
-      { arg, response },
-      `Image deleted (${arg.imageType} - ${arg.imageName})`
-    );
+    imagesLog.debug({ arg, response }, 'Image deleted');
 
     return response;
   }

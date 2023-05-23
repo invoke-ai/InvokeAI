@@ -164,9 +164,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           isExternal
           maxW="calc(100% - 3rem)"
         >
-          {image.image_url.length > 64
-            ? image.image_url.substring(0, 64).concat('...')
-            : image.image_url}
+          {image.image_name}
           <ExternalLinkIcon mx="2px" />
         </Link>
       </Flex>

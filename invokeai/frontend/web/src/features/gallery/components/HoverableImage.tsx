@@ -13,7 +13,6 @@ import { DragEvent, MouseEvent, memo, useCallback, useState } from 'react';
 import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import * as InvokeAI from 'app/types/invokeai';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
@@ -168,9 +167,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     dispatch(initialImageSelected(image));
   }, [dispatch, image]);
 
-  const handleRecallInitialImage = useCallback(() => {
-    recallInitialImage(image.metadata.invokeai?.node?.image);
-  }, [image, recallInitialImage]);
+  // const handleRecallInitialImage = useCallback(() => {
+  //   recallInitialImage(image.metadata.invokeai?.node?.image);
+  // }, [image, recallInitialImage]);
 
   /**
    * TODO: the rest of these
@@ -238,13 +237,13 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             >
               {t('parameters.useSeed')}
             </MenuItem>
-            <MenuItem
+            {/* <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleRecallInitialImage}
               isDisabled={image?.metadata?.type !== 'img2img'}
             >
               {t('parameters.useInitImg')}
-            </MenuItem>
+            </MenuItem> */}
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
