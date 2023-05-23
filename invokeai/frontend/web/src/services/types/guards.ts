@@ -1,3 +1,5 @@
+import { ResultsImageDTO } from 'features/gallery/store/resultsSlice';
+import { UploadsImageDTO } from 'features/gallery/store/uploadsSlice';
 import { get, isObject, isString } from 'lodash-es';
 import {
   GraphExecutionState,
@@ -10,7 +12,14 @@ import {
   ImageType,
   ImageField,
   LatentsOutput,
+  ImageDTO,
 } from 'services/api';
+
+export const isUploadsImageDTO = (image: ImageDTO): image is UploadsImageDTO =>
+  image.image_type === 'uploads';
+
+export const isResultsImageDTO = (image: ImageDTO): image is ResultsImageDTO =>
+  image.image_type === 'results';
 
 export const isImageOutput = (
   output: GraphExecutionState['results'][string]
@@ -42,11 +51,6 @@ export const isCollectOutput = (
 
 export const isImageType = (t: unknown): t is ImageType =>
   isString(t) && ['results', 'uploads', 'intermediates'].includes(t);
-
-export const isImage = (image: unknown): image is Image =>
-  isObject(image) &&
-  isString(get(image, 'name')) &&
-  isImageType(get(image, 'type'));
 
 export const isImageField = (imageField: unknown): imageField is ImageField =>
   isObject(imageField) &&
