@@ -277,8 +277,19 @@ class TextToLatentsInvocation(BaseInvocation):
             control_models = []
             for control_info in control_list:
                 # handle control models
-                control_model = ControlNetModel.from_pretrained(control_info.control_model,
-                                                                torch_dtype=model.unet.dtype).to(model.device)
+                if ("," in control_info.control_model):
+                    control_model_split = control_info.control_model.split(",")
+                    control_name = control_model_split[0]
+                    control_subfolder = control_model_split[1]
+                    print("Using HF model subfolders")
+                    print("    control_name: ", control_name)
+                    print("    control_subfolder: ", control_subfolder)
+                    control_model = ControlNetModel.from_pretrained(control_name,
+                                                                    subfolder=control_subfolder,
+                                                                    torch_dtype=model.unet.dtype).to(model.device)
+                else:
+                    control_model = ControlNetModel.from_pretrained(control_info.control_model,
+                                                                    torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
                 control_image_field = control_info.image
                 input_image = context.services.images.get(control_image_field.image_type, control_image_field.image_name)

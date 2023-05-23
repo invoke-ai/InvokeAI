@@ -84,9 +84,11 @@ CONTROLNET_DEFAULT_MODELS = [
      ##############################################
      #  ControlNetMediaPipeface, ControlNet v1.1
      ##############################################
-     "CrucibleAI/ControlNetMediaPipeFace",# SD 2.1?
-     # diffusion_sd15 needs to be passed to from_pretrained() as subfolder arg
      # ["CrucibleAI/ControlNetMediaPipeFace", "diffusion_sd15"],  # SD 1.5
+     #    diffusion_sd15 needs to be passed to from_pretrained() as subfolder arg
+     #    hacked t2l to split to model & subfolder if format is "model,subfolder"
+     "CrucibleAI/ControlNetMediaPipeFace,diffusion_sd15",  # SD 1.5
+     "CrucibleAI/ControlNetMediaPipeFace",  # SD 2.1?
 ]
 
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
@@ -403,3 +405,17 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
 #         processed_image = zoe_depth_processor(image)
 #         return processed_image
 
+
+class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+    """Applies mediapipe face processing to image"""
+    # fmt: off
+    type: Literal["mediapipe_face_processor"] = "mediapipe_face_processor"
+    # Inputs
+    max_faces: int = Field(default=1, ge=1, description="maximum number of faces to detect")
+    min_confidence: float = Field(default=0.5, ge=0, le=1, description="minimum confidence for face detection")
+    # fmt: on
+
+    def run_processor(self, image):
+        mediapipe_face_processor = MediapipeFaceDetector()
+        processed_image = mediapipe_face_processor(image)
+        return processed_image
