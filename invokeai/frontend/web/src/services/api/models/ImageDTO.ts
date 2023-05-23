@@ -7,11 +7,11 @@ import type { ImageMetadata } from './ImageMetadata';
 import type { ImageType } from './ImageType';
 
 /**
- * Deserialized image record with URLs.
+ * Deserialized image record, enriched for the frontend with URLs.
  */
 export type ImageDTO = {
   /**
-   * The name of the image.
+   * The unique name of the image.
    */
   image_name: string;
   /**
@@ -23,7 +23,7 @@ export type ImageDTO = {
    */
   image_url: string;
   /**
-   * The thumbnail URL of the image.
+   * The URL of the image's thumbnail.
    */
   thumbnail_url: string;
   /**
@@ -31,19 +31,35 @@ export type ImageDTO = {
    */
   image_category: ImageCategory;
   /**
+   * The width of the image in px.
+   */
+  width: number;
+  /**
+   * The height of the image in px.
+   */
+  height: number;
+  /**
    * The created timestamp of the image.
    */
   created_at: string;
   /**
-   * The session ID.
+   * The updated timestamp of the image.
+   */
+  updated_at: string;
+  /**
+   * The deleted timestamp of the image.
+   */
+  deleted_at?: string;
+  /**
+   * The session ID that generated this image, if it is a generated image.
    */
   session_id?: string;
   /**
-   * The node ID.
+   * The node ID that generated this image, if it is a generated image.
    */
   node_id?: string;
   /**
-   * The image's metadata.
+   * A limited subset of the image's metadata. Retrieve the image's session for full metadata.
    */
   metadata?: ImageMetadata;
 };
