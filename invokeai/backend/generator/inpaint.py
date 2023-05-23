@@ -196,7 +196,7 @@ class Inpaint(Img2Img):
 
         seam_noise = self.get_noise(im.width, im.height)
 
-        result = make_image(seam_noise, seed)
+        result = make_image(seam_noise, seed=None)
 
         return result
 
