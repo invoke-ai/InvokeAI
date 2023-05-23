@@ -26,7 +26,7 @@ from controlnet_aux import (
     OpenposeDetector,
     PidiNetDetector,
     ContentShuffleDetector,
-    # ZoeDetector,   # FIXME: uncomment once ZoeDetector is availabel in official controlnet_aux release
+    ZoeDetector,
 )
 
 from .image import ImageOutput, build_image_output, PILInvocationConfig
@@ -390,16 +390,14 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
         return processed_image
 
 
-# # FIXME: ZoeDetector was implemented _after_ most recent official release of controlnet_aux (v0.0.3)
-# #  so it is commented out until a new release is made
-# class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
-#     """Applies Zoe depth processing to image"""
-#     # fmt: off
-#     type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
-#     # fmt: on
-#
-#     def run_processor(self, image):
-#         zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
-#         processed_image = zoe_depth_processor(image)
-#         return processed_image
+class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+    """Applies Zoe depth processing to image"""
+    # fmt: off
+    type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
+    # fmt: on
+
+    def run_processor(self, image):
+        zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
+        processed_image = zoe_depth_processor(image)
+        return processed_image
 
