@@ -95,7 +95,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         image_dto = context.services.images_new.create(
             image=generate_output.image,
             image_type=ImageType.RESULT,
-            image_category=ImageCategory.IMAGE,
+            image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
         )
@@ -119,7 +119,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         # context.services.images_db.set(
         #     id=image_name,
         #     image_type=ImageType.RESULT,
-        #     image_category=ImageCategory.IMAGE,
+        #     image_category=ImageCategory.GENERAL,
         #     session_id=context.graph_execution_state_id,
         #     node_id=self.id,
         #     metadata=GeneratedImageOrLatentsMetadata(),

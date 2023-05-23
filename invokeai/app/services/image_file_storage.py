@@ -14,26 +14,30 @@ from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 
+# TODO: Should these excpetions subclass existing python exceptions?
+class ImageFileNotFoundException(Exception):
+    """Raised when an image file is not found in storage."""
+
+    def __init__(self, message="Image file not found"):
+        super().__init__(message)
+
+
+class ImageFileSaveException(Exception):
+    """Raised when an image cannot be saved."""
+
+    def __init__(self, message="Image file not saved"):
+        super().__init__(message)
+
+
+class ImageFileDeleteException(Exception):
+    """Raised when an image cannot be deleted."""
+
+    def __init__(self, message="Image file not deleted"):
+        super().__init__(message)
+
+
 class ImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
-
-    class ImageFileNotFoundException(Exception):
-        """Raised when an image file is not found in storage."""
-
-        def __init__(self, message="Image file not found"):
-            super().__init__(message)
-
-    class ImageFileSaveException(Exception):
-        """Raised when an image cannot be saved."""
-
-        def __init__(self, message="Image file not saved"):
-            super().__init__(message)
-
-    class ImageFileDeleteException(Exception):
-        """Raised when an image cannot be deleted."""
-
-        def __init__(self, message="Image file not deleted"):
-            super().__init__(message)
 
     @abstractmethod
     def get(self, image_type: ImageType, image_name: str) -> PILImageType:
@@ -102,7 +106,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             self.__set_cache(image_path, image)
             return image
         except FileNotFoundError as e:
-            raise ImageFileStorageBase.ImageFileNotFoundException from e
+            raise ImageFileNotFoundException from e
 
     def save(
         self,
@@ -130,7 +134,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             self.__set_cache(image_path, image)
             self.__set_cache(thumbnail_path, thumbnail_image)
         except Exception as e:
-            raise ImageFileStorageBase.ImageFileSaveException from e
+            raise ImageFileSaveException from e
 
     def delete(self, image_type: ImageType, image_name: str) -> None:
         try:
@@ -150,7 +154,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if thumbnail_path in self.__cache:
                 del self.__cache[thumbnail_path]
         except Exception as e:
-            raise ImageFileStorageBase.ImageFileDeleteException from e
+            raise ImageFileDeleteException from e
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(

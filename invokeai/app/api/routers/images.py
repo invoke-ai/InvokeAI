@@ -30,7 +30,7 @@ async def upload_image(
     image_type: ImageType,
     request: Request,
     response: Response,
-    image_category: ImageCategory = ImageCategory.IMAGE,
+    image_category: ImageCategory = ImageCategory.GENERAL,
 ) -> ImageDTO:
     """Uploads an image"""
     if not file.content_type.startswith("image"):
