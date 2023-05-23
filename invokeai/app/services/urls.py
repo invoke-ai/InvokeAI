@@ -24,7 +24,11 @@ class LocalUrlService(UrlServiceBase):
         self, image_type: ImageType, image_name: str, thumbnail: bool = False
     ) -> str:
         image_basename = os.path.basename(image_name)
-        if thumbnail:
-            return f"{self._base_url}/images/{image_type.value}/{image_basename}/thumbnail"
 
-        return f"{self._base_url}/images/{image_type.value}/{image_basename}/full"
+        # These paths are determined by the routes in invokeai/app/api/routers/images.py
+        if thumbnail:
+            return (
+                f"{self._base_url}/images/{image_type.value}/{image_basename}/thumbnail"
+            )
+
+        return f"{self._base_url}/images/{image_type.value}/{image_basename}"

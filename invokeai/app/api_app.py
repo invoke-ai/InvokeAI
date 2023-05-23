@@ -3,8 +3,7 @@ import asyncio
 from inspect import signature
 
 import uvicorn
-from invokeai.app.models import resources
-import invokeai.backend.util.logging as logger
+from invokeai.backend.util.logging import InvokeAILogger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -20,6 +19,7 @@ from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
 from .services.config import InvokeAIAppConfig
 
+logger = InvokeAILogger.getLogger()
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?

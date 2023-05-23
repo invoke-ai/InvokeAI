@@ -93,7 +93,7 @@ async def get_image_metadata(
 
 
 @images_router.get(
-    "/{image_type}/{image_name}/full",
+    "/{image_type}/{image_name}",
     operation_id="get_image_full",
     response_class=Response,
     responses={
@@ -117,7 +117,15 @@ async def get_image_full(
             image_type, image_name
         )
 
-        return FileResponse(path, media_type="image/png")
+        if not ApiDependencies.invoker.services.images_new.validate_path(path):
+            raise HTTPException(status_code=404)
+
+        return FileResponse(
+            path,
+            media_type="image/png",
+            filename=image_name,
+            content_disposition_type="inline",
+        )
     except Exception as e:
         raise HTTPException(status_code=404)
 
@@ -144,8 +152,12 @@ async def get_image_thumbnail(
         path = ApiDependencies.invoker.services.images_new.get_path(
             image_type, image_name, thumbnail=True
         )
+        if not ApiDependencies.invoker.services.images_new.validate_path(path):
+            raise HTTPException(status_code=404)
 
-        return FileResponse(path, media_type="image/webp")
+        return FileResponse(
+            path, media_type="image/webp", content_disposition_type="inline"
+        )
     except Exception as e:
         raise HTTPException(status_code=404)
 
