@@ -6,7 +6,6 @@ from invokeai.app.services.images import ImageService
 from invokeai.backend import ModelManager
 from .events import EventServiceBase
 from .latent_storage import LatentsStorageBase
-from .image_file_storage import ImageFileStorageBase
 from .restoration_services import RestorationServices
 from .invocation_queue import InvocationQueueABC
 from .item_storage import ItemStorageABC
@@ -23,12 +22,11 @@ class InvocationServices:
 
     events: EventServiceBase
     latents: LatentsStorageBase
-    images: ImageFileStorageBase
     queue: InvocationQueueABC
     model_manager: ModelManager
     restoration: RestorationServices
     configuration: InvokeAISettings
-    images_new: ImageService
+    images: ImageService
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: ItemStorageABC["LibraryGraph"]
@@ -41,9 +39,8 @@ class InvocationServices:
         events: EventServiceBase,
         logger: Logger,
         latents: LatentsStorageBase,
-        images: ImageFileStorageBase,
+        images: ImageService,
         queue: InvocationQueueABC,
-        images_new: ImageService,
         graph_library: ItemStorageABC["LibraryGraph"],
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
         processor: "InvocationProcessorABC",
@@ -56,7 +53,6 @@ class InvocationServices:
         self.latents = latents
         self.images = images
         self.queue = queue
-        self.images_new = images_new
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager
         self.processor = processor

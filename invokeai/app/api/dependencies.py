@@ -55,16 +55,6 @@ class ApiDependencies:
             os.path.join(os.path.dirname(__file__), "../../../../outputs")
         )
 
-        latents = ForwardCacheLatentsStorage(
-            DiskLatentsStorage(f"{output_folder}/latents")
-        )
-
-        metadata = CoreMetadataService()
-
-        urls = LocalUrlService()
-
-        image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
-
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
 
@@ -72,9 +62,16 @@ class ApiDependencies:
             filename=db_location, table_name="graph_executions"
         )
 
+        urls = LocalUrlService()
+        metadata = CoreMetadataService()
         image_record_storage = SqliteImageRecordStorage(db_location)
+        image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
 
-        images_new = ImageService(
+        latents = ForwardCacheLatentsStorage(
+            DiskLatentsStorage(f"{output_folder}/latents")
+        )
+
+        images = ImageService(
             image_record_storage=image_record_storage,
             image_file_storage=image_file_storage,
             metadata=metadata,
@@ -87,8 +84,7 @@ class ApiDependencies:
             model_manager=get_model_manager(config, logger),
             events=events,
             latents=latents,
-            images=image_file_storage,
-            images_new=images_new,
+            images=images,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"
