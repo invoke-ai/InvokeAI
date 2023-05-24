@@ -195,14 +195,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
 
       if (shouldTransformUrls) {
-        return getUrl(image.url);
+        return getUrl(image.image_url);
       }
 
-      if (image.url.startsWith('http')) {
-        return image.url;
+      if (image.image_url.startsWith('http')) {
+        return image.image_url;
       }
 
-      return window.location.toString() + image.url;
+      return window.location.toString() + image.image_url;
     };
 
     const url = getImageUrl();
