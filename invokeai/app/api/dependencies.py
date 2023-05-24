@@ -46,7 +46,8 @@ class ApiDependencies:
 
     invoker: Invoker = None
 
-    def initialize(config, event_handler_id: int, logger: types.ModuleType=logger):
+    @staticmethod
+    def initialize(config, event_handler_id: int, logger: Logger = logger):
         logger.info(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
@@ -91,7 +92,7 @@ class ApiDependencies:
             ),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config,logger),
+            restoration=RestorationServices(config, logger),
             configuration=config,
             logger=logger,
         )
