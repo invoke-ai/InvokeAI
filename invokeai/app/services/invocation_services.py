@@ -45,7 +45,7 @@ class InvocationServices:
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
         processor: "InvocationProcessorABC",
         restoration: RestorationServices,
-        configuration: InvokeAISettings=None,
+        configuration: InvokeAISettings = None,
     ):
         self.model_manager = model_manager
         self.events = events
@@ -58,5 +58,3 @@ class InvocationServices:
         self.processor = processor
         self.restoration = restoration
         self.configuration = configuration
-
-
