@@ -80,7 +80,8 @@ jobs:
         uses: actions/checkout@v3
 
       - name: set test prompt to main branch validation
-        run:echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: setup python
         uses: actions/setup-python@v4
