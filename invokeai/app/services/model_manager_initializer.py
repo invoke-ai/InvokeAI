@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import types
 
 import invokeai.version
-from .config import InvokeAISettings
+from .config import InvokeAIAppConfig
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 
 # TODO: Replace with an abstract class base ModelManagerBase
-def get_model_manager(config: InvokeAISettings, logger: types.ModuleType) -> ModelManager:
+def get_model_manager(config: InvokeAIAppConfig, logger: types.ModuleType) -> ModelManager:
     model_config = config.model_conf_path
     if not model_config.exists():
         report_model_error(

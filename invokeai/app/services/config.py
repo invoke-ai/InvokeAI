@@ -17,6 +17,7 @@ InvokeAI:
     outdir: outputs
     embedding_dir: embeddings
     lora_dir: loras
+    controlnet_dir: controlnets
     autoconvert_dir: null
     gfpgan_model_dir: models/gfpgan/GFPGANv1.4.pth
   Models:
@@ -361,6 +362,7 @@ setting environment variables INVOKEAI_<setting>.
     gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
+    controlnet_dir      : Path = Field(default='controlnets', description='Path to InvokeAI ControlNet model directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
@@ -464,6 +466,13 @@ setting environment variables INVOKEAI_<setting>.
         Path to the LoRA models directory.
         '''
         return self._resolve(self.lora_dir) if self.lora_dir else None
+    
+    @property
+    def controlnet_path(self) -> Path:
+        '''
+        Path to the ControlNet models directory
+        '''
+        return self._resolve(self.controlnet_dir) if self.controlnet_dir else None
 
     @property
     def autoconvert_path(self)->Path:
