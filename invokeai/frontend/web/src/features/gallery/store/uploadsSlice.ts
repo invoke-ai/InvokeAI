@@ -14,7 +14,7 @@ export type UploadsImageDTO = Omit<ImageDTO, 'image_type'> & {
 };
 
 export const uploadsAdapter = createEntityAdapter<UploadsImageDTO>({
-  selectId: (image) => image.image_category,
+  selectId: (image) => image.image_name,
   sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
 });
 
