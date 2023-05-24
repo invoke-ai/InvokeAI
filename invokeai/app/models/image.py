@@ -28,6 +28,7 @@ class ImageCategory(str, Enum, metaclass=MetaEnum):
 
     GENERAL = "general"
     CONTROL = "control"
+    MASK = "mask"
     OTHER = "other"
 
 
