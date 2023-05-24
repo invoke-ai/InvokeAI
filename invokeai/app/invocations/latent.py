@@ -169,8 +169,8 @@ class TextToLatentsInvocation(BaseInvocation):
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
-    seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
+    # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
     # Schema customisation
@@ -205,17 +205,17 @@ class TextToLatentsInvocation(BaseInvocation):
             scheduler_name=self.scheduler
         )
 
-        if isinstance(model, DiffusionPipeline):
-            for component in [model.unet, model.vae]:
-                configure_model_padding(component,
-                                        self.seamless,
-                                        self.seamless_axes
-                                        )
-        else:
-            configure_model_padding(model,
-                                    self.seamless,
-                                    self.seamless_axes
-                                    )
+        # if isinstance(model, DiffusionPipeline):
+        #     for component in [model.unet, model.vae]:
+        #         configure_model_padding(component,
+        #                                 self.seamless,
+        #                                 self.seamless_axes
+        #                                 )
+        # else:
+        #     configure_model_padding(model,
+        #                             self.seamless,
+        #                             self.seamless_axes
+        #                             )
 
         return model
 
