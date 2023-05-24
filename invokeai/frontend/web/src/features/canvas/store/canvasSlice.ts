@@ -159,7 +159,7 @@ export const canvasSlice = createSlice({
     },
     setInitialCanvasImage: (state, action: PayloadAction<ImageDTO>) => {
       const image = action.payload;
-      const { width, height } = image.metadata;
+      const { width, height } = image;
       const { stageDimensions } = state;
 
       const newBoundingBoxDimensions = {
