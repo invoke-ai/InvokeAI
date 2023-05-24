@@ -3,7 +3,7 @@
 from typing import Literal, Optional
 
 import numpy as np
-from pydantic import Field
+from pydantic import Field, validator
 
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
@@ -32,6 +32,12 @@ class RangeInvocation(BaseInvocation):
     start: int = Field(default=0, description="The start of the range")
     stop: int = Field(default=10, description="The stop of the range")
     step: int = Field(default=1, description="The step of the range")
+
+    @validator("stop")
+    def stop_gt_start(cls, v, values):
+        if "start" in values and v <= values["start"]:
+            raise ValueError("stop must be greater than start")
+        return v
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
         return IntCollectionOutput(
