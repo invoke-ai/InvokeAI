@@ -1,7 +1,10 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { ImageDTO } from 'services/api';
+import { Graph, ImageDTO } from 'services/api';
 import { AnyInvocationType } from 'services/events/types';
+import { O } from 'ts-toolbelt';
+
+export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 
 export type InvocationValue = {
   id: string;

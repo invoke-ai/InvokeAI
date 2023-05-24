@@ -66,6 +66,7 @@ export type { PromptOutput } from './models/PromptOutput';
 export type { RandomIntInvocation } from './models/RandomIntInvocation';
 export type { RandomRangeInvocation } from './models/RandomRangeInvocation';
 export type { RangeInvocation } from './models/RangeInvocation';
+export type { RangeOfSizeInvocation } from './models/RangeOfSizeInvocation';
 export type { ResizeLatentsInvocation } from './models/ResizeLatentsInvocation';
 export type { RestoreFaceInvocation } from './models/RestoreFaceInvocation';
 export type { ScaleLatentsInvocation } from './models/ScaleLatentsInvocation';

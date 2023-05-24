@@ -10,7 +10,7 @@ export const readinessSelector = createSelector(
   [generationSelector, systemSelector, activeTabNameSelector],
   (generation, system, activeTabName) => {
     const {
-      prompt,
+      positivePrompt: prompt,
       shouldGenerateVariations,
       seedWeights,
       initialImage,

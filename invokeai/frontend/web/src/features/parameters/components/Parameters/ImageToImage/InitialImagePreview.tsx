@@ -57,7 +57,7 @@ const InitialImagePreview = () => {
       const name = e.dataTransfer.getData('invokeai/imageName');
       const type = e.dataTransfer.getData('invokeai/imageType') as ImageType;
 
-      dispatch(initialImageSelected({ name, type }));
+      dispatch(initialImageSelected({ image_name: name, image_type: type }));
     },
     [dispatch]
   );
@@ -73,10 +73,10 @@ const InitialImagePreview = () => {
       }}
       onDrop={handleDrop}
     >
-      {initialImage?.url && (
+      {initialImage?.image_url && (
         <>
           <Image
-            src={getUrl(initialImage?.url)}
+            src={getUrl(initialImage?.image_url)}
             fallbackStrategy="beforeLoadOrError"
             fallback={<ImageFallbackSpinner />}
             onError={handleError}
@@ -92,7 +92,7 @@ const InitialImagePreview = () => {
           <ImageMetadataOverlay image={initialImage} />
         </>
       )}
-      {!initialImage?.url && (
+      {!initialImage?.image_url && (
         <Icon
           as={FaImage}
           sx={{

@@ -13,8 +13,8 @@ export const buildInpaintNode = (
   const activeTabName = activeTabNameSelector(state);
 
   const {
-    prompt,
-    negativePrompt,
+    positivePrompt: prompt,
+    negativePrompt: negativePrompt,
     seed,
     steps,
     width,

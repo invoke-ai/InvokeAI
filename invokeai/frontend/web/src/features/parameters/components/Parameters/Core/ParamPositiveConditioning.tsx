@@ -8,7 +8,7 @@ import { readinessSelector } from 'app/selectors/readinessSelector';
 import {
   GenerationState,
   clampSymmetrySteps,
-  setPrompt,
+  setPositivePrompt,
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
@@ -22,7 +22,7 @@ const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
   (parameters: GenerationState, activeTabName) => {
     return {
-      prompt: parameters.prompt,
+      prompt: parameters.positivePrompt,
       activeTabName,
     };
   },
@@ -46,7 +46,7 @@ const ParamPositiveConditioning = () => {
   const { t } = useTranslation();
 
   const handleChangePrompt = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    dispatch(setPrompt(e.target.value));
+    dispatch(setPositivePrompt(e.target.value));
   };
 
   useHotkeys(
