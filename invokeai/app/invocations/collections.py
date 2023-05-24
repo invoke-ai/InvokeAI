@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-from typing import Literal, Optional
+from typing import Literal
 
 import numpy as np
 from pydantic import Field, validator
@@ -24,7 +24,7 @@ class IntCollectionOutput(BaseInvocationOutput):
 
 
 class RangeInvocation(BaseInvocation):
-    """Creates a range"""
+    """Creates a range of numbers from start to stop with step"""
 
     type: Literal["range"] = "range"
 
@@ -42,6 +42,22 @@ class RangeInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
         return IntCollectionOutput(
             collection=list(range(self.start, self.stop, self.step))
+        )
+
+
+class RangeOfSizeInvocation(BaseInvocation):
+    """Creates a range from start to start + size with step"""
+
+    type: Literal["range_of_size"] = "range_of_size"
+
+    # Inputs
+    start: int = Field(default=0, description="The start of the range")
+    size: int = Field(default=1, description="The number of values")
+    step: int = Field(default=1, description="The step of the range")
+
+    def invoke(self, context: InvocationContext) -> IntCollectionOutput:
+        return IntCollectionOutput(
+            collection=list(range(self.start, self.start + self.size + 1, self.step))
         )
 
 
