@@ -3,22 +3,22 @@
 /* eslint-disable */
 
 /**
- * Creates a range of numbers from start to stop with step
+ * Creates a range from start to start + size with step
  */
-export type RangeInvocation = {
+export type RangeOfSizeInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'range';
+  type?: 'range_of_size';
   /**
    * The start of the range
    */
   start?: number;
   /**
-   * The stop of the range
+   * The number of values
    */
-  stop?: number;
+  size?: number;
   /**
    * The step of the range
    */

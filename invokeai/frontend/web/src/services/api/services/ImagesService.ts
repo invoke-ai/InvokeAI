@@ -90,6 +90,39 @@ export class ImagesService {
   }
 
   /**
+   * Get Image Full
+   * Gets a full-resolution image file
+   * @returns any Return the full-resolution image
+   * @throws ApiError
+   */
+  public static getImageFull({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of full-resolution image file to get
+     */
+    imageType: ImageType,
+    /**
+     * The name of full-resolution image file to get
+     */
+    imageName: string,
+  }): CancelablePromise<any> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/images/{image_type}/{image_name}',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      errors: {
+        404: `Image not found`,
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
    * Delete Image
    * Deletes an image
    * @returns any Successful Response
@@ -145,39 +178,6 @@ export class ImagesService {
         'image_name': imageName,
       },
       errors: {
-        422: `Validation Error`,
-      },
-    });
-  }
-
-  /**
-   * Get Image Full
-   * Gets a full-resolution image file
-   * @returns any Return the full-resolution image
-   * @throws ApiError
-   */
-  public static getImageFull({
-    imageType,
-    imageName,
-  }: {
-    /**
-     * The type of full-resolution image file to get
-     */
-    imageType: ImageType,
-    /**
-     * The name of full-resolution image file to get
-     */
-    imageName: string,
-  }): CancelablePromise<any> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}/full',
-      path: {
-        'image_type': imageType,
-        'image_name': imageName,
-      },
-      errors: {
-        404: `Image not found`,
         422: `Validation Error`,
       },
     });

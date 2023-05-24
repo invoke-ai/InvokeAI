@@ -31,7 +31,7 @@ export const setAllParametersReducer = (
       state.model = String(model);
     }
     if (prompt !== undefined) {
-      state.prompt = String(prompt);
+      state.positivePrompt = String(prompt);
     }
     if (scheduler !== undefined) {
       const schedulerString = String(scheduler);

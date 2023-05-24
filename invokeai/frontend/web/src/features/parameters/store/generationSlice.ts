@@ -16,7 +16,7 @@ export interface GenerationState {
   initialImage?: ImageDTO;
   iterations: number;
   perlin: number;
-  prompt: string;
+  positivePrompt: string;
   negativePrompt: string;
   scheduler: Scheduler;
   seamBlur: number;
@@ -50,7 +50,7 @@ export const initialGenerationState: GenerationState = {
   infillMethod: 'patchmatch',
   iterations: 1,
   perlin: 0,
-  prompt: '',
+  positivePrompt: '',
   negativePrompt: '',
   scheduler: 'lms',
   seamBlur: 16,
@@ -83,12 +83,15 @@ export const generationSlice = createSlice({
   name: 'generation',
   initialState,
   reducers: {
-    setPrompt: (state, action: PayloadAction<string | InvokeAI.Prompt>) => {
+    setPositivePrompt: (
+      state,
+      action: PayloadAction<string | InvokeAI.Prompt>
+    ) => {
       const newPrompt = action.payload;
       if (typeof newPrompt === 'string') {
-        state.prompt = newPrompt;
+        state.positivePrompt = newPrompt;
       } else {
-        state.prompt = promptToString(newPrompt);
+        state.positivePrompt = promptToString(newPrompt);
       }
     },
     setNegativePrompt: (
@@ -244,7 +247,7 @@ export const {
   setInfillMethod,
   setIterations,
   setPerlin,
-  setPrompt,
+  setPositivePrompt,
   setNegativePrompt,
   setScheduler,
   setSeamBlur,

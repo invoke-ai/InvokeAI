@@ -59,7 +59,7 @@ export type ImageDTO = {
    */
   node_id?: string;
   /**
-   * A limited subset of the image's metadata. Retrieve the image's session for full metadata.
+   * A limited subset of the image's generation metadata. Retrieve the image's session for full metadata.
    */
   metadata?: ImageMetadata;
 };

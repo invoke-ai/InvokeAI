@@ -20,7 +20,7 @@ import {
   setImg2imgStrength,
   setNegativePrompt,
   setPerlin,
-  setPrompt,
+  setPositivePrompt,
   setScheduler,
   setSeamless,
   setSeed,
@@ -199,7 +199,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
                   ? metadata.positive_conditioning
                   : promptToString(metadata.positive_conditioning)
               }
-              onClick={() => setPrompt(metadata.positive_conditioning!)}
+              onClick={() => setPositivePrompt(metadata.positive_conditioning!)}
             />
           )}
           {metadata.negative_conditioning && (
