@@ -94,6 +94,6 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
 
   // Create and add the noise nodes
   graph = addNoiseNodes(graph, TEXT_TO_LATENTS, state);
-  console.log(graph);
+
   return graph;
 };
