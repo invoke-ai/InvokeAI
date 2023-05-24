@@ -1,13 +1,13 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import io
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 import numpy
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..models.image import ImageField, ImageType
+from ..models.image import ImageCategory, ImageField, ImageType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -41,27 +41,14 @@ class ImageOutput(BaseInvocationOutput):
         schema_extra = {"required": ["type", "image", "width", "height"]}
 
 
-def build_image_output(
-    image_type: ImageType, image_name: str, image: Image.Image
-) -> ImageOutput:
-    """Builds an ImageOutput and its ImageField"""
-    image_field = ImageField(
-        image_name=image_name,
-        image_type=image_type,
-    )
-    return ImageOutput(
-        image=image_field,
-        width=image.width,
-        height=image.height,
-    )
-
-
 class MaskOutput(BaseInvocationOutput):
     """Base class for invocations that output a mask"""
 
     # fmt: off
     type: Literal["mask"] = "mask"
     mask:      ImageField = Field(default=None, description="The output mask")
+    width:            int = Field(description="The width of the mask in pixels")
+    height:           int = Field(description="The height of the mask in pixels")
     # fmt: on
 
     class Config:
@@ -84,12 +71,15 @@ class LoadImageInvocation(BaseInvocation):
     image_name:       str = Field(description="The name of the image")
     # fmt: on
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(self.image_type, self.image_name)
+        image = context.services.images.get_pil_image(self.image_type, self.image_name)
 
-        return build_image_output(
-            image_type=self.image_type,
-            image_name=self.image_name,
-            image=image,
+        return ImageOutput(
+            image=ImageField(
+                image_name=self.image_name,
+                image_type=self.image_type,
+            ),
+            width=image.width,
+            height=image.height,
         )
 
 
@@ -99,10 +89,12 @@ class ShowImageInvocation(BaseInvocation):
     type: Literal["show_image"] = "show_image"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to show")
+    image: Union[ImageField, None] = Field(
+        default=None, description="The image to show"
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
         if image:
@@ -110,10 +102,13 @@ class ShowImageInvocation(BaseInvocation):
 
         # TODO: how to handle failure?
 
-        return build_image_output(
-            image_type=self.image.image_type,
-            image_name=self.image.image_name,
-            image=image,
+        return ImageOutput(
+            image=ImageField(
+                image_name=self.image.image_name,
+                image_type=self.image.image_type,
+            ),
+            width=image.width,
+            height=image.height,
         )
 
 
@@ -124,7 +119,7 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["crop"] = "crop"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to crop")
+    image: Union[ImageField, None]  = Field(default=None, description="The image to crop")
     x:      int = Field(default=0, description="The left x coordinate of the crop rectangle")
     y:      int = Field(default=0, description="The top y coordinate of the crop rectangle")
     width:  int = Field(default=512, gt=0, description="The width of the crop rectangle")
@@ -132,7 +127,7 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -141,20 +136,21 @@ class CropImageInvocation(BaseInvocation, PILInvocationConfig):
         )
         image_crop.paste(image, (-self.x, -self.y))
 
-        image_type = ImageType.INTERMEDIATE
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
-        )
-
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, image_crop, metadata)
-        return build_image_output(
-            image_type=image_type,
-            image_name=image_name,
+        image_dto = context.services.images.create(
             image=image_crop,
+            image_type=ImageType.INTERMEDIATE,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 
@@ -165,25 +161,27 @@ class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["paste"] = "paste"
 
     # Inputs
-    base_image:     ImageField = Field(default=None, description="The base image")
-    image:          ImageField = Field(default=None, description="The image to paste")
+    base_image:     Union[ImageField, None]  = Field(default=None, description="The base image")
+    image:          Union[ImageField, None]  = Field(default=None, description="The image to paste")
     mask: Optional[ImageField] = Field(default=None, description="The mask to use when pasting")
     x:                     int = Field(default=0, description="The left x coordinate at which to paste the image")
     y:                     int = Field(default=0, description="The top y coordinate at which to paste the image")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        base_image = context.services.images.get(
+        base_image = context.services.images.get_pil_image(
             self.base_image.image_type, self.base_image.image_name
         )
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
         mask = (
             None
             if self.mask is None
             else ImageOps.invert(
-                context.services.images.get(self.mask.image_type, self.mask.image_name)
+                context.services.images.get_pil_image(
+                    self.mask.image_type, self.mask.image_name
+                )
             )
         )
         # TODO: probably shouldn't invert mask here... should user be required to do it?
@@ -199,20 +197,21 @@ class PasteImageInvocation(BaseInvocation, PILInvocationConfig):
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
         new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
 
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
-        )
-
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, new_image, metadata)
-        return build_image_output(
-            image_type=image_type,
-            image_name=image_name,
+        image_dto = context.services.images.create(
             image=new_image,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 
@@ -223,12 +222,12 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["tomask"] = "tomask"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to create the mask from")
+    image: Union[ImageField, None]  = Field(default=None, description="The image to create the mask from")
     invert:      bool = Field(default=False, description="Whether or not to invert the mask")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -236,17 +235,21 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
         if self.invert:
             image_mask = ImageOps.invert(image_mask)
 
-        image_type = ImageType.INTERMEDIATE
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=image_mask,
+            image_type=ImageType.INTERMEDIATE,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
+        return MaskOutput(
+            mask=ImageField(
+                image_type=image_dto.image_type, image_name=image_dto.image_name
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
-
-        context.services.images.save(image_type, image_name, image_mask, metadata)
-        return MaskOutput(mask=ImageField(image_type=image_type, image_name=image_name))
 
 
 class BlurInvocation(BaseInvocation, PILInvocationConfig):
@@ -256,13 +259,13 @@ class BlurInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["blur"] = "blur"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to blur")
+    image: Union[ImageField, None]  = Field(default=None, description="The image to blur")
     radius:     float = Field(default=8.0, ge=0, description="The blur radius")
     blur_type: Literal["gaussian", "box"] = Field(default="gaussian", description="The type of blur")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -273,18 +276,21 @@ class BlurInvocation(BaseInvocation, PILInvocationConfig):
         )
         blur_image = image.filter(blur)
 
-        image_type = ImageType.INTERMEDIATE
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=blur_image,
+            image_type=ImageType.INTERMEDIATE,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, blur_image, metadata)
-        return build_image_output(
-            image_type=image_type, image_name=image_name, image=blur_image
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 
@@ -295,13 +301,13 @@ class LerpInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["lerp"] = "lerp"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to lerp")
+    image: Union[ImageField, None]  = Field(default=None, description="The image to lerp")
     min: int = Field(default=0, ge=0, le=255, description="The minimum output value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum output value")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -310,18 +316,21 @@ class LerpInvocation(BaseInvocation, PILInvocationConfig):
 
         lerp_image = Image.fromarray(numpy.uint8(image_arr))
 
-        image_type = ImageType.INTERMEDIATE
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=lerp_image,
+            image_type=ImageType.INTERMEDIATE,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, lerp_image, metadata)
-        return build_image_output(
-            image_type=image_type, image_name=image_name, image=lerp_image
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 
@@ -332,13 +341,13 @@ class InverseLerpInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["ilerp"] = "ilerp"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to lerp")
+    image: Union[ImageField, None]  = Field(default=None, description="The image to lerp")
     min: int = Field(default=0, ge=0, le=255, description="The minimum input value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum input value")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -352,16 +361,19 @@ class InverseLerpInvocation(BaseInvocation, PILInvocationConfig):
 
         ilerp_image = Image.fromarray(numpy.uint8(image_arr))
 
-        image_type = ImageType.INTERMEDIATE
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=ilerp_image,
+            image_type=ImageType.INTERMEDIATE,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, ilerp_image, metadata)
-        return build_image_output(
-            image_type=image_type, image_name=image_name, image=ilerp_image
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )

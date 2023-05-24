@@ -1,17 +1,17 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-from typing import Literal, Optional, Union, get_args
+from typing import Literal, Union, get_args
 
 import numpy as np
 import math
 from PIL import Image, ImageOps
 from pydantic import Field
 
-from invokeai.app.invocations.image import ImageOutput, build_image_output
+from invokeai.app.invocations.image import ImageOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from ..models.image import ColorField, ImageField, ImageType
+from ..models.image import ColorField, ImageCategory, ImageField, ImageType
 from .baseinvocation import (
     BaseInvocation,
     InvocationContext,
@@ -125,36 +125,39 @@ class InfillColorInvocation(BaseInvocation):
     """Infills transparent areas of an image with a solid color"""
 
     type: Literal["infill_rgba"] = "infill_rgba"
-    image: Optional[ImageField] = Field(default=None, description="The image to infill")
-    color: Optional[ColorField] = Field(
+    image: Union[ImageField, None] = Field(
+        default=None, description="The image to infill"
+    )
+    color: ColorField = Field(
         default=ColorField(r=127, g=127, b=127, a=255),
         description="The color to use to infill",
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
-        infilled = Image.alpha_composite(solid_bg, image)
+        infilled = Image.alpha_composite(solid_bg, image.convert("RGBA"))
 
         infilled.paste(image, (0, 0), image.split()[-1])
 
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=infilled,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, infilled, metadata)
-        return build_image_output(
-            image_type=image_type,
-            image_name=image_name,
-            image=image,
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 
@@ -163,7 +166,9 @@ class InfillTileInvocation(BaseInvocation):
 
     type: Literal["infill_tile"] = "infill_tile"
 
-    image: Optional[ImageField] = Field(default=None, description="The image to infill")
+    image: Union[ImageField, None] = Field(
+        default=None, description="The image to infill"
+    )
     tile_size: int = Field(default=32, ge=1, description="The tile size (px)")
     seed: int = Field(
         ge=0,
@@ -173,7 +178,7 @@ class InfillTileInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -182,20 +187,21 @@ class InfillTileInvocation(BaseInvocation):
         )
         infilled.paste(image, (0, 0), image.split()[-1])
 
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=infilled,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, infilled, metadata)
-        return build_image_output(
-            image_type=image_type,
-            image_name=image_name,
-            image=image,
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 
@@ -204,10 +210,12 @@ class InfillPatchMatchInvocation(BaseInvocation):
 
     type: Literal["infill_patchmatch"] = "infill_patchmatch"
 
-    image: Optional[ImageField] = Field(default=None, description="The image to infill")
+    image: Union[ImageField, None] = Field(
+        default=None, description="The image to infill"
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -216,18 +224,19 @@ class InfillPatchMatchInvocation(BaseInvocation):
         else:
             raise ValueError("PatchMatch is not available on this system")
 
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=infilled,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
         )
 
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-
-        context.services.images.save(image_type, image_name, infilled, metadata)
-        return build_image_output(
-            image_type=image_type,
-            image_name=image_name,
-            image=image,
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
         )

@@ -45,7 +45,7 @@ async def upload_image(
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     try:
-        image_dto = ApiDependencies.invoker.services.images_new.create(
+        image_dto = ApiDependencies.invoker.services.images.create(
             pil_image,
             image_type,
             image_category,
@@ -67,7 +67,7 @@ async def delete_image(
     """Deletes an image"""
 
     try:
-        ApiDependencies.invoker.services.images_new.delete(image_type, image_name)
+        ApiDependencies.invoker.services.images.delete(image_type, image_name)
     except Exception as e:
         # TODO: Does this need any exception handling at all?
         pass
@@ -85,7 +85,7 @@ async def get_image_metadata(
     """Gets an image's metadata"""
 
     try:
-        return ApiDependencies.invoker.services.images_new.get_dto(
+        return ApiDependencies.invoker.services.images.get_dto(
             image_type, image_name
         )
     except Exception as e:
@@ -113,11 +113,11 @@ async def get_image_full(
     """Gets a full-resolution image file"""
 
     try:
-        path = ApiDependencies.invoker.services.images_new.get_path(
+        path = ApiDependencies.invoker.services.images.get_path(
             image_type, image_name
         )
 
-        if not ApiDependencies.invoker.services.images_new.validate_path(path):
+        if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
 
         return FileResponse(
@@ -149,10 +149,10 @@ async def get_image_thumbnail(
     """Gets a thumbnail image file"""
 
     try:
-        path = ApiDependencies.invoker.services.images_new.get_path(
+        path = ApiDependencies.invoker.services.images.get_path(
             image_type, image_name, thumbnail=True
         )
-        if not ApiDependencies.invoker.services.images_new.validate_path(path):
+        if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
 
         return FileResponse(
@@ -174,10 +174,10 @@ async def get_image_urls(
     """Gets an image and thumbnail URL"""
 
     try:
-        image_url = ApiDependencies.invoker.services.images_new.get_url(
+        image_url = ApiDependencies.invoker.services.images.get_url(
             image_type, image_name
         )
-        thumbnail_url = ApiDependencies.invoker.services.images_new.get_url(
+        thumbnail_url = ApiDependencies.invoker.services.images.get_url(
             image_type, image_name, thumbnail=True
         )
         return ImageUrlsDTO(
@@ -205,7 +205,7 @@ async def list_images_with_metadata(
 ) -> PaginatedResults[ImageDTO]:
     """Gets a list of images with metadata"""
 
-    image_dtos = ApiDependencies.invoker.services.images_new.get_many(
+    image_dtos = ApiDependencies.invoker.services.images.get_many(
         image_type,
         image_category,
         page,
