@@ -417,5 +417,5 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
 
     def run_processor(self, image):
         mediapipe_face_processor = MediapipeFaceDetector()
-        processed_image = mediapipe_face_processor(image)
+        processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
         return processed_image
