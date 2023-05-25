@@ -3,6 +3,7 @@
 from typing import Literal, Optional
 
 import numpy
+import cv2
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 from pydantic import Field
 from pathlib import Path
@@ -647,6 +648,153 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
 
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+class HueAdjustmentInvocation(BaseInvocation):
+    """Adjusts the Hue of an image."""
+
+    # fmt: off
+    type: Literal["hue_adjust"] = "hue_adjust"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to adjust")
+    hue: float = Field(default=0, description="The degrees by which to rotate the hue")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_image = context.services.images.get_pil_image(
+            self.image.image_type, self.image.image_name
+        )
+
+        # Convert PIL image to OpenCV format (numpy array), note color channel
+        # ordering is changed from RGB to BGR
+        image = numpy.array(pil_image.convert('RGB'))[:, :, ::-1]
+
+        # Convert image to HSV color space
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # Adjust the hue
+        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + self.hue) % 180
+
+        # Convert image back to BGR color space
+        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+
+        # Convert back to PIL format and to original color mode
+        pil_image = Image.fromarray(image[:, :, ::-1], 'RGB').convert('RGBA')
+
+        image_dto = context.services.images.create(
+            image=pil_image,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+class LuminosityAdjustmentInvocation(BaseInvocation):
+    """Adjusts the Luminosity (Value) of an image."""
+
+    # fmt: off
+    type: Literal["luminosity_adjust"] = "luminosity_adjust"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to adjust")
+    luminosity: float = Field(default=1.0, description="The factor by which to adjust the luminosity (value)")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_image = context.services.images.get_pil_image(
+            self.image.image_type, self.image.image_name
+        )
+
+        # Convert PIL image to OpenCV format (numpy array), note color channel
+        # ordering is changed from RGB to BGR
+        image = numpy.array(pil_image.convert('RGB'))[:, :, ::-1]
+
+        # Convert image to HSV color space
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # Adjust the luminosity (value)
+        hsv_image[:, :, 2] = numpy.clip(hsv_image[:, :, 2] * self.luminosity, 0, 255)
+
+        # Convert image back to BGR color space
+        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+
+        # Convert back to PIL format and to original color mode
+        pil_image = Image.fromarray(image[:, :, ::-1], 'RGB').convert('RGBA')
+
+        image_dto = context.services.images.create(
+            image=pil_image,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+class SaturationAdjustmentInvocation(BaseInvocation):
+    """Adjusts the Saturation of an image."""
+
+    # fmt: off
+    type: Literal["saturation_adjust"] = "saturation_adjust"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to adjust")
+    saturation: float = Field(default=1.0, description="The factor by which to adjust the saturation")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_image = context.services.images.get_pil_image(
+            self.image.image_type, self.image.image_name
+        )
+
+        # Convert PIL image to OpenCV format (numpy array), note color channel
+        # ordering is changed from RGB to BGR
+        image = numpy.array(pil_image.convert('RGB'))[:, :, ::-1]
+
+        # Convert image to HSV color space
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # Adjust the saturation
+        hsv_image[:, :, 1] = numpy.clip(hsv_image[:, :, 1] * self.saturation, 0, 255)
+
+        # Convert image back to BGR color space
+        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+
+        # Convert back to PIL format and to original color mode
+        pil_image = Image.fromarray(image[:, :, ::-1], 'RGB').convert('RGBA')
+
+        image_dto = context.services.images.create(
+            image=pil_image,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
             width=image_dto.width,
             height=image_dto.height,
         )
