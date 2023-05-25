@@ -33,6 +33,7 @@ def mock_services() -> InvocationServices:
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
         processor = DefaultInvocationProcessor(),
         restoration = None, # type: ignore
+        configuration = None, # type: ignore
     )
 
 @pytest.fixture()
