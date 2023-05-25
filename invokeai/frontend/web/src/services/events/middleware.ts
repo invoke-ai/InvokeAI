@@ -8,7 +8,11 @@ import {
 import { socketSubscribed, socketUnsubscribed } from './actions';
 import { AppThunkDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
-import { sessionInvoked, sessionCreated } from 'services/thunks/session';
+import {
+  sessionInvoked,
+  sessionCreated,
+  sessionWithoutGraphCreated,
+} from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { log } from 'app/logging/useLogger';
@@ -62,17 +66,14 @@ export const socketMiddleware = () => {
         socket.connect();
       }
 
-      if (sessionCreated.fulfilled.match(action)) {
+      if (
+        sessionCreated.fulfilled.match(action) ||
+        sessionWithoutGraphCreated.fulfilled.match(action)
+      ) {
         const sessionId = action.payload.id;
-        const sessionLog = socketioLog.child({ sessionId });
         const oldSessionId = getState().system.sessionId;
 
         if (oldSessionId) {
-          sessionLog.debug(
-            { oldSessionId },
-            `Unsubscribed from old session (${oldSessionId})`
-          );
-
           socket.emit('unsubscribe', {
             session: oldSessionId,
           });
@@ -85,8 +86,6 @@ export const socketMiddleware = () => {
           );
         }
 
-        sessionLog.debug(`Subscribe to new session (${sessionId})`);
-
         socket.emit('subscribe', { session: sessionId });
 
         dispatch(
@@ -95,9 +94,6 @@ export const socketMiddleware = () => {
             timestamp: getTimestamp(),
           })
         );
-
-        // Finally we actually invoke the session, starting processing
-        dispatch(sessionInvoked({ sessionId }));
       }
 
       next(action);

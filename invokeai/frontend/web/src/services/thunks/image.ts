@@ -76,3 +76,19 @@ export const imageDeleted = createAppAsyncThunk(
     return response;
   }
 );
+
+type ImageUpdatedArg = Parameters<(typeof ImagesService)['updateImage']>[0];
+
+/**
+ * `ImagesService.deleteImage()` thunk
+ */
+export const imageUpdated = createAppAsyncThunk(
+  'api/imageUpdated',
+  async (arg: ImageUpdatedArg) => {
+    const response = await ImagesService.updateImage(arg);
+
+    imagesLog.debug({ arg, response }, 'Image updated');
+
+    return response;
+  }
+);

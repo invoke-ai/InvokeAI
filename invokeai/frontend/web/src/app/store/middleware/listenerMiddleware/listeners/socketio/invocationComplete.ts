@@ -1,40 +1,49 @@
+import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
+import { startAppListening } from '../..';
+import { log } from 'app/logging/useLogger';
 import { invocationComplete } from 'services/events/actions';
-import { isImageOutput } from 'services/types/guards';
 import {
   imageMetadataReceived,
   imageUrlsReceived,
 } from 'services/thunks/image';
-import { startAppListening } from '..';
-import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
+import { sessionCanceled } from 'services/thunks/session';
+import { isImageOutput } from 'services/types/guards';
 
+const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
 
-export const addImageResultReceivedListener = () => {
+export const addInvocationCompleteListener = () => {
   startAppListening({
-    predicate: (action) => {
-      if (
-        invocationComplete.match(action) &&
-        isImageOutput(action.payload.data.result)
-      ) {
-        return true;
-      }
-      return false;
-    },
-    effect: async (action, { getState, dispatch, take }) => {
-      if (!invocationComplete.match(action)) {
-        return;
+    actionCreator: invocationComplete,
+    effect: async (action, { dispatch, getState, take }) => {
+      moduleLog.info(
+        action.payload,
+        `Invocation complete (${action.payload.data.node.type})`
+      );
+
+      const sessionId = action.payload.data.graph_execution_state_id;
+
+      const { cancelType, isCancelScheduled } = getState().system;
+
+      // Handle scheduled cancelation
+      if (cancelType === 'scheduled' && isCancelScheduled) {
+        dispatch(sessionCanceled({ sessionId }));
       }
 
       const { data } = action.payload;
       const { result, node, graph_execution_state_id } = data;
 
+      // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
         const { image_name, image_type } = result.image;
 
+        // Get its URLS
+        // TODO: is this extraneous? I think so...
         dispatch(
           imageUrlsReceived({ imageName: image_name, imageType: image_type })
         );
 
+        // Get its metadata
         dispatch(
           imageMetadataReceived({
             imageName: image_name,

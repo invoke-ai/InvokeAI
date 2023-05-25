@@ -8,7 +8,6 @@ import type { TypedStartListening, TypedAddListener } from '@reduxjs/toolkit';
 
 import type { RootState, AppDispatch } from '../../store';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
-import { addImageResultReceivedListener } from './listeners/invocationComplete';
 import { addImageUploadedListener } from './listeners/imageUploaded';
 import { addRequestedImageDeletionListener } from './listeners/imageDeleted';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
@@ -19,6 +18,16 @@ import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGaller
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
+import { addGeneratorProgressListener } from './listeners/socketio/generatorProgress';
+import { addGraphExecutionStateCompleteListener } from './listeners/socketio/graphExecutionStateComplete';
+import { addInvocationCompleteListener } from './listeners/socketio/invocationComplete';
+import { addInvocationErrorListener } from './listeners/socketio/invocationError';
+import { addInvocationStartedListener } from './listeners/socketio/invocationStarted';
+import { addSocketConnectedListener } from './listeners/socketio/socketConnected';
+import { addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
+import { addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
+import { addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
+import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -40,15 +49,27 @@ export type AppListenerEffect = ListenerEffect<
 
 addImageUploadedListener();
 addInitialImageSelectedListener();
-addImageResultReceivedListener();
 addRequestedImageDeletionListener();
 
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
 addUserInvokedTextToImageListener();
 addUserInvokedImageToImageListener();
+addSessionReadyToInvokeListener();
 
 addCanvasSavedToGalleryListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
+
+// socketio
+
+addGeneratorProgressListener();
+addGraphExecutionStateCompleteListener();
+addInvocationCompleteListener();
+addInvocationErrorListener();
+addInvocationStartedListener();
+addSocketConnectedListener();
+addSocketDisconnectedListener();
+addSocketSubscribedListener();
+addSocketUnsubscribedListener();
