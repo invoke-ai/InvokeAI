@@ -20,6 +20,7 @@ from enum import Enum, auto
 from pathlib import Path
 from shutil import move, rmtree
 from typing import Any, Dict, Optional, Union, Callable, types
+from pydantic import BaseModel
 
 import safetensors
 import safetensors.torch
@@ -67,6 +68,11 @@ class SDModelComponent(Enum):
     scheduler="scheduler"
     safety_checker="safety_checker"
     feature_extractor="feature_extractor"
+
+
+class ControlNetModelsList(BaseModel):
+    controlnet_models: dict[str, str]
+
 
 DEFAULT_MAX_MODELS = 2
 
@@ -1002,14 +1008,14 @@ class ModelManager(object):
 
         return search_folder, found_models
     
-    def get_controlnet_models(self, controlnet_models_folder: str = None) -> Dict[str, str]:
+    def get_controlnet_models(self, controlnet_models_folder: Union[Path, None] = None) -> ControlNetModelsList:
         '''
         Searches the provided folder for ControlNet models in the Diffusers format.
         Requires two files in the dir to be detected as a valid ControlNet model:
         >> config.json (with ControlNet class) & diffusion_pytorch_model.[safetensors/bin]
         '''
         if controlnet_models_folder is None and self.globals.controlnet_dir is None:
-            return {'no_models_found': 'No Models Found'}
+            return ControlNetModelsList(controlnet_models={})
         
         if controlnet_models_folder is None:
             controlnet_models_folder = self.globals.controlnet_dir
@@ -1035,7 +1041,7 @@ class ModelManager(object):
                                 'diffusion_pytorch_model.bin']:
                             controlnet_models[folder.name] = folder.as_posix()
 
-        return controlnet_models
+        return ControlNetModelsList(controlnet_models=controlnet_models)
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
