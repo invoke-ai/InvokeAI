@@ -20,6 +20,7 @@ from invokeai.app.services.image_record_storage import (
 from invokeai.app.services.models.image_record import (
     ImageRecord,
     ImageDTO,
+    ImageRecordChanges,
     image_record_to_dto,
 )
 from invokeai.app.services.image_file_storage import (
@@ -31,7 +32,6 @@ from invokeai.app.services.image_file_storage import (
 from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
 from invokeai.app.services.urls import UrlServiceBase
-from invokeai.app.util.misc import get_iso_timestamp
 
 if TYPE_CHECKING:
     from invokeai.app.services.graph import GraphExecutionState
@@ -48,9 +48,19 @@ class ImageServiceABC(ABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        metadata: Optional[ImageMetadata] = None,
+        intermediate: bool = False,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
+        pass
+
+    @abstractmethod
+    def update(
+        self,
+        image_type: ImageType,
+        image_name: str,
+        changes: ImageRecordChanges,
+    ) -> ImageDTO:
+        """Updates an image."""
         pass
 
     @abstractmethod
@@ -157,6 +167,7 @@ class ImageService(ImageServiceABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
+        is_intermediate: bool = False,
     ) -> ImageDTO:
         if image_type not in ImageType:
             raise InvalidImageTypeException
@@ -184,6 +195,8 @@ class ImageService(ImageServiceABC):
                 image_category=image_category,
                 width=width,
                 height=height,
+                # Meta fields
+                is_intermediate=is_intermediate,
                 # Nullable fields
                 node_id=node_id,
                 session_id=session_id,
@@ -217,6 +230,7 @@ class ImageService(ImageServiceABC):
                 created_at=created_at,
                 updated_at=created_at,  # this is always the same as the created_at at this time
                 deleted_at=None,
+                is_intermediate=is_intermediate,
                 # Extra non-nullable fields for DTO
                 image_url=image_url,
                 thumbnail_url=thumbnail_url,
@@ -230,6 +244,23 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self._services.logger.error("Problem saving image record and file")
             raise e
+
+    def update(
+        self,
+        image_type: ImageType,
+        image_name: str,
+        changes: ImageRecordChanges,
+    ) -> ImageDTO:
+        try:
+            self._services.records.update(image_name, image_type, changes)
+            return self.get_dto(image_type, image_name)
+        except ImageRecordSaveException:
+            self._services.logger.error("Failed to update image record")
+            raise
+        except Exception as e:
+            self._services.logger.error("Problem updating image record")
+            raise e
+        
 
     def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
         try:
