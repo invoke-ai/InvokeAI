@@ -1,105 +1,142 @@
-import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TypedDict
-from PIL import Image, PngImagePlugin
-from pydantic import BaseModel
+from typing import Any, Union
+import networkx as nx
 
-from invokeai.app.models.image import ImageType, is_image_type
-
-
-class MetadataImageField(TypedDict):
-    """Pydantic-less ImageField, used for metadata parsing."""
-
-    image_type: ImageType
-    image_name: str
-
-
-class MetadataLatentsField(TypedDict):
-    """Pydantic-less LatentsField, used for metadata parsing."""
-
-    latents_name: str
-
-
-class MetadataColorField(TypedDict):
-    """Pydantic-less ColorField, used for metadata parsing"""
-    r: int
-    g: int
-    b: int
-    a: int
-
-
-
-# TODO: This is a placeholder for `InvocationsUnion` pending resolution of circular imports
-NodeMetadata = Dict[
-    str, None | str | int | float | bool | MetadataImageField | MetadataLatentsField | MetadataColorField
-]
-
-
-class InvokeAIMetadata(TypedDict, total=False):
-    """InvokeAI-specific metadata format."""
-
-    session_id: Optional[str]
-    node: Optional[NodeMetadata]
-
-
-def build_invokeai_metadata_pnginfo(
-    metadata: InvokeAIMetadata | None,
-) -> PngImagePlugin.PngInfo:
-    """Builds a PngInfo object with key `"invokeai"` and value `metadata`"""
-    pnginfo = PngImagePlugin.PngInfo()
-
-    if metadata is not None:
-        pnginfo.add_text("invokeai", json.dumps(metadata))
-
-    return pnginfo
+from invokeai.app.models.metadata import ImageMetadata
+from invokeai.app.services.graph import Graph, GraphExecutionState
 
 
 class MetadataServiceBase(ABC):
-    @abstractmethod
-    def get_metadata(self, image: Image.Image) -> InvokeAIMetadata | None:
-        """Gets the InvokeAI metadata from a PIL Image, skipping invalid values"""
-        pass
+    """Handles building metadata for nodes, images, and outputs."""
 
     @abstractmethod
-    def build_metadata(
-        self, session_id: str, node: BaseModel
-    ) -> InvokeAIMetadata | None:
-        """Builds an InvokeAIMetadata object"""
+    def create_image_metadata(
+        self, session: GraphExecutionState, node_id: str
+    ) -> ImageMetadata:
+        """Builds an ImageMetadata object for a node."""
         pass
 
 
-class PngMetadataService(MetadataServiceBase):
-    """Handles loading and building metadata for images."""
+class CoreMetadataService(MetadataServiceBase):
+    _ANCESTOR_TYPES = ["t2l", "l2l"]
+    """The ancestor types that contain the core metadata"""
 
-    # TODO: Use `InvocationsUnion` to **validate** metadata as representing a fully-functioning node
-    def _load_metadata(self, image: Image.Image) -> dict | None:
-        """Loads a specific info entry from a PIL Image."""
+    _ANCESTOR_PARAMS = ["type", "steps", "model", "cfg_scale", "scheduler", "strength"]
+    """The core metadata parameters in the ancestor types"""
 
-        try:
-            info = image.info.get("invokeai")
+    _NOISE_FIELDS = ["seed", "width", "height"]
+    """The core metadata parameters in the noise node"""
 
-            if type(info) is not str:
-                return None
-
-            loaded_metadata = json.loads(info)
-
-            if type(loaded_metadata) is not dict:
-                return None
-
-            if len(loaded_metadata.items()) == 0:
-                return None
-
-            return loaded_metadata
-        except:
-            return None
-
-    def get_metadata(self, image: Image.Image) -> dict | None:
-        """Retrieves an image's metadata as a dict"""
-        loaded_metadata = self._load_metadata(image)
-
-        return loaded_metadata
-
-    def build_metadata(self, session_id: str, node: BaseModel) -> InvokeAIMetadata:
-        metadata = InvokeAIMetadata(session_id=session_id, node=node.dict())
+    def create_image_metadata(
+        self, session: GraphExecutionState, node_id: str
+    ) -> ImageMetadata:
+        metadata = self._build_metadata_from_graph(session, node_id)
 
         return metadata
+
+    def _find_nearest_ancestor(self, G: nx.DiGraph, node_id: str) -> Union[str, None]:
+        """
+        Finds the id of the nearest ancestor (of a valid type) of a given node.
+
+        Parameters:
+        G (nx.DiGraph): The execution graph, converted in to a networkx DiGraph. Its nodes must
+        have the same data as the execution graph.
+        node_id (str): The ID of the node.
+
+        Returns:
+        str | None: The ID of the nearest ancestor, or None if there are no valid ancestors.
+        """
+
+        # Retrieve the node from the graph
+        node = G.nodes[node_id]
+
+        # If the node type is one of the core metadata node types, return its id
+        if node.get("type") in self._ANCESTOR_TYPES:
+            return node.get("id")
+
+        # Else, look for the ancestor in the predecessor nodes
+        for predecessor in G.predecessors(node_id):
+            result = self._find_nearest_ancestor(G, predecessor)
+            if result:
+                return result
+
+        # If there are no valid ancestors, return None
+        return None
+
+    def _get_additional_metadata(
+        self, graph: Graph, node_id: str
+    ) -> Union[dict[str, Any], None]:
+        """
+        Returns additional metadata for a given node.
+
+        Parameters:
+        graph (Graph): The execution graph.
+        node_id (str): The ID of the node.
+
+        Returns:
+        dict[str, Any] | None: A dictionary of additional metadata.
+        """
+
+        metadata = {}
+
+        # Iterate over all edges in the graph
+        for edge in graph.edges:
+            dest_node_id = edge.destination.node_id
+            dest_field = edge.destination.field
+            source_node_dict = graph.nodes[edge.source.node_id].dict()
+
+            # If the destination node ID matches the given node ID, gather necessary metadata
+            if dest_node_id == node_id:
+                # Prompt
+                if dest_field == "positive_conditioning":
+                    metadata["positive_conditioning"] = source_node_dict.get("prompt")
+                # Negative prompt
+                if dest_field == "negative_conditioning":
+                    metadata["negative_conditioning"] = source_node_dict.get("prompt")
+                # Seed, width and height
+                if dest_field == "noise":
+                    for field in self._NOISE_FIELDS:
+                        metadata[field] = source_node_dict.get(field)
+        return metadata
+
+    def _build_metadata_from_graph(
+        self, session: GraphExecutionState, node_id: str
+    ) -> ImageMetadata:
+        """
+        Builds an ImageMetadata object for a node.
+
+        Parameters:
+        session (GraphExecutionState): The session.
+        node_id (str): The ID of the node.
+
+        Returns:
+        ImageMetadata: The metadata for the node.
+        """
+
+        # We need to do all the traversal on the execution graph
+        graph = session.execution_graph
+
+        # Find the nearest `t2l`/`l2l` ancestor of the given node
+        ancestor_id = self._find_nearest_ancestor(graph.nx_graph_with_data(), node_id)
+
+        # If no ancestor was found, return an empty ImageMetadata object
+        if ancestor_id is None:
+            return ImageMetadata()
+
+        ancestor_node = graph.get_node(ancestor_id)
+
+        # Grab all the core metadata from the ancestor node
+        ancestor_metadata = {
+            param: val
+            for param, val in ancestor_node.dict().items()
+            if param in self._ANCESTOR_PARAMS
+        }
+
+        # Get this image's prompts and noise parameters
+        addl_metadata = self._get_additional_metadata(graph, ancestor_id)
+
+        # If additional metadata was found, add it to the main metadata
+        if addl_metadata is not None:
+            ancestor_metadata.update(addl_metadata)
+
+        return ImageMetadata(**ancestor_metadata)

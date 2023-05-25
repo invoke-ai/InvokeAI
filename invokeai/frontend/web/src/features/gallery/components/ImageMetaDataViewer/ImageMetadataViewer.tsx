@@ -18,7 +18,9 @@ import {
   setCfgScale,
   setHeight,
   setImg2imgStrength,
+  setNegativePrompt,
   setPerlin,
+  setPositivePrompt,
   setScheduler,
   setSeamless,
   setSeed,
@@ -36,6 +38,9 @@ import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import { ImageDTO } from 'services/api';
+import { filter } from 'lodash-es';
+import { Scheduler } from 'app/constants';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -58,7 +63,6 @@ const MetadataItem = ({
   withCopy = false,
 }: MetadataItemProps) => {
   const { t } = useTranslation();
-
   return (
     <Flex gap={2}>
       {onClick && (
@@ -104,14 +108,14 @@ const MetadataItem = ({
 };
 
 type ImageMetadataViewerProps = {
-  image: InvokeAI.Image;
+  image: ImageDTO;
 };
 
 // TODO: I don't know if this is needed.
 const memoEqualityCheck = (
   prev: ImageMetadataViewerProps,
   next: ImageMetadataViewerProps
-) => prev.image.name === next.image.name;
+) => prev.image.image_name === next.image.image_name;
 
 // TODO: Show more interesting information in this component.
 
@@ -128,8 +132,9 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     dispatch(setShouldShowImageDetails(false));
   });
 
-  const sessionId = image.metadata.invokeai?.session_id;
-  const node = image.metadata.invokeai?.node as Record<string, any>;
+  const sessionId = image?.session_id;
+
+  const metadata = image?.metadata;
 
   const { t } = useTranslation();
   const { getUrl } = useGetUrl();
@@ -154,110 +159,131 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     >
       <Flex gap={2}>
         <Text fontWeight="semibold">File:</Text>
-        <Link href={getUrl(image.url)} isExternal maxW="calc(100% - 3rem)">
-          {image.url.length > 64
-            ? image.url.substring(0, 64).concat('...')
-            : image.url}
+        <Link
+          href={getUrl(image.image_url)}
+          isExternal
+          maxW="calc(100% - 3rem)"
+        >
+          {image.image_name}
           <ExternalLinkIcon mx="2px" />
         </Link>
       </Flex>
-      {node && Object.keys(node).length > 0 ? (
+      {metadata && Object.keys(metadata).length > 0 ? (
         <>
-          {node.type && (
-            <MetadataItem label="Invocation type" value={node.type} />
+          {metadata.type && (
+            <MetadataItem label="Invocation type" value={metadata.type} />
           )}
-          {node.model && <MetadataItem label="Model" value={node.model} />}
-          {node.prompt && (
+          {metadata.width && (
+            <MetadataItem
+              label="Width"
+              value={metadata.width}
+              onClick={() => dispatch(setWidth(Number(metadata.width)))}
+            />
+          )}
+          {metadata.height && (
+            <MetadataItem
+              label="Height"
+              value={metadata.height}
+              onClick={() => dispatch(setHeight(Number(metadata.height)))}
+            />
+          )}
+          {metadata.model && (
+            <MetadataItem label="Model" value={metadata.model} />
+          )}
+          {metadata.positive_conditioning && (
             <MetadataItem
               label="Prompt"
               labelPosition="top"
               value={
-                typeof node.prompt === 'string'
-                  ? node.prompt
-                  : promptToString(node.prompt)
+                typeof metadata.positive_conditioning === 'string'
+                  ? metadata.positive_conditioning
+                  : promptToString(metadata.positive_conditioning)
               }
-              onClick={() => setBothPrompts(node.prompt)}
+              onClick={() => setPositivePrompt(metadata.positive_conditioning!)}
             />
           )}
-          {node.seed !== undefined && (
+          {metadata.negative_conditioning && (
+            <MetadataItem
+              label="Prompt"
+              labelPosition="top"
+              value={
+                typeof metadata.negative_conditioning === 'string'
+                  ? metadata.negative_conditioning
+                  : promptToString(metadata.negative_conditioning)
+              }
+              onClick={() => setNegativePrompt(metadata.negative_conditioning!)}
+            />
+          )}
+          {metadata.seed !== undefined && (
             <MetadataItem
               label="Seed"
-              value={node.seed}
-              onClick={() => dispatch(setSeed(Number(node.seed)))}
+              value={metadata.seed}
+              onClick={() => dispatch(setSeed(Number(metadata.seed)))}
             />
           )}
-          {node.threshold !== undefined && (
+          {/* {metadata.threshold !== undefined && (
             <MetadataItem
               label="Noise Threshold"
-              value={node.threshold}
-              onClick={() => dispatch(setThreshold(Number(node.threshold)))}
+              value={metadata.threshold}
+              onClick={() => dispatch(setThreshold(Number(metadata.threshold)))}
             />
           )}
-          {node.perlin !== undefined && (
+          {metadata.perlin !== undefined && (
             <MetadataItem
               label="Perlin Noise"
-              value={node.perlin}
-              onClick={() => dispatch(setPerlin(Number(node.perlin)))}
+              value={metadata.perlin}
+              onClick={() => dispatch(setPerlin(Number(metadata.perlin)))}
             />
-          )}
-          {node.scheduler && (
+          )} */}
+          {metadata.scheduler && (
             <MetadataItem
               label="Scheduler"
-              value={node.scheduler}
-              onClick={() => dispatch(setScheduler(node.scheduler))}
-            />
-          )}
-          {node.steps && (
-            <MetadataItem
-              label="Steps"
-              value={node.steps}
-              onClick={() => dispatch(setSteps(Number(node.steps)))}
-            />
-          )}
-          {node.cfg_scale !== undefined && (
-            <MetadataItem
-              label="CFG scale"
-              value={node.cfg_scale}
-              onClick={() => dispatch(setCfgScale(Number(node.cfg_scale)))}
-            />
-          )}
-          {node.variations && node.variations.length > 0 && (
-            <MetadataItem
-              label="Seed-weight pairs"
-              value={seedWeightsToString(node.variations)}
+              value={metadata.scheduler}
               onClick={() =>
-                dispatch(setSeedWeights(seedWeightsToString(node.variations)))
+                dispatch(setScheduler(metadata.scheduler as Scheduler))
               }
             />
           )}
-          {node.seamless && (
+          {metadata.steps && (
+            <MetadataItem
+              label="Steps"
+              value={metadata.steps}
+              onClick={() => dispatch(setSteps(Number(metadata.steps)))}
+            />
+          )}
+          {metadata.cfg_scale !== undefined && (
+            <MetadataItem
+              label="CFG scale"
+              value={metadata.cfg_scale}
+              onClick={() => dispatch(setCfgScale(Number(metadata.cfg_scale)))}
+            />
+          )}
+          {/* {metadata.variations && metadata.variations.length > 0 && (
+            <MetadataItem
+              label="Seed-weight pairs"
+              value={seedWeightsToString(metadata.variations)}
+              onClick={() =>
+                dispatch(
+                  setSeedWeights(seedWeightsToString(metadata.variations))
+                )
+              }
+            />
+          )}
+          {metadata.seamless && (
             <MetadataItem
               label="Seamless"
-              value={node.seamless}
-              onClick={() => dispatch(setSeamless(node.seamless))}
+              value={metadata.seamless}
+              onClick={() => dispatch(setSeamless(metadata.seamless))}
             />
           )}
-          {node.hires_fix && (
+          {metadata.hires_fix && (
             <MetadataItem
               label="High Resolution Optimization"
-              value={node.hires_fix}
-              onClick={() => dispatch(setHiresFix(node.hires_fix))}
+              value={metadata.hires_fix}
+              onClick={() => dispatch(setHiresFix(metadata.hires_fix))}
             />
-          )}
-          {node.width && (
-            <MetadataItem
-              label="Width"
-              value={node.width}
-              onClick={() => dispatch(setWidth(Number(node.width)))}
-            />
-          )}
-          {node.height && (
-            <MetadataItem
-              label="Height"
-              value={node.height}
-              onClick={() => dispatch(setHeight(Number(node.height)))}
-            />
-          )}
+          )} */}
+
           {/* {init_image_path && (
             <MetadataItem
               label="Initial image"
@@ -266,22 +292,22 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               onClick={() => dispatch(setInitialImage(init_image_path))}
             />
           )} */}
-          {node.strength && (
+          {metadata.strength && (
             <MetadataItem
               label="Image to image strength"
-              value={node.strength}
+              value={metadata.strength}
               onClick={() =>
-                dispatch(setImg2imgStrength(Number(node.strength)))
+                dispatch(setImg2imgStrength(Number(metadata.strength)))
               }
             />
           )}
-          {node.fit && (
+          {/* {metadata.fit && (
             <MetadataItem
               label="Image to image fit"
-              value={node.fit}
-              onClick={() => dispatch(setShouldFitToWidthHeight(node.fit))}
+              value={metadata.fit}
+              onClick={() => dispatch(setShouldFitToWidthHeight(metadata.fit))}
             />
-          )}
+          )} */}
         </>
       ) : (
         <Center width="100%" pt={10}>

@@ -13,5 +13,13 @@ export type MaskOutput = {
    * The output mask
    */
   mask: ImageField;
+  /**
+   * The width of the mask in pixels
+   */
+  width?: number;
+  /**
+   * The height of the mask in pixels
+   */
+  height?: number;
 };
 

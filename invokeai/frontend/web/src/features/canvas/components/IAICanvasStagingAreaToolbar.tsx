@@ -157,17 +157,19 @@ const IAICanvasStagingAreaToolbar = () => {
           }
           colorScheme="accent"
         />
-        <IAIIconButton
+        {/* <IAIIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
           aria-label={t('unifiedCanvas.saveToGallery')}
           icon={<FaSave />}
           onClick={() =>
             dispatch(
-              saveStagingAreaImageToGallery(currentStagingAreaImage.image.url)
+              saveStagingAreaImageToGallery(
+                currentStagingAreaImage.image.image_url
+              )
             )
           }
           colorScheme="accent"
-        />
+        /> */}
         <IAIIconButton
           tooltip={t('unifiedCanvas.discardAll')}
           aria-label={t('unifiedCanvas.discardAll')}

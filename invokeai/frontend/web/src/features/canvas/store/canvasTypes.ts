@@ -1,6 +1,7 @@
 import * as InvokeAI from 'app/types/invokeai';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
+import { ImageDTO } from 'services/api';
 
 export const LAYER_NAMES_DICT = [
   { key: 'Base', value: 'base' },
@@ -37,7 +38,7 @@ export type CanvasImage = {
   y: number;
   width: number;
   height: number;
-  image: InvokeAI.Image;
+  image: ImageDTO;
 };
 
 export type CanvasMaskLine = {

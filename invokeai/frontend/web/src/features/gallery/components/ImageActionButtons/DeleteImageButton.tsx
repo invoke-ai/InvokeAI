@@ -12,7 +12,7 @@ import { memo, useCallback } from 'react';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import DeleteImageModal from '../DeleteImageModal';
 import { requestedImageDeletion } from 'features/gallery/store/actions';
-import { Image } from 'app/types/invokeai';
+import { ImageDTO } from 'services/api';
 
 const selector = createSelector(
   [systemSelector],
@@ -30,7 +30,7 @@ const selector = createSelector(
 );
 
 type DeleteImageButtonProps = {
-  image: Image | undefined;
+  image: ImageDTO | undefined;
 };
 
 const DeleteImageButton = (props: DeleteImageButtonProps) => {

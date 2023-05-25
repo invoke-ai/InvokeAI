@@ -8,9 +8,16 @@ const galleryLog = log.child({ namespace: 'gallery' });
 
 export const receivedResultImagesPage = createAppAsyncThunk(
   'results/receivedResultImagesPage',
-  async (_arg, { getState }) => {
-    const response = await ImagesService.listImages({
+  async (_arg, { getState, rejectWithValue }) => {
+    const { page, pages, nextPage } = getState().results;
+
+    if (nextPage === page) {
+      rejectWithValue([]);
+    }
+
+    const response = await ImagesService.listImagesWithMetadata({
       imageType: 'results',
+      imageCategory: 'general',
       page: getState().results.nextPage,
       perPage: IMAGES_PER_PAGE,
     });
@@ -24,8 +31,9 @@ export const receivedResultImagesPage = createAppAsyncThunk(
 export const receivedUploadImagesPage = createAppAsyncThunk(
   'uploads/receivedUploadImagesPage',
   async (_arg, { getState }) => {
-    const response = await ImagesService.listImages({
+    const response = await ImagesService.listImagesWithMetadata({
       imageType: 'uploads',
+      imageCategory: 'general',
       page: getState().uploads.nextPage,
       perPage: IMAGES_PER_PAGE,
     });

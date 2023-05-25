@@ -17,24 +17,24 @@ export const addRequestedImageDeletionListener = () => {
         return;
       }
 
-      const { name, type } = image;
+      const { image_name, image_type } = image;
 
-      if (type !== 'uploads' && type !== 'results') {
-        moduleLog.warn({ data: image }, `Invalid image type ${type}`);
+      if (image_type !== 'uploads' && image_type !== 'results') {
+        moduleLog.warn({ data: image }, `Invalid image type ${image_type}`);
         return;
       }
 
-      const selectedImageName = getState().gallery.selectedImage?.name;
+      const selectedImageName = getState().gallery.selectedImage?.image_name;
 
-      if (selectedImageName === name) {
-        const allIds = getState()[type].ids;
-        const allEntities = getState()[type].entities;
+      if (selectedImageName === image_name) {
+        const allIds = getState()[image_type].ids;
+        const allEntities = getState()[image_type].entities;
 
         const deletedImageIndex = allIds.findIndex(
-          (result) => result.toString() === name
+          (result) => result.toString() === image_name
         );
 
-        const filteredIds = allIds.filter((id) => id.toString() !== name);
+        const filteredIds = allIds.filter((id) => id.toString() !== image_name);
 
         const newSelectedImageIndex = clamp(
           deletedImageIndex,
@@ -53,7 +53,7 @@ export const addRequestedImageDeletionListener = () => {
         }
       }
 
-      dispatch(imageDeleted({ imageName: name, imageType: type }));
+      dispatch(imageDeleted({ imageName: image_name, imageType: image_type }));
     },
   });
 };

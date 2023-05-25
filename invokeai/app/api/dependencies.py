@@ -1,22 +1,24 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from logging import Logger
 import os
-
-import invokeai.backend.util.logging as logger
-from typing import types
+from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
+from invokeai.app.services.images import ImageService
+from invokeai.app.services.metadata import CoreMetadataService
+from invokeai.app.services.urls import LocalUrlService
+from invokeai.backend.util.logging import InvokeAILogger
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
-from ..services.image_storage import DiskImageStorage
+from ..services.image_file_storage import DiskImageFileStorage
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
-from ..services.metadata import PngMetadataService
 from .events import FastAPIEventService
 
 
@@ -36,12 +38,16 @@ def check_internet() -> bool:
         return False
 
 
+logger = InvokeAILogger.getLogger()
+
+
 class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
     invoker: Invoker = None
 
-    def initialize(config, event_handler_id: int, logger: types.ModuleType=logger):
+    @staticmethod
+    def initialize(config, event_handler_id: int, logger: Logger = logger):
         logger.info(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
@@ -50,30 +56,43 @@ class ApiDependencies:
             os.path.join(os.path.dirname(__file__), "../../../../outputs")
         )
 
-        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents'))
-
-        metadata = PngMetadataService()
-
-        images = DiskImageStorage(f'{output_folder}/images', metadata_service=metadata)
-
         # TODO: build a file/path manager?
         db_location = os.path.join(output_folder, "invokeai.db")
 
+        graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+            filename=db_location, table_name="graph_executions"
+        )
+
+        urls = LocalUrlService()
+        metadata = CoreMetadataService()
+        image_record_storage = SqliteImageRecordStorage(db_location)
+        image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
+
+        latents = ForwardCacheLatentsStorage(
+            DiskLatentsStorage(f"{output_folder}/latents")
+        )
+
+        images = ImageService(
+            image_record_storage=image_record_storage,
+            image_file_storage=image_file_storage,
+            metadata=metadata,
+            url=urls,
+            logger=logger,
+            graph_execution_manager=graph_execution_manager,
+        )
+
         services = InvocationServices(
-            model_manager=get_model_manager(config,logger),
+            model_manager=get_model_manager(config, logger),
             events=events,
             latents=latents,
             images=images,
-            metadata=metadata,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"
             ),
-            graph_execution_manager=SqliteItemStorage[GraphExecutionState](
-                filename=db_location, table_name="graph_executions"
-            ),
+            graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config,logger),
+            restoration=RestorationServices(config, logger),
             configuration=config,
             logger=logger,
         )

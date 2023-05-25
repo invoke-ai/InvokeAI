@@ -55,12 +55,17 @@ import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useParameters } from 'features/parameters/hooks/useParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
-import { requestedImageDeletion } from '../store/actions';
+import {
+  requestedImageDeletion,
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
 import { allParametersSet } from 'features/parameters/store/generationSlice';
 import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 import { useAppToaster } from 'app/components/Toaster';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -190,14 +195,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
 
       if (shouldTransformUrls) {
-        return getUrl(image.url);
+        return getUrl(image.image_url);
       }
 
-      if (image.url.startsWith('http')) {
-        return image.url;
+      if (image.image_url.startsWith('http')) {
+        return image.image_url;
       }
 
-      return window.location.toString() + image.url;
+      return window.location.toString() + image.image_url;
     };
 
     const url = getImageUrl();
@@ -252,6 +257,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('p', handleUsePrompt, [image]);
 
   const handleSendToImageToImage = useCallback(() => {
+    dispatch(sentImageToImg2Img());
     dispatch(initialImageSelected(image));
   }, [dispatch, image]);
 
@@ -327,9 +333,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
   const handleSendToCanvas = useCallback(() => {
     if (!image) return;
+    dispatch(sentImageToCanvas());
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
-    // dispatch(setInitialCanvasImage(selectedImage));
+    dispatch(setInitialCanvasImage(image));
     dispatch(requestCanvasRescale());
 
     if (activeTabName !== 'unifiedCanvas') {
