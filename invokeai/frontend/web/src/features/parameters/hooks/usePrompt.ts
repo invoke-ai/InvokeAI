@@ -12,11 +12,9 @@ const useSetBothPrompts = () => {
   const dispatch = useAppDispatch();
 
   return useCallback(
-    (inputPrompt: InvokeAI.Prompt, negativePrompt?: InvokeAI.Prompt) => {
+    (inputPrompt: InvokeAI.Prompt, negativePrompt: InvokeAI.Prompt) => {
       dispatch(setPositivePrompt(inputPrompt));
-      if (negativePrompt) {
-        dispatch(setNegativePrompt(negativePrompt));
-      }
+      dispatch(setNegativePrompt(negativePrompt));
     },
     [dispatch]
   );
