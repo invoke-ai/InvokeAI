@@ -216,6 +216,8 @@ def invoke_cli():
     # TODO: build a file/path manager?
     db_location = os.path.join(output_folder, "invokeai.db")
 
+    logger.info(f'InvokeAI database location is "{db_location}"')
+
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
         )
@@ -224,8 +226,6 @@ def invoke_cli():
     metadata = CoreMetadataService()
     image_record_storage = SqliteImageRecordStorage(db_location)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
-
-    logger.info(f'InvokeAI database location is "{db_location}"')
 
     images = ImageService(
         image_record_storage=image_record_storage,
