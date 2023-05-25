@@ -251,7 +251,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
               isDisabled={
-                !['txt2img', 'img2img', 'inpaint'].includes(
+                // what should these be
+                !['t2l', 'l2l', 'inpaint'].includes(
                   String(image?.metadata?.type)
                 )
               }
