@@ -13,10 +13,13 @@ from typing import (
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
+from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
+from invokeai.app.services.images import ImageService
+from invokeai.app.services.metadata import CoreMetadataService
+from invokeai.app.services.urls import LocalUrlService
 
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.metadata import PngMetadataService
 from .services.default_graphs import create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
@@ -188,6 +191,9 @@ def invoke_all(context: CliContext):
         raise SessionError()
 
 
+logger = logger.InvokeAILogger.getLogger()
+
+
 def invoke_cli():
     # this gets the basic configuration
     config = get_invokeai_config()
@@ -206,24 +212,38 @@ def invoke_cli():
     
     events = EventServiceBase()
     output_folder = config.output_path
-    metadata = PngMetadataService()
 
     # TODO: build a file/path manager?
     db_location = os.path.join(output_folder, "invokeai.db")
+
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+            filename=db_location, table_name="graph_executions"
+        )
+
+    urls = LocalUrlService()
+    metadata = CoreMetadataService()
+    image_record_storage = SqliteImageRecordStorage(db_location)
+    image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
+
+    images = ImageService(
+        image_record_storage=image_record_storage,
+        image_file_storage=image_file_storage,
+        metadata=metadata,
+        url=urls,
+        logger=logger,
+        graph_execution_manager=graph_execution_manager,
+    )
 
     services = InvocationServices(
         model_manager=model_manager,
         events=events,
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
-        images=DiskImageFileStorage(f'{output_folder}/images', metadata_service=metadata),
-        metadata=metadata,
+        images=images,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
             filename=db_location, table_name="graphs"
         ),
-        graph_execution_manager=SqliteItemStorage[GraphExecutionState](
-            filename=db_location, table_name="graph_executions"
-        ),
+        graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
         restoration=RestorationServices(config,logger=logger),
         logger=logger,
