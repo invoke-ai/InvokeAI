@@ -214,7 +214,10 @@ def invoke_cli():
     output_folder = config.output_path
 
     # TODO: build a file/path manager?
-    db_location = os.path.join(output_folder, "invokeai.db")
+    if config.use_memory_db:
+        db_location = ":memory:"
+    else:
+        db_location = os.path.join(output_folder, "invokeai.db")
 
     logger.info(f'InvokeAI database location is "{db_location}"')
 
