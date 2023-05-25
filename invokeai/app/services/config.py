@@ -143,14 +143,13 @@ two configs are kept in separate sections of the config file:
 '''
 import argparse
 import pydoc
-import typing
 import os
 import sys
 from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import Any, ClassVar, Dict, List, Literal, Type, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Literal, Type, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
 LEGACY_INIT_FILE = Path('invokeai.init')
@@ -168,7 +167,7 @@ class InvokeAISettings(BaseSettings):
 
     def parse_args(self, argv: list=sys.argv[1:]):
         parser = self.get_parser()
-        opt, _ = parser.parse_known_args(argv)
+        opt = parser.parse_args(argv)
         for name in self.__fields__:
             if name not in self._excluded():
                 setattr(self, name, getattr(opt,name))
@@ -365,6 +364,11 @@ setting environment variables INVOKEAI_<setting>.
 
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
     embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
+
+    log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
+    # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
+    log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
+    log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="debug", description="Emit logging messages at this level or  higher", category="Logging")
     #fmt: on
 
     def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
