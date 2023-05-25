@@ -35,25 +35,25 @@ from transformers import (
     CLIPTextModel,
     CLIPTokenizer,
 )
-
 import invokeai.configs as configs
 
+from invokeai.app.services.config import (
+    get_invokeai_config,
+    InvokeAIAppConfig,
+)
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
 )
+
 from invokeai.backend.config.legacy_arg_parsing import legacy_parser
 from invokeai.backend.config.model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,
     recommended_datasets,
-)
-from invokeai.app.services.config import (
-    get_invokeai_config,
-    InvokeAIAppConfig,
 )
 
 warnings.filterwarnings("ignore")
@@ -62,7 +62,8 @@ transformers.logging.set_verbosity_error()
 
 
 # --------------------------globals-----------------------
-config = get_invokeai_config()
+
+config = get_invokeai_config(argv=[])
 
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
@@ -699,7 +700,7 @@ def write_opts(opts: Namespace, init_file: Path):
     """
 
     # this will load current settings
-    config = InvokeAIAppConfig()
+    config = InvokeAIAppConfig(argv=[])
     for key,value in opts.__dict__.items():
         if hasattr(config,key):
             setattr(config,key,value)
@@ -820,7 +821,7 @@ def main():
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-            config = get_invokeai_config()  # reread defaults
+            config = get_invokeai_config(argv=[])  # reread defaults
 
 
         if not config.model_conf_path.exists():
