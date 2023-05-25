@@ -225,6 +225,8 @@ def invoke_cli():
     image_record_storage = SqliteImageRecordStorage(db_location)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
 
+    logger.info(f'InvokeAI database location is "{db_location}"')
+
     images = ImageService(
         image_record_storage=image_record_storage,
         image_file_storage=image_file_storage,
