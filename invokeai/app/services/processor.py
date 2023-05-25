@@ -1,10 +1,7 @@
 import time
 import traceback
 from threading import Event, Thread, BoundedSemaphore
-from typing import Any, TypeGuard
 
-from invokeai.app.invocations.image import ImageOutput
-from invokeai.app.models.image import ImageType
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
