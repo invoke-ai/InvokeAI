@@ -33,14 +33,18 @@ IAILogger.debug('this is a debugging message')
 import logging
 import logging.handlers
 import socket
-import syslog
-import sys
 import urllib.parse
 
 from abc import abstractmethod
 from pathlib import Path
 
 from invokeai.app.services.config import InvokeAIAppConfig, get_invokeai_config
+
+try:
+    import syslog
+    SYSLOG_AVAILABLE = True
+except:
+    SYSLOG_AVAILABLE = False
 
 # module level functions
 def debug(msg, *args, **kwargs):
@@ -90,7 +94,7 @@ _FACILITY_MAP = dict(
     LOG_LOCAL5 = syslog.LOG_LOCAL5,
     LOG_LOCAL6 = syslog.LOG_LOCAL6,
     LOG_LOCAL7 = syslog.LOG_LOCAL7,
-)
+) if SYSLOG_AVAILABLE else dict()
 
 _SOCK_MAP = dict(
     SOCK_STREAM = socket.SOCK_STREAM,
@@ -220,6 +224,8 @@ class InvokeAILogger(object):
     def _parse_syslog_args(
             args: str=None
     )-> logging.Handler:
+        if not SYSLOG_AVAILABLE:
+            raise ValueError("syslog is not available on this system")
         if not args:
             args='/dev/log' if Path('/dev/log').exists() else 'address:localhost:514'
         syslog_args = dict()
