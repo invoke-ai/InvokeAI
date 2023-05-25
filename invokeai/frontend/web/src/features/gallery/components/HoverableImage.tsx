@@ -155,7 +155,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallPrompt(image.metadata?.positive_conditioning);
+    recallPrompt(
+      image.metadata?.positive_conditioning,
+      image.metadata?.negative_conditioning
+    );
   }, [image, recallPrompt]);
 
   const handleRecallSeed = useCallback(() => {
