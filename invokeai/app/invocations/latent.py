@@ -370,6 +370,7 @@ class LatentsToImageInvocation(BaseInvocation):
                 image_category=ImageCategory.GENERAL,
                 session_id=context.graph_execution_state_id,
                 node_id=self.id,
+                is_intermediate=self.meta.is_intermediate
             )
 
             return ImageOutput(

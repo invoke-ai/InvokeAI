@@ -1,5 +1,6 @@
 import io
-from fastapi import HTTPException, Path, Query, Request, Response, UploadFile
+from typing import Optional
+from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.routing import APIRouter
 from fastapi.responses import FileResponse
 from PIL import Image
@@ -7,7 +8,11 @@ from invokeai.app.models.image import (
     ImageCategory,
     ImageType,
 )
-from invokeai.app.services.models.image_record import ImageDTO, ImageUrlsDTO
+from invokeai.app.services.models.image_record import (
+    ImageDTO,
+    ImageRecordChanges,
+    ImageUrlsDTO,
+)
 from invokeai.app.services.item_storage import PaginatedResults
 
 from ..dependencies import ApiDependencies
@@ -27,10 +32,17 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 )
 async def upload_image(
     file: UploadFile,
-    image_type: ImageType,
     request: Request,
     response: Response,
-    image_category: ImageCategory = ImageCategory.GENERAL,
+    image_category: ImageCategory = Query(
+        default=ImageCategory.GENERAL, description="The category of the image"
+    ),
+    is_intermediate: bool = Query(
+        default=False, description="Whether this is an intermediate image"
+    ),
+    session_id: Optional[str] = Query(
+        default=None, description="The session ID associated with this upload, if any"
+    ),
 ) -> ImageDTO:
     """Uploads an image"""
     if not file.content_type.startswith("image"):
@@ -46,9 +58,11 @@ async def upload_image(
 
     try:
         image_dto = ApiDependencies.invoker.services.images.create(
-            pil_image,
-            image_type,
-            image_category,
+            image=pil_image,
+            image_type=ImageType.UPLOAD,
+            image_category=image_category,
+            session_id=session_id,
+            is_intermediate=is_intermediate,
         )
 
         response.status_code = 201
@@ -61,7 +75,7 @@ async def upload_image(
 
 @images_router.delete("/{image_type}/{image_name}", operation_id="delete_image")
 async def delete_image(
-    image_type: ImageType = Query(description="The type of image to delete"),
+    image_type: ImageType = Path(description="The type of image to delete"),
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
     """Deletes an image"""
@@ -71,6 +85,28 @@ async def delete_image(
     except Exception as e:
         # TODO: Does this need any exception handling at all?
         pass
+
+
+@images_router.patch(
+    "/{image_type}/{image_name}",
+    operation_id="update_image",
+    response_model=ImageDTO,
+)
+async def update_image(
+    image_type: ImageType = Path(description="The type of image to update"),
+    image_name: str = Path(description="The name of the image to update"),
+    image_changes: ImageRecordChanges = Body(
+        description="The changes to apply to the image"
+    ),
+) -> ImageDTO:
+    """Updates an image"""
+
+    try:
+        return ApiDependencies.invoker.services.images.update(
+            image_type, image_name, image_changes
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Failed to update image")
 
 
 @images_router.get(
@@ -85,9 +121,7 @@ async def get_image_metadata(
     """Gets an image's metadata"""
 
     try:
-        return ApiDependencies.invoker.services.images.get_dto(
-            image_type, image_name
-        )
+        return ApiDependencies.invoker.services.images.get_dto(image_type, image_name)
     except Exception as e:
         raise HTTPException(status_code=404)
 
@@ -113,9 +147,7 @@ async def get_image_full(
     """Gets a full-resolution image file"""
 
     try:
-        path = ApiDependencies.invoker.services.images.get_path(
-            image_type, image_name
-        )
+        path = ApiDependencies.invoker.services.images.get_path(image_type, image_name)
 
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
