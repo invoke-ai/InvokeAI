@@ -49,7 +49,7 @@ class ImageTestInvocation(BaseInvocation):
     prompt: str = Field(default = "")
 
     def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
-        return ImageTestInvocationOutput(image=ImageField(image_name=self.id, width=512, height=512, mode="", info={}))
+        return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
 
 class PromptCollectionTestInvocationOutput(BaseInvocationOutput):
     type: Literal['test_prompt_collection_output'] = 'test_prompt_collection_output'

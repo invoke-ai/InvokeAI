@@ -16,7 +16,7 @@ class LatentsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def set(self, name: str, data: torch.Tensor) -> None:
+    def save(self, name: str, data: torch.Tensor) -> None:
         pass
 
     @abstractmethod
@@ -47,8 +47,8 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
         self.__set_cache(name, latent)
         return latent
 
-    def set(self, name: str, data: torch.Tensor) -> None:
-        self.__underlying_storage.set(name, data)
+    def save(self, name: str, data: torch.Tensor) -> None:
+        self.__underlying_storage.save(name, data)
         self.__set_cache(name, data)
 
     def delete(self, name: str) -> None:
@@ -80,7 +80,7 @@ class DiskLatentsStorage(LatentsStorageBase):
         latent_path = self.get_path(name)
         return torch.load(latent_path)
 
-    def set(self, name: str, data: torch.Tensor) -> None:
+    def save(self, name: str, data: torch.Tensor) -> None:
         latent_path = self.get_path(name)
         torch.save(data, latent_path)
 

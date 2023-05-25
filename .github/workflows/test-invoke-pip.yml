@@ -125,6 +125,7 @@ jobs:
           --no-nsfw_checker
           --precision=float32
           --always_use_cpu
+          --use_memory_db
           --outdir ${{ env.INVOKEAI_OUTDIR }}/${{ matrix.python-version }}/${{ matrix.pytorch }}
           --from_file ${{ env.TEST_PROMPTS }}
 

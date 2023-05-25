@@ -13,7 +13,7 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const invocationDenylist = ['Graph', 'LoadImage'];
+const invocationDenylist = ['Graph'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now

@@ -7,9 +7,9 @@ import { allParametersSet, setSeed } from '../store/generationSlice';
 import { isImageField } from 'services/types/guards';
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { initialImageSelected } from '../store/actions';
-import { Image } from 'app/types/invokeai';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useAppToaster } from 'app/components/Toaster';
+import { ImageDTO } from 'services/api';
 
 export const useParameters = () => {
   const dispatch = useAppDispatch();
@@ -88,9 +88,7 @@ export const useParameters = () => {
         return;
       }
 
-      dispatch(
-        initialImageSelected({ name: image.image_name, type: image.image_type })
-      );
+      dispatch(initialImageSelected(image));
       toaster({
         title: t('toast.initialImageSet'),
         status: 'info',
@@ -105,21 +103,21 @@ export const useParameters = () => {
    * Sets image as initial image with toast
    */
   const sendToImageToImage = useCallback(
-    (image: Image) => {
-      dispatch(initialImageSelected({ name: image.name, type: image.type }));
+    (image: ImageDTO) => {
+      dispatch(initialImageSelected(image));
     },
     [dispatch]
   );
 
   const recallAllParameters = useCallback(
-    (image: Image | undefined) => {
-      const type = image?.metadata?.invokeai?.node?.type;
+    (image: ImageDTO | undefined) => {
+      const type = image?.metadata?.type;
       if (['txt2img', 'img2img', 'inpaint'].includes(String(type))) {
         dispatch(allParametersSet(image));
 
-        if (image?.metadata?.invokeai?.node?.type === 'img2img') {
+        if (image?.metadata?.type === 'img2img') {
           dispatch(setActiveTab('img2img'));
-        } else if (image?.metadata?.invokeai?.node?.type === 'txt2img') {
+        } else if (image?.metadata?.type === 'txt2img') {
           dispatch(setActiveTab('txt2img'));
         }
 

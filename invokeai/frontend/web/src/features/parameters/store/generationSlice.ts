@@ -6,16 +6,17 @@ import { clamp, sample } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
 import { receivedModels } from 'services/thunks/model';
 import { Scheduler } from 'app/constants';
+import { ImageDTO } from 'services/api';
 
 export interface GenerationState {
   cfgScale: number;
   height: number;
   img2imgStrength: number;
   infillMethod: string;
-  initialImage?: InvokeAI.Image;
+  initialImage?: ImageDTO;
   iterations: number;
   perlin: number;
-  prompt: string;
+  positivePrompt: string;
   negativePrompt: string;
   scheduler: Scheduler;
   seamBlur: number;
@@ -49,7 +50,7 @@ export const initialGenerationState: GenerationState = {
   infillMethod: 'patchmatch',
   iterations: 1,
   perlin: 0,
-  prompt: '',
+  positivePrompt: '',
   negativePrompt: '',
   scheduler: 'lms',
   seamBlur: 16,
@@ -82,12 +83,15 @@ export const generationSlice = createSlice({
   name: 'generation',
   initialState,
   reducers: {
-    setPrompt: (state, action: PayloadAction<string | InvokeAI.Prompt>) => {
+    setPositivePrompt: (
+      state,
+      action: PayloadAction<string | InvokeAI.Prompt>
+    ) => {
       const newPrompt = action.payload;
       if (typeof newPrompt === 'string') {
-        state.prompt = newPrompt;
+        state.positivePrompt = newPrompt;
       } else {
-        state.prompt = promptToString(newPrompt);
+        state.positivePrompt = promptToString(newPrompt);
       }
     },
     setNegativePrompt: (
@@ -213,7 +217,7 @@ export const generationSlice = createSlice({
     setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
       state.shouldUseNoiseSettings = action.payload;
     },
-    initialImageChanged: (state, action: PayloadAction<InvokeAI.Image>) => {
+    initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       state.initialImage = action.payload;
     },
     modelSelected: (state, action: PayloadAction<string>) => {
@@ -243,7 +247,7 @@ export const {
   setInfillMethod,
   setIterations,
   setPerlin,
-  setPrompt,
+  setPositivePrompt,
   setNegativePrompt,
   setScheduler,
   setSeamBlur,

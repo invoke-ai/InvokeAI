@@ -13,11 +13,9 @@ const useGetImageByNameSelector = createSelector(
 
 const useGetImageByNameAndType = () => {
   const { allResults, allUploads } = useAppSelector(useGetImageByNameSelector);
-
   return (name: string, type: ImageType) => {
     if (type === 'results') {
       const resultImagesResult = allResults[name];
-
       if (resultImagesResult) {
         return resultImagesResult;
       }

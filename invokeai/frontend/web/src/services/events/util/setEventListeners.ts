@@ -165,7 +165,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     const sessionId = data.graph_execution_state_id;
 
     const { cancelType, isCancelScheduled } = getState().system;
-    const { shouldFetchImages } = getState().config;
 
     // Handle scheduled cancelation
     if (cancelType === 'scheduled' && isCancelScheduled) {
@@ -176,7 +175,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       invocationComplete({
         data,
         timestamp: getTimestamp(),
-        shouldFetchImages,
       })
     );
   });

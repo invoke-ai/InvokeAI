@@ -5,7 +5,6 @@ import {
   FlexProps,
   Grid,
   Icon,
-  Image,
   Text,
   forwardRef,
 } from '@chakra-ui/react';
@@ -51,10 +50,10 @@ import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
-import { Image as ImageType } from 'app/types/invokeai';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import GalleryProgressImage from './GalleryProgressImage';
 import { uiSelector } from 'features/ui/store/uiSelectors';
+import { ImageDTO } from 'services/api';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
@@ -66,7 +65,7 @@ const categorySelector = createSelector(
     const { currentCategory } = gallery;
 
     if (currentCategory === 'results') {
-      const tempImages: (ImageType | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
+      const tempImages: (ImageDTO | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
 
       if (system.progressImage) {
         tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
@@ -352,7 +351,7 @@ const ImageGalleryContent = () => {
                     const isSelected =
                       image === PROGRESS_IMAGE_PLACEHOLDER
                         ? false
-                        : selectedImage?.name === image?.name;
+                        : selectedImage?.image_name === image?.image_name;
 
                     return (
                       <Flex sx={{ pb: 2 }}>
@@ -362,7 +361,7 @@ const ImageGalleryContent = () => {
                           />
                         ) : (
                           <HoverableImage
-                            key={`${image.name}-${image.thumbnail}`}
+                            key={`${image.image_name}-${image.thumbnail_url}`}
                             image={image}
                             isSelected={isSelected}
                           />
@@ -385,13 +384,13 @@ const ImageGalleryContent = () => {
                     const isSelected =
                       image === PROGRESS_IMAGE_PLACEHOLDER
                         ? false
-                        : selectedImage?.name === image?.name;
+                        : selectedImage?.image_name === image?.image_name;
 
                     return image === PROGRESS_IMAGE_PLACEHOLDER ? (
                       <GalleryProgressImage key={PROGRESS_IMAGE_PLACEHOLDER} />
                     ) : (
                       <HoverableImage
-                        key={`${image.name}-${image.thumbnail}`}
+                        key={`${image.image_name}-${image.thumbnail_url}`}
                         image={image}
                         isSelected={isSelected}
                       />

@@ -13,7 +13,6 @@ import { DragEvent, MouseEvent, memo, useCallback, useState } from 'react';
 import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import * as InvokeAI from 'app/types/invokeai';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
@@ -39,6 +38,7 @@ import {
   sentImageToImg2Img,
 } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
+import { ImageDTO } from 'services/api';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -70,14 +70,16 @@ export const selector = createSelector(
 );
 
 interface HoverableImageProps {
-  image: InvokeAI.Image;
+  image: ImageDTO;
   isSelected: boolean;
 }
 
 const memoEqualityCheck = (
   prev: HoverableImageProps,
   next: HoverableImageProps
-) => prev.image.name === next.image.name && prev.isSelected === next.isSelected;
+) =>
+  prev.image.image_name === next.image.image_name &&
+  prev.isSelected === next.isSelected;
 
 /**
  * Gallery image component with delete/use all/use seed buttons on hover.
@@ -100,7 +102,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   } = useDisclosure();
 
   const { image, isSelected } = props;
-  const { url, thumbnail, name } = image;
+  const { image_url, thumbnail_url, image_name } = image;
   const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -144,8 +146,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData('invokeai/imageName', image.name);
-      e.dataTransfer.setData('invokeai/imageType', image.type);
+      e.dataTransfer.setData('invokeai/imageName', image.image_name);
+      e.dataTransfer.setData('invokeai/imageType', image.image_type);
       e.dataTransfer.effectAllowed = 'move';
     },
     [image]
@@ -153,11 +155,11 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallPrompt(image.metadata?.invokeai?.node?.prompt);
+    recallPrompt(image.metadata?.positive_conditioning);
   }, [image, recallPrompt]);
 
   const handleRecallSeed = useCallback(() => {
-    recallSeed(image.metadata.invokeai?.node?.seed);
+    recallSeed(image.metadata?.seed);
   }, [image, recallSeed]);
 
   const handleSendToImageToImage = useCallback(() => {
@@ -165,9 +167,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     dispatch(initialImageSelected(image));
   }, [dispatch, image]);
 
-  const handleRecallInitialImage = useCallback(() => {
-    recallInitialImage(image.metadata.invokeai?.node?.image);
-  }, [image, recallInitialImage]);
+  // const handleRecallInitialImage = useCallback(() => {
+  //   recallInitialImage(image.metadata.invokeai?.node?.image);
+  // }, [image, recallInitialImage]);
 
   /**
    * TODO: the rest of these
@@ -200,7 +202,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleOpenInNewTab = () => {
-    window.open(getUrl(image.url), '_blank');
+    window.open(getUrl(image.image_url), '_blank');
   };
 
   return (
@@ -223,7 +225,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleRecallPrompt}
-              isDisabled={image?.metadata?.invokeai?.node?.prompt === undefined}
+              isDisabled={image?.metadata?.positive_conditioning === undefined}
             >
               {t('parameters.usePrompt')}
             </MenuItem>
@@ -231,23 +233,23 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleRecallSeed}
-              isDisabled={image?.metadata?.invokeai?.node?.seed === undefined}
+              isDisabled={image?.metadata?.seed === undefined}
             >
               {t('parameters.useSeed')}
             </MenuItem>
-            <MenuItem
+            {/* <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleRecallInitialImage}
-              isDisabled={image?.metadata?.invokeai?.node?.type !== 'img2img'}
+              isDisabled={image?.metadata?.type !== 'img2img'}
             >
               {t('parameters.useInitImg')}
-            </MenuItem>
+            </MenuItem> */}
             <MenuItem
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
               isDisabled={
                 !['txt2img', 'img2img', 'inpaint'].includes(
-                  String(image?.metadata?.invokeai?.node?.type)
+                  String(image?.metadata?.type)
                 )
               }
             >
@@ -278,7 +280,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         {(ref) => (
           <Box
             position="relative"
-            key={name}
+            key={image_name}
             onMouseOver={handleMouseOver}
             onMouseOut={handleMouseOut}
             userSelect="none"
@@ -303,7 +305,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
               }
               rounded="md"
-              src={getUrl(thumbnail || url)}
+              src={getUrl(thumbnail_url || image_url)}
               fallback={<FaImage />}
               sx={{
                 width: '100%',

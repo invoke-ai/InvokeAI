@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any
+from typing import Any, Optional
 from invokeai.app.api.models.images import ProgressImage
 from invokeai.app.util.misc import get_timestamp
 

@@ -2,19 +2,44 @@ from enum import Enum
 from typing import Optional, Tuple
 from pydantic import BaseModel, Field
 
+from invokeai.app.util.metaenum import MetaEnum
 
-class ImageType(str, Enum):
+
+class ImageType(str, Enum, metaclass=MetaEnum):
+    """The type of an image."""
+
     RESULT = "results"
-    INTERMEDIATE = "intermediates"
     UPLOAD = "uploads"
+    INTERMEDIATE = "intermediates"
 
 
-def is_image_type(obj):
-    try:
-        ImageType(obj)
-    except ValueError:
-        return False
-    return True
+class InvalidImageTypeException(ValueError):
+    """Raised when a provided value is not a valid ImageType.
+
+    Subclasses `ValueError`.
+    """
+
+    def __init__(self, message="Invalid image type."):
+        super().__init__(message)
+
+
+class ImageCategory(str, Enum, metaclass=MetaEnum):
+    """The category of an image. Use ImageCategory.OTHER for non-default categories."""
+
+    GENERAL = "general"
+    CONTROL = "control"
+    MASK = "mask"
+    OTHER = "other"
+
+
+class InvalidImageCategoryException(ValueError):
+    """Raised when a provided value is not a valid ImageCategory.
+
+    Subclasses `ValueError`.
+    """
+
+    def __init__(self, message="Invalid image category."):
+        super().__init__(message)
 
 
 class ImageField(BaseModel):

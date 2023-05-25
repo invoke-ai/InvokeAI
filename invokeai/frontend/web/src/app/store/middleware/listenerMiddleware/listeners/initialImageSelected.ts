@@ -1,12 +1,15 @@
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { Image, isInvokeAIImage } from 'app/types/invokeai';
 import { selectResultsById } from 'features/gallery/store/resultsSlice';
 import { selectUploadsById } from 'features/gallery/store/uploadsSlice';
 import { t } from 'i18next';
 import { addToast } from 'features/system/store/systemSlice';
 import { startAppListening } from '..';
-import { initialImageSelected } from 'features/parameters/store/actions';
+import {
+  initialImageSelected,
+  isImageDTO,
+} from 'features/parameters/store/actions';
 import { makeToast } from 'app/components/Toaster';
+import { ImageDTO } from 'services/api';
 
 export const addInitialImageSelectedListener = () => {
   startAppListening({
@@ -21,21 +24,21 @@ export const addInitialImageSelectedListener = () => {
         return;
       }
 
-      if (isInvokeAIImage(action.payload)) {
+      if (isImageDTO(action.payload)) {
         dispatch(initialImageChanged(action.payload));
         dispatch(addToast(makeToast(t('toast.sentToImageToImage'))));
         return;
       }
 
-      const { name, type } = action.payload;
+      const { image_name, image_type } = action.payload;
 
-      let image: Image | undefined;
+      let image: ImageDTO | undefined;
       const state = getState();
 
-      if (type === 'results') {
-        image = selectResultsById(state, name);
-      } else if (type === 'uploads') {
-        image = selectUploadsById(state, name);
+      if (image_type === 'results') {
+        image = selectResultsById(state, image_name);
+      } else if (image_type === 'uploads') {
+        image = selectUploadsById(state, image_name);
       }
 
       if (!image) {

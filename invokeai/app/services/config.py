@@ -353,6 +353,7 @@ setting environment variables INVOKEAI_<setting>.
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
 
+
     root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
     autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
@@ -362,6 +363,7 @@ setting environment variables INVOKEAI_<setting>.
     lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
+    use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
 
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
     embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
@@ -511,7 +513,7 @@ class PagingArgumentParser(argparse.ArgumentParser):
         text = self.format_help()
         pydoc.pager(text)
 
-def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig,**kwargs)->InvokeAISettings:
+def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig,**kwargs)->InvokeAIAppConfig:
     '''
     This returns a singleton InvokeAIAppConfig configuration object.
     '''

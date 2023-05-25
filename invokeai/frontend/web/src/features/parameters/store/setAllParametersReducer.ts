@@ -1,12 +1,11 @@
 import { Draft, PayloadAction } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
 import { GenerationState } from './generationSlice';
-import { ImageToImageInvocation } from 'services/api';
+import { ImageDTO, ImageToImageInvocation } from 'services/api';
 import { isScheduler } from 'app/constants';
 
 export const setAllParametersReducer = (
   state: Draft<GenerationState>,
-  action: PayloadAction<Image | undefined>
+  action: PayloadAction<ImageDTO | undefined>
 ) => {
   const node = action.payload?.metadata.invokeai?.node;
 
@@ -32,7 +31,7 @@ export const setAllParametersReducer = (
       state.model = String(model);
     }
     if (prompt !== undefined) {
-      state.prompt = String(prompt);
+      state.positivePrompt = String(prompt);
     }
     if (scheduler !== undefined) {
       const schedulerString = String(scheduler);
