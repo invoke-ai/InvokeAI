@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { nodeUpdated, sessionCreated } from 'services/thunks/session';
+import { sessionCreated } from 'services/thunks/session';
 import { buildCanvasGraphComponents } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { log } from 'app/logging/useLogger';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
@@ -20,20 +20,17 @@ import { sessionReadyToInvoke } from 'features/system/store/actions';
 const moduleLog = log.child({ namespace: 'invoke' });
 
 /**
- * This listener is responsible invoking the canvas. This involved a number of steps:
+ * This listener is responsible invoking the canvas. This involves a number of steps:
  *
  * 1. Generate image blobs from the canvas layers
  * 2. Determine the generation mode from the layers (txt2img, img2img, inpaint)
  * 3. Build the canvas graph
- * 4. Create the session
- * 5. Upload the init image if necessary, then update the graph to refer to it (needs a separate request)
- * 6. Upload the mask image if necessary, then update the graph to refer to it (needs a separate request)
- * 7. Initialize the staging area if not yet initialized
- * 8. Finally, dispatch the sessionReadyToInvoke action to invoke the session
- *
- * We have to do the uploads after creating the session:
- * - We need to associate these particular uploads to a session, and flag them as intermediates
- * - To do this, we need to associa
+ * 4. Create the session with the graph
+ * 5. Upload the init image if necessary
+ * 6. Upload the mask image if necessary
+ * 7. Update the init and mask images with the session ID
+ * 8. Initialize the staging area if not yet initialized
+ * 9. Dispatch the sessionReadyToInvoke action to invoke the session
  */
 export const addUserInvokedCanvasListener = () => {
   startAppListening({
