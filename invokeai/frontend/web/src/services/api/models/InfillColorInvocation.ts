@@ -4,6 +4,7 @@
 
 import type { ColorField } from './ColorField';
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Infills transparent areas of an image with a solid color
@@ -14,6 +15,10 @@ export type InfillColorInvocation = {
    */
   id: string;
   type?: 'infill_rgba';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The image to infill
    */

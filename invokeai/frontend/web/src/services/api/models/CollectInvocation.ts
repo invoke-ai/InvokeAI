@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Collects values into a collection
  */
@@ -11,6 +13,10 @@ export type CollectInvocation = {
    */
   id: string;
   type?: 'collect';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The item to collect (all inputs must be of the same type)
    */

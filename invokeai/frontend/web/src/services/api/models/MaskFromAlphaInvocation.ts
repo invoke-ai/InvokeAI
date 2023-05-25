@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Extracts the alpha channel of an image as a mask.
@@ -13,6 +14,10 @@ export type MaskFromAlphaInvocation = {
    */
   id: string;
   type?: 'tomask';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The image to create the mask from
    */

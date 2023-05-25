@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * An integer parameter
  */
@@ -11,6 +13,10 @@ export type ParamIntInvocation = {
    */
   id: string;
   type?: 'param_int';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The integer value
    */

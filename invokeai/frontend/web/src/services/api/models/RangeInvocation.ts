@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Creates a range of numbers from start to stop with step
  */
@@ -11,6 +13,10 @@ export type RangeInvocation = {
    */
   id: string;
   type?: 'range';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The start of the range
    */

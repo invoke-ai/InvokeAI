@@ -3,16 +3,21 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Crops an image to a specified box. The box can be outside of the image.
  */
-export type CropImageInvocation = {
+export type ImageCropInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'crop';
+  type?: 'img_crop';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The image to crop
    */

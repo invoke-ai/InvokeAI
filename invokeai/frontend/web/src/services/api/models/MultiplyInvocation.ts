@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Multiplies two numbers
  */
@@ -11,6 +13,10 @@ export type MultiplyInvocation = {
    */
   id: string;
   type?: 'mul';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The first number
    */

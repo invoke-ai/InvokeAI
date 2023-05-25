@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Subtracts two numbers
  */
@@ -11,6 +13,10 @@ export type SubtractInvocation = {
    */
   id: string;
   type?: 'sub';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The first number
    */

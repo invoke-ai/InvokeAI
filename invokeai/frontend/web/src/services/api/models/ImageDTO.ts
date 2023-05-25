@@ -51,6 +51,10 @@ export type ImageDTO = {
    */
   deleted_at?: string;
   /**
+   * Whether this is an intermediate image.
+   */
+  is_intermediate: boolean;
+  /**
    * The session ID that generated this image, if it is a generated image.
    */
   session_id?: string;

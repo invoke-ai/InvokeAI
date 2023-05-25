@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -13,6 +14,10 @@ export type ScaleLatentsInvocation = {
    */
   id: string;
   type?: 'lscale';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The latents to scale
    */

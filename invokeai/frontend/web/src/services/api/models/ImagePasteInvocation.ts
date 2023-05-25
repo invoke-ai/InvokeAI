@@ -3,16 +3,21 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Pastes an image into another image.
  */
-export type PasteImageInvocation = {
+export type ImagePasteInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'paste';
+  type?: 'img_paste';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The base image
    */

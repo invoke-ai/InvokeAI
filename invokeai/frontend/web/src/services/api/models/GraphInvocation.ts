@@ -3,10 +3,10 @@
 /* eslint-disable */
 
 import type { Graph } from './Graph';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
- * A node to process inputs and produce outputs.
- * May use dependency injection in __init__ to receive providers.
+ * Execute a graph
  */
 export type GraphInvocation = {
   /**
@@ -14,6 +14,10 @@ export type GraphInvocation = {
    */
   id: string;
   type?: 'graph';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The graph to run
    */

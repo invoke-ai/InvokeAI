@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Generates an image using text2img.
  */
@@ -11,6 +13,10 @@ export type TextToImageInvocation = {
    */
   id: string;
   type?: 'txt2img';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The prompt to generate an image from
    */

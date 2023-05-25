@@ -2,7 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageType } from './ImageType';
+import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Load an image and provide it as output.
@@ -14,12 +15,12 @@ export type LoadImageInvocation = {
   id: string;
   type?: 'load_image';
   /**
-   * The type of the image
+   * The meta properties of this node.
    */
-  image_type: ImageType;
+  meta?: InvocationMeta;
   /**
-   * The name of the image
+   * The image to load
    */
-  image_name: string;
+  image?: ImageField;
 };
 
