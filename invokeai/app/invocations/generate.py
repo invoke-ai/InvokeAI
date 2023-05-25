@@ -101,6 +101,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
+            is_intermediate=self.meta.is_intermediate,
         )
 
         return ImageOutput(
@@ -181,6 +182,7 @@ class ImageToImageInvocation(TextToImageInvocation):
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
+            is_intermediate=self.meta.is_intermediate,
         )
 
         return ImageOutput(
@@ -296,6 +298,7 @@ class InpaintInvocation(ImageToImageInvocation):
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
+            is_intermediate=self.meta.is_intermediate,
         )
 
         return ImageOutput(

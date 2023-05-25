@@ -149,6 +149,7 @@ class InfillColorInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.meta.is_intermediate,
         )
 
         return ImageOutput(
@@ -193,6 +194,7 @@ class InfillTileInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.meta.is_intermediate,
         )
 
         return ImageOutput(
@@ -230,6 +232,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.meta.is_intermediate,
         )
 
         return ImageOutput(
