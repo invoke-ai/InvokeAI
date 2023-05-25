@@ -3,10 +3,13 @@
 import shutil
 import asyncio
 from typing import Annotated, Any, List, Literal, Optional, Union
+from fastapi import HTTPException
 
-from fastapi.routing import APIRouter, HTTPException
+from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field, parse_obj_as
 from pathlib import Path
+
+from invokeai.backend.model_management.model_manager import ControlNetModelsList
 from ..dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
@@ -58,8 +61,6 @@ class ConvertedModelResponse(BaseModel):
 class ModelsList(BaseModel):
     models: dict[str, Annotated[Union[(CkptModelInfo,DiffusersModelInfo)], Field(discriminator="format")]]
 
-class ControlNetModelsList(BaseModel):
-    controlnet_models: dict[str, str]
 
 
 @models_router.get(
@@ -129,14 +130,15 @@ async def delete_model(model_name: str) -> None:
     
 
 @models_router.get(
-    "/controlnetmodels",
-    operation_id="get_controlnet_models",
-    responses={200: {"controlnet_models": ControlNetModelsList }},
+    "/controlnet/",
+    operation_id="list_controlnet_models",
+    response_model=ControlNetModelsList
 )
-async def get_controlnet_models() -> ControlNetModelsList:
-    """Gets a dict of ControlNet models"""
-    controlnet_models_raw = ApiDependencies.invoker.services.model_manager.get_controlnet_models(ApiDependencies.invoker.services.configuration.controlnet_dir)
-    controlnet_models = parse_obj_as(ControlNetModelsList, { "controlnet_models": controlnet_models_raw })
+async def list_controlnet_models() -> ControlNetModelsList:
+    """Gets a list of ControlNet models"""
+    controlnet_dir = ApiDependencies.invoker.services.configuration.controlnet_dir
+    controlnet_models = ApiDependencies.invoker.services.model_manager.get_controlnet_models(controlnet_dir)
+    
     return controlnet_models
 
 
