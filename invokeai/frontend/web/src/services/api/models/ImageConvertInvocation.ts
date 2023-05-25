@@ -6,25 +6,25 @@ import type { ImageField } from './ImageField';
 import type { InvocationMeta } from './InvocationMeta';
 
 /**
- * Restores faces in an image.
+ * Converts an image to a different mode.
  */
-export type RestoreFaceInvocation = {
+export type ImageConvertInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'restore_face';
+  type?: 'img_conv';
   /**
    * The meta properties of this node.
    */
   meta?: InvocationMeta;
   /**
-   * The input image
+   * The image to convert
    */
   image?: ImageField;
   /**
-   * The strength of the restoration
+   * The mode to convert to
    */
-  strength?: number;
+  mode?: 'L' | 'RGB' | 'RGBA' | 'CMYK' | 'YCbCr' | 'LAB' | 'HSV' | 'I' | 'F';
 };
 

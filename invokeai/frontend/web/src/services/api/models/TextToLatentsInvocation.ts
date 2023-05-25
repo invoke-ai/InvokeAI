@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ConditioningField } from './ConditioningField';
+import type { InvocationMeta } from './InvocationMeta';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -14,6 +15,10 @@ export type TextToLatentsInvocation = {
    */
   id: string;
   type?: 't2l';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * Positive conditioning for generation
    */
@@ -42,13 +47,5 @@ export type TextToLatentsInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
-  /**
-   * Whether or not to generate an image that can tile without seams
-   */
-  seamless?: boolean;
-  /**
-   * The axes to tile the image on, 'x' and/or 'y'
-   */
-  seamless_axes?: string;
 };
 

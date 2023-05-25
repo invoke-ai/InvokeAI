@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Generates latent noise.
  */
@@ -11,6 +13,10 @@ export type NoiseInvocation = {
    */
   id: string;
   type?: 'noise';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The seed to use
    */

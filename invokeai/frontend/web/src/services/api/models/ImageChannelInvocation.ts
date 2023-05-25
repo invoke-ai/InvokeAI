@@ -6,25 +6,25 @@ import type { ImageField } from './ImageField';
 import type { InvocationMeta } from './InvocationMeta';
 
 /**
- * Restores faces in an image.
+ * Gets a channel from an image.
  */
-export type RestoreFaceInvocation = {
+export type ImageChannelInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'restore_face';
+  type?: 'img_chan';
   /**
    * The meta properties of this node.
    */
   meta?: InvocationMeta;
   /**
-   * The input image
+   * The image to get the channel from
    */
   image?: ImageField;
   /**
-   * The strength of the restoration
+   * The channel to get
    */
-  strength?: number;
+  channel?: 'A' | 'R' | 'G' | 'B';
 };
 

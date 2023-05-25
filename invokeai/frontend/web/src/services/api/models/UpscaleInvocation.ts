@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Upscales an image.
@@ -13,6 +14,10 @@ export type UpscaleInvocation = {
    */
   id: string;
   type?: 'upscale';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The input image
    */

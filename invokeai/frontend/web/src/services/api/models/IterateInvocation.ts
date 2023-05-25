@@ -2,9 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
- * A node to process inputs and produce outputs.
- * May use dependency injection in __init__ to receive providers.
+ * Iterates over a list of items
  */
 export type IterateInvocation = {
   /**
@@ -12,6 +13,10 @@ export type IterateInvocation = {
    */
   id: string;
   type?: 'iterate';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The list of items to iterate over
    */

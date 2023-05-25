@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Simple inpaint using opencv.
@@ -13,6 +14,10 @@ export type CvInpaintInvocation = {
    */
   id: string;
   type?: 'cv_inpaint';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The image to inpaint
    */

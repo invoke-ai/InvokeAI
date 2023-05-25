@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Encodes an image into latents.
@@ -13,6 +14,10 @@ export type ImageToLatentsInvocation = {
    */
   id: string;
   type?: 'i2l';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The image to encode
    */

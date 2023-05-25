@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { InvocationMeta } from './InvocationMeta';
+
 /**
  * Creates a collection of random numbers
  */
@@ -11,6 +13,10 @@ export type RandomRangeInvocation = {
    */
   id: string;
   type?: 'random_range';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The inclusive low value
    */

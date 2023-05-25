@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Infills transparent areas of an image with tiles of the image
@@ -13,6 +14,10 @@ export type InfillTileInvocation = {
    */
   id: string;
   type?: 'infill_tile';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The image to infill
    */

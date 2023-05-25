@@ -6,25 +6,25 @@ import type { ImageField } from './ImageField';
 import type { InvocationMeta } from './InvocationMeta';
 
 /**
- * Restores faces in an image.
+ * Multiplies two images together using `PIL.ImageChops.multiply()`.
  */
-export type RestoreFaceInvocation = {
+export type ImageMultiplyInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'restore_face';
+  type?: 'img_mul';
   /**
    * The meta properties of this node.
    */
   meta?: InvocationMeta;
   /**
-   * The input image
+   * The first image to multiply
    */
-  image?: ImageField;
+  image1?: ImageField;
   /**
-   * The strength of the restoration
+   * The second image to multiply
    */
-  strength?: number;
+  image2?: ImageField;
 };
 

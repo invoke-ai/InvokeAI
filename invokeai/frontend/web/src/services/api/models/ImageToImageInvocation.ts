@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Generates an image using img2img.
@@ -13,6 +14,10 @@ export type ImageToImageInvocation = {
    */
   id: string;
   type?: 'img2img';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The prompt to generate an image from
    */

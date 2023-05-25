@@ -4,6 +4,7 @@
 
 import type { ColorField } from './ColorField';
 import type { ImageField } from './ImageField';
+import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Generates an image using inpaint.
@@ -14,6 +15,10 @@ export type InpaintInvocation = {
    */
   id: string;
   type?: 'inpaint';
+  /**
+   * The meta properties of this node.
+   */
+  meta?: InvocationMeta;
   /**
    * The prompt to generate an image from
    */
