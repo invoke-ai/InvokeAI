@@ -15,6 +15,8 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
 from pydantic.schema import schema
 
+import invokeai.frontend.web as web_dir
+
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images
 from .api.sockets import SocketIO
@@ -123,7 +125,6 @@ app.openapi = custom_openapi
 
 # Override API doc favicons
 app.mount("/static", StaticFiles(directory=Path(web_dir.__path__[0], 'static/dream_web')), name="static")
-
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
