@@ -28,7 +28,6 @@ from ...backend.config.model_install_backend import (
     Dataset_path,
     default_config_file,
     default_dataset,
-    get_root,
     install_requested_models,
     recommended_datasets,
 )
@@ -454,8 +453,8 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
-    config.root = os.path.expanduser(get_root(opt.root) or "")
-
+    config.root = Path(opt.root or '')
+    
     if not (config.root_dir / config.conf_path.parent).exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
