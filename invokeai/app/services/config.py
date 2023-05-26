@@ -51,18 +51,32 @@ in INVOKEAI_ROOT. You can replace supersede this by providing any
 OmegaConf dictionary object initialization time:
 
  omegaconf = OmegaConf.load('/tmp/init.yaml')
- conf = InvokeAIAppConfig(conf=omegaconf)
+ conf = InvokeAIAppConfig()
+ conf.parse_args(conf=omegaconf)
 
-By default, InvokeAIAppConfig will parse the contents of `sys.argv` at
-initialization time. You may pass a list of strings in the optional
+InvokeAIAppConfig.parse_args() will parse the contents of `sys.argv`
+at initialization time. You may pass a list of strings in the optional
 `argv` argument to use instead of the system argv:
 
- conf = InvokeAIAppConfig(arg=['--xformers_enabled'])
+ conf.parse_args(argv=['--xformers_enabled'])
 
-It is also possible to set a value at initialization time. This value
-has highest priority.
+It is also possible to set a value at initialization time. However, if
+you call parse_args() it may be overwritten.
 
  conf = InvokeAIAppConfig(xformers_enabled=True)
+ conf.parse_args(argv=['--no-xformers'])
+ conf.xformers_enabled
+ # False
+
+
+To avoid this, use `get_config()` to retrieve the application-wide
+configuration object. This will retain any properties set at object
+creation time:
+
+ conf = InvokeAIAppConfig.get_config(xformers_enabled=True)
+ conf.parse_args(argv=['--no-xformers'])
+ conf.xformers_enabled
+ # True
 
 Any setting can be overwritten by setting an environment variable of
 form: "INVOKEAI_<setting>", as in:
@@ -76,15 +90,23 @@ Order of precedence (from highest):
    4) config file options
    5) pydantic defaults
 
-Typical usage:
+Typical usage at the top level file:
 
  from invokeai.app.services.config import InvokeAIAppConfig
- from invokeai.invocations.generate import TextToImageInvocation
 
  # get global configuration and print its nsfw_checker value
  conf = InvokeAIAppConfig.get_config()
  conf.parse_args()
  print(conf.nsfw_checker)
+
+Typical usage in a backend module:
+
+ from invokeai.app.services.config import InvokeAIAppConfig
+
+ # get global configuration and print its nsfw_checker value
+ conf = InvokeAIAppConfig.get_config()
+ print(conf.nsfw_checker)
+
 
 Computed properties:
 
@@ -138,6 +160,7 @@ two configs are kept in separate sections of the config file:
         legacy_conf_dir: configs/stable-diffusion
         outdir: outputs
      ...
+
 '''
 from __future__ import annotations
 import argparse

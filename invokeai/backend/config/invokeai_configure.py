@@ -631,7 +631,7 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = InvokeAIAppConfig(argv=[])
+    opts = InvokeAIAppConfig.get_config()
     outdir = Path(opts.outdir)
     if not outdir.is_absolute():
         opts.outdir = str(config.root / opts.outdir)
@@ -696,7 +696,7 @@ def write_opts(opts: Namespace, init_file: Path):
     """
 
     # this will load current settings
-    config = InvokeAIAppConfig()
+    config = InvokeAIAppConfig.get_config()
     for key,value in opts.__dict__.items():
         if hasattr(config,key):
             setattr(config,key,value)
@@ -728,7 +728,7 @@ def write_default_options(program_opts: Namespace, initfile: Path):
 # yaml format.
 def migrate_init_file(legacy_format:Path):
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
-    new = InvokeAIAppConfig(conf={})
+    new = InvokeAIAppConfig.get_config()
 
     fields = list(get_type_hints(InvokeAIAppConfig).keys())
     for attr in fields:
