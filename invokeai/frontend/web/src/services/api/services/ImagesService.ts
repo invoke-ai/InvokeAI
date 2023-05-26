@@ -24,6 +24,7 @@ export class ImagesService {
   public static listImagesWithMetadata({
     imageType,
     imageCategory,
+    isIntermediate = false,
     page,
     perPage = 10,
   }: {
@@ -35,6 +36,10 @@ export class ImagesService {
      * The kind of images to list
      */
     imageCategory: ImageCategory,
+    /**
+     * The kind of images to list
+     */
+    isIntermediate?: boolean,
     /**
      * The page of image metadata to get
      */
@@ -50,6 +55,7 @@ export class ImagesService {
       query: {
         'image_type': imageType,
         'image_category': imageCategory,
+        'is_intermediate': isIntermediate,
         'page': page,
         'per_page': perPage,
       },
