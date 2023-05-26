@@ -330,6 +330,7 @@ class ImageService(ImageServiceABC):
         self,
         image_type: ImageType,
         image_category: ImageCategory,
+        is_intermediate: bool = False,
         page: int = 0,
         per_page: int = 10,
     ) -> PaginatedResults[ImageDTO]:
@@ -337,6 +338,7 @@ class ImageService(ImageServiceABC):
             results = self._services.records.get_many(
                 image_type,
                 image_category,
+                is_intermediate,
                 page,
                 per_page,
             )
