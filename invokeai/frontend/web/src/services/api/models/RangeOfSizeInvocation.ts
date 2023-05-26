@@ -2,8 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { InvocationMeta } from './InvocationMeta';
-
 /**
  * Creates a range from start to start + size with step
  */
@@ -12,11 +10,11 @@ export type RangeOfSizeInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'range_of_size';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'range_of_size';
   /**
    * The start of the range
    */

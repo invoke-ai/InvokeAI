@@ -50,7 +50,6 @@ export type { InfillTileInvocation } from './models/InfillTileInvocation';
 export type { InpaintInvocation } from './models/InpaintInvocation';
 export type { IntCollectionOutput } from './models/IntCollectionOutput';
 export type { IntOutput } from './models/IntOutput';
-export type { InvocationMeta } from './models/InvocationMeta';
 export type { IterateInvocation } from './models/IterateInvocation';
 export type { IterateInvocationOutput } from './models/IterateInvocationOutput';
 export type { LatentsField } from './models/LatentsField';

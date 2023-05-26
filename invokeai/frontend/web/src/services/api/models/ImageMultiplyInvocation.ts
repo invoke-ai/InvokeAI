@@ -3,7 +3,6 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
-import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Multiplies two images together using `PIL.ImageChops.multiply()`.
@@ -13,11 +12,11 @@ export type ImageMultiplyInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'img_mul';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'img_mul';
   /**
    * The first image to multiply
    */
