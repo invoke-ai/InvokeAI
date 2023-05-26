@@ -144,15 +144,6 @@ def yes_or_no(prompt: str, default_yes=True):
     else:
         return response[0] in ("y", "Y")
 
-
-# -------------------------------------
-def get_root(root: str = None) -> str:
-    if root:
-        return root
-    else:
-        return config.root_dir
-
-
 # ---------------------------------------------
 def recommended_datasets() -> dict:
     datasets = dict()
