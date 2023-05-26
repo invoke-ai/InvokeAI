@@ -65,6 +65,7 @@ class ImageRecordStorageBase(ABC):
         self,
         image_type: ImageType,
         image_category: ImageCategory,
+        is_intermediate: bool = False,
         page: int = 0,
         per_page: int = 10,
     ) -> PaginatedResults[ImageRecord]:
@@ -245,6 +246,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self,
         image_type: ImageType,
         image_category: ImageCategory,
+        is_intermediate: bool = False,
         page: int = 0,
         per_page: int = 10,
     ) -> PaginatedResults[ImageRecord]:
@@ -254,11 +256,11 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(
                 f"""--sql
                 SELECT * FROM images
-                WHERE image_type = ? AND image_category = ?
+                WHERE image_type = ? AND image_category = ? AND is_intermediate = ?
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?;
                 """,
-                (image_type.value, image_category.value, per_page, page * per_page),
+                (image_type.value, image_category.value, is_intermediate, per_page, page * per_page),
             )
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
@@ -268,9 +270,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 SELECT count(*) FROM images
-                WHERE image_type = ? AND image_category = ?
+                WHERE image_type = ? AND image_category = ? AND is_intermediate = ?
                 """,
-                (image_type.value, image_category.value),
+                (image_type.value, image_category.value, is_intermediate),
             )
 
             count = self._cursor.fetchone()[0]

@@ -230,6 +230,9 @@ async def get_image_urls(
 async def list_images_with_metadata(
     image_type: ImageType = Query(description="The type of images to list"),
     image_category: ImageCategory = Query(description="The kind of images to list"),
+    is_intermediate: bool = Query(
+        default=False, description="The kind of images to list"
+    ),
     page: int = Query(default=0, description="The page of image metadata to get"),
     per_page: int = Query(
         default=10, description="The number of image metadata per page"
@@ -240,6 +243,7 @@ async def list_images_with_metadata(
     image_dtos = ApiDependencies.invoker.services.images.get_many(
         image_type,
         image_category,
+        is_intermediate,
         page,
         per_page,
     )
