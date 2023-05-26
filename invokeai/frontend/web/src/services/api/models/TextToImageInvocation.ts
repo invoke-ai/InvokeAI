@@ -10,6 +10,10 @@ export type TextToImageInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'txt2img';
   /**
    * The prompt to generate an image from

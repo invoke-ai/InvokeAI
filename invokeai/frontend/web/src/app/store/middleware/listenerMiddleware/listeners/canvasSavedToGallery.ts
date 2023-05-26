@@ -29,7 +29,6 @@ export const addCanvasSavedToGalleryListener = () => {
 
       dispatch(
         imageUploaded({
-          imageType: 'results',
           formData: {
             file: new File([blob], 'mergedCanvas.png', { type: 'image/png' }),
           },

@@ -10,6 +10,10 @@ export type RangeOfSizeInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'range_of_size';
   /**
    * The start of the range

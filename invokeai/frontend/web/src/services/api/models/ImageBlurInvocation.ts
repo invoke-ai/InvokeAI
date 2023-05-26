@@ -7,12 +7,16 @@ import type { ImageField } from './ImageField';
 /**
  * Blurs an image
  */
-export type BlurInvocation = {
+export type ImageBlurInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'blur';
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
+  type?: 'img_blur';
   /**
    * The image to blur
    */

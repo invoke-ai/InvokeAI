@@ -10,7 +10,6 @@ class ImageType(str, Enum, metaclass=MetaEnum):
 
     RESULT = "results"
     UPLOAD = "uploads"
-    INTERMEDIATE = "intermediates"
 
 
 class InvalidImageTypeException(ValueError):

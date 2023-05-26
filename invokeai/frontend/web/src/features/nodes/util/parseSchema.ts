@@ -13,7 +13,9 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const invocationDenylist = ['Graph'];
+const RESERVED_FIELD_NAMES = ['id', 'type', 'meta'];
+
+const invocationDenylist = ['Graph', 'InvocationMeta'];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
@@ -73,7 +75,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
           (inputsAccumulator, property, propertyName) => {
             if (
               // `type` and `id` are not valid inputs/outputs
-              !['type', 'id'].includes(propertyName) &&
+              !RESERVED_FIELD_NAMES.includes(propertyName) &&
               isSchemaObject(property)
             ) {
               const field: InputFieldTemplate | undefined =

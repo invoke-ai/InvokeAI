@@ -12,6 +12,7 @@ from invokeai.app.models.image import (
 )
 from invokeai.app.services.models.image_record import (
     ImageRecord,
+    ImageRecordChanges,
     deserialize_image_record,
 )
 from invokeai.app.services.item_storage import PaginatedResults
@@ -50,6 +51,16 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def update(
+        self,
+        image_name: str,
+        image_type: ImageType,
+        changes: ImageRecordChanges,
+    ) -> None:
+        """Updates an image record."""
+        pass
+
+    @abstractmethod
     def get_many(
         self,
         image_type: ImageType,
@@ -78,6 +89,7 @@ class ImageRecordStorageBase(ABC):
         session_id: Optional[str],
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
+        is_intermediate: bool = False,
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -125,6 +137,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 session_id TEXT,
                 node_id TEXT,
                 metadata TEXT,
+                is_intermediate BOOLEAN DEFAULT FALSE,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -192,6 +205,42 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordNotFoundException
 
         return deserialize_image_record(dict(result))
+
+    def update(
+        self,
+        image_name: str,
+        image_type: ImageType,
+        changes: ImageRecordChanges,
+    ) -> None:
+        try:
+            self._lock.acquire()
+            # Change the category of the image
+            if changes.image_category is not None:
+                self._cursor.execute(
+                    f"""--sql
+                    UPDATE images
+                    SET image_category = ?
+                    WHERE image_name = ?;
+                    """,
+                    (changes.image_category, image_name),
+                )
+            
+            # Change the session associated with the image
+            if changes.session_id is not None:
+                self._cursor.execute(
+                    f"""--sql
+                    UPDATE images
+                    SET session_id = ?
+                    WHERE image_name = ?;
+                    """,
+                    (changes.session_id, image_name),
+                )
+            self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordSaveException from e
+        finally:
+            self._lock.release()
 
     def get_many(
         self,
@@ -265,6 +314,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         height: int,
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
+        is_intermediate: bool = False,
     ) -> datetime:
         try:
             metadata_json = (
@@ -281,9 +331,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     height,
                     node_id,
                     session_id,
-                    metadata
+                    metadata,
+                    is_intermediate
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -294,6 +345,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata_json,
+                    is_intermediate,
                 ),
             )
             self._conn.commit()

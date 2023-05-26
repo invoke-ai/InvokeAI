@@ -4,9 +4,14 @@ import { imageDeleted } from 'services/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { clamp } from 'lodash-es';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { uploadsAdapter } from 'features/gallery/store/uploadsSlice';
+import { resultsAdapter } from 'features/gallery/store/resultsSlice';
 
 const moduleLog = log.child({ namespace: 'addRequestedImageDeletionListener' });
 
+/**
+ * Called when the user requests an image deletion
+ */
 export const addRequestedImageDeletionListener = () => {
   startAppListening({
     actionCreator: requestedImageDeletion,
@@ -18,11 +23,6 @@ export const addRequestedImageDeletionListener = () => {
       }
 
       const { image_name, image_type } = image;
-
-      if (image_type !== 'uploads' && image_type !== 'results') {
-        moduleLog.warn({ data: image }, `Invalid image type ${image_type}`);
-        return;
-      }
 
       const selectedImageName = getState().gallery.selectedImage?.image_name;
 
@@ -54,6 +54,52 @@ export const addRequestedImageDeletionListener = () => {
       }
 
       dispatch(imageDeleted({ imageName: image_name, imageType: image_type }));
+    },
+  });
+};
+
+/**
+ * Called when the actual delete request is sent to the server
+ */
+export const addImageDeletedPendingListener = () => {
+  startAppListening({
+    actionCreator: imageDeleted.pending,
+    effect: (action, { dispatch, getState }) => {
+      const { imageName, imageType } = action.meta.arg;
+      // Preemptively remove the image from the gallery
+      if (imageType === 'uploads') {
+        uploadsAdapter.removeOne(getState().uploads, imageName);
+      }
+      if (imageType === 'results') {
+        resultsAdapter.removeOne(getState().results, imageName);
+      }
+    },
+  });
+};
+
+/**
+ * Called on successful delete
+ */
+export const addImageDeletedFulfilledListener = () => {
+  startAppListening({
+    actionCreator: imageDeleted.fulfilled,
+    effect: (action, { dispatch, getState }) => {
+      moduleLog.debug({ data: { image: action.meta.arg } }, 'Image deleted');
+    },
+  });
+};
+
+/**
+ * Called on failed delete
+ */
+export const addImageDeletedRejectedListener = () => {
+  startAppListening({
+    actionCreator: imageDeleted.rejected,
+    effect: (action, { dispatch, getState }) => {
+      moduleLog.debug(
+        { data: { image: action.meta.arg } },
+        'Unable to delete image'
+      );
     },
   });
 };

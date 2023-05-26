@@ -56,7 +56,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
     # fmt: on
 
@@ -101,6 +101,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -181,6 +182,7 @@ class ImageToImageInvocation(TextToImageInvocation):
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -296,6 +298,7 @@ class InpaintInvocation(ImageToImageInvocation):
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(

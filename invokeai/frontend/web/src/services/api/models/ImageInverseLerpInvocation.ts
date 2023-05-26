@@ -7,12 +7,16 @@ import type { ImageField } from './ImageField';
 /**
  * Inverse linear interpolation of all pixels of an image
  */
-export type InverseLerpInvocation = {
+export type ImageInverseLerpInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'ilerp';
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
+  type?: 'img_ilerp';
   /**
    * The image to lerp
    */
