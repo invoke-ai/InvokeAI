@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
+from os import name
 from typing import Optional, TYPE_CHECKING, Union
 import uuid
 from PIL.Image import Image as PILImageType
@@ -31,6 +32,7 @@ from invokeai.app.services.image_file_storage import (
 )
 from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
+from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 
 if TYPE_CHECKING:
@@ -120,6 +122,7 @@ class ImageServiceDependencies:
     metadata: MetadataServiceBase
     urls: UrlServiceBase
     logger: Logger
+    names: NameServiceBase
     graph_execution_manager: ItemStorageABC["GraphExecutionState"]
 
     def __init__(
@@ -129,6 +132,7 @@ class ImageServiceDependencies:
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
+        names: NameServiceBase,
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
         self.records = image_record_storage
@@ -136,6 +140,7 @@ class ImageServiceDependencies:
         self.metadata = metadata
         self.urls = url
         self.logger = logger
+        self.names = names
         self.graph_execution_manager = graph_execution_manager
 
 
@@ -149,6 +154,7 @@ class ImageService(ImageServiceABC):
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
+        names: NameServiceBase,
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
         self._services = ImageServiceDependencies(
@@ -157,6 +163,7 @@ class ImageService(ImageServiceABC):
             metadata=metadata,
             url=url,
             logger=logger,
+            names=names,
             graph_execution_manager=graph_execution_manager,
         )
 
@@ -175,12 +182,7 @@ class ImageService(ImageServiceABC):
         if image_category not in ImageCategory:
             raise InvalidImageCategoryException
 
-        image_name = self._create_image_name(
-            image_type=image_type,
-            image_category=image_category,
-            node_id=node_id,
-            session_id=session_id,
-        )
+        image_name = self._services.names.create_image_name()
 
         metadata = self._get_metadata(session_id, node_id)
 
@@ -260,7 +262,6 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self._services.logger.error("Problem updating image record")
             raise e
-        
 
     def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
         try:
@@ -377,21 +378,6 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self._services.logger.error("Problem deleting image record and file")
             raise e
-
-    def _create_image_name(
-        self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        node_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-    ) -> str:
-        """Create a unique image name."""
-        uuid_str = str(uuid.uuid4())
-
-        if node_id is not None and session_id is not None:
-            return f"{image_type.value}_{image_category.value}_{session_id}_{node_id}_{uuid_str}.png"
-
-        return f"{image_type.value}_{image_category.value}_{uuid_str}.png"
 
     def _get_metadata(
         self, session_id: Optional[str] = None, node_id: Optional[str] = None

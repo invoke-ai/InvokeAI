@@ -103,7 +103,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def __init__(self, filename: str) -> None:
         super().__init__()
-
         self._filename = filename
         self._conn = sqlite3.connect(filename, check_same_thread=False)
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
