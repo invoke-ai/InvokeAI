@@ -28,7 +28,6 @@ import { addSocketDisconnectedListener } from './listeners/socketio/socketDiscon
 import { addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
-import { addImageMetadataReceivedListener } from './listeners/imageMetadataReceived';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -51,7 +50,6 @@ export type AppListenerEffect = ListenerEffect<
 addImageUploadedListener();
 addInitialImageSelectedListener();
 addRequestedImageDeletionListener();
-addImageMetadataReceivedListener();
 
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
