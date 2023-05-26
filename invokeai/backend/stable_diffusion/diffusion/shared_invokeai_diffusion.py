@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 from math import ceil
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union, List
 
 import numpy as np
 import torch
@@ -112,6 +112,8 @@ class InvokeAIDiffuserComponent:
             # TODO resuscitate attention map saving
             # self.remove_attention_map_saving()
 
+    # FIXME: this method needs review. It recursively calls itself?
+    #        and doesn't seem to currently get called from anywhere else
     def override_cross_attention(
         self, conditioning: ExtraConditioningInfo, step_count: int
     ) -> Dict[str, AttentionProcessor]:
@@ -178,7 +180,8 @@ class InvokeAIDiffuserComponent:
         sigma: torch.Tensor,
         unconditioning: Union[torch.Tensor, dict],
         conditioning: Union[torch.Tensor, dict],
-        unconditional_guidance_scale: float,
+        # unconditional_guidance_scale: float,
+        unconditional_guidance_scale: Union[float, List[float]],
         step_index: Optional[int] = None,
         total_step_count: Optional[int] = None,
         **kwargs,
@@ -192,6 +195,13 @@ class InvokeAIDiffuserComponent:
         :param step_index: counts upwards from 0 to (step_count-1) (as passed to setup_cross_attention_control, if using). May be called multiple times for a single step, therefore do not assume that its value will monotically increase. If None, will be estimated by comparing sigma against self.model.sigmas .
         :return: the new latents after applying the model to x using unscaled unconditioning and CFG-scaled conditioning.
         """
+
+        if isinstance(unconditional_guidance_scale, list):
+            guidance_scale = unconditional_guidance_scale[step_index]
+            print("step: ", step_index, "guidance_scale: ", guidance_scale)
+        else:
+            guidance_scale = unconditional_guidance_scale
+            print("guidance_scale: ", guidance_scale)
 
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
@@ -241,7 +251,8 @@ class InvokeAIDiffuserComponent:
             )
 
         combined_next_x = self._combine(
-            unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale
+            # unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale
+            unconditioned_next_x, conditioned_next_x, guidance_scale
         )
 
         return combined_next_x
@@ -495,7 +506,7 @@ class InvokeAIDiffuserComponent:
             logger.debug(
                 f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}"
             )
-            logger.debug(   
+            logger.debug(
                 f"{outside / latents.numel() * 100:.2f}% values outside threshold"
             )
 

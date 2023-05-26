@@ -226,7 +226,7 @@ class ControlNetData:
 class ConditioningData:
     unconditioned_embeddings: torch.Tensor
     text_embeddings: torch.Tensor
-    guidance_scale: float
+    guidance_scale: Union[float, List[float]]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
@@ -662,7 +662,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         down_block_res_samples, mid_block_res_sample = None, None
 
         if control_data is not None:
-            if conditioning_data.guidance_scale > 1.0:
+            # if conditioning_data.guidance_scale > 1.0:
+            if conditioning_data.guidance_scale is not None:
                 # expand the latents input to control model if doing classifier free guidance
                 #    (which I think for now is always true, there is conditional elsewhere that stops execution if
                 #     classifier_free_guidance is <= 1.0 ?)
@@ -803,7 +804,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         run_id=None,
         callback=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:        
+    ) -> InvokeAIStableDiffusionPipelineOutput:
         timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
         result_latents, result_attention_maps = self.latents_from_embeddings(
             latents=initial_latents if strength < 1.0 else torch.zeros_like(

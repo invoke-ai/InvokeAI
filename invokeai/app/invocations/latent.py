@@ -167,7 +167,7 @@ class TextToLatentsInvocation(BaseInvocation):
     negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    cfg_scale: Union[float, List[float]] = Field(default=7.5, description="CFG scale, either single value or list of value per timestep", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
@@ -184,6 +184,8 @@ class TextToLatentsInvocation(BaseInvocation):
                 "type_hints": {
                   "model": "model",
                   "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number"
                 }
             },
         }
@@ -229,10 +231,10 @@ class TextToLatentsInvocation(BaseInvocation):
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
 
         conditioning_data = ConditioningData(
-            uc,
-            c,
-            self.cfg_scale,
-            extra_conditioning_info,
+            unconditioned_embeddings=uc,
+            text_embeddings=c,
+            guidance_scale=self.cfg_scale,
+            extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,#threshold,
                 warmup=0.2,#warmup,
@@ -332,7 +334,8 @@ class TextToLatentsInvocation(BaseInvocation):
         print("type of control input: ", type(self.control))
         control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
                                               latents_shape=noise.shape,
-                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              do_classifier_free_guidance=True,)
 
         # TODO: Verify the noise is the right size
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
@@ -378,7 +381,9 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         print("type of control input: ", type(self.control))
         control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
                                               latents_shape=noise.shape,
-                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              do_classifier_free_guidance=True,
+                                              )
 
         # TODO: Verify the noise is the right size
 
