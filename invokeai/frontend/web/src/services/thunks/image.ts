@@ -2,7 +2,6 @@ import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { ImagesService } from 'services/api';
-import { getHeaders } from 'services/util/getHeaders';
 
 const imagesLog = log.child({ namespace: 'image' });
 
@@ -81,7 +80,7 @@ export const imageUpdated = createAppAsyncThunk(
   async (arg: ImageUpdatedArg) => {
     const response = await ImagesService.updateImage(arg);
 
-    imagesLog.debug({ arg, response }, 'Image updated');
+    imagesLog.debug({ data: { arg, response } }, 'Image updated');
 
     return response;
   }
