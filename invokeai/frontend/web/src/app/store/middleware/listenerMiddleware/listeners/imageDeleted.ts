@@ -84,7 +84,7 @@ export const addImageDeletedFulfilledListener = () => {
   startAppListening({
     actionCreator: imageDeleted.fulfilled,
     effect: (action, { dispatch, getState }) => {
-      moduleLog.info({ data: { image: action.meta.arg } }, 'Image deleted');
+      moduleLog.debug({ data: { image: action.meta.arg } }, 'Image deleted');
     },
   });
 };
@@ -96,7 +96,7 @@ export const addImageDeletedRejectedListener = () => {
   startAppListening({
     actionCreator: imageDeleted.rejected,
     effect: (action, { dispatch, getState }) => {
-      moduleLog.warn(
+      moduleLog.debug(
         { data: { image: action.meta.arg } },
         'Unable to delete image'
       );

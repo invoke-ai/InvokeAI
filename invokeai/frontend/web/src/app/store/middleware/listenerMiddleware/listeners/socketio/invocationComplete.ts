@@ -15,7 +15,7 @@ export const addInvocationCompleteListener = () => {
   startAppListening({
     actionCreator: invocationComplete,
     effect: async (action, { dispatch, getState, take }) => {
-      moduleLog.info(
+      moduleLog.debug(
         action.payload,
         `Invocation complete (${action.payload.data.node.type})`
       );

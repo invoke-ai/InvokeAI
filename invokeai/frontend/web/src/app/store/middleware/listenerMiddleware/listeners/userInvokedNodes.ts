@@ -17,7 +17,7 @@ export const addUserInvokedNodesListener = () => {
 
       const graph = buildNodesGraph(state);
       dispatch(nodesGraphBuilt(graph));
-      moduleLog({ data: graph }, 'Nodes graph built');
+      moduleLog.debug({ data: graph }, 'Nodes graph built');
 
       dispatch(sessionCreated({ graph }));
 

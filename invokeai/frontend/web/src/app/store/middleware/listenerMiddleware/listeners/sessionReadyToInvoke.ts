@@ -11,7 +11,7 @@ export const addSessionReadyToInvokeListener = () => {
     effect: (action, { getState, dispatch }) => {
       const { sessionId } = getState().system;
       if (sessionId) {
-        moduleLog.info(
+        moduleLog.debug(
           { sessionId },
           `Session ready to invoke (${sessionId})})`
         );

@@ -19,7 +19,7 @@ export const addUserInvokedTextToImageListener = () => {
 
       dispatch(textToImageGraphBuilt(graph));
 
-      moduleLog({ data: graph }, 'Text to Image graph built');
+      moduleLog.debug({ data: graph }, 'Text to Image graph built');
 
       dispatch(sessionCreated({ graph }));
 

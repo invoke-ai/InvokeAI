@@ -19,7 +19,7 @@ export const addInvocationStartedListener = () => {
         return;
       }
 
-      moduleLog.info(
+      moduleLog.debug(
         action.payload,
         `Invocation started (${action.payload.data.node.type})`
       );

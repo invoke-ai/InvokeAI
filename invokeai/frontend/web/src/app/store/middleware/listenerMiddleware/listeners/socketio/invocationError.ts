@@ -8,7 +8,7 @@ export const addInvocationErrorListener = () => {
   startAppListening({
     actionCreator: invocationError,
     effect: (action, { dispatch, getState }) => {
-      moduleLog.debug(
+      moduleLog.error(
         action.payload,
         `Invocation error (${action.payload.data.node.type})`
       );
