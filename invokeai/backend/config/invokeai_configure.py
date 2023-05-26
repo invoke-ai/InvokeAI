@@ -51,10 +51,7 @@ from invokeai.backend.config.model_install_backend import (
     hf_download_with_resume,
     recommended_datasets,
 )
-from invokeai.app.services.config import (
-    get_invokeai_config,
-    InvokeAIAppConfig,
-)
+from invokeai.app.services.config import InvokeAIAppConfig
 
 warnings.filterwarnings("ignore")
 
@@ -62,7 +59,7 @@ transformers.logging.set_verbosity_error()
 
 
 # --------------------------globals-----------------------
-config = get_invokeai_config()
+config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
@@ -820,8 +817,8 @@ def main():
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-            config = get_invokeai_config()  # reread defaults
-
+            # Load new init file into config
+            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
 
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)

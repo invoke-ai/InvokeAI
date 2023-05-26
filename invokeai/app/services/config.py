@@ -82,12 +82,9 @@ Typical usage:
  from invokeai.invocations.generate import TextToImageInvocation
 
  # get global configuration and print its nsfw_checker value
- conf = InvokeAIAppConfig()
+ conf = InvokeAIAppConfig.get_config()
+ conf.parse_args()
  print(conf.nsfw_checker)
-
- # get the text2image invocation and print its step value
- text2image = TextToImageInvocation()
- print(text2image.steps)
 
 Computed properties:
 
@@ -103,10 +100,11 @@ a Path object:
  lora_path          - path to the LoRA directory
 
 In most cases, you will want to create a single InvokeAIAppConfig
-object for the entire application. The get_invokeai_config() function
+object for the entire application. The InvokeAIAppConfig.get_config() function
 does this:
 
-  config = get_invokeai_config()
+  config = InvokeAIAppConfig.get_config()
+  config.parse_args()   # read values from the command line/config file
   print(config.root)
 
 # Subclassing
@@ -141,6 +139,7 @@ two configs are kept in separate sections of the config file:
         outdir: outputs
      ...
 '''
+from __future__ import annotations
 import argparse
 import pydoc
 import typing
@@ -154,9 +153,6 @@ from typing import Any, ClassVar, Dict, List, Literal, Type, Union, get_origin, 
 
 INIT_FILE = Path('invokeai.yaml')
 LEGACY_INIT_FILE = Path('invokeai.init')
-
-# This global stores a singleton InvokeAIAppConfig configuration object
-global_config = None
 
 class InvokeAISettings(BaseSettings):
     '''
@@ -330,6 +326,9 @@ the command-line client (recommended for experts only), or
 can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
 setting environment variables INVOKEAI_<setting>.
      '''
+    singleton_config: ClassVar[InvokeAIAppConfig] = None
+    singleton_init: ClassVar[Dict] = None
+    
     #fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
@@ -369,33 +368,44 @@ setting environment variables INVOKEAI_<setting>.
     embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
     #fmt: on
 
-    def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
+    def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):
         '''
-        Initialize InvokeAIAppconfig.
+        Update settings with contents of init file, environment, and 
+        command-line settings.
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
-        :param **kwargs: attributes to initialize with
+        :param clobber: ovewrite any initialization parameters passed during initialization
         '''
-        super().__init__(**kwargs)
-
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
-        self.parse_args(argv)
+        super().parse_args(argv)
         if conf is None:
             try:
                 conf = OmegaConf.load(self.root_dir / INIT_FILE)
             except:
                 pass
         InvokeAISettings.initconf = conf
-
+        
         # parse args again in order to pick up settings in configuration file
-        self.parse_args(argv)
+        super().parse_args(argv)
 
-        # restore initialization values
-        hints = get_type_hints(self)
-        for k in kwargs:
-            setattr(self,k,parse_obj_as(hints[k],kwargs[k]))
+        if self.singleton_init and not clobber:
+            hints = get_type_hints(self.__class__)
+            for k in self.singleton_init:
+                setattr(self,k,parse_obj_as(hints[k],self.singleton_init[k]))
 
+    @classmethod
+    def get_config(cls,**kwargs)->InvokeAIAppConfig:
+        '''
+        This returns a singleton InvokeAIAppConfig configuration object.
+        '''
+        if cls.singleton_config is None \
+           or type(cls.singleton_config)!=cls \
+           or (kwargs and cls.singleton_init != kwargs):
+            cls.singleton_config = cls(**kwargs)
+            cls.singleton_init = kwargs
+        return cls.singleton_config
+        
     @property
     def root_path(self)->Path:
         '''
@@ -513,11 +523,8 @@ class PagingArgumentParser(argparse.ArgumentParser):
         text = self.format_help()
         pydoc.pager(text)
 
-def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig,**kwargs)->InvokeAIAppConfig:
+def get_invokeai_config(**kwargs)->InvokeAIAppConfig:
     '''
-    This returns a singleton InvokeAIAppConfig configuration object.
+    Legacy function which returns InvokeAIAppConfig.get_config()
     '''
-    global global_config
-    if global_config is None or type(global_config)!=cls:
-        global_config = cls(**kwargs)
-    return global_config
+    return InvokeAIAppConfig.get_config(**kwargs)
