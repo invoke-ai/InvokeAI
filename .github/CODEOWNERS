@@ -2,7 +2,7 @@
 /.github/workflows/  @lstein @blessedcoolant
 
 # documentation
-/docs/ @lstein @blessedcoolant @hipsterusename
+/docs/ @lstein @blessedcoolant @hipsterusername
 /mkdocs.yml @lstein  @blessedcoolant
 
 # nodes
