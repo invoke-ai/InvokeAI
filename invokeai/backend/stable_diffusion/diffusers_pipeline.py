@@ -803,7 +803,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         run_id=None,
         callback=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:        
+    ) -> InvokeAIStableDiffusionPipelineOutput:
         timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
         result_latents, result_attention_maps = self.latents_from_embeddings(
             latents=initial_latents if strength < 1.0 else torch.zeros_like(
@@ -1031,7 +1031,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         dtype=torch.float16,
         do_classifier_free_guidance=True,
     ):
-
         if not isinstance(image, torch.Tensor):
             if isinstance(image, PIL.Image.Image):
                 image = [image]
