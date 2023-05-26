@@ -1,4 +1,3 @@
-import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { ImagesService, PaginatedResults_ImageDTO_ } from 'services/api';
 

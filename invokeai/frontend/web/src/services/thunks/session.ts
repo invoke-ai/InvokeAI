@@ -49,7 +49,7 @@ const isErrorWithStatus = (error: unknown): error is { status: number } =>
  * `SessionsService.invokeSession()` thunk
  */
 export const sessionInvoked = createAppAsyncThunk<
-  any,
+  void,
   SessionInvokedArg,
   SessionInvokedThunkConfig
 >('api/sessionInvoked', async (arg, { rejectWithValue }) => {
@@ -72,24 +72,28 @@ export const sessionInvoked = createAppAsyncThunk<
 type SessionCanceledArg = Parameters<
   (typeof SessionsService)['cancelSessionInvoke']
 >[0];
-
+type SessionCanceledThunkConfig = {
+  rejectValue: {
+    arg: SessionCanceledArg;
+    error: unknown;
+  };
+};
 /**
  * `SessionsService.cancelSession()` thunk
  */
-export const sessionCanceled = createAppAsyncThunk(
-  'api/sessionCanceled',
-  async (arg: SessionCanceledArg, _thunkApi) => {
-    const { sessionId } = arg;
+export const sessionCanceled = createAppAsyncThunk<
+  void,
+  SessionCanceledArg,
+  SessionCanceledThunkConfig
+>('api/sessionCanceled', async (arg: SessionCanceledArg, _thunkApi) => {
+  const { sessionId } = arg;
 
-    const response = await SessionsService.cancelSessionInvoke({
-      sessionId,
-    });
+  const response = await SessionsService.cancelSessionInvoke({
+    sessionId,
+  });
 
-    sessionLog.info({ arg, response }, `Session canceled (${sessionId})`);
-
-    return response;
-  }
-);
+  return response;
+});
 
 type SessionsListedArg = Parameters<
   (typeof SessionsService)['listSessions']
