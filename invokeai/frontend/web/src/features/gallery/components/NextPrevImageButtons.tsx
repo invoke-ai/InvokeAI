@@ -33,7 +33,7 @@ export const nextPrevImageButtonsSelector = createSelector(
     }
 
     const currentImageIndex = state[currentCategory].ids.findIndex(
-      (i) => i === selectedImage.name
+      (i) => i === selectedImage.image_name
     );
 
     const nextImageIndex = clamp(
