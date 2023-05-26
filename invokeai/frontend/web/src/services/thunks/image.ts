@@ -67,9 +67,6 @@ export const imageDeleted = createAppAsyncThunk(
   'api/imageDeleted',
   async (arg: ImageDeletedArg) => {
     const response = await ImagesService.deleteImage(arg);
-
-    imagesLog.debug({ arg, response }, 'Image deleted');
-
     return response;
   }
 );
@@ -77,7 +74,7 @@ export const imageDeleted = createAppAsyncThunk(
 type ImageUpdatedArg = Parameters<(typeof ImagesService)['updateImage']>[0];
 
 /**
- * `ImagesService.deleteImage()` thunk
+ * `ImagesService.updateImage()` thunk
  */
 export const imageUpdated = createAppAsyncThunk(
   'api/imageUpdated',

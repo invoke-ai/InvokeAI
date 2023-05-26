@@ -97,18 +97,6 @@ const resultsSlice = createSlice({
         });
       }
     });
-
-    /**
-     * Delete Image - PENDING
-     * Pre-emptively remove the image from the gallery
-     */
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      const { imageType, imageName } = action.meta.arg;
-
-      if (imageType === 'results') {
-        resultsAdapter.removeOne(state, imageName);
-      }
-    });
   },
 });
 
