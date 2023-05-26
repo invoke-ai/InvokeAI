@@ -9,12 +9,14 @@ const galleryLog = log.child({ namespace: 'gallery' });
 export const receivedResultImagesPage = createAppAsyncThunk(
   'results/receivedResultImagesPage',
   async (_arg, { getState, rejectWithValue }) => {
-    const { page, pages, nextPage } = getState().results;
+    const { page, pages, nextPage, upsertedImageCount } = getState().results;
+
+    const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
       imageType: 'results',
       imageCategory: 'general',
-      page: getState().results.nextPage,
+      page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
 
@@ -27,12 +29,14 @@ export const receivedResultImagesPage = createAppAsyncThunk(
 export const receivedUploadImagesPage = createAppAsyncThunk(
   'uploads/receivedUploadImagesPage',
   async (_arg, { getState, rejectWithValue }) => {
-    const { page, pages, nextPage } = getState().uploads;
+    const { page, pages, nextPage, upsertedImageCount } = getState().uploads;
+
+    const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
       imageType: 'uploads',
       imageCategory: 'general',
-      page: getState().uploads.nextPage,
+      page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
 
