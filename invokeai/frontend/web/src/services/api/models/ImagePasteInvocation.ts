@@ -7,12 +7,16 @@ import type { ImageField } from './ImageField';
 /**
  * Pastes an image into another image.
  */
-export type PasteImageInvocation = {
+export type ImagePasteInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'paste';
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
+  type?: 'img_paste';
   /**
    * The base image
    */

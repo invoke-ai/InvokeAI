@@ -4,6 +4,7 @@
 import type { Body_upload_image } from '../models/Body_upload_image';
 import type { ImageCategory } from '../models/ImageCategory';
 import type { ImageDTO } from '../models/ImageDTO';
+import type { ImageRecordChanges } from '../models/ImageRecordChanges';
 import type { ImageType } from '../models/ImageType';
 import type { ImageUrlsDTO } from '../models/ImageUrlsDTO';
 import type { PaginatedResults_ImageDTO_ } from '../models/PaginatedResults_ImageDTO_';
@@ -65,20 +66,32 @@ export class ImagesService {
    * @throws ApiError
    */
   public static uploadImage({
-    imageType,
     formData,
     imageCategory,
+    isIntermediate = false,
+    sessionId,
   }: {
-    imageType: ImageType,
     formData: Body_upload_image,
+    /**
+     * The category of the image
+     */
     imageCategory?: ImageCategory,
+    /**
+     * Whether this is an intermediate image
+     */
+    isIntermediate?: boolean,
+    /**
+     * The session ID associated with this upload, if any
+     */
+    sessionId?: string,
   }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/images/',
       query: {
-        'image_type': imageType,
         'image_category': imageCategory,
+        'is_intermediate': isIntermediate,
+        'session_id': sessionId,
       },
       formData: formData,
       mediaType: 'multipart/form-data',
@@ -132,6 +145,9 @@ export class ImagesService {
     imageType,
     imageName,
   }: {
+    /**
+     * The type of image to delete
+     */
     imageType: ImageType,
     /**
      * The name of the image to delete
@@ -145,6 +161,42 @@ export class ImagesService {
         'image_type': imageType,
         'image_name': imageName,
       },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Update Image
+   * Updates an image
+   * @returns ImageDTO Successful Response
+   * @throws ApiError
+   */
+  public static updateImage({
+    imageType,
+    imageName,
+    requestBody,
+  }: {
+    /**
+     * The type of image to update
+     */
+    imageType: ImageType,
+    /**
+     * The name of the image to update
+     */
+    imageName: string,
+    requestBody: ImageRecordChanges,
+  }): CancelablePromise<ImageDTO> {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/api/v1/images/{image_type}/{image_name}',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      body: requestBody,
+      mediaType: 'application/json',
       errors: {
         422: `Validation Error`,
       },
