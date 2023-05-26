@@ -12,7 +12,12 @@ import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
-import { addRequestedImageDeletionListener } from './listeners/imageDeleted';
+import {
+  addImageDeletedFulfilledListener,
+  addImageDeletedPendingListener,
+  addImageDeletedRejectedListener,
+  addRequestedImageDeletionListener,
+} from './listeners/imageDeleted';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
@@ -50,13 +55,17 @@ export type AppListenerEffect = ListenerEffect<
   AppDispatch
 >;
 
-// Image uploads
+// Image uploaded
 addImageUploadedFulfilledListener();
 addImageUploadedRejectedListener();
 
 addInitialImageSelectedListener();
 
+// Image deleted
 addRequestedImageDeletionListener();
+addImageDeletedPendingListener();
+addImageDeletedFulfilledListener();
+addImageDeletedRejectedListener();
 
 // Invoking stuff
 addUserInvokedCanvasListener();
