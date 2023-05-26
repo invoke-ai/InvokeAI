@@ -1,10 +1,6 @@
-import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { ImagesService } from 'services/api';
-import { getHeaders } from 'services/util/getHeaders';
-
-const imagesLog = log.child({ namespace: 'image' });
 
 type imageUrlsReceivedArg = Parameters<
   (typeof ImagesService)['getImageUrls']
@@ -17,7 +13,6 @@ export const imageUrlsReceived = createAppAsyncThunk(
   'api/imageUrlsReceived',
   async (arg: imageUrlsReceivedArg) => {
     const response = await ImagesService.getImageUrls(arg);
-    imagesLog.info({ arg, response }, 'Received image urls');
     return response;
   }
 );
@@ -33,7 +28,6 @@ export const imageMetadataReceived = createAppAsyncThunk(
   'api/imageMetadataReceived',
   async (arg: imageMetadataReceivedArg) => {
     const response = await ImagesService.getImageMetadata(arg);
-    imagesLog.info({ arg, response }, 'Received image record');
     return response;
   }
 );
@@ -53,11 +47,7 @@ export const imageUploaded = createAppAsyncThunk(
     // strip out `activeTabName` from arg - the route does not need it
     const { activeTabName, ...rest } = arg;
     const response = await ImagesService.uploadImage(rest);
-    const { location } = getHeaders(response);
-
-    imagesLog.debug({ arg: '<Blob>', response, location }, 'Image uploaded');
-
-    return { response, location };
+    return response;
   }
 );
 
@@ -70,9 +60,6 @@ export const imageDeleted = createAppAsyncThunk(
   'api/imageDeleted',
   async (arg: ImageDeletedArg) => {
     const response = await ImagesService.deleteImage(arg);
-
-    imagesLog.debug({ arg, response }, 'Image deleted');
-
     return response;
   }
 );
@@ -80,15 +67,12 @@ export const imageDeleted = createAppAsyncThunk(
 type ImageUpdatedArg = Parameters<(typeof ImagesService)['updateImage']>[0];
 
 /**
- * `ImagesService.deleteImage()` thunk
+ * `ImagesService.updateImage()` thunk
  */
 export const imageUpdated = createAppAsyncThunk(
   'api/imageUpdated',
   async (arg: ImageUpdatedArg) => {
     const response = await ImagesService.updateImage(arg);
-
-    imagesLog.debug({ arg, response }, 'Image updated');
-
     return response;
   }
 );

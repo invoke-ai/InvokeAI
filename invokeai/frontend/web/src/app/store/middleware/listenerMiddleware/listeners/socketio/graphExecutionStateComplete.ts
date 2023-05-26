@@ -10,7 +10,7 @@ export const addGraphExecutionStateCompleteListener = () => {
     effect: (action, { dispatch, getState }) => {
       moduleLog.debug(
         action.payload,
-        `Graph execution state complete (${action.payload.data.graph_execution_state_id})`
+        `Session invocation complete (${action.payload.data.graph_execution_state_id})`
       );
     },
   });

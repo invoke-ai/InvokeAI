@@ -91,7 +91,7 @@ export const addUserInvokedCanvasListener = () => {
 
       dispatch(canvasGraphBuilt(graph));
 
-      moduleLog({ data: graph }, 'Canvas graph built');
+      moduleLog.debug({ data: graph }, 'Canvas graph built');
 
       // If we are generating img2img or inpaint, we need to upload the init images
       if (baseNode.type === 'img2img' || baseNode.type === 'inpaint') {
@@ -106,19 +106,16 @@ export const addUserInvokedCanvasListener = () => {
         );
 
         // Wait for the image to be uploaded
-        const [{ payload: basePayload }] = await take(
+        const [{ payload: baseImageDTO }] = await take(
           (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
             imageUploaded.fulfilled.match(action) &&
             action.meta.arg.formData.file.name === baseFilename
         );
 
         // Update the base node with the image name and type
-        const { image_name: baseName, image_type: baseType } =
-          basePayload.response;
-
         baseNode.image = {
-          image_name: baseName,
-          image_type: baseType,
+          image_name: baseImageDTO.image_name,
+          image_type: baseImageDTO.image_type,
         };
       }
 
@@ -135,19 +132,16 @@ export const addUserInvokedCanvasListener = () => {
         );
 
         // Wait for the mask to be uploaded
-        const [{ payload: maskPayload }] = await take(
+        const [{ payload: maskImageDTO }] = await take(
           (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
             imageUploaded.fulfilled.match(action) &&
             action.meta.arg.formData.file.name === maskFilename
         );
 
         // Update the base node with the image name and type
-        const { image_name: maskName, image_type: maskType } =
-          maskPayload.response;
-
         baseNode.mask = {
-          image_name: maskName,
-          image_type: maskType,
+          image_name: maskImageDTO.image_name,
+          image_type: maskImageDTO.image_type,
         };
       }
 

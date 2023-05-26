@@ -1,11 +1,14 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
+import {
+  PayloadAction,
+  createEntityAdapter,
+  createSlice,
+} from '@reduxjs/toolkit';
 
 import { RootState } from 'app/store/store';
 import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
@@ -23,6 +26,7 @@ type AdditionalUploadsState = {
   pages: number;
   isLoading: boolean;
   nextPage: number;
+  upsertedImageCount: number;
 };
 
 export const initialUploadsState =
@@ -31,6 +35,7 @@ export const initialUploadsState =
     pages: 0,
     nextPage: 0,
     isLoading: false,
+    upsertedImageCount: 0,
   });
 
 export type UploadsState = typeof initialUploadsState;
@@ -39,7 +44,10 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadAdded: uploadsAdapter.upsertOne,
+    uploadUpserted: (state, action: PayloadAction<UploadsImageDTO>) => {
+      uploadsAdapter.upsertOne(state, action.payload);
+      state.upsertedImageCount += 1;
+    },
   },
   extraReducers: (builder) => {
     /**
@@ -65,36 +73,6 @@ const uploadsSlice = createSlice({
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
     });
-
-    /**
-     * Image URLs Received - FULFILLED
-     */
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_type, image_url, thumbnail_url } =
-        action.payload;
-
-      if (image_type === 'uploads') {
-        uploadsAdapter.updateOne(state, {
-          id: image_name,
-          changes: {
-            image_url: image_url,
-            thumbnail_url: thumbnail_url,
-          },
-        });
-      }
-    });
-
-    /**
-     * Delete Image - pending
-     * Pre-emptively remove the image from the gallery
-     */
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      const { imageType, imageName } = action.meta.arg;
-
-      if (imageType === 'uploads') {
-        uploadsAdapter.removeOne(state, imageName);
-      }
-    });
   },
 });
 
@@ -106,6 +84,6 @@ export const {
   selectTotal: selectUploadsTotal,
 } = uploadsAdapter.getSelectors<RootState>((state) => state.uploads);
 
-export const { uploadAdded } = uploadsSlice.actions;
+export const { uploadUpserted } = uploadsSlice.actions;
 
 export default uploadsSlice.reducer;

@@ -17,7 +17,7 @@ export const addUserInvokedImageToImageListener = () => {
 
       const graph = buildImageToImageGraph(state);
       dispatch(imageToImageGraphBuilt(graph));
-      moduleLog({ data: graph }, 'Image to Image graph built');
+      moduleLog.debug({ data: graph }, 'Image to Image graph built');
 
       dispatch(sessionCreated({ graph }));
 

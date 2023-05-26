@@ -8,8 +8,16 @@ import type { TypedStartListening, TypedAddListener } from '@reduxjs/toolkit';
 
 import type { RootState, AppDispatch } from '../../store';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
-import { addImageUploadedListener } from './listeners/imageUploaded';
-import { addRequestedImageDeletionListener } from './listeners/imageDeleted';
+import {
+  addImageUploadedFulfilledListener,
+  addImageUploadedRejectedListener,
+} from './listeners/imageUploaded';
+import {
+  addImageDeletedFulfilledListener,
+  addImageDeletedPendingListener,
+  addImageDeletedRejectedListener,
+  addRequestedImageDeletionListener,
+} from './listeners/imageDeleted';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
@@ -28,6 +36,37 @@ import { addSocketDisconnectedListener } from './listeners/socketio/socketDiscon
 import { addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
+import {
+  addImageMetadataReceivedFulfilledListener,
+  addImageMetadataReceivedRejectedListener,
+} from './listeners/imageMetadataReceived';
+import {
+  addImageUrlsReceivedFulfilledListener,
+  addImageUrlsReceivedRejectedListener,
+} from './listeners/imageUrlsReceived';
+import {
+  addSessionCreatedFulfilledListener,
+  addSessionCreatedPendingListener,
+  addSessionCreatedRejectedListener,
+} from './listeners/sessionCreated';
+import {
+  addSessionInvokedFulfilledListener,
+  addSessionInvokedPendingListener,
+  addSessionInvokedRejectedListener,
+} from './listeners/sessionInvoked';
+import {
+  addSessionCanceledFulfilledListener,
+  addSessionCanceledPendingListener,
+  addSessionCanceledRejectedListener,
+} from './listeners/sessionCanceled';
+import {
+  addReceivedResultImagesPageFulfilledListener,
+  addReceivedResultImagesPageRejectedListener,
+} from './listeners/receivedResultImagesPage';
+import {
+  addReceivedUploadImagesPageFulfilledListener,
+  addReceivedUploadImagesPageRejectedListener,
+} from './listeners/receivedUploadImagesPage';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -47,23 +86,40 @@ export type AppListenerEffect = ListenerEffect<
   AppDispatch
 >;
 
-addImageUploadedListener();
-addInitialImageSelectedListener();
-addRequestedImageDeletionListener();
+// Image uploaded
+addImageUploadedFulfilledListener();
+addImageUploadedRejectedListener();
 
+addInitialImageSelectedListener();
+
+// Image deleted
+addRequestedImageDeletionListener();
+addImageDeletedPendingListener();
+addImageDeletedFulfilledListener();
+addImageDeletedRejectedListener();
+
+// Image metadata
+addImageMetadataReceivedFulfilledListener();
+addImageMetadataReceivedRejectedListener();
+
+// Image URLs
+addImageUrlsReceivedFulfilledListener();
+addImageUrlsReceivedRejectedListener();
+
+// User Invoked
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
 addUserInvokedTextToImageListener();
 addUserInvokedImageToImageListener();
 addSessionReadyToInvokeListener();
 
+// Canvas actions
 addCanvasSavedToGalleryListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
 
 // socketio
-
 addGeneratorProgressListener();
 addGraphExecutionStateCompleteListener();
 addInvocationCompleteListener();
@@ -73,3 +129,24 @@ addSocketConnectedListener();
 addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
+
+// Session Created
+addSessionCreatedPendingListener();
+addSessionCreatedFulfilledListener();
+addSessionCreatedRejectedListener();
+
+// Session Invoked
+addSessionInvokedPendingListener();
+addSessionInvokedFulfilledListener();
+addSessionInvokedRejectedListener();
+
+// Session Canceled
+addSessionCanceledPendingListener();
+addSessionCanceledFulfilledListener();
+addSessionCanceledRejectedListener();
+
+// Gallery pages
+addReceivedResultImagesPageFulfilledListener();
+addReceivedResultImagesPageRejectedListener();
+addReceivedUploadImagesPageFulfilledListener();
+addReceivedUploadImagesPageRejectedListener();
