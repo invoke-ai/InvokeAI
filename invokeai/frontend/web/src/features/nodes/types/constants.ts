@@ -4,6 +4,7 @@ export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
 
 export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   integer: 'integer',
+  float: 'float',
   number: 'float',
   string: 'string',
   boolean: 'boolean',
