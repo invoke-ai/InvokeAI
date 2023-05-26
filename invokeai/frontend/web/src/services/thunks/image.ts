@@ -1,9 +1,6 @@
-import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { ImagesService } from 'services/api';
-
-const imagesLog = log.child({ namespace: 'image' });
 
 type imageUrlsReceivedArg = Parameters<
   (typeof ImagesService)['getImageUrls']
@@ -16,7 +13,6 @@ export const imageUrlsReceived = createAppAsyncThunk(
   'api/imageUrlsReceived',
   async (arg: imageUrlsReceivedArg) => {
     const response = await ImagesService.getImageUrls(arg);
-    imagesLog.info({ arg, response }, 'Received image urls');
     return response;
   }
 );
@@ -32,7 +28,6 @@ export const imageMetadataReceived = createAppAsyncThunk(
   'api/imageMetadataReceived',
   async (arg: imageMetadataReceivedArg) => {
     const response = await ImagesService.getImageMetadata(arg);
-    imagesLog.info({ arg, response }, 'Received image record');
     return response;
   }
 );
@@ -52,7 +47,6 @@ export const imageUploaded = createAppAsyncThunk(
     // strip out `activeTabName` from arg - the route does not need it
     const { activeTabName, ...rest } = arg;
     const response = await ImagesService.uploadImage(rest);
-
     return response;
   }
 );
@@ -79,9 +73,6 @@ export const imageUpdated = createAppAsyncThunk(
   'api/imageUpdated',
   async (arg: ImageUpdatedArg) => {
     const response = await ImagesService.updateImage(arg);
-
-    imagesLog.debug({ data: { arg, response } }, 'Image updated');
-
     return response;
   }
 );

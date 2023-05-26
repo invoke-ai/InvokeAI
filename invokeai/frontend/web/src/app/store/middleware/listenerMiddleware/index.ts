@@ -40,6 +40,10 @@ import {
   addImageMetadataReceivedFulfilledListener,
   addImageMetadataReceivedRejectedListener,
 } from './listeners/imageMetadataReceived';
+import {
+  addImageUrlsReceivedFulfilledListener,
+  addImageUrlsReceivedRejectedListener,
+} from './listeners/imageUrlsReceived';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -74,6 +78,10 @@ addImageDeletedRejectedListener();
 // Image metadata
 addImageMetadataReceivedFulfilledListener();
 addImageMetadataReceivedRejectedListener();
+
+// Image URLs
+addImageUrlsReceivedFulfilledListener();
+addImageUrlsReceivedRejectedListener();
 
 // Invoking stuff
 addUserInvokedCanvasListener();
