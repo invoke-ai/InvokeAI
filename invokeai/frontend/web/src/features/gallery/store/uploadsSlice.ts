@@ -1,4 +1,8 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
+import {
+  PayloadAction,
+  createEntityAdapter,
+  createSlice,
+} from '@reduxjs/toolkit';
 
 import { RootState } from 'app/store/store';
 import {
@@ -22,6 +26,7 @@ type AdditionalUploadsState = {
   pages: number;
   isLoading: boolean;
   nextPage: number;
+  upsertedImageCount: number;
 };
 
 export const initialUploadsState =
@@ -30,6 +35,7 @@ export const initialUploadsState =
     pages: 0,
     nextPage: 0,
     isLoading: false,
+    upsertedImageCount: 0,
   });
 
 export type UploadsState = typeof initialUploadsState;
@@ -38,7 +44,10 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadUpserted: uploadsAdapter.upsertOne,
+    uploadUpserted: (state, action: PayloadAction<UploadsImageDTO>) => {
+      uploadsAdapter.upsertOne(state, action.payload);
+      state.upsertedImageCount += 1;
+    },
   },
   extraReducers: (builder) => {
     /**
