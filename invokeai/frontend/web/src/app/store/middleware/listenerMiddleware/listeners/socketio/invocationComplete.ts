@@ -8,6 +8,7 @@ import {
 } from 'services/thunks/image';
 import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
+import { progressImageSet } from 'features/system/store/systemSlice';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -37,12 +38,6 @@ export const addInvocationCompleteListener = () => {
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
         const { image_name, image_type } = result.image;
 
-        // Get its URLS
-        // TODO: is this extraneous? I think so...
-        dispatch(
-          imageUrlsReceived({ imageName: image_name, imageType: image_type })
-        );
-
         // Get its metadata
         dispatch(
           imageMetadataReceived({
@@ -65,6 +60,8 @@ export const addInvocationCompleteListener = () => {
           );
           dispatch(addImageToStagingArea(image));
         }
+
+        dispatch(progressImageSet(null));
       }
     },
   });

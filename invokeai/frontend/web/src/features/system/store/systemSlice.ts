@@ -215,6 +215,9 @@ export const systemSlice = createSlice({
     languageChanged: (state, action: PayloadAction<keyof typeof LANGUAGES>) => {
       state.language = action.payload;
     },
+    progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
+      state.progressImage = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -305,7 +308,6 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusProcessingComplete';
-      state.progressImage = null;
 
       if (state.canceledSession === data.graph_execution_state_id) {
         state.isProcessing = false;
@@ -438,6 +440,7 @@ export const {
   isPersistedChanged,
   shouldAntialiasProgressImageChanged,
   languageChanged,
+  progressImageSet,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
