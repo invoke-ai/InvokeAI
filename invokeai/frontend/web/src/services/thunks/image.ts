@@ -53,11 +53,8 @@ export const imageUploaded = createAppAsyncThunk(
     // strip out `activeTabName` from arg - the route does not need it
     const { activeTabName, ...rest } = arg;
     const response = await ImagesService.uploadImage(rest);
-    const { location } = getHeaders(response);
 
-    imagesLog.debug({ arg: '<Blob>', response, location }, 'Image uploaded');
-
-    return { response, location };
+    return response;
   }
 );
 

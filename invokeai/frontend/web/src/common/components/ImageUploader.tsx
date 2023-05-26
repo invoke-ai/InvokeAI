@@ -68,7 +68,6 @@ const ImageUploader = (props: ImageUploaderProps) => {
     async (file: File) => {
       dispatch(
         imageUploaded({
-          imageType: 'uploads',
           formData: { file },
           activeTabName,
         })
