@@ -39,12 +39,6 @@ class BaseInvocationOutput(BaseModel):
         return tuple(subclasses)
 
 
-class InvocationMeta(BaseModel):
-    is_intermediate: bool = Field(
-        default=False,
-        description="Whether this is an intermediate node. Intermediate nodes are periodically deleted."
-    )
-
 class BaseInvocation(ABC, BaseModel):
     """A node to process inputs and produce outputs.
     May use dependency injection in __init__ to receive providers.
@@ -84,8 +78,7 @@ class BaseInvocation(ABC, BaseModel):
     
     #fmt: off
     id: str = Field(description="The id of this node. Must be unique among all nodes.")
-    type: str = Field(description="The type of this node. Must be unique among all nodes.")
-    meta: InvocationMeta = Field(default=InvocationMeta(), description="The meta properties of this node.")
+    is_intermediate: bool = Field(default=False, description="Whether or not this node is an intermediate node.")
     #fmt: on
 
 

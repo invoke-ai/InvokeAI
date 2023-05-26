@@ -143,7 +143,7 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -205,7 +205,7 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -244,7 +244,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.MASK,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return MaskOutput(
@@ -283,7 +283,7 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -322,7 +322,7 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -361,7 +361,7 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -403,7 +403,7 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -444,7 +444,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
@@ -490,7 +490,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.meta.is_intermediate,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
