@@ -11,6 +11,8 @@ export const receivedResultImagesPage = createAppAsyncThunk(
   async (_arg, { getState, rejectWithValue }) => {
     const { page, pages, nextPage, upsertedImageCount } = getState().results;
 
+    // If many images have been upserted, we need to offset the page number
+    // TODO: add an offset param to the list images endpoint
     const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
@@ -31,6 +33,8 @@ export const receivedUploadImagesPage = createAppAsyncThunk(
   async (_arg, { getState, rejectWithValue }) => {
     const { page, pages, nextPage, upsertedImageCount } = getState().uploads;
 
+    // If many images have been upserted, we need to offset the page number
+    // TODO: add an offset param to the list images endpoint
     const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
