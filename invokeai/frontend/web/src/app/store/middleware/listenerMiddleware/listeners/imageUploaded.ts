@@ -1,11 +1,11 @@
 import { startAppListening } from '..';
-import { uploadAdded } from 'features/gallery/store/uploadsSlice';
+import { uploadUpserted } from 'features/gallery/store/uploadsSlice';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imageUploaded } from 'services/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { resultAdded } from 'features/gallery/store/resultsSlice';
+import { resultUpserted } from 'features/gallery/store/resultsSlice';
 import { isResultsImageDTO, isUploadsImageDTO } from 'services/types/guards';
 import { log } from 'app/logging/useLogger';
 
@@ -25,7 +25,7 @@ export const addImageUploadedFulfilledListener = () => {
 
       // Handle uploads
       if (isUploadsImageDTO(image)) {
-        dispatch(uploadAdded(image));
+        dispatch(uploadUpserted(image));
 
         dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
 
@@ -45,7 +45,7 @@ export const addImageUploadedFulfilledListener = () => {
       // Handle results
       // TODO: Can this ever happen? I don't think so...
       if (isResultsImageDTO(image)) {
-        dispatch(resultAdded(image));
+        dispatch(resultUpserted(image));
       }
     },
   });

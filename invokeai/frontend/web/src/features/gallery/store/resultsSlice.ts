@@ -37,7 +37,7 @@ const resultsSlice = createSlice({
   name: 'results',
   initialState: initialResultsState,
   reducers: {
-    resultAdded: resultsAdapter.upsertOne,
+    resultUpserted: resultsAdapter.upsertOne,
   },
   extraReducers: (builder) => {
     /**
@@ -74,6 +74,6 @@ export const {
   selectTotal: selectResultsTotal,
 } = resultsAdapter.getSelectors<RootState>((state) => state.results);
 
-export const { resultAdded } = resultsSlice.actions;
+export const { resultUpserted } = resultsSlice.actions;
 
 export default resultsSlice.reducer;
