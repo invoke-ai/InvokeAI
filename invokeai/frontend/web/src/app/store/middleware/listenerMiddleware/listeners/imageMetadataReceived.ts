@@ -20,12 +20,10 @@ export const addImageMetadataReceivedFulfilledListener = () => {
       moduleLog.debug({ data: { image } }, 'Image metadata received');
 
       if (image.image_type === 'results') {
-        console.log('upsert results');
         dispatch(resultUpserted(action.payload as ResultsImageDTO));
       }
 
       if (image.image_type === 'uploads') {
-        console.log('upsert uploads');
         dispatch(uploadUpserted(action.payload as UploadsImageDTO));
       }
     },
