@@ -46,7 +46,7 @@ const IAICanvasObjectRenderer = () => {
               key={i}
               x={obj.x}
               y={obj.y}
-              url={getUrl(obj.image.url)}
+              url={getUrl(obj.image.image_url)}
             />
           );
         } else if (isCanvasBaseLine(obj)) {

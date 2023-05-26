@@ -6,36 +6,41 @@ import re
 import shlex
 import sys
 import time
-from typing import (
-    Union,
-    get_type_hints,
-)
+from typing import Union, get_type_hints
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
 
 import invokeai.backend.util.logging as logger
 import invokeai.version
+from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
+from invokeai.app.services.images import ImageService
+from invokeai.app.services.metadata import (CoreMetadataService,
+                                            PngMetadataService)
+from invokeai.app.services.urls import LocalUrlService
 
-from invokeai.app.services.metadata import PngMetadataService
-from .services.default_graphs import create_system_graphs
-from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-
-from .cli.commands import BaseCommand, CliContext, ExitCli, add_graph_parsers, add_parsers, SortedHelpFormatter
+from .cli.commands import (BaseCommand, CliContext, ExitCli,
+                           SortedHelpFormatter, add_graph_parsers, add_parsers)
 from .cli.completer import set_autocompleter
 from .invocations.baseinvocation import BaseInvocation
+from .services.config import get_invokeai_config
+from .services.default_graphs import (create_system_graphs,
+                                      default_text_to_image_graph_id)
 from .services.events import EventServiceBase
-from .services.restoration_services import RestorationServices
-from .services.graph import Edge, EdgeConnection, GraphExecutionState, GraphInvocation, LibraryGraph, are_connection_types_compatible
-from .services.default_graphs import default_text_to_image_graph_id
-from .services.image_storage import DiskImageStorage
+from .services.graph import (Edge, EdgeConnection, GraphExecutionState,
+                             GraphInvocation, LibraryGraph,
+                             are_connection_types_compatible)
+from .services.image_file_storage import DiskImageFileStorage
 from .services.invocation_queue import MemoryInvocationQueue
 from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
-from .services.processor import DefaultInvocationProcessor
-from .services.sqlite import SqliteItemStorage
+from .services.latent_storage import (DiskLatentsStorage,
+                                      ForwardCacheLatentsStorage)
 from .services.model_manager_service import ModelManagerService
-from .services.config import get_invokeai_config
+from .services.processor import DefaultInvocationProcessor
+from .services.restoration_services import RestorationServices
+from .services.sqlite import SqliteItemStorage
+
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -189,6 +194,9 @@ def invoke_all(context: CliContext):
         raise SessionError()
 
 
+logger = logger.InvokeAILogger.getLogger()
+
+
 def invoke_cli():
     # this gets the basic configuration
     config = get_invokeai_config()
@@ -207,24 +215,43 @@ def invoke_cli():
 
     events = EventServiceBase()
     output_folder = config.output_path
-    metadata = PngMetadataService()
 
     # TODO: build a file/path manager?
-    db_location = os.path.join(output_folder, "invokeai.db")
+    if config.use_memory_db:
+        db_location = ":memory:"
+    else:
+        db_location = os.path.join(output_folder, "invokeai.db")
+
+    logger.info(f'InvokeAI database location is "{db_location}"')
+
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+            filename=db_location, table_name="graph_executions"
+        )
+
+    urls = LocalUrlService()
+    metadata = CoreMetadataService()
+    image_record_storage = SqliteImageRecordStorage(db_location)
+    image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
+
+    images = ImageService(
+        image_record_storage=image_record_storage,
+        image_file_storage=image_file_storage,
+        metadata=metadata,
+        url=urls,
+        logger=logger,
+        graph_execution_manager=graph_execution_manager,
+    )
 
     services = InvocationServices(
         model_manager=model_manager,
         events=events,
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
-        images=DiskImageStorage(f'{output_folder}/images', metadata_service=metadata),
-        metadata=metadata,
+        images=images,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
             filename=db_location, table_name="graphs"
         ),
-        graph_execution_manager=SqliteItemStorage[GraphExecutionState](
-            filename=db_location, table_name="graph_executions"
-        ),
+        graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
         restoration=RestorationServices(config,logger=logger),
         logger=logger,

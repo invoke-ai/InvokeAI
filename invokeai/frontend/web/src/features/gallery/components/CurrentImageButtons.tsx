@@ -65,6 +65,7 @@ import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/U
 import { allParametersSet } from 'features/parameters/store/generationSlice';
 import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 import { useAppToaster } from 'app/components/Toaster';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -108,8 +109,9 @@ const currentImageButtonsSelector = createSelector(
       isLightboxOpen,
       shouldHidePreview,
       image: selectedImage,
-      seed: selectedImage?.metadata?.invokeai?.node?.seed,
-      prompt: selectedImage?.metadata?.invokeai?.node?.prompt,
+      seed: selectedImage?.metadata?.seed,
+      prompt: selectedImage?.metadata?.positive_conditioning,
+      negativePrompt: selectedImage?.metadata?.negative_conditioning,
     };
   },
   {
@@ -194,14 +196,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
 
       if (shouldTransformUrls) {
-        return getUrl(image.url);
+        return getUrl(image.image_url);
       }
 
-      if (image.url.startsWith('http')) {
-        return image.url;
+      if (image.image_url.startsWith('http')) {
+        return image.image_url;
       }
 
-      return window.location.toString() + image.url;
+      return window.location.toString() + image.image_url;
     };
 
     const url = getImageUrl();
@@ -244,13 +246,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const handleUseSeed = useCallback(() => {
-    recallSeed(image?.metadata?.invokeai?.node?.seed);
+    recallSeed(image?.metadata?.seed);
   }, [image, recallSeed]);
 
   useHotkeys('s', handleUseSeed, [image]);
 
   const handleUsePrompt = useCallback(() => {
-    recallPrompt(image?.metadata?.invokeai?.node?.prompt);
+    recallPrompt(
+      image?.metadata?.positive_conditioning,
+      image?.metadata?.negative_conditioning
+    );
   }, [image, recallPrompt]);
 
   useHotkeys('p', handleUsePrompt, [image]);
@@ -335,7 +340,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     dispatch(sentImageToCanvas());
     if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
-    // dispatch(setInitialCanvasImage(selectedImage));
+    dispatch(setInitialCanvasImage(image));
     dispatch(requestCanvasRescale());
 
     if (activeTabName !== 'unifiedCanvas') {
@@ -453,7 +458,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link download={true} href={getUrl(image?.url ?? '')}>
+              <Link download={true} href={getUrl(image?.image_url ?? '')}>
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>
@@ -499,7 +504,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
-            isDisabled={!image?.metadata?.invokeai?.node?.prompt}
+            isDisabled={!image?.metadata?.positive_conditioning}
             onClick={handleUsePrompt}
           />
 
@@ -507,7 +512,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!image?.metadata?.invokeai?.node?.seed}
+            isDisabled={!image?.metadata?.seed}
             onClick={handleUseSeed}
           />
 
@@ -516,9 +521,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={
-              !['txt2img', 'img2img', 'inpaint'].includes(
-                String(image?.metadata?.invokeai?.node?.type)
-              )
+              // not sure what this list should be
+              !['t2l', 'l2l', 'inpaint'].includes(String(image?.metadata?.type))
             }
             onClick={handleClickUseAllParameters}
           />

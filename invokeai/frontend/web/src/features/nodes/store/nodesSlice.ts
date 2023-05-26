@@ -11,7 +11,7 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageField } from 'services/api';
+import { ImageDTO } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
@@ -65,13 +65,7 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value:
-          | string
-          | number
-          | boolean
-          | Pick<ImageField, 'image_name' | 'image_type'>
-          | RgbaColor
-          | undefined;
+        value: string | number | boolean | ImageDTO | RgbaColor | undefined;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;

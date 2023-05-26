@@ -122,21 +122,21 @@ export type PostProcessedImageMetadata = ESRGANMetadata | FacetoolMetadata;
 /**
  * ResultImage
  */
-export type Image = {
-  name: string;
-  type: ImageType;
-  url: string;
-  thumbnail: string;
-  metadata: ImageResponseMetadata;
-};
+// export ty`pe Image = {
+//   name: string;
+//   type: ImageType;
+//   url: string;
+//   thumbnail: string;
+//   metadata: ImageResponseMetadata;
+// };
 
-export const isInvokeAIImage = (obj: Image | SelectedImage): obj is Image => {
-  if ('url' in obj && 'thumbnail' in obj) {
-    return true;
-  }
+// export const isInvokeAIImage = (obj: Image | SelectedImage): obj is Image => {
+//   if ('url' in obj && 'thumbnail' in obj) {
+//     return true;
+//   }
 
-  return false;
-};
+//   return false;
+// };
 
 /**
  * Types related to the system status.
@@ -346,7 +346,6 @@ export type AppConfig = {
   /**
    * Whether or not we need to re-fetch images
    */
-  shouldFetchImages: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];

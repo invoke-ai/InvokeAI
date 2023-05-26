@@ -1,4 +1,3 @@
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 import { startAppListening } from '..';
 import { uploadAdded } from 'features/gallery/store/uploadsSlice';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
@@ -7,6 +6,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { resultAdded } from 'features/gallery/store/resultsSlice';
+import { isResultsImageDTO, isUploadsImageDTO } from 'services/types/guards';
 
 export const addImageUploadedListener = () => {
   startAppListening({
@@ -14,13 +14,11 @@ export const addImageUploadedListener = () => {
       imageUploaded.fulfilled.match(action) &&
       action.payload.response.image_type !== 'intermediates',
     effect: (action, { dispatch, getState }) => {
-      const { response } = action.payload;
-      const { imageType } = action.meta.arg;
+      const { response: image } = action.payload;
 
       const state = getState();
-      const image = deserializeImageResponse(response);
 
-      if (imageType === 'uploads') {
+      if (isUploadsImageDTO(image)) {
         dispatch(uploadAdded(image));
 
         dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
@@ -38,7 +36,7 @@ export const addImageUploadedListener = () => {
         }
       }
 
-      if (imageType === 'results') {
+      if (isResultsImageDTO(image)) {
         dispatch(resultAdded(image));
       }
     },

@@ -4,31 +4,28 @@ from typing import Literal, Optional, Union
 
 import einops
 import torch
-from diffusers.schedulers import SchedulerMixin as Scheduler
 from diffusers.image_processor import VaeImageProcessor
-from pydantic import BaseModel, Field
+from diffusers.schedulers import SchedulerMixin as Scheduler
+from pydantic import BaseModel, Field, validator
 
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ...backend.image_util.seamless import configure_model_padding
-
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData, StableDiffusionGeneratorPipeline,
     image_resized_to_grid_as_tensor)
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
-from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from .baseinvocation import (
-    BaseInvocation, BaseInvocationOutput,
-    InvocationContext, InvocationConfig
-    )
-from ..services.image_storage import ImageType
+from ...backend.util.devices import choose_torch_device, torch_dtype
+from ..services.image_file_storage import ImageType
+from ..services.model_manager_service import ModelManagerService
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
 from .compel import ConditioningField
-from .image import ImageField, ImageOutput, build_image_output
-
+from .image import ImageField, ImageOutput
 from .model import ModelInfo, UNetField, VaeField
 
 
@@ -145,12 +142,17 @@ class NoiseInvocation(BaseInvocation):
             },
         }
 
+    @validator("seed", pre=True)
+    def modulo_seed(cls, v):
+        """Returns the seed modulo SEED_MAX to ensure it is within the valid range."""
+        return v % SEED_MAX
+
     def invoke(self, context: InvocationContext) -> NoiseOutput:
         device = torch.device(choose_torch_device())
         noise = get_noise(self.width, self.height, device, self.seed)
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, noise)
+        context.services.latents.save(name, noise)
         return build_noise_output(latents_name=name, latents=noise)
 
 
@@ -167,7 +169,7 @@ class TextToLatentsInvocation(BaseInvocation):
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
     seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
@@ -194,7 +196,18 @@ class TextToLatentsInvocation(BaseInvocation):
             source_node_id=source_node_id,
         )
 
-    def get_conditioning_data(self, context: InvocationContext, scheduler) -> ConditioningData:
+    def get_model(self, model_manager: ModelManagerService) -> StableDiffusionGeneratorPipeline:
+        model_info = model_manager.get_model(self.model)
+        model: StableDiffusionGeneratorPipeline = model_info['model']
+        model.scheduler = get_scheduler(
+            model=model,
+            scheduler_name=self.scheduler
+        )
+
+        return model
+
+
+    def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
         c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
 
@@ -209,7 +222,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(scheduler, eta=0.0)#ddim_eta)
+        ).add_scheduler_args_if_applicable(self.scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
     def create_pipeline(self, unet, scheduler) -> StableDiffusionGeneratorPipeline:
@@ -274,7 +287,7 @@ class TextToLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, result_latents)
+        context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -345,7 +358,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, result_latents)
+        context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -372,7 +385,6 @@ class LatentsToImageInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        #vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
         vae_info = context.services.model_manager.get_model(
             **self.vae.vae.dict(),
         )
@@ -407,11 +419,23 @@ class LatentsToImageInvocation(BaseInvocation):
 
         torch.cuda.empty_cache()
 
-        context.services.images.save(image_type, image_name, image, metadata)
-        return build_image_output(
-            image_type=image_type, image_name=image_name, image=image
+        image_dto = context.services.images.create(
+            image=image,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
         )
 
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+                image_type=image_dto.image_type,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
 
 LATENTS_INTERPOLATION_MODE = Literal[
     "nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"
@@ -444,7 +468,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
 
@@ -474,7 +498,7 @@ class ScaleLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
 
@@ -498,7 +522,7 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        image = context.services.images.get(
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -528,5 +552,6 @@ class ImageToLatentsInvocation(BaseInvocation):
             latents = 0.18215 * latents
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, latents)
+        context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents)
+        

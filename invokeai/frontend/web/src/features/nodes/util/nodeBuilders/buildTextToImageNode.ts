@@ -11,8 +11,8 @@ export const buildTxt2ImgNode = (
   const { generation } = state;
 
   const {
-    prompt,
-    negativePrompt,
+    positivePrompt: prompt,
+    negativePrompt: negativePrompt,
     seed,
     steps,
     width,

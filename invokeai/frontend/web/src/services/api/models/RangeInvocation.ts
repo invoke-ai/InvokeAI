@@ -3,7 +3,7 @@
 /* eslint-disable */
 
 /**
- * Creates a range
+ * Creates a range of numbers from start to stop with step
  */
 export type RangeInvocation = {
   /**

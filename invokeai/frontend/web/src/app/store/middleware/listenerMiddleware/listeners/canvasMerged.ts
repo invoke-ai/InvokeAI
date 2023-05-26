@@ -5,7 +5,6 @@ import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { imageUploaded } from 'services/thunks/image';
 import { v4 as uuidv4 } from 'uuid';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 
@@ -66,7 +65,7 @@ export const addCanvasMergedListener = () => {
           action.meta.arg.formData.file.name === filename
       );
 
-      const mergedCanvasImage = deserializeImageResponse(payload.response);
+      const mergedCanvasImage = payload.response;
 
       dispatch(
         setMergedCanvas({

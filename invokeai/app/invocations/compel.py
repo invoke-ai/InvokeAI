@@ -102,7 +102,7 @@ class CompelInvocation(BaseInvocation):
                 tokens_count_including_eos_bos=get_max_token_count(tokenizer, prompt),
                 cross_attention_control_args=options.get("cross_attention_control", None),
             )
-
+            
             conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
             # TODO: hacky but works ;D maybe rename latents somehow?

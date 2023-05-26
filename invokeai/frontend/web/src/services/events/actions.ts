@@ -38,7 +38,6 @@ export const invocationStarted = createAction<
 export const invocationComplete = createAction<
   BaseSocketPayload & {
     data: InvocationCompleteEvent;
-    shouldFetchImages: boolean;
   }
 >('socket/invocationComplete');
 
