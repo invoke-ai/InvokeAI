@@ -56,6 +56,7 @@ dependencies = [
   "flaskwebgui==1.0.3",
   "gfpgan==1.3.8",
   "huggingface-hub>=0.11.1",
+  "mediapipe",             # needed for "mediapipeface" controlnet model
   "npyscreen",
   "numpy<1.24",
   "omegaconf",
