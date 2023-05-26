@@ -91,7 +91,7 @@ export const addUserInvokedCanvasListener = () => {
 
       dispatch(canvasGraphBuilt(graph));
 
-      moduleLog({ data: graph }, 'Canvas graph built');
+      moduleLog.debug({ data: graph }, 'Canvas graph built');
 
       // If we are generating img2img or inpaint, we need to upload the init images
       if (baseNode.type === 'img2img' || baseNode.type === 'inpaint') {

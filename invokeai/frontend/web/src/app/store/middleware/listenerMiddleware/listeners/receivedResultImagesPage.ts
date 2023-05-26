@@ -10,7 +10,7 @@ export const addReceivedResultImagesPageFulfilledListener = () => {
     actionCreator: receivedResultImagesPage.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const page = action.payload;
-      moduleLog.info(
+      moduleLog.debug(
         { data: { page } },
         `Received ${page.items.length} results`
       );

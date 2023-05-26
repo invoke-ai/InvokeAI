@@ -19,7 +19,10 @@ export const addSessionInvokedFulfilledListener = () => {
     actionCreator: sessionInvoked.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const { sessionId } = action.meta.arg;
-      moduleLog.info({ data: { sessionId } }, `Session invoked (${sessionId})`);
+      moduleLog.debug(
+        { data: { sessionId } },
+        `Session invoked (${sessionId})`
+      );
     },
   });
 };

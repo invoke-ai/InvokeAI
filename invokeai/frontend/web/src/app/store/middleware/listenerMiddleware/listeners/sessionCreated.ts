@@ -19,7 +19,7 @@ export const addSessionCreatedFulfilledListener = () => {
     actionCreator: sessionCreated.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const session = action.payload;
-      moduleLog.info({ data: { session } }, `Session created (${session.id})`);
+      moduleLog.debug({ data: { session } }, `Session created (${session.id})`);
     },
   });
 };
