@@ -54,6 +54,14 @@ import {
   addSessionInvokedPendingListener,
   addSessionInvokedRejectedListener,
 } from './listeners/sessionInvoked';
+import {
+  addReceivedResultImagesPageFulfilledListener,
+  addReceivedResultImagesPageRejectedListener,
+} from './listeners/receivedResultImagesPage';
+import {
+  addReceivedUploadImagesPageFulfilledListener,
+  addReceivedUploadImagesPageRejectedListener,
+} from './listeners/receivedUploadImagesPage';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -126,3 +134,9 @@ addSocketUnsubscribedListener();
 addSessionCreatedPendingListener();
 addSessionCreatedFulfilledListener();
 addSessionCreatedRejectedListener();
+
+// Gallery pages
+addReceivedResultImagesPageFulfilledListener();
+addReceivedResultImagesPageRejectedListener();
+addReceivedUploadImagesPageFulfilledListener();
+addReceivedUploadImagesPageRejectedListener();
