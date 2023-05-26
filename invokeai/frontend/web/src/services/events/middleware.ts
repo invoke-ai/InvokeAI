@@ -8,11 +8,7 @@ import {
 import { socketSubscribed, socketUnsubscribed } from './actions';
 import { AppThunkDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
-import {
-  sessionInvoked,
-  sessionCreated,
-  sessionWithoutGraphCreated,
-} from 'services/thunks/session';
+import { sessionCreated } from 'services/thunks/session';
 import { OpenAPI } from 'services/api';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { log } from 'app/logging/useLogger';
@@ -66,10 +62,7 @@ export const socketMiddleware = () => {
         socket.connect();
       }
 
-      if (
-        sessionCreated.fulfilled.match(action) ||
-        sessionWithoutGraphCreated.fulfilled.match(action)
-      ) {
+      if (sessionCreated.fulfilled.match(action)) {
         const sessionId = action.payload.id;
         const oldSessionId = getState().system.sessionId;
 
