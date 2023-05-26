@@ -2,7 +2,7 @@
 /.github/workflows/  @lstein @blessedcoolant
 
 # documentation
-/docs/ @lstein  @tildebyte @blessedcoolant
+/docs/ @lstein @blessedcoolant @hipsterusername
 /mkdocs.yml @lstein  @blessedcoolant
 
 # nodes
@@ -18,17 +18,17 @@
 /invokeai/version @lstein @blessedcoolant
 
 # web ui
-/invokeai/frontend @blessedcoolant @psychedelicious @lstein
-/invokeai/backend @blessedcoolant @psychedelicious @lstein
+/invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp
+/invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp
 
 # generation, model management, postprocessing
-/invokeai/backend  @damian0815 @lstein @blessedcoolant @jpphoto @gregghelt2
+/invokeai/backend  @damian0815 @lstein @blessedcoolant @jpphoto @gregghelt2 @StAlKeR7779
 
 # front ends
 /invokeai/frontend/CLI @lstein
 /invokeai/frontend/install @lstein @ebr  
-/invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
-/invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
-/invokeai/frontend/web @psychedelicious @blessedcoolant
+/invokeai/frontend/merge @lstein @blessedcoolant 
+/invokeai/frontend/training @lstein @blessedcoolant 
+/invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp 
 
 
