@@ -70,17 +70,6 @@ const resultsSlice = createSlice({
     });
 
     /**
-     * Image Metadata Received - FULFILLED
-     */
-    builder.addCase(imageMetadataReceived.fulfilled, (state, action) => {
-      const { image_type } = action.payload;
-
-      if (image_type === 'results') {
-        resultsAdapter.upsertOne(state, action.payload as ResultsImageDTO);
-      }
-    });
-
-    /**
      * Image URLs Received - FULFILLED
      */
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
