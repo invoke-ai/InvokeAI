@@ -2,13 +2,11 @@ import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
 import { invocationComplete } from 'services/events/actions';
-import {
-  imageMetadataReceived,
-  imageUrlsReceived,
-} from 'services/thunks/image';
+import { imageMetadataReceived } from 'services/thunks/image';
 import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -45,6 +43,14 @@ export const addInvocationCompleteListener = () => {
             imageType: image_type,
           })
         );
+
+        const [{ payload: imageDTO }] = await take(
+          imageMetadataReceived.fulfilled.match
+        );
+
+        if (getState().gallery.shouldAutoSwitchToNewImages) {
+          dispatch(imageSelected(imageDTO));
+        }
 
         // Handle canvas image
         if (
