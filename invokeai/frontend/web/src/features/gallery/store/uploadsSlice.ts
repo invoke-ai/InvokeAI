@@ -38,7 +38,7 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadAdded: uploadsAdapter.upsertOne,
+    uploadUpserted: uploadsAdapter.upsertOne,
   },
   extraReducers: (builder) => {
     /**
@@ -75,6 +75,6 @@ export const {
   selectTotal: selectUploadsTotal,
 } = uploadsAdapter.getSelectors<RootState>((state) => state.uploads);
 
-export const { uploadAdded } = uploadsSlice.actions;
+export const { uploadUpserted } = uploadsSlice.actions;
 
 export default uploadsSlice.reducer;
