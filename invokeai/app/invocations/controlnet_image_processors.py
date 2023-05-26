@@ -7,14 +7,13 @@ from typing import Literal, Optional, Union, List
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..models.image import ImageField, ImageType
+from ..models.image import ImageField, ImageType, ImageCategory
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     InvocationContext,
     InvocationConfig,
 )
-
 from controlnet_aux import (
     CannyDetector,
     HEDdetector,
@@ -26,10 +25,11 @@ from controlnet_aux import (
     OpenposeDetector,
     PidiNetDetector,
     ContentShuffleDetector,
-    # ZoeDetector,   # FIXME: uncomment once ZoeDetector is availabel in official controlnet_aux release
+    ZoeDetector,
+    MediapipeFaceDetector,
 )
 
-from .image import ImageOutput, build_image_output, PILInvocationConfig
+from .image import ImageOutput, PILInvocationConfig
 
 CONTROLNET_DEFAULT_MODELS = [
     ###########################################
@@ -161,33 +161,41 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         return image
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        raw_image = context.services.images.get(
+
+        raw_image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
+
+        # FIXME: what happened to image metadata?
+        # metadata = context.services.metadata.build_metadata(
+        #     session_id=context.graph_execution_state_id, node=self
+        # )
+
         # currently can't see processed image in node UI without a showImage node,
         #    so for now setting image_type to RESULT instead of INTERMEDIATE so will get saved in gallery
-        # image_type = ImageType.INTERMEDIATE
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
+        image_dto = context.services.images.create(
+            image=processed_image,
+            image_type=ImageType.RESULT,
+            image_category=ImageCategory.GENERAL,
+            session_id=context.graph_execution_state_id,
+            node_id=self.id,
+            is_intermediate=self.is_intermediate
         )
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
-        context.services.images.save(image_type, image_name, processed_image, metadata)
 
         """Builds an ImageOutput and its ImageField"""
         processed_image_field = ImageField(
-            image_name=image_name,
-            image_type=image_type,
+            image_name=image_dto.image_name,
+            image_type=image_dto.image_type,
         )
         return ImageOutput(
             image=processed_image_field,
-            width=processed_image.width,
-            height=processed_image.height,
-            mode=processed_image.mode,
+            # width=processed_image.width,
+            width = image_dto.width,
+            # height=processed_image.height,
+            height = image_dto.height,
+            # mode=processed_image.mode,
         )
 
 
@@ -392,18 +400,17 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
         return processed_image
 
 
-# # FIXME: ZoeDetector was implemented _after_ most recent official release of controlnet_aux (v0.0.3)
-# #  so it is commented out until a new release is made
-# class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
-#     """Applies Zoe depth processing to image"""
-#     # fmt: off
-#     type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
-#     # fmt: on
-#
-#     def run_processor(self, image):
-#         zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
-#         processed_image = zoe_depth_processor(image)
-#         return processed_image
+# should work with controlnet_aux >= 0.0.4 and timm <= 0.6.13
+class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+    """Applies Zoe depth processing to image"""
+    # fmt: off
+    type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
+    # fmt: on
+
+    def run_processor(self, image):
+        zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
+        processed_image = zoe_depth_processor(image)
+        return processed_image
 
 
 class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
