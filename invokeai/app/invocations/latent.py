@@ -25,7 +25,7 @@ from ..services.model_manager_service import ModelManagerService
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .compel import ConditioningField
-from .image import ImageField, ImageOutput
+from .image import ImageCategory, ImageField, ImageOutput
 from .model import ModelInfo, UNetField, VaeField
 
 
@@ -390,7 +390,7 @@ class LatentsToImageInvocation(BaseInvocation):
         )
 
         with vae_info as vae:
-            if self.tiled:
+            if self.tiled or context.services.configuration.tiled_decode:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
@@ -407,15 +407,6 @@ class LatentsToImageInvocation(BaseInvocation):
                 np_image = image.cpu().permute(0, 2, 3, 1).float().numpy()
 
                 image = VaeImageProcessor.numpy_to_pil(np_image)[0]
-
-        image_type = ImageType.RESULT
-        image_name = context.services.images.create_name(
-            context.graph_execution_state_id, self.id
-        )
-
-        metadata = context.services.metadata.build_metadata(
-            session_id=context.graph_execution_state_id, node=self
-        )
 
         torch.cuda.empty_cache()
 

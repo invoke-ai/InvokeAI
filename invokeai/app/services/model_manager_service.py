@@ -549,16 +549,7 @@ class ModelManagerService(ModelManagerServiceBase):
             raise CanceledException()
         graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
         source_node_id = graph_execution_state.prepared_source_mapping[node.id]
-        if context:
-            context.services.events.emit_model_load_started(
-                graph_execution_state_id=context.graph_execution_state_id,
-                node=node.dict(),
-                source_node_id=source_node_id,
-                model_name=model_name,
-                model_type=model_type,
-                submodel=submodel,
-            )
-        else:
+        if model_info:
             context.services.events.emit_model_load_completed(
                 graph_execution_state_id=context.graph_execution_state_id,
                 node=node.dict(),
@@ -568,6 +559,16 @@ class ModelManagerService(ModelManagerServiceBase):
                 submodel=submodel,
                 model_info=model_info
             )
+        else:
+            context.services.events.emit_model_load_started(
+                graph_execution_state_id=context.graph_execution_state_id,
+                node=node.dict(),
+                source_node_id=source_node_id,
+                model_name=model_name,
+                model_type=model_type,
+                submodel=submodel,
+            )
+
 
     @property
     def logger(self):
