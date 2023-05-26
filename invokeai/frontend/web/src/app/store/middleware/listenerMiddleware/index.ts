@@ -44,6 +44,11 @@ import {
   addImageUrlsReceivedFulfilledListener,
   addImageUrlsReceivedRejectedListener,
 } from './listeners/imageUrlsReceived';
+import {
+  addSessionCreatedFulfilledListener,
+  addSessionCreatedPendingListener,
+  addSessionCreatedRejectedListener,
+} from './listeners/sessionCreated';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -106,3 +111,8 @@ addSocketConnectedListener();
 addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
+
+// Sessions
+addSessionCreatedPendingListener();
+addSessionCreatedFulfilledListener();
+addSessionCreatedRejectedListener();

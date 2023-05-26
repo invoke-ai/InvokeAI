@@ -1,7 +1,6 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { SessionsService } from 'services/api';
+import { GraphExecutionState, SessionsService } from 'services/api';
 import { log } from 'app/logging/useLogger';
-import { serializeError } from 'serialize-error';
 
 const sessionLog = log.child({ namespace: 'session' });
 
@@ -11,51 +10,27 @@ type SessionCreatedArg = {
   >[0]['requestBody'];
 };
 
+type SessionCreatedThunkConfig = {
+  rejectValue: { arg: SessionCreatedArg; error: unknown };
+};
+
 /**
  * `SessionsService.createSession()` thunk
  */
-export const sessionCreated = createAppAsyncThunk(
-  'api/sessionCreated',
-  async (arg: SessionCreatedArg, { rejectWithValue }) => {
-    try {
-      const response = await SessionsService.createSession({
-        requestBody: arg.graph,
-      });
-      sessionLog.info({ arg, response }, `Session created (${response.id})`);
-      return response;
-    } catch (err: any) {
-      sessionLog.error(
-        {
-          error: serializeError(err),
-        },
-        'Problem creating session'
-      );
-      return rejectWithValue(err.message);
-    }
+export const sessionCreated = createAppAsyncThunk<
+  GraphExecutionState,
+  SessionCreatedArg,
+  SessionCreatedThunkConfig
+>('api/sessionCreated', async (arg: SessionCreatedArg, { rejectWithValue }) => {
+  try {
+    const response = await SessionsService.createSession({
+      requestBody: arg.graph,
+    });
+    return response;
+  } catch (error) {
+    return rejectWithValue({ arg, error });
   }
-);
-
-/**
- * `SessionsService.createSession()` without graph thunk
- */
-export const sessionWithoutGraphCreated = createAppAsyncThunk(
-  'api/sessionWithoutGraphCreated',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await SessionsService.createSession({});
-      sessionLog.info({ response }, `Session created (${response.id})`);
-      return response;
-    } catch (err: any) {
-      sessionLog.error(
-        {
-          error: serializeError(err),
-        },
-        'Problem creating session'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
+});
 
 type NodeAddedArg = Parameters<(typeof SessionsService)['addNode']>[0];
 

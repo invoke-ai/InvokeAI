@@ -16,7 +16,11 @@ import {
 
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../../../app/components/Toaster';
-import { sessionCanceled, sessionInvoked } from 'services/thunks/session';
+import {
+  sessionCanceled,
+  sessionCreated,
+  sessionInvoked,
+} from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 import { LogLevelName } from 'roarr';
@@ -353,7 +357,7 @@ export const systemSlice = createSlice({
     });
 
     /**
-     * Session Canceled
+     * Session Canceled - FULFILLED
      */
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
       state.canceledSession = action.meta.arg.sessionId;
@@ -367,6 +371,23 @@ export const systemSlice = createSlice({
 
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
+      );
+    });
+
+    /**
+     * Session Created - REJECTED
+     */
+    builder.addCase(sessionCreated.rejected, (state, action) => {
+      state.isProcessing = false;
+      state.isCancelable = false;
+      state.isCancelScheduled = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.statusTranslationKey = 'common.statusConnected';
+      state.progressImage = null;
+
+      state.toastQueue.push(
+        makeToast({ title: t('toast.problemCreatingSession'), status: 'error' })
       );
     });
 
