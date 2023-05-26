@@ -55,6 +55,11 @@ import {
   addSessionInvokedRejectedListener,
 } from './listeners/sessionInvoked';
 import {
+  addSessionCanceledFulfilledListener,
+  addSessionCanceledPendingListener,
+  addSessionCanceledRejectedListener,
+} from './listeners/sessionCanceled';
+import {
   addReceivedResultImagesPageFulfilledListener,
   addReceivedResultImagesPageRejectedListener,
 } from './listeners/receivedResultImagesPage';
@@ -101,17 +106,12 @@ addImageMetadataReceivedRejectedListener();
 addImageUrlsReceivedFulfilledListener();
 addImageUrlsReceivedRejectedListener();
 
-// Invoking on tabs
+// User Invoked
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
 addUserInvokedTextToImageListener();
 addUserInvokedImageToImageListener();
 addSessionReadyToInvokeListener();
-
-// Actual session invoking
-addSessionInvokedPendingListener();
-addSessionInvokedFulfilledListener();
-addSessionInvokedRejectedListener();
 
 // Canvas actions
 addCanvasSavedToGalleryListener();
@@ -130,10 +130,20 @@ addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
 
-// Sessions
+// Session Created
 addSessionCreatedPendingListener();
 addSessionCreatedFulfilledListener();
 addSessionCreatedRejectedListener();
+
+// Session Invoked
+addSessionInvokedPendingListener();
+addSessionInvokedFulfilledListener();
+addSessionInvokedRejectedListener();
+
+// Session Canceled
+addSessionCanceledPendingListener();
+addSessionCanceledFulfilledListener();
+addSessionCanceledRejectedListener();
 
 // Gallery pages
 addReceivedResultImagesPageFulfilledListener();
