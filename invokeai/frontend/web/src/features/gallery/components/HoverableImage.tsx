@@ -155,7 +155,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallPrompt(image.metadata?.positive_conditioning);
+    recallPrompt(
+      image.metadata?.positive_conditioning,
+      image.metadata?.negative_conditioning
+    );
   }, [image, recallPrompt]);
 
   const handleRecallSeed = useCallback(() => {
@@ -248,7 +251,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
               isDisabled={
-                !['txt2img', 'img2img', 'inpaint'].includes(
+                // what should these be
+                !['t2l', 'l2l', 'inpaint'].includes(
                   String(image?.metadata?.type)
                 )
               }

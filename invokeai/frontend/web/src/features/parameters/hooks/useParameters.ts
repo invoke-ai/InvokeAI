@@ -21,8 +21,8 @@ export const useParameters = () => {
    * Sets prompt with toast
    */
   const recallPrompt = useCallback(
-    (prompt: unknown) => {
-      if (!isString(prompt)) {
+    (prompt: unknown, negativePrompt?: unknown) => {
+      if (!isString(prompt) || !isString(negativePrompt)) {
         toaster({
           title: t('toast.promptNotSet'),
           description: t('toast.promptNotSetDesc'),
@@ -33,7 +33,7 @@ export const useParameters = () => {
         return;
       }
 
-      setBothPrompts(prompt);
+      setBothPrompts(prompt, negativePrompt);
       toaster({
         title: t('toast.promptSet'),
         status: 'info',
@@ -112,12 +112,13 @@ export const useParameters = () => {
   const recallAllParameters = useCallback(
     (image: ImageDTO | undefined) => {
       const type = image?.metadata?.type;
-      if (['txt2img', 'img2img', 'inpaint'].includes(String(type))) {
+      // not sure what this list should be
+      if (['t2l', 'l2l', 'inpaint'].includes(String(type))) {
         dispatch(allParametersSet(image));
 
-        if (image?.metadata?.type === 'img2img') {
+        if (image?.metadata?.type === 'l2l') {
           dispatch(setActiveTab('img2img'));
-        } else if (image?.metadata?.type === 'txt2img') {
+        } else if (image?.metadata?.type === 't2l') {
           dispatch(setActiveTab('txt2img'));
         }
 
