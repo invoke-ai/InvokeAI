@@ -1,5 +1,5 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import type { PayloadAction } from '@reduxjs/toolkit';
+import { PayloadAction, isAnyOf } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 import {
@@ -349,13 +349,6 @@ export const systemSlice = createSlice({
       state.statusTranslationKey = 'common.statusPreparing';
     });
 
-    builder.addCase(sessionInvoked.rejected, (state, action) => {
-      const error = action.payload as string | undefined;
-      state.toastQueue.push(
-        makeToast({ title: error || t('toast.serverError'), status: 'error' })
-      );
-    });
-
     /**
      * Session Canceled - FULFILLED
      */
@@ -371,23 +364,6 @@ export const systemSlice = createSlice({
 
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
-      );
-    });
-
-    /**
-     * Session Created - REJECTED
-     */
-    builder.addCase(sessionCreated.rejected, (state, action) => {
-      state.isProcessing = false;
-      state.isCancelable = false;
-      state.isCancelScheduled = false;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.statusTranslationKey = 'common.statusConnected';
-      state.progressImage = null;
-
-      state.toastQueue.push(
-        makeToast({ title: t('toast.problemCreatingSession'), status: 'error' })
       );
     });
 
@@ -437,6 +413,26 @@ export const systemSlice = createSlice({
     builder.addCase(imageUploaded.fulfilled, (state) => {
       state.isUploading = false;
     });
+
+    // *** Matchers - must be after all cases ***
+
+    /**
+     * Session Invoked - REJECTED
+     * Session Created - REJECTED
+     */
+    builder.addMatcher(isAnySessionRejected, (state, action) => {
+      state.isProcessing = false;
+      state.isCancelable = false;
+      state.isCancelScheduled = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.statusTranslationKey = 'common.statusConnected';
+      state.progressImage = null;
+
+      state.toastQueue.push(
+        makeToast({ title: t('toast.serverError'), status: 'error' })
+      );
+    });
   },
 });
 
@@ -465,3 +461,8 @@ export const {
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
+
+const isAnySessionRejected = isAnyOf(
+  sessionCreated.rejected,
+  sessionInvoked.rejected
+);

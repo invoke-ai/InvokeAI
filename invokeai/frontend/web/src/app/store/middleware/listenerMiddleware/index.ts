@@ -49,6 +49,11 @@ import {
   addSessionCreatedPendingListener,
   addSessionCreatedRejectedListener,
 } from './listeners/sessionCreated';
+import {
+  addSessionInvokedFulfilledListener,
+  addSessionInvokedPendingListener,
+  addSessionInvokedRejectedListener,
+} from './listeners/sessionInvoked';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -88,12 +93,17 @@ addImageMetadataReceivedRejectedListener();
 addImageUrlsReceivedFulfilledListener();
 addImageUrlsReceivedRejectedListener();
 
-// Invoking stuff
+// Invoking on tabs
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
 addUserInvokedTextToImageListener();
 addUserInvokedImageToImageListener();
 addSessionReadyToInvokeListener();
+
+// Actual session invoking
+addSessionInvokedPendingListener();
+addSessionInvokedFulfilledListener();
+addSessionInvokedRejectedListener();
 
 // Canvas actions
 addCanvasSavedToGalleryListener();

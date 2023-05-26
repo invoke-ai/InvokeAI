@@ -546,7 +546,6 @@
         "availableSchedulers": "Available Schedulers"
     },
     "toast": {
-        "problemCreatingSession": "Problem Creating Session",
         "serverError": "Server Error",
         "disconnected": "Disconnected from Server",
         "connected": "Connected to Server",
