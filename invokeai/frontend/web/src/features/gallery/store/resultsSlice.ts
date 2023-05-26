@@ -4,11 +4,6 @@ import {
   receivedResultImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import {
-  imageDeleted,
-  imageMetadataReceived,
-  imageUrlsReceived,
-} from 'services/thunks/image';
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
@@ -67,24 +62,6 @@ const resultsSlice = createSlice({
       state.pages = pages;
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
-    });
-
-    /**
-     * Image URLs Received - FULFILLED
-     */
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_type, image_url, thumbnail_url } =
-        action.payload;
-
-      if (image_type === 'results') {
-        resultsAdapter.updateOne(state, {
-          id: image_name,
-          changes: {
-            image_url: image_url,
-            thumbnail_url: thumbnail_url,
-          },
-        });
-      }
     });
   },
 });
