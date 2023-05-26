@@ -2,8 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { InvocationMeta } from './InvocationMeta';
-
 /**
  * Iterates over a list of items
  */
@@ -12,11 +10,11 @@ export type IterateInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'iterate';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'iterate';
   /**
    * The list of items to iterate over
    */

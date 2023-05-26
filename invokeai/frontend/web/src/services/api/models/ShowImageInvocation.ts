@@ -3,7 +3,6 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
-import type { InvocationMeta } from './InvocationMeta';
 
 /**
  * Displays a provided image, and passes it forward in the pipeline.
@@ -13,11 +12,11 @@ export type ShowImageInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'show_image';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'show_image';
   /**
    * The image to show
    */

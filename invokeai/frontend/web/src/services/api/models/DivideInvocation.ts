@@ -2,8 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { InvocationMeta } from './InvocationMeta';
-
 /**
  * Divides two numbers
  */
@@ -12,11 +10,11 @@ export type DivideInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'div';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'div';
   /**
    * The first number
    */

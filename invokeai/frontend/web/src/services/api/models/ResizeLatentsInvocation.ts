@@ -2,7 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { InvocationMeta } from './InvocationMeta';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -13,11 +12,11 @@ export type ResizeLatentsInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'lresize';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'lresize';
   /**
    * The latents to resize
    */

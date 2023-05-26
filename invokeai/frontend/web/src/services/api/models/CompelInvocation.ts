@@ -2,8 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { InvocationMeta } from './InvocationMeta';
-
 /**
  * Parse prompt using compel package to conditioning.
  */
@@ -12,11 +10,11 @@ export type CompelInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 'compel';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 'compel';
   /**
    * Prompt
    */

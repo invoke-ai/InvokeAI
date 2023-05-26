@@ -3,7 +3,6 @@
 /* eslint-disable */
 
 import type { ConditioningField } from './ConditioningField';
-import type { InvocationMeta } from './InvocationMeta';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -14,11 +13,11 @@ export type TextToLatentsInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
-  type?: 't2l';
   /**
-   * The meta properties of this node.
+   * Whether or not this node is an intermediate node.
    */
-  meta?: InvocationMeta;
+  is_intermediate?: boolean;
+  type?: 't2l';
   /**
    * Positive conditioning for generation
    */
