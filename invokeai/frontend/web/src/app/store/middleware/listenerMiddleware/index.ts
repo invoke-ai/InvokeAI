@@ -8,7 +8,10 @@ import type { TypedStartListening, TypedAddListener } from '@reduxjs/toolkit';
 
 import type { RootState, AppDispatch } from '../../store';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
-import { addImageUploadedListener } from './listeners/imageUploaded';
+import {
+  addImageUploadedFulfilledListener,
+  addImageUploadedRejectedListener,
+} from './listeners/imageUploaded';
 import { addRequestedImageDeletionListener } from './listeners/imageDeleted';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
@@ -47,23 +50,28 @@ export type AppListenerEffect = ListenerEffect<
   AppDispatch
 >;
 
-addImageUploadedListener();
+// Image uploads
+addImageUploadedFulfilledListener();
+addImageUploadedRejectedListener();
+
 addInitialImageSelectedListener();
+
 addRequestedImageDeletionListener();
 
+// Invoking stuff
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
 addUserInvokedTextToImageListener();
 addUserInvokedImageToImageListener();
 addSessionReadyToInvokeListener();
 
+// Canvas actions
 addCanvasSavedToGalleryListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
 
 // socketio
-
 addGeneratorProgressListener();
 addGraphExecutionStateCompleteListener();
 addInvocationCompleteListener();
