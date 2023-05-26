@@ -25,6 +25,7 @@ export const receivedResultImagesPage = createAppAsyncThunk<
     const response = await ImagesService.listImagesWithMetadata({
       imageType: 'results',
       imageCategory: 'general',
+      isIntermediate: false,
       page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
@@ -55,6 +56,7 @@ export const receivedUploadImagesPage = createAppAsyncThunk<
     const response = await ImagesService.listImagesWithMetadata({
       imageType: 'uploads',
       imageCategory: 'general',
+      isIntermediate: false,
       page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
