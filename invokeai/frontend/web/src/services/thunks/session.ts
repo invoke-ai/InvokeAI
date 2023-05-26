@@ -35,6 +35,28 @@ export const sessionCreated = createAppAsyncThunk(
   }
 );
 
+/**
+ * `SessionsService.createSession()` without graph thunk
+ */
+export const sessionWithoutGraphCreated = createAppAsyncThunk(
+  'api/sessionWithoutGraphCreated',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await SessionsService.createSession({});
+      sessionLog.info({ response }, `Session created (${response.id})`);
+      return response;
+    } catch (err: any) {
+      sessionLog.error(
+        {
+          error: serializeError(err),
+        },
+        'Problem creating session'
+      );
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 type NodeAddedArg = Parameters<(typeof SessionsService)['addNode']>[0];
 
 /**
@@ -52,6 +74,29 @@ export const nodeAdded = createAppAsyncThunk(
     });
 
     sessionLog.info({ arg, response }, `Node added (${response})`);
+
+    return response;
+  }
+);
+
+type NodeUpdatedArg = Parameters<(typeof SessionsService)['updateNode']>[0];
+
+/**
+ * `SessionsService.addNode()` thunk
+ */
+export const nodeUpdated = createAppAsyncThunk(
+  'api/nodeUpdated',
+  async (
+    arg: { node: NodeUpdatedArg['requestBody']; sessionId: string },
+    _thunkApi
+  ) => {
+    const response = await SessionsService.updateNode({
+      requestBody: arg.node,
+      sessionId: arg.sessionId,
+      nodePath: arg.node.id,
+    });
+
+    sessionLog.info({ arg, response }, `Node updated (${response})`);
 
     return response;
   }

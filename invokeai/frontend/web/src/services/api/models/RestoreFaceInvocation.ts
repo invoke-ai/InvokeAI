@@ -12,6 +12,10 @@ export type RestoreFaceInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'restore_face';
   /**
    * The input image

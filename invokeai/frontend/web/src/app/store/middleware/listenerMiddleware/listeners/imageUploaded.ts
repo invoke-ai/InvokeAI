@@ -12,7 +12,7 @@ export const addImageUploadedListener = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
       imageUploaded.fulfilled.match(action) &&
-      action.payload.response.image_type !== 'intermediates',
+      action.payload.response.is_intermediate === false,
     effect: (action, { dispatch, getState }) => {
       const { response: image } = action.payload;
 

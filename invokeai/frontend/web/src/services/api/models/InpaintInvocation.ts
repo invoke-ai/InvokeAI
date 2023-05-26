@@ -13,6 +13,10 @@ export type InpaintInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'inpaint';
   /**
    * The prompt to generate an image from

@@ -12,7 +12,7 @@ export const receivedResultImagesPage = createAppAsyncThunk(
     const { page, pages, nextPage } = getState().results;
 
     if (nextPage === page) {
-      rejectWithValue([]);
+      return rejectWithValue([]);
     }
 
     const response = await ImagesService.listImagesWithMetadata({
@@ -30,7 +30,13 @@ export const receivedResultImagesPage = createAppAsyncThunk(
 
 export const receivedUploadImagesPage = createAppAsyncThunk(
   'uploads/receivedUploadImagesPage',
-  async (_arg, { getState }) => {
+  async (_arg, { getState, rejectWithValue }) => {
+    const { page, pages, nextPage } = getState().uploads;
+
+    if (nextPage === page) {
+      return rejectWithValue([]);
+    }
+
     const response = await ImagesService.listImagesWithMetadata({
       imageType: 'uploads',
       imageCategory: 'general',

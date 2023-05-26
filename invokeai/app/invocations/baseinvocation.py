@@ -78,6 +78,7 @@ class BaseInvocation(ABC, BaseModel):
     
     #fmt: off
     id: str = Field(description="The id of this node. Must be unique among all nodes.")
+    is_intermediate: bool = Field(default=False, description="Whether or not this node is an intermediate node.")
     #fmt: on
 
 
