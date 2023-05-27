@@ -30,14 +30,14 @@ export const addInitialImageSelectedListener = () => {
         return;
       }
 
-      const { image_name, image_type } = action.payload;
+      const { image_name, image_origin } = action.payload;
 
       let image: ImageDTO | undefined;
       const state = getState();
 
-      if (image_type === 'results') {
+      if (image_origin === 'results') {
         image = selectResultsById(state, image_name);
-      } else if (image_type === 'uploads') {
+      } else if (image_origin === 'uploads') {
         image = selectUploadsById(state, image_name);
       }
 

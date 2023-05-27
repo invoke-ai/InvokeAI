@@ -23,8 +23,8 @@ export const receivedGalleryImages = createAppAsyncThunk<
     const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
+      excludeCategories: ['user'],
       isIntermediate: false,
-      showInGallery: true,
       page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
@@ -53,9 +53,8 @@ export const receivedUploadImages = createAppAsyncThunk<
     const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
-      imageType: 'uploads',
+      includeCategories: ['user'],
       isIntermediate: false,
-      showInGallery: false,
       page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });

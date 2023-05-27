@@ -34,23 +34,19 @@ export const addInvocationCompleteListener = () => {
 
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
-        const { image_name, image_type } = result.image;
+        const { image_name, image_origin } = result.image;
 
         // Get its metadata
         dispatch(
           imageMetadataReceived({
             imageName: image_name,
-            imageType: image_type,
+            imageOrigin: image_origin,
           })
         );
 
         const [{ payload: imageDTO }] = await take(
           imageMetadataReceived.fulfilled.match
         );
-
-        if (getState().gallery.shouldAutoSwitchToNewImages) {
-          dispatch(imageSelected(imageDTO));
-        }
 
         // Handle canvas image
         if (

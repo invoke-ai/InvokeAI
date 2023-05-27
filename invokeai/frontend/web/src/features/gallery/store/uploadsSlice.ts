@@ -9,8 +9,12 @@ import { receivedUploadImages, IMAGES_PER_PAGE } from 'services/thunks/gallery';
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
-export type UploadsImageDTO = Omit<ImageDTO, 'image_type'> & {
-  image_type: 'uploads';
+export type UploadsImageDTO = Omit<
+  ImageDTO,
+  'image_origin' | 'image_category'
+> & {
+  image_origin: 'external';
+  image_category: 'user';
 };
 
 export const uploadsAdapter = createEntityAdapter<ImageDTO>({
@@ -44,6 +48,9 @@ const uploadsSlice = createSlice({
     uploadUpserted: (state, action: PayloadAction<ImageDTO>) => {
       uploadsAdapter.upsertOne(state, action.payload);
       state.upsertedImageCount += 1;
+    },
+    uploadRemoved: (state, action: PayloadAction<string>) => {
+      uploadsAdapter.removeOne(state, action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -81,6 +88,6 @@ export const {
   selectTotal: selectUploadsTotal,
 } = uploadsAdapter.getSelectors<RootState>((state) => state.uploads);
 
-export const { uploadUpserted } = uploadsSlice.actions;
+export const { uploadUpserted, uploadRemoved } = uploadsSlice.actions;
 
 export default uploadsSlice.reducer;

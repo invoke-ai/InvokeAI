@@ -5,6 +5,8 @@ import {
   receivedUploadImages,
 } from '../../../services/thunks/gallery';
 import { ImageDTO } from 'services/api';
+import { resultUpserted } from './resultsSlice';
+import { uploadUpserted } from './uploadsSlice';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -76,6 +78,7 @@ export const gallerySlice = createSlice({
         }
       }
     });
+
     builder.addCase(receivedUploadImages.fulfilled, (state, action) => {
       // rehydrate selectedImage URL when results list comes in
       // solves case when outdated URL is in local storage
@@ -90,6 +93,20 @@ export const gallerySlice = createSlice({
           selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
           state.selectedImage = selectedImage;
         }
+      }
+    });
+
+    builder.addCase(resultUpserted, (state, action) => {
+      if (state.shouldAutoSwitchToNewImages) {
+        state.selectedImage = action.payload;
+        state.currentCategory = 'results';
+      }
+    });
+
+    builder.addCase(uploadUpserted, (state, action) => {
+      if (state.shouldAutoSwitchToNewImages) {
+        state.selectedImage = action.payload;
+        state.currentCategory = 'uploads';
       }
     });
   },

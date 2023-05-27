@@ -57,7 +57,6 @@ export const addCanvasMergedListener = () => {
           },
           imageCategory: 'general',
           isIntermediate: true,
-          showInGallery: false,
         })
       );
 

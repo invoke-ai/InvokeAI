@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ImageType } from 'services/api';
+import { ResourceOrigin } from 'services/api';
 import { selectResultsEntities } from '../store/resultsSlice';
 import { selectUploadsEntities } from '../store/uploadsSlice';
 
@@ -11,17 +11,17 @@ const useGetImageByNameSelector = createSelector(
   }
 );
 
-const useGetImageByNameAndType = () => {
+const useGetImageByNameAndOrigin = () => {
   const { allResults, allUploads } = useAppSelector(useGetImageByNameSelector);
-  return (name: string, type: ImageType) => {
-    if (type === 'results') {
+  return (name: string, origin: ResourceOrigin) => {
+    if (origin === 'internal') {
       const resultImagesResult = allResults[name];
       if (resultImagesResult) {
         return resultImagesResult;
       }
     }
 
-    if (type === 'uploads') {
+    if (origin === 'external') {
       const userImagesResult = allUploads[name];
       if (userImagesResult) {
         return userImagesResult;
@@ -30,4 +30,4 @@ const useGetImageByNameAndType = () => {
   };
 };
 
-export default useGetImageByNameAndType;
+export default useGetImageByNameAndOrigin;
