@@ -7,7 +7,7 @@ from typing import Literal, Optional, Union, List
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..models.image import ImageField, ImageType, ImageCategory
+from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -163,7 +163,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
     def invoke(self, context: InvocationContext) -> ImageOutput:
 
         raw_image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
@@ -177,8 +177,8 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         #    so for now setting image_type to RESULT instead of INTERMEDIATE so will get saved in gallery
         image_dto = context.services.images.create(
             image=processed_image,
-            image_type=ImageType.RESULT,
-            image_category=ImageCategory.GENERAL,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.CONTROL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
             is_intermediate=self.is_intermediate
@@ -187,7 +187,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         """Builds an ImageOutput and its ImageField"""
         processed_image_field = ImageField(
             image_name=image_dto.image_name,
-            image_type=image_dto.image_type,
+            image_origin=image_dto.image_origin,
         )
         return ImageOutput(
             image=processed_image_field,
