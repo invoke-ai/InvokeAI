@@ -57,14 +57,7 @@ export const addInvocationCompleteListener = () => {
           graph_execution_state_id ===
           getState().canvas.layerState.stagingArea.sessionId
         ) {
-          const [{ payload: image }] = await take(
-            (
-              action
-            ): action is ReturnType<typeof imageMetadataReceived.fulfilled> =>
-              imageMetadataReceived.fulfilled.match(action) &&
-              action.payload.image_name === image_name
-          );
-          dispatch(addImageToStagingArea(image));
+          dispatch(addImageToStagingArea(imageDTO));
         }
 
         dispatch(progressImageSet(null));
