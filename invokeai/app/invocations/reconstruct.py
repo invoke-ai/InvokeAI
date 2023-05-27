@@ -43,10 +43,11 @@ class RestoreFaceInvocation(BaseInvocation):
         # TODO: can this return multiple results?
         image_dto = context.services.images.create(
             image=results[0][0],
-            image_type=ImageType.INTERMEDIATE,
+            image_type=ImageType.RESULT,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(

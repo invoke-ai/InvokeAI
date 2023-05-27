@@ -13,6 +13,10 @@ export type LatentsToLatentsInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'l2l';
   /**
    * Positive conditioning for generation
@@ -42,14 +46,6 @@ export type LatentsToLatentsInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
-  /**
-   * Whether or not to generate an image that can tile without seams
-   */
-  seamless?: boolean;
-  /**
-   * The axes to tile the image on, 'x' and/or 'y'
-   */
-  seamless_axes?: string;
   /**
    * The latents to use as a base image
    */

@@ -13,6 +13,10 @@ export type TextToLatentsInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 't2l';
   /**
    * Positive conditioning for generation
@@ -42,13 +46,5 @@ export type TextToLatentsInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
-  /**
-   * Whether or not to generate an image that can tile without seams
-   */
-  seamless?: boolean;
-  /**
-   * The axes to tile the image on, 'x' and/or 'y'
-   */
-  seamless_axes?: string;
 };
 

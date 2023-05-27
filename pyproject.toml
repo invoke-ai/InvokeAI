@@ -39,6 +39,8 @@ dependencies = [
   "click",
   "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel~=1.1.5",
+  "controlnet-aux>=0.0.4",
+  "timm==0.6.13",           # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
   "diffusers[torch]~=0.16.1",
   "dnspython==2.2.1",
@@ -54,6 +56,7 @@ dependencies = [
   "flaskwebgui==1.0.3",
   "gfpgan==1.3.8",
   "huggingface-hub>=0.11.1",
+  "mediapipe",             # needed for "mediapipeface" controlnet model
   "npyscreen",
   "numpy<1.24",
   "omegaconf",

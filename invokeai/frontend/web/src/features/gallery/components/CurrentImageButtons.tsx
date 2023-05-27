@@ -109,8 +109,9 @@ const currentImageButtonsSelector = createSelector(
       isLightboxOpen,
       shouldHidePreview,
       image: selectedImage,
-      seed: selectedImage?.metadata?.invokeai?.node?.seed,
-      prompt: selectedImage?.metadata?.invokeai?.node?.prompt,
+      seed: selectedImage?.metadata?.seed,
+      prompt: selectedImage?.metadata?.positive_conditioning,
+      negativePrompt: selectedImage?.metadata?.negative_conditioning,
     };
   },
   {
@@ -245,13 +246,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const handleUseSeed = useCallback(() => {
-    recallSeed(image?.metadata?.invokeai?.node?.seed);
+    recallSeed(image?.metadata?.seed);
   }, [image, recallSeed]);
 
   useHotkeys('s', handleUseSeed, [image]);
 
   const handleUsePrompt = useCallback(() => {
-    recallPrompt(image?.metadata?.invokeai?.node?.prompt);
+    recallPrompt(
+      image?.metadata?.positive_conditioning,
+      image?.metadata?.negative_conditioning
+    );
   }, [image, recallPrompt]);
 
   useHotkeys('p', handleUsePrompt, [image]);
@@ -454,7 +458,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link download={true} href={getUrl(image?.url ?? '')}>
+              <Link download={true} href={getUrl(image?.image_url ?? '')}>
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>
@@ -500,7 +504,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
-            isDisabled={!image?.metadata?.invokeai?.node?.prompt}
+            isDisabled={!image?.metadata?.positive_conditioning}
             onClick={handleUsePrompt}
           />
 
@@ -508,7 +512,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!image?.metadata?.invokeai?.node?.seed}
+            isDisabled={!image?.metadata?.seed}
             onClick={handleUseSeed}
           />
 
@@ -517,9 +521,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={
-              !['txt2img', 'img2img', 'inpaint'].includes(
-                String(image?.metadata?.invokeai?.node?.type)
-              )
+              // not sure what this list should be
+              !['t2l', 'l2l', 'inpaint'].includes(String(image?.metadata?.type))
             }
             onClick={handleClickUseAllParameters}
           />

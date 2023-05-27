@@ -12,6 +12,10 @@ export type CvInpaintInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'cv_inpaint';
   /**
    * The image to inpaint
