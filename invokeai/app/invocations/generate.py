@@ -86,8 +86,8 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         # loading controlnet image (currently requires pre-processed image)
         control_image = (
             None if self.control_image is None
-            else context.services.images.get(
-                self.control_image.image_type, self.control_image.image_name
+            else context.services.images.get_pil_image(
+                self.control_image.image_origin, self.control_image.image_name
             )
         )
         # loading controlnet model

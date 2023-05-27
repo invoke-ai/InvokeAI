@@ -297,7 +297,7 @@ class TextToLatentsInvocation(BaseInvocation):
                                                                     torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
                 control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(control_image_field.image_type,
+                input_image = context.services.images.get_pil_image(control_image_field.image_origin,
                                                                     control_image_field.image_name)
                 # self.image.image_type, self.image.image_name
                 # FIXME: still need to test with different widths, heights, devices, dtypes
