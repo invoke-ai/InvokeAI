@@ -141,9 +141,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 metadata TEXT,
                 show_in_gallery BOOLEAN DEFAULT TRUE,
                 is_intermediate BOOLEAN DEFAULT FALSE,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Soft delete, currently unused
                 deleted_at DATETIME
             );
