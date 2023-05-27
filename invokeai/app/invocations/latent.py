@@ -28,7 +28,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import ControlNetData
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
-from ..services.image_file_storage import ImageType
+from ..services.image_file_storage import ResourceOrigin
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
 from .compel import ConditioningField
@@ -468,7 +468,7 @@ class LatentsToImageInvocation(BaseInvocation):
             #     and gnenerate unique image_name
             image_dto = context.services.images.create(
                 image=image,
-                image_type=ImageType.RESULT,
+                image_origin=ResourceOrigin.INTERNAL,
                 image_category=ImageCategory.GENERAL,
                 session_id=context.graph_execution_state_id,
                 node_id=self.id,
@@ -478,7 +478,7 @@ class LatentsToImageInvocation(BaseInvocation):
             return ImageOutput(
                 image=ImageField(
                     image_name=image_dto.image_name,
-                    image_type=image_dto.image_type,
+                    image_origin=image_dto.image_origin,
                 ),
                 width=image_dto.width,
                 height=image_dto.height,
@@ -576,7 +576,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         #     self.image.image_type, self.image.image_name
         # )
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         # TODO: this only really needs the vae

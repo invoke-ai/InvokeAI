@@ -8,7 +8,7 @@ from typing import Optional, Union
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.models.image import (
     ImageCategory,
-    ImageType,
+    ResourceOrigin,
 )
 from invokeai.app.services.models.image_record import (
     ImageRecord,
@@ -46,7 +46,7 @@ class ImageRecordStorageBase(ABC):
     # TODO: Implement an `update()` method
 
     @abstractmethod
-    def get(self, image_type: ImageType, image_name: str) -> ImageRecord:
+    def get(self, image_origin: ResourceOrigin, image_name: str) -> ImageRecord:
         """Gets an image record."""
         pass
 
@@ -54,7 +54,7 @@ class ImageRecordStorageBase(ABC):
     def update(
         self,
         image_name: str,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         changes: ImageRecordChanges,
     ) -> None:
         """Updates an image record."""
@@ -65,10 +65,10 @@ class ImageRecordStorageBase(ABC):
         self,
         page: int = 0,
         per_page: int = 10,
-        image_type: Optional[ImageType] = None,
-        image_category: Optional[ImageCategory] = None,
+        image_origin: Optional[ResourceOrigin] = None,
+        include_categories: Optional[list[ImageCategory]] = None,
+        exclude_categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-        show_in_gallery: Optional[bool] = None,
     ) -> PaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass
@@ -76,7 +76,7 @@ class ImageRecordStorageBase(ABC):
     # TODO: The database has a nullable `deleted_at` column, currently unused.
     # Should we implement soft deletes? Would need coordination with ImageFileStorage.
     @abstractmethod
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
         """Deletes an image record."""
         pass
 
@@ -84,7 +84,7 @@ class ImageRecordStorageBase(ABC):
     def save(
         self,
         image_name: str,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_category: ImageCategory,
         width: int,
         height: int,
@@ -92,7 +92,6 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
         is_intermediate: bool = False,
-        show_in_gallery: bool = True,
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -131,7 +130,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             CREATE TABLE IF NOT EXISTS images (
                 image_name TEXT NOT NULL PRIMARY KEY,
                 -- This is an enum in python, unrestricted string here for flexibility
-                image_type TEXT NOT NULL,
+                image_origin TEXT NOT NULL,
                 -- This is an enum in python, unrestricted string here for flexibility
                 image_category TEXT NOT NULL,
                 width INTEGER NOT NULL,
@@ -139,7 +138,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 session_id TEXT,
                 node_id TEXT,
                 metadata TEXT,
-                show_in_gallery BOOLEAN DEFAULT TRUE,
                 is_intermediate BOOLEAN DEFAULT FALSE,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
@@ -158,7 +156,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         )
         self._cursor.execute(
             """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_image_type ON images(image_type);
+            CREATE INDEX IF NOT EXISTS idx_images_image_origin ON images(image_origin);
             """
         )
         self._cursor.execute(
@@ -185,7 +183,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
-    def get(self, image_type: ImageType, image_name: str) -> Union[ImageRecord, None]:
+    def get(
+        self, image_origin: ResourceOrigin, image_name: str
+    ) -> Union[ImageRecord, None]:
         try:
             self._lock.acquire()
 
@@ -212,7 +212,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     def update(
         self,
         image_name: str,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         changes: ImageRecordChanges,
     ) -> None:
         try:
@@ -249,71 +249,72 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self,
         page: int = 0,
         per_page: int = 10,
-        image_type: Optional[ImageType] = None,
-        image_category: Optional[ImageCategory] = None,
+        image_origin: Optional[ResourceOrigin] = None,
+        include_categories: Optional[list[ImageCategory]] = None,
+        exclude_categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-        show_in_gallery: Optional[bool] = None,
     ) -> PaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
 
             # Manually build two queries - one for the count, one for the records
 
-            count_query = """--sql
-            SELECT COUNT(*) FROM images WHERE 1=1
-            """
-
-            images_query = """--sql
-            SELECT * FROM images WHERE 1=1
-            """
+            count_query = f"""SELECT COUNT(*) FROM images WHERE 1=1\n"""
+            images_query = f"""SELECT * FROM images WHERE 1=1\n"""
 
             query_conditions = ""
             query_params = []
 
-            if image_type is not None:
-                query_conditions += """--sql
-                AND image_type = ?
-                """
-                query_params.append(image_type.value)
+            if image_origin is not None:
+                query_conditions += f"""AND image_origin = ?\n"""
+                query_params.append(image_origin.value)
 
-            if image_category is not None:
-                query_conditions += """--sql
-                AND image_category = ?
-                """
-                query_params.append(image_category.value)
+            if include_categories is not None:
+                ## Convert the enum values to unique list of strings
+                include_category_strings = list(
+                    map(lambda c: c.value, set(include_categories))
+                )
+                # Create the correct length of placeholders
+                placeholders = ",".join("?" * len(include_category_strings))
+                query_conditions += f"AND image_category IN ( {placeholders} )\n"
+
+                # Unpack the included categories into the query params
+                query_params.append(*include_category_strings)
+
+            if exclude_categories is not None:
+                ## Convert the enum values to unique list of strings
+                exclude_category_strings = list(
+                    map(lambda c: c.value, set(exclude_categories))
+                )
+
+                # Create the correct length of placeholders
+                placeholders = ",".join("?" * len(exclude_category_strings))
+                query_conditions += f"AND image_category NOT IN ( {placeholders} )\n"
+
+                # Unpack the included categories into the query params
+                query_params.append(*exclude_category_strings)
 
             if is_intermediate is not None:
-                query_conditions += """--sql
-                AND is_intermediate = ? 
-                """
+                query_conditions += f"""AND is_intermediate = ?\n"""
                 query_params.append(is_intermediate)
 
-            if show_in_gallery is not None:
-                query_conditions += """--sql
-                AND show_in_gallery = ?
-                """
-                query_params.append(show_in_gallery)
+            query_pagination = f"""ORDER BY created_at DESC LIMIT ? OFFSET ?\n"""
 
-            query_pagination = """--sql
-            ORDER BY created_at DESC LIMIT ? OFFSET ?
-            """
-
-            count_query += query_conditions + ";"
-            count_params = query_params.copy()
-
+            # Final images query with pagination
             images_query += query_conditions + query_pagination + ";"
+            # Add all the parameters
             images_params = query_params.copy()
             images_params.append(per_page)
             images_params.append(page * per_page)
-
+            # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)
-
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-
             images = list(map(lambda r: deserialize_image_record(dict(r)), result))
 
+            # Set up and execute the count query, without pagination
+            count_query += query_conditions + ";"
+            count_params = query_params.copy()
             self._cursor.execute(count_query, count_params)
-
             count = self._cursor.fetchone()[0]
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -327,7 +328,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             items=images, page=page, pages=pageCount, per_page=per_page, total=count
         )
 
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -347,7 +348,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     def save(
         self,
         image_name: str,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_category: ImageCategory,
         session_id: Optional[str],
         width: int,
@@ -355,7 +356,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
         is_intermediate: bool = False,
-        show_in_gallery: bool = True,
     ) -> datetime:
         try:
             metadata_json = (
@@ -366,21 +366,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """--sql
                 INSERT OR IGNORE INTO images (
                     image_name,
-                    image_type,
+                    image_origin,
                     image_category,
                     width,
                     height,
                     node_id,
                     session_id,
                     metadata,
-                    is_intermediate,
-                    show_in_gallery
+                    is_intermediate
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
-                    image_type.value,
+                    image_origin.value,
                     image_category.value,
                     width,
                     height,
@@ -388,7 +387,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata_json,
                     is_intermediate,
-                    show_in_gallery,
                 ),
             )
             self._conn.commit()

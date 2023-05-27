@@ -10,9 +10,9 @@ import torch
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.image import ColorField, ImageField, ImageType
+from invokeai.app.models.image import ColorField, ImageField, ResourceOrigin
 from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.models.image import ImageCategory, ImageType
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
@@ -120,7 +120,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
         image_dto = context.services.images.create(
             image=generate_output.image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
@@ -130,7 +130,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -170,7 +170,7 @@ class ImageToImageInvocation(TextToImageInvocation):
             None
             if self.image is None
             else context.services.images.get_pil_image(
-                self.image.image_type, self.image.image_name
+                self.image.image_origin, self.image.image_name
             )
         )
 
@@ -201,7 +201,7 @@ class ImageToImageInvocation(TextToImageInvocation):
 
         image_dto = context.services.images.create(
             image=generator_output.image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
@@ -211,7 +211,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -283,13 +283,13 @@ class InpaintInvocation(ImageToImageInvocation):
             None
             if self.image is None
             else context.services.images.get_pil_image(
-                self.image.image_type, self.image.image_name
+                self.image.image_origin, self.image.image_name
             )
         )
         mask = (
             None
             if self.mask is None
-            else context.services.images.get_pil_image(self.mask.image_type, self.mask.image_name)
+            else context.services.images.get_pil_image(self.mask.image_origin, self.mask.image_name)
         )
 
         # Handle invalid model parameter
@@ -317,7 +317,7 @@ class InpaintInvocation(ImageToImageInvocation):
 
         image_dto = context.services.images.create(
             image=generator_output.image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
@@ -327,7 +327,7 @@ class InpaintInvocation(ImageToImageInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,

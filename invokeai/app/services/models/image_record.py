@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional, Union
 from pydantic import BaseModel, Extra, Field, StrictStr
-from invokeai.app.models.image import ImageCategory, ImageType
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.misc import get_iso_timestamp
 
@@ -11,8 +11,8 @@ class ImageRecord(BaseModel):
 
     image_name: str = Field(description="The unique name of the image.")
     """The unique name of the image."""
-    image_type: ImageType = Field(description="The type of the image.")
-    """The type of the image."""
+    image_origin: ResourceOrigin = Field(description="The type of the image.")
+    """The origin of the image."""
     image_category: ImageCategory = Field(description="The category of the image.")
     """The category of the image."""
     width: int = Field(description="The width of the image in px.")
@@ -33,8 +33,6 @@ class ImageRecord(BaseModel):
     """The deleted timestamp of the image."""
     is_intermediate: bool = Field(description="Whether this is an intermediate image.")
     """Whether this is an intermediate image."""
-    show_in_gallery: bool = Field(description="Whether this image should be shown in the gallery.")
-    """Whether this image should be shown in the gallery."""
     session_id: Optional[str] = Field(
         default=None,
         description="The session ID that generated this image, if it is a generated image.",
@@ -76,8 +74,8 @@ class ImageUrlsDTO(BaseModel):
 
     image_name: str = Field(description="The unique name of the image.")
     """The unique name of the image."""
-    image_type: ImageType = Field(description="The type of the image.")
-    """The type of the image."""
+    image_origin: ResourceOrigin = Field(description="The type of the image.")
+    """The origin of the image."""
     image_url: str = Field(description="The URL of the image.")
     """The URL of the image."""
     thumbnail_url: str = Field(description="The URL of the image's thumbnail.")
@@ -107,7 +105,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     # Retrieve all the values, setting "reasonable" defaults if they are not present.
 
     image_name = image_dict.get("image_name", "unknown")
-    image_type = ImageType(image_dict.get("image_type", ImageType.RESULT.value))
+    image_origin = ResourceOrigin(image_dict.get("image_origin", ResourceOrigin.INTERNAL.value))
     image_category = ImageCategory(
         image_dict.get("image_category", ImageCategory.GENERAL.value)
     )
@@ -119,7 +117,6 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     updated_at = image_dict.get("updated_at", get_iso_timestamp())
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
-    show_in_gallery = image_dict.get("show_in_gallery", True)
 
     raw_metadata = image_dict.get("metadata")
 
@@ -130,7 +127,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
 
     return ImageRecord(
         image_name=image_name,
-        image_type=image_type,
+        image_origin=image_origin,
         image_category=image_category,
         width=width,
         height=height,
@@ -141,5 +138,4 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
-        show_in_gallery=show_in_gallery,
     )

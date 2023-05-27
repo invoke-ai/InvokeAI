@@ -7,7 +7,7 @@ import numpy
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 from pydantic import BaseModel, Field
 
-from ..models.image import ImageCategory, ImageField, ImageType
+from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -72,12 +72,12 @@ class LoadImageInvocation(BaseInvocation):
     )
     # fmt: on
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_type, self.image.image_name)
+        image = context.services.images.get_pil_image(self.image.image_origin, self.image.image_name)
 
         return ImageOutput(
             image=ImageField(
                 image_name=self.image.image_name,
-                image_type=self.image.image_type,
+                image_origin=self.image.image_origin,
             ),
             width=image.width,
             height=image.height,
@@ -96,7 +96,7 @@ class ShowImageInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
         if image:
             image.show()
@@ -106,7 +106,7 @@ class ShowImageInvocation(BaseInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=self.image.image_name,
-                image_type=self.image.image_type,
+                image_origin=self.image.image_origin,
             ),
             width=image.width,
             height=image.height,
@@ -129,7 +129,7 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         image_crop = Image.new(
@@ -139,7 +139,7 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
 
         image_dto = context.services.images.create(
             image=image_crop,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -149,7 +149,7 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -172,17 +172,17 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(
-            self.base_image.image_type, self.base_image.image_name
+            self.base_image.image_origin, self.base_image.image_name
         )
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
         mask = (
             None
             if self.mask is None
             else ImageOps.invert(
                 context.services.images.get_pil_image(
-                    self.mask.image_type, self.mask.image_name
+                    self.mask.image_origin, self.mask.image_name
                 )
             )
         )
@@ -201,7 +201,7 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
 
         image_dto = context.services.images.create(
             image=new_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -211,7 +211,7 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -231,7 +231,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         image_mask = image.split()[-1]
@@ -240,7 +240,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
 
         image_dto = context.services.images.create(
             image=image_mask,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.MASK,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -249,7 +249,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
 
         return MaskOutput(
             mask=ImageField(
-                image_type=image_dto.image_type, image_name=image_dto.image_name
+                image_origin=image_dto.image_origin, image_name=image_dto.image_name
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -269,17 +269,17 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image1 = context.services.images.get_pil_image(
-            self.image1.image_type, self.image1.image_name
+            self.image1.image_origin, self.image1.image_name
         )
         image2 = context.services.images.get_pil_image(
-            self.image2.image_type, self.image2.image_name
+            self.image2.image_origin, self.image2.image_name
         )
 
         multiply_image = ImageChops.multiply(image1, image2)
 
         image_dto = context.services.images.create(
             image=multiply_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -288,7 +288,7 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
 
         return ImageOutput(
             image=ImageField(
-                image_type=image_dto.image_type, image_name=image_dto.image_name
+                image_origin=image_dto.image_origin, image_name=image_dto.image_name
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -311,14 +311,14 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         channel_image = image.getchannel(self.channel)
 
         image_dto = context.services.images.create(
             image=channel_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -327,7 +327,7 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
 
         return ImageOutput(
             image=ImageField(
-                image_type=image_dto.image_type, image_name=image_dto.image_name
+                image_origin=image_dto.image_origin, image_name=image_dto.image_name
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -350,14 +350,14 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         converted_image = image.convert(self.mode)
 
         image_dto = context.services.images.create(
             image=converted_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -366,7 +366,7 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
 
         return ImageOutput(
             image=ImageField(
-                image_type=image_dto.image_type, image_name=image_dto.image_name
+                image_origin=image_dto.image_origin, image_name=image_dto.image_name
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -387,7 +387,7 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         blur = (
@@ -399,7 +399,7 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
 
         image_dto = context.services.images.create(
             image=blur_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -409,7 +409,7 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -430,7 +430,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         image_arr = numpy.asarray(image, dtype=numpy.float32) / 255
@@ -440,7 +440,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
 
         image_dto = context.services.images.create(
             image=lerp_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -450,7 +450,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -471,7 +471,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         image_arr = numpy.asarray(image, dtype=numpy.float32)
@@ -486,7 +486,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
 
         image_dto = context.services.images.create(
             image=ilerp_image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -496,7 +496,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
