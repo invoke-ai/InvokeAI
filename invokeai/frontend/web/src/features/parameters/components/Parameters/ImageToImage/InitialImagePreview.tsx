@@ -5,7 +5,7 @@ import { useGetUrl } from 'common/util/getUrl';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { DragEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageType } from 'services/api';
+import { ResourceOrigin } from 'services/api';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { initialImageSelected } from 'features/parameters/store/actions';
@@ -55,9 +55,11 @@ const InitialImagePreview = () => {
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       const name = e.dataTransfer.getData('invokeai/imageName');
-      const type = e.dataTransfer.getData('invokeai/imageType') as ImageType;
+      const type = e.dataTransfer.getData(
+        'invokeai/imageOrigin'
+      ) as ResourceOrigin;
 
-      dispatch(initialImageSelected({ image_name: name, image_type: type }));
+      dispatch(initialImageSelected({ image_name: name, image_origin: type }));
     },
     [dispatch]
   );

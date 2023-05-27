@@ -11,8 +11,8 @@ import {
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
-export type ResultsImageDTO = Omit<ImageDTO, 'image_type'> & {
-  image_type: 'results';
+export type ResultsImageDTO = Omit<ImageDTO, 'image_origin'> & {
+  image_origin: 'results';
 };
 
 export const resultsAdapter = createEntityAdapter<ImageDTO>({
@@ -46,6 +46,9 @@ const resultsSlice = createSlice({
     resultUpserted: (state, action: PayloadAction<ImageDTO>) => {
       resultsAdapter.upsertOne(state, action.payload);
       state.upsertedImageCount += 1;
+    },
+    resultRemoved: (state, action: PayloadAction<string>) => {
+      resultsAdapter.removeOne(state, action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -83,6 +86,6 @@ export const {
   selectTotal: selectResultsTotal,
 } = resultsAdapter.getSelectors<RootState>((state) => state.results);
 
-export const { resultUpserted } = resultsSlice.actions;
+export const { resultUpserted, resultRemoved } = resultsSlice.actions;
 
 export default resultsSlice.reducer;

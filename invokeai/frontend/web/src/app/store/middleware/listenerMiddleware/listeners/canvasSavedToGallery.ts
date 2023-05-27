@@ -37,8 +37,7 @@ export const addCanvasSavedToGalleryListener = () => {
             file: new File([blob], filename, { type: 'image/png' }),
           },
           imageCategory: 'general',
-          isIntermediate: false,
-          showInGallery: true,
+          isIntermediate: true,
         })
       );
 

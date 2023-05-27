@@ -13,9 +13,9 @@ export const addImageUrlsReceivedFulfilledListener = () => {
       const image = action.payload;
       moduleLog.debug({ data: { image } }, 'Image URLs received');
 
-      const { image_type, image_name, image_url, thumbnail_url } = image;
+      const { image_origin, image_name, image_url, thumbnail_url } = image;
 
-      if (image_type === 'results') {
+      if (image_origin === 'results') {
         resultsAdapter.updateOne(getState().results, {
           id: image_name,
           changes: {
@@ -25,7 +25,7 @@ export const addImageUrlsReceivedFulfilledListener = () => {
         });
       }
 
-      if (image_type === 'uploads') {
+      if (image_origin === 'uploads') {
         uploadsAdapter.updateOne(getState().uploads, {
           id: image_name,
           changes: {

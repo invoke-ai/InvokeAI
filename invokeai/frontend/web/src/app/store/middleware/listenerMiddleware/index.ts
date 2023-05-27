@@ -67,6 +67,10 @@ import {
   addReceivedUploadImagesPageFulfilledListener,
   addReceivedUploadImagesPageRejectedListener,
 } from './listeners/receivedUploadImages';
+import {
+  addImageUpdatedFulfilledListener,
+  addImageUpdatedRejectedListener,
+} from './listeners/imageUpdated';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -90,6 +94,11 @@ export type AppListenerEffect = ListenerEffect<
 addImageUploadedFulfilledListener();
 addImageUploadedRejectedListener();
 
+// Image updated
+addImageUpdatedFulfilledListener();
+addImageUpdatedRejectedListener();
+
+// Image selected
 addInitialImageSelectedListener();
 
 // Image deleted

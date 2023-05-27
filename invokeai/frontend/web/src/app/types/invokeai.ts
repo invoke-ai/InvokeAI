@@ -15,7 +15,7 @@
 import { SelectedImage } from 'features/parameters/store/actions';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
-import { ImageResponseMetadata, ImageType } from 'services/api';
+import { ImageResponseMetadata, ResourceOrigin } from 'services/api';
 import { O } from 'ts-toolbelt';
 
 /**
@@ -124,7 +124,7 @@ export type PostProcessedImageMetadata = ESRGANMetadata | FacetoolMetadata;
  */
 // export ty`pe Image = {
 //   name: string;
-//   type: ImageType;
+//   type: image_origin;
 //   url: string;
 //   thumbnail: string;
 //   metadata: ImageResponseMetadata;

@@ -69,9 +69,8 @@ const ImageUploader = (props: ImageUploaderProps) => {
       dispatch(
         imageUploaded({
           formData: { file },
-          imageCategory: 'general',
+          imageCategory: 'user',
           isIntermediate: false,
-          showInGallery: false,
         })
       );
     },

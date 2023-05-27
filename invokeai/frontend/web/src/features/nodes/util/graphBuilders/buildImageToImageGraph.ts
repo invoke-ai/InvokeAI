@@ -64,7 +64,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     model,
     image: {
       image_name: initialImage?.image_name,
-      image_type: initialImage?.image_type,
+      image_origin: initialImage?.image_origin,
     },
   };
 
