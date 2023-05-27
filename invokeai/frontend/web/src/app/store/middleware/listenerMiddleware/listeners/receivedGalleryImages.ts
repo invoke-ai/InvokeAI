@@ -1,31 +1,31 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { receivedResultImagesPage } from 'services/thunks/gallery';
+import { receivedGalleryImages } from 'services/thunks/gallery';
 import { serializeError } from 'serialize-error';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
-export const addReceivedResultImagesPageFulfilledListener = () => {
+export const addReceivedGalleryImagesFulfilledListener = () => {
   startAppListening({
-    actionCreator: receivedResultImagesPage.fulfilled,
+    actionCreator: receivedGalleryImages.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const page = action.payload;
       moduleLog.debug(
         { data: { page } },
-        `Received ${page.items.length} results`
+        `Received ${page.items.length} gallery images`
       );
     },
   });
 };
 
-export const addReceivedResultImagesPageRejectedListener = () => {
+export const addReceivedGalleryImagesRejectedListener = () => {
   startAppListening({
-    actionCreator: receivedResultImagesPage.rejected,
+    actionCreator: receivedGalleryImages.rejected,
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         moduleLog.debug(
           { data: { error: serializeError(action.payload.error) } },
-          'Problem receiving results'
+          'Problem receiving gallery images'
         );
       }
     },

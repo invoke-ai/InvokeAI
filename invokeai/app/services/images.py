@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from os import name
 from typing import Optional, TYPE_CHECKING, Union
-import uuid
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.models.image import (
@@ -51,6 +49,7 @@ class ImageServiceABC(ABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         intermediate: bool = False,
+        show_in_gallery: bool = True,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -100,10 +99,12 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
         page: int = 0,
         per_page: int = 10,
+        image_type: Optional[ImageType] = None,
+        image_category: Optional[ImageCategory] = None,
+        is_intermediate: Optional[bool] = None,
+        show_in_gallery: Optional[bool] = None,
     ) -> PaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs."""
         pass
@@ -175,6 +176,7 @@ class ImageService(ImageServiceABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         is_intermediate: bool = False,
+        show_in_gallery: bool = True,
     ) -> ImageDTO:
         if image_type not in ImageType:
             raise InvalidImageTypeException
@@ -199,6 +201,7 @@ class ImageService(ImageServiceABC):
                 height=height,
                 # Meta fields
                 is_intermediate=is_intermediate,
+                show_in_gallery=show_in_gallery,
                 # Nullable fields
                 node_id=node_id,
                 session_id=session_id,
@@ -233,6 +236,7 @@ class ImageService(ImageServiceABC):
                 updated_at=created_at,  # this is always the same as the created_at at this time
                 deleted_at=None,
                 is_intermediate=is_intermediate,
+                show_in_gallery=show_in_gallery,
                 # Extra non-nullable fields for DTO
                 image_url=image_url,
                 thumbnail_url=thumbnail_url,
@@ -328,28 +332,30 @@ class ImageService(ImageServiceABC):
 
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        is_intermediate: bool = False,
         page: int = 0,
         per_page: int = 10,
+        image_type: Optional[ImageType] = None,
+        image_category: Optional[ImageCategory] = None,
+        is_intermediate: Optional[bool] = None,
+        show_in_gallery: Optional[bool] = None,
     ) -> PaginatedResults[ImageDTO]:
         try:
             results = self._services.records.get_many(
+                page,
+                per_page,
                 image_type,
                 image_category,
                 is_intermediate,
-                page,
-                per_page,
+                show_in_gallery,
             )
 
             image_dtos = list(
                 map(
                     lambda r: image_record_to_dto(
                         r,
-                        self._services.urls.get_image_url(image_type, r.image_name),
+                        self._services.urls.get_image_url(r.image_type, r.image_name),
                         self._services.urls.get_image_url(
-                            image_type, r.image_name, True
+                            r.image_type, r.image_name, True
                         ),
                     ),
                     results.items,

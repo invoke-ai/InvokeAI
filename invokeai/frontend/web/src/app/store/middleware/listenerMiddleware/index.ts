@@ -60,13 +60,13 @@ import {
   addSessionCanceledRejectedListener,
 } from './listeners/sessionCanceled';
 import {
-  addReceivedResultImagesPageFulfilledListener,
-  addReceivedResultImagesPageRejectedListener,
-} from './listeners/receivedResultImagesPage';
+  addReceivedGalleryImagesFulfilledListener,
+  addReceivedGalleryImagesRejectedListener,
+} from './listeners/receivedGalleryImages';
 import {
   addReceivedUploadImagesPageFulfilledListener,
   addReceivedUploadImagesPageRejectedListener,
-} from './listeners/receivedUploadImagesPage';
+} from './listeners/receivedUploadImages';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -146,7 +146,7 @@ addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
 
 // Gallery pages
-addReceivedResultImagesPageFulfilledListener();
-addReceivedResultImagesPageRejectedListener();
+addReceivedGalleryImagesFulfilledListener();
+addReceivedGalleryImagesRejectedListener();
 addReceivedUploadImagesPageFulfilledListener();
 addReceivedUploadImagesPageRejectedListener();

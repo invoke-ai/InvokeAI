@@ -34,11 +34,10 @@ async def upload_image(
     file: UploadFile,
     request: Request,
     response: Response,
-    image_category: ImageCategory = Query(
-        default=ImageCategory.GENERAL, description="The category of the image"
-    ),
-    is_intermediate: bool = Query(
-        default=False, description="Whether this is an intermediate image"
+    image_category: ImageCategory = Query(description="The category of the image"),
+    is_intermediate: bool = Query(description="Whether this is an intermediate image"),
+    show_in_gallery: bool = Query(
+        description="Whether this image should be shown in the gallery"
     ),
     session_id: Optional[str] = Query(
         default=None, description="The session ID associated with this upload, if any"
@@ -63,6 +62,7 @@ async def upload_image(
             image_category=image_category,
             session_id=session_id,
             is_intermediate=is_intermediate,
+            show_in_gallery=show_in_gallery,
         )
 
         response.status_code = 201
@@ -228,24 +228,30 @@ async def get_image_urls(
     response_model=PaginatedResults[ImageDTO],
 )
 async def list_images_with_metadata(
-    image_type: ImageType = Query(description="The type of images to list"),
-    image_category: ImageCategory = Query(description="The kind of images to list"),
-    is_intermediate: bool = Query(
-        default=False, description="Whether to list intermediate images"
+    image_type: Optional[ImageType] = Query(
+        default=None, description="The type of images to list"
     ),
-    page: int = Query(default=0, description="The page of image metadata to get"),
-    per_page: int = Query(
-        default=10, description="The number of image metadata per page"
+    image_category: Optional[ImageCategory] = Query(
+        default=None, description="The kind of images to list"
     ),
+    is_intermediate: Optional[bool] = Query(
+        default=None, description="Whether to list intermediate images"
+    ),
+    show_in_gallery: Optional[bool] = Query(
+        default=None, description="Whether to list images that show in the gallery"
+    ),
+    page: int = Query(default=0, description="The page of images to get"),
+    per_page: int = Query(default=10, description="The number of images per page"),
 ) -> PaginatedResults[ImageDTO]:
-    """Gets a list of images with metadata"""
+    """Gets a list of images"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
+        page,
+        per_page,
         image_type,
         image_category,
         is_intermediate,
-        page,
-        per_page,
+        show_in_gallery,
     )
 
     return image_dtos

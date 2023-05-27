@@ -55,6 +55,10 @@ export type ImageDTO = {
    */
   is_intermediate: boolean;
   /**
+   * Whether this image should be shown in the gallery.
+   */
+  show_in_gallery: boolean;
+  /**
    * The session ID that generated this image, if it is a generated image.
    */
   session_id?: string;

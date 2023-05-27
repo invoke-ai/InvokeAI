@@ -2,8 +2,8 @@ import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
 import { socketConnected } from 'services/events/actions';
 import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
+  receivedGalleryImages,
+  receivedUploadImages,
 } from 'services/thunks/gallery';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
@@ -24,11 +24,11 @@ export const addSocketConnectedListener = () => {
 
       // These thunks need to be dispatch in middleware; cannot handle in a reducer
       if (!results.ids.length) {
-        dispatch(receivedResultImagesPage());
+        dispatch(receivedGalleryImages());
       }
 
       if (!uploads.ids.length) {
-        dispatch(receivedUploadImagesPage());
+        dispatch(receivedUploadImages());
       }
 
       if (!models.ids.length) {

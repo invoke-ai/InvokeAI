@@ -101,7 +101,9 @@ export const addUserInvokedCanvasListener = () => {
             formData: {
               file: new File([baseBlob], baseFilename, { type: 'image/png' }),
             },
+            imageCategory: 'general',
             isIntermediate: true,
+            showInGallery: false,
           })
         );
 
@@ -127,7 +129,9 @@ export const addUserInvokedCanvasListener = () => {
             formData: {
               file: new File([maskBlob], maskFilename, { type: 'image/png' }),
             },
+            imageCategory: 'mask',
             isIntermediate: true,
+            showInGallery: false,
           })
         );
 
