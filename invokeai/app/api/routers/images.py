@@ -231,7 +231,7 @@ async def list_images_with_metadata(
     image_type: ImageType = Query(description="The type of images to list"),
     image_category: ImageCategory = Query(description="The kind of images to list"),
     is_intermediate: bool = Query(
-        default=False, description="The kind of images to list"
+        default=False, description="Whether to list intermediate images"
     ),
     page: int = Query(default=0, description="The page of image metadata to get"),
     per_page: int = Query(
