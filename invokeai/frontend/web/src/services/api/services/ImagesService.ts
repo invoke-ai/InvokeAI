@@ -17,35 +17,40 @@ export class ImagesService {
 
   /**
    * List Images With Metadata
-   * Gets a list of images with metadata
+   * Gets a list of images
    * @returns PaginatedResults_ImageDTO_ Successful Response
    * @throws ApiError
    */
   public static listImagesWithMetadata({
     imageType,
     imageCategory,
-    isIntermediate = false,
+    isIntermediate,
+    showInGallery,
     page,
     perPage = 10,
   }: {
     /**
      * The type of images to list
      */
-    imageType: ImageType,
+    imageType?: ImageType,
     /**
      * The kind of images to list
      */
-    imageCategory: ImageCategory,
+    imageCategory?: ImageCategory,
     /**
-     * The kind of images to list
+     * Whether to list intermediate images
      */
     isIntermediate?: boolean,
     /**
-     * The page of image metadata to get
+     * Whether to list images that show in the gallery
+     */
+    showInGallery?: boolean,
+    /**
+     * The page of images to get
      */
     page?: number,
     /**
-     * The number of image metadata per page
+     * The number of images per page
      */
     perPage?: number,
   }): CancelablePromise<PaginatedResults_ImageDTO_> {
@@ -56,6 +61,7 @@ export class ImagesService {
         'image_type': imageType,
         'image_category': imageCategory,
         'is_intermediate': isIntermediate,
+        'show_in_gallery': showInGallery,
         'page': page,
         'per_page': perPage,
       },
@@ -72,20 +78,25 @@ export class ImagesService {
    * @throws ApiError
    */
   public static uploadImage({
-    formData,
     imageCategory,
-    isIntermediate = false,
+    isIntermediate,
+    showInGallery,
+    formData,
     sessionId,
   }: {
-    formData: Body_upload_image,
     /**
      * The category of the image
      */
-    imageCategory?: ImageCategory,
+    imageCategory: ImageCategory,
     /**
      * Whether this is an intermediate image
      */
-    isIntermediate?: boolean,
+    isIntermediate: boolean,
+    /**
+     * Whether this image should be shown in the gallery
+     */
+    showInGallery: boolean,
+    formData: Body_upload_image,
     /**
      * The session ID associated with this upload, if any
      */
@@ -97,6 +108,7 @@ export class ImagesService {
       query: {
         'image_category': imageCategory,
         'is_intermediate': isIntermediate,
+        'show_in_gallery': showInGallery,
         'session_id': sessionId,
       },
       formData: formData,

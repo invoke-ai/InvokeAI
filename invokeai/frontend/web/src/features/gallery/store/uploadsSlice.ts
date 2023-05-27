@@ -5,10 +5,7 @@ import {
 } from '@reduxjs/toolkit';
 
 import { RootState } from 'app/store/store';
-import {
-  receivedUploadImagesPage,
-  IMAGES_PER_PAGE,
-} from 'services/thunks/gallery';
+import { receivedUploadImages, IMAGES_PER_PAGE } from 'services/thunks/gallery';
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
@@ -16,7 +13,7 @@ export type UploadsImageDTO = Omit<ImageDTO, 'image_type'> & {
   image_type: 'uploads';
 };
 
-export const uploadsAdapter = createEntityAdapter<UploadsImageDTO>({
+export const uploadsAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
   sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
 });
@@ -44,7 +41,7 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadUpserted: (state, action: PayloadAction<UploadsImageDTO>) => {
+    uploadUpserted: (state, action: PayloadAction<ImageDTO>) => {
       uploadsAdapter.upsertOne(state, action.payload);
       state.upsertedImageCount += 1;
     },
@@ -53,18 +50,18 @@ const uploadsSlice = createSlice({
     /**
      * Received Upload Images Page - PENDING
      */
-    builder.addCase(receivedUploadImagesPage.pending, (state) => {
+    builder.addCase(receivedUploadImages.pending, (state) => {
       state.isLoading = true;
     });
 
     /**
      * Received Upload Images Page - FULFILLED
      */
-    builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
+    builder.addCase(receivedUploadImages.fulfilled, (state, action) => {
       const { page, pages } = action.payload;
 
       // We know these will all be of the uploads type, but it's not represented in the API types
-      const items = action.payload.items as UploadsImageDTO[];
+      const items = action.payload.items;
 
       uploadsAdapter.setMany(state, items);
 

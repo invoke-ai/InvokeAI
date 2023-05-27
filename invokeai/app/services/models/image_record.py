@@ -33,6 +33,8 @@ class ImageRecord(BaseModel):
     """The deleted timestamp of the image."""
     is_intermediate: bool = Field(description="Whether this is an intermediate image.")
     """Whether this is an intermediate image."""
+    show_in_gallery: bool = Field(description="Whether this image should be shown in the gallery.")
+    """Whether this image should be shown in the gallery."""
     session_id: Optional[str] = Field(
         default=None,
         description="The session ID that generated this image, if it is a generated image.",
@@ -117,6 +119,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     updated_at = image_dict.get("updated_at", get_iso_timestamp())
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
+    show_in_gallery = image_dict.get("show_in_gallery", True)
 
     raw_metadata = image_dict.get("metadata")
 
@@ -138,4 +141,5 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
+        show_in_gallery=show_in_gallery,
     )

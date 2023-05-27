@@ -32,11 +32,7 @@ export const imageMetadataReceived = createAppAsyncThunk(
   }
 );
 
-type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0] & {
-  // extra arg to determine post-upload actions - we check for this when the image is uploaded
-  // to determine if we should set the init image
-  activeTabName?: InvokeTabName;
-};
+type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
 
 /**
  * `ImagesService.uploadImage()` thunk
@@ -45,8 +41,7 @@ export const imageUploaded = createAppAsyncThunk(
   'api/imageUploaded',
   async (arg: ImageUploadedArg) => {
     // strip out `activeTabName` from arg - the route does not need it
-    const { activeTabName, ...rest } = arg;
-    const response = await ImagesService.uploadImage(rest);
+    const response = await ImagesService.uploadImage(arg);
     return response;
   }
 );

@@ -63,11 +63,12 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        is_intermediate: bool = False,
         page: int = 0,
         per_page: int = 10,
+        image_type: Optional[ImageType] = None,
+        image_category: Optional[ImageCategory] = None,
+        is_intermediate: Optional[bool] = None,
+        show_in_gallery: Optional[bool] = None,
     ) -> PaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass
@@ -91,6 +92,7 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
         is_intermediate: bool = False,
+        show_in_gallery: bool = True,
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -137,6 +139,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 session_id TEXT,
                 node_id TEXT,
                 metadata TEXT,
+                show_in_gallery BOOLEAN DEFAULT TRUE,
                 is_intermediate BOOLEAN DEFAULT FALSE,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 -- Updated via trigger
@@ -224,7 +227,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     """,
                     (changes.image_category, image_name),
                 )
-            
+
             # Change the session associated with the image
             if changes.session_id is not None:
                 self._cursor.execute(
@@ -244,36 +247,72 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        is_intermediate: bool = False,
         page: int = 0,
         per_page: int = 10,
+        image_type: Optional[ImageType] = None,
+        image_category: Optional[ImageCategory] = None,
+        is_intermediate: Optional[bool] = None,
+        show_in_gallery: Optional[bool] = None,
     ) -> PaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
 
-            self._cursor.execute(
-                f"""--sql
-                SELECT * FROM images
-                WHERE image_type = ? AND image_category = ? AND is_intermediate = ?
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?;
-                """,
-                (image_type.value, image_category.value, is_intermediate, per_page, page * per_page),
-            )
+            # Manually build two queries - one for the count, one for the records
+
+            count_query = """--sql
+            SELECT COUNT(*) FROM images WHERE 1=1
+            """
+
+            images_query = """--sql
+            SELECT * FROM images WHERE 1=1
+            """
+
+            query_conditions = ""
+            query_params = []
+
+            if image_type is not None:
+                query_conditions += """--sql
+                AND image_type = ?
+                """
+                query_params.append(image_type.value)
+
+            if image_category is not None:
+                query_conditions += """--sql
+                AND image_category = ?
+                """
+                query_params.append(image_category.value)
+
+            if is_intermediate is not None:
+                query_conditions += """--sql
+                AND is_intermediate = ? 
+                """
+                query_params.append(is_intermediate)
+
+            if show_in_gallery is not None:
+                query_conditions += """--sql
+                AND show_in_gallery = ?
+                """
+                query_params.append(show_in_gallery)
+
+            query_pagination = """--sql
+            ORDER BY created_at DESC LIMIT ? OFFSET ?
+            """
+
+            count_query += query_conditions + ";"
+            count_params = query_params.copy()
+
+            images_query += query_conditions + query_pagination + ";"
+            images_params = query_params.copy()
+            images_params.append(per_page)
+            images_params.append(page * per_page)
+
+            self._cursor.execute(images_query, images_params)
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
 
             images = list(map(lambda r: deserialize_image_record(dict(r)), result))
 
-            self._cursor.execute(
-                """--sql
-                SELECT count(*) FROM images
-                WHERE image_type = ? AND image_category = ? AND is_intermediate = ?
-                """,
-                (image_type.value, image_category.value, is_intermediate),
-            )
+            self._cursor.execute(count_query, count_params)
 
             count = self._cursor.fetchone()[0]
         except sqlite3.Error as e:
@@ -316,6 +355,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str],
         metadata: Optional[ImageMetadata],
         is_intermediate: bool = False,
+        show_in_gallery: bool = True,
     ) -> datetime:
         try:
             metadata_json = (
@@ -333,9 +373,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata,
-                    is_intermediate
+                    is_intermediate,
+                    show_in_gallery
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -347,6 +388,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata_json,
                     is_intermediate,
+                    show_in_gallery,
                 ),
             )
             self._conn.commit()

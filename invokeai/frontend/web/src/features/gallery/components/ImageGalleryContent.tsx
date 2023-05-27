@@ -43,8 +43,8 @@ import HoverableImage from './HoverableImage';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { resultsAdapter } from '../store/resultsSlice';
 import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
+  receivedGalleryImages,
+  receivedUploadImages,
 } from 'services/thunks/gallery';
 import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
@@ -151,11 +151,11 @@ const ImageGalleryContent = () => {
 
   const handleClickLoadMore = () => {
     if (currentCategory === 'results') {
-      dispatch(receivedResultImagesPage());
+      dispatch(receivedGalleryImages());
     }
 
     if (currentCategory === 'uploads') {
-      dispatch(receivedUploadImagesPage());
+      dispatch(receivedUploadImages());
     }
   };
 
@@ -211,9 +211,9 @@ const ImageGalleryContent = () => {
 
   const handleEndReached = useCallback(() => {
     if (currentCategory === 'results') {
-      dispatch(receivedResultImagesPage());
+      dispatch(receivedGalleryImages());
     } else if (currentCategory === 'uploads') {
-      dispatch(receivedUploadImagesPage());
+      dispatch(receivedUploadImages());
     }
   }, [dispatch, currentCategory]);
 

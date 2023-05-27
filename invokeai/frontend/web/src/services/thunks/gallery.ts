@@ -9,7 +9,7 @@ type ReceivedResultImagesPageThunkConfig = {
   };
 };
 
-export const receivedResultImagesPage = createAppAsyncThunk<
+export const receivedGalleryImages = createAppAsyncThunk<
   PaginatedResults_ImageDTO_,
   void,
   ReceivedResultImagesPageThunkConfig
@@ -23,9 +23,8 @@ export const receivedResultImagesPage = createAppAsyncThunk<
     const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
 
     const response = await ImagesService.listImagesWithMetadata({
-      imageType: 'results',
-      imageCategory: 'general',
       isIntermediate: false,
+      showInGallery: true,
       page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
@@ -40,7 +39,7 @@ type ReceivedUploadImagesPageThunkConfig = {
   };
 };
 
-export const receivedUploadImagesPage = createAppAsyncThunk<
+export const receivedUploadImages = createAppAsyncThunk<
   PaginatedResults_ImageDTO_,
   void,
   ReceivedUploadImagesPageThunkConfig
@@ -55,8 +54,8 @@ export const receivedUploadImagesPage = createAppAsyncThunk<
 
     const response = await ImagesService.listImagesWithMetadata({
       imageType: 'uploads',
-      imageCategory: 'general',
       isIntermediate: false,
+      showInGallery: false,
       page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });

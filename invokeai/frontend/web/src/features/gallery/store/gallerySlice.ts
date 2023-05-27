@@ -1,8 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
+  receivedGalleryImages,
+  receivedUploadImages,
 } from '../../../services/thunks/gallery';
 import { ImageDTO } from 'services/api';
 
@@ -60,7 +60,7 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
+    builder.addCase(receivedGalleryImages.fulfilled, (state, action) => {
       // rehydrate selectedImage URL when results list comes in
       // solves case when outdated URL is in local storage
       const selectedImage = state.selectedImage;
@@ -76,7 +76,7 @@ export const gallerySlice = createSlice({
         }
       }
     });
-    builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
+    builder.addCase(receivedUploadImages.fulfilled, (state, action) => {
       // rehydrate selectedImage URL when results list comes in
       // solves case when outdated URL is in local storage
       const selectedImage = state.selectedImage;
