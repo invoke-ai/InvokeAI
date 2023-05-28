@@ -2,12 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageField } from './ImageField';
-
 /**
- * Base class for invocations that preprocess images for ControlNet
+ * A float parameter
  */
-export type ImageProcessorInvocation = {
+export type ParamFloatInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -16,10 +14,10 @@ export type ImageProcessorInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'image_processor';
+  type?: 'param_float';
   /**
-   * image to process
+   * The float value
    */
-  image?: ImageField;
+  param?: number;
 };
 

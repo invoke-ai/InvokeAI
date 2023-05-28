@@ -6,7 +6,7 @@ import type { ImageCategory } from '../models/ImageCategory';
 import type { ImageDTO } from '../models/ImageDTO';
 import type { ImageRecordChanges } from '../models/ImageRecordChanges';
 import type { ImageUrlsDTO } from '../models/ImageUrlsDTO';
-import type { PaginatedResults_ImageDTO_ } from '../models/PaginatedResults_ImageDTO_';
+import type { OffsetPaginatedResults_ImageDTO_ } from '../models/OffsetPaginatedResults_ImageDTO_';
 import type { ResourceOrigin } from '../models/ResourceOrigin';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
@@ -18,16 +18,15 @@ export class ImagesService {
   /**
    * List Images With Metadata
    * Gets a list of images
-   * @returns PaginatedResults_ImageDTO_ Successful Response
+   * @returns OffsetPaginatedResults_ImageDTO_ Successful Response
    * @throws ApiError
    */
   public static listImagesWithMetadata({
     imageOrigin,
-    includeCategories,
-    excludeCategories,
+    categories,
     isIntermediate,
-    page,
-    perPage = 10,
+    offset,
+    limit = 10,
   }: {
     /**
      * The origin of images to list
@@ -36,34 +35,29 @@ export class ImagesService {
     /**
      * The categories of image to include
      */
-    includeCategories?: Array<ImageCategory>,
-    /**
-     * The categories of image to exclude
-     */
-    excludeCategories?: Array<ImageCategory>,
+    categories?: Array<ImageCategory>,
     /**
      * Whether to list intermediate images
      */
     isIntermediate?: boolean,
     /**
-     * The page of images to get
+     * The page offset
      */
-    page?: number,
+    offset?: number,
     /**
      * The number of images per page
      */
-    perPage?: number,
-  }): CancelablePromise<PaginatedResults_ImageDTO_> {
+    limit?: number,
+  }): CancelablePromise<OffsetPaginatedResults_ImageDTO_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/images/',
       query: {
         'image_origin': imageOrigin,
-        'include_categories': includeCategories,
-        'exclude_categories': excludeCategories,
+        'categories': categories,
         'is_intermediate': isIntermediate,
-        'page': page,
-        'per_page': perPage,
+        'offset': offset,
+        'limit': limit,
       },
       errors: {
         422: `Validation Error`,

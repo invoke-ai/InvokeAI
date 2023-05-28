@@ -5,9 +5,9 @@
 import type { ImageField } from './ImageField';
 
 /**
- * Applies Midas depth processing to image
+ * Applies Zoe depth processing to image
  */
-export type MidasDepthImageProcessorInvocation = {
+export type ZoeDepthImageProcessorInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -16,18 +16,10 @@ export type MidasDepthImageProcessorInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'midas_depth_image_processor';
+  type?: 'zoe_depth_image_processor';
   /**
    * image to process
    */
   image?: ImageField;
-  /**
-   * Midas parameter a = amult * PI
-   */
-  a_mult?: number;
-  /**
-   * Midas parameter bg_th
-   */
-  bg_th?: number;
 };
 
