@@ -253,7 +253,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 )
 
             # Change the image's `is_intermediate`` flag
-            if changes.session_id is not None:
+            if changes.is_intermediate is not None:
                 self._cursor.execute(
                     f"""--sql
                     UPDATE images
