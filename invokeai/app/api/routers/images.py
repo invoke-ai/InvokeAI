@@ -8,6 +8,7 @@ from invokeai.app.models.image import (
     ImageCategory,
     ResourceOrigin,
 )
+from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import (
     ImageDTO,
     ImageRecordChanges,
@@ -221,35 +222,28 @@ async def get_image_urls(
 @images_router.get(
     "/",
     operation_id="list_images_with_metadata",
-    response_model=PaginatedResults[ImageDTO],
+    response_model=OffsetPaginatedResults[ImageDTO],
 )
 async def list_images_with_metadata(
     image_origin: Optional[ResourceOrigin] = Query(
         default=None, description="The origin of images to list"
     ),
-    include_categories: Optional[list[ImageCategory]] = Query(
+    categories: Optional[list[ImageCategory]] = Query(
         default=None, description="The categories of image to include"
-    ),
-    exclude_categories: Optional[list[ImageCategory]] = Query(
-        default=None, description="The categories of image to exclude"
     ),
     is_intermediate: Optional[bool] = Query(
         default=None, description="Whether to list intermediate images"
     ),
-    page: int = Query(default=0, description="The page of images to get"),
-    per_page: int = Query(default=10, description="The number of images per page"),
-) -> PaginatedResults[ImageDTO]:
+    offset: int = Query(default=0, description="The page offset"),
+    limit: int = Query(default=10, description="The number of images per page"),
+) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of images"""
 
-    if include_categories is not None and exclude_categories is not None:
-        raise HTTPException(status_code=400, detail="Cannot use both 'include_category' and 'exclude_category' at the same time.")
-
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        page,
-        per_page,
+        offset,
+        limit,
         image_origin,
-        include_categories,
-        exclude_categories,
+        categories,
         is_intermediate,
     )
 

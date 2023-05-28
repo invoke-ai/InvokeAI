@@ -15,6 +15,7 @@ from invokeai.app.services.image_record_storage import (
     ImageRecordNotFoundException,
     ImageRecordSaveException,
     ImageRecordStorageBase,
+    OffsetPaginatedResults,
 )
 from invokeai.app.services.models.image_record import (
     ImageRecord,
@@ -98,13 +99,12 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_many(
         self,
-        page: int = 0,
-        per_page: int = 10,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
-        include_categories: Optional[list[ImageCategory]] = None,
-        exclude_categories: Optional[list[ImageCategory]] = None,
+        categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-    ) -> PaginatedResults[ImageDTO]:
+    ) -> OffsetPaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs."""
         pass
 
@@ -328,20 +328,18 @@ class ImageService(ImageServiceABC):
 
     def get_many(
         self,
-        page: int = 0,
-        per_page: int = 10,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
-        include_categories: Optional[list[ImageCategory]] = None,
-        exclude_categories: Optional[list[ImageCategory]] = None,
+        categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-    ) -> PaginatedResults[ImageDTO]:
+    ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self._services.records.get_many(
-                page,
-                per_page,
+                offset,
+                limit,
                 image_origin,
-                include_categories,
-                exclude_categories,
+                categories,
                 is_intermediate,
             )
 
@@ -358,11 +356,10 @@ class ImageService(ImageServiceABC):
                 )
             )
 
-            return PaginatedResults[ImageDTO](
+            return OffsetPaginatedResults[ImageDTO](
                 items=image_dtos,
-                page=results.page,
-                pages=results.pages,
-                per_page=results.per_page,
+                offset=results.offset,
+                limit=results.limit,
                 total=results.total,
             )
         except Exception as e:
