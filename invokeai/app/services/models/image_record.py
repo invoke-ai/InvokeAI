@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional, Union
-from pydantic import BaseModel, Extra, Field, StrictStr
+from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.misc import get_iso_timestamp
@@ -56,6 +56,7 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
     Only limited changes are valid:
       - `image_category`: change the category of an image
       - `session_id`: change the session associated with an image
+      - `is_intermediate`: change the image's `is_intermediate` flag
     """
 
     image_category: Optional[ImageCategory] = Field(
@@ -67,6 +68,10 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
         description="The image's new session ID.",
     )
     """The image's new session ID."""
+    is_intermediate: Optional[StrictBool] = Field(
+        default=None, description="The image's new `is_intermediate` flag."
+    )
+    """The image's new `is_intermediate` flag."""
 
 
 class ImageUrlsDTO(BaseModel):
@@ -105,7 +110,9 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     # Retrieve all the values, setting "reasonable" defaults if they are not present.
 
     image_name = image_dict.get("image_name", "unknown")
-    image_origin = ResourceOrigin(image_dict.get("image_origin", ResourceOrigin.INTERNAL.value))
+    image_origin = ResourceOrigin(
+        image_dict.get("image_origin", ResourceOrigin.INTERNAL.value)
+    )
     image_category = ImageCategory(
         image_dict.get("image_category", ImageCategory.GENERAL.value)
     )

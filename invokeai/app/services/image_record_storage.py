@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, cast
+from typing import Generic, Optional, TypeVar, cast
 import sqlite3
 import threading
 from typing import Optional, Union
+
+from pydantic import BaseModel, Field
+from pydantic.generics import GenericModel
 
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.models.image import (
@@ -15,7 +18,18 @@ from invokeai.app.services.models.image_record import (
     ImageRecordChanges,
     deserialize_image_record,
 )
-from invokeai.app.services.item_storage import PaginatedResults
+
+T = TypeVar("T", bound=BaseModel)
+
+class OffsetPaginatedResults(GenericModel, Generic[T]):
+    """Offset-paginated results"""
+
+    # fmt: off
+    items: list[T] = Field(description="Items")
+    offset: int = Field(description="Offset from which to retrieve items")
+    limit: int = Field(description="Limit of items to get")
+    total: int = Field(description="Total number of items in result")
+    # fmt: on
 
 
 # TODO: Should these excpetions subclass existing python exceptions?
@@ -63,13 +77,12 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        page: int = 0,
-        per_page: int = 10,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
-        include_categories: Optional[list[ImageCategory]] = None,
-        exclude_categories: Optional[list[ImageCategory]] = None,
+        categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-    ) -> PaginatedResults[ImageRecord]:
+    ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass
 
@@ -238,6 +251,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     """,
                     (changes.session_id, image_name),
                 )
+
+            # Change the image's `is_intermediate`` flag
+            if changes.session_id is not None:
+                self._cursor.execute(
+                    f"""--sql
+                    UPDATE images
+                    SET is_intermediate = ?
+                    WHERE image_name = ?;
+                    """,
+                    (changes.is_intermediate, image_name),
+                )
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -247,13 +271,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_many(
         self,
-        page: int = 0,
-        per_page: int = 10,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
-        include_categories: Optional[list[ImageCategory]] = None,
-        exclude_categories: Optional[list[ImageCategory]] = None,
+        categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-    ) -> PaginatedResults[ImageRecord]:
+    ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
 
@@ -269,30 +292,18 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_conditions += f"""AND image_origin = ?\n"""
                 query_params.append(image_origin.value)
 
-            if include_categories is not None:
+            if categories is not None:
                 ## Convert the enum values to unique list of strings
-                include_category_strings = list(
-                    map(lambda c: c.value, set(include_categories))
+                category_strings = list(
+                    map(lambda c: c.value, set(categories))
                 )
                 # Create the correct length of placeholders
-                placeholders = ",".join("?" * len(include_category_strings))
+                placeholders = ",".join("?" * len(category_strings))
                 query_conditions += f"AND image_category IN ( {placeholders} )\n"
 
                 # Unpack the included categories into the query params
-                query_params.append(*include_category_strings)
-
-            if exclude_categories is not None:
-                ## Convert the enum values to unique list of strings
-                exclude_category_strings = list(
-                    map(lambda c: c.value, set(exclude_categories))
-                )
-
-                # Create the correct length of placeholders
-                placeholders = ",".join("?" * len(exclude_category_strings))
-                query_conditions += f"AND image_category NOT IN ( {placeholders} )\n"
-
-                # Unpack the included categories into the query params
-                query_params.append(*exclude_category_strings)
+                for c in category_strings:
+                    query_params.append(c)
 
             if is_intermediate is not None:
                 query_conditions += f"""AND is_intermediate = ?\n"""
@@ -304,8 +315,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             images_query += query_conditions + query_pagination + ";"
             # Add all the parameters
             images_params = query_params.copy()
-            images_params.append(per_page)
-            images_params.append(page * per_page)
+            images_params.append(limit)
+            images_params.append(offset)
             # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
@@ -322,10 +333,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
-        pageCount = int(count / per_page) + 1
-
-        return PaginatedResults(
-            items=images, page=page, pages=pageCount, per_page=per_page, total=count
+        return OffsetPaginatedResults(
+            items=images, offset=offset, limit=limit, total=count
         )
 
     def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
