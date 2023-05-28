@@ -13,9 +13,6 @@ Build complex scenes by combine and modifying multiple images in a stepwise
 fashion. This feature combines img2img, inpainting and outpainting in
 a single convenient digital artist-optimized user interface.
 
-### * The [Command Line Interface (CLI)](CLI.md)
-Scriptable access to InvokeAI's features.
-
 ## Image Generation
 ### * [Prompt Engineering](PROMPTS.md)
 Get the images you want with the InvokeAI  prompt engineering language.
