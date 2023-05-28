@@ -107,17 +107,8 @@ class StepParamEasingInvocation(BaseInvocation):
     # if None, then end value is used prior to easing end
     post_end_value: Optional[float] = Field(default=None, description="value after easing end")
     show_easing_plot: bool = Field(default=False, description="show easing plot")
-
     # fmt: on
 
-    def fig2img(self, fig):
-        """Convert a Matplotlib figure to a PIL Image and return it"""
-        import io
-        buf = io.BytesIO()
-        fig.savefig(buf)
-        buf.seek(0)
-        img = Image.open(buf)
-        return img
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         # convert from start_step_percent to nearest step <= (steps * start_step_percent)
