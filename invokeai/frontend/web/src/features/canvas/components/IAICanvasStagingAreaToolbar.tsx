@@ -1,6 +1,5 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-// import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -26,6 +25,7 @@ import {
   FaPlus,
   FaSave,
 } from 'react-icons/fa';
+import { stagingAreaImageSaved } from '../store/actions';
 
 const selector = createSelector(
   [canvasSelector],
@@ -157,19 +157,15 @@ const IAICanvasStagingAreaToolbar = () => {
           }
           colorScheme="accent"
         />
-        {/* <IAIIconButton
+        <IAIIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
           aria-label={t('unifiedCanvas.saveToGallery')}
           icon={<FaSave />}
           onClick={() =>
-            dispatch(
-              saveStagingAreaImageToGallery(
-                currentStagingAreaImage.image.image_url
-              )
-            )
+            dispatch(stagingAreaImageSaved(currentStagingAreaImage.image))
           }
           colorScheme="accent"
-        /> */}
+        />
         <IAIIconButton
           tooltip={t('unifiedCanvas.discardAll')}
           aria-label={t('unifiedCanvas.discardAll')}

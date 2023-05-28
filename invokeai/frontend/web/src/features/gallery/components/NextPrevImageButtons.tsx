@@ -9,6 +9,10 @@ import { gallerySelector } from '../store/gallerySelectors';
 import { RootState } from 'app/store/store';
 import { imageSelected } from '../store/gallerySlice';
 import { useHotkeys } from 'react-hotkeys-hook';
+import {
+  selectFilteredImagesAsObject,
+  selectFilteredImagesIds,
+} from '../store/imagesSlice';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',
@@ -21,9 +25,14 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 };
 
 export const nextPrevImageButtonsSelector = createSelector(
-  [(state: RootState) => state, gallerySelector],
-  (state, gallery) => {
-    const { selectedImage, currentCategory } = gallery;
+  [
+    (state: RootState) => state,
+    gallerySelector,
+    selectFilteredImagesAsObject,
+    selectFilteredImagesIds,
+  ],
+  (state, gallery, filteredImagesAsObject, filteredImageIds) => {
+    const { selectedImage } = gallery;
 
     if (!selectedImage) {
       return {
@@ -32,29 +41,29 @@ export const nextPrevImageButtonsSelector = createSelector(
       };
     }
 
-    const currentImageIndex = state[currentCategory].ids.findIndex(
+    const currentImageIndex = filteredImageIds.findIndex(
       (i) => i === selectedImage.image_name
     );
 
     const nextImageIndex = clamp(
       currentImageIndex + 1,
       0,
-      state[currentCategory].ids.length - 1
+      filteredImageIds.length - 1
     );
 
     const prevImageIndex = clamp(
       currentImageIndex - 1,
       0,
-      state[currentCategory].ids.length - 1
+      filteredImageIds.length - 1
     );
 
-    const nextImageId = state[currentCategory].ids[nextImageIndex];
-    const prevImageId = state[currentCategory].ids[prevImageIndex];
+    const nextImageId = filteredImageIds[nextImageIndex];
+    const prevImageId = filteredImageIds[prevImageIndex];
 
-    const nextImage = state[currentCategory].entities[nextImageId];
-    const prevImage = state[currentCategory].entities[prevImageId];
+    const nextImage = filteredImagesAsObject[nextImageId];
+    const prevImage = filteredImagesAsObject[prevImageId];
 
-    const imagesLength = state[currentCategory].ids.length;
+    const imagesLength = filteredImageIds.length;
 
     return {
       isOnFirstImage: currentImageIndex === 0,

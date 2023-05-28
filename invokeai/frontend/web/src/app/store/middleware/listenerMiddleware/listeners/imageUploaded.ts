@@ -1,13 +1,8 @@
 import { startAppListening } from '..';
-import { uploadUpserted } from 'features/gallery/store/uploadsSlice';
-import {
-  imageSelected,
-  setCurrentCategory,
-} from 'features/gallery/store/gallerySlice';
 import { imageUploaded } from 'services/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
-import { resultUpserted } from 'features/gallery/store/resultsSlice';
 import { log } from 'app/logging/useLogger';
+import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -26,18 +21,8 @@ export const addImageUploadedFulfilledListener = () => {
 
       const state = getState();
 
-      // Handle uploads
-      if (image.image_category === 'user' && !image.is_intermediate) {
-        dispatch(uploadUpserted(image));
-        dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
-      }
-
-      // Handle results
-      // TODO: Can this ever happen? I don't think so...
-      if (image.image_category !== 'user' && !image.is_intermediate) {
-        dispatch(resultUpserted(image));
-        dispatch(setCurrentCategory('results'));
-      }
+      dispatch(imageUpserted(image));
+      dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
     },
   });
 };

@@ -88,7 +88,7 @@ export const useParameters = () => {
         return;
       }
 
-      dispatch(initialImageSelected(image));
+      dispatch(initialImageSelected(image.image_name));
       toaster({
         title: t('toast.initialImageSet'),
         status: 'info',

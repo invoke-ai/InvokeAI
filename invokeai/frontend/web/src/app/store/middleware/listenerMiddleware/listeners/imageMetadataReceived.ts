@@ -1,9 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
 import { imageMetadataReceived } from 'services/thunks/image';
-import { resultUpserted } from 'features/gallery/store/resultsSlice';
-import { uploadUpserted } from 'features/gallery/store/uploadsSlice';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -11,16 +9,13 @@ export const addImageMetadataReceivedFulfilledListener = () => {
   startAppListening({
     actionCreator: imageMetadataReceived.fulfilled,
     effect: (action, { getState, dispatch }) => {
-      const imageDTO = action.payload;
-      moduleLog.debug({ data: { imageDTO } }, 'Image metadata received');
-
-      if (imageDTO.image_origin === 'internal') {
-        dispatch(resultUpserted(imageDTO));
+      const image = action.payload;
+      if (image.is_intermediate) {
+        // No further actions needed for intermediate images
+        return;
       }
-
-      if (imageDTO.image_origin === 'external') {
-        dispatch(uploadUpserted(imageDTO));
-      }
+      moduleLog.debug({ data: { image } }, 'Image metadata received');
+      dispatch(imageUpserted(image));
     },
   });
 };

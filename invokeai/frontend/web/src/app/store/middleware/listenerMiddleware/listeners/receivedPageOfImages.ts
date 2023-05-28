@@ -1,31 +1,31 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { receivedUploadImages } from 'services/thunks/gallery';
 import { serializeError } from 'serialize-error';
+import { receivedPageOfImages } from 'services/thunks/image';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
-export const addReceivedUploadImagesPageFulfilledListener = () => {
+export const addReceivedPageOfImagesFulfilledListener = () => {
   startAppListening({
-    actionCreator: receivedUploadImages.fulfilled,
+    actionCreator: receivedPageOfImages.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const page = action.payload;
       moduleLog.debug(
         { data: { page } },
-        `Received ${page.items.length} uploaded images`
+        `Received ${page.items.length} images`
       );
     },
   });
 };
 
-export const addReceivedUploadImagesPageRejectedListener = () => {
+export const addReceivedPageOfImagesRejectedListener = () => {
   startAppListening({
-    actionCreator: receivedUploadImages.rejected,
+    actionCreator: receivedPageOfImages.rejected,
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         moduleLog.debug(
-          { data: { error: serializeError(action.payload.error) } },
-          'Problem receiving uploaded images'
+          { data: { error: serializeError(action.payload) } },
+          'Problem receiving images'
         );
       }
     },

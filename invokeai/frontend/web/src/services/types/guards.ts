@@ -1,4 +1,3 @@
-import { UploadsImageDTO } from 'features/gallery/store/uploadsSlice';
 import { get, isObject, isString } from 'lodash-es';
 import {
   GraphExecutionState,
@@ -10,16 +9,8 @@ import {
   CollectInvocationOutput,
   ImageField,
   LatentsOutput,
-  ImageDTO,
   ResourceOrigin,
 } from 'services/api';
-
-export const isUploadsImageDTO = (
-  image: ImageDTO | undefined
-): image is UploadsImageDTO =>
-  image !== undefined &&
-  image.image_origin === 'external' &&
-  image.image_category === 'user';
 
 export const isImageOutput = (
   output: GraphExecutionState['results'][string]

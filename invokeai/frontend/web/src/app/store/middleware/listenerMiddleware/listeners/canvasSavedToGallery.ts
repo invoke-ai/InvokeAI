@@ -5,7 +5,7 @@ import { imageUploaded } from 'services/thunks/image';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { v4 as uuidv4 } from 'uuid';
-import { resultUpserted } from 'features/gallery/store/resultsSlice';
+import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
 
@@ -47,7 +47,7 @@ export const addCanvasSavedToGalleryListener = () => {
           action.meta.arg.formData.file.name === filename
       );
 
-      dispatch(resultUpserted(uploadedImageDTO));
+      dispatch(imageUpserted(uploadedImageDTO));
     },
   });
 };
