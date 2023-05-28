@@ -8,7 +8,7 @@ import type { ImageField } from './ImageField';
  * Base class for invocations that output an image
  */
 export type ImageOutput = {
-  type: 'image';
+  type: 'image_output';
   /**
    * The output image
    */

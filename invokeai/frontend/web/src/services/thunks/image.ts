@@ -1,41 +1,33 @@
-import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { ImagesService } from 'services/api';
-import { getHeaders } from 'services/util/getHeaders';
 
-const imagesLog = log.child({ namespace: 'image' });
-
-type ImageReceivedArg = Parameters<(typeof ImagesService)['getImage']>[0];
+type imageUrlsReceivedArg = Parameters<
+  (typeof ImagesService)['getImageUrls']
+>[0];
 
 /**
- * `ImagesService.getImage()` thunk
+ * `ImagesService.getImageUrls()` thunk
  */
-export const imageReceived = createAppAsyncThunk(
-  'api/imageReceived',
-  async (arg: ImageReceivedArg) => {
-    const response = await ImagesService.getImage(arg);
-
-    imagesLog.info({ arg, response }, 'Received image');
-
+export const imageUrlsReceived = createAppAsyncThunk(
+  'api/imageUrlsReceived',
+  async (arg: imageUrlsReceivedArg) => {
+    const response = await ImagesService.getImageUrls(arg);
     return response;
   }
 );
 
-type ThumbnailReceivedArg = Parameters<
-  (typeof ImagesService)['getThumbnail']
+type imageMetadataReceivedArg = Parameters<
+  (typeof ImagesService)['getImageMetadata']
 >[0];
 
 /**
- * `ImagesService.getThumbnail()` thunk
+ * `ImagesService.getImageUrls()` thunk
  */
-export const thumbnailReceived = createAppAsyncThunk(
-  'api/thumbnailReceived',
-  async (arg: ThumbnailReceivedArg) => {
-    const response = await ImagesService.getThumbnail(arg);
-
-    imagesLog.info({ arg, response }, 'Received thumbnail');
-
+export const imageMetadataReceived = createAppAsyncThunk(
+  'api/imageMetadataReceived',
+  async (arg: imageMetadataReceivedArg) => {
+    const response = await ImagesService.getImageMetadata(arg);
     return response;
   }
 );
@@ -55,14 +47,7 @@ export const imageUploaded = createAppAsyncThunk(
     // strip out `activeTabName` from arg - the route does not need it
     const { activeTabName, ...rest } = arg;
     const response = await ImagesService.uploadImage(rest);
-    const { location } = getHeaders(response);
-
-    imagesLog.info(
-      { arg: '<Blob>', response, location },
-      `Image uploaded (${response.image_name})`
-    );
-
-    return { response, location };
+    return response;
   }
 );
 
@@ -75,12 +60,19 @@ export const imageDeleted = createAppAsyncThunk(
   'api/imageDeleted',
   async (arg: ImageDeletedArg) => {
     const response = await ImagesService.deleteImage(arg);
+    return response;
+  }
+);
 
-    imagesLog.info(
-      { arg, response },
-      `Image deleted (${arg.imageType} - ${arg.imageName})`
-    );
+type ImageUpdatedArg = Parameters<(typeof ImagesService)['updateImage']>[0];
 
+/**
+ * `ImagesService.updateImage()` thunk
+ */
+export const imageUpdated = createAppAsyncThunk(
+  'api/imageUpdated',
+  async (arg: ImageUpdatedArg) => {
+    const response = await ImagesService.updateImage(arg);
     return response;
   }
 );

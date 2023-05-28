@@ -1,21 +1,23 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
-
+import {
+  PayloadAction,
+  createEntityAdapter,
+  createSlice,
+} from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import {
   receivedResultImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
-import {
-  imageDeleted,
-  imageReceived,
-  thumbnailReceived,
-} from 'services/thunks/image';
+import { ImageDTO } from 'services/api';
+import { dateComparator } from 'common/util/dateComparator';
 
-export const resultsAdapter = createEntityAdapter<Image>({
-  selectId: (image) => image.name,
-  sortComparer: (a, b) => b.metadata.created - a.metadata.created,
+export type ResultsImageDTO = Omit<ImageDTO, 'image_type'> & {
+  image_type: 'results';
+};
+
+export const resultsAdapter = createEntityAdapter<ResultsImageDTO>({
+  selectId: (image) => image.image_name,
+  sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
 });
 
 type AdditionalResultsState = {
@@ -23,6 +25,7 @@ type AdditionalResultsState = {
   pages: number;
   isLoading: boolean;
   nextPage: number;
+  upsertedImageCount: number;
 };
 
 export const initialResultsState =
@@ -31,6 +34,7 @@ export const initialResultsState =
     pages: 0,
     isLoading: false,
     nextPage: 0,
+    upsertedImageCount: 0,
   });
 
 export type ResultsState = typeof initialResultsState;
@@ -39,7 +43,10 @@ const resultsSlice = createSlice({
   name: 'results',
   initialState: initialResultsState,
   reducers: {
-    resultAdded: resultsAdapter.upsertOne,
+    resultUpserted: (state, action: PayloadAction<ResultsImageDTO>) => {
+      resultsAdapter.upsertOne(state, action.payload);
+      state.upsertedImageCount += 1;
+    },
   },
   extraReducers: (builder) => {
     /**
@@ -53,60 +60,17 @@ const resultsSlice = createSlice({
      * Received Result Images Page - FULFILLED
      */
     builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
-      const { items, page, pages } = action.payload;
+      const { page, pages } = action.payload;
 
-      const resultImages = items.map((image) =>
-        deserializeImageResponse(image)
-      );
+      // We know these will all be of the results type, but it's not represented in the API types
+      const items = action.payload.items as ResultsImageDTO[];
 
-      resultsAdapter.setMany(state, resultImages);
+      resultsAdapter.setMany(state, items);
 
       state.page = page;
       state.pages = pages;
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
-    });
-
-    /**
-     * Image Received - FULFILLED
-     */
-    builder.addCase(imageReceived.fulfilled, (state, action) => {
-      const { imagePath } = action.payload;
-      const { imageName } = action.meta.arg;
-
-      resultsAdapter.updateOne(state, {
-        id: imageName,
-        changes: {
-          url: imagePath,
-        },
-      });
-    });
-
-    /**
-     * Thumbnail Received - FULFILLED
-     */
-    builder.addCase(thumbnailReceived.fulfilled, (state, action) => {
-      const { thumbnailPath } = action.payload;
-      const { thumbnailName } = action.meta.arg;
-
-      resultsAdapter.updateOne(state, {
-        id: thumbnailName,
-        changes: {
-          thumbnail: thumbnailPath,
-        },
-      });
-    });
-
-    /**
-     * Delete Image - PENDING
-     * Pre-emptively remove the image from the gallery
-     */
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      const { imageType, imageName } = action.meta.arg;
-
-      if (imageType === 'results') {
-        resultsAdapter.removeOne(state, imageName);
-      }
     });
   },
 });
@@ -119,6 +83,6 @@ export const {
   selectTotal: selectResultsTotal,
 } = resultsAdapter.getSelectors<RootState>((state) => state.results);
 
-export const { resultAdded } = resultsSlice.actions;
+export const { resultUpserted } = resultsSlice.actions;
 
 export default resultsSlice.reducer;

@@ -662,6 +662,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         down_block_res_samples, mid_block_res_sample = None, None
 
         if control_data is not None:
+            # FIXME: make sure guidance_scale < 1.0 is handled correctly if doing per-step guidance setting
             # if conditioning_data.guidance_scale > 1.0:
             if conditioning_data.guidance_scale is not None:
                 # expand the latents input to control model if doing classifier free guidance

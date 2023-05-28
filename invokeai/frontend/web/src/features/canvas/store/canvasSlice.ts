@@ -1,6 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/types/invokeai';
 import {
   roundDownToMultiple,
   roundToMultiple,
@@ -29,6 +28,7 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
+import { ImageDTO } from 'services/api';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -157,9 +157,9 @@ export const canvasSlice = createSlice({
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
     },
-    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+    setInitialCanvasImage: (state, action: PayloadAction<ImageDTO>) => {
       const image = action.payload;
-      const { width, height } = image.metadata;
+      const { width, height } = image;
       const { stageDimensions } = state;
 
       const newBoundingBoxDimensions = {
@@ -302,7 +302,7 @@ export const canvasSlice = createSlice({
         selectedImageIndex: -1,
       };
     },
-    addImageToStagingArea: (state, action: PayloadAction<InvokeAI.Image>) => {
+    addImageToStagingArea: (state, action: PayloadAction<ImageDTO>) => {
       const image = action.payload;
 
       if (!image || !state.layerState.stagingArea.boundingBox) {

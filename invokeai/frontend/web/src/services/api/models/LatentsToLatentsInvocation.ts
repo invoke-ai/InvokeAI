@@ -3,7 +3,6 @@
 /* eslint-disable */
 
 import type { ConditioningField } from './ConditioningField';
-import type { ControlField } from './ControlField';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -14,6 +13,10 @@ export type LatentsToLatentsInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'l2l';
   /**
    * Positive conditioning for generation
@@ -43,22 +46,6 @@ export type LatentsToLatentsInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
-  /**
-   * Whether or not to generate an image that can tile without seams
-   */
-  seamless?: boolean;
-  /**
-   * The axes to tile the image on, 'x' and/or 'y'
-   */
-  seamless_axes?: string;
-  /**
-   * Whether or not to produce progress images during generation
-   */
-  progress_images?: boolean;
-  /**
-   * The controlnet(s) to use
-   */
-  control?: (ControlField | Array<ControlField>);
   /**
    * The latents to use as a base image
    */

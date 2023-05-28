@@ -21,7 +21,7 @@ const ImageInputFieldComponent = (
 
   const getImageByNameAndType = useGetImageByNameAndType();
   const dispatch = useAppDispatch();
-  const [url, setUrl] = useState<string>();
+  const [url, setUrl] = useState<string | undefined>(field.value?.image_url);
   const { getUrl } = useGetUrl();
 
   const handleDrop = useCallback(
@@ -39,16 +39,13 @@ const ImageInputFieldComponent = (
         return;
       }
 
-      setUrl(image.url);
+      setUrl(image.image_url);
 
       dispatch(
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: {
-            image_name: name,
-            image_type: type,
-          },
+          value: image,
         })
       );
     },

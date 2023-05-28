@@ -1,17 +1,24 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
+import {
+  PayloadAction,
+  createEntityAdapter,
+  createSlice,
+} from '@reduxjs/toolkit';
 
 import { RootState } from 'app/store/store';
 import {
   receivedUploadImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import { imageDeleted } from 'services/thunks/image';
-import { deserializeImageResponse } from 'services/util/deserializeImageResponse';
+import { ImageDTO } from 'services/api';
+import { dateComparator } from 'common/util/dateComparator';
 
-export const uploadsAdapter = createEntityAdapter<Image>({
-  selectId: (image) => image.name,
-  sortComparer: (a, b) => b.metadata.created - a.metadata.created,
+export type UploadsImageDTO = Omit<ImageDTO, 'image_type'> & {
+  image_type: 'uploads';
+};
+
+export const uploadsAdapter = createEntityAdapter<UploadsImageDTO>({
+  selectId: (image) => image.image_name,
+  sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
 });
 
 type AdditionalUploadsState = {
@@ -19,6 +26,7 @@ type AdditionalUploadsState = {
   pages: number;
   isLoading: boolean;
   nextPage: number;
+  upsertedImageCount: number;
 };
 
 export const initialUploadsState =
@@ -27,6 +35,7 @@ export const initialUploadsState =
     pages: 0,
     nextPage: 0,
     isLoading: false,
+    upsertedImageCount: 0,
   });
 
 export type UploadsState = typeof initialUploadsState;
@@ -35,7 +44,10 @@ const uploadsSlice = createSlice({
   name: 'uploads',
   initialState: initialUploadsState,
   reducers: {
-    uploadAdded: uploadsAdapter.upsertOne,
+    uploadUpserted: (state, action: PayloadAction<UploadsImageDTO>) => {
+      uploadsAdapter.upsertOne(state, action.payload);
+      state.upsertedImageCount += 1;
+    },
   },
   extraReducers: (builder) => {
     /**
@@ -49,28 +61,17 @@ const uploadsSlice = createSlice({
      * Received Upload Images Page - FULFILLED
      */
     builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
-      const { items, page, pages } = action.payload;
+      const { page, pages } = action.payload;
 
-      const images = items.map((image) => deserializeImageResponse(image));
+      // We know these will all be of the uploads type, but it's not represented in the API types
+      const items = action.payload.items as UploadsImageDTO[];
 
-      uploadsAdapter.setMany(state, images);
+      uploadsAdapter.setMany(state, items);
 
       state.page = page;
       state.pages = pages;
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
-    });
-
-    /**
-     * Delete Image - pending
-     * Pre-emptively remove the image from the gallery
-     */
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      const { imageType, imageName } = action.meta.arg;
-
-      if (imageType === 'uploads') {
-        uploadsAdapter.removeOne(state, imageName);
-      }
     });
   },
 });
@@ -83,6 +84,6 @@ export const {
   selectTotal: selectUploadsTotal,
 } = uploadsAdapter.getSelectors<RootState>((state) => state.uploads);
 
-export const { uploadAdded } = uploadsSlice.actions;
+export const { uploadUpserted } = uploadsSlice.actions;
 
 export default uploadsSlice.reducer;

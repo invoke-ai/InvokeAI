@@ -1,26 +1,35 @@
 import { Draft, PayloadAction } from '@reduxjs/toolkit';
-import { Image } from 'app/types/invokeai';
 import { GenerationState } from './generationSlice';
-import { ImageToImageInvocation } from 'services/api';
+import { ImageDTO, ImageToImageInvocation } from 'services/api';
 import { isScheduler } from 'app/constants';
 
 export const setAllParametersReducer = (
   state: Draft<GenerationState>,
-  action: PayloadAction<Image | undefined>
+  action: PayloadAction<ImageDTO | undefined>
 ) => {
-  const node = action.payload?.metadata.invokeai?.node;
+  const metadata = action.payload?.metadata;
 
-  if (!node) {
+  if (!metadata) {
     return;
   }
 
+  // not sure what this list should be
   if (
-    node.type === 'txt2img' ||
-    node.type === 'img2img' ||
-    node.type === 'inpaint'
+    metadata.type === 't2l' ||
+    metadata.type === 'l2l' ||
+    metadata.type === 'inpaint'
   ) {
-    const { cfg_scale, height, model, prompt, scheduler, seed, steps, width } =
-      node;
+    const {
+      cfg_scale,
+      height,
+      model,
+      positive_conditioning,
+      negative_conditioning,
+      scheduler,
+      seed,
+      steps,
+      width,
+    } = metadata;
 
     if (cfg_scale !== undefined) {
       state.cfgScale = Number(cfg_scale);
@@ -31,8 +40,11 @@ export const setAllParametersReducer = (
     if (model !== undefined) {
       state.model = String(model);
     }
-    if (prompt !== undefined) {
-      state.prompt = String(prompt);
+    if (positive_conditioning !== undefined) {
+      state.positivePrompt = String(positive_conditioning);
+    }
+    if (negative_conditioning !== undefined) {
+      state.negativePrompt = String(negative_conditioning);
     }
     if (scheduler !== undefined) {
       const schedulerString = String(scheduler);
@@ -52,8 +64,8 @@ export const setAllParametersReducer = (
     }
   }
 
-  if (node.type === 'img2img') {
-    const { fit, image } = node as ImageToImageInvocation;
+  if (metadata.type === 'l2l') {
+    const { fit, image } = metadata as ImageToImageInvocation;
 
     if (fit !== undefined) {
       state.shouldFitToWidthHeight = Boolean(fit);

@@ -2,9 +2,12 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Body_upload_image } from '../models/Body_upload_image';
-import type { ImageResponse } from '../models/ImageResponse';
+import type { ImageCategory } from '../models/ImageCategory';
+import type { ImageDTO } from '../models/ImageDTO';
+import type { ImageRecordChanges } from '../models/ImageRecordChanges';
 import type { ImageType } from '../models/ImageType';
-import type { PaginatedResults_ImageResponse_ } from '../models/PaginatedResults_ImageResponse_';
+import type { ImageUrlsDTO } from '../models/ImageUrlsDTO';
+import type { PaginatedResults_ImageDTO_ } from '../models/PaginatedResults_ImageDTO_';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -13,21 +16,108 @@ import { request as __request } from '../core/request';
 export class ImagesService {
 
   /**
-   * Get Image
-   * Gets an image
-   * @returns any Successful Response
+   * List Images With Metadata
+   * Gets a list of images with metadata
+   * @returns PaginatedResults_ImageDTO_ Successful Response
    * @throws ApiError
    */
-  public static getImage({
+  public static listImagesWithMetadata({
+    imageType,
+    imageCategory,
+    page,
+    perPage = 10,
+  }: {
+    /**
+     * The type of images to list
+     */
+    imageType: ImageType,
+    /**
+     * The kind of images to list
+     */
+    imageCategory: ImageCategory,
+    /**
+     * The page of image metadata to get
+     */
+    page?: number,
+    /**
+     * The number of image metadata per page
+     */
+    perPage?: number,
+  }): CancelablePromise<PaginatedResults_ImageDTO_> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/images/',
+      query: {
+        'image_type': imageType,
+        'image_category': imageCategory,
+        'page': page,
+        'per_page': perPage,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Upload Image
+   * Uploads an image
+   * @returns ImageDTO The image was uploaded successfully
+   * @throws ApiError
+   */
+  public static uploadImage({
+    formData,
+    imageCategory,
+    isIntermediate = false,
+    sessionId,
+  }: {
+    formData: Body_upload_image,
+    /**
+     * The category of the image
+     */
+    imageCategory?: ImageCategory,
+    /**
+     * Whether this is an intermediate image
+     */
+    isIntermediate?: boolean,
+    /**
+     * The session ID associated with this upload, if any
+     */
+    sessionId?: string,
+  }): CancelablePromise<ImageDTO> {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/api/v1/images/',
+      query: {
+        'image_category': imageCategory,
+        'is_intermediate': isIntermediate,
+        'session_id': sessionId,
+      },
+      formData: formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        415: `Image upload failed`,
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Get Image Full
+   * Gets a full-resolution image file
+   * @returns any Return the full-resolution image
+   * @throws ApiError
+   */
+  public static getImageFull({
     imageType,
     imageName,
   }: {
     /**
-     * The type of image to get
+     * The type of full-resolution image file to get
      */
     imageType: ImageType,
     /**
-     * The name of the image to get
+     * The name of full-resolution image file to get
      */
     imageName: string,
   }): CancelablePromise<any> {
@@ -39,6 +129,7 @@ export class ImagesService {
         'image_name': imageName,
       },
       errors: {
+        404: `Image not found`,
         422: `Validation Error`,
       },
     });
@@ -46,7 +137,7 @@ export class ImagesService {
 
   /**
    * Delete Image
-   * Deletes an image and its thumbnail
+   * Deletes an image
    * @returns any Successful Response
    * @throws ApiError
    */
@@ -77,95 +168,131 @@ export class ImagesService {
   }
 
   /**
-   * Get Thumbnail
-   * Gets a thumbnail
-   * @returns any Successful Response
+   * Update Image
+   * Updates an image
+   * @returns ImageDTO Successful Response
    * @throws ApiError
    */
-  public static getThumbnail({
-    thumbnailType,
-    thumbnailName,
+  public static updateImage({
+    imageType,
+    imageName,
+    requestBody,
   }: {
     /**
-     * The type of thumbnail to get
+     * The type of image to update
      */
-    thumbnailType: ImageType,
+    imageType: ImageType,
     /**
-     * The name of the thumbnail to get
+     * The name of the image to update
      */
-    thumbnailName: string,
+    imageName: string,
+    requestBody: ImageRecordChanges,
+  }): CancelablePromise<ImageDTO> {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/api/v1/images/{image_type}/{image_name}',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      body: requestBody,
+      mediaType: 'application/json',
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Get Image Metadata
+   * Gets an image's metadata
+   * @returns ImageDTO Successful Response
+   * @throws ApiError
+   */
+  public static getImageMetadata({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of image to get
+     */
+    imageType: ImageType,
+    /**
+     * The name of image to get
+     */
+    imageName: string,
+  }): CancelablePromise<ImageDTO> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/images/{image_type}/{image_name}/metadata',
+      path: {
+        'image_type': imageType,
+        'image_name': imageName,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Get Image Thumbnail
+   * Gets a thumbnail image file
+   * @returns any Return the image thumbnail
+   * @throws ApiError
+   */
+  public static getImageThumbnail({
+    imageType,
+    imageName,
+  }: {
+    /**
+     * The type of thumbnail image file to get
+     */
+    imageType: ImageType,
+    /**
+     * The name of thumbnail image file to get
+     */
+    imageName: string,
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{thumbnail_type}/thumbnails/{thumbnail_name}',
+      url: '/api/v1/images/{image_type}/{image_name}/thumbnail',
       path: {
-        'thumbnail_type': thumbnailType,
-        'thumbnail_name': thumbnailName,
-      },
-      errors: {
-        422: `Validation Error`,
-      },
-    });
-  }
-
-  /**
-   * Upload Image
-   * @returns ImageResponse The image was uploaded successfully
-   * @throws ApiError
-   */
-  public static uploadImage({
-    imageType,
-    formData,
-  }: {
-    imageType: ImageType,
-    formData: Body_upload_image,
-  }): CancelablePromise<ImageResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/v1/images/uploads/',
-      query: {
         'image_type': imageType,
+        'image_name': imageName,
       },
-      formData: formData,
-      mediaType: 'multipart/form-data',
       errors: {
-        415: `Image upload failed`,
+        404: `Image not found`,
         422: `Validation Error`,
       },
     });
   }
 
   /**
-   * List Images
-   * Gets a list of images
-   * @returns PaginatedResults_ImageResponse_ Successful Response
+   * Get Image Urls
+   * Gets an image and thumbnail URL
+   * @returns ImageUrlsDTO Successful Response
    * @throws ApiError
    */
-  public static listImages({
+  public static getImageUrls({
     imageType,
-    page,
-    perPage = 10,
+    imageName,
   }: {
     /**
-     * The type of images to get
+     * The type of the image whose URL to get
      */
-    imageType?: ImageType,
+    imageType: ImageType,
     /**
-     * The page of images to get
+     * The name of the image whose URL to get
      */
-    page?: number,
-    /**
-     * The number of images per page
-     */
-    perPage?: number,
-  }): CancelablePromise<PaginatedResults_ImageResponse_> {
+    imageName: string,
+  }): CancelablePromise<ImageUrlsDTO> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/',
-      query: {
+      url: '/api/v1/images/{image_type}/{image_name}/urls',
+      path: {
         'image_type': imageType,
-        'page': page,
-        'per_page': perPage,
+        'image_name': imageName,
       },
       errors: {
         422: `Validation Error`,

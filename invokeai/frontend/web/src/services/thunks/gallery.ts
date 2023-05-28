@@ -1,36 +1,63 @@
-import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { ImagesService } from 'services/api';
+import { ImagesService, PaginatedResults_ImageDTO_ } from 'services/api';
 
 export const IMAGES_PER_PAGE = 20;
 
-const galleryLog = log.child({ namespace: 'gallery' });
+type ReceivedResultImagesPageThunkConfig = {
+  rejectValue: {
+    error: unknown;
+  };
+};
 
-export const receivedResultImagesPage = createAppAsyncThunk(
+export const receivedResultImagesPage = createAppAsyncThunk<
+  PaginatedResults_ImageDTO_,
+  void,
+  ReceivedResultImagesPageThunkConfig
+>(
   'results/receivedResultImagesPage',
-  async (_arg, { getState }) => {
-    const response = await ImagesService.listImages({
+  async (_arg, { getState, rejectWithValue }) => {
+    const { page, pages, nextPage, upsertedImageCount } = getState().results;
+
+    // If many images have been upserted, we need to offset the page number
+    // TODO: add an offset param to the list images endpoint
+    const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
+
+    const response = await ImagesService.listImagesWithMetadata({
       imageType: 'results',
-      page: getState().results.nextPage,
+      imageCategory: 'general',
+      page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
-
-    galleryLog.info({ response }, `Received ${response.items.length} results`);
 
     return response;
   }
 );
 
-export const receivedUploadImagesPage = createAppAsyncThunk(
+type ReceivedUploadImagesPageThunkConfig = {
+  rejectValue: {
+    error: unknown;
+  };
+};
+
+export const receivedUploadImagesPage = createAppAsyncThunk<
+  PaginatedResults_ImageDTO_,
+  void,
+  ReceivedUploadImagesPageThunkConfig
+>(
   'uploads/receivedUploadImagesPage',
-  async (_arg, { getState }) => {
-    const response = await ImagesService.listImages({
+  async (_arg, { getState, rejectWithValue }) => {
+    const { page, pages, nextPage, upsertedImageCount } = getState().uploads;
+
+    // If many images have been upserted, we need to offset the page number
+    // TODO: add an offset param to the list images endpoint
+    const pageOffset = Math.floor(upsertedImageCount / IMAGES_PER_PAGE);
+
+    const response = await ImagesService.listImagesWithMetadata({
       imageType: 'uploads',
-      page: getState().uploads.nextPage,
+      imageCategory: 'general',
+      page: nextPage + pageOffset,
       perPage: IMAGES_PER_PAGE,
     });
-
-    galleryLog.info({ response }, `Received ${response.items.length} uploads`);
 
     return response;
   }

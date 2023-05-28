@@ -1,12 +1,15 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from inspect import signature
-from typing import get_args, get_type_hints, Dict, List, Literal, TypedDict
+from typing import get_args, get_type_hints, Dict, List, Literal, TypedDict, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from ..services.invocation_services import InvocationServices
+if TYPE_CHECKING:
+    from ..services.invocation_services import InvocationServices
 
 
 class InvocationContext:
@@ -75,6 +78,7 @@ class BaseInvocation(ABC, BaseModel):
     
     #fmt: off
     id: str = Field(description="The id of this node. Must be unique among all nodes.")
+    is_intermediate: bool = Field(default=False, description="Whether or not this node is an intermediate node.")
     #fmt: on
 
 

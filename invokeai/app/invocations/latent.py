@@ -6,10 +6,11 @@ from typing import Literal, Optional, Union, List
 
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 import torch
 
 from invokeai.app.invocations.util.choose_model import choose_model
+from invokeai.app.models.image import ImageCategory
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
@@ -27,9 +28,9 @@ from ...backend.stable_diffusion.diffusers_pipeline import ControlNetData
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
-from ..services.image_storage import ImageType
+from ..services.image_file_storage import ImageType
 from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput, build_image_output
+from .image import ImageField, ImageOutput
 from .compel import ConditioningField
 from ...backend.stable_diffusion import PipelineIntermediateState
 from diffusers.schedulers import SchedulerMixin as Scheduler
@@ -146,12 +147,17 @@ class NoiseInvocation(BaseInvocation):
             },
         }
 
+    @validator("seed", pre=True)
+    def modulo_seed(cls, v):
+        """Returns the seed modulo SEED_MAX to ensure it is within the valid range."""
+        return v % SEED_MAX
+
     def invoke(self, context: InvocationContext) -> NoiseOutput:
         device = torch.device(choose_torch_device())
         noise = get_noise(self.width, self.height, device, self.seed)
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, noise)
+        context.services.latents.save(name, noise)
         return build_noise_output(latents_name=name, latents=noise)
 
 
@@ -170,10 +176,9 @@ class TextToLatentsInvocation(BaseInvocation):
     cfg_scale: Union[float, List[float]] = Field(default=7.5, description="CFG scale, either single value or list of value per timestep", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
-    seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
-    progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
     control: Union[ControlField, List[ControlField]] = Field(default=None, description="The controlnet(s) to use")
+    # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
     # Schema customisation
@@ -211,17 +216,17 @@ class TextToLatentsInvocation(BaseInvocation):
             scheduler_name=self.scheduler
         )
 
-        if isinstance(model, DiffusionPipeline):
-            for component in [model.unet, model.vae]:
-                configure_model_padding(component,
-                                        self.seamless,
-                                        self.seamless_axes
-                                        )
-        else:
-            configure_model_padding(model,
-                                    self.seamless,
-                                    self.seamless_axes
-                                    )
+        # if isinstance(model, DiffusionPipeline):
+        #     for component in [model.unet, model.vae]:
+        #         configure_model_padding(component,
+        #                                 self.seamless,
+        #                                 self.seamless_axes
+        #                                 )
+        # else:
+        #     configure_model_padding(model,
+        #                             self.seamless,
+        #                             self.seamless_axes
+        #                             )
 
         return model
 
@@ -294,7 +299,9 @@ class TextToLatentsInvocation(BaseInvocation):
                                                                     torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
                 control_image_field = control_info.image
-                input_image = context.services.images.get(control_image_field.image_type, control_image_field.image_name)
+                input_image = context.services.images.get_pil_image(control_image_field.image_type,
+                                                                    control_image_field.image_name)
+                # self.image.image_type, self.image.image_name
                 # FIXME: still need to test with different widths, heights, devices, dtypes
                 #        and add in batch_size, num_images_per_prompt?
                 #        and do real check for classifier_free_guidance?
@@ -351,7 +358,7 @@ class TextToLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, result_latents)
+        context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -363,6 +370,19 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
     strength: float = Field(default=0.5, description="The strength of the latents to use")
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents"],
+                "type_hints": {
+                    "model": "model",
+                    "control": "control",
+                    "cfg_scale": "number",
+                }
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
@@ -407,7 +427,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.set(name, result_latents)
+        context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -444,20 +464,30 @@ class LatentsToImageInvocation(BaseInvocation):
             np_image = model.decode_latents(latents)
             image = model.numpy_to_pil(np_image)[0]
 
-            image_type = ImageType.RESULT
-            image_name = context.services.images.create_name(
-                context.graph_execution_state_id, self.id
-            )
-
-            metadata = context.services.metadata.build_metadata(
-                session_id=context.graph_execution_state_id, node=self
-            )
+            # what happened to metadata?
+            # metadata = context.services.metadata.build_metadata(
+            #     session_id=context.graph_execution_state_id, node=self
 
             torch.cuda.empty_cache()
 
-            context.services.images.save(image_type, image_name, image, metadata)
-            return build_image_output(
-                image_type=image_type, image_name=image_name, image=image
+            # new (post Image service refactor) way of using services to save image
+            #     and gnenerate unique image_name
+            image_dto = context.services.images.create(
+                image=image,
+                image_type=ImageType.RESULT,
+                image_category=ImageCategory.GENERAL,
+                session_id=context.graph_execution_state_id,
+                node_id=self.id,
+                is_intermediate=self.is_intermediate
+            )
+
+            return ImageOutput(
+                image=ImageField(
+                    image_name=image_dto.image_name,
+                    image_type=image_dto.image_type,
+                ),
+                width=image_dto.width,
+                height=image_dto.height,
             )
 
 
@@ -492,7 +522,8 @@ class ResizeLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, resized_latents)
+        # context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
 
@@ -522,7 +553,8 @@ class ScaleLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, resized_latents)
+        # context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
 
@@ -546,7 +578,10 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        image = context.services.images.get(
+        # image = context.services.images.get(
+        #     self.image.image_type, self.image.image_name
+        # )
+        image = context.services.images.get_pil_image(
             self.image.image_type, self.image.image_name
         )
 
@@ -566,5 +601,6 @@ class ImageToLatentsInvocation(BaseInvocation):
         )
 
         name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.set(name, latents)
+        # context.services.latents.set(name, latents)
+        context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents)

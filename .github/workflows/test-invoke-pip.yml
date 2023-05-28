@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: set test prompt to main branch validation
-        run:echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: setup python
         uses: actions/setup-python@v4
@@ -125,6 +125,7 @@ jobs:
           --no-nsfw_checker
           --precision=float32
           --always_use_cpu
+          --use_memory_db
           --outdir ${{ env.INVOKEAI_OUTDIR }}/${{ matrix.python-version }}/${{ matrix.pytorch }}
           --from_file ${{ env.TEST_PROMPTS }}
 

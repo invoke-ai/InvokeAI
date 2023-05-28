@@ -1,10 +1,10 @@
 import { Badge, Flex } from '@chakra-ui/react';
-import { Image } from 'app/types/invokeai';
 import { isNumber, isString } from 'lodash-es';
 import { useMemo } from 'react';
+import { ImageDTO } from 'services/api';
 
 type ImageMetadataOverlayProps = {
-  image: Image;
+  image: ImageDTO;
 };
 
 const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
@@ -17,11 +17,11 @@ const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
   }, [image.metadata]);
 
   const model = useMemo(() => {
-    if (!isString(image.metadata?.invokeai?.node?.model)) {
+    if (!isString(image.metadata?.model)) {
       return;
     }
 
-    return image.metadata?.invokeai?.node?.model;
+    return image.metadata?.model;
   }, [image.metadata]);
 
   return (
