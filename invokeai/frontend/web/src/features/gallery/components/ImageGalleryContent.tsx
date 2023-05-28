@@ -1,6 +1,7 @@
 import {
   Box,
-  ButtonGroup,
+  Checkbox,
+  CheckboxGroup,
   Flex,
   FlexProps,
   Grid,
@@ -16,7 +17,6 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
-  setCurrentCategory,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
@@ -36,54 +36,53 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
+import { FaFilter, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { resultsAdapter } from '../store/resultsSlice';
-import {
-  receivedGalleryImages,
-  receivedUploadImages,
-} from 'services/thunks/gallery';
-import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import GalleryProgressImage from './GalleryProgressImage';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { ImageDTO } from 'services/api';
+import { ImageCategory, ImageDTO } from 'services/api';
+import { imageCategoriesChanged, selectImagesAll } from '../store/imagesSlice';
+import { receivedPageOfImages } from 'services/thunks/image';
+import { capitalize } from 'lodash-es';
 
-const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
 const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
+const IMAGE_CATEGORIES: ImageCategory[] = [
+  'general',
+  'control',
+  'mask',
+  'user',
+  'other',
+];
 
 const categorySelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { results, uploads, system, gallery } = state;
-    const { currentCategory } = gallery;
+    const { system, images } = state;
+    const tempImages: (ImageDTO | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
 
-    if (currentCategory === 'results') {
-      const tempImages: (ImageDTO | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
-
-      if (system.progressImage) {
-        tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
-      }
-
-      return {
-        images: tempImages.concat(
-          resultsAdapter.getSelectors().selectAll(results)
-        ),
-        isLoading: results.isLoading,
-        areMoreImagesAvailable: results.page < results.pages - 1,
-      };
+    if (system.progressImage) {
+      tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
     }
 
+    const { categories } = images;
+
+    const allImages = selectImagesAll(state);
+    const filteredImages = allImages.filter((i) =>
+      categories.includes(i.image_category)
+    );
+
     return {
-      images: uploadsAdapter.getSelectors().selectAll(uploads),
-      isLoading: uploads.isLoading,
-      areMoreImagesAvailable: uploads.page < uploads.pages - 1,
+      images: tempImages.concat(filteredImages),
+      isLoading: images.isLoading,
+      areMoreImagesAvailable: filteredImages.length < images.total,
+      categories: images.categories,
     };
   },
   defaultSelectorOptions
@@ -93,7 +92,6 @@ const mainSelector = createSelector(
   [gallerySelector, uiSelector],
   (gallery, ui) => {
     const {
-      currentCategory,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldAutoSwitchToNewImages,
@@ -104,7 +102,6 @@ const mainSelector = createSelector(
     const { shouldPinGallery } = ui;
 
     return {
-      currentCategory,
       shouldPinGallery,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
@@ -120,7 +117,6 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
-  const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
   const rootRef = useRef(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
@@ -137,7 +133,6 @@ const ImageGalleryContent = () => {
   });
 
   const {
-    currentCategory,
     shouldPinGallery,
     galleryImageMinimumWidth,
     galleryImageObjectFit,
@@ -146,18 +141,12 @@ const ImageGalleryContent = () => {
     selectedImage,
   } = useAppSelector(mainSelector);
 
-  const { images, areMoreImagesAvailable, isLoading } =
+  const { images, areMoreImagesAvailable, isLoading, categories } =
     useAppSelector(categorySelector);
 
-  const handleClickLoadMore = () => {
-    if (currentCategory === 'results') {
-      dispatch(receivedGalleryImages());
-    }
-
-    if (currentCategory === 'uploads') {
-      dispatch(receivedUploadImages());
-    }
-  };
+  const handleLoadMoreImages = useCallback(() => {
+    dispatch(receivedPageOfImages());
+  }, [dispatch]);
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
@@ -167,28 +156,6 @@ const ImageGalleryContent = () => {
     dispatch(togglePinGalleryPanel());
     dispatch(requestCanvasRescale());
   };
-
-  useEffect(() => {
-    if (!resizeObserverRef.current) {
-      return;
-    }
-    const resizeObserver = new ResizeObserver(() => {
-      if (!resizeObserverRef.current) {
-        return;
-      }
-
-      if (
-        resizeObserverRef.current.clientWidth < GALLERY_SHOW_BUTTONS_MIN_WIDTH
-      ) {
-        setShouldShouldIconButtons(true);
-        return;
-      }
-
-      setShouldShouldIconButtons(false);
-    });
-    resizeObserver.observe(resizeObserverRef.current);
-    return () => resizeObserver.disconnect(); // clean up
-  }, []);
 
   useEffect(() => {
     const { current: root } = rootRef;
@@ -210,12 +177,15 @@ const ImageGalleryContent = () => {
   }, []);
 
   const handleEndReached = useCallback(() => {
-    if (currentCategory === 'results') {
-      dispatch(receivedGalleryImages());
-    } else if (currentCategory === 'uploads') {
-      dispatch(receivedUploadImages());
-    }
-  }, [dispatch, currentCategory]);
+    handleLoadMoreImages();
+  }, [handleLoadMoreImages]);
+
+  const handleCategoriesChanged = useCallback(
+    (newCategories: ImageCategory[]) => {
+      dispatch(imageCategoriesChanged(newCategories));
+    },
+    [dispatch]
+  );
 
   return (
     <Flex
@@ -232,52 +202,28 @@ const ImageGalleryContent = () => {
         alignItems="center"
         justifyContent="space-between"
       >
-        <ButtonGroup
-          size="sm"
-          isAttached
-          w="max-content"
-          justifyContent="stretch"
+        <IAIPopover
+          triggerComponent={
+            <IAIIconButton
+              aria-label="Gallery Filter"
+              size="sm"
+              icon={<FaFilter />}
+            />
+          }
         >
-          {shouldShouldIconButtons ? (
-            <>
-              <IAIIconButton
-                aria-label={t('gallery.showGenerations')}
-                tooltip={t('gallery.showGenerations')}
-                isChecked={currentCategory === 'results'}
-                role="radio"
-                icon={<FaImage />}
-                onClick={() => dispatch(setCurrentCategory('results'))}
-              />
-              <IAIIconButton
-                aria-label={t('gallery.showUploads')}
-                tooltip={t('gallery.showUploads')}
-                role="radio"
-                isChecked={currentCategory === 'uploads'}
-                icon={<FaUser />}
-                onClick={() => dispatch(setCurrentCategory('uploads'))}
-              />
-            </>
-          ) : (
-            <>
-              <IAIButton
-                size="sm"
-                isChecked={currentCategory === 'results'}
-                onClick={() => dispatch(setCurrentCategory('results'))}
-                flexGrow={1}
-              >
-                {t('gallery.generations')}
-              </IAIButton>
-              <IAIButton
-                size="sm"
-                isChecked={currentCategory === 'uploads'}
-                onClick={() => dispatch(setCurrentCategory('uploads'))}
-                flexGrow={1}
-              >
-                {t('gallery.uploads')}
-              </IAIButton>
-            </>
-          )}
-        </ButtonGroup>
+          <Flex sx={{ flexDirection: 'column', gap: 2 }}>
+            <CheckboxGroup
+              value={categories}
+              onChange={handleCategoriesChanged}
+            >
+              {IMAGE_CATEGORIES.map((c) => (
+                <Checkbox key={c} value={c}>
+                  {capitalize(c)}
+                </Checkbox>
+              ))}
+            </CheckboxGroup>
+          </Flex>
+        </IAIPopover>
 
         <Flex gap={2}>
           <IAIPopover
@@ -400,7 +346,7 @@ const ImageGalleryContent = () => {
               )}
             </Box>
             <IAIButton
-              onClick={handleClickLoadMore}
+              onClick={handleLoadMoreImages}
               isDisabled={!areMoreImagesAvailable}
               isLoading={isLoading}
               loadingText="Loading"

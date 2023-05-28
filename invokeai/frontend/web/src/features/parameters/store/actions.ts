@@ -26,6 +26,6 @@ export const isImageDTO = (image: any): image is ImageDTO => {
   );
 };
 
-export const initialImageSelected = createAction<
-  ImageDTO | ImageNameAndOrigin | undefined
->('generation/initialImageSelected');
+export const initialImageSelected = createAction<ImageDTO | string | undefined>(
+  'generation/initialImageSelected'
+);

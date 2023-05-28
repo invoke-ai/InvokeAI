@@ -26,18 +26,21 @@ const buildBaseNode = (
   | ImageToImageInvocation
   | InpaintInvocation
   | undefined => {
-  const dimensionsOverride = state.canvas.boundingBoxDimensions;
+  const overrides = {
+    ...state.canvas.boundingBoxDimensions,
+    is_intermediate: true,
+  };
 
   if (nodeType === 'txt2img') {
-    return buildTxt2ImgNode(state, dimensionsOverride);
+    return buildTxt2ImgNode(state, overrides);
   }
 
   if (nodeType === 'img2img') {
-    return buildImg2ImgNode(state, dimensionsOverride);
+    return buildImg2ImgNode(state, overrides);
   }
 
   if (nodeType === 'inpaint' || nodeType === 'outpaint') {
-    return buildInpaintNode(state, dimensionsOverride);
+    return buildInpaintNode(state, overrides);
   }
 };
 

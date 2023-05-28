@@ -62,7 +62,6 @@ const CurrentImagePreview = () => {
         return;
       }
       e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.setData('invokeai/imageOrigin', image.image_origin);
       e.dataTransfer.effectAllowed = 'move';
     },
     [image]

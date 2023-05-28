@@ -1,5 +1,5 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { InvokeTabName } from 'features/ui/store/tabMap';
+import { selectImagesAll } from 'features/gallery/store/imagesSlice';
 import { ImagesService } from 'services/api';
 
 type imageUrlsReceivedArg = Parameters<
@@ -68,6 +68,35 @@ export const imageUpdated = createAppAsyncThunk(
   'api/imageUpdated',
   async (arg: ImageUpdatedArg) => {
     const response = await ImagesService.updateImage(arg);
+    return response;
+  }
+);
+
+type ImagesListedArg = Parameters<
+  (typeof ImagesService)['listImagesWithMetadata']
+>[0];
+
+export const IMAGES_PER_PAGE = 20;
+
+/**
+ * `ImagesService.listImagesWithMetadata()` thunk
+ */
+export const receivedPageOfImages = createAppAsyncThunk(
+  'api/receivedPageOfImages',
+  async (_, { getState }) => {
+    const state = getState();
+    const { categories } = state.images;
+
+    const totalImagesInFilter = selectImagesAll(state).filter((i) =>
+      categories.includes(i.image_category)
+    ).length;
+
+    const response = await ImagesService.listImagesWithMetadata({
+      categories,
+      isIntermediate: false,
+      offset: totalImagesInFilter,
+      limit: IMAGES_PER_PAGE,
+    });
     return response;
   }
 );
