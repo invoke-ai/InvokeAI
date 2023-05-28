@@ -1,6 +1,14 @@
+import io
 from typing import Literal, Optional
+
+# from PIL.Image import Image
+import PIL.Image
+from matplotlib.ticker import MaxNLocator
+from matplotlib.figure import Figure
+
 from pydantic import BaseModel, Field
 import numpy as np
+import matplotlib.pyplot as plt
 
 from easing_functions import (
     LinearInOut,
@@ -13,7 +21,7 @@ from easing_functions import (
     ExponentialEaseInOut, ExponentialEaseIn, ExponentialEaseOut,
     ElasticEaseIn, ElasticEaseInOut, ElasticEaseOut,
     BackEaseIn, BackEaseInOut, BackEaseOut,
-    BounceEaseIn, BounceEaseInOut, BounceEaseOut )
+    BounceEaseIn, BounceEaseInOut, BounceEaseOut)
 
 from .baseinvocation import (
     BaseInvocation,
@@ -22,6 +30,7 @@ from .baseinvocation import (
     InvocationConfig,
 )
 from .collections import FloatCollectionOutput
+
 
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
@@ -38,6 +47,7 @@ class FloatLinearRangeInvocation(BaseInvocation):
         return FloatCollectionOutput(
             collection=param_list
         )
+
 
 EASING_FUNCTIONS_MAP = {
     "linear": LinearInOut,
@@ -77,6 +87,7 @@ EASING_FUNCTION_KEYS = Literal[
     tuple(list(EASING_FUNCTIONS_MAP.keys()))
 ]
 
+
 # actually I think for now could just use CollectionOutput (which is list[Any]
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""
@@ -85,7 +96,7 @@ class StepParamEasingInvocation(BaseInvocation):
 
     # Inputs
     # fmt: off
-    easing: EASING_FUNCTION_KEYS = Field(default="linear", description="The easing function to use" )
+    easing: EASING_FUNCTION_KEYS = Field(default="linear", description="The easing function to use")
     num_steps: int = Field(description="number of denoising steps")
     start_value: float = Field(default=0.0, description="easing starting value")
     end_value: float = Field(default=1.0, description="easing ending value")
@@ -95,28 +106,47 @@ class StepParamEasingInvocation(BaseInvocation):
     pre_start_value: Optional[float] = Field(default=None, description="value before easing start")
     # if None, then end value is used prior to easing end
     post_end_value: Optional[float] = Field(default=None, description="value after easing end")
+    show_easing_plot: bool = Field(default=False, description="show easing plot")
+
     # fmt: on
+
+    def fig2img(self, fig):
+        """Convert a Matplotlib figure to a PIL Image and return it"""
+        import io
+        buf = io.BytesIO()
+        fig.savefig(buf)
+        buf.seek(0)
+        img = Image.open(buf)
+        return img
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         # convert from start_step_percent to nearest step <= (steps * start_step_percent)
         start_step = int(np.floor(self.num_steps * self.start_step_percent))
         # convert from end_step_percent to nearest step >= (steps * end_step_percent)
-        end_step =   int(np.ceil((self.num_steps-1) * self.end_step_percent))
+        end_step = int(np.ceil((self.num_steps - 1) * self.end_step_percent))
         num_easing_steps = end_step - start_step + 1
-        # print("start_step", start_step)
-        # print("end_step", end_step)
-        # print("num_easing_steps", num_easing_steps)
-        num_presteps = start_step - 1
+
+        num_presteps = max(start_step - 1, 0)
         num_poststeps = self.num_steps - (num_presteps + num_easing_steps)
         prelist = list(num_presteps * [self.pre_start_value])
         postlist = list(num_poststeps * [self.post_end_value])
+
+        print("start_step", start_step)
+        print("end_step", end_step)
+        print("num_easing_steps", num_easing_steps)
+        print("num_presteps", num_presteps)
+        print("num_poststeps", num_poststeps)
+        print("prelist size", len(prelist))
+        print("postlist size", len(postlist))
+        print("prelist", prelist)
+        print("postlist", postlist)
 
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
         # print(easing_class)
         easing_list = list()
         easing_function = easing_class(start=self.start_value,
                                        end=self.end_value,
-                                       duration=num_easing_steps-1)
+                                       duration=num_easing_steps - 1)
         for step_index in range(num_easing_steps):
             step_val = easing_function.ease(step_index)
             print(step_index, step_val)
@@ -134,9 +164,23 @@ class StepParamEasingInvocation(BaseInvocation):
         # print("easing param_list size", len(param_list))
         # print(param_list)
 
+        if self.show_easing_plot:
+            plt.figure()
+            plt.xlabel("Step")
+            plt.ylabel("Param Value")
+            plt.title("Param Easing: Per-Step Param Values")
+            plt.bar(range(len(param_list)), param_list)
+            # plt.plot(param_list)
+            ax = plt.gca()
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            im = PIL.Image.open(buf)
+            im.show()
+            buf.close()
+
         # output array of size steps, each entry list[i] is param value for step i
         return FloatCollectionOutput(
             collection=param_list
         )
-
-
