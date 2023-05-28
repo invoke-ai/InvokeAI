@@ -83,6 +83,8 @@ class StepParamEasingInvocation(BaseInvocation):
 
     type: Literal["step_param_easing"] = "step_param_easing"
 
+    # Inputs
+    # fmt: off
     easing: EASING_FUNCTION_KEYS = Field(default="linear", description="The easing function to use" )
     num_steps: int = Field(description="number of denoising steps")
     start_value: float = Field(default=0.0, description="easing starting value")
@@ -93,44 +95,48 @@ class StepParamEasingInvocation(BaseInvocation):
     pre_start_value: Optional[float] = Field(default=None, description="value before easing start")
     # if None, then end value is used prior to easing end
     post_end_value: Optional[float] = Field(default=None, description="value after easing end")
-
-    # array: List[float] = Field(description="The array")
+    # fmt: on
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         # convert from start_step_percent to nearest step <= (steps * start_step_percent)
         start_step = int(np.floor(self.num_steps * self.start_step_percent))
         # convert from end_step_percent to nearest step >= (steps * end_step_percent)
         end_step =   int(np.ceil((self.num_steps-1) * self.end_step_percent))
-
-        # param_list = list(steps * [None])
-        #num_easing_steps = end_step - start_step + 1
-        num_easing_steps = end_step - start_step
-        num_presteps = start_step
-        num_poststeps = self.num_steps - end_step
+        num_easing_steps = end_step - start_step + 1
+        # print("start_step", start_step)
+        # print("end_step", end_step)
+        # print("num_easing_steps", num_easing_steps)
+        num_presteps = start_step - 1
+        num_poststeps = self.num_steps - (num_presteps + num_easing_steps)
         prelist = list(num_presteps * [self.pre_start_value])
         postlist = list(num_poststeps * [self.post_end_value])
 
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
-        print(type(easing_class))
-        print(easing_class)
+        # print(easing_class)
         easing_list = list()
         easing_function = easing_class(start=self.start_value,
                                        end=self.end_value,
-                                       duration=num_easing_steps)
+                                       duration=num_easing_steps-1)
         for step_index in range(num_easing_steps):
             step_val = easing_function.ease(step_index)
             print(step_index, step_val)
             easing_list.append(step_val)
 
-        # easing_list = list(np.linspace(self.start_value, self.end_value, num_easing_steps))
-        # easing_list = easing_function(num_easing_steps, self.start_value, self.end_value)
+        # linspace_list = list(np.linspace(self.start_value, self.end_value, num_easing_steps))
+        # print("linspace easing param_list size", len(easing_list))
+        # print(linspace_list)
+
+        # print("prelist size", len(prelist))
+        # print("easing_list size", len(easing_list))
+        # print("postlist size", len(postlist))
 
         param_list = prelist + easing_list + postlist
-        print("easing param_list size", len(param_list))
-        print(param_list)
+        # print("easing param_list size", len(param_list))
+        # print(param_list)
 
         # output array of size steps, each entry list[i] is param value for step i
         return FloatCollectionOutput(
             collection=param_list
         )
+
 
