@@ -12,6 +12,10 @@ export type LineartAnimeImageProcessorInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'lineart_anime_image_processor';
   /**
    * image to process

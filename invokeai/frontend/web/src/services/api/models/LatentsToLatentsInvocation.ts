@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ConditioningField } from './ConditioningField';
+import type { ControlField } from './ControlField';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -46,6 +47,10 @@ export type LatentsToLatentsInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
+  /**
+   * The control to use
+   */
+  control?: (ControlField | Array<ControlField>);
   /**
    * The latents to use as a base image
    */
