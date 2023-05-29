@@ -45,14 +45,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import GalleryProgressImage from './GalleryProgressImage';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { ImageCategory, ImageDTO } from 'services/api';
+import { ImageCategory } from 'services/api';
 import { imageCategoriesChanged, selectImagesAll } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
 import { capitalize } from 'lodash-es';
 
-const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
 const IMAGE_CATEGORIES: ImageCategory[] = [
   'general',
   'control',
@@ -64,13 +62,7 @@ const IMAGE_CATEGORIES: ImageCategory[] = [
 const categorySelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { system, images } = state;
-    const tempImages: (ImageDTO | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
-
-    if (system.progressImage) {
-      tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
-    }
-
+    const { images } = state;
     const { categories } = images;
 
     const allImages = selectImagesAll(state);
@@ -79,7 +71,7 @@ const categorySelector = createSelector(
     );
 
     return {
-      images: tempImages.concat(filteredImages),
+      images: filteredImages,
       isLoading: images.isLoading,
       areMoreImagesAvailable: filteredImages.length < images.total,
       categories: images.categories,
@@ -293,28 +285,17 @@ const ImageGalleryContent = () => {
                   data={images}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
-                  itemContent={(index, image) => {
-                    const isSelected =
-                      image === PROGRESS_IMAGE_PLACEHOLDER
-                        ? false
-                        : selectedImage?.image_name === image?.image_name;
-
-                    return (
-                      <Flex sx={{ pb: 2 }}>
-                        {image === PROGRESS_IMAGE_PLACEHOLDER ? (
-                          <GalleryProgressImage
-                            key={PROGRESS_IMAGE_PLACEHOLDER}
-                          />
-                        ) : (
-                          <HoverableImage
-                            key={`${image.image_name}-${image.thumbnail_url}`}
-                            image={image}
-                            isSelected={isSelected}
-                          />
-                        )}
-                      </Flex>
-                    );
-                  }}
+                  itemContent={(index, image) => (
+                    <Flex sx={{ pb: 2 }}>
+                      <HoverableImage
+                        key={`${image.image_name}-${image.thumbnail_url}`}
+                        image={image}
+                        isSelected={
+                          selectedImage?.image_name === image?.image_name
+                        }
+                      />
+                    </Flex>
+                  )}
                 />
               ) : (
                 <VirtuosoGrid
@@ -326,22 +307,15 @@ const ImageGalleryContent = () => {
                     List: ListContainer,
                   }}
                   scrollerRef={setScroller}
-                  itemContent={(index, image) => {
-                    const isSelected =
-                      image === PROGRESS_IMAGE_PLACEHOLDER
-                        ? false
-                        : selectedImage?.image_name === image?.image_name;
-
-                    return image === PROGRESS_IMAGE_PLACEHOLDER ? (
-                      <GalleryProgressImage key={PROGRESS_IMAGE_PLACEHOLDER} />
-                    ) : (
-                      <HoverableImage
-                        key={`${image.image_name}-${image.thumbnail_url}`}
-                        image={image}
-                        isSelected={isSelected}
-                      />
-                    );
-                  }}
+                  itemContent={(index, image) => (
+                    <HoverableImage
+                      key={`${image.image_name}-${image.thumbnail_url}`}
+                      image={image}
+                      isSelected={
+                        selectedImage?.image_name === image?.image_name
+                      }
+                    />
+                  )}
                 />
               )}
             </Box>
