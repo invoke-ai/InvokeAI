@@ -33,7 +33,6 @@ const selector = createSelector(
 
 const IAICanvasObjectRenderer = () => {
   const { objects } = useAppSelector(selector);
-  const { getUrl } = useGetUrl();
 
   if (!objects) return null;
 
@@ -42,12 +41,7 @@ const IAICanvasObjectRenderer = () => {
       {objects.map((obj, i) => {
         if (isCanvasBaseImage(obj)) {
           return (
-            <IAICanvasImage
-              key={i}
-              x={obj.x}
-              y={obj.y}
-              url={getUrl(obj.image.image_url)}
-            />
+            <IAICanvasImage key={i} x={obj.x} y={obj.y} image={obj.image} />
           );
         } else if (isCanvasBaseLine(obj)) {
           const line = (

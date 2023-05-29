@@ -12,5 +12,6 @@ export const konvaNodeToBlob = async (
   node: Konva.Node,
   boundingBox: IRect
 ): Promise<Blob> => {
+  console.log(node);
   return await canvasToBlob(node.toCanvas(boundingBox));
 };

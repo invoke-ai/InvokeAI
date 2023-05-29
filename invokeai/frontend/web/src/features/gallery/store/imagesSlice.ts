@@ -5,7 +5,7 @@ import {
   createSlice,
 } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { ImageCategory, ImageDTO } from 'services/api';
+import { ImageCategory, ImageDTO, ImageUrlsDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 import { isString, keyBy } from 'lodash-es';
 import { receivedPageOfImages } from 'services/thunks/image';
@@ -57,6 +57,12 @@ const imagesSlice = createSlice({
 
       imagesAdapter.removeOne(state, action.payload.image_name);
     },
+    imageUpdatedOne: (state, action: PayloadAction<ImageUrlsDTO>) => {
+      imagesAdapter.updateOne(state, {
+        id: action.payload.image_name,
+        changes: action.payload,
+      });
+    },
     imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
       state.categories = action.payload;
     },
@@ -87,8 +93,12 @@ export const {
   selectTotal: selectImagesTotal,
 } = imagesAdapter.getSelectors<RootState>((state) => state.images);
 
-export const { imageUpserted, imageRemoved, imageCategoriesChanged } =
-  imagesSlice.actions;
+export const {
+  imageUpserted,
+  imageUpdatedOne,
+  imageRemoved,
+  imageCategoriesChanged,
+} = imagesSlice.actions;
 
 export default imagesSlice.reducer;
 
