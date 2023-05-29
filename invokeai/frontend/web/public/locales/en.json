@@ -103,7 +103,8 @@
         "openInNewTab": "Open in New Tab",
         "dontAskMeAgain": "Don't ask me again",
         "areYouSure": "Are you sure?",
-        "imagePrompt": "Image Prompt"
+        "imagePrompt": "Image Prompt",
+        "refresh": "Refresh"
     },
     "gallery": {
         "generations": "Generations",

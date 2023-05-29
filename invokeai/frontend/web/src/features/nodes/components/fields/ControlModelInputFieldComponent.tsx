@@ -1,11 +1,14 @@
-import { Select } from '@chakra-ui/react';
+import { Flex, Select } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ControlModelInputFieldTemplate,
   ControlModelInputFieldValue,
 } from 'features/nodes/types/types';
 import { ChangeEvent, ReactNode, memo, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { BiRefresh } from 'react-icons/bi';
 import { ModelsService } from 'services/api';
 import { FieldComponentProps } from './types';
 
@@ -16,6 +19,8 @@ const ControlModelInputFieldComponent = (
   >
 ) => {
   const { nodeId, field } = props;
+
+  const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
 
@@ -45,8 +50,7 @@ const ControlModelInputFieldComponent = (
   const renderControlNetModels = () => {
     const controlnetModelsToRender: ReactNode[] = [];
     if (controlnetModels) {
-      Object.keys(controlnetModels).forEach((index) => {
-        const controlnetModel = controlnetModels[Number(index)];
+      controlnetModels.forEach((controlnetModel) => {
         controlnetModelsToRender.push(
           <option key={controlnetModel} value={controlnetModel}>
             {controlnetModel}
@@ -56,10 +60,25 @@ const ControlModelInputFieldComponent = (
     }
     return controlnetModelsToRender;
   };
+
   return (
-    <Select onChange={handleValueChanged} value={field.value?.control_model}>
-      {renderControlNetModels()}
-    </Select>
+    <Flex alignItems="center" w="full">
+      <Select onChange={handleValueChanged} value={field.value?.control_model}>
+        {renderControlNetModels()}
+      </Select>
+      <IAIIconButton
+        aria-label={t('common.refresh')}
+        icon={<BiRefresh size={18} />}
+        size="sm"
+        onClick={() => getControlNetModels()}
+        sx={{
+          background: 'none',
+          _hover: {
+            background: 'none',
+          },
+        }}
+      />
+    </Flex>
   );
 };
 
