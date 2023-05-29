@@ -696,7 +696,10 @@ export const canvasSlice = createSlice({
         0
       );
     },
-    commitStagingAreaImage: (state) => {
+    commitStagingAreaImage: (
+      state,
+      action: PayloadAction<string | undefined>
+    ) => {
       if (!state.layerState.stagingArea.images.length) {
         return;
       }

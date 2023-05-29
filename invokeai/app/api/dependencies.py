@@ -5,6 +5,7 @@ import os
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import CoreMetadataService
+from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -65,7 +66,7 @@ class ApiDependencies:
         metadata = CoreMetadataService()
         image_record_storage = SqliteImageRecordStorage(db_location)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
-
+        names = SimpleNameService()
         latents = ForwardCacheLatentsStorage(
             DiskLatentsStorage(f"{output_folder}/latents")
         )
@@ -76,6 +77,7 @@ class ApiDependencies:
             metadata=metadata,
             url=urls,
             logger=logger,
+            names=names,
             graph_execution_manager=graph_execution_manager,
         )
 

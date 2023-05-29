@@ -4,7 +4,7 @@
 
 import type { ImageCategory } from './ImageCategory';
 import type { ImageMetadata } from './ImageMetadata';
-import type { ImageType } from './ImageType';
+import type { ResourceOrigin } from './ResourceOrigin';
 
 /**
  * Deserialized image record, enriched for the frontend with URLs.
@@ -17,7 +17,7 @@ export type ImageDTO = {
   /**
    * The type of the image.
    */
-  image_type: ImageType;
+  image_origin: ResourceOrigin;
   /**
    * The URL of the image.
    */

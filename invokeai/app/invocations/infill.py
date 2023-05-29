@@ -11,7 +11,7 @@ from invokeai.app.invocations.image import ImageOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from ..models.image import ColorField, ImageCategory, ImageField, ImageType
+from ..models.image import ColorField, ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     InvocationContext,
@@ -135,7 +135,7 @@ class InfillColorInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
@@ -145,7 +145,7 @@ class InfillColorInvocation(BaseInvocation):
 
         image_dto = context.services.images.create(
             image=infilled,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -155,7 +155,7 @@ class InfillColorInvocation(BaseInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -180,7 +180,7 @@ class InfillTileInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         infilled = tile_fill_missing(
@@ -190,7 +190,7 @@ class InfillTileInvocation(BaseInvocation):
 
         image_dto = context.services.images.create(
             image=infilled,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -200,7 +200,7 @@ class InfillTileInvocation(BaseInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -218,7 +218,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         if PatchMatch.patchmatch_available():
@@ -228,7 +228,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
 
         image_dto = context.services.images.create(
             image=infilled,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
@@ -238,7 +238,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,

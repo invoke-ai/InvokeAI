@@ -4,6 +4,9 @@
 
 import type { CollectInvocationOutput } from './CollectInvocationOutput';
 import type { CompelOutput } from './CompelOutput';
+import type { ControlOutput } from './ControlOutput';
+import type { FloatCollectionOutput } from './FloatCollectionOutput';
+import type { FloatOutput } from './FloatOutput';
 import type { Graph } from './Graph';
 import type { GraphInvocationOutput } from './GraphInvocationOutput';
 import type { ImageOutput } from './ImageOutput';
@@ -42,7 +45,7 @@ export type GraphExecutionState = {
   /**
    * The results of node executions
    */
-  results: Record<string, (ImageOutput | MaskOutput | PromptOutput | CompelOutput | IntOutput | LatentsOutput | NoiseOutput | IntCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+  results: Record<string, (ImageOutput | MaskOutput | ControlOutput | PromptOutput | CompelOutput | IntOutput | FloatOutput | LatentsOutput | NoiseOutput | IntCollectionOutput | FloatCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
   /**
    * Errors raised when executing nodes
    */
