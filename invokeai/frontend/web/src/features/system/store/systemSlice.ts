@@ -2,17 +2,6 @@ import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, isAnyOf } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
-import {
-  generatorProgress,
-  graphExecutionStateComplete,
-  invocationComplete,
-  invocationError,
-  invocationStarted,
-  socketConnected,
-  socketDisconnected,
-  socketSubscribed,
-  socketUnsubscribed,
-} from 'services/events/actions';
 
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../../../app/components/Toaster';
@@ -30,6 +19,17 @@ import { t } from 'i18next';
 import { userInvoked } from 'app/store/actions';
 import { LANGUAGES } from '../components/LanguagePicker';
 import { imageUploaded } from 'services/thunks/image';
+import {
+  appSocketConnected,
+  appSocketDisconnected,
+  appSocketGeneratorProgress,
+  appSocketGraphExecutionStateComplete,
+  appSocketInvocationComplete,
+  appSocketInvocationError,
+  appSocketInvocationStarted,
+  appSocketSubscribed,
+  appSocketUnsubscribed,
+} from 'services/events/actions';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -227,7 +227,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Subscribed
      */
-    builder.addCase(socketSubscribed, (state, action) => {
+    builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
       state.canceledSession = '';
     });
@@ -235,14 +235,14 @@ export const systemSlice = createSlice({
     /**
      * Socket Unsubscribed
      */
-    builder.addCase(socketUnsubscribed, (state) => {
+    builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
     });
 
     /**
      * Socket Connected
      */
-    builder.addCase(socketConnected, (state) => {
+    builder.addCase(appSocketConnected, (state) => {
       state.isConnected = true;
       state.isCancelable = true;
       state.isProcessing = false;
@@ -257,7 +257,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Disconnected
      */
-    builder.addCase(socketDisconnected, (state) => {
+    builder.addCase(appSocketDisconnected, (state) => {
       state.isConnected = false;
       state.isProcessing = false;
       state.isCancelable = true;
@@ -272,7 +272,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(invocationStarted, (state) => {
+    builder.addCase(appSocketInvocationStarted, (state) => {
       state.isCancelable = true;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
@@ -286,7 +286,7 @@ export const systemSlice = createSlice({
     /**
      * Generator Progress
      */
-    builder.addCase(generatorProgress, (state, action) => {
+    builder.addCase(appSocketGeneratorProgress, (state, action) => {
       const { step, total_steps, progress_image } = action.payload.data;
 
       state.isProcessing = true;
@@ -303,7 +303,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Complete
      */
-    builder.addCase(invocationComplete, (state, action) => {
+    builder.addCase(appSocketInvocationComplete, (state, action) => {
       const { data } = action.payload;
 
       // state.currentIteration = 0;
@@ -322,7 +322,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Error
      */
-    builder.addCase(invocationError, (state) => {
+    builder.addCase(appSocketInvocationError, (state) => {
       state.isProcessing = false;
       state.isCancelable = true;
       // state.currentIteration = 0;
@@ -336,6 +336,18 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: t('toast.serverError'), status: 'error' })
       );
+    });
+
+    /**
+     * Graph Execution State Complete
+     */
+    builder.addCase(appSocketGraphExecutionStateComplete, (state) => {
+      state.isProcessing = false;
+      state.isCancelable = false;
+      state.isCancelScheduled = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.statusTranslationKey = 'common.statusConnected';
     });
 
     /**
@@ -365,18 +377,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
       );
-    });
-
-    /**
-     * Session Canceled
-     */
-    builder.addCase(graphExecutionStateComplete, (state) => {
-      state.isProcessing = false;
-      state.isCancelable = false;
-      state.isCancelScheduled = false;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.statusTranslationKey = 'common.statusConnected';
     });
 
     /**

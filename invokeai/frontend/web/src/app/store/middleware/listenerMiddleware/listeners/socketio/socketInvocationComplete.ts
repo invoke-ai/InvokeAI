@@ -1,7 +1,10 @@
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { invocationComplete } from 'services/events/actions';
+import {
+  appSocketInvocationComplete,
+  socketInvocationComplete,
+} from 'services/events/actions';
 import { imageMetadataReceived } from 'services/thunks/image';
 import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
@@ -10,9 +13,9 @@ import { progressImageSet } from 'features/system/store/systemSlice';
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
 
-export const addInvocationCompleteListener = () => {
+export const addInvocationCompleteEventListener = () => {
   startAppListening({
-    actionCreator: invocationComplete,
+    actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState, take }) => {
       moduleLog.debug(
         action.payload,
@@ -57,6 +60,8 @@ export const addInvocationCompleteListener = () => {
 
         dispatch(progressImageSet(null));
       }
+      // pass along the socket event as an application action
+      dispatch(appSocketInvocationComplete(action.payload));
     },
   });
 };
