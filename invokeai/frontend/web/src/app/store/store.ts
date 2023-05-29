@@ -5,8 +5,8 @@ import {
   configureStore,
 } from '@reduxjs/toolkit';
 
-import { rememberReducer, rememberEnhancer } from 'redux-remember';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
+import { rememberEnhancer, rememberReducer } from 'redux-remember';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
@@ -16,26 +16,28 @@ import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 // import sessionReducer from 'features/system/store/sessionSlice';
-import configReducer from 'features/system/store/configSlice';
-import uiReducer from 'features/ui/store/uiSlice';
-import hotkeysReducer from 'features/ui/store/hotkeysSlice';
-import modelsReducer from 'features/system/store/modelSlice';
+import controlnetReducer from 'features/controlnet/store/controlnetSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
+import configReducer from 'features/system/store/configSlice';
+import modelsReducer from 'features/system/store/modelSlice';
+import hotkeysReducer from 'features/ui/store/hotkeysSlice';
+import uiReducer from 'features/ui/store/uiSlice';
 
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
-import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
+import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 
+import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
-import { LOCALSTORAGE_PREFIX } from './constants';
 
 const allReducers = {
   canvas: canvasReducer,
   gallery: galleryReducer,
   generation: generationReducer,
+  controlnet: controlnetReducer,
   lightbox: lightboxReducer,
   models: modelsReducer,
   nodes: nodesReducer,

@@ -100,7 +100,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             ref={refs.setFloating}
             sx={{
               ...floatingStyles,
-              width: 'max-content',
+              width: '100%',
               top: 0,
               left: 0,
               flexDirection: 'column',

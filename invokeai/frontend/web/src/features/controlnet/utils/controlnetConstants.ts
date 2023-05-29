@@ -1,0 +1,15 @@
+export const CONTROLNET_PROCESSORS: string[] = [
+  'none',
+  'canny',
+  'depth',
+  'depth_zoe',
+  'lineart',
+  'lineart_anime',
+  'mediapipe',
+  'mlsd',
+  'normal_bae',
+  'openpose',
+  'pidi',
+  'softedge',
+  'shuffle',
+];

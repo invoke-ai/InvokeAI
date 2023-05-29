@@ -17,7 +17,7 @@ export const SCHEDULERS = [
   'heun',
   'heun_k',
   'unipc',
-] as const;
+];
 
 export type Scheduler = (typeof SCHEDULERS)[number];
 
