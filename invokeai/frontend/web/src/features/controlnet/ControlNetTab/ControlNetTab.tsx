@@ -2,8 +2,11 @@ import { Flex, Text } from '@chakra-ui/react';
 import { ActionCreatorWithPayload } from '@reduxjs/toolkit';
 import { ControlNetConfig } from '../store/controlnetTypes';
 import ControlNetEnabled from './ControlNetEnabled';
+import ControlNetEnd from './ControlNetEnd';
+import ControlNetImage from './ControlNetImage';
 import ControlNetModels from './ControlNetModels';
 import ControlNetProcessor from './ControlNetProcessor';
+import ControlNetStart from './ControlNetStart';
 import ControlNetWeight from './ControlNetWeight';
 
 interface ControlNetTabProps {
@@ -23,7 +26,7 @@ export default function ControlNetTab(props: ControlNetTabProps) {
         flexDirection: 'column',
         rowGap: 2,
         background: `${
-          controlnet.controlnetEnabled ? 'accent.850' : 'base.850'
+          controlnet.controlnetEnabled ? 'accent.800' : 'base.800'
         }`,
         padding: 4,
         borderRadius: 4,
@@ -36,6 +39,7 @@ export default function ControlNetTab(props: ControlNetTabProps) {
         />
         <Text>{label}</Text>
       </Flex>
+      <ControlNetImage />
       <Flex gap={2}>
         <ControlNetProcessor
           controlnet={controlnet}
@@ -47,6 +51,8 @@ export default function ControlNetTab(props: ControlNetTabProps) {
         />
       </Flex>
       <ControlNetWeight controlnet={controlnet} setControlnet={setControlnet} />
+      <ControlNetStart controlnet={controlnet} setControlnet={setControlnet} />
+      <ControlNetEnd controlnet={controlnet} setControlnet={setControlnet} />
     </Flex>
   );
 }
