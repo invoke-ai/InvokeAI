@@ -11,7 +11,7 @@ export const addReceivedPageOfImagesFulfilledListener = () => {
     effect: (action, { getState, dispatch }) => {
       const page = action.payload;
       moduleLog.debug(
-        { data: { page } },
+        { data: { payload: action.payload } },
         `Received ${page.items.length} images`
       );
     },

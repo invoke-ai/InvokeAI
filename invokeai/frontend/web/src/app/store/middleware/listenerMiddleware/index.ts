@@ -69,6 +69,7 @@ import {
 } from './listeners/receivedPageOfImages';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
+import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -166,6 +167,9 @@ addSessionCanceledPendingListener();
 addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
 
-// Images
+// Fetching images
 addReceivedPageOfImagesFulfilledListener();
 addReceivedPageOfImagesRejectedListener();
+
+// Gallery
+addImageCategoriesChangedListener();
