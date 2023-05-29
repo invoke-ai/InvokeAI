@@ -5,9 +5,9 @@
 import type { ImageField } from './ImageField';
 
 /**
- * Applies Midas depth processing to image
+ * Applies mediapipe face processing to image
  */
-export type MidasDepthImageProcessorInvocation = {
+export type MediapipeFaceProcessorInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -16,18 +16,18 @@ export type MidasDepthImageProcessorInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'midas_depth_image_processor';
+  type?: 'mediapipe_face_processor';
   /**
    * image to process
    */
   image?: ImageField;
   /**
-   * Midas parameter a = amult * PI
+   * maximum number of faces to detect
    */
-  a_mult?: number;
+  max_faces?: number;
   /**
-   * Midas parameter bg_th
+   * minimum confidence for face detection
    */
-  bg_th?: number;
+  min_confidence?: number;
 };
 

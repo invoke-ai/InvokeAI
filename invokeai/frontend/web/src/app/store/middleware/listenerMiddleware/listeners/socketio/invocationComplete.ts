@@ -6,7 +6,6 @@ import { imageMetadataReceived } from 'services/thunks/image';
 import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -34,13 +33,13 @@ export const addInvocationCompleteListener = () => {
 
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
-        const { image_name, image_type } = result.image;
+        const { image_name, image_origin } = result.image;
 
         // Get its metadata
         dispatch(
           imageMetadataReceived({
             imageName: image_name,
-            imageType: image_type,
+            imageOrigin: image_origin,
           })
         );
 
@@ -48,23 +47,12 @@ export const addInvocationCompleteListener = () => {
           imageMetadataReceived.fulfilled.match
         );
 
-        if (getState().gallery.shouldAutoSwitchToNewImages) {
-          dispatch(imageSelected(imageDTO));
-        }
-
         // Handle canvas image
         if (
           graph_execution_state_id ===
           getState().canvas.layerState.stagingArea.sessionId
         ) {
-          const [{ payload: image }] = await take(
-            (
-              action
-            ): action is ReturnType<typeof imageMetadataReceived.fulfilled> =>
-              imageMetadataReceived.fulfilled.match(action) &&
-              action.payload.image_name === image_name
-          );
-          dispatch(addImageToStagingArea(image));
+          dispatch(addImageToStagingArea(imageDTO));
         }
 
         dispatch(progressImageSet(null));

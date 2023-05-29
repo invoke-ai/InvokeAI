@@ -147,7 +147,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.setData('invokeai/imageType', image.image_type);
       e.dataTransfer.effectAllowed = 'move';
     },
     [image]

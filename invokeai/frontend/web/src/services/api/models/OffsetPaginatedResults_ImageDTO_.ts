@@ -5,25 +5,21 @@
 import type { ImageDTO } from './ImageDTO';
 
 /**
- * Paginated results
+ * Offset-paginated results
  */
-export type PaginatedResults_ImageDTO_ = {
+export type OffsetPaginatedResults_ImageDTO_ = {
   /**
    * Items
    */
   items: Array<ImageDTO>;
   /**
-   * Current Page
+   * Offset from which to retrieve items
    */
-  page: number;
+  offset: number;
   /**
-   * Total number of pages
+   * Limit of items to get
    */
-  pages: number;
-  /**
-   * Number of items per page
-   */
-  per_page: number;
+  limit: number;
   /**
    * Total number of items in result
    */

@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageType } from './ImageType';
+import type { ResourceOrigin } from './ResourceOrigin';
 
 /**
  * The URLs for an image and its thumbnail.
@@ -15,7 +15,7 @@ export type ImageUrlsDTO = {
   /**
    * The type of the image.
    */
-  image_type: ImageType;
+  image_origin: ResourceOrigin;
   /**
    * The URL of the image.
    */

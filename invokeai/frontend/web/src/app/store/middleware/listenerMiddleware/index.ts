@@ -60,13 +60,14 @@ import {
   addSessionCanceledRejectedListener,
 } from './listeners/sessionCanceled';
 import {
-  addReceivedResultImagesPageFulfilledListener,
-  addReceivedResultImagesPageRejectedListener,
-} from './listeners/receivedResultImagesPage';
+  addImageUpdatedFulfilledListener,
+  addImageUpdatedRejectedListener,
+} from './listeners/imageUpdated';
 import {
-  addReceivedUploadImagesPageFulfilledListener,
-  addReceivedUploadImagesPageRejectedListener,
-} from './listeners/receivedUploadImagesPage';
+  addReceivedPageOfImagesFulfilledListener,
+  addReceivedPageOfImagesRejectedListener,
+} from './listeners/receivedPageOfImages';
+import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -90,6 +91,11 @@ export type AppListenerEffect = ListenerEffect<
 addImageUploadedFulfilledListener();
 addImageUploadedRejectedListener();
 
+// Image updated
+addImageUpdatedFulfilledListener();
+addImageUpdatedRejectedListener();
+
+// Image selected
 addInitialImageSelectedListener();
 
 // Image deleted
@@ -118,6 +124,7 @@ addCanvasSavedToGalleryListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
+addStagingAreaImageSavedListener();
 
 // socketio
 addGeneratorProgressListener();
@@ -145,8 +152,6 @@ addSessionCanceledPendingListener();
 addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
 
-// Gallery pages
-addReceivedResultImagesPageFulfilledListener();
-addReceivedResultImagesPageRejectedListener();
-addReceivedUploadImagesPageFulfilledListener();
-addReceivedUploadImagesPageRejectedListener();
+// Images
+addReceivedPageOfImagesFulfilledListener();
+addReceivedPageOfImagesRejectedListener();
