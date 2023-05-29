@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { DragEvent, useCallback } from 'react';
+import { DragEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
@@ -13,6 +13,7 @@ import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinn
 import { FaImage } from 'react-icons/fa';
 import { configSelector } from '../../../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
+import { imageUrlsReceived } from 'services/thunks/image';
 
 const selector = createSelector(
   [generationSelector],
@@ -32,15 +33,26 @@ const InitialImagePreview = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const toaster = useAppToaster();
+  const [didGetUrls, setDidGetUrls] = useState(false);
 
   const handleError = useCallback(() => {
     dispatch(clearInitialImage());
-    if (shouldFetchImages) {
-      toaster({
-        title: 'Something went wrong, please refresh',
-        status: 'error',
-        isClosable: true,
-      });
+    if (shouldFetchImages && initialImage) {
+      if (didGetUrls) {
+        toaster({
+          title: 'Something went wrong, please refresh',
+          status: 'error',
+          isClosable: true,
+        });
+        return;
+      }
+
+      const { image_origin, image_name } = initialImage;
+
+      dispatch(
+        imageUrlsReceived({ imageOrigin: image_origin, imageName: image_name })
+      );
+      setDidGetUrls(true);
     } else {
       toaster({
         title: t('toast.parametersFailed'),
@@ -49,7 +61,7 @@ const InitialImagePreview = () => {
         isClosable: true,
       });
     }
-  }, [dispatch, t, toaster, shouldFetchImages]);
+  }, [dispatch, t, toaster, shouldFetchImages, initialImage, didGetUrls]);
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {

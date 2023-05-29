@@ -5,6 +5,7 @@ import { merge } from 'lodash-es';
 
 export const initialConfigState: AppConfig = {
   shouldTransformUrls: false,
+  shouldFetchImages: false,
   disabledTabs: [],
   disabledFeatures: [],
   disabledSDFeatures: [],
