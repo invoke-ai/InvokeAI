@@ -352,7 +352,7 @@ export const systemSlice = createSlice({
     });
 
     /**
-     * Session Invoked - PENDING
+     * User Invoked
      */
 
     builder.addCase(userInvoked, (state) => {
