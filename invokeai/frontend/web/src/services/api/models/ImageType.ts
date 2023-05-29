@@ -5,4 +5,4 @@
 /**
  * The type of an image.
  */
-export type ImageType = 'results' | 'uploads' | 'intermediates';
+export type ImageType = 'results' | 'uploads';

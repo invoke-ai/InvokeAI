@@ -5,4 +5,4 @@
 /**
  * The category of an image. Use ImageCategory.OTHER for non-default categories.
  */
-export type ImageCategory = 'general' | 'control' | 'other';
+export type ImageCategory = 'general' | 'control' | 'mask' | 'other';

@@ -34,6 +34,15 @@ class IntOutput(BaseInvocationOutput):
     # fmt: on
 
 
+class FloatOutput(BaseInvocationOutput):
+    """A float output"""
+
+    # fmt: off
+    type: Literal["float_output"] = "float_output"
+    param: float = Field(default=None, description="The output float")
+    # fmt: on
+
+
 class AddInvocation(BaseInvocation, MathInvocationConfig):
     """Adds two numbers"""
 

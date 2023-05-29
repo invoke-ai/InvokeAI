@@ -11,7 +11,7 @@ import { addNoiseNodes } from '../nodeBuilders/addNoiseNodes';
 const POSITIVE_CONDITIONING = 'positive_conditioning';
 const NEGATIVE_CONDITIONING = 'negative_conditioning';
 const TEXT_TO_LATENTS = 'text_to_latents';
-const LATENTS_TO_IMAGE = 'latnets_to_image';
+const LATENTS_TO_IMAGE = 'latents_to_image';
 
 /**
  * Builds the Text to Image tab graph.

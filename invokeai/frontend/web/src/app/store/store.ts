@@ -16,6 +16,7 @@ import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
+// import sessionReducer from 'features/system/store/sessionSlice';
 import configReducer from 'features/system/store/configSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
@@ -46,6 +47,7 @@ const allReducers = {
   ui: uiReducer,
   uploads: uploadsReducer,
   hotkeys: hotkeysReducer,
+  // session: sessionReducer,
 };
 
 const rootReducer = combineReducers(allReducers);

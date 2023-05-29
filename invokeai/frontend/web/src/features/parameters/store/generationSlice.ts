@@ -52,7 +52,7 @@ export const initialGenerationState: GenerationState = {
   perlin: 0,
   positivePrompt: '',
   negativePrompt: '',
-  scheduler: 'lms',
+  scheduler: 'euler',
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,

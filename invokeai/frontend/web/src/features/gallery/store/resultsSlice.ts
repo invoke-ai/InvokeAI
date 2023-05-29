@@ -1,14 +1,13 @@
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
+import {
+  PayloadAction,
+  createEntityAdapter,
+  createSlice,
+} from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import {
   receivedResultImagesPage,
   IMAGES_PER_PAGE,
 } from 'services/thunks/gallery';
-import {
-  imageDeleted,
-  imageMetadataReceived,
-  imageUrlsReceived,
-} from 'services/thunks/image';
 import { ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 
@@ -26,6 +25,7 @@ type AdditionalResultsState = {
   pages: number;
   isLoading: boolean;
   nextPage: number;
+  upsertedImageCount: number;
 };
 
 export const initialResultsState =
@@ -34,6 +34,7 @@ export const initialResultsState =
     pages: 0,
     isLoading: false,
     nextPage: 0,
+    upsertedImageCount: 0,
   });
 
 export type ResultsState = typeof initialResultsState;
@@ -42,7 +43,10 @@ const resultsSlice = createSlice({
   name: 'results',
   initialState: initialResultsState,
   reducers: {
-    resultAdded: resultsAdapter.upsertOne,
+    resultUpserted: (state, action: PayloadAction<ResultsImageDTO>) => {
+      resultsAdapter.upsertOne(state, action.payload);
+      state.upsertedImageCount += 1;
+    },
   },
   extraReducers: (builder) => {
     /**
@@ -68,47 +72,6 @@ const resultsSlice = createSlice({
       state.nextPage = items.length < IMAGES_PER_PAGE ? page : page + 1;
       state.isLoading = false;
     });
-
-    /**
-     * Image Metadata Received - FULFILLED
-     */
-    builder.addCase(imageMetadataReceived.fulfilled, (state, action) => {
-      const { image_type } = action.payload;
-
-      if (image_type === 'results') {
-        resultsAdapter.upsertOne(state, action.payload as ResultsImageDTO);
-      }
-    });
-
-    /**
-     * Image URLs Received - FULFILLED
-     */
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_type, image_url, thumbnail_url } =
-        action.payload;
-
-      if (image_type === 'results') {
-        resultsAdapter.updateOne(state, {
-          id: image_name,
-          changes: {
-            image_url: image_url,
-            thumbnail_url: thumbnail_url,
-          },
-        });
-      }
-    });
-
-    /**
-     * Delete Image - PENDING
-     * Pre-emptively remove the image from the gallery
-     */
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      const { imageType, imageName } = action.meta.arg;
-
-      if (imageType === 'results') {
-        resultsAdapter.removeOne(state, imageName);
-      }
-    });
   },
 });
 
@@ -120,6 +83,6 @@ export const {
   selectTotal: selectResultsTotal,
 } = resultsAdapter.getSelectors<RootState>((state) => state.results);
 
-export const { resultAdded } = resultsSlice.actions;
+export const { resultUpserted } = resultsSlice.actions;
 
 export default resultsSlice.reducer;

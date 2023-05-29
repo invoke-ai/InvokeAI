@@ -57,10 +57,11 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
 
         image_dto = context.services.images.create(
             image=image_inpainted,
-            image_type=ImageType.INTERMEDIATE,
+            image_type=ImageType.RESULT,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(

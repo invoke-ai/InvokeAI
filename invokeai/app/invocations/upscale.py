@@ -49,6 +49,7 @@ class UpscaleInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
