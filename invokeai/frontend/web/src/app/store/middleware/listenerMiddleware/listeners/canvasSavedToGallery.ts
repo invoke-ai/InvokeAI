@@ -15,7 +15,7 @@ export const addCanvasSavedToGalleryListener = () => {
     effect: async (action, { dispatch, getState, take }) => {
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
+      const blob = await getBaseLayerBlob(state, true);
 
       if (!blob) {
         moduleLog.error('Problem getting base layer blob');
