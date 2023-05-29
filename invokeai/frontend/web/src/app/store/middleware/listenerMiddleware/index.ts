@@ -68,6 +68,7 @@ import {
   addReceivedPageOfImagesRejectedListener,
 } from './listeners/receivedPageOfImages';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
+import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -125,6 +126,7 @@ addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
 addStagingAreaImageSavedListener();
+addCommitStagingAreaImageListener();
 
 /**
  * Socket.IO Events - these handle SIO events directly and pass on internal application actions.
