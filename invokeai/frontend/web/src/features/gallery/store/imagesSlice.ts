@@ -15,6 +15,14 @@ export const imagesAdapter = createEntityAdapter<ImageDTO>({
   sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
 });
 
+export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
+export const ASSETS_CATEGORIES: ImageCategory[] = [
+  'control',
+  'mask',
+  'user',
+  'other',
+];
+
 type AdditionaImagesState = {
   offset: number;
   limit: number;
@@ -29,7 +37,7 @@ export const initialImagesState =
     limit: 0,
     total: 0,
     isLoading: false,
-    categories: ['general', 'control', 'mask', 'other', 'user'],
+    categories: IMAGE_CATEGORIES,
   });
 
 export type ImagesState = typeof initialImagesState;

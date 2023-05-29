@@ -1,5 +1,6 @@
 import {
   Box,
+  ButtonGroup,
   Checkbox,
   CheckboxGroup,
   Flex,
@@ -36,7 +37,13 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { FaFilter, FaWrench } from 'react-icons/fa';
+import {
+  FaFilter,
+  FaImage,
+  FaImages,
+  FaServer,
+  FaWrench,
+} from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
@@ -47,17 +54,14 @@ import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { ImageCategory } from 'services/api';
-import { imageCategoriesChanged, selectImagesAll } from '../store/imagesSlice';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+  imageCategoriesChanged,
+  selectImagesAll,
+} from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
 import { capitalize } from 'lodash-es';
-
-const IMAGE_CATEGORIES: ImageCategory[] = [
-  'general',
-  'control',
-  'mask',
-  'user',
-  'other',
-];
 
 const categorySelector = createSelector(
   [(state: RootState) => state],
@@ -179,6 +183,14 @@ const ImageGalleryContent = () => {
     [dispatch]
   );
 
+  const handleClickImagesCategory = useCallback(() => {
+    dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
+  }, [dispatch]);
+
+  const handleClickAssetsCategory = useCallback(() => {
+    dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
+  }, [dispatch]);
+
   return (
     <Flex
       sx={{
@@ -194,35 +206,31 @@ const ImageGalleryContent = () => {
         alignItems="center"
         justifyContent="space-between"
       >
-        <IAIPopover
-          triggerComponent={
-            <IAIIconButton
-              aria-label="Gallery Filter"
-              size="sm"
-              icon={<FaFilter />}
-            />
-          }
-        >
-          <Flex sx={{ flexDirection: 'column', gap: 2 }}>
-            <CheckboxGroup
-              value={categories}
-              onChange={handleCategoriesChanged}
-            >
-              {IMAGE_CATEGORIES.map((c) => (
-                <Checkbox key={c} value={c}>
-                  {capitalize(c)}
-                </Checkbox>
-              ))}
-            </CheckboxGroup>
-          </Flex>
-        </IAIPopover>
-
+        <ButtonGroup isAttached>
+          <IAIIconButton
+            tooltip={t('gallery.images')}
+            aria-label={t('gallery.images')}
+            onClick={handleClickImagesCategory}
+            isChecked={categories === IMAGE_CATEGORIES}
+            size="sm"
+            icon={<FaImage />}
+          />
+          <IAIIconButton
+            tooltip={t('gallery.assets')}
+            aria-label={t('gallery.assets')}
+            onClick={handleClickAssetsCategory}
+            isChecked={categories === ASSETS_CATEGORIES}
+            size="sm"
+            icon={<FaServer />}
+          />
+        </ButtonGroup>
         <Flex gap={2}>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
-                size="sm"
+                tooltip={t('gallery.gallerySettings')}
                 aria-label={t('gallery.gallerySettings')}
+                size="sm"
                 icon={<FaWrench />}
               />
             }

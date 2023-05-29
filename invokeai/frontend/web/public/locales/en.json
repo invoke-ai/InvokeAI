@@ -122,7 +122,9 @@
         "noImagesInGallery": "No Images In Gallery",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
-        "deleteImagePermanent": "Deleted images cannot be restored."
+        "deleteImagePermanent": "Deleted images cannot be restored.",
+        "images": "Images",
+        "assets": "Assets"
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",

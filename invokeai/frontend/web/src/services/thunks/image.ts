@@ -91,6 +91,8 @@ export const receivedPageOfImages = createAppAsyncThunk(
       categories.includes(i.image_category)
     ).length;
 
+    console.log(categories);
+
     const response = await ImagesService.listImagesWithMetadata({
       categories,
       isIntermediate: false,
