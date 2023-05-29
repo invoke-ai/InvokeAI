@@ -4,6 +4,7 @@ import { ControlNetConfig } from '../store/controlnetTypes';
 import ControlNetEnabled from './ControlNetEnabled';
 import ControlNetModels from './ControlNetModels';
 import ControlNetProcessor from './ControlNetProcessor';
+import ControlNetWeight from './ControlNetWeight';
 
 interface ControlNetTabProps {
   label: string;
@@ -22,7 +23,7 @@ export default function ControlNetTab(props: ControlNetTabProps) {
         flexDirection: 'column',
         rowGap: 2,
         background: `${
-          controlnet.controlnetEnabled ? 'accent.600' : 'base.850'
+          controlnet.controlnetEnabled ? 'accent.850' : 'base.850'
         }`,
         padding: 4,
         borderRadius: 4,
@@ -45,6 +46,7 @@ export default function ControlNetTab(props: ControlNetTabProps) {
           setControlnet={setControlnet}
         />
       </Flex>
+      <ControlNetWeight controlnet={controlnet} setControlnet={setControlnet} />
     </Flex>
   );
 }
