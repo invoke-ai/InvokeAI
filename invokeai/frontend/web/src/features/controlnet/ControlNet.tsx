@@ -5,7 +5,7 @@ import ControlNetTab3 from './ControlNetTab3';
 
 export default function ControlNet() {
   return (
-    <Flex sx={{ minWidth: '30%', flexDirection: 'column', rowGap: 2 }}>
+    <Flex sx={{ width: 'full', flexDirection: 'column', rowGap: 2 }}>
       <ControlNetTab1 />
       <ControlNetTab2 />
       <ControlNetTab3 />
