@@ -159,7 +159,7 @@ class StepParamEasingInvocation(BaseInvocation):
             plt.figure()
             plt.xlabel("Step")
             plt.ylabel("Param Value")
-            plt.title("Param Easing: Per-Step Param Values")
+            plt.title("Per-Step Param Values Based On", self.easing, "Easing Function")
             plt.bar(range(len(param_list)), param_list)
             # plt.plot(param_list)
             ax = plt.gca()
