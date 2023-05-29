@@ -32,7 +32,7 @@ const selector = createSelector(
   (canvas) => {
     const {
       layerState: {
-        stagingArea: { images, selectedImageIndex },
+        stagingArea: { images, selectedImageIndex, sessionId },
       },
       shouldShowStagingOutline,
       shouldShowStagingImage,
@@ -45,6 +45,7 @@ const selector = createSelector(
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
       shouldShowStagingOutline,
+      sessionId,
     };
   },
   {
@@ -61,6 +62,7 @@ const IAICanvasStagingAreaToolbar = () => {
     isOnLastImage,
     currentStagingAreaImage,
     shouldShowStagingImage,
+    sessionId,
   } = useAppSelector(selector);
 
   const { t } = useTranslation();
@@ -106,9 +108,20 @@ const IAICanvasStagingAreaToolbar = () => {
     }
   );
 
-  const handlePrevImage = () => dispatch(prevStagingAreaImage());
-  const handleNextImage = () => dispatch(nextStagingAreaImage());
-  const handleAccept = () => dispatch(commitStagingAreaImage());
+  const handlePrevImage = useCallback(
+    () => dispatch(prevStagingAreaImage()),
+    [dispatch]
+  );
+
+  const handleNextImage = useCallback(
+    () => dispatch(nextStagingAreaImage()),
+    [dispatch]
+  );
+
+  const handleAccept = useCallback(
+    () => dispatch(commitStagingAreaImage(sessionId)),
+    [dispatch, sessionId]
+  );
 
   if (!currentStagingAreaImage) return null;
 
