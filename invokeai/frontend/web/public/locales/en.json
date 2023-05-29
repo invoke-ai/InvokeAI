@@ -526,7 +526,7 @@
     },
     "settings": {
         "models": "Models",
-        "displayInProgress": "Display In-Progress Images",
+        "displayInProgress": "Display Progress Images",
         "saveSteps": "Save images every n steps",
         "confirmOnDelete": "Confirm On Delete",
         "displayHelpIcons": "Display Help Icons",
