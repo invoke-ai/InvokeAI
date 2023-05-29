@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { ImageDTO } from 'services/api';
+import { imageUpserted } from './imagesSlice';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -46,6 +47,13 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(imageUpserted, (state, action) => {
+      if (state.shouldAutoSwitchToNewImages) {
+        state.selectedImage = action.payload;
+      }
+    });
   },
 });
 
