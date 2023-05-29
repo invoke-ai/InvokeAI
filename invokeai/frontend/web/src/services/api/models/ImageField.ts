@@ -17,4 +17,3 @@ export type ImageField = {
    */
   image_name: string;
 };
-

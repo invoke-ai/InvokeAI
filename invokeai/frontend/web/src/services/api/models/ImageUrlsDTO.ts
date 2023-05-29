@@ -25,4 +25,3 @@ export type ImageUrlsDTO = {
    */
   thumbnail_url: string;
 };
-

@@ -62,4 +62,3 @@ export type TextToImageInvocation = {
    */
   control_image?: ImageField;
 };
-

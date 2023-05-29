@@ -20,4 +20,3 @@ export type ParamFloatInvocation = {
    */
   param?: number;
 };
-

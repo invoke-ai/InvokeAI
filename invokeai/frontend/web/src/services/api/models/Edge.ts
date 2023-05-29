@@ -14,4 +14,3 @@ export type Edge = {
    */
   destination: EdgeConnection;
 };
-

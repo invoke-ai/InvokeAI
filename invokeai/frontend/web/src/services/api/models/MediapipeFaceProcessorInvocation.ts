@@ -30,4 +30,3 @@ export type MediapipeFaceProcessorInvocation = {
    */
   min_confidence?: number;
 };
-

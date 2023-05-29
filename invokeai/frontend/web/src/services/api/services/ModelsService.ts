@@ -1,6 +1,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ControlNetModelsList } from '../models/ControlNetModelsList';
 import type { CreateModelRequest } from '../models/CreateModelRequest';
 import type { ModelsList } from '../models/ModelsList';
 
@@ -30,10 +31,10 @@ export class ModelsService {
    * @throws ApiError
    */
   public static updateModel({
-    requestBody,
-  }: {
-    requestBody: CreateModelRequest,
-  }): CancelablePromise<any> {
+requestBody,
+}: {
+requestBody: CreateModelRequest,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/models/',
@@ -52,10 +53,10 @@ export class ModelsService {
    * @throws ApiError
    */
   public static delModel({
-    modelName,
-  }: {
-    modelName: string,
-  }): CancelablePromise<any> {
+modelName,
+}: {
+modelName: string,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/models/{model_name}',
@@ -66,6 +67,19 @@ export class ModelsService {
         404: `Model not found`,
         422: `Validation Error`,
       },
+    });
+  }
+
+  /**
+   * List Controlnet Models
+   * Gets a list of ControlNet models
+   * @returns ControlNetModelsList Successful Response
+   * @throws ApiError
+   */
+  public static listControlnetModels(): CancelablePromise<ControlNetModelsList> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/models/controlnet/',
     });
   }
 

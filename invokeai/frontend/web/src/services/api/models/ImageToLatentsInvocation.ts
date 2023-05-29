@@ -26,4 +26,3 @@ export type ImageToLatentsInvocation = {
    */
   model?: string;
 };
-

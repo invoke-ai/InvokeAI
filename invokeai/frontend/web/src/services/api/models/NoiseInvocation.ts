@@ -28,4 +28,3 @@ export type NoiseInvocation = {
    */
   height?: number;
 };
-

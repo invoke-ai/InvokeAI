@@ -24,4 +24,3 @@ export type IterateInvocation = {
    */
   index?: number;
 };
-

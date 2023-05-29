@@ -22,4 +22,3 @@ export type NoiseOutput = {
    */
   height: number;
 };
-

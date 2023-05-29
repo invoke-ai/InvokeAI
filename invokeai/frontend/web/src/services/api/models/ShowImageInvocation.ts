@@ -22,4 +22,3 @@ export type ShowImageInvocation = {
    */
   image?: ImageField;
 };
-

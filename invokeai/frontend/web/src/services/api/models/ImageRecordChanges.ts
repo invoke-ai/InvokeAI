@@ -26,4 +26,3 @@ export type ImageRecordChanges = {
    */
   is_intermediate?: boolean;
 };
-

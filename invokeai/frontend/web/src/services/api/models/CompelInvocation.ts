@@ -24,4 +24,3 @@ export type CompelInvocation = {
    */
   model?: string;
 };
-

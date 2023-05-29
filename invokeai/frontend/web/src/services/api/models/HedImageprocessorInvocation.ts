@@ -34,4 +34,3 @@ export type HedImageprocessorInvocation = {
    */
   scribble?: boolean;
 };
-
