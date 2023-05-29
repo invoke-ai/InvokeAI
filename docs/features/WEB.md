@@ -299,14 +299,6 @@ initial image" icons are located.
 
 See the [Unified Canvas Guide](UNIFIED_CANVAS.md)
 
-## Parting remarks
-
-This concludes the walkthrough, but there are several more features that you can
-explore. Please check out the [Command Line Interface](CLI.md) documentation for
-further explanation of the advanced features that were not covered here.
-
-The WebUI is only rapid development. Check back regularly for updates!
-
 ## Reference
 
 ### Additional Options
@@ -349,11 +341,9 @@ the settings configured in the toolbar.
 
 See below for additional documentation related to each feature:
 
-- [Core Prompt Settings](./CLI.md)
 - [Variations](./VARIATIONS.md)
 - [Upscaling](./POSTPROCESS.md#upscaling)
 - [Image to Image](./IMG2IMG.md)
-- [Inpainting](./INPAINTING.md)
 - [Other](./OTHER.md)
 
 #### Invocation Gallery

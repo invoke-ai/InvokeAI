@@ -137,11 +137,8 @@ This method is recommended for those familiar with running Docker containers
 
 ### Image Management
 - [Image2Image](features/IMG2IMG.md)
-- [Inpainting](features/INPAINTING.md)
-- [Outpainting](features/OUTPAINTING.md)
 - [Adding custom styles and subjects](features/CONCEPTS.md)
 - [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
-- [Embiggen upscaling](features/EMBIGGEN.md)
 - [Other Features](features/OTHER.md)
 
 <!-- separator -->

@@ -494,7 +494,7 @@ sections describe what's new for InvokeAI.
   [Manual Installation](installation/020_INSTALL_MANUAL.md).
 - The ability to save frequently-used startup options (model to load, steps,
   sampler, etc) in a `.invokeai` file. See
-  [Client](features/CLI.md)
+  [Client](deprecated/CLI.md)
 - Support for AMD GPU cards (non-CUDA) on Linux machines.
 - Multiple bugs and edge cases squashed.
 
@@ -617,7 +617,7 @@ sections describe what's new for InvokeAI.
 - `dream.py` script renamed `invoke.py`. A `dream.py` script wrapper remains for
   backward compatibility.
 - Completely new WebGUI - launch with `python3 scripts/invoke.py --web`
-- Support for [inpainting](features/INPAINTING.md) and
+- Support for [inpainting](deprecated/INPAINTING.md) and
   [outpainting](features/OUTPAINTING.md)
 - img2img runs on all k\* samplers
 - Support for
@@ -629,7 +629,7 @@ sections describe what's new for InvokeAI.
   using facial reconstruction, ESRGAN upscaling, outcropping (similar to DALL-E
   infinite canvas), and "embiggen" upscaling. See the `!fix` command.
 - New `--hires` option on `invoke>` line allows
-  [larger images to be created without duplicating elements](features/CLI.md#this-is-an-example-of-txt2img),
+  [larger images to be created without duplicating elements](deprecated/CLI.md#this-is-an-example-of-txt2img),
   at the cost of some performance.
 - New `--perlin` and `--threshold` options allow you to add and control
   variation during image generation (see
@@ -638,7 +638,7 @@ sections describe what's new for InvokeAI.
   of images and tweaking of previous settings.
 - Command-line completion in `invoke.py` now works on Windows, Linux and Mac
   platforms.
-- Improved [command-line completion behavior](features/CLI.md) New commands
+- Improved [command-line completion behavior](deprecated/CLI.md) New commands
   added:
   - List command-line history with `!history`
   - Search command-line history with `!search`

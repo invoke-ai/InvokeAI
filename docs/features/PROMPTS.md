@@ -4,77 +4,12 @@ title: Prompting-Features
 
 # :octicons-command-palette-24: Prompting-Features
 
-## **Reading Prompts from a File**
-
-You can automate `invoke.py` by providing a text file with the prompts you want
-to run, one line per prompt. The text file must be composed with a text editor
-(e.g. Notepad) and not a word processor. Each line should look like what you
-would type at the invoke> prompt:
-
-```bash
-"a beautiful sunny day in the park, children playing" -n4 -C10
-"stormy weather on a mountain top, goats grazing" -s100
-"innovative packaging for a squid's dinner" -S137038382
-```
-
-Then pass this file's name to `invoke.py` when you invoke it:
-
-```bash
-python scripts/invoke.py --from_file "/path/to/prompts.txt"
-```
-
-You may also read a series of prompts from standard input by providing
-a filename of `-`. For example, here is a python script that creates a
-matrix of prompts, each one varying slightly:
-
-```bash
-#!/usr/bin/env python
-
-adjectives = ['sunny','rainy','overcast']
-samplers = ['k_lms','k_euler_a','k_heun']
-cfg = [7.5, 9, 11]
-
-for adj in adjectives:
-    for samp in samplers:
-        for cg in cfg:
-            print(f'a {adj} day -A{samp} -C{cg}')
-```
-
-Its output looks like this (abbreviated):
-
-```bash
-a sunny day -Aklms -C7.5
-a sunny day -Aklms -C9
-a sunny day -Aklms -C11
-a sunny day -Ak_euler_a -C7.5
-a sunny day -Ak_euler_a -C9
-...
-a overcast day -Ak_heun -C9
-a overcast day -Ak_heun -C11
-```
-
-To feed it to invoke.py, pass the filename of "-"
-
-```bash
-python matrix.py | python scripts/invoke.py --from_file -
-```
-
-When the script is finished, each of the 27 combinations
-of adjective, sampler and CFG will be executed.
-
-The command-line interface provides `!fetch` and `!replay` commands
-which allow you to read the prompts from a single previously-generated
-image or a whole directory of them, write the prompts to a file, and
-then replay them. Or you can create your own file of prompts and feed
-them to the command-line client from within an interactive session.
-See [Command-Line Interface](CLI.md) for details.
-
----
-
 ## **Negative and Unconditioned Prompts**
 
-Any words between a pair of square brackets will instruct Stable Diffusion to
-attempt to ban the concept from the generated image.
+Any words between a pair of square brackets will instruct Stable
+Diffusion to attempt to ban the concept from the generated image. The
+same effect is achieved by placing words in the "Negative Prompts"
+textbox in the Web UI.
 
 ```text
 this is a test prompt [not really] to make you understand [cool] how this works.
@@ -87,7 +22,9 @@ Here's a prompt that depicts what it does.
 
 original prompt:
 
-`#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve"`
+
+`#!bash parameters: steps=20, dimensions=512x768, CFG=7.5, Scheduler=k_euler_a, seed=1654590180`
 
 <figure markdown>
 
@@ -99,7 +36,8 @@ That image has a woman, so if we want the horse without a rider, we can
 influence the image not to have a woman by putting [woman] in the prompt, like
 this:
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman]"`
+(same parameters as above)
 
 <figure markdown>
 
@@ -110,7 +48,8 @@ this:
 That's nice - but say we also don't want the image to be quite so blue. We can
 add "blue" to the list of negative prompts, so it's now [woman blue]:
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue]"`
+(same parameters as above)
 
 <figure markdown>
 
@@ -121,7 +60,8 @@ add "blue" to the list of negative prompts, so it's now [woman blue]:
 Getting close - but there's no sense in having a saddle when our horse doesn't
 have a rider, so we'll add one more negative prompt: [woman blue saddle].
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue saddle]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue saddle]"`
+(same parameters as above)
 
 <figure markdown>
 
@@ -261,19 +201,6 @@ Prompt2prompt `.swap()` is not compatible with xformers, which will be temporari
 The `prompt2prompt` code is based off
 [bloc97's colab](https://github.com/bloc97/CrossAttentionControl).
 
-Note that `prompt2prompt` is not currently working with the runwayML inpainting
-model, and may never work due to the way this model is set up. If you attempt to
-use `prompt2prompt` you will get the original image back. However, since this
-model is so good at inpainting, a good substitute is to use the `clipseg` text
-masking option:
-
-```bash
-invoke> a fluffy cat eating a hotdog
-Outputs:
-[1010] outputs/000025.2182095108.png: a fluffy cat eating a hotdog
-invoke> a smiling dog eating a hotdog -I 000025.2182095108.png -tm cat
-```
-
 ### Escaping parantheses () and speech marks ""
 
 If the model you are using has parentheses () or speech marks "" as part of its
@@ -374,6 +301,5 @@ summoning up the concept of some sort of scifi creature? Let's find out.
 Indeed, removing the word "hybrid" produces an image that is more like what we'd
 expect.
 
-In conclusion, prompt blending is great for exploring creative space, but can be
-difficult to direct. A forthcoming release of InvokeAI will feature more
-deterministic prompt weighting.
+In conclusion, prompt blending is great for exploring creative space,
+but takes some trial and error to achieve the desired effect.
