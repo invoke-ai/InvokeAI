@@ -3,11 +3,11 @@ import { AppDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
 import { Socket } from 'socket.io-client';
 import {
-  generatorProgress,
-  graphExecutionStateComplete,
-  invocationComplete,
-  invocationError,
-  invocationStarted,
+  socketGeneratorProgress,
+  socketGraphExecutionStateComplete,
+  socketInvocationComplete,
+  socketInvocationError,
+  socketInvocationStarted,
   socketConnected,
   socketDisconnected,
   socketSubscribed,
@@ -77,21 +77,21 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    * Invocation started
    */
   socket.on('invocation_started', (data) => {
-    dispatch(invocationStarted({ data, timestamp: getTimestamp() }));
+    dispatch(socketInvocationStarted({ data, timestamp: getTimestamp() }));
   });
 
   /**
    * Generator progress
    */
   socket.on('generator_progress', (data) => {
-    dispatch(generatorProgress({ data, timestamp: getTimestamp() }));
+    dispatch(socketGeneratorProgress({ data, timestamp: getTimestamp() }));
   });
 
   /**
    * Invocation error
    */
   socket.on('invocation_error', (data) => {
-    dispatch(invocationError({ data, timestamp: getTimestamp() }));
+    dispatch(socketInvocationError({ data, timestamp: getTimestamp() }));
   });
 
   /**
@@ -99,7 +99,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    */
   socket.on('invocation_complete', (data) => {
     dispatch(
-      invocationComplete({
+      socketInvocationComplete({
         data,
         timestamp: getTimestamp(),
       })
@@ -110,6 +110,11 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    * Graph complete
    */
   socket.on('graph_execution_state_complete', (data) => {
-    dispatch(graphExecutionStateComplete({ data, timestamp: getTimestamp() }));
+    dispatch(
+      socketGraphExecutionStateComplete({
+        data,
+        timestamp: getTimestamp(),
+      })
+    );
   });
 };

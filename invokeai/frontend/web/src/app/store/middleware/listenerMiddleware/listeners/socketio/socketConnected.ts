@@ -1,13 +1,13 @@
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { socketConnected } from 'services/events/actions';
+import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { receivedPageOfImages } from 'services/thunks/image';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
-export const addSocketConnectedListener = () => {
+export const addSocketConnectedEventListener = () => {
   startAppListening({
     actionCreator: socketConnected,
     effect: (action, { dispatch, getState }) => {
@@ -30,6 +30,9 @@ export const addSocketConnectedListener = () => {
       if (!nodes.schema && !disabledTabs.includes('nodes')) {
         dispatch(receivedOpenAPISchema());
       }
+
+      // pass along the socket event as an application action
+      dispatch(appSocketConnected(action.payload));
     },
   });
 };

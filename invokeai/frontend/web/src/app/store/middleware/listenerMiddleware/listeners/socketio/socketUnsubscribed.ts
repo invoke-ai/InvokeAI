@@ -1,10 +1,13 @@
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { socketUnsubscribed } from 'services/events/actions';
+import {
+  appSocketUnsubscribed,
+  socketUnsubscribed,
+} from 'services/events/actions';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
-export const addSocketUnsubscribedListener = () => {
+export const addSocketUnsubscribedEventListener = () => {
   startAppListening({
     actionCreator: socketUnsubscribed,
     effect: (action, { dispatch, getState }) => {
@@ -12,6 +15,7 @@ export const addSocketUnsubscribedListener = () => {
         action.payload,
         `Unsubscribed (${action.payload.sessionId})`
       );
+      dispatch(appSocketUnsubscribed(action.payload));
     },
   });
 };

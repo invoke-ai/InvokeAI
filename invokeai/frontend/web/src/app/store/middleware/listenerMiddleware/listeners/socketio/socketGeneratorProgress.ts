@@ -1,12 +1,15 @@
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { generatorProgress } from 'services/events/actions';
+import {
+  appSocketGeneratorProgress,
+  socketGeneratorProgress,
+} from 'services/events/actions';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
-export const addGeneratorProgressListener = () => {
+export const addGeneratorProgressEventListener = () => {
   startAppListening({
-    actionCreator: generatorProgress,
+    actionCreator: socketGeneratorProgress,
     effect: (action, { dispatch, getState }) => {
       if (
         getState().system.canceledSession ===
@@ -23,6 +26,9 @@ export const addGeneratorProgressListener = () => {
         action.payload,
         `Generator progress (${action.payload.data.node.type})`
       );
+
+      // pass along the socket event as an application action
+      dispatch(appSocketGeneratorProgress(action.payload));
     },
   });
 };
