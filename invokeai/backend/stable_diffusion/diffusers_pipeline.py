@@ -218,7 +218,7 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 class ControlNetData:
     model: ControlNetModel = Field(default=None)
     image_tensor: torch.Tensor= Field(default=None)
-    weight: float = Field(default=1.0)
+    weight: Union[float, List[float]]= Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
 
@@ -681,13 +681,20 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 # only apply controlnet if current step is within the controlnet's begin/end step range
                 if step_index >= first_control_step and step_index <= last_control_step:
                     # print("running controlnet", i, "for step", step_index)
+                    if isinstance(control_datum.weight, list):
+                        # if controlnet has multiple weights, use the weight for the current step
+                        controlnet_weight = control_datum.weight[step_index]
+                    else:
+                        # if controlnet has a single weight, use it for all steps
+                        controlnet_weight = control_datum.weight
                     down_samples, mid_sample = control_datum.model(
                         sample=latent_control_input,
                         timestep=timestep,
                         encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
                                                          conditioning_data.text_embeddings]),
                         controlnet_cond=control_datum.image_tensor,
-                        conditioning_scale=control_datum.weight,
+                        # conditioning_scale=control_datum.weight,
+                        conditioning_scale=controlnet_weight,
                         # cross_attention_kwargs,
                         guess_mode=False,
                         return_dict=False,

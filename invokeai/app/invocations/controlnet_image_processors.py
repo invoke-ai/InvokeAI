@@ -97,7 +97,8 @@ CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="processed image")
     control_model: Optional[str] = Field(default=None, description="control model used")
-    control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
+    # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
+    control_weight: Union[float, List[float]] = Field(default=1, description="weight given to controlnet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
                                                 description="% of total steps at which controlnet is first applied")
     end_step_percent: float = Field(default=1, ge=0, le=1,
@@ -105,7 +106,13 @@ class ControlField(BaseModel):
 
     class Config:
         schema_extra = {
-            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"]
+            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"],
+            "ui": {
+                "type_hints": {
+                    "control_weight": "float",
+                    # "control_weight": "number",
+                }
+            }
         }
 
 
@@ -125,7 +132,9 @@ class ControlNetInvocation(BaseInvocation):
     image: ImageField = Field(default=None, description="image to process")
     control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
                                                   description="control model used")
-    control_weight: float = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
+    # control_weight: float = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
+    # control_weight: Union[float, List[float]] = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
+    control_weight: Union[float, List[float]] = Field(default=1.0, description="weight given to controlnet")
     # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
                                         description="% of total steps at which controlnet is first applied")
@@ -133,6 +142,19 @@ class ControlNetInvocation(BaseInvocation):
                                       description="% of total steps at which controlnet is last applied")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents"],
+                "type_hints": {
+                  "model": "model",
+                  "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number",
+                  "control_weight": "float",
+                }
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ControlOutput:
 
