@@ -7,6 +7,7 @@ import torch
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import BaseModel, Field, validator
+from contextlib import ExitStack
 
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
@@ -27,6 +28,8 @@ from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
 from .compel import ConditioningField
 from .image import ImageCategory, ImageField, ImageOutput
 from .model import ModelInfo, UNetField, VaeField
+
+from ...backend.model_management.lora import LoRAHelper
 
 
 class LatentsField(BaseModel):
@@ -196,18 +199,7 @@ class TextToLatentsInvocation(BaseInvocation):
             source_node_id=source_node_id,
         )
 
-    def get_model(self, model_manager: ModelManagerService) -> StableDiffusionGeneratorPipeline:
-        model_info = model_manager.get_model(self.model)
-        model: StableDiffusionGeneratorPipeline = model_info['model']
-        model.scheduler = get_scheduler(
-            model=model,
-            scheduler_name=self.scheduler
-        )
-
-        return model
-
-
-    def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
+    def get_conditioning_data(self, context: InvocationContext, scheduler) -> ConditioningData:
         c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
 
@@ -222,7 +214,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(self.scheduler, eta=0.0)#ddim_eta)
+        ).add_scheduler_args_if_applicable(scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
     def create_pipeline(self, unet, scheduler) -> StableDiffusionGeneratorPipeline:
@@ -264,7 +256,9 @@ class TextToLatentsInvocation(BaseInvocation):
             self.dispatch_progress(context, source_node_id, state)
 
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
-        with unet_info as unet:
+        with unet_info as unet,\
+             ExitStack() as stack:
+
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -274,14 +268,17 @@ class TextToLatentsInvocation(BaseInvocation):
             pipeline = self.create_pipeline(unet, scheduler)
             conditioning_data = self.get_conditioning_data(context, scheduler)
 
-            # TODO: Verify the noise is the right size
-            result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
-                noise=noise,
-                num_inference_steps=self.steps,
-                conditioning_data=conditioning_data,
-                callback=step_callback
-            )
+            loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+
+            with LoRAHelper.apply_lora_unet(pipeline.unet, loras):
+                # TODO: Verify the noise is the right size
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    callback=step_callback
+                )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -324,7 +321,9 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             **self.unet.unet.dict(),
         )
 
-        with unet_info as unet:
+        with unet_info as unet,\
+             ExitStack() as stack:
+
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -345,14 +344,17 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 device=unet.device,
             )
 
-            result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                latents=initial_latents,
-                timesteps=timesteps,
-                noise=noise,
-                num_inference_steps=self.steps,
-                conditioning_data=conditioning_data,
-                callback=step_callback
-            )
+            loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+
+            with LoRAHelper.apply_lora_unet(pipeline.unet, loras):
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=initial_latents,
+                    timesteps=timesteps,
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    callback=step_callback
+                )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -416,7 +418,6 @@ class LatentsToImageInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(

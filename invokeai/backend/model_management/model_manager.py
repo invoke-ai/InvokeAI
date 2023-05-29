@@ -332,7 +332,10 @@ class ModelManager(object):
             location = None
         
         revision = mconfig.get('revision')
-        hash = self.cache.model_hash(location, revision)
+        if model_type in [SDModelType.Lora]:
+            hash = "<NO_HASH>" # TODO:
+        else:
+            hash = self.cache.model_hash(location, revision)
 
         # If the caller is asking for part of the model and the config indicates
         # an external replacement for that field, then we fetch the replacement

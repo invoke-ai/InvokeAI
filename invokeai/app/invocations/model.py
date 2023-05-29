@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, List
 from pydantic import BaseModel, Field
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
@@ -7,19 +7,22 @@ from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.model_management import SDModelType
 
 class ModelInfo(BaseModel):
-    model_name: str = Field(description="Info to load unet submodel")
-    model_type: SDModelType = Field(description="Info to load unet submodel")
-    submodel: Optional[SDModelType] = Field(description="Info to load unet submodel")
+    model_name: str = Field(description="Info to load submodel")
+    model_type: SDModelType = Field(description="Info to load submodel")
+    submodel: Optional[SDModelType] = Field(description="Info to load submodel")
+
+class LoraInfo(ModelInfo):
+    weight: float = Field(description="Lora's weight which to use when apply to model")
 
 class UNetField(BaseModel):
     unet: ModelInfo = Field(description="Info to load unet submodel")
     scheduler: ModelInfo = Field(description="Info to load scheduler submodel")
-    # loras: List[ModelInfo]
+    loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
 
 class ClipField(BaseModel):
     tokenizer: ModelInfo = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelInfo = Field(description="Info to load text_encoder submodel")
-    # loras: List[ModelInfo]
+    loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
 
 class VaeField(BaseModel):
     # TODO: better naming?
@@ -95,6 +98,21 @@ class ModelLoaderInvocation(BaseInvocation):
             )
         """
 
+        loras = [
+            LoraInfo(
+                model_name="sadcatmeme",
+                model_type=SDModelType.Lora,
+                submodel=None,
+                weight=0.75,
+            ),
+            LoraInfo(
+                model_name="gunAimingAtYouV1",
+                model_type=SDModelType.Lora,
+                submodel=None,
+                weight=0.75,
+            ),
+        ]
+
 
         return ModelLoaderOutput(
             unet=UNetField(
@@ -108,6 +126,7 @@ class ModelLoaderInvocation(BaseInvocation):
                     model_type=SDModelType.Diffusers,
                     submodel=SDModelType.Scheduler,
                 ),
+                loras=loras,
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
@@ -120,6 +139,7 @@ class ModelLoaderInvocation(BaseInvocation):
                     model_type=SDModelType.Diffusers,
                     submodel=SDModelType.TextEncoder,
                 ),
+                loras=loras,
             ),
             vae=VaeField(
                 vae=ModelInfo(

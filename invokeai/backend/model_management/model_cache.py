@@ -37,6 +37,8 @@ from transformers import logging as transformers_logging
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import get_invokeai_config
 
+from .lora import LoRAModel
+
 def get_model_path(repo_id_or_path: str):
     globals = get_invokeai_config()
     
@@ -152,6 +154,7 @@ class SDModelType(str, Enum):
     Tokenizer = "tokenizer"
     Vae = "vae"
     Scheduler = "scheduler"
+    Lora = "lora"
 
 
 class ModelInfoBase:
@@ -400,10 +403,45 @@ class VaeModelInfo(ModelInfoBase):
         return model
 
 
+class LoRAModelInfo(ModelInfoBase):
+    #model_size: int
+
+    def __init__(self, file_path: str, model_type: SDModelType):
+        assert model_type == SDModelType.Lora
+        # check manualy as super().__init__ will try to resolve repo_id too
+        if not os.path.exists(file_path):
+            raise Exception("Model not found")
+        super().__init__(file_path, model_type)
+
+        self.model_size = os.path.getsize(file_path)
+
+    def get_size(self, child_type: Optional[SDModelType] = None):
+        if child_type is not None:
+            raise Exception("There is no child models in lora model")
+        return self.model_size
+
+    def get_model(
+        self,
+        child_type: Optional[SDModelType] = None,
+        torch_dtype: Optional[torch.dtype] = None,
+    ):
+        if child_type is not None:
+            raise Exception("There is no child models in lora model")
+
+        model = LoRAModel.from_checkpoint(
+            file_path=self.model_path,
+            dtype=torch_dtype,
+        )
+
+        self.model_size = model.calc_size()
+        return model
+
+
 MODEL_TYPES = {
     SDModelType.Diffusers: DiffusersModelInfo,
     SDModelType.Classifier: ClassifierModelInfo,
     SDModelType.Vae: VaeModelInfo,
+    SDModelType.Lora: LoRAModelInfo,
 }
 
 
@@ -558,7 +596,7 @@ class ModelCache(object):
             model_type=model_type,
             revision=revision,
         )
-
+        # TODO: variant
         key = self.get_key(
             model_path=model_path,
             model_type=model_type,
