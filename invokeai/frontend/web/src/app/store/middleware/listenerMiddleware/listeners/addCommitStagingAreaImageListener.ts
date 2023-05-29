@@ -10,8 +10,13 @@ export const addCommitStagingAreaImageListener = () => {
     actionCreator: commitStagingAreaImage,
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
-      const { sessionId } = state.system;
+      const { sessionId, isProcessing } = state.system;
       const canvasSessionId = action.payload;
+
+      if (!isProcessing) {
+        // Only need to cancel if we are processing
+        return;
+      }
 
       if (!canvasSessionId) {
         moduleLog.debug('No canvas session, skipping cancel');
