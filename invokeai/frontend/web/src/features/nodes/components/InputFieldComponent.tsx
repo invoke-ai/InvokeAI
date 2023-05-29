@@ -3,16 +3,17 @@ import { memo } from 'react';
 import { InputFieldTemplate, InputFieldValue } from '../types/types';
 import ArrayInputFieldComponent from './fields/ArrayInputFieldComponent';
 import BooleanInputFieldComponent from './fields/BooleanInputFieldComponent';
-import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
-import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
-import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
+import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
 import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
 import ControlInputFieldComponent from './fields/ControlInputFieldComponent';
+import ControlModelInputFieldComponent from './fields/ControlModelInputFieldComponent';
+import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
+import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
+import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
+import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
-import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
-import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -101,6 +102,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'control' && template.type === 'control') {
     return (
       <ControlInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'control_model' && template.type === 'control_model') {
+    return (
+      <ControlModelInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

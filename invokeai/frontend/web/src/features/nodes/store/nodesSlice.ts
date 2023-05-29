@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { log } from 'app/logging/useLogger';
+import { size } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
+import { RgbaColor } from 'react-colorful';
 import {
   addEdge,
   applyEdgeChanges,
@@ -11,14 +14,11 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageDTO } from 'services/api';
+import { ControlModelField, ImageDTO } from 'services/api';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
-import { log } from 'app/logging/useLogger';
-import { size } from 'lodash-es';
 import { isAnyGraphBuilt } from './actions';
-import { RgbaColor } from 'react-colorful';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -65,7 +65,14 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value: string | number | boolean | ImageDTO | RgbaColor | undefined;
+        value:
+          | string
+          | number
+          | boolean
+          | ImageDTO
+          | RgbaColor
+          | ControlModelField
+          | undefined;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;

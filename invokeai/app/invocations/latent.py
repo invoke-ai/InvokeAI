@@ -14,7 +14,7 @@ from invokeai.app.models.image import ImageCategory
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from .controlnet_image_processors import ControlField
+from .controlnet import ControlField
 
 from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype

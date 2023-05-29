@@ -17,6 +17,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   item: 'item',
   ColorField: 'color',
   ControlField: 'control',
+  ControlModelField: 'control_model',
   control: 'control',
 };
 
@@ -82,6 +83,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     colorCssVar: getColorTokenCssVariable('cyan'), // TODO: no free color left
     title: 'Control',
     description: 'Control info passed between nodes.',
+  },
+  control_model: {
+    color: 'cyan',
+    colorCssVar: getColorTokenCssVariable('cyan'), // TODO: no free color left
+    title: 'Control Model',
+    description: 'List of ControlNet Models',
   },
   model: {
     color: 'teal',

@@ -2,110 +2,47 @@
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
 
+from typing import List, Literal, Optional, Union
+
 import numpy as np
-from typing import Literal, Optional, Union, List
+from controlnet_aux import (CannyDetector, ContentShuffleDetector, HEDdetector,
+                            LineartAnimeDetector, LineartDetector,
+                            MediapipeFaceDetector, MidasDetector, MLSDdetector,
+                            NormalBaeDetector, OpenposeDetector,
+                            PidiNetDetector, ZoeDetector)
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..models.image import ImageField, ImageCategory, ResourceOrigin
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    InvocationContext,
-    InvocationConfig,
-)
-from controlnet_aux import (
-    CannyDetector,
-    HEDdetector,
-    LineartDetector,
-    LineartAnimeDetector,
-    MidasDetector,
-    MLSDdetector,
-    NormalBaeDetector,
-    OpenposeDetector,
-    PidiNetDetector,
-    ContentShuffleDetector,
-    ZoeDetector,
-    MediapipeFaceDetector,
-)
-
+from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
 from .image import ImageOutput, PILInvocationConfig
 
-CONTROLNET_DEFAULT_MODELS = [
-    ###########################################
-    # lllyasviel sd v1.5, ControlNet v1.0 models
-    ##############################################
-    "lllyasviel/sd-controlnet-canny",
-    "lllyasviel/sd-controlnet-depth",
-    "lllyasviel/sd-controlnet-hed",
-    "lllyasviel/sd-controlnet-seg",
-    "lllyasviel/sd-controlnet-openpose",
-    "lllyasviel/sd-controlnet-scribble",
-    "lllyasviel/sd-controlnet-normal",
-    "lllyasviel/sd-controlnet-mlsd",
 
-    #############################################
-    # lllyasviel sd v1.5, ControlNet v1.1 models
-    #############################################
-    "lllyasviel/control_v11p_sd15_canny",
-    "lllyasviel/control_v11p_sd15_openpose",
-    "lllyasviel/control_v11p_sd15_seg",
-    # "lllyasviel/control_v11p_sd15_depth",  # broken
-    "lllyasviel/control_v11f1p_sd15_depth",
-    "lllyasviel/control_v11p_sd15_normalbae",
-    "lllyasviel/control_v11p_sd15_scribble",
-    "lllyasviel/control_v11p_sd15_mlsd",
-    "lllyasviel/control_v11p_sd15_softedge",
-    "lllyasviel/control_v11p_sd15s2_lineart_anime",
-    "lllyasviel/control_v11p_sd15_lineart",
-    "lllyasviel/control_v11p_sd15_inpaint",
-    # "lllyasviel/control_v11u_sd15_tile",
-    # problem (temporary?) with huffingface "lllyasviel/control_v11u_sd15_tile",
-    # so for now replace  "lllyasviel/control_v11f1e_sd15_tile",
-    "lllyasviel/control_v11e_sd15_shuffle",
-    "lllyasviel/control_v11e_sd15_ip2p",
-    "lllyasviel/control_v11f1e_sd15_tile",
+class ControlModelField(BaseModel):
+    control_model: Optional[str] = Field(
+        default=None, description="control model used")
 
-     #################################################
-     #  thibaud sd v2.1 models (ControlNet v1.0? or v1.1?
-     ##################################################
-     "thibaud/controlnet-sd21-openpose-diffusers",
-     "thibaud/controlnet-sd21-canny-diffusers",
-     "thibaud/controlnet-sd21-depth-diffusers",
-     "thibaud/controlnet-sd21-scribble-diffusers",
-     "thibaud/controlnet-sd21-hed-diffusers",
-     "thibaud/controlnet-sd21-zoedepth-diffusers",
-     "thibaud/controlnet-sd21-color-diffusers",
-     "thibaud/controlnet-sd21-openposev2-diffusers",
-     "thibaud/controlnet-sd21-lineart-diffusers",
-     "thibaud/controlnet-sd21-normalbae-diffusers",
-     "thibaud/controlnet-sd21-ade20k-diffusers",
+    class Config:
+        schema_extra = {"required": ["control_model"]}
 
-     ##############################################
-     #  ControlNetMediaPipeface, ControlNet v1.1
-     ##############################################
-     # ["CrucibleAI/ControlNetMediaPipeFace", "diffusion_sd15"],  # SD 1.5
-     #    diffusion_sd15 needs to be passed to from_pretrained() as subfolder arg
-     #    hacked t2l to split to model & subfolder if format is "model,subfolder"
-     "CrucibleAI/ControlNetMediaPipeFace,diffusion_sd15",  # SD 1.5
-     "CrucibleAI/ControlNetMediaPipeFace",  # SD 2.1?
-]
-
-CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="processed image")
-    control_model: Optional[str] = Field(default=None, description="control model used")
-    control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
-    begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                                description="% of total steps at which controlnet is first applied")
-    end_step_percent: float = Field(default=1, ge=0, le=1,
-                                    description="% of total steps at which controlnet is last applied")
+    control_model: Optional[str] = Field(
+        default=None, description="control model used")
+    control_weight: Optional[float] = Field(
+        default=1, description="weight given to controlnet")
+    begin_step_percent: float = Field(
+        default=0, ge=0, le=1,
+        description="% of total steps at which controlnet is first applied")
+    end_step_percent: float = Field(
+        default=1, ge=0, le=1,
+        description="% of total steps at which controlnet is last applied")
 
     class Config:
-        schema_extra = {
-            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"]
-        }
+        schema_extra = {"required": [
+            "image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"]}
 
 
 class ControlOutput(BaseInvocationOutput):
@@ -122,8 +59,7 @@ class ControlNetInvocation(BaseInvocation):
     type: Literal["controlnet"] = "controlnet"
     # Inputs
     image: ImageField = Field(default=None, description="image to process")
-    control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
-                                                  description="control model used")
+    control_model: ControlModelField = Field(default=None, description="control model used")
     control_weight: float = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
     # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
@@ -132,20 +68,22 @@ class ControlNetInvocation(BaseInvocation):
                                       description="% of total steps at which controlnet is last applied")
     # fmt: on
 
-
     def invoke(self, context: InvocationContext) -> ControlOutput:
+        controlnet_dir = context.services.configuration.controlnet_dir
+        controlnet_models = context.services.model_manager.get_controlnet_models(
+            controlnet_dir).controlnet_models
 
         return ControlOutput(
             control=ControlField(
                 image=self.image,
-                control_model=self.control_model,
+                control_model=controlnet_models[self.control_model.control_model],
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
-                end_step_percent=self.end_step_percent,
-            ),
-        )
+                end_step_percent=self.end_step_percent,),)
 
 # TODO: move image processors to separate file (image_analysis.py
+
+
 class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
     """Base class for invocations that preprocess images for ControlNet"""
 
@@ -154,7 +92,6 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
     # Inputs
     image: ImageField = Field(default=None, description="image to process")
     # fmt: on
-
 
     def run_processor(self, image):
         # superclass just passes through image without processing
@@ -192,14 +129,15 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         return ImageOutput(
             image=processed_image_field,
             # width=processed_image.width,
-            width = image_dto.width,
+            width=image_dto.width,
             # height=processed_image.height,
-            height = image_dto.height,
+            height=image_dto.height,
             # mode=processed_image.mode,
         )
 
 
-class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class CannyImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Canny edge detection for ControlNet"""
     # fmt: off
     type: Literal["canny_image_processor"] = "canny_image_processor"
@@ -210,11 +148,13 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
 
     def run_processor(self, image):
         canny_processor = CannyDetector()
-        processed_image = canny_processor(image, self.low_threshold, self.high_threshold)
+        processed_image = canny_processor(
+            image, self.low_threshold, self.high_threshold)
         return processed_image
 
 
-class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class HedImageprocessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies HED edge detection to image"""
     # fmt: off
     type: Literal["hed_image_processor"] = "hed_image_processor"
@@ -238,7 +178,8 @@ class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig)
         return processed_image
 
 
-class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class LineartImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies line art processing to image"""
     # fmt: off
     type: Literal["lineart_image_processor"] = "lineart_image_processor"
@@ -249,15 +190,16 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCon
     # fmt: on
 
     def run_processor(self, image):
-        lineart_processor = LineartDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = lineart_processor(image,
-                                            detect_resolution=self.detect_resolution,
-                                            image_resolution=self.image_resolution,
-                                            coarse=self.coarse)
+        lineart_processor = LineartDetector.from_pretrained(
+            "lllyasviel/Annotators")
+        processed_image = lineart_processor(
+            image, detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution, coarse=self.coarse)
         return processed_image
 
 
-class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class LineartAnimeImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies line art anime processing to image"""
     # fmt: off
     type: Literal["lineart_anime_image_processor"] = "lineart_anime_image_processor"
@@ -267,7 +209,8 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocati
     # fmt: on
 
     def run_processor(self, image):
-        processor = LineartAnimeDetector.from_pretrained("lllyasviel/Annotators")
+        processor = LineartAnimeDetector.from_pretrained(
+            "lllyasviel/Annotators")
         processed_image = processor(image,
                                     detect_resolution=self.detect_resolution,
                                     image_resolution=self.image_resolution,
@@ -275,7 +218,8 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocati
         return processed_image
 
 
-class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class OpenposeImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies Openpose processing to image"""
     # fmt: off
     type: Literal["openpose_image_processor"] = "openpose_image_processor"
@@ -286,16 +230,17 @@ class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: on
 
     def run_processor(self, image):
-        openpose_processor = OpenposeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = openpose_processor(image,
-                                             detect_resolution=self.detect_resolution,
-                                             image_resolution=self.image_resolution,
-                                             hand_and_face=self.hand_and_face,
-                                             )
+        openpose_processor = OpenposeDetector.from_pretrained(
+            "lllyasviel/Annotators")
+        processed_image = openpose_processor(
+            image, detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
+            hand_and_face=self.hand_and_face,)
         return processed_image
 
 
-class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class MidasDepthImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies Midas depth processing to image"""
     # fmt: off
     type: Literal["midas_depth_image_processor"] = "midas_depth_image_processor"
@@ -317,7 +262,8 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocation
         return processed_image
 
 
-class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class NormalbaeImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies NormalBae processing to image"""
     # fmt: off
     type: Literal["normalbae_image_processor"] = "normalbae_image_processor"
@@ -327,14 +273,16 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationC
     # fmt: on
 
     def run_processor(self, image):
-        normalbae_processor = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = normalbae_processor(image,
-                                              detect_resolution=self.detect_resolution,
-                                              image_resolution=self.image_resolution)
+        normalbae_processor = NormalBaeDetector.from_pretrained(
+            "lllyasviel/Annotators")
+        processed_image = normalbae_processor(
+            image, detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution)
         return processed_image
 
 
-class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class MlsdImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies MLSD processing to image"""
     # fmt: off
     type: Literal["mlsd_image_processor"] = "mlsd_image_processor"
@@ -347,15 +295,15 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
 
     def run_processor(self, image):
         mlsd_processor = MLSDdetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = mlsd_processor(image,
-                                         detect_resolution=self.detect_resolution,
-                                         image_resolution=self.image_resolution,
-                                         thr_v=self.thr_v,
-                                         thr_d=self.thr_d)
+        processed_image = mlsd_processor(
+            image, detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution, thr_v=self.thr_v,
+            thr_d=self.thr_d)
         return processed_image
 
 
-class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class PidiImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies PIDI processing to image"""
     # fmt: off
     type: Literal["pidi_image_processor"] = "pidi_image_processor"
@@ -367,25 +315,26 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: on
 
     def run_processor(self, image):
-        pidi_processor = PidiNetDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = pidi_processor(image,
-                                         detect_resolution=self.detect_resolution,
-                                         image_resolution=self.image_resolution,
-                                         safe=self.safe,
-                                         scribble=self.scribble)
+        pidi_processor = PidiNetDetector.from_pretrained(
+            "lllyasviel/Annotators")
+        processed_image = pidi_processor(
+            image, detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution, safe=self.safe,
+            scribble=self.scribble)
         return processed_image
 
 
-class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class ContentShuffleImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies content shuffle processing to image"""
     # fmt: off
     type: Literal["content_shuffle_image_processor"] = "content_shuffle_image_processor"
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
     image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    h: Union[int | None] = Field(default=512, ge=0, description="content shuffle h parameter")
-    w: Union[int | None] = Field(default=512, ge=0, description="content shuffle w parameter")
-    f: Union[int | None] = Field(default=256, ge=0, description="cont")
+    h: Union[int, None] = Field(default=512, ge=0, description="content shuffle h parameter")
+    w: Union[int, None] = Field(default=512, ge=0, description="content shuffle w parameter")
+    f: Union[int, None] = Field(default=256, ge=0, description="cont")
     # fmt: on
 
     def run_processor(self, image):
@@ -401,19 +350,22 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
 
 
 # should work with controlnet_aux >= 0.0.4 and timm <= 0.6.13
-class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class ZoeDepthImageProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies Zoe depth processing to image"""
     # fmt: off
     type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
     # fmt: on
 
     def run_processor(self, image):
-        zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
+        zoe_depth_processor = ZoeDetector.from_pretrained(
+            "lllyasviel/Annotators")
         processed_image = zoe_depth_processor(image)
         return processed_image
 
 
-class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class MediapipeFaceProcessorInvocation(
+        ImageProcessorInvocation, PILInvocationConfig):
     """Applies mediapipe face processing to image"""
     # fmt: off
     type: Literal["mediapipe_face_processor"] = "mediapipe_face_processor"
@@ -424,5 +376,6 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
 
     def run_processor(self, image):
         mediapipe_face_processor = MediapipeFaceDetector()
-        processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
+        processed_image = mediapipe_face_processor(
+            image, max_faces=self.max_faces, min_confidence=self.min_confidence)
         return processed_image

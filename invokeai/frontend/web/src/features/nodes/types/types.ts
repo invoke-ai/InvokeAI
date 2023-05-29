@@ -1,6 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { Graph, ImageDTO } from 'services/api';
+import { ControlModelField, Graph, ImageDTO } from 'services/api';
 import { AnyInvocationType } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
@@ -62,6 +62,7 @@ export type FieldType =
   | 'latents'
   | 'conditioning'
   | 'control'
+  | 'control_model'
   | 'model'
   | 'array'
   | 'item'
@@ -84,6 +85,7 @@ export type InputFieldValue =
   | LatentsInputFieldValue
   | ConditioningInputFieldValue
   | ControlInputFieldValue
+  | ControlModelInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
   | ArrayInputFieldValue
@@ -105,6 +107,7 @@ export type InputFieldTemplate =
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
   | ControlInputFieldTemplate
+  | ControlModelInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
   | ArrayInputFieldTemplate
@@ -186,6 +189,11 @@ export type ConditioningInputFieldValue = FieldValueBase & {
 export type ControlInputFieldValue = FieldValueBase & {
   type: 'control';
   value?: undefined;
+};
+
+export type ControlModelInputFieldValue = FieldValueBase & {
+  type: 'control_model';
+  value?: ControlModelField;
 };
 
 export type ImageInputFieldValue = FieldValueBase & {
@@ -273,6 +281,11 @@ export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
 export type ControlInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'control';
+};
+
+export type ControlModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'control_model';
 };
 
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {

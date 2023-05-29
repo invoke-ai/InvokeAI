@@ -3,23 +3,24 @@ import { OpenAPIV3 } from 'openapi-types';
 import { FIELD_TYPE_MAP } from '../types/constants';
 import { isSchemaObject } from '../types/typeGuards';
 import {
+  ArrayInputFieldTemplate,
   BooleanInputFieldTemplate,
-  EnumInputFieldTemplate,
-  FloatInputFieldTemplate,
-  ImageInputFieldTemplate,
-  IntegerInputFieldTemplate,
-  LatentsInputFieldTemplate,
+  ColorInputFieldTemplate,
   ConditioningInputFieldTemplate,
   ControlInputFieldTemplate,
-  StringInputFieldTemplate,
-  ModelInputFieldTemplate,
-  ArrayInputFieldTemplate,
-  ItemInputFieldTemplate,
-  ColorInputFieldTemplate,
-  InputFieldTemplateBase,
-  OutputFieldTemplate,
-  TypeHints,
+  ControlModelInputFieldTemplate,
+  EnumInputFieldTemplate,
   FieldType,
+  FloatInputFieldTemplate,
+  ImageInputFieldTemplate,
+  InputFieldTemplateBase,
+  IntegerInputFieldTemplate,
+  ItemInputFieldTemplate,
+  LatentsInputFieldTemplate,
+  ModelInputFieldTemplate,
+  OutputFieldTemplate,
+  StringInputFieldTemplate,
+  TypeHints,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -231,6 +232,21 @@ const buildControlInputFieldTemplate = ({
   return template;
 };
 
+const buildControlModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ControlModelInputFieldTemplate => {
+  const template: ControlModelInputFieldTemplate = {
+    ...baseField,
+    type: 'control_model',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -360,6 +376,9 @@ export const buildInputFieldTemplate = (
   }
   if (['control'].includes(fieldType)) {
     return buildControlInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['control_model'].includes(fieldType)) {
+    return buildControlModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
