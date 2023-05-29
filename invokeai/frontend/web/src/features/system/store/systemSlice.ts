@@ -348,6 +348,7 @@ export const systemSlice = createSlice({
       state.currentStep = 0;
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusConnected';
+      state.progressImage = null;
     });
 
     /**
