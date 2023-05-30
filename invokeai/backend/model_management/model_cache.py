@@ -37,7 +37,7 @@ from transformers import logging as transformers_logging
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import get_invokeai_config
 
-from .lora import LoRAModel
+from .lora import LoRAModel, TextualInversionModel
 
 def get_model_path(repo_id_or_path: str):
     globals = get_invokeai_config()
@@ -155,6 +155,7 @@ class SDModelType(str, Enum):
     Vae = "vae"
     Scheduler = "scheduler"
     Lora = "lora"
+    TextualInversion = "textual_inversion"
 
 
 class ModelInfoBase:
@@ -417,7 +418,7 @@ class LoRAModelInfo(ModelInfoBase):
 
     def get_size(self, child_type: Optional[SDModelType] = None):
         if child_type is not None:
-            raise Exception("There is no child models in lora model")
+            raise Exception("There is no child models in lora")
         return self.model_size
 
     def get_model(
@@ -426,7 +427,7 @@ class LoRAModelInfo(ModelInfoBase):
         torch_dtype: Optional[torch.dtype] = None,
     ):
         if child_type is not None:
-            raise Exception("There is no child models in lora model")
+            raise Exception("There is no child models in lora")
 
         model = LoRAModel.from_checkpoint(
             file_path=self.model_path,
@@ -437,11 +438,46 @@ class LoRAModelInfo(ModelInfoBase):
         return model
 
 
+class TextualInversionModelInfo(ModelInfoBase):
+    #model_size: int
+
+    def __init__(self, file_path: str, model_type: SDModelType):
+        assert model_type == SDModelType.TextualInversion
+        # check manualy as super().__init__ will try to resolve repo_id too
+        if not os.path.exists(file_path):
+            raise Exception("Model not found")
+        super().__init__(file_path, model_type)
+
+        self.model_size = os.path.getsize(file_path)
+
+    def get_size(self, child_type: Optional[SDModelType] = None):
+        if child_type is not None:
+            raise Exception("There is no child models in textual inversion")
+        return self.model_size
+
+    def get_model(
+        self,
+        child_type: Optional[SDModelType] = None,
+        torch_dtype: Optional[torch.dtype] = None,
+    ):
+        if child_type is not None:
+            raise Exception("There is no child models in textual inversion")
+
+        model = TextualInversionModel.from_checkpoint(
+            file_path=self.model_path,
+            dtype=torch_dtype,
+        )
+
+        self.model_size = model.embedding.nelement() * model.embedding.element_size()
+        return model
+
+
 MODEL_TYPES = {
     SDModelType.Diffusers: DiffusersModelInfo,
     SDModelType.Classifier: ClassifierModelInfo,
     SDModelType.Vae: VaeModelInfo,
     SDModelType.Lora: LoRAModelInfo,
+    SDModelType.TextualInversion: TextualInversionModelInfo,
 }
 
 

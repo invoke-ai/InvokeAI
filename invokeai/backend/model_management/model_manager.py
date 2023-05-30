@@ -332,7 +332,7 @@ class ModelManager(object):
             location = None
         
         revision = mconfig.get('revision')
-        if model_type in [SDModelType.Lora]:
+        if model_type in [SDModelType.Lora, SDModelType.TextualInversion]:
             hash = "<NO_HASH>" # TODO:
         else:
             hash = self.cache.model_hash(location, revision)
