@@ -393,7 +393,7 @@ class VaeModelInfo(ModelInfoBase):
         if child_type is not None:
             raise Exception("There is no child models in vae model")
 
-        model = self.vae_type.from_pretrained(
+        model = self.vae_class.from_pretrained(
             self.repo_id_or_path,
             cache_dir=get_invokeai_config().cache_dir,
             torch_dtype=torch_dtype,
