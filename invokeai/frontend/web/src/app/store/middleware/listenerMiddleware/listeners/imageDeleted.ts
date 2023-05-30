@@ -4,8 +4,12 @@ import { imageDeleted } from 'services/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { clamp } from 'lodash-es';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { uploadsAdapter } from 'features/gallery/store/uploadsSlice';
-import { resultsAdapter } from 'features/gallery/store/resultsSlice';
+import {
+  imageRemoved,
+  imagesAdapter,
+  selectImagesEntities,
+  selectImagesIds,
+} from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'addRequestedImageDeletionListener' });
 
@@ -22,19 +26,20 @@ export const addRequestedImageDeletionListener = () => {
         return;
       }
 
-      const { image_name, image_type } = image;
+      const { image_name, image_origin } = image;
 
-      const selectedImageName = getState().gallery.selectedImage?.image_name;
+      const state = getState();
+      const selectedImage = state.gallery.selectedImage;
 
-      if (selectedImageName === image_name) {
-        const allIds = getState()[image_type].ids;
-        const allEntities = getState()[image_type].entities;
+      if (selectedImage && selectedImage.image_name === image_name) {
+        const ids = selectImagesIds(state);
+        const entities = selectImagesEntities(state);
 
-        const deletedImageIndex = allIds.findIndex(
+        const deletedImageIndex = ids.findIndex(
           (result) => result.toString() === image_name
         );
 
-        const filteredIds = allIds.filter((id) => id.toString() !== image_name);
+        const filteredIds = ids.filter((id) => id.toString() !== image_name);
 
         const newSelectedImageIndex = clamp(
           deletedImageIndex,
@@ -44,7 +49,7 @@ export const addRequestedImageDeletionListener = () => {
 
         const newSelectedImageId = filteredIds[newSelectedImageIndex];
 
-        const newSelectedImage = allEntities[newSelectedImageId];
+        const newSelectedImage = entities[newSelectedImageId];
 
         if (newSelectedImageId) {
           dispatch(imageSelected(newSelectedImage));
@@ -53,7 +58,11 @@ export const addRequestedImageDeletionListener = () => {
         }
       }
 
-      dispatch(imageDeleted({ imageName: image_name, imageType: image_type }));
+      dispatch(imageRemoved(image_name));
+
+      dispatch(
+        imageDeleted({ imageName: image_name, imageOrigin: image_origin })
+      );
     },
   });
 };
@@ -65,14 +74,9 @@ export const addImageDeletedPendingListener = () => {
   startAppListening({
     actionCreator: imageDeleted.pending,
     effect: (action, { dispatch, getState }) => {
-      const { imageName, imageType } = action.meta.arg;
+      const { imageName, imageOrigin } = action.meta.arg;
       // Preemptively remove the image from the gallery
-      if (imageType === 'uploads') {
-        uploadsAdapter.removeOne(getState().uploads, imageName);
-      }
-      if (imageType === 'results') {
-        resultsAdapter.removeOne(getState().results, imageName);
-      }
+      imagesAdapter.removeOne(getState().images, imageName);
     },
   });
 };

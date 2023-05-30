@@ -53,6 +53,11 @@ const MetadataItem = ({
   withCopy = false,
 }: MetadataItemProps) => {
   const { t } = useTranslation();
+
+  if (!value) {
+    return null;
+  }
+
   return (
     <Flex gap={2}>
       {onClick && (

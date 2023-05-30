@@ -1,12 +1,15 @@
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { invocationStarted } from 'services/events/actions';
+import {
+  appSocketInvocationStarted,
+  socketInvocationStarted,
+} from 'services/events/actions';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
-export const addInvocationStartedListener = () => {
+export const addInvocationStartedEventListener = () => {
   startAppListening({
-    actionCreator: invocationStarted,
+    actionCreator: socketInvocationStarted,
     effect: (action, { dispatch, getState }) => {
       if (
         getState().system.canceledSession ===
@@ -23,6 +26,7 @@ export const addInvocationStartedListener = () => {
         action.payload,
         `Invocation started (${action.payload.data.node.type})`
       );
+      dispatch(appSocketInvocationStarted(action.payload));
     },
   });
 };

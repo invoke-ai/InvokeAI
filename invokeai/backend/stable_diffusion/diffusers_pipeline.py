@@ -2,23 +2,29 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import math
 import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
+from pydantic import BaseModel, Field
 
 import einops
 import PIL.Image
+import numpy as np
 from accelerate.utils import set_seed
 import psutil
 import torch
 import torchvision.transforms as T
 from compel import EmbeddingsProvider
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
+from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
 )
@@ -27,6 +33,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
+from diffusers.utils import PIL_INTERPOLATION
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.outputs import BaseOutput
 from torchvision.transforms.functional import resize as tv_resize
@@ -207,6 +214,13 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
             raise AssertionError("why was that an empty generator?")
         return result
 
+@dataclass
+class ControlNetData:
+    model: ControlNetModel = Field(default=None)
+    image_tensor: torch.Tensor= Field(default=None)
+    weight: float = Field(default=1.0)
+    begin_step_percent: float = Field(default=0.0)
+    end_step_percent: float = Field(default=1.0)
 
 @dataclass(frozen=True)
 class ConditioningData:
@@ -302,6 +316,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         feature_extractor: Optional[CLIPFeatureExtractor],
         requires_safety_checker: bool = False,
         precision: str = "float32",
+        control_model: ControlNetModel = None,
     ):
         super().__init__(
             vae,
@@ -322,6 +337,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
+            # FIXME: can't currently register control module
+            # control_model=control_model,
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(
             self.unet, self._unet_forward, is_running_diffusers=True
@@ -341,6 +358,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         self._model_group = FullyLoadedModelGroup(self.unet.device)
         self._model_group.install(*self._submodels)
+        self.control_model = control_model
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
         """
@@ -463,6 +481,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         callback: Callable[[PipelineIntermediateState], None] = None,
         run_id=None,
+        **kwargs,
     ) -> InvokeAIStableDiffusionPipelineOutput:
         r"""
         Function invoked when calling the pipeline for generation.
@@ -483,6 +502,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             noise=noise,
             run_id=run_id,
             callback=callback,
+            **kwargs,
         )
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -507,6 +527,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         run_id=None,
         callback: Callable[[PipelineIntermediateState], None] = None,
+        control_data: List[ControlNetData] = None,
+        **kwargs,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if self.scheduler.config.get("cpu_only", False):
             scheduler_device = torch.device('cpu')
@@ -527,6 +549,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             additional_guidance=additional_guidance,
             run_id=run_id,
             callback=callback,
+            control_data=control_data,
+            **kwargs,
         )
         return result.latents, result.attention_map_saver
 
@@ -539,6 +563,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         run_id: str = None,
         additional_guidance: List[Callable] = None,
+        control_data: List[ControlNetData] = None,
+        **kwargs,
     ):
         self._adjust_memory_efficient_attention(latents)
         if run_id is None:
@@ -568,7 +594,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             attention_map_saver: Optional[AttentionMapSaver] = None
-
+            # print("timesteps:", timesteps)
             for i, t in enumerate(self.progress_bar(timesteps)):
                 batched_t.fill_(t)
                 step_output = self.step(
@@ -578,6 +604,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     step_index=i,
                     total_step_count=len(timesteps),
                     additional_guidance=additional_guidance,
+                    control_data=control_data,
+                    **kwargs,
                 )
                 latents = step_output.prev_sample
 
@@ -618,16 +646,59 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         step_index: int,
         total_step_count: int,
         additional_guidance: List[Callable] = None,
+        control_data: List[ControlNetData] = None,
+        **kwargs,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
-
         if additional_guidance is None:
             additional_guidance = []
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
+
+        # default is no controlnet, so set controlnet processing output to None
+        down_block_res_samples, mid_block_res_sample = None, None
+
+        if control_data is not None:
+            if conditioning_data.guidance_scale > 1.0:
+                # expand the latents input to control model if doing classifier free guidance
+                #    (which I think for now is always true, there is conditional elsewhere that stops execution if
+                #     classifier_free_guidance is <= 1.0 ?)
+                latent_control_input = torch.cat([latent_model_input] * 2)
+            else:
+                latent_control_input = latent_model_input
+            # control_data should be type List[ControlNetData]
+            # this loop covers both ControlNet (one ControlNetData in list)
+            #      and MultiControlNet (multiple ControlNetData in list)
+            for i, control_datum in enumerate(control_data):
+                # print("controlnet", i, "==>", type(control_datum))
+                first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
+                last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
+                # only apply controlnet if current step is within the controlnet's begin/end step range
+                if step_index >= first_control_step and step_index <= last_control_step:
+                    # print("running controlnet", i, "for step", step_index)
+                    down_samples, mid_sample = control_datum.model(
+                        sample=latent_control_input,
+                        timestep=timestep,
+                        encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
+                                                         conditioning_data.text_embeddings]),
+                        controlnet_cond=control_datum.image_tensor,
+                        conditioning_scale=control_datum.weight,
+                        # cross_attention_kwargs,
+                        guess_mode=False,
+                        return_dict=False,
+                    )
+                    if down_block_res_samples is None and mid_block_res_sample is None:
+                        down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
+                    else:
+                        # add controlnet outputs together if have multiple controlnets
+                        down_block_res_samples = [
+                            samples_prev + samples_curr
+                            for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
+                        ]
+                        mid_block_res_sample += mid_sample
 
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
@@ -638,6 +709,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
+            down_block_additional_residuals=down_block_res_samples,  # from controlnet(s)
+            mid_block_additional_residual=mid_block_res_sample,      # from controlnet(s)
         )
 
         # compute the previous noisy sample x_t -> x_t-1
@@ -659,6 +732,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         t,
         text_embeddings,
         cross_attention_kwargs: Optional[dict[str, Any]] = None,
+        **kwargs,
     ):
         """predict the noise residual"""
         if is_inpainting_model(self.unet) and latents.size(1) == 4:
@@ -678,7 +752,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # First three args should be positional, not keywords, so torch hooks can see them.
         return self.unet(
-            latents, t, text_embeddings, cross_attention_kwargs=cross_attention_kwargs
+            latents, t, text_embeddings, cross_attention_kwargs=cross_attention_kwargs,
+            **kwargs,
         ).sample
 
     def img2img_from_embeddings(
@@ -728,7 +803,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         run_id=None,
         callback=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:        
+    ) -> InvokeAIStableDiffusionPipelineOutput:
         timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
         result_latents, result_attention_maps = self.latents_from_embeddings(
             latents=initial_latents if strength < 1.0 else torch.zeros_like(
@@ -940,3 +1015,51 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             debug_image(
                 img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True
             )
+
+    # Copied from diffusers pipeline_stable_diffusion_controlnet.py
+    # Returns torch.Tensor of shape (batch_size, 3, height, width)
+    def prepare_control_image(
+        self,
+        image,
+        # FIXME: need to fix hardwiring of width and height, change to basing on latents dimensions?
+        # latents,
+        width=512,  # should be 8 * latent.shape[3]
+        height=512, # should be 8 * latent height[2]
+        batch_size=1,
+        num_images_per_prompt=1,
+        device="cuda",
+        dtype=torch.float16,
+        do_classifier_free_guidance=True,
+    ):
+
+        if not isinstance(image, torch.Tensor):
+            if isinstance(image, PIL.Image.Image):
+                image = [image]
+
+            if isinstance(image[0], PIL.Image.Image):
+                images = []
+                for image_ in image:
+                    image_ = image_.convert("RGB")
+                    image_ = image_.resize((width, height), resample=PIL_INTERPOLATION["lanczos"])
+                    image_ = np.array(image_)
+                    image_ = image_[None, :]
+                    images.append(image_)
+                image = images
+                image = np.concatenate(image, axis=0)
+                image = np.array(image).astype(np.float32) / 255.0
+                image = image.transpose(0, 3, 1, 2)
+                image = torch.from_numpy(image)
+            elif isinstance(image[0], torch.Tensor):
+                image = torch.cat(image, dim=0)
+
+        image_batch_size = image.shape[0]
+        if image_batch_size == 1:
+            repeat_by = batch_size
+        else:
+            # image batch size is the same as prompt batch size
+            repeat_by = num_images_per_prompt
+        image = image.repeat_interleave(repeat_by, dim=0)
+        image = image.to(device=device, dtype=dtype)
+        if do_classifier_free_guidance:
+            image = torch.cat([image] * 2)
+        return image

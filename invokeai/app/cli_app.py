@@ -16,6 +16,7 @@ from pydantic.fields import Field
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import CoreMetadataService
+from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 
 
@@ -230,6 +231,7 @@ def invoke_cli():
     metadata = CoreMetadataService()
     image_record_storage = SqliteImageRecordStorage(db_location)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
+    names = SimpleNameService()
 
     images = ImageService(
         image_record_storage=image_record_storage,
@@ -237,6 +239,7 @@ def invoke_cli():
         metadata=metadata,
         url=urls,
         logger=logger,
+        names=names,
         graph_execution_manager=graph_execution_manager,
     )
 

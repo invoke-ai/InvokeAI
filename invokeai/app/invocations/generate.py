@@ -4,13 +4,15 @@ from functools import partial
 from typing import Literal, Optional, Union, get_args
 
 import numpy as np
+from diffusers import ControlNetModel
 from torch import Tensor
+import torch
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.image import ColorField, ImageField, ImageType
+from invokeai.app.models.image import ColorField, ImageField, ResourceOrigin
 from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.models.image import ImageCategory, ImageType
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
@@ -58,6 +60,9 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
     cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
+    progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
+    control_model: Optional[str] = Field(default=None, description="The control model to use")
+    control_image: Optional[ImageField] = Field(default=None, description="The processed control image")
     # fmt: on
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
@@ -78,17 +83,35 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         # Handle invalid model parameter
         model = choose_model(context.services.model_manager, self.model)
 
+        # loading controlnet image (currently requires pre-processed image)
+        control_image = (
+            None if self.control_image is None
+            else context.services.images.get_pil_image(
+                self.control_image.image_origin, self.control_image.image_name
+            )
+        )
+        # loading controlnet model
+        if (self.control_model is None or self.control_model==''):
+            control_model = None
+        else:
+            # FIXME: change this to dropdown menu?
+            # FIXME: generalize so don't have to hardcode torch_dtype and device
+            control_model = ControlNetModel.from_pretrained(self.control_model,
+                                                            torch_dtype=torch.float16).to("cuda")
+
         # Get the source node id (we are invoking the prepared node)
         graph_execution_state = context.services.graph_execution_manager.get(
             context.graph_execution_state_id
         )
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        outputs = Txt2Img(model).generate(
+        txt2img = Txt2Img(model, control_model=control_model)
+        outputs = txt2img.generate(
             prompt=self.prompt,
             step_callback=partial(self.dispatch_progress, context, source_node_id),
+            control_image=control_image,
             **self.dict(
-                exclude={"prompt"}
+                exclude={"prompt", "control_image" }
             ),  # Shorthand for passing all of the parameters above manually
         )
         # Outputs is an infinite iterator that will return a new InvokeAIGeneratorOutput object
@@ -97,7 +120,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
         image_dto = context.services.images.create(
             image=generate_output.image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
@@ -107,7 +130,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -147,7 +170,7 @@ class ImageToImageInvocation(TextToImageInvocation):
             None
             if self.image is None
             else context.services.images.get_pil_image(
-                self.image.image_type, self.image.image_name
+                self.image.image_origin, self.image.image_name
             )
         )
 
@@ -178,7 +201,7 @@ class ImageToImageInvocation(TextToImageInvocation):
 
         image_dto = context.services.images.create(
             image=generator_output.image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
@@ -188,7 +211,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
@@ -260,13 +283,13 @@ class InpaintInvocation(ImageToImageInvocation):
             None
             if self.image is None
             else context.services.images.get_pil_image(
-                self.image.image_type, self.image.image_name
+                self.image.image_origin, self.image.image_name
             )
         )
         mask = (
             None
             if self.mask is None
-            else context.services.images.get_pil_image(self.mask.image_type, self.mask.image_name)
+            else context.services.images.get_pil_image(self.mask.image_origin, self.mask.image_name)
         )
 
         # Handle invalid model parameter
@@ -294,7 +317,7 @@ class InpaintInvocation(ImageToImageInvocation):
 
         image_dto = context.services.images.create(
             image=generator_output.image,
-            image_type=ImageType.RESULT,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
@@ -304,7 +327,7 @@ class InpaintInvocation(ImageToImageInvocation):
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,
