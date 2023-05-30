@@ -121,6 +121,8 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
       id: NOISE,
       type: 'noise',
       seed: seed,
+      width,
+      height,
     };
 
     graph.nodes[NOISE] = noiseNode;
@@ -147,6 +149,8 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     const noiseNode: NoiseInvocation = {
       id: NOISE,
       type: 'noise',
+      width,
+      height,
     };
 
     graph.nodes[RANDOM_INT] = randomIntNode;
@@ -193,6 +197,8 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     const noiseNode: NoiseInvocation = {
       id: NOISE,
       type: 'noise',
+      width,
+      height,
     };
 
     // Adding to the graph
