@@ -384,8 +384,8 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
       },
     });
   } else {
-    // We are not resizing, so we need to set the image on the `LATENTS_TO_LATENTS` node explicitly
-    set(graph.nodes[LATENTS_TO_LATENTS], 'image', {
+    // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
+    set(graph.nodes[IMAGE_TO_LATENTS], 'image', {
       image_name: initialImage.image_name,
       image_origin: initialImage.image_origin,
     });
