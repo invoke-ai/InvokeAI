@@ -351,6 +351,7 @@ export type AppConfig = {
   disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
+    defaultModel?: string;
     iterations: {
       initial: number;
       min: number;
