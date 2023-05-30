@@ -3,17 +3,14 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { DragEvent, useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { DragEvent, useCallback } from 'react';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinner';
 import { FaImage } from 'react-icons/fa';
-import { configSelector } from '../../../../system/store/configSelectors';
-import { useAppToaster } from 'app/components/Toaster';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { useHandleOldUrls } from 'common/hooks/useHandleOldUrls';
 
 const selector = createSelector(
   [generationSelector],
@@ -28,40 +25,15 @@ const selector = createSelector(
 
 const InitialImagePreview = () => {
   const { initialImage } = useAppSelector(selector);
-  const { shouldFetchImages } = useAppSelector(configSelector);
   const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-  const toaster = useAppToaster();
-  const [didGetUrls, setDidGetUrls] = useState(false);
+  const handleOldUrls = useHandleOldUrls();
 
   const handleError = useCallback(() => {
-    dispatch(clearInitialImage());
-    if (shouldFetchImages && initialImage) {
-      if (didGetUrls) {
-        toaster({
-          title: 'Something went wrong, please refresh',
-          status: 'error',
-          isClosable: true,
-        });
-        return;
-      }
-
-      const { image_origin, image_name } = initialImage;
-
-      dispatch(
-        imageUrlsReceived({ imageOrigin: image_origin, imageName: image_name })
-      );
-      setDidGetUrls(true);
-    } else {
-      toaster({
-        title: t('toast.parametersFailed'),
-        description: t('toast.parametersFailedDesc'),
-        status: 'error',
-        isClosable: true,
-      });
-    }
-  }, [dispatch, t, toaster, shouldFetchImages, initialImage, didGetUrls]);
+    handleOldUrls(initialImage, () => {
+      dispatch(clearInitialImage());
+    });
+  }, [dispatch, handleOldUrls, initialImage]);
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {

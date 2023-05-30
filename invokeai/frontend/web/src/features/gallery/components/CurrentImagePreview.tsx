@@ -8,14 +8,12 @@ import { isEqual } from 'lodash-es';
 import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { DragEvent, memo, useCallback, useState } from 'react';
+import { DragEvent, memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import ImageFallbackSpinner from './ImageFallbackSpinner';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
-import { configSelector } from '../../system/store/configSelectors';
-import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { useHandleOldUrls } from 'common/hooks/useHandleOldUrls';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -52,11 +50,9 @@ const CurrentImagePreview = () => {
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
-  const { shouldFetchImages } = useAppSelector(configSelector);
   const { getUrl } = useGetUrl();
-  const toaster = useAppToaster();
   const dispatch = useAppDispatch();
-  const [didGetUrls, setDidGetUrls] = useState(false);
+  const handleOldUrls = useHandleOldUrls();
 
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -70,25 +66,10 @@ const CurrentImagePreview = () => {
   );
 
   const handleError = useCallback(() => {
-    dispatch(imageSelected());
-    if (shouldFetchImages && image) {
-      if (didGetUrls) {
-        toaster({
-          title: 'Something went wrong, please refresh',
-          status: 'error',
-          isClosable: true,
-        });
-        return;
-      }
-
-      const { image_origin, image_name } = image;
-
-      dispatch(
-        imageUrlsReceived({ imageOrigin: image_origin, imageName: image_name })
-      );
-      setDidGetUrls(true);
-    }
-  }, [dispatch, toaster, didGetUrls, shouldFetchImages, image]);
+    handleOldUrls(image, () => {
+      dispatch(imageSelected());
+    });
+  }, [dispatch, handleOldUrls, image]);
 
   return (
     <Flex

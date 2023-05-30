@@ -1,10 +1,7 @@
-import { useAppToaster } from 'app/components/Toaster';
-import { RootState } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useEffect, useState } from 'react';
+import { useHandleOldUrls } from 'common/hooks/useHandleOldUrls';
+import { useEffect } from 'react';
 import { Image } from 'react-konva';
 import { ImageDTO } from 'services/api';
-import { imageUrlsReceived } from 'services/thunks/image';
 import useImage from 'use-image';
 
 type IAICanvasImageProps = {
@@ -15,40 +12,20 @@ type IAICanvasImageProps = {
 
 const IAICanvasImage = (props: IAICanvasImageProps) => {
   const { image, x, y } = props;
-  const dispatch = useAppDispatch();
-  const toaster = useAppToaster();
-  const shouldFetchImages = useAppSelector(
-    (state: RootState) => state.config.shouldFetchImages
-  );
-  const [didGetUrls, setDidGetUrls] = useState(false);
+  const handleOldUrls = useHandleOldUrls();
   const [imageElement] = useImage(image.image_url, 'anonymous');
 
   useEffect(() => {
     if (imageElement) {
-      imageElement.onerror = () => {
-        if (shouldFetchImages && image) {
-          if (didGetUrls) {
-            toaster({
-              title: 'Something went wrong, please refresh',
-              status: 'error',
-              isClosable: true,
-            });
-            return;
-          }
-
-          const { image_origin, image_name } = image;
-
-          dispatch(
-            imageUrlsReceived({
-              imageOrigin: image_origin,
-              imageName: image_name,
-            })
-          );
-          setDidGetUrls(true);
-        }
-      };
+      imageElement.onerror = () => handleOldUrls(image);
     }
-  }, [dispatch, imageElement, image, shouldFetchImages, didGetUrls, toaster]);
+
+    return () => {
+      if (imageElement) {
+        imageElement.onerror = () => undefined;
+      }
+    };
+  }, [imageElement, image, handleOldUrls]);
   return <Image x={x} y={y} image={imageElement} listening={false} />;
 };
 
