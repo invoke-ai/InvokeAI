@@ -19,7 +19,7 @@ export const initialUIState: UIState = {
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
-  shouldShowProgressInViewer: false,
+  shouldShowProgressInViewer: true,
   schedulers: SCHEDULERS,
 };
 
