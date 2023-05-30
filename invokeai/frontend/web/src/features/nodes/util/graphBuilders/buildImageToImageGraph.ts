@@ -352,6 +352,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
         image_name: initialImage.image_name,
         image_origin: initialImage.image_origin,
       },
+      is_intermediate: true,
       height,
       width,
     };
