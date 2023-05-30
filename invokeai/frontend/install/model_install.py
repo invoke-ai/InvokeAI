@@ -53,14 +53,17 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
-        self.initial_models = OmegaConf.load(Dataset_path)
+        self.initial_models = OmegaConf.load(Dataset_path)['diffusers']
+        self.control_net_models = OmegaConf.load(Dataset_path)['controlnet']
+        self.installed_cn_models = self._get_installed_cn_models()
         try:
             self.existing_models = OmegaConf.load(default_config_file())
         except:
             self.existing_models = dict()
-        self.starter_model_list = [
-            x for x in list(self.initial_models.keys()) if x not in self.existing_models
-        ]
+        # self.starter_model_list = [
+        #     x for x in list(self.initial_models.keys()) if x not in self.existing_models
+        # ]
+        self.starter_model_list = list(self.initial_models.keys())
         self.installed_models = dict()
         super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
@@ -75,6 +78,9 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.installed_models = sorted(
             [x for x in list(self.initial_models.keys()) if x in self.existing_models]
         )
+
+        cn_model_list = sorted(self.control_net_models.keys())
+        
         self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
@@ -89,44 +95,44 @@ class addModelsForm(npyscreen.FormMultiPage):
             color="CAUTION",
         )
         self.nextrely += 1
-        if len(self.installed_models) > 0:
-            self.add_widget_intelligent(
-                CenteredTitleText,
-                name="== INSTALLED STARTER MODELS ==",
-                editable=False,
-                color="CONTROL",
-            )
-            self.nextrely -= 1
-            self.add_widget_intelligent(
-                CenteredTitleText,
-                name="Currently installed starter models. Uncheck to delete:",
-                editable=False,
-                labelColor="CAUTION",
-            )
-            self.nextrely -= 1
-            columns = self._get_columns()
-            self.previously_installed_models = self.add_widget_intelligent(
-                MultiSelectColumns,
-                columns=columns,
-                values=self.installed_models,
-                value=[x for x in range(0, len(self.installed_models))],
-                max_height=1 + len(self.installed_models) // columns,
-                relx=4,
-                slow_scroll=True,
-                scroll_exit=True,
-            )
-            self.purge_deleted = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name="Purge deleted models from disk",
-                value=False,
-                scroll_exit=True,
-                relx=4,
-            )
-        self.nextrely += 1
+        # if len(self.installed_models) > 0:
+        #     self.add_widget_intelligent(
+        #         CenteredTitleText,
+        #         name="== INSTALLED STARTER MODELS ==",
+        #         editable=False,
+        #         color="CONTROL",
+        #     )
+        #     self.nextrely -= 1
+        #     self.add_widget_intelligent(
+        #         CenteredTitleText,
+        #         name="Currently installed starter models. Uncheck to delete:",
+        #         editable=False,
+        #         labelColor="CAUTION",
+        #     )
+        #     self.nextrely -= 1
+        #     columns = self._get_columns()
+        #     self.previously_installed_models = self.add_widget_intelligent(
+        #         MultiSelectColumns,
+        #         columns=columns,
+        #         values=self.installed_models,
+        #         value=[x for x in range(0, len(self.installed_models))],
+        #         max_height=1 + len(self.installed_models) // columns,
+        #         relx=4,
+        #         slow_scroll=True,
+        #         scroll_exit=True,
+        #     )
+        #     self.purge_deleted = self.add_widget_intelligent(
+        #         npyscreen.Checkbox,
+        #         name="Purge deleted models from disk",
+        #         value=False,
+        #         scroll_exit=True,
+        #         relx=4,
+        #     )
+        # self.nextrely += 1
         if len(self.starter_model_list) > 0:
             self.add_widget_intelligent(
                 CenteredTitleText,
-                name="== STARTER MODELS (recommended ones selected) ==",
+                name="== DIFFUSERS MODELS (recommended ones selected) ==",
                 editable=False,
                 color="CONTROL",
             )
@@ -148,11 +154,41 @@ class addModelsForm(npyscreen.FormMultiPage):
                 value=[
                     self.starter_model_list.index(x)
                     for x in self.starter_model_list
-                    if show_recommended and x in recommended_models
+                    if (show_recommended and x in recommended_models)\
+                    or (x in self.existing_models)
                 ],
                 max_height=len(starter_model_labels) + 1,
                 relx=4,
                 scroll_exit=True,
+            )
+            self.add_widget_intelligent(
+                CenteredTitleText,
+                name="== CONTROLNET MODELS ==",
+                editable=False,
+                color="CONTROL",
+            )
+            columns=6
+            self.cn_models_selected = self.add_widget_intelligent(
+                MultiSelectColumns,
+                columns=columns,
+                name="Install ControlNet Models",
+                values=cn_model_list,
+                value=[
+                    cn_model_list.index(x)
+                    for x in cn_model_list
+                    if x in self.installed_cn_models
+                ],
+                max_height=len(cn_model_list)//columns + 1,
+                relx=4,
+                scroll_exit=True,
+            )
+            self.nextrely += 1
+            self.purge_deleted = self.add_widget_intelligent(
+                npyscreen.Checkbox,
+                name="Purge unchecked models from disk",
+                value=False,
+                scroll_exit=True,
+                relx=4,
             )
         self.add_widget_intelligent(
             CenteredTitleText,
@@ -263,6 +299,21 @@ class addModelsForm(npyscreen.FormMultiPage):
             for x in range(0, len(names))
         ]
 
+    def _get_installed_cn_models(self)->list[str]:
+        with open('log.txt','w') as file:
+            cn_dir = config.controlnet_path
+            file.write(f'cn_dir={cn_dir}\n')
+            installed_cn_models = set()
+            for root, dirs, files in os.walk(cn_dir):
+                for name in dirs:
+                    file.write(f'{root}/{name}/config.json\n')
+                    if Path(root, name, 'config.json').exists():
+                        installed_cn_models.add(name)
+            inverse_dict = {name.split('/')[1]: key for key, name in self.control_net_models.items()}
+            file.write(f'inverse={inverse_dict}')
+        return [inverse_dict[x] for x in installed_cn_models]
+        
+
     def _get_columns(self) -> int:
         window_width, window_height = get_terminal_size()
         cols = (
@@ -318,16 +369,20 @@ class addModelsForm(npyscreen.FormMultiPage):
             )
         else:
             starter_models = dict()
-        selections.purge_deleted_models = False
-        if hasattr(self, "previously_installed_models"):
-            unchecked = [
-                self.previously_installed_models.values[x]
-                for x in range(0, len(self.previously_installed_models.values))
-                if x not in self.previously_installed_models.value
-            ]
-            starter_models.update(map(lambda x: (x, False), unchecked))
-            selections.purge_deleted_models = self.purge_deleted.value
-        selections.starter_models = starter_models
+        selections.purge_deleted_models = self.purge_deleted.value
+        
+        selections.install_models = [x for x in starter_models if x not in self.existing_models]
+        selections.remove_models = [x for x in self.starter_model_list if x in self.existing_models and x not in starter_models]
+
+        selections.install_cn_models = [self.control_net_models[self.cn_models_selected.values[x]]
+                                        for x in self.cn_models_selected.value
+                                        if self.cn_models_selected.values[x] not in self.installed_cn_models
+                                        ]
+        selections.remove_cn_models = [self.control_net_models[x]
+                                       for x in self.cn_models_selected.values
+                                       if x in self.installed_cn_models
+                                       and self.cn_models_selected.values.index(x) not in self.cn_models_selected.value
+                                       ]
 
         # load directory and whether to scan on startup
         if self.show_directory_fields.value:
@@ -346,8 +401,11 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         super().__init__()
         self.user_cancelled = False
         self.user_selections = Namespace(
-            starter_models=None,
+            install_models=None,
+            remove_models=None,
             purge_deleted_models=False,
+            install_cn_models = None,
+            remove_cn_models = None,
             scan_directory=None,
             autoscan_on_startup=None,
             import_model_paths=None,
@@ -362,28 +420,29 @@ class AddModelApplication(npyscreen.NPSAppManaged):
 
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace, selections: Namespace):
-    models_to_remove = [
-        x for x in selections.starter_models if not selections.starter_models[x]
-    ]
-    models_to_install = [
-        x for x in selections.starter_models if selections.starter_models[x]
-    ]
+    models_to_install = selections.install_models
+    models_to_remove = selections.remove_models
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
 
-    install_requested_models(
-        install_initial_models=models_to_install,
-        remove_models=models_to_remove,
-        scan_directory=Path(directory_to_scan) if directory_to_scan else None,
-        external_models=potential_models_to_install,
-        scan_at_startup=scan_at_startup,
-        precision="float32"
-        if opt.full_precision
-        else choose_precision(torch.device(choose_torch_device())),
-        purge_deleted=selections.purge_deleted_models,
-        config_file_path=Path(opt.config_file) if opt.config_file else None,
-    )
+    print('NOT INSTALLING MODELS DURING DEBUGGING')
+    print('models to install:',models_to_install)
+    print('models to remove:',models_to_remove)
+    print('CN models to install:',selections.install_cn_models)
+    print('CN models to remove:',selections.remove_cn_models)
+    # install_requested_models(
+    #     install_initial_models=models_to_install,
+    #     remove_models=models_to_remove,
+    #     scan_directory=Path(directory_to_scan) if directory_to_scan else None,
+    #     external_models=potential_models_to_install,
+    #     scan_at_startup=scan_at_startup,
+    #     precision="float32"
+    #     if opt.full_precision
+    #     else choose_precision(torch.device(choose_torch_device())),
+    #     purge_deleted=selections.purge_deleted_models,
+    #     config_file_path=Path(opt.config_file) if opt.config_file else None,
+    # )
 
 
 # --------------------------------------------------------
@@ -453,8 +512,9 @@ def main():
     opt = parser.parse_args()
 
     # setting a global here
-    config.root = Path(opt.root or '')
-    
+    if opt.root and Path(opt.root).exists():
+        config.root = Path(opt.root)
+
     if not (config.root_dir / config.conf_path.parent).exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."

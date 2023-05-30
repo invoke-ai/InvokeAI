@@ -49,8 +49,8 @@ Config_preamble = """
 
 
 def default_config_file():
+    print(config.root_dir)
     return config.model_conf_path
-
 
 def sd_configs():
     return config.legacy_conf_path
@@ -59,8 +59,7 @@ def initial_models():
     global Datasets
     if Datasets:
         return Datasets
-    return (Datasets := OmegaConf.load(Dataset_path))
-
+    return (Datasets := OmegaConf.load(Dataset_path)['diffusers'])
 
 def install_requested_models(
     install_initial_models: List[str] = None,
@@ -79,7 +78,7 @@ def install_requested_models(
     if not config_file_path.exists():
         open(config_file_path, "w")
 
-    model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
+    model_manager = ModelManager(OmegaConf.load(config_file_path)['diffusers'], precision=precision)
 
     if remove_models and len(remove_models) > 0:
         print("== DELETING UNCHECKED STARTER MODELS ==")

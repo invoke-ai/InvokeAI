@@ -12,7 +12,6 @@ print("Loading Python libraries...\n",file=sys.stderr)
 import argparse
 import io
 import os
-import re
 import shutil
 import traceback
 import warnings
@@ -67,13 +66,8 @@ config = get_invokeai_config()
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
-# the initial "configs" dir is now bundled in the `invokeai.configs` package
-Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
-
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
-
-Datasets = OmegaConf.load(Dataset_path)
 
 # minimum size for the UI
 MIN_COLS = 135
