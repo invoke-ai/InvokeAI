@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 import promptToString from 'common/util/promptToString';
-import { clamp, sample } from 'lodash-es';
+import { clamp, sample, sortBy } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
 import { receivedModels } from 'services/thunks/model';
 import { Scheduler } from 'app/constants';
@@ -227,10 +227,8 @@ export const generationSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(receivedModels.fulfilled, (state, action) => {
       if (!state.model) {
-        const randomModel = sample(action.payload);
-        if (randomModel) {
-          state.model = randomModel.name;
-        }
+        const firstModel = sortBy(action.payload, 'name')[0];
+        state.model = firstModel.name;
       }
     });
   },
