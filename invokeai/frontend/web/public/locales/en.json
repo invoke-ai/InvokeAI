@@ -454,6 +454,8 @@
         "height": "Height",
         "scheduler": "Scheduler",
         "seed": "Seed",
+        "boundingBoxWidth": "Bounding Box Width",
+        "boundingBoxHeight": "Bounding Box Height",
         "imageToImage": "Image to Image",
         "randomizeSeed": "Randomize Seed",
         "shuffle": "Shuffle Seed",

@@ -7,11 +7,11 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
-import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
-import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
 import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
 import ParamSchedulerAndModel from 'features/parameters/components/Parameters/Core/ParamSchedulerAndModel';
+import ParamBoundingBoxWidth from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxWidth';
+import ParamBoundingBoxHeight from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxHeight';
 
 const selector = createSelector(
   uiSelector,
@@ -41,8 +41,8 @@ const UnifiedCanvasCoreParameters = () => {
           <ParamIterations />
           <ParamSteps />
           <ParamCFGScale />
-          <ParamWidth />
-          <ParamHeight />
+          <ParamBoundingBoxWidth />
+          <ParamBoundingBoxHeight />
           <ImageToImageStrength />
           <ImageToImageFit />
           <ParamSchedulerAndModel />
@@ -55,8 +55,8 @@ const UnifiedCanvasCoreParameters = () => {
             <ParamCFGScale />
           </Flex>
           <ParamSchedulerAndModel />
-          <ParamWidth />
-          <ParamHeight />
+          <ParamBoundingBoxWidth />
+          <ParamBoundingBoxHeight />
           <ImageToImageStrength />
         </Flex>
       )}
