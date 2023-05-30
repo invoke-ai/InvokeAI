@@ -2,11 +2,12 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 import promptToString from 'common/util/promptToString';
-import { clamp, sample, sortBy } from 'lodash-es';
+import { clamp, sortBy } from 'lodash-es';
 import { setAllParametersReducer } from './setAllParametersReducer';
 import { receivedModels } from 'services/thunks/model';
 import { Scheduler } from 'app/constants';
 import { ImageDTO } from 'services/api';
+import { configChanged } from 'features/system/store/configSlice';
 
 export interface GenerationState {
   cfgScale: number;
@@ -229,6 +230,13 @@ export const generationSlice = createSlice({
       if (!state.model) {
         const firstModel = sortBy(action.payload, 'name')[0];
         state.model = firstModel.name;
+      }
+    });
+
+    builder.addCase(configChanged, (state, action) => {
+      const defaultModel = action.payload.sd?.defaultModel;
+      if (defaultModel && !state.model) {
+        state.model = defaultModel;
       }
     });
   },
