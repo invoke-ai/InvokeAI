@@ -359,7 +359,7 @@ setting environment variables INVOKEAI_<setting>.
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
     embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory', category='Paths')
     gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
-    controlnet_dir      : Path = Field(default="controlnet", description='Path to directory of ControlNet models.', category='Paths')
+    controlnet_dir      : Path = Field(default="controlnets", description='Path to directory of ControlNet models.', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
@@ -416,6 +416,13 @@ setting environment variables INVOKEAI_<setting>.
 
     def _resolve(self,partial_path:Path)->Path:
         return (self.root_path / partial_path).resolve()
+
+    @property
+    def init_file_path(self)->Path:
+        '''
+        Path to invokeai.yaml
+        '''
+        return self._resolve(INIT_FILE)
 
     @property
     def output_path(self)->Path:
