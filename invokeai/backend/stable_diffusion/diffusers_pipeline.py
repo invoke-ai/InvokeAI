@@ -75,10 +75,10 @@ class AddsMaskLatents:
     initial_image_latents: torch.Tensor
 
     def __call__(
-        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor
+        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor, **kwargs,
     ) -> torch.Tensor:
         model_input = self.add_mask_channels(latents)
-        return self.forward(model_input, t, text_embeddings)
+        return self.forward(model_input, t, text_embeddings, **kwargs)
 
     def add_mask_channels(self, latents):
         batch_size = latents.size(0)
