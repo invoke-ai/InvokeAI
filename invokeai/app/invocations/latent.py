@@ -366,7 +366,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
-    strength: float = Field(default=0.5, description="The strength of the latents to use")
+    strength: float = Field(default=0.7, ge=0, le=1, description="The strength of the latents to use")
 
     # Schema customisation
     class Config(InvocationConfig):
