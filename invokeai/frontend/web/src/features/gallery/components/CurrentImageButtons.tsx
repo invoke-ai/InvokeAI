@@ -461,7 +461,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link download={true} href={getUrl(image?.image_url ?? '')}>
+              <Link
+                download={true}
+                href={getUrl(image?.image_url ?? '')}
+                target="_blank"
+              >
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>
