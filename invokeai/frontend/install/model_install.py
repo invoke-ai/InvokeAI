@@ -98,7 +98,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         if len(self.starter_model_list) > 0:
             self.add_widget_intelligent(
                 CenteredTitleText,
-                name="== DIFFUSERS MODELS (recommended ones selected) ==",
+                name="== DIFFUSERS MODEL STARTER PACK ==",
                 editable=False,
                 color="CONTROL",
             )
@@ -137,15 +137,14 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely += 1            
         self.add_widget_intelligent(
             CenteredTitleText,
-            name="== IMPORT LOCAL AND REMOTE MODELS ==",
+            name="== IMPORT MORE DIFFUSERS MODELS FROM YOUR LOCAL DISK OR THE INTERNET ==",
             editable=False,
             color="CONTROL",
         )
         self.nextrely -= 1
 
         for line in [
-            "In the box below, enter URLs, file paths, or HuggingFace repository IDs.",
-            "Separate model names by lines or whitespace (Use shift-control-V to paste):",
+            "Enter URLs, file paths, or HuggingFace repository IDs, separated by spaces. Use shift-control-V to paste:",
         ]:
             self.add_widget_intelligent(
                 CenteredTitleText,
@@ -161,7 +160,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely += 1
         self.show_directory_fields = self.add_widget_intelligent(
             npyscreen.FormControlCheckbox,
-            name="Select a directory for models to import",
+            name="Select a directory for models to import automatically at startup",
             value=False,
         )
         self.autoload_directory = self.add_widget_intelligent(
@@ -212,7 +211,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely += 1        
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
-            name='Additional ControlNet HuggingFace repo_ids to install (space separated):',
+            name='Additional ControlNet HuggingFace repo_ids to install (Space separated. Use shift-control-V to paste):',
             relx=4,
             color='CONTROL',
             editable=False,
