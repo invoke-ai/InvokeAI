@@ -1,24 +1,36 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { Scheduler } from 'app/constants';
-import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICustomSelect from 'common/components/IAICustomSelect';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selector = createSelector(
+  [uiSelector, generationSelector, activeTabNameSelector],
+  (ui, generation, activeTabName) => {
+    const allSchedulers = ['img2img', 'unifiedCanvas'].includes(activeTabName)
+      ? ui.schedulers.filter((scheduler) => {
+          return !['dpmpp_2s'].includes(scheduler);
+        })
+      : ui.schedulers;
+
+    return {
+      scheduler: generation.scheduler,
+      allSchedulers,
+    };
+  },
+  defaultSelectorOptions
+);
+
 const ParamScheduler = () => {
-  const scheduler = useAppSelector(
-    (state: RootState) => state.generation.scheduler
-  );
-
-  const activeTabName = useAppSelector(activeTabNameSelector);
-
-  const schedulers = useAppSelector((state: RootState) => state.ui.schedulers);
-
-  const img2imgSchedulers = schedulers.filter((scheduler) => {
-    return !['dpmpp_2s'].includes(scheduler);
-  });
+  const { allSchedulers, scheduler } = useAppSelector(selector);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -38,11 +50,7 @@ const ParamScheduler = () => {
       label={t('parameters.scheduler')}
       selectedItem={scheduler}
       setSelectedItem={handleChange}
-      items={
-        ['img2img', 'unifiedCanvas'].includes(activeTabName)
-          ? img2imgSchedulers
-          : schedulers
-      }
+      items={allSchedulers}
       withCheckIcon
     />
   );
