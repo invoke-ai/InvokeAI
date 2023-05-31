@@ -5,21 +5,18 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICustomSelect from 'common/components/IAICustomSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import {
-  activeTabNameSelector,
-  uiSelector,
-} from 'features/ui/store/uiSelectors';
+import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
-  [uiSelector, generationSelector, activeTabNameSelector],
-  (ui, generation, activeTabName) => {
-    const allSchedulers = ['img2img', 'unifiedCanvas'].includes(activeTabName)
-      ? ui.schedulers.filter((scheduler) => {
-          return !['dpmpp_2s'].includes(scheduler);
-        })
-      : ui.schedulers;
+  [uiSelector, generationSelector],
+  (ui, generation) => {
+    // TODO: DPMSolverSinglestepScheduler is fixed in https://github.com/huggingface/diffusers/pull/3413
+    // but we need to wait for the next release before removing this special handling.
+    const allSchedulers = ui.schedulers.filter((scheduler) => {
+      return !['dpmpp_2s'].includes(scheduler);
+    });
 
     return {
       scheduler: generation.scheduler,
