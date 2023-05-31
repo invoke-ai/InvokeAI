@@ -101,7 +101,8 @@
     "serialize-error": "^11.0.0",
     "socket.io-client": "^4.6.0",
     "use-image": "^1.1.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "zod": "^3.21.4"
   },
   "peerDependencies": {
     "@chakra-ui/cli": "^2.4.0",

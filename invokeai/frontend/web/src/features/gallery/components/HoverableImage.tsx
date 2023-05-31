@@ -30,7 +30,7 @@ import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useParameters } from 'features/parameters/hooks/useParameters';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import {
   requestedImageDeletion,
@@ -114,8 +114,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
 
-  const { recallSeed, recallPrompt, recallInitialImage, recallAllParameters } =
-    useParameters();
+  const { recallBothPrompts, recallSeed, recallAllParameters } =
+    useRecallParameters();
 
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
@@ -154,11 +154,15 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallPrompt(
+    recallBothPrompts(
       image.metadata?.positive_conditioning,
       image.metadata?.negative_conditioning
     );
-  }, [image, recallPrompt]);
+  }, [
+    image.metadata?.negative_conditioning,
+    image.metadata?.positive_conditioning,
+    recallBothPrompts,
+  ]);
 
   const handleRecallSeed = useCallback(() => {
     recallSeed(image.metadata?.seed);
