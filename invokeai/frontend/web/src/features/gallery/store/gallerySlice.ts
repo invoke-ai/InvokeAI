@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { ImageDTO } from 'services/api';
-import { imageUpdatedOne, imageUpserted } from './imagesSlice';
+import { imageUrlsUpdated, imageUpserted } from './imagesSlice';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -54,7 +54,7 @@ export const gallerySlice = createSlice({
         state.selectedImage = action.payload;
       }
     });
-    builder.addCase(imageUpdatedOne, (state, action) => {
+    builder.addCase(imageUrlsUpdated, (state, action) => {
       const { image_name, image_origin, image_url, thumbnail_url } =
         action.payload;
 

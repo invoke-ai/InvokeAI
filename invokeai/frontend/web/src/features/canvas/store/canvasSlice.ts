@@ -30,7 +30,7 @@ import {
 } from './canvasTypes';
 import { ImageDTO } from 'services/api';
 import { sessionCanceled } from 'services/thunks/session';
-import { imageUpdatedOne } from 'features/gallery/store/imagesSlice';
+import { imageUrlsUpdated } from 'features/gallery/store/imagesSlice';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -853,7 +853,7 @@ export const canvasSlice = createSlice({
       }
     });
 
-    builder.addCase(imageUpdatedOne, (state, action) => {
+    builder.addCase(imageUrlsUpdated, (state, action) => {
       const { image_name, image_origin, image_url, thumbnail_url } =
         action.payload;
 
@@ -863,6 +863,13 @@ export const canvasSlice = createSlice({
             object.image.image_url = image_url;
             object.image.thumbnail_url = thumbnail_url;
           }
+        }
+      });
+
+      state.layerState.stagingArea.images.forEach((stagedImage) => {
+        if (stagedImage.image.image_name === image_name) {
+          stagedImage.image.image_url = image_url;
+          stagedImage.image.thumbnail_url = thumbnail_url;
         }
       });
     });

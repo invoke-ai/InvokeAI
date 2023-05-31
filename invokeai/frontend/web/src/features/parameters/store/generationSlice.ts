@@ -8,6 +8,7 @@ import { receivedModels } from 'services/thunks/model';
 import { Scheduler } from 'app/constants';
 import { ImageDTO } from 'services/api';
 import { configChanged } from 'features/system/store/configSlice';
+import { imageUrlsUpdated } from 'features/gallery/store/imagesSlice';
 
 export interface GenerationState {
   cfgScale: number;
@@ -237,6 +238,15 @@ export const generationSlice = createSlice({
       const defaultModel = action.payload.sd?.defaultModel;
       if (defaultModel && !state.model) {
         state.model = defaultModel;
+      }
+    });
+    builder.addCase(imageUrlsUpdated, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      if (state.initialImage && state.initialImage.image_name === image_name) {
+        state.initialImage.image_url = image_url;
+        state.initialImage.thumbnail_url = thumbnail_url;
       }
     });
   },

@@ -57,7 +57,7 @@ const imagesSlice = createSlice({
 
       imagesAdapter.removeOne(state, action.payload.image_name);
     },
-    imageUpdatedOne: (state, action: PayloadAction<ImageUrlsDTO>) => {
+    imageUrlsUpdated: (state, action: PayloadAction<ImageUrlsDTO>) => {
       imagesAdapter.updateOne(state, {
         id: action.payload.image_name,
         changes: action.payload,
@@ -95,7 +95,7 @@ export const {
 
 export const {
   imageUpserted,
-  imageUpdatedOne,
+  imageUrlsUpdated,
   imageRemoved,
   imageCategoriesChanged,
 } = imagesSlice.actions;
