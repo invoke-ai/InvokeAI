@@ -568,6 +568,8 @@
         "canvasMerged": "Canvas Merged",
         "sentToImageToImage": "Sent To Image To Image",
         "sentToUnifiedCanvas": "Sent to Unified Canvas",
+        "parameterSet": "Parameter set",
+        "parameterNotSet": "Parameter not set",
         "parametersSet": "Parameters Set",
         "parametersNotSet": "Parameters Not Set",
         "parametersNotSetDesc": "No metadata found for this image.",
