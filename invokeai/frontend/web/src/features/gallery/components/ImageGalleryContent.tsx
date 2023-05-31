@@ -1,8 +1,6 @@
 import {
   Box,
   ButtonGroup,
-  Checkbox,
-  CheckboxGroup,
   Flex,
   FlexProps,
   Grid,
@@ -32,18 +30,13 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import {
-  FaFilter,
-  FaImage,
-  FaImages,
-  FaServer,
-  FaWrench,
-} from 'react-icons/fa';
+import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
@@ -53,7 +46,6 @@ import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { ImageCategory } from 'services/api';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
@@ -61,7 +53,6 @@ import {
   selectImagesAll,
 } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
-import { capitalize } from 'lodash-es';
 
 const categorySelector = createSelector(
   [(state: RootState) => state],
@@ -144,6 +135,13 @@ const ImageGalleryContent = () => {
     dispatch(receivedPageOfImages());
   }, [dispatch]);
 
+  const handleEndReached = useMemo(() => {
+    if (areMoreImagesAvailable && !isLoading) {
+      return handleLoadMoreImages;
+    }
+    return undefined;
+  }, [areMoreImagesAvailable, handleLoadMoreImages, isLoading]);
+
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
   };
@@ -171,17 +169,6 @@ const ImageGalleryContent = () => {
       setScroller(ref);
     }
   }, []);
-
-  const handleEndReached = useCallback(() => {
-    handleLoadMoreImages();
-  }, [handleLoadMoreImages]);
-
-  const handleCategoriesChanged = useCallback(
-    (newCategories: ImageCategory[]) => {
-      dispatch(imageCategoriesChanged(newCategories));
-    },
-    [dispatch]
-  );
 
   const handleClickImagesCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
