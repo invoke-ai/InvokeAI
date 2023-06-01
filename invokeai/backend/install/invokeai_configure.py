@@ -43,8 +43,8 @@ from invokeai.frontend.install.widgets import (
     IntTitleSlider,
     set_min_terminal_size,
 )
-from invokeai.backend.config.legacy_arg_parsing import legacy_parser
-from invokeai.backend.config.model_install_backend import (
+from invokeai.backend.install.legacy_arg_parsing import legacy_parser
+from invokeai.backend.install.model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,

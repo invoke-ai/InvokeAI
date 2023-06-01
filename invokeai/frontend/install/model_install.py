@@ -24,7 +24,7 @@ from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
 
-from ...backend.config.model_install_backend import (
+from ...backend.install.model_install_backend import (
     Dataset_path,
     default_config_file,
     default_dataset,
