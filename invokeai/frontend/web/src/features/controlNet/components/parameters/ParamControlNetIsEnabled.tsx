@@ -1,5 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIFullCheckbox from 'common/components/IAIFullCheckbox';
+import IAISwitch from 'common/components/IAISwitch';
 import { controlNetToggled } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 
@@ -17,7 +17,7 @@ const ParamControlNetIsEnabled = (props: ParamControlNetIsEnabledProps) => {
   }, [dispatch, controlNetId]);
 
   return (
-    <IAIFullCheckbox
+    <IAISwitch
       label="Enabled"
       isChecked={isEnabled}
       onChange={handleIsEnabledChanged}

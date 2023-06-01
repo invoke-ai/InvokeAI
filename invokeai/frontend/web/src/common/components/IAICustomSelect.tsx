@@ -104,7 +104,8 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             ref={refs.setFloating}
             sx={{
               ...floatingStyles,
-              width: 'max-content',
+              width: 'full',
+              // width: 'max-content',
               top: 0,
               left: 0,
               flexDirection: 'column',
@@ -118,6 +119,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
               px: 0,
               h: 'fit-content',
               maxH: 64,
+              minW: 48,
             }}
           >
             <OverlayScrollbarsComponent>

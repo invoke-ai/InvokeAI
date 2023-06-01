@@ -64,6 +64,7 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
             fallbackStrategy="beforeLoadOrError"
             fallback={<ImageFallback />}
             onError={onError}
+            draggable={false}
             sx={{
               borderRadius: 'base',
             }}
@@ -80,6 +81,7 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
             >
               <IAIIconButton
                 size={resetIconSize}
+                tooltip="Reset Image"
                 aria-label="Reset Image"
                 icon={<FaTimes />}
                 onClick={onReset}
