@@ -2,7 +2,10 @@ import { Flex, Icon, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGetUrl } from 'common/util/getUrl';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import {
+  clearInitialImage,
+  initialImageChanged,
+} from 'features/parameters/store/generationSlice';
 import { DragEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
@@ -13,6 +16,8 @@ import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinn
 import { FaImage } from 'react-icons/fa';
 import { configSelector } from '../../../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
+import IAISelectableImage from 'features/controlNet/components/parameters/IAISelectableImage';
+import { ImageDTO } from 'services/api';
 
 const selector = createSelector(
   [generationSelector],
@@ -51,13 +56,16 @@ const InitialImagePreview = () => {
     }
   }, [dispatch, t, toaster, shouldFetchImages]);
 
-  const handleDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      const name = e.dataTransfer.getData('invokeai/imageName');
-      dispatch(initialImageSelected(name));
+  const handleChange = useCallback(
+    (image: ImageDTO) => {
+      dispatch(initialImageChanged(image));
     },
     [dispatch]
   );
+
+  const handleReset = useCallback(() => {
+    dispatch(clearInitialImage());
+  }, [dispatch]);
 
   return (
     <Flex
@@ -68,9 +76,14 @@ const InitialImagePreview = () => {
         alignItems: 'center',
         justifyContent: 'center',
       }}
-      onDrop={handleDrop}
+      // onDrop={handleDrop}
     >
-      {initialImage?.image_url && (
+      <IAISelectableImage
+        image={initialImage}
+        onChange={handleChange}
+        onReset={handleReset}
+      />
+      {/* {initialImage?.image_url && (
         <>
           <Image
             src={getUrl(initialImage?.image_url)}
@@ -97,7 +110,7 @@ const InitialImagePreview = () => {
             color: 'base.500',
           }}
         />
-      )}
+      )} */}
     </Flex>
   );
 };

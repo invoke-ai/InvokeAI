@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { setShouldSnapToGrid } from 'features/canvas/store/canvasSlice';
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +17,7 @@ export default function UnifiedCanvasSnapToGrid() {
     dispatch(setShouldSnapToGrid(e.target.checked));
 
   return (
-    <IAICheckbox
+    <IAISimpleCheckbox
       label={`${t('unifiedCanvas.snapToGrid')} (N)`}
       isChecked={shouldSnapToGrid}
       onChange={handleChangeShouldSnapToGrid}

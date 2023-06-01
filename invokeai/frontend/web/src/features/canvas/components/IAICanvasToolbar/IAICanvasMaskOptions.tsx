@@ -2,7 +2,7 @@ import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
@@ -117,12 +117,12 @@ const IAICanvasMaskOptions = () => {
       }
     >
       <Flex direction="column" gap={2}>
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={`${t('unifiedCanvas.enableMask')} (H)`}
           isChecked={isMaskEnabled}
           onChange={handleToggleEnableMask}
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.preserveMaskedArea')}
           isChecked={shouldPreserveMaskedArea}
           onChange={(e) =>

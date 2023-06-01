@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -73,33 +73,33 @@ const UnifiedCanvasSettings = () => {
       }
     >
       <Flex direction="column" gap={2}>
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.showIntermediates')}
           isChecked={shouldShowIntermediates}
           onChange={(e) =>
             dispatch(setShouldShowIntermediates(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.autoSaveToGallery')}
           isChecked={shouldAutoSave}
           onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.saveBoxRegionOnly')}
           isChecked={shouldCropToBoundingBoxOnSave}
           onChange={(e) =>
             dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.showCanvasDebugInfo')}
           isChecked={shouldShowCanvasDebugInfo}
           onChange={(e) =>
             dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.antialiasing')}
           isChecked={shouldAntialias}
           onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
