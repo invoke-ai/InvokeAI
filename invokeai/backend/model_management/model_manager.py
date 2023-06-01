@@ -773,7 +773,7 @@ class ModelManager(object):
 
         """
         model_path: Path = None
-        thing = path_url_or_repo  # to save typing
+        thing = str(path_url_or_repo)  # to save typing
 
         self.logger.info(f"Probing {thing} for import")
 

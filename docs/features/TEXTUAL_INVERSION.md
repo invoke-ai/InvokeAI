@@ -46,11 +46,19 @@ start the front end by selecting choice (3):
 
 ```sh
 Do you want to generate images using the
-1. command-line
-2. browser-based UI
-3. textual inversion training
-4. open the developer console
-Please enter 1, 2, 3, or 4: [1] 3
+1: Browser-based UI
+2: Command-line interface
+3: Run textual inversion training
+4: Merge models (diffusers type only)
+5: Download and install models
+6: Change InvokeAI startup options
+7: Re-run the configure script to fix a broken install
+8: Open the developer console
+9: Update InvokeAI
+10: Command-line help
+Q: Quit
+
+Please enter 1-10, Q: [1] 
 ```
 
 From the command line, with the InvokeAI virtual environment active,
