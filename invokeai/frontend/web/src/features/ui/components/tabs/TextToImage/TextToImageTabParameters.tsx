@@ -9,6 +9,7 @@ import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Sym
 import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/ParamHiresCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import TextToImageTabCoreParameters from './TextToImageTabCoreParameters';
+import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 
 const TextToImageTabParameters = () => {
   return (
@@ -18,6 +19,7 @@ const TextToImageTabParameters = () => {
       <ProcessButtons />
       <TextToImageTabCoreParameters />
       <ParamSeedCollapse />
+      <ParamControlNetCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />
       <ParamSymmetryCollapse />
