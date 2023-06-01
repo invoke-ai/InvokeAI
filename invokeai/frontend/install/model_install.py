@@ -325,7 +325,6 @@ class addModelsForm(npyscreen.FormMultiPage):
         for i in [self.autoload_directory, self.autoscan_on_startup]:
             self.show_directory_fields.addVisibleWhenSelected(i)
 
-        # self.tabs.when_value_edited = self._toggle_tables
         self.tabs.on_changed = self._toggle_tables
 
         self.show_directory_fields.when_value_edited = self._clear_scan_directory
@@ -336,7 +335,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             self.models_selected.values = self._get_starter_model_labels()
 
     def _toggle_tables(self, value=None):
-        selected_tab = value[0] if value else self.tabs.value[0]
+        selected_tab = value[0]
         widgets = [
             [self.cn_label_1, self.cn_models_selected, self.cn_label_2, self.additional_controlnet_ids],
             [self.lora_label_1,self.loras],
