@@ -4,19 +4,21 @@ import {
   Icon,
   IconButtonProps,
   Image,
+  Spinner,
   Text,
 } from '@chakra-ui/react';
 import { useDroppable } from '@dnd-kit/core';
 import IAIIconButton from 'common/components/IAIIconButton';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useGetUrl } from 'common/util/getUrl';
-import ImageFallbackSpinner from 'features/gallery/components/ImageFallbackSpinner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SyntheticEvent } from 'react';
 import { memo, useRef } from 'react';
 import { FaImage, FaUndo } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
+
+const PLACEHOLDER_MIN_HEIGHT = 48;
 
 type IAISelectableImageProps = {
   image: ImageDTO | null | undefined;
@@ -49,17 +51,42 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
       ref={setNodeRef}
     >
       {image && (
-        <Flex sx={{ position: 'relative' }}>
+        <Flex
+          sx={{
+            position: 'relative',
+            w: 'full',
+            h: 'full',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <Image
             src={getUrl(image.image_url)}
             fallbackStrategy="beforeLoadOrError"
-            fallback={<ImageFallbackSpinner />}
+            fallback={<ImageFallback />}
             onError={onError}
             sx={{
               borderRadius: 'base',
             }}
           />
           <ImageMetadataOverlay image={image} />
+          {onReset && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                p: 2,
+              }}
+            >
+              <IAIIconButton
+                size={resetIconSize}
+                aria-label="Reset Image"
+                icon={<FaUndo />}
+                onClick={onReset}
+              />
+            </Box>
+          )}
           <AnimatePresence>
             {active && <DropOverlay isOver={isOver} />}
           </AnimatePresence>
@@ -69,7 +96,7 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
         <>
           <Flex
             sx={{
-              p: 8,
+              minH: PLACEHOLDER_MIN_HEIGHT,
               bg: 'base.850',
               w: 'full',
               h: 'full',
@@ -90,23 +117,6 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
             {active && <DropOverlay isOver={isOver} />}
           </AnimatePresence>
         </>
-      )}
-      {image && onReset && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            p: 2,
-          }}
-        >
-          <IAIIconButton
-            size={resetIconSize}
-            aria-label="Reset Image"
-            icon={<FaUndo />}
-            onClick={onReset}
-          />
-        </Box>
       )}
     </Flex>
   );
@@ -198,3 +208,20 @@ const DropOverlay = (props: DropOverlayProps) => {
     </motion.div>
   );
 };
+
+const ImageFallback = () => (
+  <Flex
+    sx={{
+      w: 'full',
+      h: 'full',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minH: PLACEHOLDER_MIN_HEIGHT,
+      color: 'base.400',
+      bg: 'base.850',
+      borderRadius: 'base',
+    }}
+  >
+    <Spinner size="xl" />
+  </Flex>
+);
