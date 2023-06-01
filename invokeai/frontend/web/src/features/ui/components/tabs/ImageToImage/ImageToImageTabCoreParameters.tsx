@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Flex } from '@chakra-ui/react';
+import { Box, Flex, useDisclosure } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -13,6 +13,8 @@ import ImageToImageStrength from 'features/parameters/components/Parameters/Imag
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import ParamSchedulerAndModel from 'features/parameters/components/Parameters/Core/ParamSchedulerAndModel';
+import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
+import IAICollapse from 'common/components/IAICollapse';
 
 const selector = createSelector(
   [uiSelector, generationSelector],
@@ -27,43 +29,47 @@ const selector = createSelector(
 
 const ImageToImageTabCoreParameters = () => {
   const { shouldUseSliders, shouldFitToWidthHeight } = useAppSelector(selector);
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
   return (
-    <Flex
-      sx={{
-        flexDirection: 'column',
-        gap: 2,
-        bg: 'base.800',
-        p: 4,
-        borderRadius: 'base',
-      }}
-    >
-      {shouldUseSliders ? (
-        <Flex sx={{ gap: 3, flexDirection: 'column' }}>
-          <ParamIterations />
-          <ParamSteps />
-          <ParamCFGScale />
-          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
-          <ImageToImageStrength />
-          <ImageToImageFit />
-          <ParamSchedulerAndModel />
-        </Flex>
-      ) : (
-        <Flex sx={{ gap: 2, flexDirection: 'column' }}>
-          <Flex gap={3}>
+    <IAICollapse label={'General'} isOpen={isOpen} onToggle={onToggle}>
+      <Flex
+        sx={{
+          flexDirection: 'column',
+          gap: 3,
+        }}
+      >
+        {shouldUseSliders ? (
+          <>
+            <ParamSchedulerAndModel />
+            <Box pt={2}>
+              <ParamSeedFull />
+            </Box>
             <ParamIterations />
             <ParamSteps />
             <ParamCFGScale />
-          </Flex>
-          <ParamSchedulerAndModel />
-          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
-          <ImageToImageStrength />
-          <ImageToImageFit />
-        </Flex>
-      )}
-    </Flex>
+            <ParamWidth isDisabled={!shouldFitToWidthHeight} />
+            <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+          </>
+        ) : (
+          <>
+            <Flex gap={3}>
+              <ParamIterations />
+              <ParamSteps />
+              <ParamCFGScale />
+            </Flex>
+            <ParamSchedulerAndModel />
+            <Box pt={2}>
+              <ParamSeedFull />
+            </Box>
+            <ParamWidth isDisabled={!shouldFitToWidthHeight} />
+            <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+          </>
+        )}
+        <ImageToImageStrength />
+        <ImageToImageFit />
+      </Flex>
+    </IAICollapse>
   );
 };
 

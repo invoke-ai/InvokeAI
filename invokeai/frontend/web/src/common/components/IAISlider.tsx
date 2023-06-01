@@ -203,6 +203,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
+                  mt: 1.5,
                 }}
                 {...sliderMarkProps}
               >
@@ -213,6 +214,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
+                  mt: 1.5,
                 }}
                 {...sliderMarkProps}
               >

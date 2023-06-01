@@ -62,16 +62,21 @@ export type ControlNet = {
 
 export type ControlNetState = {
   controlNets: Record<string, ControlNet>;
+  isEnabled: boolean;
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
+  isEnabled: false,
 };
 
 export const controlNetSlice = createSlice({
   name: 'controlNet',
   initialState: initialControlNetState,
   reducers: {
+    isControlNetEnabledToggled: (state) => {
+      state.isEnabled = !state.isEnabled;
+    },
     controlNetAdded: (
       state,
       action: PayloadAction<{ controlNetId: string }>
@@ -166,6 +171,7 @@ export const controlNetSlice = createSlice({
 });
 
 export const {
+  isControlNetEnabledToggled,
   controlNetAdded,
   controlNetAddedFromImage,
   controlNetRemoved,
