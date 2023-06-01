@@ -171,6 +171,9 @@ class SingleSelectColumns(SelectColumnBase, npyscreen.SelectOne):
     def when_cursor_moved(self):
         self.h_select(self.cursor_line)
 
+    def h_cursor_line_right(self,ch):
+        self.h_exit_down('bye bye')
+
 class TextBox(npyscreen.MultiLineEdit):
     def update(self, clear=True):
         if clear:
