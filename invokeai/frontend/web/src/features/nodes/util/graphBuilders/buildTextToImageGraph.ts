@@ -19,6 +19,7 @@ const NOISE = 'noise';
 const RANDOM_INT = 'rand_int';
 const RANGE_OF_SIZE = 'range_of_size';
 const ITERATE = 'iterate';
+const CONTROL_NET = 'control_net';
 
 /**
  * Builds the Text to Image tab graph.

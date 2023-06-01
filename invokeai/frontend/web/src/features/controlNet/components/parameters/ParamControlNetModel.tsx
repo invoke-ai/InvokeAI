@@ -27,7 +27,6 @@ const ParamIsControlNetModel = (props: ParamIsControlNetModelProps) => {
 
   return (
     <IAICustomSelect
-      label="Model"
       items={CONTROLNET_MODELS}
       selectedItem={model}
       setSelectedItem={handleModelChanged}

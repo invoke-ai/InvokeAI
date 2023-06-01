@@ -1,23 +1,22 @@
 import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import { memo, useCallback, useState } from 'react';
-import ControlNetProcessButton from './common/ControlNetProcessButton';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import ControlNetResetProcessedImageButton from './common/ControlNetResetProcessedImageButton';
-import { ControlNetProcessorProps } from '../ControlNetProcessorCollapse';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
+import ControlNetProcessorButtons from './common/ControlNetProcessorButtons';
+import { memo, useCallback, useState } from 'react';
+import { ControlNetProcessorProps } from '../ControlNet';
 
 export const CANNY_PROCESSOR = 'canny_image_processor';
 
 const CannyProcessor = (props: ControlNetProcessorProps) => {
-  const { controlNetId, image, type } = props;
+  const { controlNetId, controlImage, processedControlImage, type } = props;
   const dispatch = useAppDispatch();
   const [lowThreshold, setLowThreshold] = useState(100);
   const [highThreshold, setHighThreshold] = useState(200);
 
   const handleProcess = useCallback(() => {
-    if (!image) {
+    if (!controlImage) {
       return;
     }
 
@@ -28,15 +27,15 @@ const CannyProcessor = (props: ControlNetProcessorProps) => {
           id: CANNY_PROCESSOR,
           type: 'canny_image_processor',
           image: {
-            image_name: image.image_name,
-            image_origin: image.image_origin,
+            image_name: controlImage.image_name,
+            image_origin: controlImage.image_origin,
           },
           low_threshold: lowThreshold,
           high_threshold: highThreshold,
         },
       })
     );
-  }, [controlNetId, dispatch, highThreshold, image, lowThreshold]);
+  }, [controlNetId, dispatch, highThreshold, controlImage, lowThreshold]);
 
   const handleReset = useCallback(() => {
     dispatch(
@@ -65,10 +64,12 @@ const CannyProcessor = (props: ControlNetProcessorProps) => {
         max={255}
         withInput
       />
-      <Flex sx={{ gap: 4 }}>
-        <ControlNetProcessButton onClick={handleProcess} />
-        <ControlNetResetProcessedImageButton onClick={handleReset} />
-      </Flex>
+      <ControlNetProcessorButtons
+        handleProcess={handleProcess}
+        isProcessDisabled={Boolean(!controlImage)}
+        handleReset={handleReset}
+        isResetDisabled={Boolean(!processedControlImage)}
+      />
     </Flex>
   );
 };
