@@ -44,6 +44,7 @@ dependencies = [
   "datasets",
   "diffusers[torch]~=0.16.1",
   "dnspython==2.2.1",
+  "easing-functions",
   "einops",
   "eventlet",
   "facexlib",
