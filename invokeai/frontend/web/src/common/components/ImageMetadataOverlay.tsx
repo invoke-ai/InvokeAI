@@ -1,5 +1,5 @@
 import { Badge, Flex } from '@chakra-ui/react';
-import { isNumber, isString } from 'lodash-es';
+import { isString } from 'lodash-es';
 import { useMemo } from 'react';
 import { ImageDTO } from 'services/api';
 
@@ -8,14 +8,6 @@ type ImageMetadataOverlayProps = {
 };
 
 const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
-  const dimensions = useMemo(() => {
-    if (!isNumber(image.metadata?.width) || isNumber(!image.metadata?.height)) {
-      return;
-    }
-
-    return `${image.metadata?.width} × ${image.metadata?.height}`;
-  }, [image.metadata]);
-
   const model = useMemo(() => {
     if (!isString(image.metadata?.model)) {
       return;
@@ -37,11 +29,9 @@ const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
         gap: 2,
       }}
     >
-      {dimensions && (
-        <Badge variant="solid" colorScheme="base">
-          {dimensions}
-        </Badge>
-      )}
+      <Badge variant="solid" colorScheme="base">
+        {image.width} × {image.height}
+      </Badge>
       {model && (
         <Badge variant="solid" colorScheme="base">
           {model}
