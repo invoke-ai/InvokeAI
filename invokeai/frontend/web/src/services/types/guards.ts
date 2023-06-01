@@ -10,7 +10,24 @@ import {
   ImageField,
   LatentsOutput,
   ResourceOrigin,
+  ImageDTO,
 } from 'services/api';
+
+export const isImageDTO = (obj: unknown): obj is ImageDTO => {
+  return (
+    isObject(obj) &&
+    'image_name' in obj &&
+    isString(obj?.image_name) &&
+    'thumbnail_url' in obj &&
+    isString(obj?.thumbnail_url) &&
+    'image_url' in obj &&
+    isString(obj?.image_url) &&
+    'image_origin' in obj &&
+    isString(obj?.image_origin) &&
+    'created_at' in obj &&
+    isString(obj?.created_at)
+  );
+};
 
 export const isImageOutput = (
   output: GraphExecutionState['results'][string]

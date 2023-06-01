@@ -4,8 +4,6 @@ import { memo, useCallback, useState } from 'react';
 import ControlNetProcessButton from './common/ControlNetProcessButton';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { ImageDTO } from 'services/api';
-import ControlNetProcessorImage from './common/ControlNetProcessorImage';
 import { ControlNetProcessorProps } from '../ControlNet';
 
 export const CANNY_PROCESSOR = 'canny_processor';

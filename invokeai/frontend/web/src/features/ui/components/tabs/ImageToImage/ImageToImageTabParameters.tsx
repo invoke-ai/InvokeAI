@@ -8,6 +8,7 @@ import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import ImageToImageTabCoreParameters from './ImageToImageTabCoreParameters';
+import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 
 const ImageToImageTabParameters = () => {
   return (
@@ -17,6 +18,7 @@ const ImageToImageTabParameters = () => {
       <ProcessButtons />
       <ImageToImageTabCoreParameters />
       <ParamSeedCollapse />
+      <ParamControlNetCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />
       <ParamSymmetryCollapse />

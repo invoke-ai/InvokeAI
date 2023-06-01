@@ -1,61 +1,59 @@
-import { Flex, Text, useDisclosure } from '@chakra-ui/react';
+import { Flex, useDisclosure } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 import IAICollapse from 'common/components/IAICollapse';
-import { memo, useCallback, useState } from 'react';
-import IAICustomSelect from 'common/components/IAICustomSelect';
+import { memo, useCallback } from 'react';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaPlus } from 'react-icons/fa';
-import CannyProcessor from 'features/controlNet/components/processors/CannyProcessor';
 import ControlNet from 'features/controlNet/components/ControlNet';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import {
+  controlNetAdded,
+  controlNetSelector,
+} from 'features/controlNet/store/controlNetSlice';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { map } from 'lodash-es';
+import { v4 as uuidv4 } from 'uuid';
 
-const CONTROLNET_MODELS = [
-  'lllyasviel/sd-controlnet-canny',
-  'lllyasviel/sd-controlnet-depth',
-  'lllyasviel/sd-controlnet-hed',
-  'lllyasviel/sd-controlnet-seg',
-  'lllyasviel/sd-controlnet-openpose',
-  'lllyasviel/sd-controlnet-scribble',
-  'lllyasviel/sd-controlnet-normal',
-  'lllyasviel/sd-controlnet-mlsd',
-];
+const selector = createSelector(
+  controlNetSelector,
+  (controlNet) => {
+    const { controlNets } = controlNet;
+
+    return { controlNets };
+  },
+  defaultSelectorOptions
+);
 
 const ParamControlNetCollapse = () => {
   const { t } = useTranslation();
   const { isOpen, onToggle } = useDisclosure();
-  const [model, setModel] = useState<string>(CONTROLNET_MODELS[0]);
+  const { controlNets } = useAppSelector(selector);
+  const dispatch = useAppDispatch();
 
-  const handleSetControlNet = useCallback(
-    (model: string | null | undefined) => {
-      if (model) {
-        setModel(model);
-      }
-    },
-    []
-  );
+  const handleClickedAddControlNet = useCallback(() => {
+    dispatch(controlNetAdded({ controlNetId: uuidv4() }));
+  }, [dispatch]);
 
   return (
-    <ControlNet />
-    // <IAICollapse
-    //   label={'ControlNet'}
-    //   // label={t('parameters.seamCorrectionHeader')}
-    //   isOpen={isOpen}
-    //   onToggle={onToggle}
-    // >
-    //   <Flex sx={{ alignItems: 'flex-end' }}>
-    //     <IAICustomSelect
-    //       label="ControlNet Model"
-    //       items={CONTROLNET_MODELS}
-    //       selectedItem={model}
-    //       setSelectedItem={handleSetControlNet}
-    //     />
-    //     <IAIIconButton
-    //       size="sm"
-    //       aria-label="Add ControlNet"
-    //       icon={<FaPlus />}
-    //     />
-    //   </Flex>
-    //   <CannyProcessor />
-    // </IAICollapse>
+    <IAICollapse
+      label={'ControlNet'}
+      // label={t('parameters.seamCorrectionHeader')}
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
+      <Flex sx={{ alignItems: 'flex-end' }}>
+        <IAIIconButton
+          size="sm"
+          aria-label="Add ControlNet"
+          onClick={handleClickedAddControlNet}
+          icon={<FaPlus />}
+        />
+      </Flex>
+      {map(controlNets, (c) => (
+        <ControlNet key={c.controlNetId} controlNet={c} />
+      ))}
+    </IAICollapse>
   );
 };
 

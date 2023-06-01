@@ -39,6 +39,8 @@ import {
 } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -116,6 +118,13 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
+
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: image_name,
+    data: {
+      image,
+    },
+  });
 
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
@@ -212,7 +221,12 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   return (
-    <>
+    <Box
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      sx={{ w: 'full', h: 'full' }}
+    >
       <ContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
         renderMenu={() => (
@@ -291,8 +305,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             onMouseOver={handleMouseOver}
             onMouseOut={handleMouseOut}
             userSelect="none"
-            draggable={true}
-            onDragStart={handleDragStart}
+            // draggable={true}
+            // onDragStart={handleDragStart}
             onClick={handleSelectImage}
             ref={ref}
             sx={{
@@ -373,7 +387,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         onClose={onDeleteDialogClose}
         handleDelete={handleDelete}
       />
-    </>
+    </Box>
   );
 }, memoEqualityCheck);
 

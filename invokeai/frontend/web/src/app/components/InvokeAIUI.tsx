@@ -16,6 +16,7 @@ import { PartialAppConfig } from 'app/types/invokeai';
 import '../../i18n';
 import { socketMiddleware } from 'services/events/middleware';
 import { Middleware } from '@reduxjs/toolkit';
+import ImageDndContext from './ImageDnd/ImageDndContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -69,11 +70,13 @@ const InvokeAIUI = ({
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <App
-              config={config}
-              headerComponent={headerComponent}
-              setIsReady={setIsReady}
-            />
+            <ImageDndContext>
+              <App
+                config={config}
+                headerComponent={headerComponent}
+                setIsReady={setIsReady}
+              />
+            </ImageDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>

@@ -28,7 +28,6 @@ const InitialImageDisplay = () => {
           gap: 4,
         }}
       >
-        <InitialImageButtons />
         <InitialImagePreview />
       </Flex>
     </Flex>

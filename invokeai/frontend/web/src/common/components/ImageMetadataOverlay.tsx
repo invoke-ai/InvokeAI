@@ -23,9 +23,9 @@ const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
         flexDirection: 'column',
         position: 'absolute',
         top: 0,
-        right: 0,
+        insetInlineStart: 0,
         p: 2,
-        alignItems: 'flex-end',
+        alignItems: 'flex-start',
         gap: 2,
       }}
     >
