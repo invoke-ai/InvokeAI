@@ -18,20 +18,22 @@ export const CONTROLNET_MODELS = [
   'lllyasviel/sd-controlnet-mlsd',
 ];
 
-// export const CONTROLNET_PROCESSORS = [
-//   'canny',
-//   'contentShuffle',
-//   'hed',
-//   'lineart',
-//   'lineartAnime',
-//   'mediapipeFace',
-//   'midasDepth',
-//   'mlsd',
-//   'normalBae',
-//   'openpose',
-//   'pidi',
-//   'zoeDepth',
-// ] as const;
+export const CONTROLNET_PROCESSORS = [
+  'canny',
+  'contentShuffle',
+  'hed',
+  'lineart',
+  'lineartAnime',
+  'mediapipeFace',
+  'midasDepth',
+  'mlsd',
+  'normalBae',
+  'openpose',
+  'pidi',
+  'zoeDepth',
+];
+
+export type ControlNetProcessor = (typeof CONTROLNET_PROCESSORS)[number];
 
 export type ControlNetModel = (typeof CONTROLNET_MODELS)[number];
 
@@ -109,6 +111,7 @@ export const controlNetSlice = createSlice({
     ) => {
       const { controlNetId, controlImage } = action.payload;
       state.controlNets[controlNetId].controlImage = controlImage;
+      state.controlNets[controlNetId].processedControlImage = null;
     },
     isControlNetImageProcessedToggled: (
       state,

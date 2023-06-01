@@ -4,9 +4,11 @@ import { memo, useCallback, useState } from 'react';
 import ControlNetProcessButton from './common/ControlNetProcessButton';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { ControlNetProcessorProps } from '../ControlNet';
+import ControlNetResetProcessedImageButton from './common/ControlNetResetProcessedImageButton';
+import { ControlNetProcessorProps } from '../ControlNetProcessorCollapse';
+import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
 
-export const CANNY_PROCESSOR = 'canny_processor';
+export const CANNY_PROCESSOR = 'canny_image_processor';
 
 const CannyProcessor = (props: ControlNetProcessorProps) => {
   const { controlNetId, image, type } = props;
@@ -36,6 +38,15 @@ const CannyProcessor = (props: ControlNetProcessorProps) => {
     );
   }, [controlNetId, dispatch, highThreshold, image, lowThreshold]);
 
+  const handleReset = useCallback(() => {
+    dispatch(
+      controlNetProcessedImageChanged({
+        controlNetId,
+        processedControlImage: null,
+      })
+    );
+  }, [controlNetId, dispatch]);
+
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
@@ -54,7 +65,10 @@ const CannyProcessor = (props: ControlNetProcessorProps) => {
         max={255}
         withInput
       />
-      <ControlNetProcessButton onClick={handleProcess} />
+      <Flex sx={{ gap: 4 }}>
+        <ControlNetProcessButton onClick={handleProcess} />
+        <ControlNetResetProcessedImageButton onClick={handleReset} />
+      </Flex>
     </Flex>
   );
 };

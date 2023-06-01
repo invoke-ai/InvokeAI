@@ -1,15 +1,13 @@
 import { startAppListening } from '..';
-import { imageMetadataReceived, imageUploaded } from 'services/thunks/image';
-import { addToast } from 'features/system/store/systemSlice';
+import { imageMetadataReceived } from 'services/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { Graph } from 'services/api';
 import { sessionCreated } from 'services/thunks/session';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
-import { appSocketInvocationComplete } from 'services/events/actions';
+import { socketInvocationComplete } from 'services/events/actions';
 import { isImageOutput } from 'services/types/guards';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { selectImagesById } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'controlNet' });
 
@@ -18,27 +16,36 @@ export const addControlNetImageProcessedListener = () => {
     actionCreator: controlNetImageProcessed,
     effect: async (action, { dispatch, getState, take }) => {
       const { controlNetId, processorNode } = action.payload;
-      const { id } = processorNode;
+
+      // ControlNet one-off procressing graph is just he processor node, no edges
       const graph: Graph = {
-        nodes: { [id]: processorNode },
+        nodes: { [processorNode.id]: processorNode },
       };
+
+      // Create a session to run the graph & wait til it's ready to invoke
       const sessionCreatedAction = dispatch(sessionCreated({ graph }));
       const [sessionCreatedFulfilledAction] = await take(
         (action): action is ReturnType<typeof sessionCreated.fulfilled> =>
           sessionCreated.fulfilled.match(action) &&
           action.meta.requestId === sessionCreatedAction.requestId
       );
+
       const sessionId = sessionCreatedFulfilledAction.payload.id;
+
+      // Invoke the session & wait til it's complete
       dispatch(sessionReadyToInvoke());
-      const [processorAction] = await take(
-        (action): action is ReturnType<typeof appSocketInvocationComplete> =>
-          appSocketInvocationComplete.match(action) &&
+      const [invocationCompleteAction] = await take(
+        (action): action is ReturnType<typeof socketInvocationComplete> =>
+          socketInvocationComplete.match(action) &&
           action.payload.data.graph_execution_state_id === sessionId
       );
 
-      if (isImageOutput(processorAction.payload.data.result)) {
-        const { image_name } = processorAction.payload.data.result.image;
+      // We still have to check the output type
+      if (isImageOutput(invocationCompleteAction.payload.data.result)) {
+        const { image_name } =
+          invocationCompleteAction.payload.data.result.image;
 
+        // Wait for the ImageDTO to be received
         const [imageMetadataReceivedAction] = await take(
           (
             action
@@ -46,8 +53,9 @@ export const addControlNetImageProcessedListener = () => {
             imageMetadataReceived.fulfilled.match(action) &&
             action.payload.image_name === image_name
         );
-
         const processedControlImage = imageMetadataReceivedAction.payload;
+
+        // Update the processed image in the store
         dispatch(
           controlNetProcessedImageChanged({
             controlNetId,
