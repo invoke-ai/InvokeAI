@@ -46,18 +46,20 @@ export const initialControlNet: Omit<ControlNet, 'controlNetId'> = {
   controlImage: null,
   isControlImageProcessed: false,
   processedControlImage: null,
+  processor: 'canny',
 };
 
 export type ControlNet = {
   controlNetId: string;
   isEnabled: boolean;
-  model: string;
+  model: ControlNetModel;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
   controlImage: ImageDTO | null;
   isControlImageProcessed: boolean;
   processedControlImage: ImageDTO | null;
+  processor: ControlNetProcessor;
 };
 
 export type ControlNetState = {
@@ -167,6 +169,16 @@ export const controlNetSlice = createSlice({
       const { controlNetId, endStepPct } = action.payload;
       state.controlNets[controlNetId].endStepPct = endStepPct;
     },
+    controlNetProcessorChanged: (
+      state,
+      action: PayloadAction<{
+        controlNetId: string;
+        processor: ControlNetProcessor;
+      }>
+    ) => {
+      const { controlNetId, processor } = action.payload;
+      state.controlNets[controlNetId].processor = processor;
+    },
   },
 });
 
@@ -183,6 +195,7 @@ export const {
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
+  controlNetProcessorChanged,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

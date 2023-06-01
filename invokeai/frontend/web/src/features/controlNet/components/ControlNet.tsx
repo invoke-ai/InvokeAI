@@ -12,6 +12,7 @@ import {
   controlNetImageChanged,
   controlNetModelChanged,
   controlNetProcessedImageChanged,
+  controlNetProcessorChanged,
   controlNetRemoved,
   controlNetToggled,
   controlNetWeightChanged,
@@ -61,17 +62,21 @@ const ControlNet = (props: ControlNetProps) => {
     controlImage,
     isControlImageProcessed,
     processedControlImage,
+    processor,
   } = props.controlNet;
   const dispatch = useAppDispatch();
 
-  const [processorType, setProcessorType] =
-    useState<ControlNetProcessor>('canny');
-
-  const handleProcessorTypeChanged = (type: string | null | undefined) => {
-    setProcessorType(type as ControlNetProcessor);
-  };
-
-  const { isOpen, onToggle } = useDisclosure();
+  const handleProcessorTypeChanged = useCallback(
+    (processor: string | null | undefined) => {
+      dispatch(
+        controlNetProcessorChanged({
+          controlNetId,
+          processor: processor as ControlNetProcessor,
+        })
+      );
+    },
+    [controlNetId, dispatch]
+  );
 
   const handleControlImageChanged = useCallback(
     (controlImage: ImageDTO) => {
@@ -87,18 +92,6 @@ const ControlNet = (props: ControlNetProps) => {
   const handleControlNetRemoved = useCallback(() => {
     dispatch(controlNetRemoved(controlNetId));
   }, [controlNetId, dispatch]);
-
-  const handleProcessedControlImageChanged = useCallback(
-    (processedControlImage: ImageDTO | null) => {
-      dispatch(
-        controlNetProcessedImageChanged({
-          controlNetId,
-          processedControlImage,
-        })
-      );
-    },
-    [controlNetId, dispatch]
-  );
 
   return (
     <Flex sx={{ flexDir: 'column', gap: 3 }}>
@@ -147,14 +140,14 @@ const ControlNet = (props: ControlNetProps) => {
             <IAICustomSelect
               label="Processor"
               items={CONTROLNET_PROCESSORS}
-              selectedItem={processorType}
+              selectedItem={processor}
               setSelectedItem={handleProcessorTypeChanged}
             />
             <ProcessorComponent
               controlNetId={controlNetId}
               controlImage={controlImage}
               processedControlImage={processedControlImage}
-              type={processorType}
+              type={processor}
             />
           </TabPanel>
         </TabPanels>
