@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { ControlNetProcessorNode } from '../store/types';
 import { ImageDTO } from 'services/api';
 import CannyProcessor from './processors/CannyProcessor';
@@ -27,19 +27,10 @@ import { Flex, HStack, VStack } from '@chakra-ui/react';
 import IAISelectableImage from './parameters/IAISelectableImage';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-
-export type ControlNetProcessorProps = {
-  controlNetId: string;
-  image: ImageDTO;
-  type: ControlNetProcessorNode['type'];
-};
-
-const renderProcessorComponent = (props: ControlNetProcessorProps) => {
-  const { type } = props;
-  if (type === 'canny_image_processor') {
-    return <CannyProcessor {...props} />;
-  }
-};
+import IAISwitch from 'common/components/IAISwitch';
+import ParamControlNetIsPreprocessed from './parameters/ParamControlNetIsPreprocessed';
+import IAICollapse from 'common/components/IAICollapse';
+import ControlNetProcessorCollapse from './ControlNetProcessorCollapse';
 
 type ControlNetProps = {
   controlNet: ControlNet;
@@ -59,6 +50,10 @@ const ControlNet = (props: ControlNetProps) => {
   } = props.controlNet;
   const dispatch = useAppDispatch();
 
+  const [processorType, setProcessorType] = useState<
+    ControlNetProcessorNode['type']
+  >('canny_image_processor');
+
   const handleControlImageChanged = useCallback(
     (controlImage: ImageDTO) => {
       dispatch(controlNetImageChanged({ controlNetId, controlImage }));
@@ -72,14 +67,6 @@ const ControlNet = (props: ControlNetProps) => {
 
   const handleControlNetRemoved = useCallback(() => {
     dispatch(controlNetRemoved(controlNetId));
-  }, [controlNetId, dispatch]);
-
-  const handleIsControlImageProcessedToggled = useCallback(() => {
-    dispatch(
-      isControlNetImageProcessedToggled({
-        controlNetId,
-      })
-    );
   }, [controlNetId, dispatch]);
 
   const handleProcessedControlImageChanged = useCallback(
@@ -98,10 +85,14 @@ const ControlNet = (props: ControlNetProps) => {
     <Flex sx={{ flexDir: 'column', gap: 3, pb: 4 }}>
       <IAIButton onClick={handleControlNetRemoved}>Remove ControlNet</IAIButton>
       <IAISelectableImage
-        image={controlImage}
+        image={processedControlImage || controlImage}
         onChange={handleControlImageChanged}
         onReset={handleControlImageReset}
         resetIconSize="sm"
+      />
+      <ControlNetProcessorCollapse
+        controlNetId={controlNetId}
+        image={controlImage}
       />
       <ParamControlNetModel controlNetId={controlNetId} model={model} />
       <ParamControlNetIsEnabled
