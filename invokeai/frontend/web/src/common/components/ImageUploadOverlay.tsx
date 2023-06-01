@@ -4,7 +4,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 type ImageUploadOverlayProps = {
   isDragAccept: boolean;
   isDragReject: boolean;
-  overlaySecondaryText: string;
   setIsHandlingUpload: (isHandlingUpload: boolean) => void;
 };
 
@@ -12,7 +11,6 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
   const {
     isDragAccept,
     isDragReject: _isDragAccept,
-    overlaySecondaryText,
     setIsHandlingUpload,
   } = props;
 
@@ -48,7 +46,7 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
         }}
       >
         {isDragAccept ? (
-          <Heading size="lg">Upload Image{overlaySecondaryText}</Heading>
+          <Heading size="lg">Drop to Upload</Heading>
         ) : (
           <>
             <Heading size="lg">Invalid Upload</Heading>

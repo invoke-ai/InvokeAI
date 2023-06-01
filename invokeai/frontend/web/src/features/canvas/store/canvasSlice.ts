@@ -29,6 +29,7 @@ import {
   isCanvasMaskLine,
 } from './canvasTypes';
 import { ImageDTO } from 'services/api';
+import { sessionCanceled } from 'services/thunks/session';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -696,7 +697,10 @@ export const canvasSlice = createSlice({
         0
       );
     },
-    commitStagingAreaImage: (state) => {
+    commitStagingAreaImage: (
+      state,
+      action: PayloadAction<string | undefined>
+    ) => {
       if (!state.layerState.stagingArea.images.length) {
         return;
       }
@@ -840,6 +844,13 @@ export const canvasSlice = createSlice({
       state.isMovingBoundingBox = false;
       state.isTransformingBoundingBox = false;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(sessionCanceled.pending, (state) => {
+      if (!state.layerState.stagingArea.images.length) {
+        state.layerState.stagingArea = initialLayerState.stagingArea;
+      }
+    });
   },
 });
 

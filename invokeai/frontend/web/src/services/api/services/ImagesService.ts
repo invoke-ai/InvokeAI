@@ -4,9 +4,10 @@
 import type { Body_upload_image } from '../models/Body_upload_image';
 import type { ImageCategory } from '../models/ImageCategory';
 import type { ImageDTO } from '../models/ImageDTO';
-import type { ImageType } from '../models/ImageType';
+import type { ImageRecordChanges } from '../models/ImageRecordChanges';
 import type { ImageUrlsDTO } from '../models/ImageUrlsDTO';
-import type { PaginatedResults_ImageDTO_ } from '../models/PaginatedResults_ImageDTO_';
+import type { OffsetPaginatedResults_ImageDTO_ } from '../models/OffsetPaginatedResults_ImageDTO_';
+import type { ResourceOrigin } from '../models/ResourceOrigin';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -16,41 +17,47 @@ export class ImagesService {
 
   /**
    * List Images With Metadata
-   * Gets a list of images with metadata
-   * @returns PaginatedResults_ImageDTO_ Successful Response
+   * Gets a list of images
+   * @returns OffsetPaginatedResults_ImageDTO_ Successful Response
    * @throws ApiError
    */
   public static listImagesWithMetadata({
-    imageType,
-    imageCategory,
-    page,
-    perPage = 10,
+    imageOrigin,
+    categories,
+    isIntermediate,
+    offset,
+    limit = 10,
   }: {
     /**
-     * The type of images to list
+     * The origin of images to list
      */
-    imageType: ImageType,
+    imageOrigin?: ResourceOrigin,
     /**
-     * The kind of images to list
+     * The categories of image to include
      */
-    imageCategory: ImageCategory,
+    categories?: Array<ImageCategory>,
     /**
-     * The page of image metadata to get
+     * Whether to list intermediate images
      */
-    page?: number,
+    isIntermediate?: boolean,
     /**
-     * The number of image metadata per page
+     * The page offset
      */
-    perPage?: number,
-  }): CancelablePromise<PaginatedResults_ImageDTO_> {
+    offset?: number,
+    /**
+     * The number of images per page
+     */
+    limit?: number,
+  }): CancelablePromise<OffsetPaginatedResults_ImageDTO_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/images/',
       query: {
-        'image_type': imageType,
-        'image_category': imageCategory,
-        'page': page,
-        'per_page': perPage,
+        'image_origin': imageOrigin,
+        'categories': categories,
+        'is_intermediate': isIntermediate,
+        'offset': offset,
+        'limit': limit,
       },
       errors: {
         422: `Validation Error`,
@@ -65,20 +72,32 @@ export class ImagesService {
    * @throws ApiError
    */
   public static uploadImage({
-    imageType,
-    formData,
     imageCategory,
+    isIntermediate,
+    formData,
+    sessionId,
   }: {
-    imageType: ImageType,
+    /**
+     * The category of the image
+     */
+    imageCategory: ImageCategory,
+    /**
+     * Whether this is an intermediate image
+     */
+    isIntermediate: boolean,
     formData: Body_upload_image,
-    imageCategory?: ImageCategory,
+    /**
+     * The session ID associated with this upload, if any
+     */
+    sessionId?: string,
   }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/images/',
       query: {
-        'image_type': imageType,
         'image_category': imageCategory,
+        'is_intermediate': isIntermediate,
+        'session_id': sessionId,
       },
       formData: formData,
       mediaType: 'multipart/form-data',
@@ -96,13 +115,13 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageFull({
-    imageType,
+    imageOrigin,
     imageName,
   }: {
     /**
      * The type of full-resolution image file to get
      */
-    imageType: ImageType,
+    imageOrigin: ResourceOrigin,
     /**
      * The name of full-resolution image file to get
      */
@@ -110,9 +129,9 @@ export class ImagesService {
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}',
+      url: '/api/v1/images/{image_origin}/{image_name}',
       path: {
-        'image_type': imageType,
+        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -129,10 +148,13 @@ export class ImagesService {
    * @throws ApiError
    */
   public static deleteImage({
-    imageType,
+    imageOrigin,
     imageName,
   }: {
-    imageType: ImageType,
+    /**
+     * The origin of image to delete
+     */
+    imageOrigin: ResourceOrigin,
     /**
      * The name of the image to delete
      */
@@ -140,11 +162,47 @@ export class ImagesService {
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
-      url: '/api/v1/images/{image_type}/{image_name}',
+      url: '/api/v1/images/{image_origin}/{image_name}',
       path: {
-        'image_type': imageType,
+        'image_origin': imageOrigin,
         'image_name': imageName,
       },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
+   * Update Image
+   * Updates an image
+   * @returns ImageDTO Successful Response
+   * @throws ApiError
+   */
+  public static updateImage({
+    imageOrigin,
+    imageName,
+    requestBody,
+  }: {
+    /**
+     * The origin of image to update
+     */
+    imageOrigin: ResourceOrigin,
+    /**
+     * The name of the image to update
+     */
+    imageName: string,
+    requestBody: ImageRecordChanges,
+  }): CancelablePromise<ImageDTO> {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/api/v1/images/{image_origin}/{image_name}',
+      path: {
+        'image_origin': imageOrigin,
+        'image_name': imageName,
+      },
+      body: requestBody,
+      mediaType: 'application/json',
       errors: {
         422: `Validation Error`,
       },
@@ -158,13 +216,13 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageMetadata({
-    imageType,
+    imageOrigin,
     imageName,
   }: {
     /**
-     * The type of image to get
+     * The origin of image to get
      */
-    imageType: ImageType,
+    imageOrigin: ResourceOrigin,
     /**
      * The name of image to get
      */
@@ -172,9 +230,9 @@ export class ImagesService {
   }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}/metadata',
+      url: '/api/v1/images/{image_origin}/{image_name}/metadata',
       path: {
-        'image_type': imageType,
+        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -190,13 +248,13 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageThumbnail({
-    imageType,
+    imageOrigin,
     imageName,
   }: {
     /**
-     * The type of thumbnail image file to get
+     * The origin of thumbnail image file to get
      */
-    imageType: ImageType,
+    imageOrigin: ResourceOrigin,
     /**
      * The name of thumbnail image file to get
      */
@@ -204,9 +262,9 @@ export class ImagesService {
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}/thumbnail',
+      url: '/api/v1/images/{image_origin}/{image_name}/thumbnail',
       path: {
-        'image_type': imageType,
+        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -223,13 +281,13 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageUrls({
-    imageType,
+    imageOrigin,
     imageName,
   }: {
     /**
-     * The type of the image whose URL to get
+     * The origin of the image whose URL to get
      */
-    imageType: ImageType,
+    imageOrigin: ResourceOrigin,
     /**
      * The name of the image whose URL to get
      */
@@ -237,9 +295,9 @@ export class ImagesService {
   }): CancelablePromise<ImageUrlsDTO> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_type}/{image_name}/urls',
+      url: '/api/v1/images/{image_origin}/{image_name}/urls',
       path: {
-        'image_type': imageType,
+        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {

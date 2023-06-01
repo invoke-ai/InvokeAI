@@ -16,7 +16,6 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
-  setCurrentCategory,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
@@ -31,59 +30,46 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
+import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { resultsAdapter } from '../store/resultsSlice';
-import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
-} from 'services/thunks/gallery';
-import { uploadsAdapter } from '../store/uploadsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import GalleryProgressImage from './GalleryProgressImage';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { ImageDTO } from 'services/api';
-
-const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 290;
-const PROGRESS_IMAGE_PLACEHOLDER = 'PROGRESS_IMAGE_PLACEHOLDER';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+  imageCategoriesChanged,
+  selectImagesAll,
+} from '../store/imagesSlice';
+import { receivedPageOfImages } from 'services/thunks/image';
 
 const categorySelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { results, uploads, system, gallery } = state;
-    const { currentCategory } = gallery;
+    const { images } = state;
+    const { categories } = images;
 
-    if (currentCategory === 'results') {
-      const tempImages: (ImageDTO | typeof PROGRESS_IMAGE_PLACEHOLDER)[] = [];
-
-      if (system.progressImage) {
-        tempImages.push(PROGRESS_IMAGE_PLACEHOLDER);
-      }
-
-      return {
-        images: tempImages.concat(
-          resultsAdapter.getSelectors().selectAll(results)
-        ),
-        isLoading: results.isLoading,
-        areMoreImagesAvailable: results.page < results.pages - 1,
-      };
-    }
+    const allImages = selectImagesAll(state);
+    const filteredImages = allImages.filter((i) =>
+      categories.includes(i.image_category)
+    );
 
     return {
-      images: uploadsAdapter.getSelectors().selectAll(uploads),
-      isLoading: uploads.isLoading,
-      areMoreImagesAvailable: uploads.page < uploads.pages - 1,
+      images: filteredImages,
+      isLoading: images.isLoading,
+      areMoreImagesAvailable: filteredImages.length < images.total,
+      categories: images.categories,
     };
   },
   defaultSelectorOptions
@@ -93,7 +79,6 @@ const mainSelector = createSelector(
   [gallerySelector, uiSelector],
   (gallery, ui) => {
     const {
-      currentCategory,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldAutoSwitchToNewImages,
@@ -104,7 +89,6 @@ const mainSelector = createSelector(
     const { shouldPinGallery } = ui;
 
     return {
-      currentCategory,
       shouldPinGallery,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
@@ -120,7 +104,6 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
-  const [shouldShouldIconButtons, setShouldShouldIconButtons] = useState(true);
   const rootRef = useRef(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
@@ -137,7 +120,6 @@ const ImageGalleryContent = () => {
   });
 
   const {
-    currentCategory,
     shouldPinGallery,
     galleryImageMinimumWidth,
     galleryImageObjectFit,
@@ -146,18 +128,19 @@ const ImageGalleryContent = () => {
     selectedImage,
   } = useAppSelector(mainSelector);
 
-  const { images, areMoreImagesAvailable, isLoading } =
+  const { images, areMoreImagesAvailable, isLoading, categories } =
     useAppSelector(categorySelector);
 
-  const handleClickLoadMore = () => {
-    if (currentCategory === 'results') {
-      dispatch(receivedResultImagesPage());
-    }
+  const handleLoadMoreImages = useCallback(() => {
+    dispatch(receivedPageOfImages());
+  }, [dispatch]);
 
-    if (currentCategory === 'uploads') {
-      dispatch(receivedUploadImagesPage());
+  const handleEndReached = useMemo(() => {
+    if (areMoreImagesAvailable && !isLoading) {
+      return handleLoadMoreImages;
     }
-  };
+    return undefined;
+  }, [areMoreImagesAvailable, handleLoadMoreImages, isLoading]);
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
@@ -167,28 +150,6 @@ const ImageGalleryContent = () => {
     dispatch(togglePinGalleryPanel());
     dispatch(requestCanvasRescale());
   };
-
-  useEffect(() => {
-    if (!resizeObserverRef.current) {
-      return;
-    }
-    const resizeObserver = new ResizeObserver(() => {
-      if (!resizeObserverRef.current) {
-        return;
-      }
-
-      if (
-        resizeObserverRef.current.clientWidth < GALLERY_SHOW_BUTTONS_MIN_WIDTH
-      ) {
-        setShouldShouldIconButtons(true);
-        return;
-      }
-
-      setShouldShouldIconButtons(false);
-    });
-    resizeObserver.observe(resizeObserverRef.current);
-    return () => resizeObserver.disconnect(); // clean up
-  }, []);
 
   useEffect(() => {
     const { current: root } = rootRef;
@@ -209,13 +170,13 @@ const ImageGalleryContent = () => {
     }
   }, []);
 
-  const handleEndReached = useCallback(() => {
-    if (currentCategory === 'results') {
-      dispatch(receivedResultImagesPage());
-    } else if (currentCategory === 'uploads') {
-      dispatch(receivedUploadImagesPage());
-    }
-  }, [dispatch, currentCategory]);
+  const handleClickImagesCategory = useCallback(() => {
+    dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
+  }, [dispatch]);
+
+  const handleClickAssetsCategory = useCallback(() => {
+    dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
+  }, [dispatch]);
 
   return (
     <Flex
@@ -232,59 +193,31 @@ const ImageGalleryContent = () => {
         alignItems="center"
         justifyContent="space-between"
       >
-        <ButtonGroup
-          size="sm"
-          isAttached
-          w="max-content"
-          justifyContent="stretch"
-        >
-          {shouldShouldIconButtons ? (
-            <>
-              <IAIIconButton
-                aria-label={t('gallery.showGenerations')}
-                tooltip={t('gallery.showGenerations')}
-                isChecked={currentCategory === 'results'}
-                role="radio"
-                icon={<FaImage />}
-                onClick={() => dispatch(setCurrentCategory('results'))}
-              />
-              <IAIIconButton
-                aria-label={t('gallery.showUploads')}
-                tooltip={t('gallery.showUploads')}
-                role="radio"
-                isChecked={currentCategory === 'uploads'}
-                icon={<FaUser />}
-                onClick={() => dispatch(setCurrentCategory('uploads'))}
-              />
-            </>
-          ) : (
-            <>
-              <IAIButton
-                size="sm"
-                isChecked={currentCategory === 'results'}
-                onClick={() => dispatch(setCurrentCategory('results'))}
-                flexGrow={1}
-              >
-                {t('gallery.generations')}
-              </IAIButton>
-              <IAIButton
-                size="sm"
-                isChecked={currentCategory === 'uploads'}
-                onClick={() => dispatch(setCurrentCategory('uploads'))}
-                flexGrow={1}
-              >
-                {t('gallery.uploads')}
-              </IAIButton>
-            </>
-          )}
+        <ButtonGroup isAttached>
+          <IAIIconButton
+            tooltip={t('gallery.images')}
+            aria-label={t('gallery.images')}
+            onClick={handleClickImagesCategory}
+            isChecked={categories === IMAGE_CATEGORIES}
+            size="sm"
+            icon={<FaImage />}
+          />
+          <IAIIconButton
+            tooltip={t('gallery.assets')}
+            aria-label={t('gallery.assets')}
+            onClick={handleClickAssetsCategory}
+            isChecked={categories === ASSETS_CATEGORIES}
+            size="sm"
+            icon={<FaServer />}
+          />
         </ButtonGroup>
-
         <Flex gap={2}>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
-                size="sm"
+                tooltip={t('gallery.gallerySettings')}
                 aria-label={t('gallery.gallerySettings')}
+                size="sm"
                 icon={<FaWrench />}
               />
             }
@@ -347,28 +280,17 @@ const ImageGalleryContent = () => {
                   data={images}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
-                  itemContent={(index, image) => {
-                    const isSelected =
-                      image === PROGRESS_IMAGE_PLACEHOLDER
-                        ? false
-                        : selectedImage?.image_name === image?.image_name;
-
-                    return (
-                      <Flex sx={{ pb: 2 }}>
-                        {image === PROGRESS_IMAGE_PLACEHOLDER ? (
-                          <GalleryProgressImage
-                            key={PROGRESS_IMAGE_PLACEHOLDER}
-                          />
-                        ) : (
-                          <HoverableImage
-                            key={`${image.image_name}-${image.thumbnail_url}`}
-                            image={image}
-                            isSelected={isSelected}
-                          />
-                        )}
-                      </Flex>
-                    );
-                  }}
+                  itemContent={(index, image) => (
+                    <Flex sx={{ pb: 2 }}>
+                      <HoverableImage
+                        key={`${image.image_name}-${image.thumbnail_url}`}
+                        image={image}
+                        isSelected={
+                          selectedImage?.image_name === image?.image_name
+                        }
+                      />
+                    </Flex>
+                  )}
                 />
               ) : (
                 <VirtuosoGrid
@@ -380,27 +302,20 @@ const ImageGalleryContent = () => {
                     List: ListContainer,
                   }}
                   scrollerRef={setScroller}
-                  itemContent={(index, image) => {
-                    const isSelected =
-                      image === PROGRESS_IMAGE_PLACEHOLDER
-                        ? false
-                        : selectedImage?.image_name === image?.image_name;
-
-                    return image === PROGRESS_IMAGE_PLACEHOLDER ? (
-                      <GalleryProgressImage key={PROGRESS_IMAGE_PLACEHOLDER} />
-                    ) : (
-                      <HoverableImage
-                        key={`${image.image_name}-${image.thumbnail_url}`}
-                        image={image}
-                        isSelected={isSelected}
-                      />
-                    );
-                  }}
+                  itemContent={(index, image) => (
+                    <HoverableImage
+                      key={`${image.image_name}-${image.thumbnail_url}`}
+                      image={image}
+                      isSelected={
+                        selectedImage?.image_name === image?.image_name
+                      }
+                    />
+                  )}
                 />
               )}
             </Box>
             <IAIButton
-              onClick={handleClickLoadMore}
+              onClick={handleLoadMoreImages}
               isDisabled={!areMoreImagesAvailable}
               isLoading={isLoading}
               loadingText="Loading"

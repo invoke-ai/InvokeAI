@@ -1,33 +1,18 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ImageType } from 'services/api';
-import { selectResultsEntities } from '../store/resultsSlice';
-import { selectUploadsEntities } from '../store/uploadsSlice';
+import { selectImagesEntities } from '../store/imagesSlice';
+import { useCallback } from 'react';
 
-const useGetImageByNameSelector = createSelector(
-  [selectResultsEntities, selectUploadsEntities],
-  (allResults, allUploads) => {
-    return { allResults, allUploads };
-  }
-);
-
-const useGetImageByNameAndType = () => {
-  const { allResults, allUploads } = useAppSelector(useGetImageByNameSelector);
-  return (name: string, type: ImageType) => {
-    if (type === 'results') {
-      const resultImagesResult = allResults[name];
-      if (resultImagesResult) {
-        return resultImagesResult;
+const useGetImageByName = () => {
+  const images = useAppSelector(selectImagesEntities);
+  return useCallback(
+    (name: string | undefined) => {
+      if (!name) {
+        return;
       }
-    }
-
-    if (type === 'uploads') {
-      const userImagesResult = allUploads[name];
-      if (userImagesResult) {
-        return userImagesResult;
-      }
-    }
-  };
+      return images[name];
+    },
+    [images]
+  );
 };
 
-export default useGetImageByNameAndType;
+export default useGetImageByName;

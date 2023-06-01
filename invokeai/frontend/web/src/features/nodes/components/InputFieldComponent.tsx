@@ -10,6 +10,7 @@ import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComp
 import UNetInputFieldComponent from './fields/UNetInputFieldComponent';
 import ClipInputFieldComponent from './fields/ClipInputFieldComponent';
 import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
+import ControlInputFieldComponent from './fields/ControlInputFieldComponent';
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
@@ -123,6 +124,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'vae' && template.type === 'vae') {
     return (
       <VaeInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'control' && template.type === 'control') {
+    return (
+      <ControlInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

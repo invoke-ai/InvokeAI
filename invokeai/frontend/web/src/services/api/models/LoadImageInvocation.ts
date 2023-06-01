@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageType } from './ImageType';
+import type { ImageField } from './ImageField';
 
 /**
  * Load an image and provide it as output.
@@ -12,14 +12,14 @@ export type LoadImageInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'load_image';
   /**
-   * The type of the image
+   * The image to load
    */
-  image_type: ImageType;
-  /**
-   * The name of the image
-   */
-  image_name: string;
+  image?: ImageField;
 };
 

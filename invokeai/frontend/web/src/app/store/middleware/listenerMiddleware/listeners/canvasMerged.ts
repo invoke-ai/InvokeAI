@@ -52,10 +52,11 @@ export const addCanvasMergedListener = () => {
 
       dispatch(
         imageUploaded({
-          imageType: 'intermediates',
           formData: {
             file: new File([blob], filename, { type: 'image/png' }),
           },
+          imageCategory: 'general',
+          isIntermediate: true,
         })
       );
 
@@ -65,7 +66,7 @@ export const addCanvasMergedListener = () => {
           action.meta.arg.formData.file.name === filename
       );
 
-      const mergedCanvasImage = payload.response;
+      const mergedCanvasImage = payload;
 
       dispatch(
         setMergedCanvas({

@@ -13,6 +13,7 @@ import {
   UNetInputFieldTemplate,
   ClipInputFieldTemplate,
   VaeInputFieldTemplate,
+  ControlInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
   ArrayInputFieldTemplate,
@@ -263,6 +264,21 @@ const buildVaeInputFieldTemplate = ({
   return template;
 };
 
+const buildControlInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ControlInputFieldTemplate => {
+  const template: ControlInputFieldTemplate = {
+    ...baseField,
+    type: 'control',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -334,9 +350,20 @@ export const getFieldType = (
   if (typeHints && name in typeHints) {
     rawFieldType = typeHints[name];
   } else if (!schemaObject.type) {
-    rawFieldType = refObjectToFieldType(
-      schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
-    );
+    // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
+    if (schemaObject.allOf) {
+      rawFieldType = refObjectToFieldType(
+        schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
+      );
+    } else if (schemaObject.anyOf) {
+      rawFieldType = refObjectToFieldType(
+        schemaObject.anyOf![0] as OpenAPIV3.ReferenceObject
+      );
+    } else if (schemaObject.oneOf) {
+      rawFieldType = refObjectToFieldType(
+        schemaObject.oneOf![0] as OpenAPIV3.ReferenceObject
+      );
+    }
   } else if (schemaObject.enum) {
     rawFieldType = 'enum';
   } else if (schemaObject.type) {
@@ -387,6 +414,9 @@ export const buildInputFieldTemplate = (
   }
   if (['vae'].includes(fieldType)) {
     return buildVaeInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['control'].includes(fieldType)) {
+    return buildControlInputFieldTemplate({ schemaObject, baseField });
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });

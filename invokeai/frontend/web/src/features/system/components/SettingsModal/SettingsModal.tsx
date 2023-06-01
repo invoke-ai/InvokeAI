@@ -35,7 +35,13 @@ import {
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
-import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
+import {
+  ChangeEvent,
+  cloneElement,
+  ReactElement,
+  useCallback,
+  useEffect,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
@@ -85,14 +91,32 @@ const modalSectionStyles: ChakraProps['sx'] = {
   borderRadius: 'base',
 };
 
+type ConfigOptions = {
+  shouldShowDeveloperSettings: boolean;
+  shouldShowResetWebUiText: boolean;
+  shouldShowBetaLayout: boolean;
+};
+
 type SettingsModalProps = {
   /* The button to open the Settings Modal */
   children: ReactElement;
+  config?: ConfigOptions;
 };
 
-const SettingsModal = ({ children }: SettingsModalProps) => {
+const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
+  const shouldShowBetaLayout = config?.shouldShowBetaLayout ?? true;
+  const shouldShowDeveloperSettings =
+    config?.shouldShowDeveloperSettings ?? true;
+  const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
+
+  useEffect(() => {
+    if (!shouldShowDeveloperSettings) {
+      dispatch(shouldLogToConsoleChanged(false));
+    }
+  }, [shouldShowDeveloperSettings, dispatch]);
 
   const {
     isOpen: isSettingsModalOpen,
@@ -189,13 +213,15 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                     dispatch(setShouldDisplayGuides(e.target.checked))
                   }
                 />
-                <IAISwitch
-                  label={t('settings.useCanvasBeta')}
-                  isChecked={shouldUseCanvasBetaLayout}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                  }
-                />
+                {shouldShowBetaLayout && (
+                  <IAISwitch
+                    label={t('settings.useCanvasBeta')}
+                    isChecked={shouldUseCanvasBetaLayout}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
+                    }
+                  />
+                )}
                 <IAISwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
@@ -221,38 +247,44 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 />
               </Flex>
 
-              <Flex sx={modalSectionStyles}>
-                <Heading size="sm">{t('settings.developer')}</Heading>
-                <IAISwitch
-                  label={t('settings.shouldLogToConsole')}
-                  isChecked={shouldLogToConsole}
-                  onChange={handleLogToConsoleChanged}
-                />
-                <IAISelect
-                  horizontal
-                  spaceEvenly
-                  isDisabled={!shouldLogToConsole}
-                  label={t('settings.consoleLogLevel')}
-                  onChange={handleLogLevelChanged}
-                  value={consoleLogLevel}
-                  validValues={VALID_LOG_LEVELS.concat()}
-                />
-                <IAISwitch
-                  label={t('settings.enableImageDebugging')}
-                  isChecked={enableImageDebugging}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setEnableImageDebugging(e.target.checked))
-                  }
-                />
-              </Flex>
+              {shouldShowDeveloperSettings && (
+                <Flex sx={modalSectionStyles}>
+                  <Heading size="sm">{t('settings.developer')}</Heading>
+                  <IAISwitch
+                    label={t('settings.shouldLogToConsole')}
+                    isChecked={shouldLogToConsole}
+                    onChange={handleLogToConsoleChanged}
+                  />
+                  <IAISelect
+                    horizontal
+                    spaceEvenly
+                    isDisabled={!shouldLogToConsole}
+                    label={t('settings.consoleLogLevel')}
+                    onChange={handleLogLevelChanged}
+                    value={consoleLogLevel}
+                    validValues={VALID_LOG_LEVELS.concat()}
+                  />
+                  <IAISwitch
+                    label={t('settings.enableImageDebugging')}
+                    isChecked={enableImageDebugging}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setEnableImageDebugging(e.target.checked))
+                    }
+                  />
+                </Flex>
+              )}
 
               <Flex sx={modalSectionStyles}>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
                 <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
                   {t('settings.resetWebUI')}
                 </IAIButton>
-                <Text>{t('settings.resetWebUIDesc1')}</Text>
-                <Text>{t('settings.resetWebUIDesc2')}</Text>
+                {shouldShowResetWebUiText && (
+                  <>
+                    <Text>{t('settings.resetWebUIDesc1')}</Text>
+                    <Text>{t('settings.resetWebUIDesc2')}</Text>
+                  </>
+                )}
               </Flex>
             </Flex>
           </ModalBody>

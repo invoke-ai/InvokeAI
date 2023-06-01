@@ -2,7 +2,7 @@ import { Box, Image } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import SelectImagePlaceholder from 'common/components/SelectImagePlaceholder';
 import { useGetUrl } from 'common/util/getUrl';
-import useGetImageByNameAndType from 'features/gallery/hooks/useGetImageByName';
+import useGetImageByName from 'features/gallery/hooks/useGetImageByName';
 
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
@@ -11,7 +11,6 @@ import {
 } from 'features/nodes/types/types';
 import { DragEvent, memo, useCallback, useState } from 'react';
 
-import { ImageType } from 'services/api';
 import { FieldComponentProps } from './types';
 
 const ImageInputFieldComponent = (
@@ -19,7 +18,7 @@ const ImageInputFieldComponent = (
 ) => {
   const { nodeId, field } = props;
 
-  const getImageByNameAndType = useGetImageByNameAndType();
+  const getImageByName = useGetImageByName();
   const dispatch = useAppDispatch();
   const [url, setUrl] = useState<string | undefined>(field.value?.image_url);
   const { getUrl } = useGetUrl();
@@ -27,13 +26,7 @@ const ImageInputFieldComponent = (
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       const name = e.dataTransfer.getData('invokeai/imageName');
-      const type = e.dataTransfer.getData('invokeai/imageType') as ImageType;
-
-      if (!name || !type) {
-        return;
-      }
-
-      const image = getImageByNameAndType(name, type);
+      const image = getImageByName(name);
 
       if (!image) {
         return;
@@ -49,7 +42,7 @@ const ImageInputFieldComponent = (
         })
       );
     },
-    [getImageByNameAndType, dispatch, field.name, nodeId]
+    [getImageByName, dispatch, field.name, nodeId]
   );
 
   return (

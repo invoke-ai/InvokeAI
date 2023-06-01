@@ -75,9 +75,11 @@ class InvokeAIGenerator(metaclass=ABCMeta):
     def __init__(self,
                  model_info: dict,
                  params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
+                 **kwargs,
                  ):
         self.model_info=model_info
         self.params=params
+        self.kwargs = kwargs
 
     def generate(self,
                  prompt: str='',
@@ -120,7 +122,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             )
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt,model=model)
             gen_class = self._generator_class()
-            generator = gen_class(model, self.params.precision)
+            generator = gen_class(model, self.params.precision, **self.kwargs)
             if self.params.variation_amount > 0:
                 generator.set_variation(generator_args.get('seed'),
                                         generator_args.get('variation_amount'),
@@ -275,7 +277,7 @@ class Generator:
     precision: str
     model: DiffusionPipeline
 
-    def __init__(self, model: DiffusionPipeline, precision: str):
+    def __init__(self, model: DiffusionPipeline, precision: str, **kwargs):
         self.model = model
         self.precision = precision
         self.seed = None

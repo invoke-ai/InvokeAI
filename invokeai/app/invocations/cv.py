@@ -7,7 +7,7 @@ import numpy
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.image import ImageCategory, ImageField, ImageType
+from invokeai.app.models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput
 
@@ -37,10 +37,10 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
         mask = context.services.images.get_pil_image(
-            self.mask.image_type, self.mask.image_name
+            self.mask.image_origin, self.mask.image_name
         )
 
         # Convert to cv image/mask
@@ -57,16 +57,17 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
 
         image_dto = context.services.images.create(
             image=image_inpainted,
-            image_type=ImageType.INTERMEDIATE,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,

@@ -68,13 +68,13 @@ const ImageUploader = (props: ImageUploaderProps) => {
     async (file: File) => {
       dispatch(
         imageUploaded({
-          imageType: 'uploads',
           formData: { file },
-          activeTabName,
+          imageCategory: 'user',
+          isIntermediate: false,
         })
       );
     },
-    [dispatch, activeTabName]
+    [dispatch]
   );
 
   const onDrop = useCallback(
@@ -145,14 +145,6 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [inputRef, open, setOpenUploaderFunction]);
 
-  const overlaySecondaryText = useMemo(() => {
-    if (['img2img', 'unifiedCanvas'].includes(activeTabName)) {
-      return ` to ${String(t(`common.${activeTabName}` as ResourceKey))}`;
-    }
-
-    return '';
-  }, [t, activeTabName]);
-
   return (
     <Box
       {...getRootProps({ style: {} })}
@@ -167,7 +159,6 @@ const ImageUploader = (props: ImageUploaderProps) => {
         <ImageUploadOverlay
           isDragAccept={isDragAccept}
           isDragReject={isDragReject}
-          overlaySecondaryText={overlaySecondaryText}
           setIsHandlingUpload={setIsHandlingUpload}
         />
       )}

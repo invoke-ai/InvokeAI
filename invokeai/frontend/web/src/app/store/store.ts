@@ -10,12 +10,12 @@ import dynamicMiddlewares from 'redux-dynamic-middlewares';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
-import resultsReducer from 'features/gallery/store/resultsSlice';
-import uploadsReducer from 'features/gallery/store/uploadsSlice';
+import imagesReducer from 'features/gallery/store/imagesSlice';
 import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
+// import sessionReducer from 'features/system/store/sessionSlice';
 import configReducer from 'features/system/store/configSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
@@ -40,12 +40,12 @@ const allReducers = {
   models: modelsReducer,
   nodes: nodesReducer,
   postprocessing: postprocessingReducer,
-  results: resultsReducer,
   system: systemReducer,
   config: configReducer,
   ui: uiReducer,
-  uploads: uploadsReducer,
   hotkeys: hotkeysReducer,
+  images: imagesReducer,
+  // session: sessionReducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -63,8 +63,6 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'system',
   'ui',
   // 'hotkeys',
-  // 'results',
-  // 'uploads',
   // 'config',
 ];
 

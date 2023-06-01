@@ -1,44 +1,46 @@
 import { startAppListening } from '..';
-import { uploadAdded } from 'features/gallery/store/uploadsSlice';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imageUploaded } from 'services/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
-import { initialImageSelected } from 'features/parameters/store/actions';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { resultAdded } from 'features/gallery/store/resultsSlice';
-import { isResultsImageDTO, isUploadsImageDTO } from 'services/types/guards';
+import { log } from 'app/logging/useLogger';
+import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
-export const addImageUploadedListener = () => {
+const moduleLog = log.child({ namespace: 'image' });
+
+export const addImageUploadedFulfilledListener = () => {
   startAppListening({
-    predicate: (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
-      imageUploaded.fulfilled.match(action) &&
-      action.payload.response.image_type !== 'intermediates',
+    actionCreator: imageUploaded.fulfilled,
     effect: (action, { dispatch, getState }) => {
-      const { response: image } = action.payload;
+      const image = action.payload;
+
+      moduleLog.debug({ arg: '<Blob>', image }, 'Image uploaded');
+
+      if (action.payload.is_intermediate) {
+        // No further actions needed for intermediate images
+        return;
+      }
 
       const state = getState();
 
-      if (isUploadsImageDTO(image)) {
-        dispatch(uploadAdded(image));
+      dispatch(imageUpserted(image));
+      dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
+    },
+  });
+};
 
-        dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
-
-        if (state.gallery.shouldAutoSwitchToNewImages) {
-          dispatch(imageSelected(image));
-        }
-
-        if (action.meta.arg.activeTabName === 'img2img') {
-          dispatch(initialImageSelected(image));
-        }
-
-        if (action.meta.arg.activeTabName === 'unifiedCanvas') {
-          dispatch(setInitialCanvasImage(image));
-        }
-      }
-
-      if (isResultsImageDTO(image)) {
-        dispatch(resultAdded(image));
-      }
+export const addImageUploadedRejectedListener = () => {
+  startAppListening({
+    actionCreator: imageUploaded.rejected,
+    effect: (action, { dispatch }) => {
+      const { formData, ...rest } = action.meta.arg;
+      const sanitizedData = { arg: { ...rest, formData: { file: '<Blob>' } } };
+      moduleLog.error({ data: sanitizedData }, 'Image upload failed');
+      dispatch(
+        addToast({
+          title: 'Image Upload Failed',
+          description: action.error.message,
+          status: 'error',
+        })
+      );
     },
   });
 };

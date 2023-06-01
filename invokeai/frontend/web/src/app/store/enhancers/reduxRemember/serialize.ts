@@ -1,7 +1,5 @@
 import { canvasPersistDenylist } from 'features/canvas/store/canvasPersistDenylist';
 import { galleryPersistDenylist } from 'features/gallery/store/galleryPersistDenylist';
-import { resultsPersistDenylist } from 'features/gallery/store/resultsPersistDenylist';
-import { uploadsPersistDenylist } from 'features/gallery/store/uploadsPersistDenylist';
 import { lightboxPersistDenylist } from 'features/lightbox/store/lightboxPersistDenylist';
 import { nodesPersistDenylist } from 'features/nodes/store/nodesPersistDenylist';
 import { generationPersistDenylist } from 'features/parameters/store/generationPersistDenylist';
@@ -22,11 +20,9 @@ const serializationDenylist: {
   models: modelsPersistDenylist,
   nodes: nodesPersistDenylist,
   postprocessing: postprocessingPersistDenylist,
-  results: resultsPersistDenylist,
   system: systemPersistDenylist,
   // config: configPersistDenyList,
   ui: uiPersistDenylist,
-  uploads: uploadsPersistDenylist,
   // hotkeys: hotkeysPersistDenylist,
 };
 

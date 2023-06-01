@@ -1,7 +1,7 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { SessionsService } from 'services/api';
+import { GraphExecutionState, SessionsService } from 'services/api';
 import { log } from 'app/logging/useLogger';
-import { serializeError } from 'serialize-error';
+import { isObject } from 'lodash-es';
 
 const sessionLog = log.child({ namespace: 'session' });
 
@@ -11,99 +11,89 @@ type SessionCreatedArg = {
   >[0]['requestBody'];
 };
 
+type SessionCreatedThunkConfig = {
+  rejectValue: { arg: SessionCreatedArg; error: unknown };
+};
+
 /**
  * `SessionsService.createSession()` thunk
  */
-export const sessionCreated = createAppAsyncThunk(
-  'api/sessionCreated',
-  async (arg: SessionCreatedArg, { rejectWithValue }) => {
-    try {
-      const response = await SessionsService.createSession({
-        requestBody: arg.graph,
-      });
-      sessionLog.info({ arg, response }, `Session created (${response.id})`);
-      return response;
-    } catch (err: any) {
-      sessionLog.error(
-        {
-          error: serializeError(err),
-        },
-        'Problem creating session'
-      );
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-type NodeAddedArg = Parameters<(typeof SessionsService)['addNode']>[0];
-
-/**
- * `SessionsService.addNode()` thunk
- */
-export const nodeAdded = createAppAsyncThunk(
-  'api/nodeAdded',
-  async (
-    arg: { node: NodeAddedArg['requestBody']; sessionId: string },
-    _thunkApi
-  ) => {
-    const response = await SessionsService.addNode({
-      requestBody: arg.node,
-      sessionId: arg.sessionId,
+export const sessionCreated = createAppAsyncThunk<
+  GraphExecutionState,
+  SessionCreatedArg,
+  SessionCreatedThunkConfig
+>('api/sessionCreated', async (arg, { rejectWithValue }) => {
+  try {
+    const response = await SessionsService.createSession({
+      requestBody: arg.graph,
     });
-
-    sessionLog.info({ arg, response }, `Node added (${response})`);
-
     return response;
+  } catch (error) {
+    return rejectWithValue({ arg, error });
   }
-);
+});
+
+type SessionInvokedArg = { sessionId: string };
+
+type SessionInvokedThunkConfig = {
+  rejectValue: {
+    arg: SessionInvokedArg;
+    error: unknown;
+  };
+};
+
+const isErrorWithStatus = (error: unknown): error is { status: number } =>
+  isObject(error) && 'status' in error;
 
 /**
  * `SessionsService.invokeSession()` thunk
  */
-export const sessionInvoked = createAppAsyncThunk(
-  'api/sessionInvoked',
-  async (arg: { sessionId: string }, { rejectWithValue }) => {
-    const { sessionId } = arg;
+export const sessionInvoked = createAppAsyncThunk<
+  void,
+  SessionInvokedArg,
+  SessionInvokedThunkConfig
+>('api/sessionInvoked', async (arg, { rejectWithValue }) => {
+  const { sessionId } = arg;
 
-    try {
-      const response = await SessionsService.invokeSession({
-        sessionId,
-        all: true,
-      });
-      sessionLog.info({ arg, response }, `Session invoked (${sessionId})`);
-
-      return response;
-    } catch (error) {
-      const err = error as any;
-      if (err.status === 403) {
-        return rejectWithValue(err.body.detail);
-      }
-      throw error;
+  try {
+    const response = await SessionsService.invokeSession({
+      sessionId,
+      all: true,
+    });
+    return response;
+  } catch (error) {
+    if (isErrorWithStatus(error) && error.status === 403) {
+      return rejectWithValue({ arg, error: (error as any).body.detail });
     }
+    return rejectWithValue({ arg, error });
   }
-);
+});
 
 type SessionCanceledArg = Parameters<
   (typeof SessionsService)['cancelSessionInvoke']
 >[0];
-
+type SessionCanceledThunkConfig = {
+  rejectValue: {
+    arg: SessionCanceledArg;
+    error: unknown;
+  };
+};
 /**
  * `SessionsService.cancelSession()` thunk
  */
-export const sessionCanceled = createAppAsyncThunk(
-  'api/sessionCanceled',
-  async (arg: SessionCanceledArg, _thunkApi) => {
-    const { sessionId } = arg;
+export const sessionCanceled = createAppAsyncThunk<
+  void,
+  SessionCanceledArg,
+  SessionCanceledThunkConfig
+>('api/sessionCanceled', async (arg: SessionCanceledArg, _thunkApi) => {
+  const { sessionId } = arg;
 
-    const response = await SessionsService.cancelSessionInvoke({
-      sessionId,
-    });
+  const response = await SessionsService.cancelSessionInvoke({
+    sessionId,
+  });
 
-    sessionLog.info({ arg, response }, `Session canceled (${sessionId})`);
-
-    return response;
-  }
-);
+  return response;
+});
 
 type SessionsListedArg = Parameters<
   (typeof SessionsService)['listSessions']

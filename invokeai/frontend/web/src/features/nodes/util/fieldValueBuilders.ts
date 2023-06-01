@@ -64,6 +64,10 @@ export const buildInputFieldValue = (
       fieldValue.value = undefined;
     }
 
+    if (template.type === 'control') {
+      fieldValue.value = undefined;
+    }
+
     if (template.type === 'model') {
       fieldValue.value = undefined;
     }

@@ -4,6 +4,7 @@ export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
 
 export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   integer: 'integer',
+  float: 'float',
   number: 'float',
   string: 'string',
   boolean: 'boolean',
@@ -18,6 +19,8 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   array: 'array',
   item: 'item',
   ColorField: 'color',
+  ControlField: 'control',
+  control: 'control',
 };
 
 const COLOR_TOKEN_VALUE = 500;
@@ -25,6 +28,9 @@ const COLOR_TOKEN_VALUE = 500;
 const getColorTokenCssVariable = (color: string) =>
   `var(--invokeai-colors-${color}-${COLOR_TOKEN_VALUE})`;
 
+// @ts-ignore
+// @ts-ignore
+// @ts-ignore
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
   integer: {
     color: 'red',
@@ -91,6 +97,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     colorCssVar: getColorTokenCssVariable('blue'),
     title: 'Vae',
     description: 'Vae submodel.',
+  },
+  control: {
+    color: 'cyan',
+    colorCssVar: getColorTokenCssVariable('cyan'), // TODO: no free color left
+    title: 'Control',
+    description: 'Control info passed between nodes.',
   },
   model: {
     color: 'teal',

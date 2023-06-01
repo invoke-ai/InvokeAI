@@ -12,6 +12,10 @@ export type ScaleLatentsInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'lscale';
   /**
    * The latents to scale

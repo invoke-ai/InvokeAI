@@ -64,6 +64,7 @@ export type FieldType =
   | 'unet'
   | 'clip'
   | 'vae'
+  | 'control'
   | 'model'
   | 'array'
   | 'item'
@@ -88,6 +89,7 @@ export type InputFieldValue =
   | UNetInputFieldValue
   | ClipInputFieldValue
   | VaeInputFieldValue
+  | ControlInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
   | ArrayInputFieldValue
@@ -111,6 +113,7 @@ export type InputFieldTemplate =
   | UNetInputFieldTemplate
   | ClipInputFieldTemplate
   | VaeInputFieldTemplate
+  | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
   | ArrayInputFieldTemplate
@@ -186,6 +189,11 @@ export type LatentsInputFieldValue = FieldValueBase & {
 
 export type ConditioningInputFieldValue = FieldValueBase & {
   type: 'conditioning';
+  value?: string;
+};
+
+export type ControlInputFieldValue = FieldValueBase & {
+  type: 'control';
   value?: undefined;
 };
 
@@ -284,6 +292,11 @@ export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
 export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'conditioning';
+};
+
+export type ControlInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'control';
 };
 
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
