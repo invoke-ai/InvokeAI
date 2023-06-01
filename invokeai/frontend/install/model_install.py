@@ -30,11 +30,15 @@ from ...backend.install.model_install_backend import (
     default_dataset,
     install_requested_models,
     recommended_datasets,
+    ModelInstallList,
+    dataclass,
 )
+from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
 from .widgets import (
     CenteredTitleText,
     MultiSelectColumns,
+    SingleSelectColumns,
     OffsetButtonPress,
     TextBox,
     set_min_terminal_size,
@@ -53,12 +57,12 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
+
+        model_manager = ModelManager(config.model_conf_path)
         
         self.initial_models = OmegaConf.load(Dataset_path)['diffusers']
-        self.control_net_models = OmegaConf.load(Dataset_path)['controlnet']
-        self.installed_cn_models = self._get_installed_cn_models()
-        self._add_additional_cn_models(self.control_net_models,self.installed_cn_models)
-        
+        self.installed_cn_models = model_manager.list_controlnet_models()
+
         try:
             self.existing_models = OmegaConf.load(default_config_file())
         except:
@@ -79,7 +83,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             [x for x in list(self.initial_models.keys()) if x in self.existing_models]
         )
 
-        cn_model_list = sorted(self.control_net_models.keys())
+        cn_model_list = sorted(self.installed_cn_models.keys())
         
         self.nextrely -= 1
         self.add_widget_intelligent(
@@ -180,16 +184,34 @@ class addModelsForm(npyscreen.FormMultiPage):
             relx=4,
             scroll_exit=True,
         )
+
         self.add_widget_intelligent(
             CenteredTitleText,
-            name="== CONTROLNET MODELS ==",
+            name='_' * (window_width-5),
             editable=False,
-            color="CONTROL",
+            labelColor='CAUTION'
         )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
+            
+        self.nextrely += 1
+        self.tabs = self.add_widget_intelligent(
+            SingleSelectColumns,
+            values=['ADD CONTROLNET MODELS','ADD LORA/LYCORIS MODELS', 'ADD TEXTUAL INVERSION MODELS'],
+            value=0,
+            columns = 4,
+            max_height = 2,
+            relx=8,
+            scroll_exit = True,
+        )
+        # self.add_widget_intelligent(
+        #     CenteredTitleText,
+        #     name="== CONTROLNET MODELS ==",
+        #     editable=False,
+        #     color="CONTROL",
+        # )
+        top_of_table = self.nextrely
+        self.cn_label_1 = self.add_widget_intelligent(
             CenteredTitleText,
-            name="Select the desired ControlNet models. Unchecked models will be purged from disk.",
+            name="Select the desired models to install. Unchecked models will be purged from disk.",
             editable=False,
             labelColor="CAUTION",
         )
@@ -202,14 +224,14 @@ class addModelsForm(npyscreen.FormMultiPage):
             value=[
                 cn_model_list.index(x)
                 for x in cn_model_list
-                if x in self.installed_cn_models
+                if self.installed_cn_models[x]
             ],
             max_height=len(cn_model_list)//columns + 1,
             relx=4,
             scroll_exit=True,
         )
         self.nextrely += 1        
-        self.add_widget_intelligent(
+        self.cn_label_2 = self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name='Additional ControlNet HuggingFace repo_ids to install (Space separated. Use shift-control-V to paste):',
             relx=4,
@@ -221,6 +243,55 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.additional_controlnet_ids = self.add_widget_intelligent(
             TextBox, max_height=2, scroll_exit=True, editable=True, relx=4
         )
+
+        bottom_of_table = self.nextrely
+        self.nextrely = top_of_table
+        self.lora_label_1 = self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name='LoRA/LYCORIS models to download and install (Space separated. Use shift-control-V to paste):',
+            relx=4,
+            color='CONTROL',
+            editable=False,
+            hidden=True,
+            scroll_exit=True
+        )
+        self.nextrely -= 1
+        self.loras = self.add_widget_intelligent(
+            TextBox,
+            max_height=2,
+            scroll_exit=True,
+            editable=True,
+            relx=4,
+            hidden=True,
+        )
+        self.nextrely = top_of_table
+        self.ti_label_1 = self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name='Textual Inversion models to download and install (Space separated. Use shift-control-V to paste):',
+            relx=4,
+            color='CONTROL',
+            editable=False,
+            hidden=True,
+            scroll_exit=True
+        )
+        self.nextrely -= 1
+        self.tis = self.add_widget_intelligent(
+            TextBox,
+            max_height=2,
+            scroll_exit=True,
+            editable=True,
+            relx=4,
+            hidden=True,
+        )
+        self.nextrely = bottom_of_table
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            CenteredTitleText,
+            name='_' * (window_width-5),
+            editable=False,
+            labelColor='CAUTION'
+        )
+
         self.cancel = self.add_widget_intelligent(
             npyscreen.ButtonPress,
             name="CANCEL",
@@ -254,12 +325,30 @@ class addModelsForm(npyscreen.FormMultiPage):
         for i in [self.autoload_directory, self.autoscan_on_startup]:
             self.show_directory_fields.addVisibleWhenSelected(i)
 
+        # self.tabs.when_value_edited = self._toggle_tables
+        self.tabs.on_changed = self._toggle_tables
+
         self.show_directory_fields.when_value_edited = self._clear_scan_directory
 
     def resize(self):
         super().resize()
         if hasattr(self, "models_selected"):
             self.models_selected.values = self._get_starter_model_labels()
+
+    def _toggle_tables(self, value=None):
+        selected_tab = value[0] if value else self.tabs.value[0]
+        widgets = [
+            [self.cn_label_1, self.cn_models_selected, self.cn_label_2, self.additional_controlnet_ids],
+            [self.lora_label_1,self.loras],
+            [self.ti_label_1,self.tis],
+        ]
+
+        for group in widgets:
+            for w in group:
+                w.hidden = True
+        for w in widgets[selected_tab]:
+            w.hidden = False
+        self.display()
 
     def _clear_scan_directory(self):
         if not self.show_directory_fields.value:
@@ -361,20 +450,18 @@ class addModelsForm(npyscreen.FormMultiPage):
         selections.install_models = [x for x in starter_models if x not in self.existing_models]
         selections.remove_models = [x for x in self.starter_model_list if x in self.existing_models and x not in starter_models]
 
-        selections.control_net_map = self.control_net_models
         selections.install_cn_models = [self.cn_models_selected.values[x]
                                         for x in self.cn_models_selected.value
-                                        if self.cn_models_selected.values[x] not in self.installed_cn_models
+                                        if not self.installed_cn_models[self.cn_models_selected.values[x]]
                                         ]
         selections.remove_cn_models = [x
                                        for x in self.cn_models_selected.values
-                                       if x in self.installed_cn_models
+                                       if self.installed_cn_models[x]
                                        and self.cn_models_selected.values.index(x) not in self.cn_models_selected.value
                                        ]
         if (additional_cns := self.additional_controlnet_ids.value.split()):
             valid_cns = [x for x in additional_cns if '/' in x]
             selections.install_cn_models.extend(valid_cns)
-            selections.control_net_map.update({x: x for x in valid_cns})
 
         # load directory and whether to scan on startup
         if self.show_directory_fields.value:
@@ -387,22 +474,22 @@ class addModelsForm(npyscreen.FormMultiPage):
         # URLs and the like
         selections.import_model_paths = self.import_model_paths.value.split()
 
-
+@dataclass
+class UserSelections():
+    install_models: List[str]=None
+    remove_models: List[str]=None
+    purge_deleted_models: bool=False,
+    install_cn_models: List[str] = None,
+    remove_cn_models: List[str] = None,
+    scan_directory: Path=None,
+    autoscan_on_startup: bool=False,
+    import_model_paths: str=None,
+        
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self):
         super().__init__()
         self.user_cancelled = False
-        self.user_selections = Namespace(
-            install_models=None,
-            remove_models=None,
-            purge_deleted_models=False,
-            install_cn_models = None,
-            remove_cn_models = None,
-            control_net_map = None,
-            scan_directory=None,
-            autoscan_on_startup=None,
-            import_model_paths=None,
-        )
+        self.user_selections = UserSelections()
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -418,15 +505,9 @@ def process_and_execute(opt: Namespace, selections: Namespace):
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
-    print(f'selections.install_cn_models={selections.install_cn_models}')
-    print(f'selections.remove_cn_models={selections.remove_cn_models}')
-    print(f'selections.cn_model_map={selections.control_net_map}')
     install_requested_models(
-        install_initial_models=models_to_install,
-        remove_models=models_to_remove,
-        install_cn_models=selections.install_cn_models,
-        remove_cn_models=selections.remove_cn_models,
-        cn_model_map=selections.control_net_map,
+        diffusers = ModelInstallList(models_to_install, models_to_remove),
+        controlnet = ModelInstallList(selections.install_cn_models, selections.remove_cn_models),
         scan_directory=Path(directory_to_scan) if directory_to_scan else None,
         external_models=potential_models_to_install,
         scan_at_startup=scan_at_startup,

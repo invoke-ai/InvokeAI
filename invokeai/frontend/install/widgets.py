@@ -94,13 +94,7 @@ class FloatTitleSlider(npyscreen.TitleText):
     _entry_type = FloatSlider
 
 
-class MultiSelectColumns(npyscreen.MultiSelect):
-    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
-        self.columns = columns
-        self.value_cnt = len(values)
-        self.rows = math.ceil(self.value_cnt / self.columns)
-        super().__init__(screen, values=values, **keywords)
-
+class SelectColumnBase():
     def make_contained_widgets(self):
         self._my_widgets = []
         column_width = self.width // self.columns
@@ -150,6 +144,32 @@ class MultiSelectColumns(npyscreen.MultiSelect):
     def h_cursor_line_right(self, ch):
         super().h_cursor_line_down(ch)
 
+class MultiSelectColumns( SelectColumnBase, npyscreen.MultiSelect):
+    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
+        self.columns = columns
+        self.value_cnt = len(values)
+        self.rows = math.ceil(self.value_cnt / self.columns)
+        super().__init__(screen, values=values, **keywords)
+
+
+class SingleSelectColumns(SelectColumnBase, npyscreen.SelectOne):
+    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
+        self.columns = columns
+        self.value_cnt = len(values)
+        self.rows = math.ceil(self.value_cnt / self.columns)
+        self.on_changed = None
+        super().__init__(screen, values=values, **keywords)
+
+    def h_select(self,ch):
+        super().h_select(ch)
+        if self.on_changed:
+            self.on_changed(self.value)
+
+    def when_value_edited(self):
+        self.h_select(self.cursor_line)
+
+    def when_cursor_moved(self):
+        self.h_select(self.cursor_line)
 
 class TextBox(npyscreen.MultiLineEdit):
     def update(self, clear=True):

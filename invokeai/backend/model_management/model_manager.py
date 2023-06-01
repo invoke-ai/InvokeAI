@@ -11,6 +11,7 @@ import gc
 import hashlib
 import os
 import re
+import shutil
 import sys
 import textwrap
 import time
@@ -49,6 +50,10 @@ from ..stable_diffusion import (
     StableDiffusionGeneratorPipeline,
 )
 from invokeai.app.services.config import get_invokeai_config
+from ..install.model_install_backend import (
+    Dataset_path,
+    hf_download_with_resume,
+)
 from ..util import CUDA_DEVICE, ask_user, download_with_resume
 
 class SDLegacyType(Enum):
@@ -1316,3 +1321,74 @@ class ModelManager(object):
         return (
             os.getenv("HF_HOME") is not None or os.getenv("XDG_CACHE_HOME") is not None
         )
+
+    def list_controlnet_models(self)->Dict[str,bool]:
+        '''Return a dict of installed controlnet models; key is repo_id or short name
+        of model (defined in INITIAL_MODELS), and valule is True if installed'''
+
+        cn_models = OmegaConf.load(Dataset_path).get('controlnet') or {}
+        installed_models = {x: False for x in cn_models.keys()}
+        
+        cn_dir = self.globals.controlnet_path
+        installed_cn_models = dict()
+        for root, dirs, files in os.walk(cn_dir):
+            for name in dirs:
+                if Path(root, name, '.download_complete').exists():
+                    installed_models.update({name.replace('--','/'): True})
+        return installed_models
+
+    def install_controlnet_models(self, model_names: list[str], access_token: str=None):
+        '''Download list of controlnet models; provide either repo_id or short name listed in INITIAL_MODELS.yaml'''
+        short_names = OmegaConf.load(Dataset_path).get('controlnet') or {}
+        dest_dir = self.globals.controlnet_path
+        dest_dir.mkdir(parents=True,exist_ok=True)
+        
+        # The model file may be fp32 or fp16, and may be either a
+        # .bin file or a .safetensors. We try each until we get one,
+        # preferring 'fp16' if using half precision, and preferring
+        # safetensors over over bin.
+        precisions = ['.fp16',''] if self.precision=='float16' else ['']
+        formats = ['.safetensors','.bin']
+        possible_filenames = list()
+        for p in precisions:
+            for f in formats:
+                possible_filenames.append(Path(f'diffusion_pytorch_model{p}{f}'))
+        
+        for directory_name in model_names:
+            repo_id = short_names.get(directory_name) or directory_name
+            safe_name = directory_name.replace('/','--')
+            self.logger.info(f'Downloading ControlNet model {directory_name} ({repo_id})')
+            hf_download_with_resume(
+                repo_id = repo_id,
+                model_dir = dest_dir / safe_name,
+                model_name = 'config.json',
+                access_token = access_token
+            )
+
+            path = None
+            for filename in possible_filenames:
+                suffix = filename.suffix
+                dest_filename = Path(f'diffusion_pytorch_model{suffix}')
+                self.logger.info(f'Checking availability of {directory_name}/{filename}...')
+                path = hf_download_with_resume(
+                    repo_id = repo_id,
+                    model_dir = dest_dir / safe_name,
+                    model_name = str(filename),
+                    access_token = access_token,
+                    model_dest = Path(dest_dir, safe_name, dest_filename),
+                )
+                if path:
+                    (path.parent / '.download_complete').touch()
+                    break
+
+    def delete_controlnet_models(self, model_names: List[str]):
+        '''Remove the list of controlnet models'''
+        for name in model_names:
+            safe_name = name.replace('/','--')
+            directory = self.globals.controlnet_path / safe_name
+            if directory.exists():
+                self.logger.info(f'Purging controlnet model {name}')
+                shutil.rmtree(str(directory))
+
+
+        
