@@ -15,6 +15,7 @@ import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { configSelector } from '../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
+import { useDraggable } from '@dnd-kit/core';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -46,7 +47,6 @@ const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
     image,
-    shouldHidePreview,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
@@ -56,16 +56,12 @@ const CurrentImagePreview = () => {
   const toaster = useAppToaster();
   const dispatch = useAppDispatch();
 
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      if (!image) {
-        return;
-      }
-      e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.effectAllowed = 'move';
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: `currentImage_${image?.image_name}`,
+    data: {
+      image,
     },
-    [image]
-  );
+  });
 
   const handleError = useCallback(() => {
     dispatch(imageSelected());
@@ -105,24 +101,32 @@ const CurrentImagePreview = () => {
         />
       ) : (
         image && (
-          <>
+          <Flex
+            sx={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'absolute',
+            }}
+          >
             <Image
+              ref={setNodeRef}
+              {...listeners}
+              {...attributes}
               src={getUrl(image.image_url)}
               fallbackStrategy="beforeLoadOrError"
               fallback={<ImageFallbackSpinner />}
-              onDragStart={handleDragStart}
               sx={{
                 objectFit: 'contain',
                 maxWidth: '100%',
                 maxHeight: '100%',
                 height: 'auto',
-                position: 'absolute',
                 borderRadius: 'base',
+                touchAction: 'none',
               }}
               onError={handleError}
             />
             <ImageMetadataOverlay image={image} />
-          </>
+          </Flex>
         )
       )}
       {shouldShowImageDetails && image && 'metadata' in image && (

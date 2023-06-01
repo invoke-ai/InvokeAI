@@ -14,7 +14,7 @@ import { useGetUrl } from 'common/util/getUrl';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SyntheticEvent } from 'react';
 import { memo, useRef } from 'react';
-import { FaImage, FaUndo } from 'react-icons/fa';
+import { FaImage, FaTimes } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -53,9 +53,8 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
       {image && (
         <Flex
           sx={{
-            position: 'relative',
             w: 'full',
-            h: 'full',
+            position: 'relative',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -82,7 +81,7 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
               <IAIIconButton
                 size={resetIconSize}
                 aria-label="Reset Image"
-                icon={<FaUndo />}
+                icon={<FaTimes />}
                 onClick={onReset}
               />
             </Box>
@@ -184,7 +183,7 @@ const DropOverlay = (props: DropOverlayProps) => {
             transitionDuration: '0.15s',
           }}
         >
-          <Text sx={{ fontSize: '2xl', fontWeight: 600, color: 'base.50' }}>
+          <Text sx={{ fontSize: '2xl', fontWeight: 600, color: 'base.200' }}>
             Drop Image
           </Text>
         </Flex>

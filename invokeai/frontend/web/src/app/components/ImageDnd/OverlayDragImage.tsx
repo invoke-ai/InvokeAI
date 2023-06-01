@@ -10,8 +10,8 @@ const OverlayDragImage = (props: OverlayDragImageProps) => {
   return (
     <Image
       sx={{
-        maxW: 32,
-        maxH: 32,
+        maxW: 36,
+        maxH: 36,
         borderRadius: 'base',
         shadow: 'dark-lg',
       }}

@@ -3,6 +3,11 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import OverlayDragImage from './OverlayDragImage';
@@ -32,8 +37,23 @@ const ImageDndContext = (props: ImageDndContextProps) => {
     [draggedImage]
   );
 
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: { distance: 15 },
+  });
+
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { distance: 15 },
+  });
+  const keyboardSensor = useSensor(KeyboardSensor);
+
+  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
+
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      sensors={sensors}
+    >
       {props.children}
       <DragOverlay dropAnimation={null}>
         {draggedImage && <OverlayDragImage image={draggedImage} />}

@@ -40,7 +40,6 @@ import {
 import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -120,7 +119,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     useRecallParameters();
 
   const { attributes, listeners, setNodeRef } = useDraggable({
-    id: image_name,
+    id: `galleryImage_${image_name}`,
     data: {
       image,
     },
@@ -152,14 +151,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSelectImage = useCallback(() => {
     dispatch(imageSelected(image));
   }, [image, dispatch]);
-
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.effectAllowed = 'move';
-    },
-    [image]
-  );
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
@@ -225,7 +216,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      sx={{ w: 'full', h: 'full' }}
+      sx={{ w: 'full', h: 'full', touchAction: 'none' }}
     >
       <ContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
