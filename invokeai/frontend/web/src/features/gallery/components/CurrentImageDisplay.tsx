@@ -1,4 +1,4 @@
-import { Flex, Icon } from '@chakra-ui/react';
+import { Box, Flex, Icon } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
@@ -55,10 +55,7 @@ const CurrentImageDisplay = () => {
         }}
       >
         {hasAnImageToDisplay ? (
-          <>
-            <CurrentImageButtons />
-            <CurrentImagePreview />
-          </>
+          <CurrentImagePreview />
         ) : (
           <Icon
             as={FaImage}
@@ -69,6 +66,11 @@ const CurrentImageDisplay = () => {
           />
         )}
       </Flex>
+      {hasAnImageToDisplay && (
+        <Box sx={{ position: 'absolute', top: 0 }}>
+          <CurrentImageButtons />
+        </Box>
+      )}
     </Flex>
   );
 };

@@ -32,6 +32,16 @@ const ImageInputFieldComponent = (
     [dispatch, field.name, nodeId]
   );
 
+  const handleReset = useCallback(() => {
+    dispatch(
+      fieldValueChanged({
+        nodeId,
+        fieldName: field.name,
+        value: undefined,
+      })
+    );
+  }, [dispatch, field.name, nodeId]);
+
   return (
     <Flex
       sx={{
@@ -41,7 +51,12 @@ const ImageInputFieldComponent = (
         justifyContent: 'center',
       }}
     >
-      <IAISelectableImage image={field.value} onChange={handleChange} />
+      <IAISelectableImage
+        image={field.value}
+        onChange={handleChange}
+        onReset={handleReset}
+        resetIconSize="sm"
+      />
     </Flex>
   );
 };
