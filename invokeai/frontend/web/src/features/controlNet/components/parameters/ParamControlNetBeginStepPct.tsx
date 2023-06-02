@@ -1,6 +1,9 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
-import { controlNetBeginStepPctChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlNetBeginStepPctChanged,
+  controlNetEndStepPctChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 
 type ParamControlNetBeginStepPctProps = {
@@ -21,9 +24,20 @@ const ParamControlNetBeginStepPct = (
     [controlNetId, dispatch]
   );
 
-  const handleBeginStepPctReset = () => {
+  const handleBeginStepPctReset = useCallback(() => {
     dispatch(controlNetBeginStepPctChanged({ controlNetId, beginStepPct: 0 }));
-  };
+  }, [controlNetId, dispatch]);
+
+  const handleEndStepPctChanged = useCallback(
+    (endStepPct: number) => {
+      dispatch(controlNetEndStepPctChanged({ controlNetId, endStepPct }));
+    },
+    [controlNetId, dispatch]
+  );
+
+  const handleEndStepPctReset = useCallback(() => {
+    dispatch(controlNetEndStepPctChanged({ controlNetId, endStepPct: 0 }));
+  }, [controlNetId, dispatch]);
 
   return (
     <IAISlider

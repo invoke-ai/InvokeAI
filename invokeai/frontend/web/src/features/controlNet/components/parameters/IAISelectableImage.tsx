@@ -12,7 +12,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useGetUrl } from 'common/util/getUrl';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SyntheticEvent } from 'react';
+import { ReactElement, SyntheticEvent } from 'react';
 import { memo, useRef } from 'react';
 import { FaImage, FaTimes } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
@@ -26,14 +26,29 @@ type IAISelectableImageProps = {
   onReset?: () => void;
   onError?: (event: SyntheticEvent<HTMLImageElement>) => void;
   resetIconSize?: IconButtonProps['size'];
+  withResetIcon?: boolean;
+  withMetadataOverlay?: boolean;
+  isDropDisabled?: boolean;
+  fallback?: ReactElement;
 };
 
 const IAISelectableImage = (props: IAISelectableImageProps) => {
-  const { image, onChange, onReset, onError, resetIconSize = 'md' } = props;
+  const {
+    image,
+    onChange,
+    onReset,
+    onError,
+    resetIconSize = 'md',
+    withResetIcon = false,
+    withMetadataOverlay = false,
+    isDropDisabled = false,
+    fallback = <ImageFallback />,
+  } = props;
   const droppableId = useRef(uuidv4());
   const { getUrl } = useGetUrl();
   const { isOver, setNodeRef, active } = useDroppable({
     id: droppableId.current,
+    disabled: isDropDisabled,
     data: {
       handleDrop: onChange,
     },
@@ -54,6 +69,7 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
         <Flex
           sx={{
             w: 'full',
+            h: 'full',
             position: 'relative',
             alignItems: 'center',
             justifyContent: 'center',
@@ -62,15 +78,15 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
           <Image
             src={getUrl(image.image_url)}
             fallbackStrategy="beforeLoadOrError"
-            fallback={<ImageFallback />}
+            fallback={fallback}
             onError={onError}
             draggable={false}
             sx={{
               borderRadius: 'base',
             }}
           />
-          <ImageMetadataOverlay image={image} />
-          {onReset && (
+          {withMetadataOverlay && <ImageMetadataOverlay image={image} />}
+          {onReset && withResetIcon && (
             <Box
               sx={{
                 position: 'absolute',

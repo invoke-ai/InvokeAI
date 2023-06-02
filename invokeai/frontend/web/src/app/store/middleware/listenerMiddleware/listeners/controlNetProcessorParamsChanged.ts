@@ -2,6 +2,7 @@ import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import {
+  controlNetImageChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
 } from 'features/controlNet/store/controlNetSlice';
@@ -13,10 +14,11 @@ const moduleLog = log.child({ namespace: 'controlNet' });
  *
  * The network request is debounced by 1 second.
  */
-export const addControlNetProcessorParamsChangedListener = () => {
+export const addControlNetAutoProcessListener = () => {
   startAppListening({
     predicate: (action) =>
       controlNetProcessorParamsChanged.match(action) ||
+      controlNetImageChanged.match(action) ||
       controlNetProcessorTypeChanged.match(action),
     effect: async (
       action,
@@ -35,11 +37,19 @@ export const addControlNetProcessorParamsChangedListener = () => {
 
       const { controlNetId } = action.payload;
 
+      if (!state.controlNet.controlNets[controlNetId].controlImage) {
+        moduleLog.trace(
+          { data: { controlNetId } },
+          'No ControlNet image to auto-process'
+        );
+        return;
+      }
+
       // Cancel any in-progress instances of this listener
       cancelActiveListeners();
 
       // Delay before starting actual work
-      await delay(1000);
+      await delay(300);
 
       dispatch(controlNetImageProcessed({ controlNetId }));
     },

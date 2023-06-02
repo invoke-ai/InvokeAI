@@ -8,6 +8,7 @@ import {
   RequiredControlNetProcessorNode,
 } from './types';
 import { CONTROLNET_PROCESSORS } from './constants';
+import { controlNetImageProcessed } from './actions';
 
 export const CONTROLNET_MODELS = [
   'lllyasviel/sd-controlnet-canny',
@@ -52,12 +53,14 @@ export type ControlNetState = {
   controlNets: Record<string, ControlNet>;
   isEnabled: boolean;
   shouldAutoProcess: boolean;
+  isProcessingControlImage: boolean;
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
   shouldAutoProcess: true,
+  isProcessingControlImage: false,
 };
 
 export const controlNetSlice = createSlice({
@@ -107,6 +110,9 @@ export const controlNetSlice = createSlice({
       const { controlNetId, controlImage } = action.payload;
       state.controlNets[controlNetId].controlImage = controlImage;
       state.controlNets[controlNetId].processedControlImage = null;
+      if (state.shouldAutoProcess && controlImage !== null) {
+        state.isProcessingControlImage = true;
+      }
     },
     isControlNetImageProcessedToggled: (
       state,
@@ -128,6 +134,7 @@ export const controlNetSlice = createSlice({
       const { controlNetId, processedControlImage } = action.payload;
       state.controlNets[controlNetId].processedControlImage =
         processedControlImage;
+      state.isProcessingControlImage = false;
     },
     controlNetModelChanged: (
       state,
@@ -189,6 +196,15 @@ export const controlNetSlice = createSlice({
     shouldAutoProcessToggled: (state) => {
       state.shouldAutoProcess = !state.shouldAutoProcess;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(controlNetImageProcessed, (state, action) => {
+      if (
+        state.controlNets[action.payload.controlNetId].controlImage !== null
+      ) {
+        state.isProcessingControlImage = true;
+      }
+    });
   },
 });
 
