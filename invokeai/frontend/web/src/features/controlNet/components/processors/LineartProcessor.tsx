@@ -4,6 +4,9 @@ import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import { RequiredLineartImageProcessorInvocation } from 'features/controlNet/store/types';
 import IAISwitch from 'common/components/IAISwitch';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor.default;
 
 type LineartProcessorProps = {
   controlNetId: string;
@@ -29,6 +32,18 @@ const LineartProcessor = (props: LineartProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
+  const handleDetectResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      detect_resolution: DEFAULTS.detect_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
+  const handleImageResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      image_resolution: DEFAULTS.image_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
   const handleCoarseChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       processorChanged(controlNetId, { coarse: e.target.checked });
@@ -42,6 +57,8 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         label="Detect Resolution"
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
+        handleReset={handleDetectResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -50,6 +67,8 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         label="Image Resolution"
         value={image_resolution}
         onChange={handleImageResolutionChanged}
+        handleReset={handleImageResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput

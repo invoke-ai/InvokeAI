@@ -22,7 +22,7 @@ type ControlNetProcessorsDict = Record<
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
+export const CONTROLNET_PROCESSORS = {
   canny_image_processor: {
     type: 'canny_image_processor',
     label: 'Canny',

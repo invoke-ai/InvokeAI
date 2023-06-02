@@ -3,6 +3,9 @@ import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import { RequiredContentShuffleImageProcessorInvocation } from 'features/controlNet/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.content_shuffle_image_processor.default;
 
 type Props = {
   controlNetId: string;
@@ -21,12 +24,24 @@ const ContentShuffleProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleDetectResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      detect_resolution: DEFAULTS.detect_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
   const handleImageResolutionChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { image_resolution: v });
     },
     [controlNetId, processorChanged]
   );
+
+  const handleImageResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      image_resolution: DEFAULTS.image_resolution,
+    });
+  }, [controlNetId, processorChanged]);
 
   const handleWChanged = useCallback(
     (v: number) => {
@@ -35,12 +50,24 @@ const ContentShuffleProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleWReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      w: DEFAULTS.w,
+    });
+  }, [controlNetId, processorChanged]);
+
   const handleHChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { h: v });
     },
     [controlNetId, processorChanged]
   );
+
+  const handleHReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      h: DEFAULTS.h,
+    });
+  }, [controlNetId, processorChanged]);
 
   const handleFChanged = useCallback(
     (v: number) => {
@@ -49,12 +76,20 @@ const ContentShuffleProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleFReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      f: DEFAULTS.f,
+    });
+  }, [controlNetId, processorChanged]);
+
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
+        handleReset={handleDetectResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -63,6 +98,8 @@ const ContentShuffleProcessor = (props: Props) => {
         label="Image Resolution"
         value={image_resolution}
         onChange={handleImageResolutionChanged}
+        handleReset={handleImageResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -71,6 +108,8 @@ const ContentShuffleProcessor = (props: Props) => {
         label="W"
         value={w}
         onChange={handleWChanged}
+        handleReset={handleWReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -79,6 +118,8 @@ const ContentShuffleProcessor = (props: Props) => {
         label="H"
         value={h}
         onChange={handleHChanged}
+        handleReset={handleHReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -87,6 +128,8 @@ const ContentShuffleProcessor = (props: Props) => {
         label="F"
         value={f}
         onChange={handleFChanged}
+        handleReset={handleFReset}
+        withReset
         min={0}
         max={4096}
         withInput
