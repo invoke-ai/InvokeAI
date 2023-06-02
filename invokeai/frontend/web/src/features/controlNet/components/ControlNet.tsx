@@ -1,7 +1,5 @@
 import { memo, useCallback } from 'react';
-import { RequiredControlNetProcessorNode } from '../store/types';
 import { ImageDTO } from 'services/api';
-import CannyProcessor from './processors/CannyProcessor';
 import {
   ControlNet,
   controlNetImageChanged,
@@ -23,11 +21,11 @@ import {
 } from '@chakra-ui/react';
 import IAISelectableImage from './parameters/IAISelectableImage';
 import IAIButton from 'common/components/IAIButton';
-import { controlNetImageProcessed } from '../store/actions';
 import { FaUndo } from 'react-icons/fa';
-import HedProcessor from './processors/HedProcessor';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
-import ProcessorComponent from './ProcessorComponent';
+import ControlNetProcessorComponent from './ControlNetProcessorComponent';
+import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
+import ControlNetPreprocessButton from './ControlNetPreprocessButton';
 
 type ControlNetProps = {
   controlNet: ControlNet;
@@ -47,6 +45,7 @@ const ControlNet = (props: ControlNetProps) => {
     processorNode,
   } = props.controlNet;
   const dispatch = useAppDispatch();
+  const isReady = useIsApplicationReady();
 
   const handleControlImageChanged = useCallback(
     (controlImage: ImageDTO) => {
@@ -54,14 +53,6 @@ const ControlNet = (props: ControlNetProps) => {
     },
     [controlNetId, dispatch]
   );
-
-  const handleProcess = useCallback(() => {
-    dispatch(
-      controlNetImageProcessed({
-        controlNetId,
-      })
-    );
-  }, [controlNetId, dispatch]);
 
   const handleReset = useCallback(() => {
     dispatch(
@@ -128,17 +119,11 @@ const ControlNet = (props: ControlNetProps) => {
               controlNetId={controlNetId}
               processorNode={processorNode}
             />
-            <ProcessorComponent
+            <ControlNetProcessorComponent
               controlNetId={controlNetId}
               processorNode={processorNode}
             />
-            <IAIButton
-              size="sm"
-              onClick={handleProcess}
-              isDisabled={Boolean(!controlImage)}
-            >
-              Preprocess
-            </IAIButton>
+            <ControlNetPreprocessButton controlNet={props.controlNet} />
             <IAIButton
               size="sm"
               leftIcon={<FaUndo />}
