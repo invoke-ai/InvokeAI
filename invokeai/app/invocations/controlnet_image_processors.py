@@ -214,12 +214,12 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
         return processed_image
 
 
-class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class HedImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies HED edge detection to image"""
     # fmt: off
     type: Literal["hed_image_processor"] = "hed_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # safe not supported in controlnet_aux v0.0.3
     # safe: bool = Field(default=False, description="whether to use safe mode")
@@ -243,7 +243,7 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCon
     # fmt: off
     type: Literal["lineart_image_processor"] = "lineart_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     coarse: bool = Field(default=False, description="Whether to use coarse mode")
     # fmt: on
@@ -262,7 +262,7 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocati
     # fmt: off
     type: Literal["lineart_anime_image_processor"] = "lineart_anime_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # fmt: on
 
@@ -281,7 +281,7 @@ class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     type: Literal["openpose_image_processor"] = "openpose_image_processor"
     # Inputs
     hand_and_face: bool = Field(default=False, description="Whether to use hands and face mode")
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # fmt: on
 
@@ -322,7 +322,7 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationC
     # fmt: off
     type: Literal["normalbae_image_processor"] = "normalbae_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # fmt: on
 
@@ -339,7 +339,7 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: off
     type: Literal["mlsd_image_processor"] = "mlsd_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     thr_v: float = Field(default=0.1, ge=0, description="MLSD parameter `thr_v`")
     thr_d: float = Field(default=0.1, ge=0, description="MLSD parameter `thr_d`")
@@ -360,7 +360,7 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: off
     type: Literal["pidi_image_processor"] = "pidi_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     safe: bool = Field(default=False, description="Whether to use safe mode")
     scribble: bool = Field(default=False, description="Whether to use scribble mode")
@@ -381,7 +381,7 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
     # fmt: off
     type: Literal["content_shuffle_image_processor"] = "content_shuffle_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for edge detection")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     h: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `h` parameter")
     w: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `w` parameter")
