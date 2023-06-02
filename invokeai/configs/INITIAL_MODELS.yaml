@@ -96,3 +96,8 @@ controlnet:
    shuffle: lllyasviel/control_v11e_sd15_shuffle
    tile: lllyasviel/control_v11f1e_sd15_tile
    ip2p: lllyasviel/control_v11e_sd15_ip2p
+textual_inversion:
+   'EasyNegative.safetensors': https://huggingface.co/embed/EasyNegative/blob/main/EasyNegative.safetensors
+lora:
+   'LowRA.safetensors': https://civitai.com/api/download/models/63006
+   'Ink scenery.safetensors': https://civitai.com/api/download/models/83390

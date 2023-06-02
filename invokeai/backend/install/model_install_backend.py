@@ -95,6 +95,9 @@ def install_requested_models(
     model_manager.install_controlnet_models(controlnet.install_models, access_token=access_token)
     model_manager.delete_controlnet_models(controlnet.remove_models)
 
+    model_manager.install_lora_models(lora.install_models)
+    model_manager.delete_lora_models(lora.remove_models)
+
     # TODO: Replace next three paragraphs with calls into new model manager
     if diffusers.remove_models and len(diffusers.remove_models) > 0:
         logger.info("DELETING UNCHECKED STARTER MODELS")
