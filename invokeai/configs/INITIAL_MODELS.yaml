@@ -97,7 +97,10 @@ controlnet:
    tile: lllyasviel/control_v11f1e_sd15_tile
    ip2p: lllyasviel/control_v11e_sd15_ip2p
 textual_inversion:
-   'EasyNegative.safetensors': https://huggingface.co/embed/EasyNegative/blob/main/EasyNegative.safetensors
+   'EasyNegative': https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
+   'ahx-beta-453407d': sd-concepts-library/ahx-beta-453407d
 lora:
-   'LowRA.safetensors': https://civitai.com/api/download/models/63006
-   'Ink scenery.safetensors': https://civitai.com/api/download/models/83390
+   'LowRA': https://civitai.com/api/download/models/63006
+   'Ink scenery': https://civitai.com/api/download/models/83390
+   'sd-model-finetuned-lora-t4': sayakpaul/sd-model-finetuned-lora-t4
+ 

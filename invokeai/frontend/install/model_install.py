@@ -10,6 +10,7 @@ The work is actually done in backend code in model_install_backend.py.
 """
 
 import argparse
+import curses
 import os
 import sys
 from argparse import Namespace
@@ -23,6 +24,7 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
+from dataclasses import dataclass,field
 
 from ...backend.install.model_install_backend import (
     Dataset_path,
@@ -31,7 +33,6 @@ from ...backend.install.model_install_backend import (
     install_requested_models,
     recommended_datasets,
     ModelInstallList,
-    dataclass,
 )
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
@@ -51,9 +52,13 @@ MIN_LINES = 50
 
 config = get_invokeai_config()
 
+
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
     # FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    
+    # for persistence
+    current_tab = 0
 
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
@@ -89,7 +94,6 @@ class addModelsForm(npyscreen.FormMultiPage):
             editable=False,
             color="CAUTION",
         )
-
         self.nextrely += 1
         self.tabs = self.add_widget_intelligent(
             SingleSelectColumns,
@@ -99,7 +103,7 @@ class addModelsForm(npyscreen.FormMultiPage):
                 'LORA/LYCORIS MODELS',
                 'TEXTUAL INVERSION MODELS'
             ],
-            value=0,
+            value=[self.current_tab],
             columns = 4,
             max_height = 2,
             relx=8,
@@ -110,7 +114,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         top_of_table = self.nextrely
         self.diffusers_models = self.add_diffusers()
         bottom_of_table = self.nextrely
-        
+
         self.nextrely = top_of_table
         self.controlnet_models = self.add_controlnets()
 
@@ -123,14 +127,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely = bottom_of_table
         
         self.nextrely += 1
-        self.cancel = self.add_widget_intelligent(
-            npyscreen.ButtonPress,
-            name="CANCEL",
-            rely=-3,
-            when_pressed_function=self.on_cancel,
-        )
-
-        done_label = "DONE"
+        done_label = "INSTALL/REMOVE"
         back_label = "BACK"
         button_length = len(done_label)
         button_offset = 0
@@ -154,7 +151,18 @@ class addModelsForm(npyscreen.FormMultiPage):
             when_pressed_function=self.on_ok,
         )
 
-        self._toggle_tables([0])
+        self.cancel = self.add_widget_intelligent(
+            npyscreen.ButtonPress,
+            name="QUIT",
+            rely=-3,
+            relx=window_width-20,
+            when_pressed_function=self.on_cancel,
+        )
+
+        # This restores the selected page on return from an installation
+        for i in range(1,self.current_tab+1):
+            self.tabs.h_cursor_line_down(1)
+        self._toggle_tables([self.current_tab])
 
     def add_diffusers(self)->dict[str, npyscreen.widget]:
         '''Add widgets responsible for selecting diffusers models'''
@@ -172,16 +180,6 @@ class addModelsForm(npyscreen.FormMultiPage):
 
         widgets.update(
             label1 = self.add_widget_intelligent(
-                CenteredTitleText,
-                name="== DIFFUSERS MODEL STARTER PACK ==",
-                editable=False,
-                color="CONTROL",
-            )
-        )
-        
-        self.nextrely -= 1
-        widgets.update(
-            label2 = self.add_widget_intelligent(
                 CenteredTitleText,
                 name="Select from a starter set of Stable Diffusion models from HuggingFace.",
                 editable=False,
@@ -283,7 +281,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         widgets.update(
             label1 = self.add_widget_intelligent(
                 CenteredTitleText,
-                name="Select the desired models to install. Unchecked models will be purged from disk.",
+                name="Select the desired ControlNet models to install. Unchecked models will be purged from disk.",
                 editable=False,
                 labelColor="CAUTION",
             )
@@ -322,7 +320,11 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely -= 1
         widgets.update(
             download_ids = self.add_widget_intelligent(
-                TextBox, max_height=2, scroll_exit=True, editable=True, relx=4
+                TextBox,
+                max_height=4,
+                scroll_exit=True,
+                editable=True,
+                relx=4
             )
         )
         return widgets
@@ -341,7 +343,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             )
         )
 
-        columns=min(len(model_list),3)
+        columns=min(len(model_list),3) or 1
         widgets.update(
             models_selected = self.add_widget_intelligent(
                 MultiSelectColumns,
@@ -376,7 +378,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         widgets.update(
             download_ids = self.add_widget_intelligent(
                 TextBox,
-                max_height=2,
+                max_height=4,
                 scroll_exit=True,
                 editable=True,
                 relx=4,
@@ -387,10 +389,39 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def add_tis(self)->dict[str, npyscreen.widget]:
         widgets = dict()
+        model_list = sorted(self.installed_ti_models.keys())
+
         widgets.update(
             label1 = self.add_widget_intelligent(
+                CenteredTitleText,
+                name="Select the desired models to install. Unchecked models will be purged from disk.",
+                editable=False,
+                labelColor="CAUTION",
+            )
+        )
+        
+        columns=min(len(model_list),6) or 1
+        widgets.update(
+            models_selected = self.add_widget_intelligent(
+                MultiSelectColumns,
+                columns=columns,
+                name="Install Textual Inversion Embeddings",
+                values=model_list,
+                value=[
+                    model_list.index(x)
+                    for x in model_list
+                    if self.installed_ti_models[x]
+                ],
+                max_height=len(model_list)//columns + 1,
+                relx=4,
+                scroll_exit=True,
+            )
+        )
+        
+        widgets.update(
+            label2 = self.add_widget_intelligent(
                 npyscreen.TitleFixedText,
-                name='Textual Inversion models to download and install (Space separated. Use shift-control-V to paste):',
+                name='Textual Inversion models to download, use URLs or HugggingFace repo_ids  (Space separated. Use shift-control-V to paste):',
                 relx=4,
                 color='CONTROL',
                 editable=False,
@@ -403,7 +434,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         widgets.update(
             download_ids = self.add_widget_intelligent(
                 TextBox,
-                max_height=2,
+                max_height=4,
                 scroll_exit=True,
                 editable=True,
                 relx=4,
@@ -431,6 +462,7 @@ class addModelsForm(npyscreen.FormMultiPage):
                 v.hidden = True
         for k,v in widgets[selected_tab].items():
             v.hidden = False
+        self.__class__.current_tab = selected_tab  # for persistence
         self.display()
 
     def _get_starter_model_labels(self) -> List[str]:
@@ -477,12 +509,9 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.editing = False
 
     def on_cancel(self):
-        if npyscreen.notify_yes_no(
-            "Are you sure you want to cancel?\nYou may re-run this script later using the invoke.sh or invoke.bat command.\n"
-        ):
-            self.parentApp.setNextForm(None)
-            self.parentApp.user_cancelled = True
-            self.editing = False
+        self.parentApp.setNextForm(None)
+        self.parentApp.user_cancelled = True
+        self.editing = False
 
     def marshall_arguments(self):
         """
@@ -510,7 +539,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         selections.install_models = [x for x in starter_models if x not in self.existing_models]
         selections.remove_models = [x for x in self.starter_model_list if x in self.existing_models and x not in starter_models]
 
-        # TODO: REFACTOR CUT AND PASTE CODE
+        # TODO: REFACTOR THIS REPETITIVE CODE
         cn_models_selected = self.controlnet_models['models_selected']
         selections.install_cn_models = [cn_models_selected.values[x]
                                         for x in cn_models_selected.value
@@ -538,9 +567,24 @@ class addModelsForm(npyscreen.FormMultiPage):
                                          ]
                 
         if (additional_loras := self.lora_models['download_ids'].value.split()):
-            valid_loras = [x for x in additional_loras if x.startswith(('http:','https:','ftp:'))]
-            selections.install_lora_models.extend(valid_loras)
+            selections.install_lora_models.extend(additional_loras)
 
+        # same thing, for TIs
+        # TODO: refactor
+        tis_selected = self.ti_models['models_selected']
+        selections.install_ti_models = [tis_selected.values[x]
+                                        for x in tis_selected.value
+                                        if not self.installed_ti_models[tis_selected.values[x]]
+                                        ]
+        selections.remove_ti_models = [x
+                                       for x in tis_selected.values
+                                       if self.installed_ti_models[x]
+                                       and tis_selected.values.index(x) not in tis_selected.value
+                                       ]
+                
+        if (additional_tis := self.ti_models['download_ids'].value.split()):
+            selections.install_ti_models.extend(additional_tis)
+            
         # load directory and whether to scan on startup
         selections.scan_directory = self.diffusers_models['autoload_directory'].value
         selections.autoscan_on_startup = self.diffusers_models['autoscan_on_startup'].value
@@ -548,16 +592,21 @@ class addModelsForm(npyscreen.FormMultiPage):
         # URLs and the like
         selections.import_model_paths = self.diffusers_models['download_ids'].value.split()
 
+
 @dataclass
 class UserSelections():
-    install_models: List[str]=None
-    remove_models: List[str]=None
-    purge_deleted_models: bool=False,
-    install_cn_models: List[str] = None,
-    remove_cn_models: List[str] = None,
-    scan_directory: Path=None,
-    autoscan_on_startup: bool=False,
-    import_model_paths: str=None,
+    install_models: List[str]= field(default_factory=list)
+    remove_models: List[str]=field(default_factory=list)
+    purge_deleted_models: bool=field(default_factory=list)
+    install_cn_models: List[str] = field(default_factory=list)
+    remove_cn_models: List[str] = field(default_factory=list)
+    install_lora_models: List[str] = field(default_factory=list)
+    remove_lora_models: List[str] = field(default_factory=list)
+    install_ti_models: List[str] = field(default_factory=list)
+    remove_ti_models: List[str] = field(default_factory=list)
+    scan_directory: Path = None
+    autoscan_on_startup: bool=False
+    import_model_paths: str=None
         
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self):
@@ -583,6 +632,7 @@ def process_and_execute(opt: Namespace, selections: Namespace):
         diffusers = ModelInstallList(models_to_install, models_to_remove),
         controlnet = ModelInstallList(selections.install_cn_models, selections.remove_cn_models),
         lora = ModelInstallList(selections.install_lora_models, selections.remove_lora_models),
+        ti = ModelInstallList(selections.install_ti_models, selections.remove_ti_models),
         scan_directory=Path(directory_to_scan) if directory_to_scan else None,
         external_models=potential_models_to_install,
         scan_at_startup=scan_at_startup,
@@ -615,10 +665,7 @@ def select_and_download_models(opt: Namespace):
         set_min_terminal_size(MIN_COLS, MIN_LINES)
         installApp = AddModelApplication()
         installApp.run()
-
-        if not installApp.user_cancelled:
-            process_and_execute(opt, installApp.user_selections)
-
+        process_and_execute(opt, installApp.user_selections)
 
 # -------------------------------------
 def main():
@@ -679,6 +726,9 @@ def main():
         logger.error(e)
         sys.exit(-1)
     except KeyboardInterrupt:
+        curses.nocbreak()
+        curses.echo()
+        curses.endwin()
         logger.info("Goodbye! Come back soon.")
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
