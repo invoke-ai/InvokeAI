@@ -12,6 +12,7 @@ import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
+import ProgressBar from 'features/system/components/ProgressBar';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -43,7 +44,7 @@ export default function InvokeButton(props: InvokeButton) {
   );
 
   return (
-    <Box style={{ flexGrow: 4 }}>
+    <Box style={{ flexGrow: 4 }} position="relative">
       {iconButton ? (
         <IAIIconButton
           aria-label={t('parameters.invoke')}
@@ -75,6 +76,7 @@ export default function InvokeButton(props: InvokeButton) {
           Invoke
         </IAIButton>
       )}
+      {!isReady && <ProgressBar />}
     </Box>
   );
 }
