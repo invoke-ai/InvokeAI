@@ -72,6 +72,11 @@ export const addControlNetImageProcessedListener = () => {
         );
         const processedControlImage = imageMetadataReceivedAction.payload;
 
+        moduleLog.debug(
+          { data: { arg: action.payload, processedControlImage } },
+          'ControlNet image processed'
+        );
+
         // Update the processed image in the store
         dispatch(
           controlNetProcessedImageChanged({
