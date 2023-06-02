@@ -32,7 +32,7 @@ export type { Graph } from './models/Graph';
 export type { GraphExecutionState } from './models/GraphExecutionState';
 export type { GraphInvocation } from './models/GraphInvocation';
 export type { GraphInvocationOutput } from './models/GraphInvocationOutput';
-export type { HedImageprocessorInvocation } from './models/HedImageprocessorInvocation';
+export type { HedImageProcessorInvocation } from './models/HedImageProcessorInvocation';
 export type { HTTPValidationError } from './models/HTTPValidationError';
 export type { ImageBlurInvocation } from './models/ImageBlurInvocation';
 export type { ImageCategory } from './models/ImageCategory';

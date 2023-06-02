@@ -7,7 +7,7 @@ import type { ImageField } from './ImageField';
 /**
  * Applies HED edge detection to image
  */
-export type HedImageprocessorInvocation = {
+export type HedImageProcessorInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -18,19 +18,19 @@ export type HedImageprocessorInvocation = {
   is_intermediate?: boolean;
   type?: 'hed_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * pixel resolution for edge detection
+   * The pixel resolution for detection
    */
   detect_resolution?: number;
   /**
-   * pixel resolution for output image
+   * The pixel resolution for the output image
    */
   image_resolution?: number;
   /**
-   * whether to use scribble mode
+   * Whether to use scribble mode
    */
   scribble?: boolean;
 };
