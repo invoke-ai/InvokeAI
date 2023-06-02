@@ -1,21 +1,17 @@
 import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/types';
+import { RequiredNormalbaeImageProcessorInvocation } from 'features/controlNet/store/types';
 
-type HedProcessorProps = {
+type Props = {
   controlNetId: string;
-  processorNode: RequiredHedImageProcessorInvocation;
+  processorNode: RequiredNormalbaeImageProcessorInvocation;
 };
 
-const HedPreprocessor = (props: HedProcessorProps) => {
-  const {
-    controlNetId,
-    processorNode: { detect_resolution, image_resolution, scribble },
-  } = props;
-
+const NormalBaeProcessor = (props: Props) => {
+  const { controlNetId, processorNode } = props;
+  const { image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
 
   const handleDetectResolutionChanged = useCallback(
@@ -28,13 +24,6 @@ const HedPreprocessor = (props: HedProcessorProps) => {
   const handleImageResolutionChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { image_resolution: v });
-    },
-    [controlNetId, processorChanged]
-  );
-
-  const handleScribbleChanged = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      processorChanged(controlNetId, { scribble: e.target.checked });
     },
     [controlNetId, processorChanged]
   );
@@ -57,13 +46,8 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         max={4096}
         withInput
       />
-      <IAISwitch
-        label="Scribble"
-        isChecked={scribble}
-        onChange={handleScribbleChanged}
-      />
     </Flex>
   );
 };
 
-export default memo(HedPreprocessor);
+export default memo(NormalBaeProcessor);

@@ -8,6 +8,7 @@ import { sessionReadyToInvoke } from 'features/system/store/actions';
 import { socketInvocationComplete } from 'services/events/actions';
 import { isImageOutput } from 'services/types/guards';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
+import { pick } from 'lodash-es';
 
 const moduleLog = log.child({ namespace: 'controlNet' });
 
@@ -15,11 +16,27 @@ export const addControlNetImageProcessedListener = () => {
   startAppListening({
     actionCreator: controlNetImageProcessed,
     effect: async (action, { dispatch, getState, take }) => {
-      const { controlNetId, processorNode } = action.payload;
+      const { controlNetId } = action.payload;
+      const controlNet = getState().controlNet.controlNets[controlNetId];
 
-      // ControlNet one-off procressing graph is just he processor node, no edges
+      if (!controlNet.controlImage) {
+        moduleLog.error('Unable to process ControlNet image');
+        return;
+      }
+
+      // ControlNet one-off procressing graph is just the processor node, no edges.
+      // Also we need to grab the image.
       const graph: Graph = {
-        nodes: { [processorNode.id]: processorNode },
+        nodes: {
+          [controlNet.processorNode.id]: {
+            ...controlNet.processorNode,
+            is_intermediate: true,
+            image: pick(controlNet.controlImage, [
+              'image_name',
+              'image_origin',
+            ]),
+          },
+        },
       };
 
       // Create a session to run the graph & wait til it's ready to invoke

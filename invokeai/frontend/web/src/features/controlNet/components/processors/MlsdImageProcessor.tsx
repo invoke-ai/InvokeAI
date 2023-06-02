@@ -1,21 +1,17 @@
 import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/types';
+import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/types';
 
-type HedProcessorProps = {
+type Props = {
   controlNetId: string;
-  processorNode: RequiredHedImageProcessorInvocation;
+  processorNode: RequiredMlsdImageProcessorInvocation;
 };
 
-const HedPreprocessor = (props: HedProcessorProps) => {
-  const {
-    controlNetId,
-    processorNode: { detect_resolution, image_resolution, scribble },
-  } = props;
-
+const MlsdImageProcessor = (props: Props) => {
+  const { controlNetId, processorNode } = props;
+  const { image_resolution, detect_resolution, thr_d, thr_v } = processorNode;
   const processorChanged = useProcessorNodeChanged();
 
   const handleDetectResolutionChanged = useCallback(
@@ -32,9 +28,16 @@ const HedPreprocessor = (props: HedProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleScribbleChanged = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      processorChanged(controlNetId, { scribble: e.target.checked });
+  const handleThrDChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { thr_d: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleThrVChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { thr_v: v });
     },
     [controlNetId, processorChanged]
   );
@@ -57,13 +60,26 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         max={4096}
         withInput
       />
-      <IAISwitch
-        label="Scribble"
-        isChecked={scribble}
-        onChange={handleScribbleChanged}
+      <IAISlider
+        label="W"
+        value={thr_d}
+        onChange={handleThrDChanged}
+        min={0}
+        max={1}
+        step={0.01}
+        withInput
+      />
+      <IAISlider
+        label="H"
+        value={thr_v}
+        onChange={handleThrVChanged}
+        min={0}
+        max={1}
+        step={0.01}
+        withInput
       />
     </Flex>
   );
 };
 
-export default memo(HedPreprocessor);
+export default memo(MlsdImageProcessor);

@@ -1,51 +1,33 @@
-import { memo, useCallback, useState } from 'react';
-import { ControlNetProcessorNode } from '../store/types';
+import { memo, useCallback } from 'react';
+import { RequiredControlNetProcessorNode } from '../store/types';
 import { ImageDTO } from 'services/api';
 import CannyProcessor from './processors/CannyProcessor';
 import {
-  CONTROLNET_PROCESSORS,
   ControlNet,
-  ControlNetModel,
-  ControlNetProcessor,
-  controlNetBeginStepPctChanged,
-  controlNetEndStepPctChanged,
   controlNetImageChanged,
-  controlNetModelChanged,
   controlNetProcessedImageChanged,
-  controlNetProcessorChanged,
   controlNetRemoved,
-  controlNetToggled,
-  controlNetWeightChanged,
-  isControlNetImageProcessedToggled,
 } from '../store/controlNetSlice';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
-import IAISlider from 'common/components/IAISlider';
-import ParamControlNetIsEnabled from './parameters/ParamControlNetIsEnabled';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 import ParamControlNetBeginStepPct from './parameters/ParamControlNetBeginStepPct';
 import ParamControlNetEndStepPct from './parameters/ParamControlNetEndStepPct';
 import {
-  Box,
   Flex,
-  HStack,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
-  VStack,
-  useDisclosure,
 } from '@chakra-ui/react';
 import IAISelectableImage from './parameters/IAISelectableImage';
 import IAIButton from 'common/components/IAIButton';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAISwitch from 'common/components/IAISwitch';
-import ParamControlNetIsPreprocessed from './parameters/ParamControlNetIsPreprocessed';
-import IAICollapse from 'common/components/IAICollapse';
-import ControlNetProcessorCollapse from './ControlNetProcessorCollapse';
-import IAICustomSelect from 'common/components/IAICustomSelect';
+import { controlNetImageProcessed } from '../store/actions';
+import { FaUndo } from 'react-icons/fa';
+import HedProcessor from './processors/HedProcessor';
+import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
+import ProcessorComponent from './ProcessorComponent';
 
 type ControlNetProps = {
   controlNet: ControlNet;
@@ -62,21 +44,9 @@ const ControlNet = (props: ControlNetProps) => {
     controlImage,
     isControlImageProcessed,
     processedControlImage,
-    processor,
+    processorNode,
   } = props.controlNet;
   const dispatch = useAppDispatch();
-
-  const handleProcessorTypeChanged = useCallback(
-    (processor: string | null | undefined) => {
-      dispatch(
-        controlNetProcessorChanged({
-          controlNetId,
-          processor: processor as ControlNetProcessor,
-        })
-      );
-    },
-    [controlNetId, dispatch]
-  );
 
   const handleControlImageChanged = useCallback(
     (controlImage: ImageDTO) => {
@@ -84,6 +54,23 @@ const ControlNet = (props: ControlNetProps) => {
     },
     [controlNetId, dispatch]
   );
+
+  const handleProcess = useCallback(() => {
+    dispatch(
+      controlNetImageProcessed({
+        controlNetId,
+      })
+    );
+  }, [controlNetId, dispatch]);
+
+  const handleReset = useCallback(() => {
+    dispatch(
+      controlNetProcessedImageChanged({
+        controlNetId,
+        processedControlImage: null,
+      })
+    );
+  }, [controlNetId, dispatch]);
 
   const handleControlImageReset = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
@@ -137,18 +124,29 @@ const ControlNet = (props: ControlNetProps) => {
             />
           </TabPanel>
           <TabPanel sx={{ p: 0 }}>
-            <IAICustomSelect
-              label="Processor"
-              items={CONTROLNET_PROCESSORS}
-              selectedItem={processor}
-              setSelectedItem={handleProcessorTypeChanged}
+            <ParamControlNetProcessorSelect
+              controlNetId={controlNetId}
+              processorNode={processorNode}
             />
             <ProcessorComponent
               controlNetId={controlNetId}
-              controlImage={controlImage}
-              processedControlImage={processedControlImage}
-              type={processor}
+              processorNode={processorNode}
             />
+            <IAIButton
+              size="sm"
+              onClick={handleProcess}
+              isDisabled={Boolean(!controlImage)}
+            >
+              Preprocess
+            </IAIButton>
+            <IAIButton
+              size="sm"
+              leftIcon={<FaUndo />}
+              onClick={handleReset}
+              isDisabled={Boolean(!processedControlImage)}
+            >
+              Reset Processing
+            </IAIButton>
           </TabPanel>
         </TabPanels>
       </Tabs>
@@ -158,18 +156,3 @@ const ControlNet = (props: ControlNetProps) => {
 };
 
 export default memo(ControlNet);
-
-export type ControlNetProcessorProps = {
-  controlNetId: string;
-  controlImage: ImageDTO | null;
-  processedControlImage: ImageDTO | null;
-  type: ControlNetProcessor;
-};
-
-const ProcessorComponent = (props: ControlNetProcessorProps) => {
-  const { type } = props;
-  if (type === 'canny') {
-    return <CannyProcessor {...props} />;
-  }
-  return null;
-};

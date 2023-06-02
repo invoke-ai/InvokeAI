@@ -1,25 +1,47 @@
 import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import { memo, useState } from 'react';
+import { memo, useCallback } from 'react';
+import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
+import { RequiredLineartAnimeImageProcessorInvocation } from 'features/controlNet/store/types';
 
-const LineartPreprocessor = () => {
-  const [detectResolution, setDetectResolution] = useState(512);
-  const [imageResolution, setImageResolution] = useState(512);
+type Props = {
+  controlNetId: string;
+  processorNode: RequiredLineartAnimeImageProcessorInvocation;
+};
+
+const LineartAnimeProcessor = (props: Props) => {
+  const { controlNetId, processorNode } = props;
+  const { image_resolution, detect_resolution } = processorNode;
+  const processorChanged = useProcessorNodeChanged();
+
+  const handleDetectResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { detect_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleImageResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
 
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="Detect Resolution"
-        value={detectResolution}
-        onChange={setDetectResolution}
+        value={detect_resolution}
+        onChange={handleDetectResolutionChanged}
         min={0}
         max={4096}
         withInput
       />
       <IAISlider
         label="Image Resolution"
-        value={imageResolution}
-        onChange={setImageResolution}
+        value={image_resolution}
+        onChange={handleImageResolutionChanged}
         min={0}
         max={4096}
         withInput
@@ -28,4 +50,4 @@ const LineartPreprocessor = () => {
   );
 };
 
-export default memo(LineartPreprocessor);
+export default memo(LineartAnimeProcessor);
