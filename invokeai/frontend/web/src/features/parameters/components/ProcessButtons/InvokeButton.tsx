@@ -7,12 +7,12 @@ import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
+import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
-import ProgressBar from 'features/system/components/ProgressBar';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -59,6 +59,7 @@ export default function InvokeButton(props: InvokeButton) {
             tooltipProps={{ placement: 'bottom' }}
             colorScheme="accent"
             id="invoke-button"
+            zIndex={2}
             {...rest}
           />
         ) : (
@@ -72,6 +73,7 @@ export default function InvokeButton(props: InvokeButton) {
             colorScheme="accent"
             id="invoke-button"
             fontWeight={700}
+            zIndex={2}
             {...rest}
           >
             Invoke
@@ -84,7 +86,10 @@ export default function InvokeButton(props: InvokeButton) {
               bottom: '0',
               left: '0',
               right: '0',
+              height: '100%',
               zIndex: 1,
+              borderRadius: 4,
+              overflow: 'clip',
             }}
           >
             <ProgressBar />
