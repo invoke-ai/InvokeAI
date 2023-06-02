@@ -15,7 +15,10 @@ const moduleLog = log.child({ namespace: 'controlNet' });
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
     actionCreator: controlNetImageProcessed,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (
+      action,
+      { dispatch, getState, take, unsubscribe, subscribe }
+    ) => {
       const { controlNetId } = action.payload;
       const controlNet = getState().controlNet.controlNets[controlNetId];
 

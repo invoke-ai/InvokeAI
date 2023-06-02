@@ -1,18 +1,21 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { ImageDTO } from 'services/api';
 import {
   ControlNet,
   controlNetImageChanged,
   controlNetProcessedImageChanged,
   controlNetRemoved,
+  controlNetSelector,
 } from '../store/controlNetSlice';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 import ParamControlNetBeginStepPct from './parameters/ParamControlNetBeginStepPct';
 import ParamControlNetEndStepPct from './parameters/ParamControlNetEndStepPct';
 import {
+  Box,
   Flex,
+  Spinner,
   Tab,
   TabList,
   TabPanel,
@@ -22,10 +25,15 @@ import {
 import IAISelectableImage from './parameters/IAISelectableImage';
 import IAIButton from 'common/components/IAIButton';
 import { FaUndo } from 'react-icons/fa';
+import { TbSquareToggle } from 'react-icons/tb';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
-import { useIsApplicationReady } from 'features/system/hooks/useIsApplicationReady';
 import ControlNetPreprocessButton from './ControlNetPreprocessButton';
+import IAIIconButton from 'common/components/IAIIconButton';
+import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
+import ControlNetImagePreview from './ControlNetImagePreview';
+import { createSelector } from '@reduxjs/toolkit';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 type ControlNetProps = {
   controlNet: ControlNet;
@@ -45,15 +53,6 @@ const ControlNet = (props: ControlNetProps) => {
     processorNode,
   } = props.controlNet;
   const dispatch = useAppDispatch();
-  const isReady = useIsApplicationReady();
-
-  const handleControlImageChanged = useCallback(
-    (controlImage: ImageDTO) => {
-      dispatch(controlNetImageChanged({ controlNetId, controlImage }));
-    },
-    [controlNetId, dispatch]
-  );
-
   const handleReset = useCallback(() => {
     dispatch(
       controlNetProcessedImageChanged({
@@ -63,21 +62,16 @@ const ControlNet = (props: ControlNetProps) => {
     );
   }, [controlNetId, dispatch]);
 
-  const handleControlImageReset = useCallback(() => {
-    dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
-  }, [controlNetId, dispatch]);
-
   const handleControlNetRemoved = useCallback(() => {
     dispatch(controlNetRemoved(controlNetId));
   }, [controlNetId, dispatch]);
 
   return (
     <Flex sx={{ flexDir: 'column', gap: 3 }}>
-      <IAISelectableImage
-        image={processedControlImage || controlImage}
-        onChange={handleControlImageChanged}
-        onReset={handleControlImageReset}
-        resetIconSize="sm"
+      <ControlNetImagePreview
+        controlNetId={controlNetId}
+        controlImage={controlImage}
+        processedControlImage={processedControlImage}
       />
       <ParamControlNetModel controlNetId={controlNetId} model={model} />
       <Tabs
@@ -105,12 +99,9 @@ const ControlNet = (props: ControlNetProps) => {
               controlNetId={controlNetId}
               weight={weight}
             />
-            <ParamControlNetBeginStepPct
+            <ParamControlNetBeginEnd
               controlNetId={controlNetId}
               beginStepPct={beginStepPct}
-            />
-            <ParamControlNetEndStepPct
-              controlNetId={controlNetId}
               endStepPct={endStepPct}
             />
           </TabPanel>

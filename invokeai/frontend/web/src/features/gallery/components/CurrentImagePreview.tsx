@@ -8,7 +8,7 @@ import { isEqual } from 'lodash-es';
 import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { DragEvent, memo, useCallback } from 'react';
+import { DragEvent, memo, useCallback, useEffect, useState } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import ImageFallbackSpinner from './ImageFallbackSpinner';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
@@ -55,6 +55,7 @@ const CurrentImagePreview = () => {
   const { getUrl } = useGetUrl();
   const toaster = useAppToaster();
   const dispatch = useAppDispatch();
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: `currentImage_${image?.image_name}`,
@@ -74,11 +75,15 @@ const CurrentImagePreview = () => {
     }
   }, [dispatch, toaster, shouldFetchImages]);
 
+  useEffect(() => {
+    setIsLoaded(false);
+  }, [image]);
+
   return (
     <Flex
       sx={{
-        width: '100%',
-        height: '100%',
+        width: 'full',
+        height: 'full',
         position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
@@ -91,8 +96,8 @@ const CurrentImagePreview = () => {
           height={progressImage.height}
           sx={{
             objectFit: 'contain',
-            maxWidth: '100%',
-            maxHeight: '100%',
+            maxWidth: 'full',
+            maxHeight: 'full',
             height: 'auto',
             position: 'absolute',
             borderRadius: 'base',
@@ -124,8 +129,11 @@ const CurrentImagePreview = () => {
                 touchAction: 'none',
               }}
               onError={handleError}
+              onLoad={() => {
+                setIsLoaded(true);
+              }}
             />
-            <ImageMetadataOverlay image={image} />
+            {isLoaded && <ImageMetadataOverlay image={image} />}
           </Flex>
         )
       )}
