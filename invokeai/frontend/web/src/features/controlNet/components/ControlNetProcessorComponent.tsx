@@ -18,7 +18,7 @@ export type ControlNetProcessorProps = {
   processorNode: RequiredControlNetProcessorNode;
 };
 
-const ProcessorComponent = (props: ControlNetProcessorProps) => {
+const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   const { controlNetId, processorNode } = props;
   if (processorNode.type === 'canny_image_processor') {
     return (
@@ -128,4 +128,4 @@ const ProcessorComponent = (props: ControlNetProcessorProps) => {
   return null;
 };
 
-export default memo(ProcessorComponent);
+export default memo(ControlNetProcessorComponent);

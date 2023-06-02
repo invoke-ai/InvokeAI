@@ -1,11 +1,11 @@
 import { Box } from '@chakra-ui/react';
-import { readinessSelector } from 'app/selectors/readinessSelector';
 import { userInvoked } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -22,7 +22,7 @@ interface InvokeButton
 export default function InvokeButton(props: InvokeButton) {
   const { iconButton = false, ...rest } = props;
   const dispatch = useAppDispatch();
-  const { isReady } = useAppSelector(readinessSelector);
+  const isReady = useIsReadyToInvoke();
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleInvoke = useCallback(() => {
