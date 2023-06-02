@@ -8,13 +8,33 @@ import {
 
 const moduleLog = log.child({ namespace: 'controlNet' });
 
+/**
+ * Listener that automatically processes a ControlNet image when its processor parameters are changed.
+ *
+ * The network request is debounced by 1 second.
+ */
 export const addControlNetProcessorParamsChangedListener = () => {
   startAppListening({
     predicate: (action) =>
       controlNetProcessorParamsChanged.match(action) ||
       controlNetProcessorTypeChanged.match(action),
-    effect: async (action, { dispatch, cancelActiveListeners, delay }) => {
+    effect: async (
+      action,
+      { dispatch, getState, cancelActiveListeners, delay }
+    ) => {
+      const state = getState();
+      if (!state.controlNet.shouldAutoProcess) {
+        // silently skip
+        return;
+      }
+
+      if (state.system.isProcessing) {
+        moduleLog.trace('System busy, skipping ControlNet auto-processing');
+        return;
+      }
+
       const { controlNetId } = action.payload;
+
       // Cancel any in-progress instances of this listener
       cancelActiveListeners();
 
