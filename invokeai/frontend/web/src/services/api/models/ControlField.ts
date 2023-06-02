@@ -6,23 +6,23 @@ import type { ImageField } from './ImageField';
 
 export type ControlField = {
   /**
-   * processed image
+   * The control image
    */
   image: ImageField;
   /**
-   * control model used
+   * The ControlNet model to use
    */
   control_model: string;
   /**
-   * weight given to controlnet
+   * The weight given to the ControlNet
    */
   control_weight: number;
   /**
-   * % of total steps at which controlnet is first applied
+   * When the ControlNet is first applied (% of total steps)
    */
   begin_step_percent: number;
   /**
-   * % of total steps at which controlnet is last applied
+   * When the ControlNet is last applied (% of total steps)
    */
   end_step_percent: number;
 };

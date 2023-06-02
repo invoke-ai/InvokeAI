@@ -18,15 +18,15 @@ export type MidasDepthImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'midas_depth_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * Midas parameter a = amult * PI
+   * Midas parameter `a_mult` (a = a_mult * PI)
    */
   a_mult?: number;
   /**
-   * Midas parameter bg_th
+   * Midas parameter `bg_th`
    */
   bg_th?: number;
 };
