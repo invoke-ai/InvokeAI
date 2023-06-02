@@ -55,6 +55,7 @@ export default function InvokeButton(props: InvokeButton) {
               right: '0',
               height: '100%',
               overflow: 'clip',
+              borderRadius: 4,
             }}
           >
             <ProgressBar />
@@ -86,7 +87,6 @@ export default function InvokeButton(props: InvokeButton) {
             colorScheme="accent"
             id="invoke-button"
             fontWeight={700}
-            background={!isReady ? 'none' : 'accent.700'}
             {...rest}
           >
             Invoke
