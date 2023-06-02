@@ -1,11 +1,12 @@
-import {
-  $CombinedState,
-  PayloadAction,
-  createSelector,
-} from '@reduxjs/toolkit';
+import { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { ImageDTO } from 'services/api';
+import {
+  ControlNetProcessorType,
+  RequiredControlNetProcessorNode,
+} from './types';
+import { CONTROLNET_PROCESSORS } from './constants';
 
 export const CONTROLNET_MODELS = [
   'lllyasviel/sd-controlnet-canny',
@@ -18,23 +19,6 @@ export const CONTROLNET_MODELS = [
   'lllyasviel/sd-controlnet-mlsd',
 ];
 
-export const CONTROLNET_PROCESSORS = [
-  'canny',
-  'contentShuffle',
-  'hed',
-  'lineart',
-  'lineartAnime',
-  'mediapipeFace',
-  'midasDepth',
-  'mlsd',
-  'normalBae',
-  'openpose',
-  'pidi',
-  'zoeDepth',
-];
-
-export type ControlNetProcessor = (typeof CONTROLNET_PROCESSORS)[number];
-
 export type ControlNetModel = (typeof CONTROLNET_MODELS)[number];
 
 export const initialControlNet: Omit<ControlNet, 'controlNetId'> = {
@@ -46,7 +30,7 @@ export const initialControlNet: Omit<ControlNet, 'controlNetId'> = {
   controlImage: null,
   isControlImageProcessed: false,
   processedControlImage: null,
-  processor: 'canny',
+  processorNode: CONTROLNET_PROCESSORS.canny_image_processor.default,
 };
 
 export type ControlNet = {
@@ -59,17 +43,19 @@ export type ControlNet = {
   controlImage: ImageDTO | null;
   isControlImageProcessed: boolean;
   processedControlImage: ImageDTO | null;
-  processor: ControlNetProcessor;
+  processorNode: RequiredControlNetProcessorNode;
 };
 
 export type ControlNetState = {
   controlNets: Record<string, ControlNet>;
   isEnabled: boolean;
+  shouldAutoProcess: boolean;
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
+  shouldAutoProcess: true,
 };
 
 export const controlNetSlice = createSlice({
@@ -169,15 +155,36 @@ export const controlNetSlice = createSlice({
       const { controlNetId, endStepPct } = action.payload;
       state.controlNets[controlNetId].endStepPct = endStepPct;
     },
-    controlNetProcessorChanged: (
+    controlNetProcessorParamsChanged: (
       state,
       action: PayloadAction<{
         controlNetId: string;
-        processor: ControlNetProcessor;
+        changes: Omit<
+          Partial<RequiredControlNetProcessorNode>,
+          'id' | 'type' | 'is_intermediate'
+        >;
       }>
     ) => {
-      const { controlNetId, processor } = action.payload;
-      state.controlNets[controlNetId].processor = processor;
+      const { controlNetId, changes } = action.payload;
+      const processorNode = state.controlNets[controlNetId].processorNode;
+      state.controlNets[controlNetId].processorNode = {
+        ...processorNode,
+        ...changes,
+      };
+    },
+    controlNetProcessorTypeChanged: (
+      state,
+      action: PayloadAction<{
+        controlNetId: string;
+        processorType: ControlNetProcessorType;
+      }>
+    ) => {
+      const { controlNetId, processorType } = action.payload;
+      state.controlNets[controlNetId].processorNode =
+        CONTROLNET_PROCESSORS[processorType].default;
+    },
+    shouldAutoProcessToggled: (state) => {
+      state.shouldAutoProcess = !state.shouldAutoProcess;
     },
   },
 });
@@ -195,7 +202,9 @@ export const {
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
-  controlNetProcessorChanged,
+  controlNetProcessorParamsChanged,
+  controlNetProcessorTypeChanged,
+  shouldAutoProcessToggled,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

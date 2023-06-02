@@ -21,23 +21,7 @@ const ControlNetProcessorButtons = (props: ControlNetProcessorButtonsProps) => {
         alignItems: 'center',
         justifyContent: 'stretch',
       }}
-    >
-      <IAIButton
-        size="sm"
-        onClick={handleProcess}
-        isDisabled={isProcessDisabled}
-      >
-        Preprocess
-      </IAIButton>
-      <IAIButton
-        size="sm"
-        leftIcon={<FaUndo />}
-        onClick={handleReset}
-        isDisabled={isResetDisabled}
-      >
-        Reset Processing
-      </IAIButton>
-    </Flex>
+    ></Flex>
   );
 };
 

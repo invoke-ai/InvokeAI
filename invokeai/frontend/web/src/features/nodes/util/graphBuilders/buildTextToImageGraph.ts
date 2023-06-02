@@ -12,9 +12,7 @@ import {
   TextToLatentsInvocation,
 } from 'services/api';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { forEach, map, size } from 'lodash-es';
-import { ControlNetProcessorNode } from 'features/controlNet/store/types';
-import { ControlNetModel } from 'features/controlNet/store/controlNetSlice';
+import { forEach, size } from 'lodash-es';
 
 const POSITIVE_CONDITIONING = 'positive_conditioning';
 const NEGATIVE_CONDITIONING = 'negative_conditioning';
@@ -344,7 +342,7 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
         beginStepPct,
         endStepPct,
         model,
-        processor,
+        processorNode,
         weight,
       } = controlNet;
 

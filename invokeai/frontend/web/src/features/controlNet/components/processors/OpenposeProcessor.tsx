@@ -1,21 +1,18 @@
 import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/types';
+import { RequiredOpenposeImageProcessorInvocation } from 'features/controlNet/store/types';
+import IAISwitch from 'common/components/IAISwitch';
 
-type HedProcessorProps = {
+type Props = {
   controlNetId: string;
-  processorNode: RequiredHedImageProcessorInvocation;
+  processorNode: RequiredOpenposeImageProcessorInvocation;
 };
 
-const HedPreprocessor = (props: HedProcessorProps) => {
-  const {
-    controlNetId,
-    processorNode: { detect_resolution, image_resolution, scribble },
-  } = props;
-
+const OpenposeProcessor = (props: Props) => {
+  const { controlNetId, processorNode } = props;
+  const { image_resolution, detect_resolution, hand_and_face } = processorNode;
   const processorChanged = useProcessorNodeChanged();
 
   const handleDetectResolutionChanged = useCallback(
@@ -32,9 +29,9 @@ const HedPreprocessor = (props: HedProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleScribbleChanged = useCallback(
+  const handleHandAndFaceChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      processorChanged(controlNetId, { scribble: e.target.checked });
+      processorChanged(controlNetId, { hand_and_face: e.target.checked });
     },
     [controlNetId, processorChanged]
   );
@@ -58,12 +55,12 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         withInput
       />
       <IAISwitch
-        label="Scribble"
-        isChecked={scribble}
-        onChange={handleScribbleChanged}
+        label="Hand and Face"
+        isChecked={hand_and_face}
+        onChange={handleHandAndFaceChanged}
       />
     </Flex>
   );
 };
 
-export default memo(HedPreprocessor);
+export default memo(OpenposeProcessor);

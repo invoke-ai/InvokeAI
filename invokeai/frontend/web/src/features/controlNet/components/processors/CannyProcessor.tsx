@@ -1,74 +1,60 @@
 import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
-import ControlNetProcessorButtons from './common/ControlNetProcessorButtons';
-import { memo, useCallback, useState } from 'react';
-import { ControlNetProcessorProps } from '../ControlNet';
+import { memo, useCallback } from 'react';
+import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
+import { RequiredCannyImageProcessorInvocation } from 'features/controlNet/store/types';
 
-export const CANNY_PROCESSOR = 'canny_image_processor';
+type CannyProcessorProps = {
+  controlNetId: string;
+  processorNode: RequiredCannyImageProcessorInvocation;
+};
 
-const CannyProcessor = (props: ControlNetProcessorProps) => {
-  const { controlNetId, controlImage, processedControlImage, type } = props;
-  const dispatch = useAppDispatch();
-  const [lowThreshold, setLowThreshold] = useState(100);
-  const [highThreshold, setHighThreshold] = useState(200);
+const CannyProcessor = (props: CannyProcessorProps) => {
+  const { controlNetId, processorNode } = props;
+  const { low_threshold, high_threshold } = processorNode;
+  const processorChanged = useProcessorNodeChanged();
 
-  const handleProcess = useCallback(() => {
-    if (!controlImage) {
-      return;
-    }
+  const handleLowThresholdChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { low_threshold: v });
+    },
+    [controlNetId, processorChanged]
+  );
 
-    dispatch(
-      controlNetImageProcessed({
-        controlNetId,
-        processorNode: {
-          id: CANNY_PROCESSOR,
-          type: 'canny_image_processor',
-          image: {
-            image_name: controlImage.image_name,
-            image_origin: controlImage.image_origin,
-          },
-          low_threshold: lowThreshold,
-          high_threshold: highThreshold,
-        },
-      })
-    );
-  }, [controlNetId, dispatch, highThreshold, controlImage, lowThreshold]);
+  const handleLowThresholdReset = useCallback(() => {
+    processorChanged(controlNetId, { low_threshold: 100 });
+  }, [controlNetId, processorChanged]);
 
-  const handleReset = useCallback(() => {
-    dispatch(
-      controlNetProcessedImageChanged({
-        controlNetId,
-        processedControlImage: null,
-      })
-    );
-  }, [controlNetId, dispatch]);
+  const handleHighThresholdChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { high_threshold: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleHighThresholdReset = useCallback(() => {
+    processorChanged(controlNetId, { high_threshold: 200 });
+  }, [controlNetId, processorChanged]);
 
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="Low Threshold"
-        value={lowThreshold}
-        onChange={setLowThreshold}
+        value={low_threshold}
+        onChange={handleLowThresholdChanged}
+        handleReset={handleLowThresholdReset}
         min={0}
         max={255}
         withInput
       />
       <IAISlider
         label="High Threshold"
-        value={highThreshold}
-        onChange={setHighThreshold}
+        value={high_threshold}
+        onChange={handleHighThresholdChanged}
+        handleReset={handleHighThresholdReset}
         min={0}
         max={255}
         withInput
-      />
-      <ControlNetProcessorButtons
-        handleProcess={handleProcess}
-        isProcessDisabled={Boolean(!controlImage)}
-        handleReset={handleReset}
-        isResetDisabled={Boolean(!processedControlImage)}
       />
     </Flex>
   );
