@@ -4,6 +4,7 @@ import { RootState } from 'app/store/store';
 import { ImageDTO } from 'services/api';
 import {
   ControlNetProcessorType,
+  RequiredCannyImageProcessorInvocation,
   RequiredControlNetProcessorNode,
 } from './types';
 import { CONTROLNET_PROCESSORS } from './constants';
@@ -30,7 +31,8 @@ export const initialControlNet: Omit<ControlNet, 'controlNetId'> = {
   controlImage: null,
   isControlImageProcessed: false,
   processedControlImage: null,
-  processorNode: CONTROLNET_PROCESSORS.canny_image_processor.default,
+  processorNode: CONTROLNET_PROCESSORS.canny_image_processor
+    .default as RequiredCannyImageProcessorInvocation,
 };
 
 export type ControlNet = {
@@ -180,8 +182,9 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, processorType } = action.payload;
-      state.controlNets[controlNetId].processorNode =
-        CONTROLNET_PROCESSORS[processorType].default;
+      state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
+        processorType
+      ].default as RequiredControlNetProcessorNode;
     },
     shouldAutoProcessToggled: (state) => {
       state.shouldAutoProcess = !state.shouldAutoProcess;

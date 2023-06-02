@@ -4,6 +4,9 @@ import IAISwitch from 'common/components/IAISwitch';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor.default;
 
 type HedProcessorProps = {
   controlNetId: string;
@@ -39,12 +42,26 @@ const HedPreprocessor = (props: HedProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
+  const handleDetectResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      detect_resolution: DEFAULTS.detect_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
+  const handleImageResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      image_resolution: DEFAULTS.image_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
+        handleReset={handleDetectResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -53,6 +70,8 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         label="Image Resolution"
         value={image_resolution}
         onChange={handleImageResolutionChanged}
+        handleReset={handleImageResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput

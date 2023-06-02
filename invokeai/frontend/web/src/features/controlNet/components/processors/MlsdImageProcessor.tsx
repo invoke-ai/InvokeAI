@@ -3,6 +3,9 @@ import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor.default;
 
 type Props = {
   controlNetId: string;
@@ -42,12 +45,34 @@ const MlsdImageProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleDetectResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      detect_resolution: DEFAULTS.detect_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
+  const handleImageResolutionReset = useCallback(() => {
+    processorChanged(controlNetId, {
+      image_resolution: DEFAULTS.image_resolution,
+    });
+  }, [controlNetId, processorChanged]);
+
+  const handleThrDReset = useCallback(() => {
+    processorChanged(controlNetId, { thr_d: DEFAULTS.thr_d });
+  }, [controlNetId, processorChanged]);
+
+  const handleThrVReset = useCallback(() => {
+    processorChanged(controlNetId, { thr_v: DEFAULTS.thr_v });
+  }, [controlNetId, processorChanged]);
+
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
+        handleReset={handleDetectResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -56,6 +81,8 @@ const MlsdImageProcessor = (props: Props) => {
         label="Image Resolution"
         value={image_resolution}
         onChange={handleImageResolutionChanged}
+        handleReset={handleImageResolutionReset}
+        withReset
         min={0}
         max={4096}
         withInput
@@ -64,6 +91,8 @@ const MlsdImageProcessor = (props: Props) => {
         label="W"
         value={thr_d}
         onChange={handleThrDChanged}
+        handleReset={handleThrDReset}
+        withReset
         min={0}
         max={1}
         step={0.01}
@@ -73,6 +102,8 @@ const MlsdImageProcessor = (props: Props) => {
         label="H"
         value={thr_v}
         onChange={handleThrVChanged}
+        handleReset={handleThrVReset}
+        withReset
         min={0}
         max={1}
         step={0.01}

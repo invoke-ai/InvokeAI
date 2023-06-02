@@ -3,6 +3,9 @@ import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlNet/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor.default;
 
 type Props = {
   controlNetId: string;
@@ -28,12 +31,22 @@ const MidasDepthProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleAMultReset = useCallback(() => {
+    processorChanged(controlNetId, { a_mult: DEFAULTS.a_mult });
+  }, [controlNetId, processorChanged]);
+
+  const handleBgThReset = useCallback(() => {
+    processorChanged(controlNetId, { bg_th: DEFAULTS.bg_th });
+  }, [controlNetId, processorChanged]);
+
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="a_mult"
         value={a_mult}
         onChange={handleAMultChanged}
+        handleReset={handleAMultReset}
+        withReset
         min={0}
         max={20}
         step={0.01}
@@ -43,6 +56,8 @@ const MidasDepthProcessor = (props: Props) => {
         label="bg_th"
         value={bg_th}
         onChange={handleBgThChanged}
+        handleReset={handleBgThReset}
+        withReset
         min={0}
         max={20}
         step={0.01}

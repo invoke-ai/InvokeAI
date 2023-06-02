@@ -2,10 +2,10 @@ import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import {
-  RequiredContentShuffleImageProcessorInvocation,
-  RequiredMediapipeFaceProcessorInvocation,
-} from 'features/controlNet/store/types';
+import { RequiredMediapipeFaceProcessorInvocation } from 'features/controlNet/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.mediapipe_face_processor.default;
 
 type Props = {
   controlNetId: string;
@@ -31,12 +31,22 @@ const MediapipeFaceProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleMaxFacesReset = useCallback(() => {
+    processorChanged(controlNetId, { max_faces: DEFAULTS.max_faces });
+  }, [controlNetId, processorChanged]);
+
+  const handleMinConfidenceReset = useCallback(() => {
+    processorChanged(controlNetId, { min_confidence: DEFAULTS.min_confidence });
+  }, [controlNetId, processorChanged]);
+
   return (
     <Flex sx={{ flexDirection: 'column', gap: 2 }}>
       <IAISlider
         label="Max Faces"
         value={max_faces}
         onChange={handleMaxFacesChanged}
+        handleReset={handleMaxFacesReset}
+        withReset
         min={1}
         max={20}
         withInput
@@ -45,6 +55,8 @@ const MediapipeFaceProcessor = (props: Props) => {
         label="Min Confidence"
         value={min_confidence}
         onChange={handleMinConfidenceChanged}
+        handleReset={handleMinConfidenceReset}
+        withReset
         min={0}
         max={1}
         step={0.01}

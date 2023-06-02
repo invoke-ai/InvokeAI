@@ -3,6 +3,9 @@ import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import { RequiredCannyImageProcessorInvocation } from 'features/controlNet/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+
+const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor.default;
 
 type CannyProcessorProps = {
   controlNetId: string;
@@ -22,7 +25,9 @@ const CannyProcessor = (props: CannyProcessorProps) => {
   );
 
   const handleLowThresholdReset = useCallback(() => {
-    processorChanged(controlNetId, { low_threshold: 100 });
+    processorChanged(controlNetId, {
+      low_threshold: DEFAULTS.low_threshold,
+    });
   }, [controlNetId, processorChanged]);
 
   const handleHighThresholdChanged = useCallback(
@@ -33,7 +38,9 @@ const CannyProcessor = (props: CannyProcessorProps) => {
   );
 
   const handleHighThresholdReset = useCallback(() => {
-    processorChanged(controlNetId, { high_threshold: 200 });
+    processorChanged(controlNetId, {
+      high_threshold: DEFAULTS.high_threshold,
+    });
   }, [controlNetId, processorChanged]);
 
   return (
@@ -43,6 +50,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         value={low_threshold}
         onChange={handleLowThresholdChanged}
         handleReset={handleLowThresholdReset}
+        withReset
         min={0}
         max={255}
         withInput
@@ -52,6 +60,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         value={high_threshold}
         onChange={handleHighThresholdChanged}
         handleReset={handleHighThresholdReset}
+        withReset
         min={0}
         max={255}
         withInput
