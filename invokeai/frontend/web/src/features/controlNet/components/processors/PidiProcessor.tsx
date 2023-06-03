@@ -4,7 +4,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredPidiImageProcessorInvocation } from 'features/controlNet/store/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
+import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor.default;
 
@@ -59,7 +59,7 @@ const PidiProcessor = (props: Props) => {
   );
 
   return (
-    <ProcessorOptionsContainer>
+    <ProcessorWrapper>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
@@ -86,7 +86,7 @@ const PidiProcessor = (props: Props) => {
         onChange={handleScribbleChanged}
       />
       <IAISwitch label="Safe" isChecked={safe} onChange={handleSafeChanged} />
-    </ProcessorOptionsContainer>
+    </ProcessorWrapper>
   );
 };
 

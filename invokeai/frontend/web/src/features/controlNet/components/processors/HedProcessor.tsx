@@ -4,7 +4,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
+import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor.default;
 
@@ -55,7 +55,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <ProcessorOptionsContainer>
+    <ProcessorWrapper>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
@@ -81,7 +81,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         isChecked={scribble}
         onChange={handleScribbleChanged}
       />
-    </ProcessorOptionsContainer>
+    </ProcessorWrapper>
   );
 };
 
