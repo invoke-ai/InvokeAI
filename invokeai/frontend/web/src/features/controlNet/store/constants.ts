@@ -22,7 +22,7 @@ type ControlNetProcessorsDict = Record<
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CONTROLNET_PROCESSORS = {
+export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   canny_image_processor: {
     type: 'canny_image_processor',
     label: 'Canny',
@@ -163,4 +163,28 @@ export const CONTROLNET_PROCESSORS = {
       type: 'zoe_depth_image_processor',
     },
   },
+};
+
+export const CONTROLNET_MODELS = [
+  'lllyasviel/sd-controlnet-canny',
+  'lllyasviel/sd-controlnet-depth',
+  'lllyasviel/sd-controlnet-hed',
+  'lllyasviel/sd-controlnet-seg',
+  'lllyasviel/sd-controlnet-openpose',
+  'lllyasviel/sd-controlnet-scribble',
+  'lllyasviel/sd-controlnet-normal',
+  'lllyasviel/sd-controlnet-mlsd',
+];
+
+export type ControlNetModel = (typeof CONTROLNET_MODELS)[number];
+
+export const CONTROLNET_MODEL_MAP: Record<
+  ControlNetModel,
+  ControlNetProcessorType
+> = {
+  'lllyasviel/sd-controlnet-canny': 'canny_image_processor',
+  'lllyasviel/sd-controlnet-depth': 'midas_depth_image_processor',
+  'lllyasviel/sd-controlnet-hed': 'hed_image_processor',
+  'lllyasviel/sd-controlnet-openpose': 'openpose_image_processor',
+  'lllyasviel/sd-controlnet-mlsd': 'mlsd_image_processor',
 };

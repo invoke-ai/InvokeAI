@@ -1,12 +1,12 @@
 import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
-import { ControlNet } from '../store/controlNetSlice';
+import { ControlNetConfig } from '../store/controlNetSlice';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlNetImageProcessed } from '../store/actions';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 type Props = {
-  controlNet: ControlNet;
+  controlNet: ControlNetConfig;
 };
 
 const ControlNetPreprocessButton = (props: Props) => {

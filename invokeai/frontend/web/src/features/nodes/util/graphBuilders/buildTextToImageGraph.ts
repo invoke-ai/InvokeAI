@@ -1,8 +1,6 @@
 import { RootState } from 'app/store/store';
 import {
-  CollectInvocation,
   CompelInvocation,
-  ControlNetInvocation,
   Graph,
   IterateInvocation,
   LatentsToImageInvocation,
@@ -12,7 +10,7 @@ import {
   TextToLatentsInvocation,
 } from 'services/api';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { forEach, size } from 'lodash-es';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 
 const POSITIVE_CONDITIONING = 'positive_conditioning';
 const NEGATIVE_CONDITIONING = 'negative_conditioning';
@@ -22,7 +20,6 @@ const NOISE = 'noise';
 const RANDOM_INT = 'rand_int';
 const RANGE_OF_SIZE = 'range_of_size';
 const ITERATE = 'iterate';
-const CONTROL_NET_COLLECT = 'control_net_collect';
 
 /**
  * Builds the Text to Image tab graph.
@@ -41,8 +38,6 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     seed,
     shouldRandomizeSeed,
   } = state.generation;
-
-  const { isEnabled: isControlNetEnabled, controlNets } = state.controlNet;
 
   const graph: NonNullableGraph = {
     nodes: {},
@@ -315,91 +310,7 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     });
   }
 
-  // Add ControlNet
-  if (isControlNetEnabled) {
-    if (size(controlNets) > 1) {
-      const controlNetIterateNode: CollectInvocation = {
-        id: CONTROL_NET_COLLECT,
-        type: 'collect',
-      };
-      graph.nodes[controlNetIterateNode.id] = controlNetIterateNode;
-      graph.edges.push({
-        source: { node_id: controlNetIterateNode.id, field: 'collection' },
-        destination: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'control',
-        },
-      });
-    }
-
-    forEach(controlNets, (controlNet, index) => {
-      const {
-        controlNetId,
-        isEnabled,
-        isControlImageProcessed,
-        controlImage,
-        processedControlImage,
-        beginStepPct,
-        endStepPct,
-        model,
-        processorNode,
-        weight,
-      } = controlNet;
-
-      if (!isEnabled) {
-        // Skip disabled ControlNets
-        return;
-      }
-
-      const controlNetNode: ControlNetInvocation = {
-        id: `control_net_${controlNetId}`,
-        type: 'controlnet',
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-        control_model: model as ControlNetInvocation['control_model'],
-        control_weight: weight,
-      };
-
-      if (processedControlImage && !isControlImageProcessed) {
-        // We've already processed the image in the app, so we can just use the processed image
-        const { image_name, image_origin } = processedControlImage;
-        controlNetNode.image = {
-          image_name,
-          image_origin,
-        };
-      } else if (controlImage && isControlImageProcessed) {
-        // The control image is preprocessed
-        const { image_name, image_origin } = controlImage;
-        controlNetNode.image = {
-          image_name,
-          image_origin,
-        };
-      } else {
-        // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
-        return;
-      }
-
-      graph.nodes[controlNetNode.id] = controlNetNode;
-
-      if (size(controlNets) > 1) {
-        graph.edges.push({
-          source: { node_id: controlNetNode.id, field: 'control' },
-          destination: {
-            node_id: CONTROL_NET_COLLECT,
-            field: 'item',
-          },
-        });
-      } else {
-        graph.edges.push({
-          source: { node_id: controlNetNode.id, field: 'control' },
-          destination: {
-            node_id: TEXT_TO_LATENTS,
-            field: 'control',
-          },
-        });
-      }
-    });
-  }
+  addControlNetToLinearGraph(graph, TEXT_TO_LATENTS, state);
 
   return graph;
 };
