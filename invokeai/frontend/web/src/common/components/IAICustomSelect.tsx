@@ -109,7 +109,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
               top: 0,
               left: 0,
               flexDirection: 'column',
-              zIndex: 1,
+              zIndex: 2,
               bg: 'base.800',
               borderRadius: 'base',
               border: '1px',

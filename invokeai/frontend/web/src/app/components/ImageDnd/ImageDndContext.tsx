@@ -6,6 +6,7 @@ import {
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -13,6 +14,7 @@ import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import OverlayDragImage from './OverlayDragImage';
 import { ImageDTO } from 'services/api';
 import { isImageDTO } from 'services/types/guards';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 
 type ImageDndContextProps = PropsWithChildren;
 
@@ -53,9 +55,10 @@ const ImageDndContext = (props: ImageDndContextProps) => {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       sensors={sensors}
+      collisionDetection={pointerWithin}
     >
       {props.children}
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
         {draggedImage && <OverlayDragImage image={draggedImage} />}
       </DragOverlay>
     </DndContext>

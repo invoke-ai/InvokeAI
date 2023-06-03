@@ -1,4 +1,4 @@
-import { Image } from '@chakra-ui/react';
+import { Box, Image } from '@chakra-ui/react';
 import { memo } from 'react';
 import { ImageDTO } from 'services/api';
 
@@ -8,15 +8,27 @@ type OverlayDragImageProps = {
 
 const OverlayDragImage = (props: OverlayDragImageProps) => {
   return (
-    <Image
-      sx={{
-        maxW: 36,
-        maxH: 36,
-        borderRadius: 'base',
-        shadow: 'dark-lg',
+    <Box
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+        cursor: 'grabbing',
       }}
-      src={props.image.thumbnail_url}
-    />
+    >
+      <Image
+        sx={{
+          maxW: 36,
+          maxH: 36,
+          borderRadius: 'base',
+          shadow: 'dark-lg',
+        }}
+        src={props.image.thumbnail_url}
+      />
+    </Box>
   );
 };
 

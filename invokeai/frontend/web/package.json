@@ -61,6 +61,7 @@
     "@chakra-ui/theme-tools": "^2.0.16",
     "@dagrejs/graphlib": "^2.1.12",
     "@dnd-kit/core": "^6.0.8",
+    "@dnd-kit/modifiers": "^6.0.1",
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
     "@floating-ui/react-dom": "^2.0.0",

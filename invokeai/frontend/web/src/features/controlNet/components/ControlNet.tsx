@@ -1,39 +1,29 @@
-import { memo, useCallback, useState } from 'react';
-import { ImageDTO } from 'services/api';
+import { memo, useCallback } from 'react';
 import {
   ControlNet,
-  controlNetImageChanged,
   controlNetProcessedImageChanged,
   controlNetRemoved,
-  controlNetSelector,
 } from '../store/controlNetSlice';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
-import ParamControlNetBeginStepPct from './parameters/ParamControlNetBeginStepPct';
-import ParamControlNetEndStepPct from './parameters/ParamControlNetEndStepPct';
 import {
   Box,
   Flex,
-  Spinner,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
+  Text,
 } from '@chakra-ui/react';
-import IAISelectableImage from './parameters/IAISelectableImage';
 import IAIButton from 'common/components/IAIButton';
 import { FaUndo } from 'react-icons/fa';
-import { TbSquareToggle } from 'react-icons/tb';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ControlNetPreprocessButton from './ControlNetPreprocessButton';
-import IAIIconButton from 'common/components/IAIIconButton';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ControlNetImagePreview from './ControlNetImagePreview';
-import { createSelector } from '@reduxjs/toolkit';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 type ControlNetProps = {
   controlNet: ControlNet;

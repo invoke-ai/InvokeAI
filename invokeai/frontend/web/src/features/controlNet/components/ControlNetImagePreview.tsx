@@ -5,13 +5,12 @@ import {
   controlNetSelector,
 } from '../store/controlNetSlice';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Box, Flex, Spinner } from '@chakra-ui/react';
-import IAISelectableImage from './parameters/IAISelectableImage';
-import { TbSquareToggle } from 'react-icons/tb';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { Box } from '@chakra-ui/react';
+import IAIDndImage from './parameters/IAISelectableImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
+import { IAIImageFallback } from 'common/components/IAIImageFallback';
 
 const selector = createSelector(
   controlNetSelector,
@@ -43,24 +42,20 @@ const ControlNetImagePreview = (props: Props) => {
     [controlNetId, dispatch]
   );
 
-  const handleControlImageReset = useCallback(() => {
-    dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
-  }, [controlNetId, dispatch]);
-
   const shouldShowProcessedImageBackdrop =
     Number(controlImage?.width) > Number(processedControlImage?.width) ||
     Number(controlImage?.height) > Number(processedControlImage?.height);
 
   return (
-    <Box sx={{ position: 'relative', aspectRatio: '1/1' }}>
-      <IAISelectableImage
+    <Box
+      sx={{ position: 'relative', h: 'inherit' }}
+      onMouseOver={() => setShouldShowProcessedImage(false)}
+      onMouseOut={() => setShouldShowProcessedImage(true)}
+    >
+      <IAIDndImage
         image={controlImage}
-        onChange={handleControlImageChanged}
-        onReset={handleControlImageReset}
+        onDrop={handleControlImageChanged}
         isDropDisabled={Boolean(processedControlImage)}
-        fallback={<ProcessedImageFallback />}
-        withResetIcon
-        resetIconSize="sm"
       />
       <AnimatePresence>
         {controlImage &&
@@ -108,13 +103,10 @@ const ControlNetImagePreview = (props: Props) => {
                     h: 'full',
                   }}
                 >
-                  <IAISelectableImage
+                  <IAIDndImage
                     image={processedControlImage}
-                    onChange={handleControlImageChanged}
-                    onReset={handleControlImageReset}
-                    withResetIcon
-                    resetIconSize="sm"
-                    fallback={<ProcessedImageFallback />}
+                    onDrop={handleControlImageChanged}
+                    payloadImage={controlImage}
                   />
                 </Box>
               </Box>
@@ -131,18 +123,7 @@ const ControlNetImagePreview = (props: Props) => {
             h: 'full',
           }}
         >
-          <ProcessedImageFallback />
-        </Box>
-      )}
-      {processedControlImage && !isProcessingControlImage && (
-        <Box sx={{ position: 'absolute', bottom: 0, insetInlineEnd: 0, p: 2 }}>
-          <IAIIconButton
-            aria-label="Hide Preview"
-            icon={<TbSquareToggle />}
-            size="sm"
-            onMouseOver={() => setShouldShowProcessedImage(false)}
-            onMouseOut={() => setShouldShowProcessedImage(true)}
-          />
+          <IAIImageFallback />
         </Box>
       )}
     </Box>
@@ -150,19 +131,3 @@ const ControlNetImagePreview = (props: Props) => {
 };
 
 export default memo(ControlNetImagePreview);
-
-const ProcessedImageFallback = () => (
-  <Flex
-    sx={{
-      bg: 'base.900',
-      opacity: 0.7,
-      w: 'full',
-      h: 'full',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 'base',
-    }}
-  >
-    <Spinner size="xl" />
-  </Flex>
-);

@@ -6,10 +6,11 @@ import { memo, useCallback } from 'react';
 type ParamControlNetWeightProps = {
   controlNetId: string;
   weight: number;
+  mini?: boolean;
 };
 
 const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
-  const { controlNetId, weight } = props;
+  const { controlNetId, weight, mini = false } = props;
   const dispatch = useAppDispatch();
 
   const handleWeightChanged = useCallback(
@@ -22,6 +23,20 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   const handleWeightReset = () => {
     dispatch(controlNetWeightChanged({ controlNetId, weight: 1 }));
   };
+
+  if (mini) {
+    return (
+      <IAISlider
+        label={'Weight'}
+        sliderFormLabelProps={{ pb: 1 }}
+        value={weight}
+        onChange={handleWeightChanged}
+        min={0}
+        max={1}
+        step={0.01}
+      />
+    );
+  }
 
   return (
     <IAISlider

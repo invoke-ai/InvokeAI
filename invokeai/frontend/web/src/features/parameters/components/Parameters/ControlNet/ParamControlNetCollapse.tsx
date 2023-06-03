@@ -24,6 +24,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map, startCase } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 import { CloseIcon } from '@chakra-ui/icons';
+import ControlNetMini from 'features/controlNet/components/ControlNetMini';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   controlNetSelector,
@@ -38,6 +40,7 @@ const selector = createSelector(
 const ParamControlNetCollapse = () => {
   const { t } = useTranslation();
   const { controlNetsArray, isEnabled } = useAppSelector(selector);
+  const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();
 
   const handleClickControlNetToggle = useCallback(() => {
@@ -47,6 +50,18 @@ const ParamControlNetCollapse = () => {
   const handleClickedAddControlNet = useCallback(() => {
     dispatch(controlNetAdded({ controlNetId: uuidv4() }));
   }, [dispatch]);
+
+  if (isControlNetDisabled) {
+    return null;
+  }
+
+  return (
+    <>
+      {controlNetsArray.map((c) => (
+        <ControlNetMini key={c.controlNetId} controlNet={c} />
+      ))}
+    </>
+  );
 
   return (
     <IAICollapse
@@ -80,6 +95,7 @@ const ParamControlNetCollapse = () => {
           {controlNetsArray.map((c) => (
             <TabPanel key={`tabPanel_${c.controlNetId}`} sx={{ p: 0 }}>
               <ControlNet controlNet={c} />
+              {/* <ControlNetMini controlNet={c} /> */}
             </TabPanel>
           ))}
         </TabPanels>
