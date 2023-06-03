@@ -3,8 +3,8 @@ import IAICustomSelect from 'common/components/IAICustomSelect';
 import {
   CONTROLNET_MODELS,
   ControlNetModel,
-  controlNetModelChanged,
-} from 'features/controlNet/store/controlNetSlice';
+} from 'features/controlNet/store/constants';
+import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 
 type ParamIsControlNetModelProps = {

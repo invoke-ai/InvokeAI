@@ -71,7 +71,7 @@ import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSa
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
-import { addControlNetAutoProcessListener } from './listeners/controlNetProcessorParamsChanged';
+import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 
 export const listenerMiddleware = createListenerMiddleware();
 

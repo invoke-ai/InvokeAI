@@ -3,7 +3,7 @@ import IAIFullCheckbox from 'common/components/IAIFullCheckbox';
 import IAISwitch from 'common/components/IAISwitch';
 import {
   controlNetToggled,
-  isControlNetImageProcessedToggled,
+  isControlNetImagePreprocessedToggled,
 } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 
@@ -18,7 +18,7 @@ const ParamControlNetIsEnabled = (props: ParamControlNetIsEnabledProps) => {
 
   const handleIsControlImageProcessedToggled = useCallback(() => {
     dispatch(
-      isControlNetImageProcessedToggled({
+      isControlNetImagePreprocessedToggled({
         controlNetId,
       })
     );

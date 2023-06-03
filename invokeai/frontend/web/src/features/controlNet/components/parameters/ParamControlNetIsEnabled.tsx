@@ -13,7 +13,7 @@ const ParamControlNetIsEnabled = (props: ParamControlNetIsEnabledProps) => {
   const dispatch = useAppDispatch();
 
   const handleIsEnabledChanged = useCallback(() => {
-    dispatch(controlNetToggled(controlNetId));
+    dispatch(controlNetToggled({ controlNetId }));
   }, [dispatch, controlNetId]);
 
   return (

@@ -1,7 +1,7 @@
 import { memo, useCallback, useRef, useState } from 'react';
 import { ImageDTO } from 'services/api';
 import {
-  ControlNet,
+  ControlNetConfig,
   controlNetImageChanged,
   controlNetSelector,
 } from '../store/controlNetSlice';
@@ -24,7 +24,7 @@ const selector = createSelector(
 );
 
 type Props = {
-  controlNet: ControlNet;
+  controlNet: ControlNetConfig;
 };
 
 const ControlNetImagePreview = (props: Props) => {
@@ -32,7 +32,7 @@ const ControlNetImagePreview = (props: Props) => {
     controlNetId,
     controlImage,
     processedControlImage,
-    isControlImageProcessed,
+    isPreprocessed: isControlImageProcessed,
   } = props.controlNet;
   const dispatch = useAppDispatch();
   const { isProcessingControlImage } = useAppSelector(selector);
@@ -63,63 +63,62 @@ const ControlNetImagePreview = (props: Props) => {
       <IAIDndImage
         image={controlImage}
         onDrop={handleControlImageChanged}
-        isDropDisabled={Boolean(processedControlImage)}
+        isDropDisabled={Boolean(
+          processedControlImage && !isControlImageProcessed
+        )}
       />
       <AnimatePresence>
-        {controlImage &&
-          processedControlImage &&
-          shouldShowProcessedImage &&
-          !isProcessingControlImage && (
-            <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-                transition: { duration: 0.1 },
-              }}
-              exit={{
-                opacity: 0,
-                transition: { duration: 0.1 },
+        {shouldShowProcessedImage && (
+          <motion.div
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.1 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { duration: 0.1 },
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                w: 'full',
+                h: 'full',
+                top: 0,
+                insetInlineStart: 0,
               }}
             >
+              {shouldShowProcessedImageBackdrop && (
+                <Box
+                  sx={{
+                    w: 'full',
+                    h: 'full',
+                    bg: 'base.900',
+                    opacity: 0.7,
+                  }}
+                />
+              )}
               <Box
                 sx={{
                   position: 'absolute',
-                  w: 'full',
-                  h: 'full',
                   top: 0,
                   insetInlineStart: 0,
+                  w: 'full',
+                  h: 'full',
                 }}
               >
-                {shouldShowProcessedImageBackdrop && (
-                  <Box
-                    sx={{
-                      w: 'full',
-                      h: 'full',
-                      bg: 'base.900',
-                      opacity: 0.7,
-                    }}
-                  />
-                )}
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    insetInlineStart: 0,
-                    w: 'full',
-                    h: 'full',
-                  }}
-                >
-                  <IAIDndImage
-                    image={processedControlImage}
-                    onDrop={handleControlImageChanged}
-                    payloadImage={controlImage}
-                  />
-                </Box>
+                <IAIDndImage
+                  image={processedControlImage}
+                  onDrop={handleControlImageChanged}
+                  payloadImage={controlImage}
+                />
               </Box>
-            </motion.div>
-          )}
+            </Box>
+          </motion.div>
+        )}
       </AnimatePresence>
       {isProcessingControlImage && (
         <Box

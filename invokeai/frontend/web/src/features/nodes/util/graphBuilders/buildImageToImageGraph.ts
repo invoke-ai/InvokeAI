@@ -14,6 +14,7 @@ import {
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { log } from 'app/logging/useLogger';
 import { set } from 'lodash-es';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -407,6 +408,8 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
       },
     });
   }
+
+  addControlNetToLinearGraph(graph, LATENTS_TO_LATENTS, state);
 
   return graph;
 };

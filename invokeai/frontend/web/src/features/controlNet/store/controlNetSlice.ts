@@ -7,36 +7,27 @@ import {
   RequiredCannyImageProcessorInvocation,
   RequiredControlNetProcessorNode,
 } from './types';
-import { CONTROLNET_PROCESSORS } from './constants';
+import {
+  CONTROLNET_MODELS,
+  CONTROLNET_PROCESSORS,
+  ControlNetModel,
+} from './constants';
 import { controlNetImageProcessed } from './actions';
 
-export const CONTROLNET_MODELS = [
-  'lllyasviel/sd-controlnet-canny',
-  'lllyasviel/sd-controlnet-depth',
-  'lllyasviel/sd-controlnet-hed',
-  'lllyasviel/sd-controlnet-seg',
-  'lllyasviel/sd-controlnet-openpose',
-  'lllyasviel/sd-controlnet-scribble',
-  'lllyasviel/sd-controlnet-normal',
-  'lllyasviel/sd-controlnet-mlsd',
-];
-
-export type ControlNetModel = (typeof CONTROLNET_MODELS)[number];
-
-export const initialControlNet: Omit<ControlNet, 'controlNetId'> = {
+export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
   model: CONTROLNET_MODELS[0],
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
   controlImage: null,
-  isControlImageProcessed: false,
+  isPreprocessed: false,
   processedControlImage: null,
   processorNode: CONTROLNET_PROCESSORS.canny_image_processor
     .default as RequiredCannyImageProcessorInvocation,
 };
 
-export type ControlNet = {
+export type ControlNetConfig = {
   controlNetId: string;
   isEnabled: boolean;
   model: ControlNetModel;
@@ -44,22 +35,20 @@ export type ControlNet = {
   beginStepPct: number;
   endStepPct: number;
   controlImage: ImageDTO | null;
-  isControlImageProcessed: boolean;
+  isPreprocessed: boolean;
   processedControlImage: ImageDTO | null;
   processorNode: RequiredControlNetProcessorNode;
 };
 
 export type ControlNetState = {
-  controlNets: Record<string, ControlNet>;
+  controlNets: Record<string, ControlNetConfig>;
   isEnabled: boolean;
-  shouldAutoProcess: boolean;
   isProcessingControlImage: boolean;
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
-  shouldAutoProcess: true,
   isProcessingControlImage: false,
 };
 
@@ -72,7 +61,10 @@ export const controlNetSlice = createSlice({
     },
     controlNetAdded: (
       state,
-      action: PayloadAction<{ controlNetId: string; controlNet?: ControlNet }>
+      action: PayloadAction<{
+        controlNetId: string;
+        controlNet?: ControlNetConfig;
+      }>
     ) => {
       const { controlNetId, controlNet } = action.payload;
       state.controlNets[controlNetId] = {
@@ -91,12 +83,18 @@ export const controlNetSlice = createSlice({
         controlImage,
       };
     },
-    controlNetRemoved: (state, action: PayloadAction<string>) => {
-      const controlNetId = action.payload;
+    controlNetRemoved: (
+      state,
+      action: PayloadAction<{ controlNetId: string }>
+    ) => {
+      const { controlNetId } = action.payload;
       delete state.controlNets[controlNetId];
     },
-    controlNetToggled: (state, action: PayloadAction<string>) => {
-      const controlNetId = action.payload;
+    controlNetToggled: (
+      state,
+      action: PayloadAction<{ controlNetId: string }>
+    ) => {
+      const { controlNetId } = action.payload;
       state.controlNets[controlNetId].isEnabled =
         !state.controlNets[controlNetId].isEnabled;
     },
@@ -110,17 +108,20 @@ export const controlNetSlice = createSlice({
       const { controlNetId, controlImage } = action.payload;
       state.controlNets[controlNetId].controlImage = controlImage;
       state.controlNets[controlNetId].processedControlImage = null;
-      if (state.shouldAutoProcess && controlImage !== null) {
+      if (
+        controlImage !== null &&
+        !state.controlNets[controlNetId].isPreprocessed
+      ) {
         state.isProcessingControlImage = true;
       }
     },
-    isControlNetImageProcessedToggled: (
+    isControlNetImagePreprocessedToggled: (
       state,
-      action: PayloadAction<string>
+      action: PayloadAction<{ controlNetId: string }>
     ) => {
-      const controlNetId = action.payload;
-      state.controlNets[controlNetId].isControlImageProcessed =
-        !state.controlNets[controlNetId].isControlImageProcessed;
+      const { controlNetId } = action.payload;
+      state.controlNets[controlNetId].isPreprocessed =
+        !state.controlNets[controlNetId].isPreprocessed;
     },
     controlNetProcessedImageChanged: (
       state,
@@ -191,9 +192,6 @@ export const controlNetSlice = createSlice({
         processorType
       ].default as RequiredControlNetProcessorNode;
     },
-    shouldAutoProcessToggled: (state) => {
-      state.shouldAutoProcess = !state.shouldAutoProcess;
-    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -212,7 +210,7 @@ export const {
   controlNetAddedFromImage,
   controlNetRemoved,
   controlNetImageChanged,
-  isControlNetImageProcessedToggled,
+  isControlNetImagePreprocessedToggled,
   controlNetProcessedImageChanged,
   controlNetToggled,
   controlNetModelChanged,
@@ -221,7 +219,6 @@ export const {
   controlNetEndStepPctChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
-  shouldAutoProcessToggled,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

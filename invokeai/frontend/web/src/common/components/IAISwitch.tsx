@@ -36,9 +36,11 @@ const IAISwitch = (props: Props) => {
       alignItems="center"
       {...formControlProps}
     >
-      <FormLabel my={1} flexGrow={1} {...formLabelProps}>
-        {label}
-      </FormLabel>
+      {label && (
+        <FormLabel my={1} flexGrow={1} {...formLabelProps}>
+          {label}
+        </FormLabel>
+      )}
       <Switch {...rest} />
     </FormControl>
   );
