@@ -2,14 +2,18 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { AddInvocation } from '../models/AddInvocation';
+import type { CannyImageProcessorInvocation } from '../models/CannyImageProcessorInvocation';
 import type { CollectInvocation } from '../models/CollectInvocation';
 import type { CompelInvocation } from '../models/CompelInvocation';
+import type { ContentShuffleImageProcessorInvocation } from '../models/ContentShuffleImageProcessorInvocation';
+import type { ControlNetInvocation } from '../models/ControlNetInvocation';
 import type { CvInpaintInvocation } from '../models/CvInpaintInvocation';
 import type { DivideInvocation } from '../models/DivideInvocation';
 import type { Edge } from '../models/Edge';
 import type { Graph } from '../models/Graph';
 import type { GraphExecutionState } from '../models/GraphExecutionState';
 import type { GraphInvocation } from '../models/GraphInvocation';
+import type { HedImageprocessorInvocation } from '../models/HedImageprocessorInvocation';
 import type { ImageBlurInvocation } from '../models/ImageBlurInvocation';
 import type { ImageChannelInvocation } from '../models/ImageChannelInvocation';
 import type { ImageConvertInvocation } from '../models/ImageConvertInvocation';
@@ -18,6 +22,9 @@ import type { ImageInverseLerpInvocation } from '../models/ImageInverseLerpInvoc
 import type { ImageLerpInvocation } from '../models/ImageLerpInvocation';
 import type { ImageMultiplyInvocation } from '../models/ImageMultiplyInvocation';
 import type { ImagePasteInvocation } from '../models/ImagePasteInvocation';
+import type { ImageProcessorInvocation } from '../models/ImageProcessorInvocation';
+import type { ImageResizeInvocation } from '../models/ImageResizeInvocation';
+import type { ImageScaleInvocation } from '../models/ImageScaleInvocation';
 import type { ImageToImageInvocation } from '../models/ImageToImageInvocation';
 import type { ImageToLatentsInvocation } from '../models/ImageToLatentsInvocation';
 import type { InfillColorInvocation } from '../models/InfillColorInvocation';
@@ -27,12 +34,21 @@ import type { InpaintInvocation } from '../models/InpaintInvocation';
 import type { IterateInvocation } from '../models/IterateInvocation';
 import type { LatentsToImageInvocation } from '../models/LatentsToImageInvocation';
 import type { LatentsToLatentsInvocation } from '../models/LatentsToLatentsInvocation';
+import type { LineartAnimeImageProcessorInvocation } from '../models/LineartAnimeImageProcessorInvocation';
+import type { LineartImageProcessorInvocation } from '../models/LineartImageProcessorInvocation';
 import type { LoadImageInvocation } from '../models/LoadImageInvocation';
 import type { MaskFromAlphaInvocation } from '../models/MaskFromAlphaInvocation';
+import type { MediapipeFaceProcessorInvocation } from '../models/MediapipeFaceProcessorInvocation';
+import type { MidasDepthImageProcessorInvocation } from '../models/MidasDepthImageProcessorInvocation';
+import type { MlsdImageProcessorInvocation } from '../models/MlsdImageProcessorInvocation';
 import type { MultiplyInvocation } from '../models/MultiplyInvocation';
 import type { NoiseInvocation } from '../models/NoiseInvocation';
+import type { NormalbaeImageProcessorInvocation } from '../models/NormalbaeImageProcessorInvocation';
+import type { OpenposeImageProcessorInvocation } from '../models/OpenposeImageProcessorInvocation';
 import type { PaginatedResults_GraphExecutionState_ } from '../models/PaginatedResults_GraphExecutionState_';
+import type { ParamFloatInvocation } from '../models/ParamFloatInvocation';
 import type { ParamIntInvocation } from '../models/ParamIntInvocation';
+import type { PidiImageProcessorInvocation } from '../models/PidiImageProcessorInvocation';
 import type { RandomIntInvocation } from '../models/RandomIntInvocation';
 import type { RandomRangeInvocation } from '../models/RandomRangeInvocation';
 import type { RangeInvocation } from '../models/RangeInvocation';
@@ -45,6 +61,7 @@ import type { SubtractInvocation } from '../models/SubtractInvocation';
 import type { TextToImageInvocation } from '../models/TextToImageInvocation';
 import type { TextToLatentsInvocation } from '../models/TextToLatentsInvocation';
 import type { UpscaleInvocation } from '../models/UpscaleInvocation';
+import type { ZoeDepthImageProcessorInvocation } from '../models/ZoeDepthImageProcessorInvocation';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -154,7 +171,7 @@ export class SessionsService {
      * The id of the session
      */
     sessionId: string,
-    requestBody: (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
+    requestBody: (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageprocessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
   }): CancelablePromise<string> {
     return __request(OpenAPI, {
       method: 'POST',
@@ -191,7 +208,7 @@ export class SessionsService {
      * The path to the node in the graph
      */
     nodePath: string,
-    requestBody: (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
+    requestBody: (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageprocessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
   }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'PUT',

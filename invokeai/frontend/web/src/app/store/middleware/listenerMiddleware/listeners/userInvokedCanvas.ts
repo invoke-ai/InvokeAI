@@ -101,6 +101,7 @@ export const addUserInvokedCanvasListener = () => {
             formData: {
               file: new File([baseBlob], baseFilename, { type: 'image/png' }),
             },
+            imageCategory: 'general',
             isIntermediate: true,
           })
         );
@@ -115,7 +116,7 @@ export const addUserInvokedCanvasListener = () => {
         // Update the base node with the image name and type
         baseNode.image = {
           image_name: baseImageDTO.image_name,
-          image_type: baseImageDTO.image_type,
+          image_origin: baseImageDTO.image_origin,
         };
       }
 
@@ -127,6 +128,7 @@ export const addUserInvokedCanvasListener = () => {
             formData: {
               file: new File([maskBlob], maskFilename, { type: 'image/png' }),
             },
+            imageCategory: 'mask',
             isIntermediate: true,
           })
         );
@@ -141,7 +143,7 @@ export const addUserInvokedCanvasListener = () => {
         // Update the base node with the image name and type
         baseNode.mask = {
           image_name: maskImageDTO.image_name,
-          image_type: maskImageDTO.image_type,
+          image_origin: maskImageDTO.image_origin,
         };
       }
 
@@ -158,7 +160,7 @@ export const addUserInvokedCanvasListener = () => {
         dispatch(
           imageUpdated({
             imageName: baseNode.image.image_name,
-            imageType: baseNode.image.image_type,
+            imageOrigin: baseNode.image.image_origin,
             requestBody: { session_id: sessionId },
           })
         );
@@ -169,7 +171,7 @@ export const addUserInvokedCanvasListener = () => {
         dispatch(
           imageUpdated({
             imageName: baseNode.mask.image_name,
-            imageType: baseNode.mask.image_type,
+            imageOrigin: baseNode.mask.image_origin,
             requestBody: { session_id: sessionId },
           })
         );

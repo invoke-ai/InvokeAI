@@ -55,6 +55,8 @@ export const addCanvasMergedListener = () => {
           formData: {
             file: new File([blob], filename, { type: 'image/png' }),
           },
+          imageCategory: 'general',
+          isIntermediate: true,
         })
       );
 

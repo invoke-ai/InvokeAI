@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ConditioningField } from './ConditioningField';
+import type { ControlField } from './ControlField';
 import type { LatentsField } from './LatentsField';
 
 /**
@@ -46,5 +47,9 @@ export type TextToLatentsInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
+  /**
+   * The control to use
+   */
+  control?: (ControlField | Array<ControlField>);
 };
 

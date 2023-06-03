@@ -16,7 +16,7 @@ import { buildEdges } from '../edgeBuilders/buildEdges';
 import { log } from 'app/logging/useLogger';
 import { buildInpaintNode } from '../nodeBuilders/buildInpaintNode';
 
-const moduleLog = log.child({ namespace: 'buildCanvasGraph' });
+const moduleLog = log.child({ namespace: 'nodes' });
 
 const buildBaseNode = (
   nodeType: 'txt2img' | 'img2img' | 'inpaint' | 'outpaint',
@@ -26,18 +26,21 @@ const buildBaseNode = (
   | ImageToImageInvocation
   | InpaintInvocation
   | undefined => {
-  const dimensionsOverride = state.canvas.boundingBoxDimensions;
+  const overrides = {
+    ...state.canvas.boundingBoxDimensions,
+    is_intermediate: true,
+  };
 
   if (nodeType === 'txt2img') {
-    return buildTxt2ImgNode(state, dimensionsOverride);
+    return buildTxt2ImgNode(state, overrides);
   }
 
   if (nodeType === 'img2img') {
-    return buildImg2ImgNode(state, dimensionsOverride);
+    return buildImg2ImgNode(state, overrides);
   }
 
   if (nodeType === 'inpaint' || nodeType === 'outpaint') {
-    return buildInpaintNode(state, dimensionsOverride);
+    return buildInpaintNode(state, overrides);
   }
 };
 
@@ -77,18 +80,23 @@ export const buildCanvasGraphComponents = async (
       infillMethod,
     } = state.generation;
 
-    // generationParameters.invert_mask = shouldPreserveMaskedArea;
-    // if (boundingBoxScale !== 'none') {
-    //   generationParameters.inpaint_width = scaledBoundingBoxDimensions.width;
-    //   generationParameters.inpaint_height = scaledBoundingBoxDimensions.height;
-    // }
+    const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } =
+      state.canvas;
+
+    if (boundingBoxScaleMethod !== 'none') {
+      baseNode.inpaint_width = scaledBoundingBoxDimensions.width;
+      baseNode.inpaint_height = scaledBoundingBoxDimensions.height;
+    }
+
     baseNode.seam_size = seamSize;
     baseNode.seam_blur = seamBlur;
     baseNode.seam_strength = seamStrength;
     baseNode.seam_steps = seamSteps;
-    baseNode.tile_size = tileSize;
     baseNode.infill_method = infillMethod as InpaintInvocation['infill_method'];
-    // baseNode.force_outpaint = false;
+
+    if (infillMethod === 'tile') {
+      baseNode.tile_size = tileSize;
+    }
   }
 
   // We always range and iterate nodes, no matter the iteration count

@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual, isString } from 'lodash-es';
+import { isEqual } from 'lodash-es';
 
 import {
   ButtonGroup,
@@ -25,8 +25,8 @@ import {
 } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
-  setShouldHidePreview,
   setShouldShowImageDetails,
+  setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -37,23 +37,19 @@ import {
   FaDownload,
   FaExpand,
   FaExpandArrowsAlt,
-  FaEye,
-  FaEyeSlash,
   FaGrinStars,
+  FaHourglassHalf,
   FaQuoteRight,
   FaSeedling,
   FaShare,
   FaShareAlt,
-  FaTrash,
-  FaWrench,
 } from 'react-icons/fa';
 import { gallerySelector } from '../store/gallerySelectors';
-import DeleteImageModal from './DeleteImageModal';
 import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useParameters } from 'features/parameters/hooks/useParameters';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import {
   requestedImageDeletion,
@@ -62,7 +58,6 @@ import {
 } from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
-import { allParametersSet } from 'features/parameters/store/generationSlice';
 import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 import { useAppToaster } from 'app/components/Toaster';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
@@ -90,7 +85,11 @@ const currentImageButtonsSelector = createSelector(
 
     const { isLightboxOpen } = lightbox;
 
-    const { shouldShowImageDetails, shouldHidePreview } = ui;
+    const {
+      shouldShowImageDetails,
+      shouldHidePreview,
+      shouldShowProgressInViewer,
+    } = ui;
 
     const { selectedImage } = gallery;
 
@@ -112,6 +111,7 @@ const currentImageButtonsSelector = createSelector(
       seed: selectedImage?.metadata?.seed,
       prompt: selectedImage?.metadata?.positive_conditioning,
       negativePrompt: selectedImage?.metadata?.negative_conditioning,
+      shouldShowProgressInViewer,
     };
   },
   {
@@ -145,6 +145,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     image,
     canDeleteImage,
     shouldConfirmOnDelete,
+    shouldShowProgressInViewer,
   } = useAppSelector(currentImageButtonsSelector);
 
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
@@ -163,7 +164,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const { recallPrompt, recallSeed, recallAllParameters } = useParameters();
+  const { recallBothPrompts, recallSeed, recallAllParameters } =
+    useRecallParameters();
 
   // const handleCopyImage = useCallback(async () => {
   //   if (!image?.url) {
@@ -229,10 +231,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     });
   }, [toaster, shouldTransformUrls, getUrl, t, image]);
 
-  const handlePreviewVisibility = useCallback(() => {
-    dispatch(setShouldHidePreview(!shouldHidePreview));
-  }, [dispatch, shouldHidePreview]);
-
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(image);
   }, [image, recallAllParameters]);
@@ -252,11 +250,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('s', handleUseSeed, [image]);
 
   const handleUsePrompt = useCallback(() => {
-    recallPrompt(
+    recallBothPrompts(
       image?.metadata?.positive_conditioning,
       image?.metadata?.negative_conditioning
     );
-  }, [image, recallPrompt]);
+  }, [image, recallBothPrompts]);
 
   useHotkeys('p', handleUsePrompt, [image]);
 
@@ -386,6 +384,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     }
   }, [shouldConfirmOnDelete, onDeleteDialogOpen, handleDelete]);
 
+  const handleClickProgressImagesToggle = useCallback(() => {
+    dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
+  }, [dispatch, shouldShowProgressInViewer]);
+
   useHotkeys('delete', handleInitiateDelete, [
     image,
     shouldConfirmOnDelete,
@@ -412,8 +414,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           <IAIPopover
             triggerComponent={
               <IAIIconButton
-                isDisabled={!image}
                 aria-label={`${t('parameters.sendTo')}...`}
+                tooltip={`${t('parameters.sendTo')}...`}
+                isDisabled={!image}
                 icon={<FaShareAlt />}
               />
             }
@@ -458,28 +461,17 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link download={true} href={getUrl(image?.image_url ?? '')}>
+              <Link
+                download={true}
+                href={getUrl(image?.image_url ?? '')}
+                target="_blank"
+              >
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>
               </Link>
             </Flex>
           </IAIPopover>
-          {/* <IAIIconButton
-            icon={shouldHidePreview ? <FaEyeSlash /> : <FaEye />}
-            tooltip={
-              !shouldHidePreview
-                ? t('parameters.hidePreview')
-                : t('parameters.showPreview')
-            }
-            aria-label={
-              !shouldHidePreview
-                ? t('parameters.hidePreview')
-                : t('parameters.showPreview')
-            }
-            isChecked={shouldHidePreview}
-            onClick={handlePreviewVisibility}
-          /> */}
           {isLightboxEnabled && (
             <IAIIconButton
               icon={<FaExpand />}
@@ -601,6 +593,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             aria-label={`${t('parameters.info')} (I)`}
             isChecked={shouldShowImageDetails}
             onClick={handleClickShowImageDetails}
+          />
+        </ButtonGroup>
+
+        <ButtonGroup isAttached={true}>
+          <IAIIconButton
+            aria-label={t('settings.displayInProgress')}
+            tooltip={t('settings.displayInProgress')}
+            icon={<FaHourglassHalf />}
+            isChecked={shouldShowProgressInViewer}
+            onClick={handleClickProgressImagesToggle}
           />
         </ButtonGroup>
 

@@ -22,6 +22,14 @@ class IntCollectionOutput(BaseInvocationOutput):
     # Outputs
     collection: list[int] = Field(default=[], description="The int collection")
 
+class FloatCollectionOutput(BaseInvocationOutput):
+    """A collection of floats"""
+
+    type: Literal["float_collection"] = "float_collection"
+
+    # Outputs
+    collection: list[float] = Field(default=[], description="The float collection")
+
 
 class RangeInvocation(BaseInvocation):
     """Creates a range of numbers from start to stop with step"""

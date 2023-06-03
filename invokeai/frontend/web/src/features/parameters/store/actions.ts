@@ -1,10 +1,10 @@
 import { createAction } from '@reduxjs/toolkit';
 import { isObject } from 'lodash-es';
-import { ImageDTO, ImageType } from 'services/api';
+import { ImageDTO, ResourceOrigin } from 'services/api';
 
-export type ImageNameAndType = {
+export type ImageNameAndOrigin = {
   image_name: string;
-  image_type: ImageType;
+  image_origin: ResourceOrigin;
 };
 
 export const isImageDTO = (image: any): image is ImageDTO => {
@@ -13,8 +13,8 @@ export const isImageDTO = (image: any): image is ImageDTO => {
     isObject(image) &&
     'image_name' in image &&
     image?.image_name !== undefined &&
-    'image_type' in image &&
-    image?.image_type !== undefined &&
+    'image_origin' in image &&
+    image?.image_origin !== undefined &&
     'image_url' in image &&
     image?.image_url !== undefined &&
     'thumbnail_url' in image &&
@@ -26,6 +26,6 @@ export const isImageDTO = (image: any): image is ImageDTO => {
   );
 };
 
-export const initialImageSelected = createAction<
-  ImageDTO | ImageNameAndType | undefined
->('generation/initialImageSelected');
+export const initialImageSelected = createAction<ImageDTO | string | undefined>(
+  'generation/initialImageSelected'
+);

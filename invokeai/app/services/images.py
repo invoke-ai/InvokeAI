@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
 from logging import Logger
 from typing import Optional, TYPE_CHECKING, Union
-import uuid
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.models.image import (
     ImageCategory,
-    ImageType,
+    ResourceOrigin,
     InvalidImageCategoryException,
-    InvalidImageTypeException,
+    InvalidOriginException,
 )
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.services.image_record_storage import (
@@ -16,6 +15,7 @@ from invokeai.app.services.image_record_storage import (
     ImageRecordNotFoundException,
     ImageRecordSaveException,
     ImageRecordStorageBase,
+    OffsetPaginatedResults,
 )
 from invokeai.app.services.models.image_record import (
     ImageRecord,
@@ -31,6 +31,7 @@ from invokeai.app.services.image_file_storage import (
 )
 from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
+from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class ImageServiceABC(ABC):
     def create(
         self,
         image: PILImageType,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -56,7 +57,7 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def update(
         self,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_name: str,
         changes: ImageRecordChanges,
     ) -> ImageDTO:
@@ -64,22 +65,22 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
+    def get_pil_image(self, image_origin: ResourceOrigin, image_name: str) -> PILImageType:
         """Gets an image as a PIL image."""
         pass
 
     @abstractmethod
-    def get_record(self, image_type: ImageType, image_name: str) -> ImageRecord:
+    def get_record(self, image_origin: ResourceOrigin, image_name: str) -> ImageRecord:
         """Gets an image record."""
         pass
 
     @abstractmethod
-    def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
+    def get_dto(self, image_origin: ResourceOrigin, image_name: str) -> ImageDTO:
         """Gets an image DTO."""
         pass
 
     @abstractmethod
-    def get_path(self, image_type: ImageType, image_name: str) -> str:
+    def get_path(self, image_origin: ResourceOrigin, image_name: str) -> str:
         """Gets an image's path."""
         pass
 
@@ -90,7 +91,7 @@ class ImageServiceABC(ABC):
 
     @abstractmethod
     def get_url(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
     ) -> str:
         """Gets an image's or thumbnail's URL."""
         pass
@@ -98,16 +99,17 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        page: int = 0,
-        per_page: int = 10,
-    ) -> PaginatedResults[ImageDTO]:
+        offset: int = 0,
+        limit: int = 10,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+    ) -> OffsetPaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs."""
         pass
 
     @abstractmethod
-    def delete(self, image_type: ImageType, image_name: str):
+    def delete(self, image_origin: ResourceOrigin, image_name: str):
         """Deletes an image."""
         pass
 
@@ -120,6 +122,7 @@ class ImageServiceDependencies:
     metadata: MetadataServiceBase
     urls: UrlServiceBase
     logger: Logger
+    names: NameServiceBase
     graph_execution_manager: ItemStorageABC["GraphExecutionState"]
 
     def __init__(
@@ -129,6 +132,7 @@ class ImageServiceDependencies:
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
+        names: NameServiceBase,
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
         self.records = image_record_storage
@@ -136,6 +140,7 @@ class ImageServiceDependencies:
         self.metadata = metadata
         self.urls = url
         self.logger = logger
+        self.names = names
         self.graph_execution_manager = graph_execution_manager
 
 
@@ -149,6 +154,7 @@ class ImageService(ImageServiceABC):
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
+        names: NameServiceBase,
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
         self._services = ImageServiceDependencies(
@@ -157,30 +163,26 @@ class ImageService(ImageServiceABC):
             metadata=metadata,
             url=url,
             logger=logger,
+            names=names,
             graph_execution_manager=graph_execution_manager,
         )
 
     def create(
         self,
         image: PILImageType,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         is_intermediate: bool = False,
     ) -> ImageDTO:
-        if image_type not in ImageType:
-            raise InvalidImageTypeException
+        if image_origin not in ResourceOrigin:
+            raise InvalidOriginException
 
         if image_category not in ImageCategory:
             raise InvalidImageCategoryException
 
-        image_name = self._create_image_name(
-            image_type=image_type,
-            image_category=image_category,
-            node_id=node_id,
-            session_id=session_id,
-        )
+        image_name = self._services.names.create_image_name()
 
         metadata = self._get_metadata(session_id, node_id)
 
@@ -191,7 +193,7 @@ class ImageService(ImageServiceABC):
             created_at = self._services.records.save(
                 # Non-nullable fields
                 image_name=image_name,
-                image_type=image_type,
+                image_origin=image_origin,
                 image_category=image_category,
                 width=width,
                 height=height,
@@ -204,21 +206,21 @@ class ImageService(ImageServiceABC):
             )
 
             self._services.files.save(
-                image_type=image_type,
+                image_origin=image_origin,
                 image_name=image_name,
                 image=image,
                 metadata=metadata,
             )
 
-            image_url = self._services.urls.get_image_url(image_type, image_name)
+            image_url = self._services.urls.get_image_url(image_origin, image_name)
             thumbnail_url = self._services.urls.get_image_url(
-                image_type, image_name, True
+                image_origin, image_name, True
             )
 
             return ImageDTO(
                 # Non-nullable fields
                 image_name=image_name,
-                image_type=image_type,
+                image_origin=image_origin,
                 image_category=image_category,
                 width=width,
                 height=height,
@@ -247,24 +249,23 @@ class ImageService(ImageServiceABC):
 
     def update(
         self,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_name: str,
         changes: ImageRecordChanges,
     ) -> ImageDTO:
         try:
-            self._services.records.update(image_name, image_type, changes)
-            return self.get_dto(image_type, image_name)
+            self._services.records.update(image_name, image_origin, changes)
+            return self.get_dto(image_origin, image_name)
         except ImageRecordSaveException:
             self._services.logger.error("Failed to update image record")
             raise
         except Exception as e:
             self._services.logger.error("Problem updating image record")
             raise e
-        
 
-    def get_pil_image(self, image_type: ImageType, image_name: str) -> PILImageType:
+    def get_pil_image(self, image_origin: ResourceOrigin, image_name: str) -> PILImageType:
         try:
-            return self._services.files.get(image_type, image_name)
+            return self._services.files.get(image_origin, image_name)
         except ImageFileNotFoundException:
             self._services.logger.error("Failed to get image file")
             raise
@@ -272,9 +273,9 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image file")
             raise e
 
-    def get_record(self, image_type: ImageType, image_name: str) -> ImageRecord:
+    def get_record(self, image_origin: ResourceOrigin, image_name: str) -> ImageRecord:
         try:
-            return self._services.records.get(image_type, image_name)
+            return self._services.records.get(image_origin, image_name)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
             raise
@@ -282,14 +283,14 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image record")
             raise e
 
-    def get_dto(self, image_type: ImageType, image_name: str) -> ImageDTO:
+    def get_dto(self, image_origin: ResourceOrigin, image_name: str) -> ImageDTO:
         try:
-            image_record = self._services.records.get(image_type, image_name)
+            image_record = self._services.records.get(image_origin, image_name)
 
             image_dto = image_record_to_dto(
                 image_record,
-                self._services.urls.get_image_url(image_type, image_name),
-                self._services.urls.get_image_url(image_type, image_name, True),
+                self._services.urls.get_image_url(image_origin, image_name),
+                self._services.urls.get_image_url(image_origin, image_name, True),
             )
 
             return image_dto
@@ -301,10 +302,10 @@ class ImageService(ImageServiceABC):
             raise e
 
     def get_path(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
     ) -> str:
         try:
-            return self._services.files.get_path(image_type, image_name, thumbnail)
+            return self._services.files.get_path(image_origin, image_name, thumbnail)
         except Exception as e:
             self._services.logger.error("Problem getting image path")
             raise e
@@ -317,57 +318,58 @@ class ImageService(ImageServiceABC):
             raise e
 
     def get_url(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
     ) -> str:
         try:
-            return self._services.urls.get_image_url(image_type, image_name, thumbnail)
+            return self._services.urls.get_image_url(image_origin, image_name, thumbnail)
         except Exception as e:
             self._services.logger.error("Problem getting image path")
             raise e
 
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        page: int = 0,
-        per_page: int = 10,
-    ) -> PaginatedResults[ImageDTO]:
+        offset: int = 0,
+        limit: int = 10,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+    ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self._services.records.get_many(
-                image_type,
-                image_category,
-                page,
-                per_page,
+                offset,
+                limit,
+                image_origin,
+                categories,
+                is_intermediate,
             )
 
             image_dtos = list(
                 map(
                     lambda r: image_record_to_dto(
                         r,
-                        self._services.urls.get_image_url(image_type, r.image_name),
+                        self._services.urls.get_image_url(r.image_origin, r.image_name),
                         self._services.urls.get_image_url(
-                            image_type, r.image_name, True
+                            r.image_origin, r.image_name, True
                         ),
                     ),
                     results.items,
                 )
             )
 
-            return PaginatedResults[ImageDTO](
+            return OffsetPaginatedResults[ImageDTO](
                 items=image_dtos,
-                page=results.page,
-                pages=results.pages,
-                per_page=results.per_page,
+                offset=results.offset,
+                limit=results.limit,
                 total=results.total,
             )
         except Exception as e:
             self._services.logger.error("Problem getting paginated image DTOs")
             raise e
 
-    def delete(self, image_type: ImageType, image_name: str):
+    def delete(self, image_origin: ResourceOrigin, image_name: str):
         try:
-            self._services.files.delete(image_type, image_name)
-            self._services.records.delete(image_type, image_name)
+            self._services.files.delete(image_origin, image_name)
+            self._services.records.delete(image_origin, image_name)
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image record")
             raise
@@ -377,21 +379,6 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self._services.logger.error("Problem deleting image record and file")
             raise e
-
-    def _create_image_name(
-        self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        node_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-    ) -> str:
-        """Create a unique image name."""
-        uuid_str = str(uuid.uuid4())
-
-        if node_id is not None and session_id is not None:
-            return f"{image_type.value}_{image_category.value}_{session_id}_{node_id}_{uuid_str}.png"
-
-        return f"{image_type.value}_{image_category.value}_{uuid_str}.png"
 
     def _get_metadata(
         self, session_id: Optional[str] = None, node_id: Optional[str] = None

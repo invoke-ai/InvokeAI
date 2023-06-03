@@ -1,5 +1,3 @@
-import { ResultsImageDTO } from 'features/gallery/store/resultsSlice';
-import { UploadsImageDTO } from 'features/gallery/store/uploadsSlice';
 import { get, isObject, isString } from 'lodash-es';
 import {
   GraphExecutionState,
@@ -9,17 +7,10 @@ import {
   PromptOutput,
   IterateInvocationOutput,
   CollectInvocationOutput,
-  ImageType,
   ImageField,
   LatentsOutput,
-  ImageDTO,
+  ResourceOrigin,
 } from 'services/api';
-
-export const isUploadsImageDTO = (image: ImageDTO): image is UploadsImageDTO =>
-  image.image_type === 'uploads';
-
-export const isResultsImageDTO = (image: ImageDTO): image is ResultsImageDTO =>
-  image.image_type === 'results';
 
 export const isImageOutput = (
   output: GraphExecutionState['results'][string]
@@ -49,10 +40,10 @@ export const isCollectOutput = (
   output: GraphExecutionState['results'][string]
 ): output is CollectInvocationOutput => output.type === 'collect_output';
 
-export const isImageType = (t: unknown): t is ImageType =>
-  isString(t) && ['results', 'uploads', 'intermediates'].includes(t);
+export const isResourceOrigin = (t: unknown): t is ResourceOrigin =>
+  isString(t) && ['internal', 'external'].includes(t);
 
 export const isImageField = (imageField: unknown): imageField is ImageField =>
   isObject(imageField) &&
   isString(get(imageField, 'image_name')) &&
-  isImageType(get(imageField, 'image_type'));
+  isResourceOrigin(get(imageField, 'image_origin'));

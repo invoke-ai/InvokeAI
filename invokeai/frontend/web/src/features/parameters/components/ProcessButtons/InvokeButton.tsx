@@ -7,6 +7,7 @@ import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
+import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -43,38 +44,55 @@ export default function InvokeButton(props: InvokeButton) {
   );
 
   return (
-    <Box style={{ flexGrow: 4 }}>
-      {iconButton ? (
-        <IAIIconButton
-          aria-label={t('parameters.invoke')}
-          type="submit"
-          icon={<FaPlay />}
-          isDisabled={!isReady}
-          onClick={handleInvoke}
-          flexGrow={1}
-          w="100%"
-          tooltip={t('parameters.invoke')}
-          tooltipProps={{ placement: 'bottom' }}
-          colorScheme="accent"
-          id="invoke-button"
-          {...rest}
-        />
-      ) : (
-        <IAIButton
-          aria-label={t('parameters.invoke')}
-          type="submit"
-          isDisabled={!isReady}
-          onClick={handleInvoke}
-          flexGrow={1}
-          w="100%"
-          colorScheme="accent"
-          id="invoke-button"
-          fontWeight={700}
-          {...rest}
-        >
-          Invoke
-        </IAIButton>
-      )}
+    <Box style={{ flexGrow: 4 }} position="relative">
+      <Box style={{ position: 'relative' }}>
+        {!isReady && (
+          <Box
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '100%',
+              overflow: 'clip',
+              borderRadius: 4,
+            }}
+          >
+            <ProgressBar />
+          </Box>
+        )}
+        {iconButton ? (
+          <IAIIconButton
+            aria-label={t('parameters.invoke')}
+            type="submit"
+            icon={<FaPlay />}
+            isDisabled={!isReady}
+            onClick={handleInvoke}
+            flexGrow={1}
+            w="100%"
+            tooltip={t('parameters.invoke')}
+            tooltipProps={{ placement: 'bottom' }}
+            colorScheme="accent"
+            id="invoke-button"
+            {...rest}
+          />
+        ) : (
+          <IAIButton
+            aria-label={t('parameters.invoke')}
+            type="submit"
+            isDisabled={!isReady}
+            onClick={handleInvoke}
+            flexGrow={1}
+            w="100%"
+            colorScheme="accent"
+            id="invoke-button"
+            fontWeight={700}
+            {...rest}
+          >
+            Invoke
+          </IAIButton>
+        )}
+      </Box>
     </Box>
   );
 }
