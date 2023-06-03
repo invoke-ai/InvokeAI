@@ -12,7 +12,7 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { configSelector } from '../../../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
-import IAIDndImage from 'features/controlNet/components/parameters/IAISelectableImage';
+import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 

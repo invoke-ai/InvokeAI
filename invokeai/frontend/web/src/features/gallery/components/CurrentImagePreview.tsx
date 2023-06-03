@@ -12,7 +12,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import { configSelector } from '../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
-import IAIDndImage from 'features/controlNet/components/parameters/IAISelectableImage';
+import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 

@@ -19,9 +19,7 @@ import { FaImage, FaTimes } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
 
-const PLACEHOLDER_MIN_HEIGHT = 36;
-
-type IAISelectableImageProps = {
+type IAIDndImageProps = {
   image: ImageDTO | null | undefined;
   onDrop: (image: ImageDTO) => void;
   onReset?: () => void;
@@ -34,9 +32,10 @@ type IAISelectableImageProps = {
   isDropDisabled?: boolean;
   fallback?: ReactElement;
   payloadImage?: ImageDTO | null | undefined;
+  minSize?: number;
 };
 
-const IAIDndImage = (props: IAISelectableImageProps) => {
+const IAIDndImage = (props: IAIDndImageProps) => {
   const {
     image,
     onDrop,
@@ -49,6 +48,7 @@ const IAIDndImage = (props: IAISelectableImageProps) => {
     isDragDisabled = false,
     fallback = <IAIImageFallback />,
     payloadImage,
+    minSize = 36,
   } = props;
   const dndId = useRef(uuidv4());
   const { getUrl } = useGetUrl();
@@ -86,8 +86,9 @@ const IAIDndImage = (props: IAISelectableImageProps) => {
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
-        minW: 36,
-        minH: 36,
+        minW: minSize,
+        minH: minSize,
+        userSelect: 'none',
       }}
       {...attributes}
       {...listeners}
@@ -144,7 +145,7 @@ const IAIDndImage = (props: IAISelectableImageProps) => {
         <>
           <Flex
             sx={{
-              minH: PLACEHOLDER_MIN_HEIGHT,
+              minH: minSize,
               bg: 'base.850',
               w: 'full',
               h: 'full',

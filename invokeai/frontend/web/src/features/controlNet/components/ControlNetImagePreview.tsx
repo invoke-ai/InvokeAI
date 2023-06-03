@@ -6,7 +6,7 @@ import {
 } from '../store/controlNetSlice';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { Box } from '@chakra-ui/react';
-import IAIDndImage from './parameters/IAISelectableImage';
+import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
