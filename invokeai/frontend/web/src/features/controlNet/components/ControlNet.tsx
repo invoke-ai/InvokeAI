@@ -1,4 +1,19 @@
+import {
+  Box,
+  Checkbox,
+  Flex,
+  FormControl,
+  FormLabel,
+  HStack,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+} from '@chakra-ui/react';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
   ControlNetConfig,
   controlNetAdded,
@@ -6,34 +21,19 @@ import {
   controlNetToggled,
   isControlNetImagePreprocessedToggled,
 } from '../store/controlNetSlice';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
-import {
-  Checkbox,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  TabList,
-  TabPanels,
-  Tabs,
-  Tab,
-  TabPanel,
-  Box,
-} from '@chakra-ui/react';
-import { FaCopy, FaTrash } from 'react-icons/fa';
 
-import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
-import ControlNetImagePreview from './ControlNetImagePreview';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { v4 as uuidv4 } from 'uuid';
-import { useToggle } from 'react-use';
-import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
-import ControlNetProcessorComponent from './ControlNetProcessorComponent';
-import ControlNetPreprocessButton from './ControlNetPreprocessButton';
 import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
+import { useToggle } from 'react-use';
+import { v4 as uuidv4 } from 'uuid';
+import ControlNetImagePreview from './ControlNetImagePreview';
+import ControlNetPreprocessButton from './ControlNetPreprocessButton';
+import ControlNetProcessorComponent from './ControlNetProcessorComponent';
+import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
+import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 
 type ControlNetProps = {
   controlNet: ControlNetConfig;
@@ -117,19 +117,6 @@ const ControlNet = (props: ControlNetProps) => {
       {isEnabled && (
         <>
           <Flex sx={{ gap: 4 }}>
-            {!shouldShowAdvanced && (
-              <Flex
-                sx={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  h: 32,
-                  w: 32,
-                  aspectRatio: '1/1',
-                }}
-              >
-                <ControlNetImagePreview controlNet={props.controlNet} />
-              </Flex>
-            )}
             <Flex
               sx={{
                 flexDir: 'column',
@@ -137,13 +124,13 @@ const ControlNet = (props: ControlNetProps) => {
                 w: 'full',
                 paddingInlineEnd: 2,
                 pb: shouldShowAdvanced ? 0 : 2,
-                justifyContent: 'space-between',
               }}
             >
               <Flex
                 sx={{
-                  justifyContent: 'space-between',
-                  w: 'full',
+                  w: 'max-content',
+                  columnGap: 4,
+                  p: 2,
                 }}
               >
                 <FormControl>
@@ -165,17 +152,41 @@ const ControlNet = (props: ControlNetProps) => {
                   </HStack>
                 </FormControl>
               </Flex>
-              <ParamControlNetWeight
-                controlNetId={controlNetId}
-                weight={weight}
-                mini
-              />
-              <ParamControlNetBeginEnd
-                controlNetId={controlNetId}
-                beginStepPct={beginStepPct}
-                endStepPct={endStepPct}
-                mini
-              />
+              <Flex
+                sx={{
+                  w: 'full',
+                  justifyContent: 'space-between',
+                  columnGap: 6,
+                  p: 2,
+                }}
+              >
+                <Flex sx={{ flexDirection: 'column', w: 'full' }}>
+                  <ParamControlNetWeight
+                    controlNetId={controlNetId}
+                    weight={weight}
+                    mini
+                  />
+                  <ParamControlNetBeginEnd
+                    controlNetId={controlNetId}
+                    beginStepPct={beginStepPct}
+                    endStepPct={endStepPct}
+                    mini
+                  />
+                </Flex>
+                {!shouldShowAdvanced && (
+                  <Flex
+                    sx={{
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      h: 24,
+                      w: 24,
+                      aspectRatio: '1/1',
+                    }}
+                  >
+                    <ControlNetImagePreview controlNet={props.controlNet} />
+                  </Flex>
+                )}
+              </Flex>
             </Flex>
           </Flex>
           {shouldShowAdvanced && (
