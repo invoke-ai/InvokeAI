@@ -14,10 +14,14 @@ import curses
 import os
 import sys
 from argparse import Namespace
+from collections import deque
+from multiprocessing import Process
+from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
 from typing import List
 
+import logging
 import npyscreen
 import torch
 from npyscreen import widget
@@ -36,12 +40,14 @@ from ...backend.install.model_install_backend import (
 )
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
+from ...backend.util.logging import InvokeAILogger, InvokeAILogFormatter
 from .widgets import (
     CenteredTitleText,
     MultiSelectColumns,
     SingleSelectColumns,
     OffsetButtonPress,
     TextBox,
+    BufferBox,
     set_min_terminal_size,
 )
 from invokeai.app.services.config import get_invokeai_config
@@ -52,7 +58,6 @@ MIN_LINES = 50
 
 config = get_invokeai_config()
 
-
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
     # FIX_MINIMUM_SIZE_WHEN_CREATED = False
@@ -62,7 +67,13 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
+        super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
+    def create(self):
+        self.keypress_timeout = 10
+        self.counter = 0
+        self.subprocess_connection = None
+        
         model_manager = ModelManager(config.model_conf_path)
         
         self.initial_models = OmegaConf.load(Dataset_path)['diffusers']
@@ -74,11 +85,10 @@ class addModelsForm(npyscreen.FormMultiPage):
             self.existing_models = OmegaConf.load(default_config_file())
         except:
             self.existing_models = dict()
+            
         self.starter_model_list = list(self.initial_models.keys())
         self.installed_models = dict()
-        super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
-    def create(self):
         window_width, window_height = get_terminal_size()
 
         self.nextrely -= 1
@@ -124,7 +134,19 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely = top_of_table
         self.ti_models = self.add_tis()
                 
-        self.nextrely = bottom_of_table
+        self.nextrely = bottom_of_table+1
+
+        self.monitor = self.add_widget_intelligent(
+            BufferBox,
+            name='Log Messages',
+            editable=False,
+            max_height = 20,
+        )
+        # self.monitor = self.add_widget_intelligent(
+        #     npyscreen.BufferPager,
+        #     editable=False,
+        #     max_height = 20,
+        # )
         
         self.nextrely += 1
         done_label = "INSTALL/REMOVE"
@@ -148,7 +170,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             offset=+3,
             relx=button_offset + 1 + (window_width - button_length) // 2,
             rely=-3,
-            when_pressed_function=self.on_ok,
+            when_pressed_function=self.on_execute
         )
 
         self.cancel = self.add_widget_intelligent(
@@ -164,6 +186,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             self.tabs.h_cursor_line_down(1)
         self._toggle_tables([self.current_tab])
 
+    ############# diffusers tab ##########        
     def add_diffusers(self)->dict[str, npyscreen.widget]:
         '''Add widgets responsible for selecting diffusers models'''
         widgets = dict()
@@ -273,7 +296,7 @@ class addModelsForm(npyscreen.FormMultiPage):
             
         return widgets
 
-
+    ############# controlnet tab ##########        
     def add_controlnets(self)->dict[str, npyscreen.widget]:
         widgets = dict()
         cn_model_list = sorted(self.installed_cn_models.keys())
@@ -329,6 +352,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         )
         return widgets
 
+    ############# LoRA tab ############
     # TO DO - create generic function for loras and textual inversions
     def add_loras(self)->dict[str,npyscreen.widget]:
         widgets = dict()
@@ -387,6 +411,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         )
         return widgets
 
+    ############# Textual Inversion tab ############
     def add_tis(self)->dict[str, npyscreen.widget]:
         widgets = dict()
         model_list = sorted(self.installed_ti_models.keys())
@@ -498,6 +523,27 @@ class addModelsForm(npyscreen.FormMultiPage):
         )
         return min(cols, len(self.installed_models))
 
+    def on_execute(self):
+        self.monitor.entry_widget.buffer(['Installing...'],scroll_end=True)
+        self.marshall_arguments()
+        app = self.parentApp
+        self.display()
+        
+        # for communication with the subprocess
+        parent_conn, child_conn = Pipe()
+        p = Process(
+            target = process_and_execute,
+            kwargs=dict(
+                opt = app.opt,
+                selections = app.user_selections,
+                conn_out = child_conn,
+            )
+        )
+        p.start()
+        child_conn.close()
+        self.subprocess_connection = parent_conn
+        # process_and_execute(app.opt, app.user_selections)
+
     def on_ok(self):
         self.parentApp.setNextForm(None)
         self.editing = False
@@ -512,6 +558,27 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.parentApp.setNextForm(None)
         self.parentApp.user_cancelled = True
         self.editing = False
+
+    def while_waiting(self):
+        if c := self.subprocess_connection:
+            while c.poll():
+                try:
+                    data = c.recv_bytes().decode('utf-8')
+                    data.strip('\n')
+                    if data=='*done*':
+                        self.subprocess_connection = None
+                        self.monitor.entry_widget.buffer(['** Action Complete **'])
+                        self.display()
+                        # this is crazy
+                        self.parentApp.main_form = self.parentApp.addForm(
+                            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
+                        )
+                        self.parentApp.switchForm('NEW')
+                        return
+                    self.monitor.entry_widget.buffer([data])
+                    self.display()
+                except (EOFError,OSError):
+                    self.subprocess_connection = None
 
     def marshall_arguments(self):
         """
@@ -609,8 +676,9 @@ class UserSelections():
     import_model_paths: str=None
         
 class AddModelApplication(npyscreen.NPSAppManaged):
-    def __init__(self):
+    def __init__(self,opt):
         super().__init__()
+        self.opt = opt
         self.user_cancelled = False
         self.user_selections = UserSelections()
 
@@ -620,9 +688,28 @@ class AddModelApplication(npyscreen.NPSAppManaged):
             "MAIN", addModelsForm, name="Install Stable Diffusion Models"
         )
 
+class StderrToMessage():
+    def __init__(self, connection: Connection):
+        self.connection = connection
 
+    def write(self, data:str):
+        self.connection.send_bytes(data.encode('utf-8'))
+
+    def flush(self):
+        pass
+        
 # --------------------------------------------------------
-def process_and_execute(opt: Namespace, selections: Namespace):
+def process_and_execute(opt: Namespace,
+                        selections: Namespace,
+                        conn_out: Connection=None,
+                        ):
+    # set up so that stderr is sent to conn_out
+    if conn_out:
+        translator = StderrToMessage(conn_out)
+        sys.stderr = translator
+        sys.stdout = translator
+        InvokeAILogger.getLogger().handlers[0]=logging.StreamHandler(translator)
+    
     models_to_install = selections.install_models
     models_to_remove = selections.remove_models
     directory_to_scan = selections.scan_directory
@@ -643,6 +730,10 @@ def process_and_execute(opt: Namespace, selections: Namespace):
         config_file_path=Path(opt.config_file) if opt.config_file else None,
     )
 
+    if conn_out:
+        conn_out.send_bytes('*done*'.encode('utf-8'))
+        conn_out.close()
+
 
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
@@ -662,8 +753,11 @@ def select_and_download_models(opt: Namespace):
             precision=precision,
         )
     else:
+        # needed because the torch library is loaded, even though we don't use it
+        torch.multiprocessing.set_start_method("spawn")
+        
         set_min_terminal_size(MIN_COLS, MIN_LINES)
-        installApp = AddModelApplication()
+        installApp = AddModelApplication(opt)
         installApp.run()
         process_and_execute(opt, installApp.user_selections)
 

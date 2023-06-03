@@ -31,7 +31,7 @@ IAILogger.debug('this is a debugging message')
 """
 
 import logging
-
+import sys
 
 # module level functions
 def debug(msg, *args, **kwargs):
@@ -92,7 +92,6 @@ class InvokeAILogFormatter(logging.Formatter):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt, datefmt="%d-%m-%Y %H:%M:%S")
         return formatter.format(record)
-
 
 class InvokeAILogger(object):
     loggers = dict()

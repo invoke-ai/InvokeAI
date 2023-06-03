@@ -223,3 +223,6 @@ class TextBox(npyscreen.MultiLineEdit):
         self.width -= 1
         super().update(clear=False)
         (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
+
+class BufferBox(npyscreen.BoxTitle):
+    _contained_widget = npyscreen.BufferPager
