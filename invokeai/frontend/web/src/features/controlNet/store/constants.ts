@@ -166,14 +166,21 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
 };
 
 export const CONTROLNET_MODELS = [
-  'lllyasviel/sd-controlnet-canny',
-  'lllyasviel/sd-controlnet-depth',
-  'lllyasviel/sd-controlnet-hed',
-  'lllyasviel/sd-controlnet-seg',
-  'lllyasviel/sd-controlnet-openpose',
-  'lllyasviel/sd-controlnet-scribble',
-  'lllyasviel/sd-controlnet-normal',
-  'lllyasviel/sd-controlnet-mlsd',
+  'lllyasviel/control_v11p_sd15_canny',
+  'lllyasviel/control_v11p_sd15_inpaint',
+  'lllyasviel/control_v11p_sd15_mlsd',
+  'lllyasviel/control_v11f1p_sd15_depth',
+  'lllyasviel/control_v11p_sd15_normalbae',
+  'lllyasviel/control_v11p_sd15_seg',
+  'lllyasviel/control_v11p_sd15_lineart',
+  'lllyasviel/control_v11p_sd15s2_lineart_anime',
+  'lllyasviel/control_v11p_sd15_scribble',
+  'lllyasviel/control_v11p_sd15_softedge',
+  'lllyasviel/control_v11e_sd15_shuffle',
+  'lllyasviel/control_v11p_sd15_openpose',
+  'lllyasviel/control_v11f1e_sd15_tile',
+  'lllyasviel/control_v11e_sd15_ip2p',
+  'CrucibleAI/ControlNetMediaPipeFace',
 ];
 
 export type ControlNetModel = (typeof CONTROLNET_MODELS)[number];
@@ -182,9 +189,15 @@ export const CONTROLNET_MODEL_MAP: Record<
   ControlNetModel,
   ControlNetProcessorType
 > = {
-  'lllyasviel/sd-controlnet-canny': 'canny_image_processor',
-  'lllyasviel/sd-controlnet-depth': 'midas_depth_image_processor',
-  'lllyasviel/sd-controlnet-hed': 'hed_image_processor',
-  'lllyasviel/sd-controlnet-openpose': 'openpose_image_processor',
-  'lllyasviel/sd-controlnet-mlsd': 'mlsd_image_processor',
+  'lllyasviel/control_v11p_sd15_canny': 'canny_image_processor',
+  'lllyasviel/control_v11p_sd15_mlsd': 'mlsd_image_processor',
+  'lllyasviel/control_v11f1p_sd15_depth': 'midas_depth_image_processor',
+  'lllyasviel/control_v11p_sd15_normalbae': 'normalbae_image_processor',
+  'lllyasviel/control_v11p_sd15_lineart': 'lineart_image_processor',
+  'lllyasviel/control_v11p_sd15s2_lineart_anime':
+    'lineart_anime_image_processor',
+  'lllyasviel/control_v11p_sd15_softedge': 'hed_image_processor',
+  'lllyasviel/control_v11e_sd15_shuffle': 'content_shuffle_image_processor',
+  'lllyasviel/control_v11p_sd15_openpose': 'openpose_image_processor',
+  'CrucibleAI/ControlNetMediaPipeFace': 'mediapipe_face_processor',
 };
