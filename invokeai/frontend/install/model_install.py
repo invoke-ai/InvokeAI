@@ -14,7 +14,6 @@ import curses
 import os
 import sys
 from argparse import Namespace
-from collections import deque
 from multiprocessing import Process
 from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
@@ -28,7 +27,6 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
-from dataclasses import dataclass,field
 
 from ...backend.install.model_install_backend import (
     Dataset_path,
@@ -37,10 +35,11 @@ from ...backend.install.model_install_backend import (
     install_requested_models,
     recommended_datasets,
     ModelInstallList,
+    UserSelections,
 )
 from ...backend import ModelManager
 from ...backend.util import choose_precision, choose_torch_device
-from ...backend.util.logging import InvokeAILogger, InvokeAILogFormatter
+from ...backend.util.logging import InvokeAILogger
 from .widgets import (
     CenteredTitleText,
     MultiSelectColumns,
@@ -54,7 +53,7 @@ from invokeai.app.services.config import get_invokeai_config
 
 # minimum size for the UI
 MIN_COLS = 120
-MIN_LINES = 50
+MIN_LINES = 52
 
 config = get_invokeai_config()
 
@@ -140,13 +139,8 @@ class addModelsForm(npyscreen.FormMultiPage):
             BufferBox,
             name='Log Messages',
             editable=False,
-            max_height = 20,
+            max_height = 15,
         )
-        # self.monitor = self.add_widget_intelligent(
-        #     npyscreen.BufferPager,
-        #     editable=False,
-        #     max_height = 20,
-        # )
         
         self.nextrely += 1
         done_label = "INSTALL/REMOVE"
@@ -661,22 +655,6 @@ class addModelsForm(npyscreen.FormMultiPage):
         # URLs and the like
         selections.import_model_paths = self.diffusers_models['download_ids'].value.split()
 
-
-@dataclass
-class UserSelections():
-    install_models: List[str]= field(default_factory=list)
-    remove_models: List[str]=field(default_factory=list)
-    purge_deleted_models: bool=field(default_factory=list)
-    install_cn_models: List[str] = field(default_factory=list)
-    remove_cn_models: List[str] = field(default_factory=list)
-    install_lora_models: List[str] = field(default_factory=list)
-    remove_lora_models: List[str] = field(default_factory=list)
-    install_ti_models: List[str] = field(default_factory=list)
-    remove_ti_models: List[str] = field(default_factory=list)
-    scan_directory: Path = None
-    autoscan_on_startup: bool=False
-    import_model_paths: str=None
-        
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self,opt):
         super().__init__()

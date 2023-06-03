@@ -12,6 +12,7 @@ from tempfile import TemporaryFile
 from typing import List, Dict
 
 import requests
+from dataclasses import dataclass,field
 from diffusers import AutoencoderKL
 from huggingface_hub import hf_hub_url, HfFolder
 from omegaconf import OmegaConf
@@ -56,6 +57,21 @@ class ModelInstallList:
     install_models: List[str]
     remove_models: List[str]
 
+@dataclass
+class UserSelections():
+    install_models: List[str]= field(default_factory=list)
+    remove_models: List[str]=field(default_factory=list)
+    purge_deleted_models: bool=field(default_factory=list)
+    install_cn_models: List[str] = field(default_factory=list)
+    remove_cn_models: List[str] = field(default_factory=list)
+    install_lora_models: List[str] = field(default_factory=list)
+    remove_lora_models: List[str] = field(default_factory=list)
+    install_ti_models: List[str] = field(default_factory=list)
+    remove_ti_models: List[str] = field(default_factory=list)
+    scan_directory: Path = None
+    autoscan_on_startup: bool=False
+    import_model_paths: str=None
+        
 def default_config_file():
     return config.model_conf_path
 

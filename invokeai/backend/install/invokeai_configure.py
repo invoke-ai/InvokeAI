@@ -49,6 +49,7 @@ from invokeai.backend.install.model_install_backend import (
     download_from_hf,
     hf_download_with_resume,
     recommended_datasets,
+    UserSelections,
 )
 from invokeai.app.services.config import (
     get_invokeai_config,
@@ -636,9 +637,9 @@ def default_startup_options(init_file: Path) -> Namespace:
         opts.nsfw_checker = True
     return opts
 
-def default_user_selections(program_opts: Namespace) -> Namespace:
-    return Namespace(
-        starter_models=default_dataset()
+def default_user_selections(program_opts: Namespace) -> UserSelections:
+    return UserSelections(
+        install_models=default_dataset()
         if program_opts.default_only
         else recommended_datasets()
         if program_opts.yes_to_all
@@ -646,8 +647,6 @@ def default_user_selections(program_opts: Namespace) -> Namespace:
         purge_deleted_models=False,
         scan_directory=None,
         autoscan_on_startup=None,
-        import_model_paths=None,
-        convert_to_diffusers=None,
     )
 
 
