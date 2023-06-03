@@ -4,7 +4,6 @@ import {
   controlNetAdded,
   controlNetRemoved,
   controlNetToggled,
-  isControlNetImagePreprocessedToggled,
 } from '../store/controlNetSlice';
 import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
@@ -22,7 +21,7 @@ import {
   TabPanel,
   Box,
 } from '@chakra-ui/react';
-import { FaCopy, FaTrash } from 'react-icons/fa';
+import { FaCopy, FaPlus, FaTrash, FaWrench } from 'react-icons/fa';
 
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ControlNetImagePreview from './ControlNetImagePreview';
@@ -34,6 +33,7 @@ import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ControlNetPreprocessButton from './ControlNetPreprocessButton';
 import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
+import { ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 
 type ControlNetProps = {
   controlNet: ControlNetConfig;
@@ -48,12 +48,12 @@ const ControlNet = (props: ControlNetProps) => {
     beginStepPct,
     endStepPct,
     controlImage,
-    isPreprocessed,
     processedControlImage,
     processorNode,
+    processorType,
   } = props.controlNet;
   const dispatch = useAppDispatch();
-  const [shouldShowAdvanced, onToggleAdvanced] = useToggle(true);
+  const [shouldShowAdvanced, onToggleAdvanced] = useToggle(false);
 
   const handleDelete = useCallback(() => {
     dispatch(controlNetRemoved({ controlNetId }));
@@ -69,23 +69,20 @@ const ControlNet = (props: ControlNetProps) => {
     dispatch(controlNetToggled({ controlNetId }));
   }, [controlNetId, dispatch]);
 
-  const handleToggleIsPreprocessed = useCallback(() => {
-    dispatch(isControlNetImagePreprocessedToggled({ controlNetId }));
-  }, [controlNetId, dispatch]);
-
   return (
     <Flex
       sx={{
         flexDir: 'column',
         gap: 2,
-        p: 2,
+        p: 3,
         bg: 'base.850',
         borderRadius: 'base',
       }}
     >
       <Flex sx={{ gap: 2 }}>
         <IAISwitch
-          aria-label="Toggle ControlNet"
+          tooltip="Toggle"
+          aria-label="Toggle"
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
         />
@@ -103,18 +100,37 @@ const ControlNet = (props: ControlNetProps) => {
         </Box>
         <IAIIconButton
           size="sm"
-          tooltip="Duplicate ControlNet"
-          aria-label="Duplicate ControlNet"
+          tooltip="Duplicate"
+          aria-label="Duplicate"
           onClick={handleDuplicate}
           icon={<FaCopy />}
         />
         <IAIIconButton
           size="sm"
-          tooltip="Delete ControlNet"
-          aria-label="Delete ControlNet"
+          tooltip="Delete"
+          aria-label="Delete"
           colorScheme="error"
           onClick={handleDelete}
           icon={<FaTrash />}
+        />
+        <IAIIconButton
+          size="sm"
+          aria-label="Expand"
+          onClick={onToggleAdvanced}
+          variant="link"
+          icon={
+            <ChevronUpIcon
+              sx={{
+                boxSize: 4,
+                color: 'base.300',
+                transform: shouldShowAdvanced
+                  ? 'rotate(0deg)'
+                  : 'rotate(180deg)',
+                transitionProperty: 'common',
+                transitionDuration: 'normal',
+              }}
+            />
+          }
         />
       </Flex>
       {isEnabled && (
@@ -125,38 +141,13 @@ const ControlNet = (props: ControlNetProps) => {
                 flexDir: 'column',
                 gap: 2,
                 w: 'full',
-                h: 32,
-                paddingInlineStart: 2,
-                paddingInlineEnd: shouldShowAdvanced ? 2 : 0,
+                h: 24,
+                paddingInlineStart: 1,
+                paddingInlineEnd: shouldShowAdvanced ? 1 : 0,
                 pb: 2,
                 justifyContent: 'space-between',
               }}
             >
-              <Flex
-                sx={{
-                  justifyContent: 'space-between',
-                  w: 'full',
-                }}
-              >
-                <FormControl>
-                  <HStack>
-                    <Checkbox
-                      isChecked={isPreprocessed}
-                      onChange={handleToggleIsPreprocessed}
-                    />
-                    <FormLabel>Preprocessed</FormLabel>
-                  </HStack>
-                </FormControl>
-                <FormControl>
-                  <HStack>
-                    <Checkbox
-                      isChecked={shouldShowAdvanced}
-                      onChange={onToggleAdvanced}
-                    />
-                    <FormLabel>Advanced</FormLabel>
-                  </HStack>
-                </FormControl>
-              </Flex>
               <ParamControlNetWeight
                 controlNetId={controlNetId}
                 weight={weight}
@@ -174,8 +165,8 @@ const ControlNet = (props: ControlNetProps) => {
                 sx={{
                   alignItems: 'center',
                   justifyContent: 'center',
-                  h: 32,
-                  w: 32,
+                  h: 24,
+                  w: 24,
                   aspectRatio: '1/1',
                 }}
               >
@@ -188,18 +179,14 @@ const ControlNet = (props: ControlNetProps) => {
               <Box pt={2}>
                 <ControlNetImagePreview controlNet={props.controlNet} />
               </Box>
-              {!isPreprocessed && (
-                <>
-                  <ParamControlNetProcessorSelect
-                    controlNetId={controlNetId}
-                    processorNode={processorNode}
-                  />
-                  <ControlNetProcessorComponent
-                    controlNetId={controlNetId}
-                    processorNode={processorNode}
-                  />
-                </>
-              )}
+              <ParamControlNetProcessorSelect
+                controlNetId={controlNetId}
+                processorNode={processorNode}
+              />
+              <ControlNetProcessorComponent
+                controlNetId={controlNetId}
+                processorNode={processorNode}
+              />
             </>
           )}
         </>

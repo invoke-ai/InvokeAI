@@ -28,12 +28,8 @@ type Props = {
 };
 
 const ControlNetImagePreview = (props: Props) => {
-  const {
-    controlNetId,
-    controlImage,
-    processedControlImage,
-    isPreprocessed: isControlImageProcessed,
-  } = props.controlNet;
+  const { controlNetId, controlImage, processedControlImage, processorType } =
+    props.controlNet;
   const dispatch = useAppDispatch();
   const { isProcessingControlImage } = useAppSelector(selector);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,7 +52,7 @@ const ControlNetImagePreview = (props: Props) => {
     processedControlImage &&
     !isMouseOverImage &&
     !isProcessingControlImage &&
-    !isControlImageProcessed;
+    processorType !== 'none';
 
   return (
     <Box ref={containerRef} sx={{ position: 'relative', w: 'full', h: 'full' }}>
@@ -64,7 +60,7 @@ const ControlNetImagePreview = (props: Props) => {
         image={controlImage}
         onDrop={handleControlImageChanged}
         isDropDisabled={Boolean(
-          processedControlImage && !isControlImageProcessed
+          processedControlImage && processorType !== 'none'
         )}
       />
       <AnimatePresence>

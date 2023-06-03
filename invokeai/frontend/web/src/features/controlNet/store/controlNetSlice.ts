@@ -21,8 +21,8 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   beginStepPct: 0,
   endStepPct: 1,
   controlImage: null,
-  isPreprocessed: false,
   processedControlImage: null,
+  processorType: 'canny_image_processor',
   processorNode: CONTROLNET_PROCESSORS.canny_image_processor
     .default as RequiredCannyImageProcessorInvocation,
 };
@@ -35,8 +35,8 @@ export type ControlNetConfig = {
   beginStepPct: number;
   endStepPct: number;
   controlImage: ImageDTO | null;
-  isPreprocessed: boolean;
   processedControlImage: ImageDTO | null;
+  processorType: ControlNetProcessorType;
   processorNode: RequiredControlNetProcessorNode;
 };
 
@@ -110,18 +110,10 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId].processedControlImage = null;
       if (
         controlImage !== null &&
-        !state.controlNets[controlNetId].isPreprocessed
+        state.controlNets[controlNetId].processorType !== 'none'
       ) {
         state.isProcessingControlImage = true;
       }
-    },
-    isControlNetImagePreprocessedToggled: (
-      state,
-      action: PayloadAction<{ controlNetId: string }>
-    ) => {
-      const { controlNetId } = action.payload;
-      state.controlNets[controlNetId].isPreprocessed =
-        !state.controlNets[controlNetId].isPreprocessed;
     },
     controlNetProcessedImageChanged: (
       state,
@@ -188,6 +180,7 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, processorType } = action.payload;
+      state.controlNets[controlNetId].processorType = processorType;
       state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
         processorType
       ].default as RequiredControlNetProcessorNode;
@@ -210,7 +203,6 @@ export const {
   controlNetAddedFromImage,
   controlNetRemoved,
   controlNetImageChanged,
-  isControlNetImagePreprocessedToggled,
   controlNetProcessedImageChanged,
   controlNetToggled,
   controlNetModelChanged,

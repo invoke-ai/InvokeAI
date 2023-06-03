@@ -6,7 +6,6 @@ import {
   controlNetImageChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
-  isControlNetImagePreprocessedToggled,
 } from 'features/controlNet/store/controlNetSlice';
 import { RootState } from 'app/store/store';
 
@@ -16,25 +15,22 @@ const predicate = (action: AnyAction, state: RootState) => {
   const isActionMatched =
     controlNetProcessorParamsChanged.match(action) ||
     controlNetImageChanged.match(action) ||
-    controlNetProcessorTypeChanged.match(action) ||
-    isControlNetImagePreprocessedToggled.match(action);
+    controlNetProcessorTypeChanged.match(action);
 
   if (!isActionMatched) {
     return false;
   }
 
-  const { controlNetId } = action.payload;
+  const { controlImage, processorType } =
+    state.controlNet.controlNets[action.payload.controlNetId];
 
-  const shouldAutoProcess =
-    !state.controlNet.controlNets[controlNetId].isPreprocessed;
+  const isProcessorSelected = processorType !== 'none';
 
   const isBusy = state.system.isProcessing;
 
-  const hasControlImage = Boolean(
-    state.controlNet.controlNets[controlNetId].controlImage
-  );
+  const hasControlImage = Boolean(controlImage);
 
-  return shouldAutoProcess && !isBusy && hasControlImage;
+  return isProcessorSelected && !isBusy && hasControlImage;
 };
 
 /**
