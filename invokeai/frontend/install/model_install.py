@@ -569,11 +569,13 @@ class addModelsForm(npyscreen.FormMultiPage):
                         self.subprocess_connection = None
                         self.monitor.entry_widget.buffer(['** Action Complete **'])
                         self.display()
-                        # this is crazy
+                        # rebuild the form, saving log messages
+                        saved_messages = self.monitor.entry_widget.values
                         self.parentApp.main_form = self.parentApp.addForm(
                             "MAIN", addModelsForm, name="Install Stable Diffusion Models"
                         )
-                        self.parentApp.switchForm('NEW')
+                        self.parentApp.switchForm('MAIN')
+                        self.parentApp.main_form.monitor.entry_widget.values = saved_messages
                         return
                     self.monitor.entry_widget.buffer([data])
                     self.display()

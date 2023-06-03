@@ -865,7 +865,7 @@ class ModelManager(object):
                     model_config_file = self.globals.legacy_conf_path / "v1-inference.yaml"
                 elif model_type == SDLegacyType.V1_INPAINT:
                     self.logger.debug("SD-v1 inpainting model detected")
-                    model_config_file = self.globals.legacy_conf_path / "v1-inpainting-inference.yaml",
+                    model_config_file = self.globals.legacy_conf_path / "v1-inpainting-inference.yaml"
                 elif model_type == SDLegacyType.V2_v:
                     self.logger.debug("SD-v2-v model detected")
                     model_config_file = self.globals.legacy_conf_path / "v2-inference-v.yaml"
