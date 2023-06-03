@@ -8,7 +8,7 @@ import {
 import { memo, useCallback } from 'react';
 
 import { FieldComponentProps } from './types';
-import IAIDndImage from 'features/controlNet/components/parameters/IAISelectableImage';
+import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { Flex } from '@chakra-ui/react';
 
