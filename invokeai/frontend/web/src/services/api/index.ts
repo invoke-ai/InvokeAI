@@ -49,6 +49,8 @@ export type { ImageOutput } from './models/ImageOutput';
 export type { ImagePasteInvocation } from './models/ImagePasteInvocation';
 export type { ImageProcessorInvocation } from './models/ImageProcessorInvocation';
 export type { ImageRecordChanges } from './models/ImageRecordChanges';
+export type { ImageResizeInvocation } from './models/ImageResizeInvocation';
+export type { ImageScaleInvocation } from './models/ImageScaleInvocation';
 export type { ImageToImageInvocation } from './models/ImageToImageInvocation';
 export type { ImageToLatentsInvocation } from './models/ImageToLatentsInvocation';
 export type { ImageUrlsDTO } from './models/ImageUrlsDTO';

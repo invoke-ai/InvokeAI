@@ -6,7 +6,6 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
@@ -19,16 +18,15 @@ interface InvokeButton
   iconButton?: boolean;
 }
 
-export default function InvokeButton(props: InvokeButton) {
+export default function NodeInvokeButton(props: InvokeButton) {
   const { iconButton = false, ...rest } = props;
   const dispatch = useAppDispatch();
   const { isReady } = useAppSelector(readinessSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleInvoke = useCallback(() => {
-    dispatch(clampSymmetrySteps());
-    dispatch(userInvoked(activeTabName));
-  }, [dispatch, activeTabName]);
+    dispatch(userInvoked('nodes'));
+  }, [dispatch]);
 
   const { t } = useTranslation();
 

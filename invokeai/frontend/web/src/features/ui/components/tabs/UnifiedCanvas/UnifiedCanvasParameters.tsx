@@ -2,7 +2,6 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import ParamSeedCollapse from 'features/parameters/components/Parameters/Seed/ParamSeedCollapse';
 import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
-import ParamBoundingBoxCollapse from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxCollapse';
 import ParamInfillAndScalingCollapse from 'features/parameters/components/Parameters/Canvas/InfillAndScaling/ParamInfillAndScalingCollapse';
 import ParamSeamCorrectionCollapse from 'features/parameters/components/Parameters/Canvas/SeamCorrection/ParamSeamCorrectionCollapse';
 import UnifiedCanvasCoreParameters from './UnifiedCanvasCoreParameters';
@@ -20,7 +19,6 @@ const UnifiedCanvasParameters = () => {
       <ParamSeedCollapse />
       <ParamVariationCollapse />
       <ParamSymmetryCollapse />
-      <ParamBoundingBoxCollapse />
       <ParamSeamCorrectionCollapse />
       <ParamInfillAndScalingCollapse />
     </>
