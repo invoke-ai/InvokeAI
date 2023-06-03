@@ -1,8 +1,8 @@
 import { Checkbox, CheckboxProps, Text } from '@chakra-ui/react';
-import { memo, ReactNode } from 'react';
+import { memo, ReactElement } from 'react';
 
 type IAISimpleCheckboxProps = CheckboxProps & {
-  label: string | ReactNode;
+  label: string | ReactElement;
 };
 
 const IAISimpleCheckbox = (props: IAISimpleCheckboxProps) => {

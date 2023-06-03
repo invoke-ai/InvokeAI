@@ -58,11 +58,7 @@ const ControlNet = (props: ControlNetProps) => {
 
   return (
     <Flex sx={{ flexDir: 'column', gap: 3 }}>
-      <ControlNetImagePreview
-        controlNetId={controlNetId}
-        controlImage={controlImage}
-        processedControlImage={processedControlImage}
-      />
+      <ControlNetImagePreview controlNet={props.controlNet} />
       <ParamControlNetModel controlNetId={controlNetId} model={model} />
       <Tabs
         isFitted

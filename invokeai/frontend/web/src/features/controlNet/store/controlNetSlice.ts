@@ -72,11 +72,11 @@ export const controlNetSlice = createSlice({
     },
     controlNetAdded: (
       state,
-      action: PayloadAction<{ controlNetId: string }>
+      action: PayloadAction<{ controlNetId: string; controlNet?: ControlNet }>
     ) => {
-      const { controlNetId } = action.payload;
+      const { controlNetId, controlNet } = action.payload;
       state.controlNets[controlNetId] = {
-        ...initialControlNet,
+        ...(controlNet ?? initialControlNet),
         controlNetId,
       };
     },
@@ -116,11 +116,9 @@ export const controlNetSlice = createSlice({
     },
     isControlNetImageProcessedToggled: (
       state,
-      action: PayloadAction<{
-        controlNetId: string;
-      }>
+      action: PayloadAction<string>
     ) => {
-      const { controlNetId } = action.payload;
+      const controlNetId = action.payload;
       state.controlNets[controlNetId].isControlImageProcessed =
         !state.controlNets[controlNetId].isControlImageProcessed;
     },

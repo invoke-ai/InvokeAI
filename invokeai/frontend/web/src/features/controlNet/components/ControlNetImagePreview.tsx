@@ -1,6 +1,7 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { ImageDTO } from 'services/api';
 import {
+  ControlNet,
   controlNetImageChanged,
   controlNetSelector,
 } from '../store/controlNetSlice';
@@ -11,6 +12,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { useHoverDirty } from 'react-use';
 
 const selector = createSelector(
   controlNetSelector,
@@ -22,18 +24,21 @@ const selector = createSelector(
 );
 
 type Props = {
-  controlNetId: string;
-  controlImage: ImageDTO | null;
-  processedControlImage: ImageDTO | null;
+  controlNet: ControlNet;
 };
 
 const ControlNetImagePreview = (props: Props) => {
-  const { controlNetId, controlImage, processedControlImage } = props;
+  const {
+    controlNetId,
+    controlImage,
+    processedControlImage,
+    isControlImageProcessed,
+  } = props.controlNet;
   const dispatch = useAppDispatch();
   const { isProcessingControlImage } = useAppSelector(selector);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const [shouldShowProcessedImage, setShouldShowProcessedImage] =
-    useState(true);
+  const isMouseOverImage = useHoverDirty(containerRef);
 
   const handleControlImageChanged = useCallback(
     (controlImage: ImageDTO) => {
@@ -46,12 +51,15 @@ const ControlNetImagePreview = (props: Props) => {
     Number(controlImage?.width) > Number(processedControlImage?.width) ||
     Number(controlImage?.height) > Number(processedControlImage?.height);
 
+  const shouldShowProcessedImage =
+    controlImage &&
+    processedControlImage &&
+    !isMouseOverImage &&
+    !isProcessingControlImage &&
+    !isControlImageProcessed;
+
   return (
-    <Box
-      sx={{ position: 'relative', h: 'inherit' }}
-      onMouseOver={() => setShouldShowProcessedImage(false)}
-      onMouseOut={() => setShouldShowProcessedImage(true)}
-    >
+    <Box ref={containerRef} sx={{ position: 'relative', w: 'full', h: 'full' }}>
       <IAIDndImage
         image={controlImage}
         onDrop={handleControlImageChanged}

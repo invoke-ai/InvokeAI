@@ -1,29 +1,26 @@
 import { memo, useCallback } from 'react';
 import {
   ControlNet,
-  controlNetProcessedImageChanged,
+  controlNetAdded,
   controlNetRemoved,
+  controlNetToggled,
+  isControlNetImageProcessedToggled,
 } from '../store/controlNetSlice';
 import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 import {
-  Box,
+  Checkbox,
   Flex,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-  Text,
+  FormControl,
+  FormLabel,
+  HStack,
 } from '@chakra-ui/react';
-import IAIButton from 'common/components/IAIButton';
-import { FaUndo } from 'react-icons/fa';
-import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
-import ControlNetProcessorComponent from './ControlNetProcessorComponent';
-import ControlNetPreprocessButton from './ControlNetPreprocessButton';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ControlNetImagePreview from './ControlNetImagePreview';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { v4 as uuidv4 } from 'uuid';
 
 type ControlNetProps = {
   controlNet: ControlNet;
@@ -43,56 +40,111 @@ const ControlNet = (props: ControlNetProps) => {
     processorNode,
   } = props.controlNet;
   const dispatch = useAppDispatch();
-  const handleReset = useCallback(() => {
-    dispatch(
-      controlNetProcessedImageChanged({
-        controlNetId,
-        processedControlImage: null,
-      })
-    );
+
+  const handleDelete = useCallback(() => {
+    dispatch(controlNetRemoved(controlNetId));
   }, [controlNetId, dispatch]);
 
-  const handleControlNetRemoved = useCallback(() => {
-    dispatch(controlNetRemoved(controlNetId));
+  const handleDuplicate = useCallback(() => {
+    dispatch(
+      controlNetAdded({ controlNetId: uuidv4(), controlNet: props.controlNet })
+    );
+  }, [dispatch, props.controlNet]);
+
+  const handleToggleIsEnabled = useCallback(() => {
+    dispatch(controlNetToggled(controlNetId));
+  }, [controlNetId, dispatch]);
+
+  const handleToggleIsPreprocessed = useCallback(() => {
+    dispatch(isControlNetImageProcessedToggled(controlNetId));
   }, [controlNetId, dispatch]);
 
   return (
     <Flex
       sx={{
-        gap: 4,
-        p: 2,
-        paddingInlineEnd: 4,
-        bg: 'base.850',
-        borderRadius: 'base',
+        flexDir: 'column',
+        gap: 2,
       }}
     >
+      <HStack>
+        <ParamControlNetModel controlNetId={controlNetId} model={model} />
+        <IAIIconButton
+          size="sm"
+          tooltip="Duplicate ControlNet"
+          aria-label="Duplicate ControlNet"
+          onClick={handleDuplicate}
+          icon={<FaCopy />}
+        />
+        <IAIIconButton
+          size="sm"
+          tooltip="Delete ControlNet"
+          aria-label="Delete ControlNet"
+          colorScheme="error"
+          onClick={handleDelete}
+          icon={<FaTrash />}
+        />
+      </HStack>
       <Flex
         sx={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          h: 36,
-          w: 36,
+          gap: 4,
+          paddingInlineEnd: 2,
         }}
       >
-        <ControlNetImagePreview
-          controlNetId={controlNetId}
-          controlImage={controlImage}
-          processedControlImage={processedControlImage}
-        />
-      </Flex>
-      <Flex sx={{ flexDir: 'column', gap: 2, w: 'full', h: 'full' }}>
-        <ParamControlNetModel controlNetId={controlNetId} model={model} />
-        <ParamControlNetWeight
-          controlNetId={controlNetId}
-          weight={weight}
-          mini
-        />
-        <ParamControlNetBeginEnd
-          controlNetId={controlNetId}
-          beginStepPct={beginStepPct}
-          endStepPct={endStepPct}
-          mini
-        />
+        <Flex
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            h: 32,
+            w: 32,
+            aspectRatio: '1/1',
+          }}
+        >
+          <ControlNetImagePreview controlNet={props.controlNet} />
+        </Flex>
+        <Flex
+          sx={{
+            flexDir: 'column',
+            gap: 2,
+            w: 'full',
+            justifyContent: 'space-between',
+          }}
+        >
+          <ParamControlNetWeight
+            controlNetId={controlNetId}
+            weight={weight}
+            mini
+          />
+          <ParamControlNetBeginEnd
+            controlNetId={controlNetId}
+            beginStepPct={beginStepPct}
+            endStepPct={endStepPct}
+            mini
+          />
+          <Flex
+            sx={{
+              justifyContent: 'space-between',
+            }}
+          >
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={isEnabled}
+                  onChange={handleToggleIsEnabled}
+                />
+                <FormLabel>Enabled</FormLabel>
+              </HStack>
+            </FormControl>
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={isControlImageProcessed}
+                  onChange={handleToggleIsPreprocessed}
+                />
+                <FormLabel>Preprocessed</FormLabel>
+              </HStack>
+            </FormControl>
+          </Flex>
+        </Flex>
       </Flex>
     </Flex>
   );
