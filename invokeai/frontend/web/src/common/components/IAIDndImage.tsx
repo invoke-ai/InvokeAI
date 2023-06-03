@@ -89,6 +89,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         minW: minSize,
         minH: minSize,
         userSelect: 'none',
+        cursor: 'grab',
       }}
       {...attributes}
       {...listeners}
