@@ -4,11 +4,12 @@ import {
   Icon,
   IconButtonProps,
   Image,
-  Spinner,
   Text,
 } from '@chakra-ui/react';
-import { useDroppable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { useCombinedRefs } from '@dnd-kit/utilities';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useGetUrl } from 'common/util/getUrl';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -18,41 +19,64 @@ import { FaImage, FaTimes } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
 
-const PLACEHOLDER_MIN_HEIGHT = 48;
+const PLACEHOLDER_MIN_HEIGHT = 36;
 
 type IAISelectableImageProps = {
   image: ImageDTO | null | undefined;
-  onChange: (image: ImageDTO) => void;
+  onDrop: (image: ImageDTO) => void;
   onReset?: () => void;
   onError?: (event: SyntheticEvent<HTMLImageElement>) => void;
+  onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void;
   resetIconSize?: IconButtonProps['size'];
   withResetIcon?: boolean;
   withMetadataOverlay?: boolean;
+  isDragDisabled?: boolean;
   isDropDisabled?: boolean;
   fallback?: ReactElement;
+  payloadImage?: ImageDTO | null | undefined;
 };
 
-const IAISelectableImage = (props: IAISelectableImageProps) => {
+const IAIDndImage = (props: IAISelectableImageProps) => {
   const {
     image,
-    onChange,
+    onDrop,
     onReset,
     onError,
     resetIconSize = 'md',
     withResetIcon = false,
     withMetadataOverlay = false,
     isDropDisabled = false,
-    fallback = <ImageFallback />,
+    isDragDisabled = false,
+    fallback = <IAIImageFallback />,
+    payloadImage,
   } = props;
-  const droppableId = useRef(uuidv4());
+  const dndId = useRef(uuidv4());
   const { getUrl } = useGetUrl();
-  const { isOver, setNodeRef, active } = useDroppable({
-    id: droppableId.current,
+  const {
+    isOver,
+    setNodeRef: setDroppableRef,
+    active,
+  } = useDroppable({
+    id: dndId.current,
     disabled: isDropDisabled,
     data: {
-      handleDrop: onChange,
+      handleDrop: onDrop,
     },
   });
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableRef,
+  } = useDraggable({
+    id: dndId.current,
+    data: {
+      image: payloadImage ? payloadImage : image,
+    },
+    disabled: isDragDisabled,
+  });
+
+  const setNodeRef = useCombinedRefs(setDroppableRef, setDraggableRef);
 
   return (
     <Flex
@@ -62,7 +86,11 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+        minW: 36,
+        minH: 36,
       }}
+      {...attributes}
+      {...listeners}
       ref={setNodeRef}
     >
       {image && (
@@ -80,8 +108,11 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
             fallbackStrategy="beforeLoadOrError"
             fallback={fallback}
             onError={onError}
+            objectFit="contain"
             draggable={false}
             sx={{
+              maxW: 'full',
+              maxH: 'full',
               borderRadius: 'base',
             }}
           />
@@ -139,7 +170,7 @@ const IAISelectableImage = (props: IAISelectableImageProps) => {
   );
 };
 
-export default memo(IAISelectableImage);
+export default memo(IAIDndImage);
 
 type DropOverlayProps = {
   isOver: boolean;
@@ -179,14 +210,15 @@ const DropOverlay = (props: DropOverlayProps) => {
             w: 'full',
             h: 'full',
             bg: 'base.900',
-            opacity: isOver ? 0.9 : 0.7,
+            opacity: 0.7,
             borderRadius: 'base',
             alignItems: 'center',
             justifyContent: 'center',
             transitionProperty: 'common',
-            transitionDuration: '0.15s',
+            transitionDuration: '0.1s',
           }}
         />
+
         <Flex
           sx={{
             position: 'absolute',
@@ -194,51 +226,31 @@ const DropOverlay = (props: DropOverlayProps) => {
             left: 0,
             w: 'full',
             h: 'full',
-            opacity: isOver ? 1 : 0.9,
-            alignItems: 'center',
-            justifyContent: 'center',
-            transitionProperty: 'common',
-            transitionDuration: '0.15s',
-          }}
-        >
-          <Text sx={{ fontSize: '2xl', fontWeight: 600, color: 'base.200' }}>
-            Drop Image
-          </Text>
-        </Flex>
-        <Flex
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            w: 'full',
-            h: 'full',
-            opacity: isOver ? 1 : 0.7,
+            opacity: 1,
             borderWidth: 2,
-            borderColor: 'base.500',
+            borderColor: isOver ? 'base.200' : 'base.500',
             borderRadius: 'base',
             borderStyle: 'dashed',
             transitionProperty: 'common',
-            transitionDuration: '0.15s',
+            transitionDuration: '0.1s',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-        ></Flex>
+        >
+          <Text
+            sx={{
+              fontSize: '2xl',
+              fontWeight: 600,
+              transform: isOver ? 'scale(1.1)' : 'scale(1)',
+              color: isOver ? 'base.100' : 'base.500',
+              transitionProperty: 'common',
+              transitionDuration: '0.1s',
+            }}
+          >
+            Drop
+          </Text>
+        </Flex>
       </Flex>
     </motion.div>
   );
 };
-
-const ImageFallback = () => (
-  <Flex
-    sx={{
-      w: 'full',
-      h: 'full',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minH: PLACEHOLDER_MIN_HEIGHT,
-      color: 'base.400',
-      bg: 'base.850',
-      borderRadius: 'base',
-    }}
-  >
-    <Spinner size="xl" />
-  </Flex>
-);

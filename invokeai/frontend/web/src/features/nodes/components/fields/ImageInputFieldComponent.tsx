@@ -8,7 +8,7 @@ import {
 import { memo, useCallback } from 'react';
 
 import { FieldComponentProps } from './types';
-import IAISelectableImage from 'features/controlNet/components/parameters/IAISelectableImage';
+import IAIDndImage from 'features/controlNet/components/parameters/IAISelectableImage';
 import { ImageDTO } from 'services/api';
 import { Flex } from '@chakra-ui/react';
 
@@ -51,9 +51,9 @@ const ImageInputFieldComponent = (
         justifyContent: 'center',
       }}
     >
-      <IAISelectableImage
+      <IAIDndImage
         image={field.value}
-        onChange={handleChange}
+        onDrop={handleChange}
         onReset={handleReset}
         resetIconSize="sm"
       />

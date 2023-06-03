@@ -23,12 +23,13 @@ type Props = {
   controlNetId: string;
   beginStepPct: number;
   endStepPct: number;
+  mini?: boolean;
 };
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
 const ParamControlNetBeginEnd = (props: Props) => {
-  const { controlNetId, beginStepPct, endStepPct } = props;
+  const { controlNetId, beginStepPct, endStepPct, mini = false } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -69,52 +70,59 @@ const ParamControlNetBeginEnd = (props: Props) => {
           <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
             <RangeSliderThumb index={1} />
           </Tooltip>
-          <RangeSliderMark
-            value={0}
-            sx={{
-              fontSize: 'xs',
-              fontWeight: '500',
-              color: 'base.200',
-              insetInlineStart: '0 !important',
-              insetInlineEnd: 'unset !important',
-              mt: 1.5,
-            }}
-          >
-            0%
-          </RangeSliderMark>
-          <RangeSliderMark
-            value={0.5}
-            sx={{
-              fontSize: 'xs',
-              fontWeight: '500',
-              color: 'base.200',
-              mt: 1.5,
-            }}
-          >
-            50%
-          </RangeSliderMark>
-          <RangeSliderMark
-            value={1}
-            sx={{
-              fontSize: 'xs',
-              fontWeight: '500',
-              color: 'base.200',
-              insetInlineStart: 'unset !important',
-              insetInlineEnd: '0 !important',
-              mt: 1.5,
-            }}
-          >
-            100%
-          </RangeSliderMark>
+          {!mini && (
+            <>
+              {' '}
+              <RangeSliderMark
+                value={0}
+                sx={{
+                  fontSize: 'xs',
+                  fontWeight: '500',
+                  color: 'base.200',
+                  insetInlineStart: '0 !important',
+                  insetInlineEnd: 'unset !important',
+                  mt: 1.5,
+                }}
+              >
+                0%
+              </RangeSliderMark>
+              <RangeSliderMark
+                value={0.5}
+                sx={{
+                  fontSize: 'xs',
+                  fontWeight: '500',
+                  color: 'base.200',
+                  mt: 1.5,
+                }}
+              >
+                50%
+              </RangeSliderMark>
+              <RangeSliderMark
+                value={1}
+                sx={{
+                  fontSize: 'xs',
+                  fontWeight: '500',
+                  color: 'base.200',
+                  insetInlineStart: 'unset !important',
+                  insetInlineEnd: '0 !important',
+                  mt: 1.5,
+                }}
+              >
+                100%
+              </RangeSliderMark>
+            </>
+          )}
         </RangeSlider>
 
-        <IAIIconButton
-          size="sm"
-          aria-label={t('accessibility.reset')}
-          tooltip={t('accessibility.reset')}
-          icon={<BiReset />}
-          onClick={handleStepPctReset}
-        />
+        {!mini && (
+          <IAIIconButton
+            size="sm"
+            aria-label={t('accessibility.reset')}
+            tooltip={t('accessibility.reset')}
+            icon={<BiReset />}
+            onClick={handleStepPctReset}
+          />
+        )}
       </HStack>
     </FormControl>
   );

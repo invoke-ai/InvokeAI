@@ -1,21 +1,20 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGetUrl } from 'common/util/getUrl';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 
 import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { DragEvent, memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import ImageFallbackSpinner from './ImageFallbackSpinner';
-import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { configSelector } from '../../system/store/configSelectors';
 import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
-import { useDraggable } from '@dnd-kit/core';
+import IAIDndImage from 'features/controlNet/components/parameters/IAISelectableImage';
+import { ImageDTO } from 'services/api';
+import { IAIImageFallback } from 'common/components/IAIImageFallback';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -52,17 +51,8 @@ const CurrentImagePreview = () => {
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
   const { shouldFetchImages } = useAppSelector(configSelector);
-  const { getUrl } = useGetUrl();
   const toaster = useAppToaster();
   const dispatch = useAppDispatch();
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  const { attributes, listeners, setNodeRef } = useDraggable({
-    id: `currentImage_${image?.image_name}`,
-    data: {
-      image,
-    },
-  });
 
   const handleError = useCallback(() => {
     dispatch(imageSelected());
@@ -75,9 +65,12 @@ const CurrentImagePreview = () => {
     }
   }, [dispatch, toaster, shouldFetchImages]);
 
-  useEffect(() => {
-    setIsLoaded(false);
-  }, [image]);
+  const handleDrop = useCallback(
+    (droppedImage: ImageDTO) => {
+      dispatch(imageSelected(droppedImage));
+    },
+    [dispatch]
+  );
 
   return (
     <Flex
@@ -108,42 +101,28 @@ const CurrentImagePreview = () => {
         image && (
           <Flex
             sx={{
+              width: 'full',
+              height: 'full',
               alignItems: 'center',
               justifyContent: 'center',
-              position: 'absolute',
             }}
           >
-            <Image
-              ref={setNodeRef}
-              {...listeners}
-              {...attributes}
-              src={getUrl(image.image_url)}
-              fallbackStrategy="beforeLoadOrError"
-              fallback={<ImageFallbackSpinner />}
-              sx={{
-                objectFit: 'contain',
-                maxWidth: '100%',
-                maxHeight: '100%',
-                height: 'auto',
-                borderRadius: 'base',
-                touchAction: 'none',
-              }}
+            <IAIDndImage
+              image={image}
+              onDrop={handleDrop}
               onError={handleError}
-              onLoad={() => {
-                setIsLoaded(true);
-              }}
+              fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
             />
-            {isLoaded && <ImageMetadataOverlay image={image} />}
           </Flex>
         )
       )}
-      {shouldShowImageDetails && image && 'metadata' in image && (
+      {shouldShowImageDetails && image && image.metadata && (
         <Box
           sx={{
             position: 'absolute',
             top: '0',
-            width: '100%',
-            height: '100%',
+            width: 'full',
+            height: 'full',
             borderRadius: 'base',
             overflow: 'scroll',
           }}
@@ -151,7 +130,19 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && <NextPrevImageButtons />}
+      {!shouldShowImageDetails && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '0',
+            width: 'full',
+            height: 'full',
+            pointerEvents: 'none',
+          }}
+        >
+          <NextPrevImageButtons />
+        </Box>
+      )}
     </Flex>
   );
 };

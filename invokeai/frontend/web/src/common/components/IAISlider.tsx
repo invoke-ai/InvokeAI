@@ -40,7 +40,7 @@ import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 
 export type IAIFullSliderProps = {
-  label: string;
+  label?: string;
   value: number;
   min?: number;
   max?: number;
@@ -178,9 +178,11 @@ const IAISlider = (props: IAIFullSliderProps) => {
       isDisabled={isDisabled}
       {...sliderFormControlProps}
     >
-      <FormLabel {...sliderFormLabelProps} mb={-1}>
-        {label}
-      </FormLabel>
+      {label && (
+        <FormLabel {...sliderFormLabelProps} mb={-1}>
+          {label}
+        </FormLabel>
+      )}
 
       <HStack w="100%" gap={2} alignItems="center">
         <Slider
