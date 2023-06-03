@@ -1,19 +1,4 @@
-import {
-  Box,
-  Checkbox,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-} from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
-import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
   ControlNetConfig,
   controlNetAdded,
@@ -21,19 +6,34 @@ import {
   controlNetToggled,
   isControlNetImagePreprocessedToggled,
 } from '../store/controlNetSlice';
+import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
+import {
+  Checkbox,
+  Flex,
+  FormControl,
+  FormLabel,
+  HStack,
+  TabList,
+  TabPanels,
+  Tabs,
+  Tab,
+  TabPanel,
+  Box,
+} from '@chakra-ui/react';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 
-import IAIButton from 'common/components/IAIButton';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAISwitch from 'common/components/IAISwitch';
-import { useToggle } from 'react-use';
-import { v4 as uuidv4 } from 'uuid';
-import ControlNetImagePreview from './ControlNetImagePreview';
-import ControlNetPreprocessButton from './ControlNetPreprocessButton';
-import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
+import ControlNetImagePreview from './ControlNetImagePreview';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { v4 as uuidv4 } from 'uuid';
+import { useToggle } from 'react-use';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
+import ControlNetProcessorComponent from './ControlNetProcessorComponent';
+import ControlNetPreprocessButton from './ControlNetPreprocessButton';
+import IAIButton from 'common/components/IAIButton';
+import IAISwitch from 'common/components/IAISwitch';
 
 type ControlNetProps = {
   controlNet: ControlNetConfig;
@@ -48,7 +48,7 @@ const ControlNet = (props: ControlNetProps) => {
     beginStepPct,
     endStepPct,
     controlImage,
-    isPreprocessed: isControlImageProcessed,
+    isPreprocessed,
     processedControlImage,
     processorNode,
   } = props.controlNet;
@@ -83,18 +83,21 @@ const ControlNet = (props: ControlNetProps) => {
         borderRadius: 'base',
       }}
     >
-      <HStack>
+      <Flex sx={{ gap: 2 }}>
         <IAISwitch
           aria-label="Toggle ControlNet"
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
         />
         <Box
-          w="full"
-          opacity={isEnabled ? 1 : 0.5}
-          pointerEvents={isEnabled ? 'auto' : 'none'}
-          transitionProperty="common"
-          transitionDuration="0.1s"
+          sx={{
+            w: 'full',
+            minW: 0,
+            opacity: isEnabled ? 1 : 0.5,
+            pointerEvents: isEnabled ? 'auto' : 'none',
+            transitionProperty: 'common',
+            transitionDuration: '0.1s',
+          }}
         >
           <ParamControlNetModel controlNetId={controlNetId} model={model} />
         </Box>
@@ -113,7 +116,7 @@ const ControlNet = (props: ControlNetProps) => {
           onClick={handleDelete}
           icon={<FaTrash />}
         />
-      </HStack>
+      </Flex>
       {isEnabled && (
         <>
           <Flex sx={{ gap: 4 }}>
@@ -122,21 +125,23 @@ const ControlNet = (props: ControlNetProps) => {
                 flexDir: 'column',
                 gap: 2,
                 w: 'full',
-                paddingInlineEnd: 2,
-                pb: shouldShowAdvanced ? 0 : 2,
+                h: 32,
+                paddingInlineStart: 2,
+                paddingInlineEnd: shouldShowAdvanced ? 2 : 0,
+                pb: 2,
+                justifyContent: 'space-between',
               }}
             >
               <Flex
                 sx={{
-                  w: 'max-content',
-                  columnGap: 4,
-                  p: 2,
+                  justifyContent: 'space-between',
+                  w: 'full',
                 }}
               >
                 <FormControl>
                   <HStack>
                     <Checkbox
-                      isChecked={isControlImageProcessed}
+                      isChecked={isPreprocessed}
                       onChange={handleToggleIsPreprocessed}
                     />
                     <FormLabel>Preprocessed</FormLabel>
@@ -152,49 +157,38 @@ const ControlNet = (props: ControlNetProps) => {
                   </HStack>
                 </FormControl>
               </Flex>
+              <ParamControlNetWeight
+                controlNetId={controlNetId}
+                weight={weight}
+                mini
+              />
+              <ParamControlNetBeginEnd
+                controlNetId={controlNetId}
+                beginStepPct={beginStepPct}
+                endStepPct={endStepPct}
+                mini
+              />
+            </Flex>
+            {!shouldShowAdvanced && (
               <Flex
                 sx={{
-                  w: 'full',
-                  justifyContent: 'space-between',
-                  columnGap: 6,
-                  p: 2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  h: 32,
+                  w: 32,
+                  aspectRatio: '1/1',
                 }}
               >
-                <Flex sx={{ flexDirection: 'column', w: 'full' }}>
-                  <ParamControlNetWeight
-                    controlNetId={controlNetId}
-                    weight={weight}
-                    mini
-                  />
-                  <ParamControlNetBeginEnd
-                    controlNetId={controlNetId}
-                    beginStepPct={beginStepPct}
-                    endStepPct={endStepPct}
-                    mini
-                  />
-                </Flex>
-                {!shouldShowAdvanced && (
-                  <Flex
-                    sx={{
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      h: 24,
-                      w: 24,
-                      aspectRatio: '1/1',
-                    }}
-                  >
-                    <ControlNetImagePreview controlNet={props.controlNet} />
-                  </Flex>
-                )}
+                <ControlNetImagePreview controlNet={props.controlNet} />
               </Flex>
-            </Flex>
+            )}
           </Flex>
           {shouldShowAdvanced && (
             <>
               <Box pt={2}>
                 <ControlNetImagePreview controlNet={props.controlNet} />
               </Box>
-              {!isControlImageProcessed && (
+              {!isPreprocessed && (
                 <>
                   <ParamControlNetProcessorSelect
                     controlNetId={controlNetId}
