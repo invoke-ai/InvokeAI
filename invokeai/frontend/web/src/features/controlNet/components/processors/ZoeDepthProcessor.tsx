@@ -1,5 +1,5 @@
-import { memo } from 'react';
 import { RequiredZoeDepthImageProcessorInvocation } from 'features/controlNet/store/types';
+import { memo } from 'react';
 
 type Props = {
   controlNetId: string;

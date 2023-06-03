@@ -1,10 +1,10 @@
-import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredOpenposeImageProcessorInvocation } from 'features/controlNet/store/types';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import { RequiredOpenposeImageProcessorInvocation } from 'features/controlNet/store/types';
+import { ChangeEvent, memo, useCallback } from 'react';
+import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
+import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.openpose_image_processor.default;
 
@@ -52,7 +52,7 @@ const OpenposeProcessor = (props: Props) => {
   );
 
   return (
-    <Flex sx={{ flexDirection: 'column', gap: 2 }}>
+    <ProcessorOptionsContainer>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
@@ -78,7 +78,7 @@ const OpenposeProcessor = (props: Props) => {
         isChecked={hand_and_face}
         onChange={handleHandAndFaceChanged}
       />
-    </Flex>
+    </ProcessorOptionsContainer>
   );
 };
 
