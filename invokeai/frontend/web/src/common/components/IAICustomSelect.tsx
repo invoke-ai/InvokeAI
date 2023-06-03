@@ -90,9 +90,20 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             alignItems: 'center',
             userSelect: 'none',
             cursor: 'pointer',
+            overflow: 'hidden',
+            width: 'full',
           }}
         >
-          <Text sx={{ fontSize: 'sm', fontWeight: 500, color: 'base.100' }}>
+          <Text
+            sx={{
+              fontSize: 'sm',
+              fontWeight: 500,
+              color: 'base.100',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
             {selectedItem}
           </Text>
         </Select>
@@ -105,7 +116,6 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             sx={{
               ...floatingStyles,
               width: 'full',
-              // width: 'max-content',
               top: 0,
               left: 0,
               flexDirection: 'column',
