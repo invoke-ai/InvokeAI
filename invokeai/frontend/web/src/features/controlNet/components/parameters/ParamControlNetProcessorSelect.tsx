@@ -39,6 +39,7 @@ const ParamControlNetProcessorSelect = (
       items={CONTROLNET_PROCESSOR_TYPES}
       selectedItem={processorNode.type ?? 'canny_image_processor'}
       setSelectedItem={handleProcessorTypeChanged}
+      withCheckIcon
     />
   );
 };

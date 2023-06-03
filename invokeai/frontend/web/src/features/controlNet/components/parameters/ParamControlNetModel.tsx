@@ -30,6 +30,7 @@ const ParamIsControlNetModel = (props: ParamIsControlNetModelProps) => {
       items={CONTROLNET_MODELS}
       selectedItem={model}
       setSelectedItem={handleModelChanged}
+      withCheckIcon
     />
   );
 };
