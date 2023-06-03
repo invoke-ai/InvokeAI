@@ -18,7 +18,7 @@ import { autoUpdate, offset, shift, useFloating } from '@floating-ui/react-dom';
 import { useSelect } from 'downshift';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { getInputOutlineStyles } from 'theme/util/getInputOutlineStyles';
 
 export type ItemTooltips = { [key: string]: string };
@@ -34,6 +34,7 @@ type IAICustomSelectProps = {
   buttonProps?: FlexProps;
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
+  ellipsisPosition?: 'start' | 'end';
 };
 
 const IAICustomSelect = (props: IAICustomSelectProps) => {
@@ -48,6 +49,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
     tooltip,
     buttonProps,
     tooltipProps,
+    ellipsisPosition = 'end',
   } = props;
 
   const {
@@ -68,6 +70,14 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
     whileElementsMounted: autoUpdate,
     middleware: [offset(4), shift({ crossAxis: true, padding: 8 })],
   });
+
+  const labelTextDirection = useMemo(() => {
+    if (ellipsisPosition === 'start') {
+      return document.dir === 'rtl' ? 'ltr' : 'rtl';
+    }
+
+    return document.dir;
+  }, [ellipsisPosition]);
 
   return (
     <FormControl sx={{ w: 'full' }} {...formControlProps}>
@@ -106,6 +116,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              direction: labelTextDirection,
             }}
           >
             {selectedItem}
