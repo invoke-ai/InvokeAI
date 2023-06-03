@@ -1,9 +1,9 @@
-import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import { RequiredNormalbaeImageProcessorInvocation } from 'features/controlNet/store/types';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredNormalbaeImageProcessorInvocation } from 'features/controlNet/store/types';
-import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.normalbae_image_processor.default;
 
@@ -44,7 +44,7 @@ const NormalBaeProcessor = (props: Props) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <Flex sx={{ flexDirection: 'column', gap: 2 }}>
+    <ProcessorOptionsContainer>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
@@ -65,7 +65,7 @@ const NormalBaeProcessor = (props: Props) => {
         max={4096}
         withInput
       />
-    </Flex>
+    </ProcessorOptionsContainer>
   );
 };
 

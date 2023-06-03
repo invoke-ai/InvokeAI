@@ -1,9 +1,9 @@
-import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import { RequiredMediapipeFaceProcessorInvocation } from 'features/controlNet/store/types';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredMediapipeFaceProcessorInvocation } from 'features/controlNet/store/types';
-import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.mediapipe_face_processor.default;
 
@@ -40,7 +40,7 @@ const MediapipeFaceProcessor = (props: Props) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <Flex sx={{ flexDirection: 'column', gap: 2 }}>
+    <ProcessorOptionsContainer>
       <IAISlider
         label="Max Faces"
         value={max_faces}
@@ -62,7 +62,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         step={0.01}
         withInput
       />
-    </Flex>
+    </ProcessorOptionsContainer>
   );
 };
 

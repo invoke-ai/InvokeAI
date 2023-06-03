@@ -1,9 +1,9 @@
-import { Flex } from '@chakra-ui/react';
 import IAISlider from 'common/components/IAISlider';
+import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlNet/store/types';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlNet/store/types';
-import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor.default;
 
@@ -40,7 +40,7 @@ const MidasDepthProcessor = (props: Props) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <Flex sx={{ flexDirection: 'column', gap: 2 }}>
+    <ProcessorOptionsContainer>
       <IAISlider
         label="a_mult"
         value={a_mult}
@@ -63,7 +63,7 @@ const MidasDepthProcessor = (props: Props) => {
         step={0.01}
         withInput
       />
-    </Flex>
+    </ProcessorOptionsContainer>
   );
 };
 
