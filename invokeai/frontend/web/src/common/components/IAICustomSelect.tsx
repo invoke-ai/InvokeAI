@@ -1,4 +1,4 @@
-import { CheckIcon } from '@chakra-ui/icons';
+import { CheckIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import {
   Box,
   Flex,
@@ -10,7 +10,6 @@ import {
   GridItem,
   List,
   ListItem,
-  Select,
   Text,
   Tooltip,
   TooltipProps,
@@ -20,6 +19,7 @@ import { useSelect } from 'downshift';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
 import { memo } from 'react';
+import { getInputOutlineStyles } from 'theme/util/getInputOutlineStyles';
 
 export type ItemTooltips = { [key: string]: string };
 
@@ -82,16 +82,20 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
         </FormLabel>
       )}
       <Tooltip label={tooltip} {...tooltipProps}>
-        <Select
+        <Flex
           {...getToggleButtonProps({ ref: refs.setReference })}
           {...buttonProps}
-          as={Flex}
           sx={{
             alignItems: 'center',
             userSelect: 'none',
             cursor: 'pointer',
             overflow: 'hidden',
             width: 'full',
+            py: 1,
+            px: 2,
+            gap: 2,
+            justifyContent: 'space-between',
+            ...getInputOutlineStyles(),
           }}
         >
           <Text
@@ -106,7 +110,15 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
           >
             {selectedItem}
           </Text>
-        </Select>
+          <ChevronUpIcon
+            sx={{
+              color: 'base.300',
+              transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+              transitionProperty: 'common',
+              transitionDuration: 'normal',
+            }}
+          />
+        </Flex>
       </Tooltip>
       <Box {...getMenuProps()}>
         {isOpen && (
@@ -115,9 +127,8 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             ref={refs.setFloating}
             sx={{
               ...floatingStyles,
-              width: 'full',
               top: 0,
-              left: 0,
+              insetInlineStart: 0,
               flexDirection: 'column',
               zIndex: 2,
               bg: 'base.800',
@@ -133,58 +144,68 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             }}
           >
             <OverlayScrollbarsComponent>
-              {items.map((item, index) => (
-                <Tooltip
-                  isDisabled={!itemTooltips}
-                  key={`${item}${index}`}
-                  label={itemTooltips?.[item]}
-                  hasArrow
-                  placement="right"
-                >
-                  <ListItem
-                    sx={{
-                      bg: highlightedIndex === index ? 'base.700' : undefined,
-                      py: 1,
-                      paddingInlineStart: 3,
-                      paddingInlineEnd: 6,
-                      cursor: 'pointer',
-                      transitionProperty: 'common',
-                      transitionDuration: '0.15s',
-                    }}
+              {items.map((item, index) => {
+                const isSelected = selectedItem === item;
+                const isHighlighted = highlightedIndex === index;
+                const fontWeight = isSelected ? 700 : 500;
+                const bg = isHighlighted
+                  ? 'base.700'
+                  : isSelected
+                  ? 'base.750'
+                  : undefined;
+                return (
+                  <Tooltip
+                    isDisabled={!itemTooltips}
                     key={`${item}${index}`}
-                    {...getItemProps({ item, index })}
+                    label={itemTooltips?.[item]}
+                    hasArrow
+                    placement="right"
                   >
-                    {withCheckIcon ? (
-                      <Grid gridTemplateColumns="1.25rem auto">
-                        <GridItem>
-                          {selectedItem === item && <CheckIcon boxSize={2} />}
-                        </GridItem>
-                        <GridItem>
-                          <Text
-                            sx={{
-                              fontSize: 'sm',
-                              color: 'base.100',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {item}
-                          </Text>
-                        </GridItem>
-                      </Grid>
-                    ) : (
-                      <Text
-                        sx={{
-                          fontSize: 'sm',
-                          color: 'base.100',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {item}
-                      </Text>
-                    )}
-                  </ListItem>
-                </Tooltip>
-              ))}
+                    <ListItem
+                      sx={{
+                        bg,
+                        py: 1,
+                        paddingInlineStart: 3,
+                        paddingInlineEnd: 6,
+                        cursor: 'pointer',
+                        transitionProperty: 'common',
+                        transitionDuration: '0.15s',
+                      }}
+                      key={`${item}${index}`}
+                      {...getItemProps({ item, index })}
+                    >
+                      {withCheckIcon ? (
+                        <Grid gridTemplateColumns="1.25rem auto">
+                          <GridItem>
+                            {isSelected && <CheckIcon boxSize={2} />}
+                          </GridItem>
+                          <GridItem>
+                            <Text
+                              sx={{
+                                fontSize: 'sm',
+                                color: 'base.100',
+                                fontWeight,
+                              }}
+                            >
+                              {item}
+                            </Text>
+                          </GridItem>
+                        </Grid>
+                      ) : (
+                        <Text
+                          sx={{
+                            fontSize: 'sm',
+                            color: 'base.50',
+                            fontWeight,
+                          }}
+                        >
+                          {item}
+                        </Text>
+                      )}
+                    </ListItem>
+                  </Tooltip>
+                );
+              })}
             </OverlayScrollbarsComponent>
           </List>
         )}
