@@ -49,7 +49,7 @@ import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useParameters } from 'features/parameters/hooks/useParameters';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import {
   requestedImageDeletion,
@@ -58,7 +58,6 @@ import {
 } from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
-import { allParametersSet } from 'features/parameters/store/generationSlice';
 import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 import { useAppToaster } from 'app/components/Toaster';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
@@ -165,7 +164,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const { recallPrompt, recallSeed, recallAllParameters } = useParameters();
+  const { recallBothPrompts, recallSeed, recallAllParameters } =
+    useRecallParameters();
 
   // const handleCopyImage = useCallback(async () => {
   //   if (!image?.url) {
@@ -250,11 +250,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('s', handleUseSeed, [image]);
 
   const handleUsePrompt = useCallback(() => {
-    recallPrompt(
+    recallBothPrompts(
       image?.metadata?.positive_conditioning,
       image?.metadata?.negative_conditioning
     );
-  }, [image, recallPrompt]);
+  }, [image, recallBothPrompts]);
 
   useHotkeys('p', handleUsePrompt, [image]);
 
@@ -461,7 +461,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link download={true} href={getUrl(image?.image_url ?? '')}>
+              <Link
+                download={true}
+                href={getUrl(image?.image_url ?? '')}
+                target="_blank"
+              >
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>
