@@ -33,13 +33,12 @@ export const addControlNetToLinearGraph = (
       const {
         controlNetId,
         isEnabled,
-        isPreprocessed: isControlImageProcessed,
         controlImage,
         processedControlImage,
         beginStepPct,
         endStepPct,
         model,
-        processorNode,
+        processorType,
         weight,
       } = controlNet;
 
@@ -57,14 +56,14 @@ export const addControlNetToLinearGraph = (
         control_weight: weight,
       };
 
-      if (processedControlImage && !isControlImageProcessed) {
+      if (processedControlImage && processorType !== 'none') {
         // We've already processed the image in the app, so we can just use the processed image
         const { image_name, image_origin } = processedControlImage;
         controlNetNode.image = {
           image_name,
           image_origin,
         };
-      } else if (controlImage && isControlImageProcessed) {
+      } else if (controlImage && processorType !== 'none') {
         // The control image is preprocessed
         const { image_name, image_origin } = controlImage;
         controlNetNode.image = {

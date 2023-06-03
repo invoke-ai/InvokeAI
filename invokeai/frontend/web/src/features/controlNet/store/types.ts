@@ -36,7 +36,7 @@ export type ControlNetProcessorNode =
  * Any ControlNet processor type
  */
 export type ControlNetProcessorType = NonNullable<
-  ControlNetProcessorNode['type']
+  ControlNetProcessorNode['type'] | 'none'
 >;
 
 /**

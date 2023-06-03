@@ -24,6 +24,14 @@ type ControlNetProcessorsDict = Record<
  * TODO: Generate from the OpenAPI schema
  */
 export const CONTROLNET_PROCESSORS = {
+  none: {
+    type: 'none',
+    label: 'None',
+    description: '',
+    default: {
+      type: 'none',
+    },
+  },
   canny_image_processor: {
     type: 'canny_image_processor',
     label: 'Canny',

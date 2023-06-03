@@ -27,9 +27,12 @@ const ParamIsControlNetModel = (props: ParamIsControlNetModelProps) => {
 
   return (
     <IAICustomSelect
+      tooltip={model}
+      tooltipProps={{ placement: 'top', hasArrow: true }}
       items={CONTROLNET_MODELS}
       selectedItem={model}
       setSelectedItem={handleModelChanged}
+      ellipsisPosition="start"
       withCheckIcon
     />
   );
