@@ -346,6 +346,11 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
         weight,
       } = controlNet;
 
+      if (!isEnabled) {
+        // Skip disabled ControlNets
+        return;
+      }
+
       const controlNetNode: ControlNetInvocation = {
         id: `control_net_${controlNetId}`,
         type: 'controlnet',
@@ -355,14 +360,14 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
         control_weight: weight,
       };
 
-      if (processedControlImage) {
+      if (processedControlImage && !isControlImageProcessed) {
         // We've already processed the image in the app, so we can just use the processed image
         const { image_name, image_origin } = processedControlImage;
         controlNetNode.image = {
           image_name,
           image_origin,
         };
-      } else if (controlImage) {
+      } else if (controlImage && isControlImageProcessed) {
         // The control image is preprocessed
         const { image_name, image_origin } = controlImage;
         controlNetNode.image = {
@@ -370,9 +375,10 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
           image_origin,
         };
       } else {
-        // The control image is not processed, so we need to add a preprocess node
-        // TODO: Add preprocess node
+        // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
+        return;
       }
+
       graph.nodes[controlNetNode.id] = controlNetNode;
 
       if (size(controlNets) > 1) {

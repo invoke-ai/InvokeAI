@@ -48,7 +48,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     isDragDisabled = false,
     fallback = <IAIImageFallback />,
     payloadImage,
-    minSize = 36,
+    minSize = 24,
   } = props;
   const dndId = useRef(uuidv4());
   const { getUrl } = useGetUrl();

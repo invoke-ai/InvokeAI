@@ -50,7 +50,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
 
   return (
     <FormControl>
-      <FormLabel>Begin & End Step %</FormLabel>
+      <FormLabel>Begin / End Step Percentage</FormLabel>
       <HStack w="100%" gap={2} alignItems="center">
         <RangeSlider
           aria-label={['Begin Step %', 'End Step %']}
@@ -72,7 +72,6 @@ const ParamControlNetBeginEnd = (props: Props) => {
           </Tooltip>
           {!mini && (
             <>
-              {' '}
               <RangeSliderMark
                 value={0}
                 sx={{

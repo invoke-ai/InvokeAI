@@ -1,6 +1,6 @@
 import {
+  Divider,
   Flex,
-  Spacer,
   Tab,
   TabList,
   TabPanel,
@@ -9,7 +9,7 @@ import {
 } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 import IAICollapse from 'common/components/IAICollapse';
-import { memo, useCallback } from 'react';
+import { Fragment, memo, useCallback } from 'react';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaPlus } from 'react-icons/fa';
 import ControlNet from 'features/controlNet/components/ControlNet';
@@ -21,11 +21,11 @@ import {
   isControlNetEnabledToggled,
 } from 'features/controlNet/store/controlNetSlice';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { map, startCase } from 'lodash-es';
+import { map } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
-import { CloseIcon } from '@chakra-ui/icons';
 import ControlNetMini from 'features/controlNet/components/ControlNetMini';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import IAIButton from 'common/components/IAIButton';
 
 const selector = createSelector(
   controlNetSelector,
@@ -56,11 +56,26 @@ const ParamControlNetCollapse = () => {
   }
 
   return (
-    <>
-      {controlNetsArray.map((c) => (
-        <ControlNetMini key={c.controlNetId} controlNet={c} />
-      ))}
-    </>
+    <IAICollapse
+      label={'ControlNet'}
+      isOpen={isEnabled}
+      onToggle={handleClickControlNetToggle}
+      withSwitch
+    >
+      {controlNetsArray.length === 0 && (
+        <IAIButton onClick={handleClickedAddControlNet}>
+          Add ControlNet
+        </IAIButton>
+      )}
+      <Flex sx={{ flexDir: 'column', gap: 4 }}>
+        {controlNetsArray.map((c, i) => (
+          <Fragment key={c.controlNetId}>
+            {i > 0 && <Divider />}
+            <ControlNetMini controlNet={c} />
+          </Fragment>
+        ))}
+      </Flex>
+    </IAICollapse>
   );
 
   return (
