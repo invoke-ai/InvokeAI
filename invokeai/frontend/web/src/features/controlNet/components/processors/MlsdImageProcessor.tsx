@@ -3,7 +3,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/types';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
+import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor.default;
 
@@ -66,7 +66,7 @@ const MlsdImageProcessor = (props: Props) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <ProcessorOptionsContainer>
+    <ProcessorWrapper>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
@@ -109,7 +109,7 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
       />
-    </ProcessorOptionsContainer>
+    </ProcessorWrapper>
   );
 };
 

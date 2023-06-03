@@ -3,7 +3,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlNet/store/types';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
+import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor.default;
 
@@ -40,7 +40,7 @@ const MidasDepthProcessor = (props: Props) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <ProcessorOptionsContainer>
+    <ProcessorWrapper>
       <IAISlider
         label="a_mult"
         value={a_mult}
@@ -63,7 +63,7 @@ const MidasDepthProcessor = (props: Props) => {
         step={0.01}
         withInput
       />
-    </ProcessorOptionsContainer>
+    </ProcessorWrapper>
   );
 };
 

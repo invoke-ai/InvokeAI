@@ -4,7 +4,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredLineartImageProcessorInvocation } from 'features/controlNet/store/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
+import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor.default;
 
@@ -52,7 +52,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
   );
 
   return (
-    <ProcessorOptionsContainer>
+    <ProcessorWrapper>
       <IAISlider
         label="Detect Resolution"
         value={detect_resolution}
@@ -78,7 +78,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         isChecked={coarse}
         onChange={handleCoarseChanged}
       />
-    </ProcessorOptionsContainer>
+    </ProcessorWrapper>
   );
 };
 

@@ -3,7 +3,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredCannyImageProcessorInvocation } from 'features/controlNet/store/types';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
-import ProcessorOptionsContainer from './shared/ProcessorOptionsContainer';
+import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor.default;
 
@@ -44,7 +44,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
   }, [controlNetId, processorChanged]);
 
   return (
-    <ProcessorOptionsContainer>
+    <ProcessorWrapper>
       <IAISlider
         label="Low Threshold"
         value={low_threshold}
@@ -65,7 +65,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         max={255}
         withInput
       />
-    </ProcessorOptionsContainer>
+    </ProcessorWrapper>
   );
 };
 
