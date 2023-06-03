@@ -5,12 +5,12 @@ import curses
 import math
 import os
 import platform
+import pyperclip
 import struct
 import sys
 from shutil import get_terminal_size
-
+from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 import npyscreen
-
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int):
@@ -175,6 +175,50 @@ class SingleSelectColumns(SelectColumnBase, npyscreen.SelectOne):
         self.h_exit_down('bye bye')
 
 class TextBox(npyscreen.MultiLineEdit):
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.yank = None
+        self.handlers.update({
+            "^A": self.h_cursor_to_start,
+            "^E": self.h_cursor_to_end,
+            "^K": self.h_kill,
+            "^F": self.h_cursor_right,
+            "^B": self.h_cursor_left,
+            "^Y": self.h_yank,
+            "^V": self.h_paste,
+        })
+
+    def h_cursor_to_start(self, input):
+        self.cursor_position = 0
+
+    def h_cursor_to_end(self, input):
+        self.cursor_position = len(self.value)
+
+    def h_kill(self, input):
+        self.yank = self.value[self.cursor_position:]
+        self.value = self.value[:self.cursor_position]
+
+    def h_yank(self, input):
+        if self.yank:
+            self.paste(self.yank)
+
+    def paste(self, text: str):
+        self.value = self.value[:self.cursor_position] + text + self.value[self.cursor_position:]
+        self.cursor_position += len(text)
+
+    def h_paste(self, input: int=0):
+        try:
+            text = pyperclip.paste()
+        except ModuleNotFoundError:
+            text = "To paste with the mouse on Linux, please install the 'xclip' program."
+        self.paste(text)
+        
+    def handle_mouse_event(self, mouse_event):
+        mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
+        if bstate & (BUTTON2_CLICKED|BUTTON3_CLICKED):
+            self.h_paste()
+
     def update(self, clear=True):
         if clear:
             self.clear()
@@ -226,3 +270,5 @@ class TextBox(npyscreen.MultiLineEdit):
 
 class BufferBox(npyscreen.BoxTitle):
     _contained_widget = npyscreen.BufferPager
+
+    

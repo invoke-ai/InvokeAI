@@ -677,6 +677,12 @@ def run_console_ui(
     invokeai_opts = default_startup_options(initfile)
 
     set_min_terminal_size(MIN_COLS, MIN_LINES)
+
+    # the install-models application spawns a subprocess to install
+    # models, and will crash unless this is set before running.
+    import torch
+    torch.multiprocessing.set_start_method("spawn")
+    
     editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     if editApp.user_cancelled:

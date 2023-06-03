@@ -6,13 +6,12 @@ import re
 import shutil
 import sys
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass,field
 from pathlib import Path
 from tempfile import TemporaryFile
 from typing import List, Dict
 
 import requests
-from dataclasses import dataclass,field
 from diffusers import AutoencoderKL
 from huggingface_hub import hf_hub_url, HfFolder
 from omegaconf import OmegaConf
@@ -127,14 +126,17 @@ def install_requested_models(
 
     if diffusers.install_models and len(diffusers.install_models) > 0:
         logger.info("INSTALLING SELECTED STARTER MODELS")
-        successfully_downloaded = download_weight_datasets(
+        downloaded_paths = download_weight_datasets(
             models=diffusers.install_models,
             access_token=None,
             precision=precision,
         )  # FIX: for historical reasons, we don't use model manager here
-        update_config_file(successfully_downloaded, config_file_path)
-        if len(successfully_downloaded) < len(diffusers.install_models):
-            logger.warning("Some of the model downloads were not successful")
+        successful = {x:v for x,v in downloaded_paths.items() if v is not None}
+        if len(successful) > 0:
+            update_config_file(successful, config_file_path)
+        if len(successful) < len(diffusers.install_models):
+            unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
+            logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
 
     # due to above, we have to reload the model manager because conf file
     # was changed behind its back
@@ -254,7 +256,6 @@ def _download_repo_or_file(
             )
     return path
 
-
 def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
     repo_id = mconfig["repo_id"]
     filename = mconfig["file"]
@@ -302,10 +303,10 @@ def _download_diffusion_weights(
                 **extra_args,
             )
         except OSError as e:
-            if str(e).startswith("fp16 is not a valid"):
+            if 'Revision Not Found' in str(e):
                 pass
             else:
-                logger.error(f"An unexpected error occurred while downloading the model: {e})")
+                logger.error(str(e))
         if path:
             break
     return path

@@ -65,6 +65,7 @@ dependencies = [
   "pillow",
   "prompt-toolkit",
   "pypatchmatch",
+  'pyperclip',
   "pyreadline3",
   "python-multipart==0.0.6",
   "pytorch-lightning==1.7.7",
