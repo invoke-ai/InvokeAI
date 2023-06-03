@@ -17,6 +17,7 @@ const OverlayDragImage = (props: OverlayDragImageProps) => {
         justifyContent: 'center',
         userSelect: 'none',
         cursor: 'grabbing',
+        opacity: 0.5,
       }}
     >
       <Image
