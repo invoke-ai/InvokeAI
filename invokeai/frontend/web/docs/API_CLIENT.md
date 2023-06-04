@@ -26,7 +26,7 @@ We need to start the nodes web server, which serves the OpenAPI schema to the ge
 
 ```bash
 # from the repo root
-python scripts/invoke-new.py --web
+python scripts/invokeai-web.py
 ```
 
 2. Generate the API client.
