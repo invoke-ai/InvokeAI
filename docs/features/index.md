@@ -57,6 +57,9 @@ Personalize models by adding your own style or subjects.
 ## * [The NSFW Checker](NSFW.md)
 Prevent InvokeAI from displaying unwanted racy images.
 
+## * [Controlling Logging](LOGGING.md)
+Control how InvokeAI logs status messages.
+
 ## * [Miscellaneous](OTHER.md)
 Run InvokeAI on Google Colab, generate images with repeating patterns,
 batch process a file of prompts, increase the "creativity" of image

@@ -46,7 +46,7 @@ from invokeai.app.services.config import get_invokeai_config
 MIN_COLS = 120
 MIN_LINES = 45
 
-config = get_invokeai_config()
+config = get_invokeai_config(argv=[])
 
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
