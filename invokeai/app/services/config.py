@@ -152,6 +152,7 @@ from pydantic import BaseSettings, Field, parse_obj_as
 from typing import ClassVar, Dict, List, Literal, Type, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
+DB_FILE   = Path('invokeai.db')
 LEGACY_INIT_FILE = Path('invokeai.init')
 
 # This global stores a singleton InvokeAIAppConfig configuration object
@@ -361,6 +362,7 @@ setting environment variables INVOKEAI_<setting>.
     controlnet_dir      : Path = Field(default="controlnets", description='Path to directory of ControlNet models.', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
+    db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
@@ -434,6 +436,13 @@ setting environment variables INVOKEAI_<setting>.
         Path to defaults outputs directory.
         '''
         return self._resolve(self.outdir)
+
+    @property
+    def db_path(self)->Path:
+        '''
+        Path to the invokeai.db file.
+        '''
+        return self._resolve(self.db_dir) / DB_FILE
 
     @property
     def model_conf_path(self)->Path:

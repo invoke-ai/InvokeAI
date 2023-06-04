@@ -56,7 +56,7 @@ class ApiDependencies:
         output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_location = os.path.join(output_folder, "invokeai.db")
+        db_location = config.db_path
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"

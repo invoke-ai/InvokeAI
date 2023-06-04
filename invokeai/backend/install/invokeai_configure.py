@@ -655,11 +655,13 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
 
     for name in (
-        "models",
-        "configs",
-        "embeddings",
-        "text-inversion-output",
-        "text-inversion-training-data",
+            "models",
+            "configs",
+            "embeddings",
+            "databases",
+            "controlnets",
+            "text-inversion-output",
+            "text-inversion-training-data",
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
 
