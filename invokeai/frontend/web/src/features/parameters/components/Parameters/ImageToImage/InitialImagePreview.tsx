@@ -53,11 +53,14 @@ const InitialImagePreview = () => {
     }
   }, [dispatch, t, toaster, shouldFetchImages]);
 
-  const handleChange = useCallback(
-    (image: ImageDTO) => {
-      dispatch(initialImageChanged(image));
+  const handleDrop = useCallback(
+    (droppedImage: ImageDTO) => {
+      if (droppedImage.image_name === initialImage?.image_name) {
+        return;
+      }
+      dispatch(initialImageChanged(droppedImage));
     },
-    [dispatch]
+    [dispatch, initialImage?.image_name]
   );
 
   const handleReset = useCallback(() => {
@@ -76,7 +79,7 @@ const InitialImagePreview = () => {
     >
       <IAIDndImage
         image={initialImage}
-        onDrop={handleChange}
+        onDrop={handleDrop}
         onReset={handleReset}
         fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
       />

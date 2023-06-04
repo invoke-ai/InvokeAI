@@ -21,7 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 type IAIDndImageProps = {
   image: ImageDTO | null | undefined;
-  onDrop: (image: ImageDTO) => void;
+  onDrop: (droppedImage: ImageDTO) => void;
   onReset?: () => void;
   onError?: (event: SyntheticEvent<HTMLImageElement>) => void;
   onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void;
