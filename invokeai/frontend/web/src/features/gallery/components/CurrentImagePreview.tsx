@@ -101,23 +101,21 @@ const CurrentImagePreview = () => {
           }}
         />
       ) : (
-        image && (
-          <Flex
-            sx={{
-              width: 'full',
-              height: 'full',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IAIDndImage
-              image={image}
-              onDrop={handleDrop}
-              onError={handleError}
-              fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
-            />
-          </Flex>
-        )
+        <Flex
+          sx={{
+            width: 'full',
+            height: 'full',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IAIDndImage
+            image={image}
+            onDrop={handleDrop}
+            onError={handleError}
+            fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
+          />
+        </Flex>
       )}
       {shouldShowImageDetails && image && image.metadata && (
         <Box
@@ -133,7 +131,7 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && (
+      {!shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',
