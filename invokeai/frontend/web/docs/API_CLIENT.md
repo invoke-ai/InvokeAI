@@ -29,7 +29,7 @@ We need to start the nodes web server, which serves the OpenAPI schema to the ge
 python scripts/invokeai-web.py
 ```
 
-2. Generate the API client.
+2. Generate the API client. 
 
 ```bash
 # from invokeai/frontend/web/
