@@ -19,6 +19,9 @@ const isApplicationReadySelector = createSelector(
   }
 );
 
+/**
+ * Checks if the application is ready to be used, i.e. if the initial startup process is finished.
+ */
 export const useIsApplicationReady = () => {
   const { disabledTabs, wereModelsReceived, wasSchemaParsed } = useAppSelector(
     isApplicationReadySelector

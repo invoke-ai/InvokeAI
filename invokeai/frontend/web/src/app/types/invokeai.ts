@@ -95,6 +95,7 @@ export type AppFeature =
  * A disable-able Stable Diffusion feature
  */
 export type SDFeature =
+  | 'controlNet'
   | 'noise'
   | 'variation'
   | 'symmetry'

@@ -1,10 +1,16 @@
 export type InvokeAIThemeColors = {
   base: Partial<InvokeAIPaletteSteps>;
+  baseAlpha: Partial<InvokeAIPaletteSteps>;
   accent: Partial<InvokeAIPaletteSteps>;
+  accentAlpha: Partial<InvokeAIPaletteSteps>;
   working: Partial<InvokeAIPaletteSteps>;
+  workingAlpha: Partial<InvokeAIPaletteSteps>;
   warning: Partial<InvokeAIPaletteSteps>;
+  warningAlpha: Partial<InvokeAIPaletteSteps>;
   ok: Partial<InvokeAIPaletteSteps>;
+  okAlpha: Partial<InvokeAIPaletteSteps>;
   error: Partial<InvokeAIPaletteSteps>;
+  errorAlpha: Partial<InvokeAIPaletteSteps>;
   gridLineColor: string;
 };
 

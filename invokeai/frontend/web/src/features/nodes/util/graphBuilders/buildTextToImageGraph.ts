@@ -10,6 +10,7 @@ import {
   TextToLatentsInvocation,
 } from 'services/api';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 
 const POSITIVE_CONDITIONING = 'positive_conditioning';
 const NEGATIVE_CONDITIONING = 'negative_conditioning';
@@ -308,5 +309,8 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
       },
     });
   }
+
+  addControlNetToLinearGraph(graph, TEXT_TO_LATENTS, state);
+
   return graph;
 };

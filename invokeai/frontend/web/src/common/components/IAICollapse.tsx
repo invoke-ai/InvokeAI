@@ -49,7 +49,7 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
           />
         )}
       </Flex>
-      <Collapse in={isOpen} animateOpacity>
+      <Collapse in={isOpen} animateOpacity style={{ overflow: 'unset' }}>
         <Box sx={{ p: 4, borderBottomRadius: 'base', bg: 'base.800' }}>
           {children}
         </Box>

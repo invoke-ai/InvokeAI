@@ -13,6 +13,7 @@ import galleryReducer from 'features/gallery/store/gallerySlice';
 import imagesReducer from 'features/gallery/store/imagesSlice';
 import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
+import controlNetReducer from 'features/controlNet/store/controlNetSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 // import sessionReducer from 'features/system/store/sessionSlice';
@@ -45,6 +46,7 @@ const allReducers = {
   ui: uiReducer,
   hotkeys: hotkeysReducer,
   images: imagesReducer,
+  controlNet: controlNetReducer,
   // session: sessionReducer,
 };
 
@@ -62,6 +64,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'postprocessing',
   'system',
   'ui',
+  'controlNet',
   // 'hotkeys',
   // 'config',
 ];

@@ -12,14 +12,8 @@ def main():
     # Change working directory to the repo root
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-    if '--web' in sys.argv:
-        sys.argv.remove('--web')
-        from invokeai.app.api_app import invoke_api
-        invoke_api()
-    else:
-        # TODO: Parse some top-level args here.
-        from invokeai.app.cli_app import invoke_cli
-        invoke_cli()
+    from invokeai.app.api_app import invoke_api
+    invoke_api()
 
 
 if __name__ == '__main__':

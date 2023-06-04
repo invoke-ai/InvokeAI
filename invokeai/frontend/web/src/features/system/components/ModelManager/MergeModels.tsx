@@ -24,7 +24,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as InvokeAI from 'app/types/invokeai';
 import IAISlider from 'common/components/IAISlider';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 
 export default function MergeModels() {
   const dispatch = useAppDispatch();
@@ -286,7 +286,7 @@ export default function MergeModels() {
                 )}
               </Flex>
 
-              <IAICheckbox
+              <IAISimpleCheckbox
                 label={t('modelManager.ignoreMismatch')}
                 isChecked={modelMergeForce}
                 onChange={(e) => setModelMergeForce(e.target.checked)}
