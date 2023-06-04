@@ -467,7 +467,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Directories containing textual inversion and LoRA models (<tab> autocompletes, ctrl-N advances):",
+            value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
         )
@@ -486,6 +486,17 @@ class editOptsForm(npyscreen.FormMultiPage):
             npyscreen.TitleFilename,
             name="             LoRA and LyCORIS:",
             value=str(default_lora_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=32,
+            scroll_exit=True,
+        )
+        self.controlnet_dir = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name="             ControlNets:",
+            value=str(default_controlnet_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -582,6 +593,7 @@ class editOptsForm(npyscreen.FormMultiPage):
                 "always_use_cpu",
                 "embedding_dir",
                 "lora_dir",
+                "controlnet_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
@@ -659,6 +671,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
             "configs",
             "embeddings",
             "databases",
+            "loras",
             "controlnets",
             "text-inversion-output",
             "text-inversion-training-data",
@@ -719,6 +732,10 @@ def default_embedding_dir() -> Path:
 # -------------------------------------
 def default_lora_dir() -> Path:
     return config.root / "loras"
+
+# -------------------------------------
+def default_controlnet_dir() -> Path:
+    return config.root / "controlnets"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):

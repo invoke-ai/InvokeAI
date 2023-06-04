@@ -182,17 +182,15 @@ class addModelsForm(npyscreen.FormMultiPage):
             button_length += len(back_label) + 1
             button_offset += len(back_label) + 1
             self.back_button = self.add_widget_intelligent(
-                OffsetButtonPress,
+                npyscreen.ButtonPress,
                 name=back_label,
                 relx=(window_width - button_length) // 2,
-                offset=-3,
                 rely=-3,
                 when_pressed_function=self.on_back,
             )
         self.ok_button = self.add_widget_intelligent(
-            OffsetButtonPress,
+            npyscreen.ButtonPress, # OffsetButtonPress,
             name=done_label,
-            offset=+3,
             relx=button_offset + 1 + (window_width - button_length) // 2,
             rely=-3,
             when_pressed_function=self.on_execute
@@ -464,7 +462,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         p = Process(
             target = process_and_execute,
             kwargs=dict(
-                opt = app.opt,
+                opt = app.program_opts,
                 selections = app.user_selections,
                 conn_out = child_conn,
             )
@@ -653,7 +651,7 @@ class addModelsForm(npyscreen.FormMultiPage):
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self,opt):
         super().__init__()
-        self.opt = opt
+        self.program_opts = opt
         self.user_cancelled = False
         self.user_selections = UserSelections()
 

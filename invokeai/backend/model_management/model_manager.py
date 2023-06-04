@@ -936,34 +936,35 @@ class ModelManager(object):
 
         from . import convert_ckpt_to_diffusers
 
-        if diffusers_path.exists():
-            self.logger.error(
-                f"The path {str(diffusers_path)} already exists. Please move or remove it and try again."
-            )
-            return
-
         model_name = model_name or diffusers_path.name
         model_description = model_description or f"Converted version of {model_name}"
-        self.logger.debug(f"Converting {model_name} to diffusers (30-60s)")
+        
         try:
-            # By passing the specified VAE to the conversion function, the autoencoder
-            # will be built into the model rather than tacked on afterward via the config file
-            vae_model = None
-            if vae:
-                vae_model = self._load_vae(vae)
-                vae_path = None
-            convert_ckpt_to_diffusers(
-                ckpt_path,
-                diffusers_path,
-                extract_ema=True,
-                original_config_file=original_config_file,
-                vae=vae_model,
-                vae_path=vae_path,
-                scan_needed=scan_needed,
-            )
-            self.logger.debug(
-                f"Success. Converted model is now located at {str(diffusers_path)}"
-            )
+            if diffusers_path.exists():
+                self.logger.error(
+                    f"The path {str(diffusers_path)} already exists. Installing previously-converted path."
+                )
+            else:
+                self.logger.debug(f"Converting {model_name} to diffusers (30-60s)")
+
+                # By passing the specified VAE to the conversion function, the autoencoder
+                # will be built into the model rather than tacked on afterward via the config file
+                vae_model = None
+                if vae:
+                    vae_model = self._load_vae(vae)
+                    vae_path = None
+                convert_ckpt_to_diffusers(
+                    ckpt_path,
+                    diffusers_path,
+                    extract_ema=True,
+                    original_config_file=original_config_file,
+                    vae=vae_model,
+                    vae_path=vae_path,
+                    scan_needed=scan_needed,
+                )
+                self.logger.debug(
+                    f"Success. Converted model is now located at {str(diffusers_path)}"
+                )
             self.logger.debug(f"Writing new config file entry for {model_name}")
             new_config = dict(
                 path=str(diffusers_path),
@@ -975,7 +976,7 @@ class ModelManager(object):
             self.add_model(model_name, new_config, True)
             if commit_to_conf:
                 self.commit(commit_to_conf)
-            self.logger.debug("Conversion succeeded")
+            self.logger.debug(f"Model {model_name} installed")
         except Exception as e:
             self.logger.warning(f"Conversion failed: {str(e)}")
             self.logger.warning(traceback.format_exc())
