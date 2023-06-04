@@ -13,6 +13,7 @@ def main():
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
     if '--web' in sys.argv:
+        sys.argv.remove('--web')
         from invokeai.app.api_app import invoke_api
         invoke_api()
     else:

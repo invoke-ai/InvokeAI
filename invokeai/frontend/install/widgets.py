@@ -8,9 +8,12 @@ import platform
 import pyperclip
 import struct
 import sys
+import npyscreen
+import textwrap
+import npyscreen.wgmultiline as wgmultiline
+from npyscreen import fmPopup
 from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
-import npyscreen
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int):
@@ -151,19 +154,19 @@ class MultiSelectColumns( SelectColumnBase, npyscreen.MultiSelect):
         self.rows = math.ceil(self.value_cnt / self.columns)
         super().__init__(screen, values=values, **keywords)
 
+class SingleSelectWithChanged(npyscreen.SelectOne):
+    def h_select(self,ch):
+        super().h_select(ch)
+        if self.on_changed:
+            self.on_changed(self.value)
 
-class SingleSelectColumns(SelectColumnBase, npyscreen.SelectOne):
+class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
         self.value_cnt = len(values)
         self.rows = math.ceil(self.value_cnt / self.columns)
         self.on_changed = None
         super().__init__(screen, values=values, **keywords)
-
-    def h_select(self,ch):
-        super().h_select(ch)
-        if self.on_changed:
-            self.on_changed(self.value)
 
     def when_value_edited(self):
         self.h_select(self.cursor_line)
@@ -271,4 +274,90 @@ class TextBox(npyscreen.MultiLineEdit):
 class BufferBox(npyscreen.BoxTitle):
     _contained_widget = npyscreen.BufferPager
 
+class ConfirmCancelPopup(fmPopup.ActionPopup):
+    DEFAULT_COLUMNS = 100
+    def on_ok(self):
+        self.value = True
+    def on_cancel(self):
+        self.value = False
+        
+class FileBox(npyscreen.BoxTitle):
+    _contained_widget = npyscreen.Filename
     
+def _wrap_message_lines(message, line_length):
+    lines = []
+    for line in message.split('\n'):
+        lines.extend(textwrap.wrap(line.rstrip(), line_length))
+    return lines
+    
+def _prepare_message(message):
+    if isinstance(message, list) or isinstance(message, tuple):
+        return "\n".join([ s.rstrip() for s in message])
+        #return "\n".join(message)
+    else:
+        return message
+    
+def select_stable_diffusion_config_file(
+        form_color: str='DANGER',
+        wrap:bool =True,
+        model_name:str='Unknown',
+):
+    message = "Please select the correct base model for the V2 checkpoint named {model_name}. Press <CANCEL> to skip installation."
+    title = "CONFIG FILE SELECTION"
+    options=[
+        "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
+        "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
+        "Enter config file path manually",
+    ]
+
+    F = ConfirmCancelPopup(
+        name=title,
+        color=form_color,
+        cycle_widgets=True,
+        lines=16,
+    )
+    F.preserve_selected_widget = True
+    
+    mlw = F.add(
+        wgmultiline.Pager,
+        max_height=4,
+        editable=False,
+    )
+    mlw_width = mlw.width-1
+    if wrap:
+        message = _wrap_message_lines(message, mlw_width)
+    mlw.values = message
+
+    choice = F.add(
+        SingleSelectWithChanged,
+        values = options,
+        value = [0],
+        max_height = len(options)+1,
+        scroll_exit=True,
+    )
+    file = F.add(
+        FileBox,
+        name='Path to config file',
+        max_height=3,
+        hidden=True,
+        must_exist=True,
+        scroll_exit=True
+    )
+
+    def toggle_visible(value):
+        value = value[0]
+        if value==2:
+            file.hidden=False
+        else:
+            file.hidden=True
+        F.display()
+        
+    choice.on_changed = toggle_visible
+
+    F.editw = 1
+    F.edit()
+    if not F.value:
+        return None
+    assert choice.value[0] in range(0,3),'invalid choice'
+    choices = ['epsilon','v',file.value]
+    return choices[choice.value[0]]

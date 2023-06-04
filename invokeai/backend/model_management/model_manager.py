@@ -874,14 +874,12 @@ class ModelManager(object):
                     model_config_file = self.globals.legacy_conf_path / "v2-inference.yaml"
                 elif model_type == SDLegacyType.V2:
                     self.logger.warning(
-                        f"{thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                        f"{thing} is a V2 checkpoint file, but its parameterization cannot be determined."
                     )
-                    return
                 else:
                     self.logger.warning(
-                        f"{thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                        f"{thing} is a legacy checkpoint file but not a known Stable Diffusion model."
                     )
-                    return
 
         if not model_config_file and config_file_callback:
             model_config_file = config_file_callback(model_path)

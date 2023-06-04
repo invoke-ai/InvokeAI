@@ -48,7 +48,9 @@ from .widgets import (
     OffsetButtonPress,
     TextBox,
     BufferBox,
+    FileBox,
     set_min_terminal_size,
+    select_stable_diffusion_config_file,
 )
 from invokeai.app.services.config import get_invokeai_config
 
@@ -363,7 +365,9 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.nextrely += 2
         widgets.update(
             autoload_directory = self.add_widget_intelligent(
-                npyscreen.TitleFilename,
+#                npyscreen.TitleFilename,
+                FileBox,
+                max_height=3,
                 name=label,
                 select_dir=True,
                 must_exist=True,
@@ -485,39 +489,67 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.parentApp.user_cancelled = True
         self.editing = False
 
+    ########## This routine monitors the child process that is performing model installation and removal #####
     def while_waiting(self):
-        app = self.parentApp
+        '''Called during idle periods. Main task is to update the Log Messages box with messages
+        from the child process that does the actual installation/removal'''
+        c = self.subprocess_connection
+        if not c:
+            return
+        
         monitor_widget = self.monitor.entry_widget
-        if c := self.subprocess_connection:
-            while c.poll():
-                try:
-                    data = c.recv_bytes().decode('utf-8')
-                    data.strip('\n')
-                    if data=='*done*':
-                        self.subprocess_connection = None
-                        monitor_widget.buffer(['** Action Complete **'])
-                        self.display()
-                        # rebuild the form, saving log messages
-                        saved_messages = monitor_widget.values
-                        app.main_form = app.addForm(
-                            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
-                        )
-                        app.switchForm('MAIN')
-                        app.main_form.monitor.entry_widget.values = saved_messages
-                        app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
-                        break
-                    else:
-                        monitor_widget.buffer(
-                            textwrap.wrap(data,
-                                          width=monitor_widget.width,
-                                          subsequent_indent='   ',
-                                          ),
-                            scroll_end=True
-                        )
-                        self.display()
-                except (EOFError,OSError):
-                    self.subprocess_connection = None
+        while c.poll():
+            try:
+                data = c.recv_bytes().decode('utf-8')
+                data.strip('\n')
 
+                # processing child is requesting user input to select the
+                # right configuration file
+                if data.startswith('*need v2 config'):
+                    _,model_path,*_ = data.split(":",2)
+                    self._return_v2_config(model_path)
+
+                # processing child is done
+                elif data=='*done*':
+                    self._close_subprocess_and_regenerate_form()
+                    break
+
+                # update the log message box
+                else:
+                    monitor_widget.buffer(
+                        textwrap.wrap(data,
+                                      width=monitor_widget.width,
+                                      subsequent_indent='   ',
+                                      ),
+                        scroll_end=True
+                    )
+                    self.display()
+            except (EOFError,OSError):
+                self.subprocess_connection = None
+
+    def _return_v2_config(self,model_path: str):
+        c = self.subprocess_connection
+        model_name = Path(model_path).name
+        message = select_stable_diffusion_config_file(model_name=model_name)
+        c.send_bytes(message.encode('utf-8'))
+
+    def _close_subprocess_and_regenerate_form(self):
+        app = self.parentApp
+        self.subprocess_connection.close()
+        self.subprocess_connection = None
+        self.monitor.entry_widget.buffer(['** Action Complete **'])
+        self.display()
+        # rebuild the form, saving log messages
+        saved_messages = self.monitor.entry_widget.values
+        app.main_form = app.addForm(
+            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
+        )
+        app.switchForm('MAIN')
+        app.main_form.monitor.entry_widget.values = saved_messages
+        app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
+
+    ###############################################################
+    
     def list_additional_diffusers_models(self,
                                          manager: ModelManager,
                                          starters:dict
@@ -628,7 +660,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main_form = self.addForm(
-            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
+            "MAIN", addModelsForm, name="Install Stable Diffusion Models", cycle_widgets=True,
         )
 
 class StderrToMessage():
@@ -640,6 +672,57 @@ class StderrToMessage():
 
     def flush(self):
         pass
+
+# --------------------------------------------------------
+def ask_user_for_config_file(model_path: Path,
+                             tui_conn: Connection=None
+                             )->Path:
+    logger.debug(f'Waiting for user action in dialog box (above).')
+    if tui_conn:
+        return _ask_user_for_cf_tui(model_path, tui_conn)        
+    else:
+        return _ask_user_for_cf_cmdline(model_path)
+
+def _ask_user_for_cf_cmdline(model_path):
+    choices = [
+        config.model_conf_path / 'stable-diffusion' / x
+        for x in ['v2-inference.yaml','v2-inference-v.yaml']
+    ]
+    print(
+f"""
+Please select the type of the V2 checkpoint named {model_path.name}:
+[1] A Stable Diffusion v2.x base model (512 pixels; there should be no 'parameterization:' line in its yaml file)
+[2] A Stable Diffusion v2.x v-predictive model (768 pixels; look for a 'parameterization: "v"' line in its yaml file)
+"""
+        )
+    choice = None
+    ok = False
+    while not ok:
+        try:
+            choice = input('select> ').strip()
+            choice = choices[int(choice)-1]
+            ok = True
+        except (ValueError, IndexError):
+            print(f'{choice} is not a valid choice')
+        except EOFError:
+            return
+    return choice
+        
+def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
+    try:
+        tui_conn.send_bytes(f'*need v2 config for:{model_path}'.encode('utf-8'))
+        # note that we don't do any status checking here
+        response = tui_conn.recv_bytes().decode('utf-8')
+        if response is None:
+            return None
+        elif response == 'epsilon':
+            return config.legacy_conf_path / 'v2-inference.yaml'
+        elif response == 'v':
+            return config.legacy_conf_path  / 'v2-inference-v.yaml'
+        else:
+            return Path(response)
+    except:
+        return None
         
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace,
@@ -651,13 +734,16 @@ def process_and_execute(opt: Namespace,
         translator = StderrToMessage(conn_out)
         sys.stderr = translator
         sys.stdout = translator
-        InvokeAILogger.getLogger().handlers[0]=logging.StreamHandler(translator)
+        logger = InvokeAILogger.getLogger()
+        logger.handlers.clear()
+        logger.addHandler(logging.StreamHandler(translator))
     
     models_to_install = selections.install_models
     models_to_remove = selections.remove_models
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
+
     install_requested_models(
         diffusers = ModelInstallList(models_to_install, models_to_remove),
         controlnet = ModelInstallList(selections.install_cn_models, selections.remove_cn_models),
@@ -671,6 +757,7 @@ def process_and_execute(opt: Namespace,
         else choose_precision(torch.device(choose_torch_device())),
         purge_deleted=selections.purge_deleted_models,
         config_file_path=Path(opt.config_file) if opt.config_file else None,
+        model_config_file_callback = lambda x: ask_user_for_config_file(x,conn_out)
     )
 
     if conn_out:

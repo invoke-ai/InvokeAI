@@ -9,7 +9,7 @@ import warnings
 from dataclasses import dataclass,field
 from pathlib import Path
 from tempfile import TemporaryFile
-from typing import List, Dict
+from typing import List, Dict, Callable
 
 import requests
 from diffusers import AutoencoderKL
@@ -95,6 +95,7 @@ def install_requested_models(
         precision: str = "float16",
         purge_deleted: bool = False,
         config_file_path: Path = None,
+        model_config_file_callback:  Callable[[Path],Path] = None
 ):
     """
     Entry point for installing/deleting starter models, or installing external models.
@@ -118,19 +119,19 @@ def install_requested_models(
 
     # TODO: Replace next three paragraphs with calls into new model manager
     if diffusers.remove_models and len(diffusers.remove_models) > 0:
-        logger.info("DELETING UNCHECKED STARTER MODELS")
+        logger.info("Processing requested deletions")
         for model in diffusers.remove_models:
             logger.info(f"{model}...")
             model_manager.del_model(model, delete_files=purge_deleted)
         model_manager.commit(config_file_path)
 
     if diffusers.install_models and len(diffusers.install_models) > 0:
-        logger.info("INSTALLING SELECTED STARTER MODELS")
+        logger.info("Installing requested models")
         downloaded_paths = download_weight_datasets(
             models=diffusers.install_models,
             access_token=None,
             precision=precision,
-        )  # FIX: for historical reasons, we don't use model manager here
+        )
         successful = {x:v for x,v in downloaded_paths.items() if v is not None}
         if len(successful) > 0:
             update_config_file(successful, config_file_path)
@@ -153,6 +154,7 @@ def install_requested_models(
                 model_manager.heuristic_import(
                     path_url_or_repo,
                     commit_to_conf=config_file_path,
+                    config_file_callback = model_config_file_callback,
                 )
             except KeyboardInterrupt:
                 sys.exit(-1)
