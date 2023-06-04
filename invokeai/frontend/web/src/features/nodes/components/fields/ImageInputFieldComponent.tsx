@@ -19,17 +19,21 @@ const ImageInputFieldComponent = (
 
   const dispatch = useAppDispatch();
 
-  const handleChange = useCallback(
-    (image: ImageDTO) => {
+  const handleDrop = useCallback(
+    (droppedImage: ImageDTO) => {
+      if (field.value?.image_name === droppedImage.image_name) {
+        return;
+      }
+
       dispatch(
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: image,
+          value: droppedImage,
         })
       );
     },
-    [dispatch, field.name, nodeId]
+    [dispatch, field.name, field.value?.image_name, nodeId]
   );
 
   const handleReset = useCallback(() => {
@@ -53,7 +57,7 @@ const ImageInputFieldComponent = (
     >
       <IAIDndImage
         image={field.value}
-        onDrop={handleChange}
+        onDrop={handleDrop}
         onReset={handleReset}
         resetIconSize="sm"
       />

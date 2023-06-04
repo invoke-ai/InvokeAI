@@ -67,9 +67,12 @@ const CurrentImagePreview = () => {
 
   const handleDrop = useCallback(
     (droppedImage: ImageDTO) => {
+      if (droppedImage.image_name === image?.image_name) {
+        return;
+      }
       dispatch(imageSelected(droppedImage));
     },
-    [dispatch]
+    [dispatch, image?.image_name]
   );
 
   return (

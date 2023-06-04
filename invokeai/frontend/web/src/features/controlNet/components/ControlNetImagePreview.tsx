@@ -36,11 +36,16 @@ const ControlNetImagePreview = (props: Props) => {
 
   const isMouseOverImage = useHoverDirty(containerRef);
 
-  const handleControlImageChanged = useCallback(
-    (controlImage: ImageDTO) => {
-      dispatch(controlNetImageChanged({ controlNetId, controlImage }));
+  const handleDrop = useCallback(
+    (droppedImage: ImageDTO) => {
+      if (controlImage?.image_name === droppedImage.image_name) {
+        return;
+      }
+      dispatch(
+        controlNetImageChanged({ controlNetId, controlImage: droppedImage })
+      );
     },
-    [controlNetId, dispatch]
+    [controlImage, controlNetId, dispatch]
   );
 
   const shouldShowProcessedImageBackdrop =
@@ -58,7 +63,7 @@ const ControlNetImagePreview = (props: Props) => {
     <Box ref={containerRef} sx={{ position: 'relative', w: 'full', h: 'full' }}>
       <IAIDndImage
         image={controlImage}
-        onDrop={handleControlImageChanged}
+        onDrop={handleDrop}
         isDropDisabled={Boolean(
           processedControlImage && processorType !== 'none'
         )}
@@ -108,7 +113,7 @@ const ControlNetImagePreview = (props: Props) => {
               >
                 <IAIDndImage
                   image={processedControlImage}
-                  onDrop={handleControlImageChanged}
+                  onDrop={handleDrop}
                   payloadImage={controlImage}
                 />
               </Box>
