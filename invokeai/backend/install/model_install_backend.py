@@ -27,7 +27,7 @@ from ..util.logging import InvokeAILogger
 warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
-config = get_invokeai_config()
+config = get_invokeai_config(argv=[])
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
