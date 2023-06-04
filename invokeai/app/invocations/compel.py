@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.util.choose_model import choose_model
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+from ...backend.prompting.conditioning import try_parse_legacy_blend
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
@@ -13,7 +14,7 @@ from compel.prompt_parser import (
     Blend,
     CrossAttentionControlSubstitute,
     FlattenedPrompt,
-    Fragment,
+    Fragment, Conjunction,
 )
 
 
@@ -93,25 +94,22 @@ class CompelInvocation(BaseInvocation):
             text_encoder=text_encoder,
             textual_inversion_manager=pipeline.textual_inversion_manager,
             dtype_for_device_getter=torch_dtype,
-            truncate_long_prompts=True, # TODO:
+            truncate_long_prompts=False,
         )
 
-        # TODO: support legacy blend?
-
-        conjunction = Compel.parse_prompt_string(prompt_str)
-        prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
+        legacy_blend = try_parse_legacy_blend(prompt_str, skip_normalize=False)
+        if legacy_blend is not None:
+            conjunction = legacy_blend
+        else:
+            conjunction = Compel.parse_prompt_string(prompt_str)
 
         if context.services.configuration.log_tokenization:
-            log_tokenization_for_prompt_object(prompt, tokenizer)
+            log_tokenization_for_conjunction(conjunction, tokenizer)
 
-        c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
-
-        # TODO: long prompt support
-        #if not self.truncate_long_prompts:
-        #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+        c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
         ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-            tokens_count_including_eos_bos=get_max_token_count(tokenizer, prompt),
+            tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
             cross_attention_control_args=options.get("cross_attention_control", None),
         )
 
@@ -128,14 +126,22 @@ class CompelInvocation(BaseInvocation):
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=False
+    tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction], truncate_if_too_long=False
 ) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
         return max(
             [
-                get_max_token_count(tokenizer, c, truncate_if_too_long)
-                for c in blend.prompts
+                get_max_token_count(tokenizer, p, truncate_if_too_long)
+                for p in blend.prompts
+            ]
+        )
+    elif type(prompt) is Conjunction:
+        conjunction: Conjunction = prompt
+        return sum(
+            [
+                get_max_token_count(tokenizer, p, truncate_if_too_long)
+                for p in conjunction.prompts
             ]
         )
     else:
@@ -168,6 +174,22 @@ def get_tokens_for_prompt_object(
         max_tokens_length = tokenizer.model_max_length - 2  # typically 75
         tokens = tokens[0:max_tokens_length]
     return tokens
+
+
+def log_tokenization_for_conjunction(
+    c: Conjunction, tokenizer, display_label_prefix=None
+):
+    display_label_prefix = display_label_prefix or ""
+    for i, p in enumerate(c.prompts):
+        if len(c.prompts)>1:
+            this_display_label_prefix = f"{display_label_prefix}(conjunction part {i + 1}, weight={c.weights[i]})"
+        else:
+            this_display_label_prefix = display_label_prefix
+        log_tokenization_for_prompt_object(
+            p,
+            tokenizer,
+            display_label_prefix=this_display_label_prefix
+        )
 
 
 def log_tokenization_for_prompt_object(

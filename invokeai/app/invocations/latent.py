@@ -4,6 +4,7 @@ import random
 import einops
 from typing import Literal, Optional, Union, List
 
+from compel import Compel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
 
 from pydantic import BaseModel, Field, validator
@@ -232,6 +233,15 @@ class TextToLatentsInvocation(BaseInvocation):
     def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
         c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
+
+        compel = Compel(
+            tokenizer=model.tokenizer,
+            text_encoder=model.text_encoder,
+            textual_inversion_manager=model.textual_inversion_manager,
+            dtype_for_device_getter=torch_dtype,
+            truncate_long_prompts=False,
+        )
+        [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
         conditioning_data = ConditioningData(
             uc,

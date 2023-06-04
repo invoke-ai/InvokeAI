@@ -28,6 +28,7 @@ warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
 config = InvokeAIAppConfig.get_config()
+
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 

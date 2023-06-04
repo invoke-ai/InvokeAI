@@ -1,4 +1,5 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
+import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
 import { initialImagesState } from 'features/gallery/store/imagesSlice';
 import { initialLightboxState } from 'features/lightbox/store/lightboxSlice';
@@ -28,6 +29,7 @@ const initialStates: {
   ui: initialUIState,
   hotkeys: initialHotkeysState,
   images: initialImagesState,
+  controlNet: initialControlNetState,
 };
 
 export const unserialize: UnserializeFunction = (data, key) => {

@@ -1,12 +1,15 @@
 import os
 import pytest
+import sys
 
 from omegaconf import OmegaConf
 from pathlib import Path
 
 os.environ['INVOKEAI_ROOT']='/tmp'
+
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.invocations.generate import TextToImageInvocation
+
 
 init1 = OmegaConf.create(
 '''

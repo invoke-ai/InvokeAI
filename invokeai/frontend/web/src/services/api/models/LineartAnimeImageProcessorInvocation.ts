@@ -18,15 +18,15 @@ export type LineartAnimeImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'lineart_anime_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * pixel resolution for edge detection
+   * The pixel resolution for detection
    */
   detect_resolution?: number;
   /**
-   * pixel resolution for output image
+   * The pixel resolution for the output image
    */
   image_resolution?: number;
 };

@@ -2,12 +2,10 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { t } from 'i18next';
 import { addToast } from 'features/system/store/systemSlice';
 import { startAppListening } from '..';
-import {
-  initialImageSelected,
-  isImageDTO,
-} from 'features/parameters/store/actions';
+import { initialImageSelected } from 'features/parameters/store/actions';
 import { makeToast } from 'app/components/Toaster';
 import { selectImagesById } from 'features/gallery/store/imagesSlice';
+import { isImageDTO } from 'services/types/guards';
 
 export const addInitialImageSelectedListener = () => {
   startAppListening({

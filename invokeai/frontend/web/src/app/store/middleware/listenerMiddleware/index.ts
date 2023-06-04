@@ -70,6 +70,8 @@ import {
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
+import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
+import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -173,3 +175,7 @@ addReceivedPageOfImagesRejectedListener();
 
 // Gallery
 addImageCategoriesChangedListener();
+
+// ControlNet
+addControlNetImageProcessedListener();
+addControlNetAutoProcessListener();

@@ -18,27 +18,27 @@ export type ContentShuffleImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'content_shuffle_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * pixel resolution for edge detection
+   * The pixel resolution for detection
    */
   detect_resolution?: number;
   /**
-   * pixel resolution for output image
+   * The pixel resolution for the output image
    */
   image_resolution?: number;
   /**
-   * content shuffle h parameter
+   * Content shuffle `h` parameter
    */
   'h'?: number;
   /**
-   * content shuffle w parameter
+   * Content shuffle `w` parameter
    */
   'w'?: number;
   /**
-   * cont
+   * Content shuffle `f` parameter
    */
   'f'?: number;
 };
