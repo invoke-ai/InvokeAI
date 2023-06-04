@@ -18,19 +18,19 @@ export type OpenposeImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'openpose_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * whether to use hands and face mode
+   * Whether to use hands and face mode
    */
   hand_and_face?: boolean;
   /**
-   * pixel resolution for edge detection
+   * The pixel resolution for detection
    */
   detect_resolution?: number;
   /**
-   * pixel resolution for output image
+   * The pixel resolution for the output image
    */
   image_resolution?: number;
 };

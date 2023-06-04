@@ -10,7 +10,7 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
@@ -233,7 +233,7 @@ const ImageGalleryContent = () => {
                 withReset
                 handleReset={() => dispatch(setGalleryImageMinimumWidth(64))}
               />
-              <IAICheckbox
+              <IAISimpleCheckbox
                 label={t('gallery.maintainAspectRatio')}
                 isChecked={galleryImageObjectFit === 'contain'}
                 onChange={() =>
@@ -244,14 +244,14 @@ const ImageGalleryContent = () => {
                   )
                 }
               />
-              <IAICheckbox
+              <IAISimpleCheckbox
                 label={t('gallery.autoSwitchNewImages')}
                 isChecked={shouldAutoSwitchToNewImages}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldAutoSwitchToNewImages(e.target.checked))
                 }
               />
-              <IAICheckbox
+              <IAISimpleCheckbox
                 label={t('gallery.singleColumnLayout')}
                 isChecked={shouldUseSingleGalleryColumn}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>

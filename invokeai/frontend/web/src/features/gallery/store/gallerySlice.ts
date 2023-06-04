@@ -50,7 +50,10 @@ export const gallerySlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(imageUpserted, (state, action) => {
-      if (state.shouldAutoSwitchToNewImages) {
+      if (
+        state.shouldAutoSwitchToNewImages &&
+        action.payload.image_category === 'general'
+      ) {
         state.selectedImage = action.payload;
       }
     });

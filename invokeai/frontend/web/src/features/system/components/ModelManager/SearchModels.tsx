@@ -1,5 +1,5 @@
 import IAIButton from 'common/components/IAIButton';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import React from 'react';
 
@@ -81,13 +81,13 @@ function SearchModelEntry({
       borderRadius={4}
     >
       <Flex gap={4} alignItems="center" justifyContent="space-between">
-        <IAICheckbox
+        <IAISimpleCheckbox
           value={model.name}
           label={<Text fontWeight={500}>{model.name}</Text>}
           isChecked={modelsToAdd.includes(model.name)}
           isDisabled={existingModels.includes(model.location)}
           onChange={foundModelsChangeHandler}
-        ></IAICheckbox>
+        ></IAISimpleCheckbox>
         {existingModels.includes(model.location) && (
           <Badge colorScheme="accent">{t('modelManager.modelExists')}</Badge>
         )}
@@ -324,7 +324,7 @@ export default function SearchModels() {
               >
                 {t('modelManager.deselectAll')}
               </IAIButton>
-              <IAICheckbox
+              <IAISimpleCheckbox
                 label={t('modelManager.showExisting')}
                 isChecked={shouldShowExistingModelsInSearch}
                 onChange={() =>

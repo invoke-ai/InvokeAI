@@ -16,7 +16,6 @@ const UnifiedCanvasParameters = () => {
       <ParamNegativeConditioning />
       <ProcessButtons />
       <UnifiedCanvasCoreParameters />
-      <ParamSeedCollapse />
       <ParamVariationCollapse />
       <ParamSymmetryCollapse />
       <ParamSeamCorrectionCollapse />

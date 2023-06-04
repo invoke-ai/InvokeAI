@@ -18,23 +18,23 @@ export type PidiImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'pidi_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * pixel resolution for edge detection
+   * The pixel resolution for detection
    */
   detect_resolution?: number;
   /**
-   * pixel resolution for output image
+   * The pixel resolution for the output image
    */
   image_resolution?: number;
   /**
-   * whether to use safe mode
+   * Whether to use safe mode
    */
   safe?: boolean;
   /**
-   * whether to use scribble mode
+   * Whether to use scribble mode
    */
   scribble?: boolean;
 };

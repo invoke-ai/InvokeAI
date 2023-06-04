@@ -2,30 +2,10 @@ import { ChangeEvent, memo } from 'react';
 
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISwitch from 'common/components/IAISwitch';
 import { setShouldRandomizeSeed } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
-import { FormControl, FormLabel, Switch } from '@chakra-ui/react';
-
-// export default function RandomizeSeed() {
-//   const dispatch = useAppDispatch();
-//   const { t } = useTranslation();
-
-//   const shouldRandomizeSeed = useAppSelector(
-//     (state: RootState) => state.generation.shouldRandomizeSeed
-//   );
-
-//   const handleChangeShouldRandomizeSeed = (e: ChangeEvent<HTMLInputElement>) =>
-//     dispatch(setShouldRandomizeSeed(e.target.checked));
-
-//   return (
-//     <Switch
-//       aria-label={t('parameters.randomizeSeed')}
-//       isChecked={shouldRandomizeSeed}
-//       onChange={handleChangeShouldRandomizeSeed}
-//     />
-//   );
-// }
+import { FormControl, FormLabel, Switch, Tooltip } from '@chakra-ui/react';
+import IAISwitch from 'common/components/IAISwitch';
 
 const ParamSeedRandomize = () => {
   const dispatch = useAppDispatch();
@@ -37,6 +17,14 @@ const ParamSeedRandomize = () => {
 
   const handleChangeShouldRandomizeSeed = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setShouldRandomizeSeed(e.target.checked));
+
+  return (
+    <IAISwitch
+      label={t('common.random')}
+      isChecked={shouldRandomizeSeed}
+      onChange={handleChangeShouldRandomizeSeed}
+    />
+  );
 
   return (
     <FormControl

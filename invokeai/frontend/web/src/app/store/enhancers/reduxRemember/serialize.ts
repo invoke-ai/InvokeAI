@@ -1,4 +1,5 @@
 import { canvasPersistDenylist } from 'features/canvas/store/canvasPersistDenylist';
+import { controlNetDenylist } from 'features/controlNet/store/controlNetDenylist';
 import { galleryPersistDenylist } from 'features/gallery/store/galleryPersistDenylist';
 import { lightboxPersistDenylist } from 'features/lightbox/store/lightboxPersistDenylist';
 import { nodesPersistDenylist } from 'features/nodes/store/nodesPersistDenylist';
@@ -23,6 +24,7 @@ const serializationDenylist: {
   system: systemPersistDenylist,
   // config: configPersistDenyList,
   ui: uiPersistDenylist,
+  controlNet: controlNetDenylist,
   // hotkeys: hotkeysPersistDenylist,
 };
 

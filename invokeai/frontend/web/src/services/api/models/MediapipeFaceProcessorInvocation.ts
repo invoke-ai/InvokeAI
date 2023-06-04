@@ -18,15 +18,15 @@ export type MediapipeFaceProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'mediapipe_face_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * maximum number of faces to detect
+   * Maximum number of faces to detect
    */
   max_faces?: number;
   /**
-   * minimum confidence for face detection
+   * Minimum confidence for face detection
    */
   min_confidence?: number;
 };
