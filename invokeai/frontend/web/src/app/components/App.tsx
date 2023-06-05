@@ -21,6 +21,7 @@ import { ReactNode, memo, useCallback, useEffect, useState } from 'react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import DeleteModal from 'features/gallery/components/DeleteModal';
 
 const DEFAULT_CONFIG = {};
 
@@ -133,6 +134,7 @@ const App = ({
           <FloatingGalleryButton />
         </Portal>
       </Grid>
+      <DeleteModal />
       <Toaster />
       <GlobalHotkeys />
     </>

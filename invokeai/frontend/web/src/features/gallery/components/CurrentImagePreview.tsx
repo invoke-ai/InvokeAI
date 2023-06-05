@@ -15,6 +15,7 @@ import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { useGetIsImageInUse } from 'common/hooks/useGetIsImageInUse';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -54,6 +55,8 @@ const CurrentImagePreview = () => {
   const toaster = useAppToaster();
   const dispatch = useAppDispatch();
 
+  const isImageInUse = useGetIsImageInUse(image?.image_name);
+  console.log(isImageInUse);
   const handleError = useCallback(() => {
     dispatch(imageSelected());
     if (shouldFetchImages) {

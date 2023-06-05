@@ -17,6 +17,10 @@ import '../../i18n';
 import { socketMiddleware } from 'services/events/middleware';
 import { Middleware } from '@reduxjs/toolkit';
 import ImageDndContext from './ImageDnd/ImageDndContext';
+import {
+  DeleteImageContext,
+  DeleteImageContextProvider,
+} from 'app/contexts/DeleteImageContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -71,11 +75,13 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <ImageDndContext>
-              <App
-                config={config}
-                headerComponent={headerComponent}
-                setIsReady={setIsReady}
-              />
+              <DeleteImageContextProvider>
+                <App
+                  config={config}
+                  headerComponent={headerComponent}
+                  setIsReady={setIsReady}
+                />
+              </DeleteImageContextProvider>
             </ImageDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
