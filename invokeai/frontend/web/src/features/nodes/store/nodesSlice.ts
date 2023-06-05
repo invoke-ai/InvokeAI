@@ -17,9 +17,9 @@ import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
 import { forEach, size } from 'lodash-es';
-import { isAnyGraphBuilt } from './actions';
 import { RgbaColor } from 'react-colorful';
 import { imageUrlsReceived } from 'services/thunks/image';
+import { RootState } from 'app/store/store';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -130,3 +130,5 @@ export const {
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
+
+export const nodesSelecter = (state: RootState) => state.nodes;
