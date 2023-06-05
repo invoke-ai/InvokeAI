@@ -50,37 +50,37 @@ class FloatLinearRangeInvocation(BaseInvocation):
 
 
 EASING_FUNCTIONS_MAP = {
-    "linear": LinearInOut,
-    "quad_in": QuadEaseIn,
-    "quad_out": QuadEaseOut,
-    "quad_in_out": QuadEaseInOut,
-    "cubic_in": CubicEaseIn,
-    "cubic_out": CubicEaseOut,
-    "cubic_in_out": CubicEaseInOut,
-    "quartic_in": QuarticEaseIn,
-    "quartic_out": QuarticEaseOut,
-    "quartic_in_out": QuarticEaseInOut,
-    "quintic_in": QuinticEaseIn,
-    "quintic_out": QuinticEaseOut,
-    "quintic_in_out": QuinticEaseInOut,
-    "sine_in": SineEaseIn,
-    "sine_out": SineEaseOut,
-    "sine_in_out": SineEaseInOut,
-    "circular_in": CircularEaseIn,
-    "circular_out": CircularEaseOut,
-    "circular_in_out": CircularEaseInOut,
-    "exponential_in": ExponentialEaseIn,
-    "exponential_out": ExponentialEaseOut,
-    "exponential_in_out": ExponentialEaseInOut,
-    "elastic_in": ElasticEaseIn,
-    "elastic_out": ElasticEaseOut,
-    "elastic_in_out": ElasticEaseInOut,
-    "back_in": BackEaseIn,
-    "back_out": BackEaseOut,
-    "back_in_out": BackEaseInOut,
-    "bounce_in": BounceEaseIn,
-    "bounce_out": BounceEaseOut,
-    "bounce_in_out": BounceEaseInOut,
+    "Linear": LinearInOut,
+    "QuadIn": QuadEaseIn,
+    "QuadOut": QuadEaseOut,
+    "QuadInOut": QuadEaseInOut,
+    "CubicIn": CubicEaseIn,
+    "CubicOut": CubicEaseOut,
+    "CubicInOut": CubicEaseInOut,
+    "QuarticIn": QuarticEaseIn,
+    "QuarticOut": QuarticEaseOut,
+    "QuarticInOut": QuarticEaseInOut,
+    "QuinticIn": QuinticEaseIn,
+    "QuinticOut": QuinticEaseOut,
+    "QuinticInOut": QuinticEaseInOut,
+    "SineIn": SineEaseIn,
+    "SineOut": SineEaseOut,
+    "SineInOut": SineEaseInOut,
+    "CircularIn": CircularEaseIn,
+    "CircularOut": CircularEaseOut,
+    "CircularInOut": CircularEaseInOut,
+    "ExponentialIn": ExponentialEaseIn,
+    "ExponentialOut": ExponentialEaseOut,
+    "ExponentialInOut": ExponentialEaseInOut,
+    "ElasticIn": ElasticEaseIn,
+    "ElasticOut": ElasticEaseOut,
+    "ElasticInOut": ElasticEaseInOut,
+    "BackIn": BackEaseIn,
+    "BackOut": BackEaseOut,
+    "BackInOut": BackEaseInOut,
+    "BounceIn": BounceEaseIn,
+    "BounceOut": BounceEaseOut,
+    "BounceInOut": BounceEaseInOut,
 }
 
 EASING_FUNCTION_KEYS = Literal[
@@ -106,60 +106,115 @@ class StepParamEasingInvocation(BaseInvocation):
     pre_start_value: Optional[float] = Field(default=None, description="value before easing start")
     # if None, then end value is used prior to easing end
     post_end_value: Optional[float] = Field(default=None, description="value after easing end")
+    mirror: bool = Field(default=False, description="include mirror of easing function")
+    # FIXME: add alt_mirror option (alternative to default or mirror), or remove entirely
+    # alt_mirror: bool = Field(default=False, description="alternative mirroring by dual easing")
     show_easing_plot: bool = Field(default=False, description="show easing plot")
     # fmt: on
 
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
+        print_diagnostics = False
         # convert from start_step_percent to nearest step <= (steps * start_step_percent)
-        start_step = int(np.floor(self.num_steps * self.start_step_percent))
+        # start_step = int(np.floor(self.num_steps * self.start_step_percent))
+        start_step = int(np.round(self.num_steps * self.start_step_percent))
         # convert from end_step_percent to nearest step >= (steps * end_step_percent)
-        end_step = int(np.ceil((self.num_steps - 1) * self.end_step_percent))
+        # end_step = int(np.ceil((self.num_steps - 1) * self.end_step_percent))
+        end_step = int(np.round((self.num_steps - 1) * self.end_step_percent))
+
+        # end_step = int(np.ceil(self.num_steps * self.end_step_percent))
         num_easing_steps = end_step - start_step + 1
 
-        num_presteps = max(start_step - 1, 0)
+        # num_presteps = max(start_step - 1, 0)
+        num_presteps = start_step
         num_poststeps = self.num_steps - (num_presteps + num_easing_steps)
         prelist = list(num_presteps * [self.pre_start_value])
         postlist = list(num_poststeps * [self.post_end_value])
 
-        print("start_step", start_step)
-        print("end_step", end_step)
-        print("num_easing_steps", num_easing_steps)
-        print("num_presteps", num_presteps)
-        print("num_poststeps", num_poststeps)
-        print("prelist size", len(prelist))
-        print("postlist size", len(postlist))
-        print("prelist", prelist)
-        print("postlist", postlist)
+        if print_diagnostics:
+            print("start_step", start_step)
+            print("end_step", end_step)
+            print("num_easing_steps", num_easing_steps)
+            print("num_presteps", num_presteps)
+            print("num_poststeps", num_poststeps)
+            print("prelist size", len(prelist))
+            print("postlist size", len(postlist))
+            print("prelist", prelist)
+            print("postlist", postlist)
 
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
-        # print(easing_class)
+        if print_diagnostics: print(easing_class)
         easing_list = list()
-        easing_function = easing_class(start=self.start_value,
-                                       end=self.end_value,
-                                       duration=num_easing_steps - 1)
-        for step_index in range(num_easing_steps):
-            step_val = easing_function.ease(step_index)
-            print(step_index, step_val)
-            easing_list.append(step_val)
+        if self.mirror:  # "expected" mirroring
+            # if number of steps is even, squeeze duration down to (number_of_steps)/2
+            # and create reverse copy of list to append
+            # if number of steps is odd, squeeze duration down to ceil(number_of_steps/2)
+            # and create reverse copy of list[1:end-1]
+            # but if even then number_of_steps/2 === ceil(number_of_steps/2), so can just use ceil always
 
-        # linspace_list = list(np.linspace(self.start_value, self.end_value, num_easing_steps))
-        # print("linspace easing param_list size", len(easing_list))
-        # print(linspace_list)
+            base_easing_duration = int(np.ceil(num_easing_steps/2.0))
+            if print_diagnostics: print("base easing duration: ", base_easing_duration)
+            even_num_steps = (num_easing_steps % 2 == 0)  # even number of steps
+            easing_function = easing_class(start=self.start_value,
+                                           end=self.end_value,
+                                           duration=base_easing_duration - 1)
+            base_easing_vals = list()
+            for step_index in range(base_easing_duration):
+                easing_val = easing_function.ease(step_index)
+                base_easing_vals.append(easing_val)
+                if print_diagnostics: print("step_index: ", step_index, "easing_val: ", easing_val)
+            if even_num_steps:
+                mirror_easing_vals = list(reversed(base_easing_vals))
+            else:
+                mirror_easing_vals = list(reversed(base_easing_vals[0:-1]))
+            if print_diagnostics:
+                print("base easing vals: ", base_easing_vals)
+                print("mirror easing vals: ", mirror_easing_vals)
+            easing_list = base_easing_vals + mirror_easing_vals
 
-        # print("prelist size", len(prelist))
-        # print("easing_list size", len(easing_list))
-        # print("postlist size", len(postlist))
+        # FIXME: add alt_mirror option (alternative to default or mirror), or remove entirely
+        # elif self.alt_mirror:  # function mirroring (unintuitive behavior (at least to me))
+        #     # half_ease_duration = round(num_easing_steps - 1 / 2)
+        #     half_ease_duration = round((num_easing_steps - 1) / 2)
+        #     easing_function = easing_class(start=self.start_value,
+        #                                    end=self.end_value,
+        #                                    duration=half_ease_duration,
+        #                                    )
+        #
+        #     mirror_function = easing_class(start=self.end_value,
+        #                                    end=self.start_value,
+        #                                    duration=half_ease_duration,
+        #                                    )
+        #     for step_index in range(num_easing_steps):
+        #         if step_index <= half_ease_duration:
+        #             step_val = easing_function.ease(step_index)
+        #         else:
+        #             step_val = mirror_function.ease(step_index - half_ease_duration)
+        #         easing_list.append(step_val)
+        #         if print_diagnostics: print(step_index, step_val)
+        #
+
+        else:  # no mirroring (default)
+            easing_function = easing_class(start=self.start_value,
+                                           end=self.end_value,
+                                           duration=num_easing_steps - 1)
+            for step_index in range(num_easing_steps):
+                step_val = easing_function.ease(step_index)
+                easing_list.append(step_val)
+                if print_diagnostics: print(step_index, step_val)
+
+        if print_diagnostics:
+            print("prelist size", len(prelist))
+            print("easing_list size", len(easing_list))
+            print("postlist size", len(postlist))
 
         param_list = prelist + easing_list + postlist
-        # print("easing param_list size", len(param_list))
-        # print(param_list)
 
         if self.show_easing_plot:
             plt.figure()
             plt.xlabel("Step")
             plt.ylabel("Param Value")
-            plt.title("Per-Step Param Values Based On", self.easing, "Easing Function")
+            plt.title("Per-Step Values Based On Easing: " + self.easing)
             plt.bar(range(len(param_list)), param_list)
             # plt.plot(param_list)
             ax = plt.gca()
