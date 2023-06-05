@@ -51,6 +51,7 @@ const CurrentImageDisplay = () => {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 4,
+          position: 'absolute',
         }}
       >
         <CurrentImagePreview />
