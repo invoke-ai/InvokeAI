@@ -5,8 +5,6 @@ import { log } from 'app/logging/useLogger';
 import { clamp } from 'lodash-es';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
-  imageRemoved,
-  imagesAdapter,
   selectImagesEntities,
   selectImagesIds,
 } from 'features/gallery/store/imagesSlice';
@@ -58,8 +56,6 @@ export const addRequestedImageDeletionListener = () => {
         }
       }
 
-      dispatch(imageRemoved(image_name));
-
       dispatch(
         imageDeleted({ imageName: image_name, imageOrigin: image_origin })
       );
@@ -74,9 +70,7 @@ export const addImageDeletedPendingListener = () => {
   startAppListening({
     actionCreator: imageDeleted.pending,
     effect: (action, { dispatch, getState }) => {
-      const { imageName, imageOrigin } = action.meta.arg;
-      // Preemptively remove the image from the gallery
-      imagesAdapter.removeOne(getState().images, imageName);
+      //
     },
   });
 };

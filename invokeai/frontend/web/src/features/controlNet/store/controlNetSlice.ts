@@ -13,6 +13,8 @@ import {
   ControlNetModel,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
+import { imageDeleted } from 'services/thunks/image';
+import { forEach } from 'lodash-es';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
@@ -193,6 +195,20 @@ export const controlNetSlice = createSlice({
       ) {
         state.isProcessingControlImage = true;
       }
+    });
+
+    builder.addCase(imageDeleted.pending, (state, action) => {
+      // Preemptively remove the image from the gallery
+      const { imageName } = action.meta.arg;
+      forEach(state.controlNets, (c) => {
+        if (c.controlImage?.image_name === imageName) {
+          c.controlImage = null;
+          c.processedControlImage = null;
+        }
+        if (c.processedControlImage?.image_name === imageName) {
+          c.processedControlImage = null;
+        }
+      });
     });
   },
 });
