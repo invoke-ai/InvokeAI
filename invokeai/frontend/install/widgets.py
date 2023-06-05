@@ -19,8 +19,6 @@ from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int):
     ts = get_terminal_size()
-    if ts.columns >= columns and ts.lines >= lines:
-        return
     width = max(columns,ts.columns)
     height = max(lines,ts.lines)
 
@@ -29,12 +27,11 @@ def set_terminal_size(columns: int, lines: int):
         # The new Windows Terminal doesn't resize, so we relaunch in a CMD window.
         # Would prefer to use execvpe() here, but somehow it is not working properly
         # in the Windows 10 environment.
-        if 'WT_SESSION' in os.environ and 'IA_RELAUNCHED' not in os.environ:
-            args=['wt','-M']
+        if 'IA_RELAUNCHED' not in os.environ:
+            args=['conhost']
             args.extend(sys.argv)
-            os.environ.pop('WT_SESSION')
             os.environ['IA_RELAUNCHED'] = 'True'
-            os.execvp('wt',args)
+            os.execvp('conhost',args)
         else:
             _set_terminal_size_powershell(width,height)
     elif OS in ["Darwin", "Linux"]:
