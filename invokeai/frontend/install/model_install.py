@@ -55,8 +55,8 @@ from .widgets import (
 from invokeai.app.services.config import get_invokeai_config
 
 # minimum size for the UI
-MIN_COLS = 120
-MIN_LINES = 30
+MIN_COLS = 140
+MIN_LINES = 50
 
 config = get_invokeai_config(argv=[])
 
