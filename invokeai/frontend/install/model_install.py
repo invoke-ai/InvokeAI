@@ -55,7 +55,7 @@ from .widgets import (
 from invokeai.app.services.config import get_invokeai_config
 
 # minimum size for the UI
-MIN_COLS = 120
+MIN_COLS = 140
 MIN_LINES = 52
 
 config = get_invokeai_config(argv=[])
@@ -239,7 +239,8 @@ class addModelsForm(npyscreen.FormMultiPage):
         show_recommended = not self.existing_models
         widgets.update(
             models_selected = self.add_widget_intelligent(
-                npyscreen.MultiSelect,
+                MultiSelectColumns,
+                columns=1,
                 name="Install Starter Models",
                 values=starter_model_labels,
                 value=[
@@ -455,6 +456,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.monitor.entry_widget.buffer(['Processing...'],scroll_end=True)
         self.marshall_arguments()
         app = self.parentApp
+        self.ok_button.hidden = True
         self.display()
         
         # for communication with the subprocess
@@ -471,12 +473,6 @@ class addModelsForm(npyscreen.FormMultiPage):
         child_conn.close()
         self.subprocess_connection = parent_conn
         # process_and_execute(app.opt, app.user_selections)
-
-    def on_ok(self):
-        self.parentApp.setNextForm(None)
-        self.editing = False
-        self.parentApp.user_cancelled = False
-        self.marshall_arguments()
 
     def on_back(self):
         self.parentApp.switchFormPrevious()

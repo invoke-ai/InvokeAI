@@ -7,6 +7,7 @@ import os
 import platform
 import pyperclip
 import struct
+import subprocess
 import sys
 import npyscreen
 import textwrap
@@ -17,18 +18,39 @@ from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int):
+    ts = get_terminal_size()
+    width = max(columns,ts.columns)
+    height = max(lines,ts.lines)
+
     OS = platform.uname().system
     if OS == "Windows":
-        os.system(f"mode con: cols={columns} lines={lines}")
+        _set_terminal_size_powershell(width,height)
     elif OS in ["Darwin", "Linux"]:
-        import fcntl
-        import termios
+        _set_terminal_size_unix(width,height)
 
-        winsize = struct.pack("HHHH", lines, columns, 0, 0)
-        fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
-        sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=lines, cols=columns))
-        sys.stdout.flush()
+def _set_terminal_size_powershell(width: int, height: int):
+    script=f'''
+$pshost = get-host
+$pswindow = $pshost.ui.rawui
+$newsize = $pswindow.buffersize
+$newsize.height = 3000
+$newsize.width = {width}
+$pswindow.buffersize = $newsize
+$newsize = $pswindow.windowsize
+$newsize.height = {height}
+$newsize.width = {width}
+$pswindow.windowsize = $newsize
+'''
+    subprocess.run(["powershell","-Command","-"],input=script,text=True)
 
+def _set_terminal_size_unix(width: int, height: int):
+    import fcntl
+    import termios
+
+    winsize = struct.pack("HHHH", height, width, 0, 0)
+    fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
+    sys.stdout.write("\x1b[8;{height};{width}t".format(height=height, width=width))
+    sys.stdout.flush()
 
 def set_min_terminal_size(min_cols: int, min_lines: int):
     # make sure there's enough room for the ui
@@ -96,7 +118,6 @@ class FloatSlider(npyscreen.Slider):
 class FloatTitleSlider(npyscreen.TitleText):
     _entry_type = FloatSlider
 
-
 class SelectColumnBase():
     def make_contained_widgets(self):
         self._my_widgets = []
@@ -147,6 +168,18 @@ class SelectColumnBase():
     def h_cursor_line_right(self, ch):
         super().h_cursor_line_down(ch)
 
+    def handle_mouse_event(self, mouse_event):
+        mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
+        column_width = self.width // self.columns
+        column_height = math.ceil(self.value_cnt / self.columns)
+        column_no = rel_x // column_width
+        row_no = rel_y // self._contained_widget_height
+        self.cursor_line = column_no * column_height + row_no
+        if bstate & curses.BUTTON1_DOUBLE_CLICKED:
+            if hasattr(self,'on_mouse_double_click'):
+                self.on_mouse_double_click(self.cursor_line)
+        self.display()
+
 class MultiSelectColumns( SelectColumnBase, npyscreen.MultiSelect):
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
@@ -154,7 +187,13 @@ class MultiSelectColumns( SelectColumnBase, npyscreen.MultiSelect):
         self.rows = math.ceil(self.value_cnt / self.columns)
         super().__init__(screen, values=values, **keywords)
 
+    def on_mouse_double_click(self, cursor_line):
+        self.h_select_toggle(cursor_line)
+
 class SingleSelectWithChanged(npyscreen.SelectOne):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+
     def h_select(self,ch):
         super().h_select(ch)
         if self.on_changed:
