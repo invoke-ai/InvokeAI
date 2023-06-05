@@ -14,6 +14,7 @@ import { useAppToaster } from 'app/components/Toaster';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { useGetIsImageInUse } from 'common/hooks/useGetIsImageInUse';
 
 const selector = createSelector(
   [generationSelector],

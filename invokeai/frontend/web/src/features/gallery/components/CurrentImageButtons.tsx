@@ -1,13 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash-es';
 
-import {
-  ButtonGroup,
-  Flex,
-  FlexProps,
-  Link,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { ButtonGroup, Flex, FlexProps, Link } from '@chakra-ui/react';
 // import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -45,21 +39,18 @@ import {
   FaShareAlt,
 } from 'react-icons/fa';
 import { gallerySelector } from '../store/gallerySelectors';
-import { useCallback } from 'react';
+import { useCallback, useContext } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
-import {
-  requestedImageDeletion,
-  sentImageToCanvas,
-  sentImageToImg2Img,
-} from '../store/actions';
+import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
-import DeleteImageButton from './ImageActionButtons/DeleteImageButton';
 import { useAppToaster } from 'app/components/Toaster';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
+import { DeleteImageButton } from './DeleteModal';
 
 const currentImageButtonsSelector = createSelector(
   [
@@ -122,10 +113,6 @@ const currentImageButtonsSelector = createSelector(
 
 type CurrentImageButtonsProps = FlexProps;
 
-/**
- * Row of buttons for common actions:
- * Use as init image, use all params, use seed, upscale, fix faces, details, delete.
- */
 const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
   const {
@@ -137,13 +124,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     facetoolStrength,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
-    // currentImage,
     isLightboxOpen,
     activeTabName,
     shouldHidePreview,
     image,
-    canDeleteImage,
-    shouldConfirmOnDelete,
     shouldShowProgressInViewer,
   } = useAppSelector(currentImageButtonsSelector);
 
@@ -152,17 +136,13 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
 
-  const {
-    isOpen: isDeleteDialogOpen,
-    onOpen: onDeleteDialogOpen,
-    onClose: onDeleteDialogClose,
-  } = useDisclosure();
-
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
+
+  const { onDelete } = useContext(DeleteImageContext);
 
   // const handleCopyImage = useCallback(async () => {
   //   if (!image?.url) {
@@ -261,6 +241,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const handleClickUpscale = useCallback(() => {
     // selectedImage && dispatch(runESRGAN(selectedImage));
   }, []);
+
+  const handleDelete = useCallback(() => {
+    onDelete(image);
+  }, [image, onDelete]);
 
   useHotkeys(
     'Shift+U',
@@ -363,30 +347,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [image, shouldShowImageDetails, toaster]
   );
 
-  const handleDelete = useCallback(() => {
-    if (canDeleteImage && image) {
-      dispatch(requestedImageDeletion(image));
-    }
-  }, [image, canDeleteImage, dispatch]);
-
-  const handleInitiateDelete = useCallback(() => {
-    if (shouldConfirmOnDelete) {
-      onDeleteDialogOpen();
-    } else {
-      handleDelete();
-    }
-  }, [shouldConfirmOnDelete, onDeleteDialogOpen, handleDelete]);
-
   const handleClickProgressImagesToggle = useCallback(() => {
     dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
   }, [dispatch, shouldShowProgressInViewer]);
-
-  useHotkeys('delete', handleInitiateDelete, [
-    image,
-    shouldConfirmOnDelete,
-    isConnected,
-    isProcessing,
-  ]);
 
   const handleLightBox = useCallback(() => {
     dispatch(setIsLightboxOpen(!isLightboxOpen));
@@ -596,7 +559,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         <ButtonGroup isAttached={true}>
-          <DeleteImageButton image={image} />
+          <DeleteImageButton onClick={handleDelete} />
         </ButtonGroup>
       </Flex>
     </>
