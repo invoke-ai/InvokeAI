@@ -4,7 +4,6 @@ import { useCombinedRefs } from '@dnd-kit/utilities';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
-import { useGetUrl } from 'common/util/getUrl';
 import { AnimatePresence } from 'framer-motion';
 import { ReactElement, SyntheticEvent } from 'react';
 import { memo, useRef } from 'react';
@@ -45,7 +44,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     minSize = 24,
   } = props;
   const dndId = useRef(uuidv4());
-  const { getUrl } = useGetUrl();
   const {
     isOver,
     setNodeRef: setDroppableRef,
@@ -100,7 +98,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           }}
         >
           <Image
-            src={getUrl(image.image_url)}
+            src={image.image_url}
             fallbackStrategy="beforeLoadOrError"
             fallback={fallback}
             onError={onError}

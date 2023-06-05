@@ -47,7 +47,6 @@ import {
 import { gallerySelector } from '../store/gallerySelectors';
 import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { useGetUrl } from 'common/util/getUrl';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
@@ -153,8 +152,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
 
-  const { getUrl, shouldTransformUrls } = useGetUrl();
-
   const {
     isOpen: isDeleteDialogOpen,
     onOpen: onDeleteDialogOpen,
@@ -197,10 +194,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         return;
       }
 
-      if (shouldTransformUrls) {
-        return getUrl(image.image_url);
-      }
-
       if (image.image_url.startsWith('http')) {
         return image.image_url;
       }
@@ -229,7 +222,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         isClosable: true,
       });
     });
-  }, [toaster, shouldTransformUrls, getUrl, t, image]);
+  }, [toaster, t, image]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(image);
@@ -461,11 +454,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link
-                download={true}
-                href={getUrl(image?.image_url ?? '')}
-                target="_blank"
-              >
+              <Link download={true} href={image?.image_url} target="_blank">
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>

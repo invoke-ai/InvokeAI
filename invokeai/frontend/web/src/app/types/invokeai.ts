@@ -108,11 +108,7 @@ export type SDFeature =
  */
 export type AppConfig = {
   /**
-   * Whether or not URLs should be transformed to use a different host
-   */
-  shouldTransformUrls: boolean;
-  /**
-   * Whether or not we need to re-fetch images
+   * Whether or not we should update image urls when image loading errors
    */
   shouldUpdateImageUrlsOnError: boolean;
   disabledTabs: InvokeTabName[];
