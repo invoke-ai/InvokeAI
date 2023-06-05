@@ -7,8 +7,8 @@ import {
 import { RootState } from 'app/store/store';
 import { ImageCategory, ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
-import { isString, keyBy } from 'lodash-es';
-import { receivedPageOfImages } from 'services/thunks/image';
+import { keyBy } from 'lodash-es';
+import { imageDeleted, receivedPageOfImages } from 'services/thunks/image';
 
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
@@ -49,14 +49,6 @@ const imagesSlice = createSlice({
     imageUpserted: (state, action: PayloadAction<ImageDTO>) => {
       imagesAdapter.upsertOne(state, action.payload);
     },
-    imageRemoved: (state, action: PayloadAction<string | ImageDTO>) => {
-      if (isString(action.payload)) {
-        imagesAdapter.removeOne(state, action.payload);
-        return;
-      }
-
-      imagesAdapter.removeOne(state, action.payload.image_name);
-    },
     imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
       state.categories = action.payload;
     },
@@ -76,6 +68,11 @@ const imagesSlice = createSlice({
       state.total = total;
       imagesAdapter.upsertMany(state, items);
     });
+    builder.addCase(imageDeleted.pending, (state, action) => {
+      // Preemptively remove the image from the gallery
+      const { imageName } = action.meta.arg;
+      imagesAdapter.removeOne(state, imageName);
+    });
   },
 });
 
@@ -87,8 +84,7 @@ export const {
   selectTotal: selectImagesTotal,
 } = imagesAdapter.getSelectors<RootState>((state) => state.images);
 
-export const { imageUpserted, imageRemoved, imageCategoriesChanged } =
-  imagesSlice.actions;
+export const { imageUpserted, imageCategoriesChanged } = imagesSlice.actions;
 
 export default imagesSlice.reducer;
 
