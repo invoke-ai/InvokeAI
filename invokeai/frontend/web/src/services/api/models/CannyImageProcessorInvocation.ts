@@ -12,17 +12,21 @@ export type CannyImageProcessorInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'canny_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * low threshold of Canny pixel gradient
+   * The low threshold of the Canny pixel gradient (0-255)
    */
   low_threshold?: number;
   /**
-   * high threshold of Canny pixel gradient
+   * The high threshold of the Canny pixel gradient (0-255)
    */
   high_threshold?: number;
 };

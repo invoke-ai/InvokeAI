@@ -4,6 +4,7 @@ import random
 import einops
 from typing import Literal, Optional, Union, List
 
+from compel import Compel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
 
 from pydantic import BaseModel, Field, validator
@@ -28,7 +29,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import ControlNetData
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
-from ..services.image_file_storage import ImageType
+from ..services.image_file_storage import ResourceOrigin
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
 from .compel import ConditioningField
@@ -173,10 +174,10 @@ class TextToLatentsInvocation(BaseInvocation):
     negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    cfg_scale: Union[float, List[float]] = Field(default=7.5, description="CFG scale, either single value or list of value per timestep", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
+    cfg_scale: Union[float, list[float]] = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
-    control: Union[ControlField, List[ControlField]] = Field(default=None, description="The controlnet(s) to use")
+    control: Union[ControlField, List[ControlField]] = Field(default=None, description="The control to use")
     # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
@@ -234,6 +235,15 @@ class TextToLatentsInvocation(BaseInvocation):
     def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
         c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
+
+        compel = Compel(
+            tokenizer=model.tokenizer,
+            text_encoder=model.text_encoder,
+            textual_inversion_manager=model.textual_inversion_manager,
+            dtype_for_device_getter=torch_dtype,
+            truncate_long_prompts=False,
+        )
+        [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
         conditioning_data = ConditioningData(
             unconditioned_embeddings=uc,
@@ -299,7 +309,7 @@ class TextToLatentsInvocation(BaseInvocation):
                                                                     torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
                 control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(control_image_field.image_type,
+                input_image = context.services.images.get_pil_image(control_image_field.image_origin,
                                                                     control_image_field.image_name)
                 # self.image.image_type, self.image.image_name
                 # FIXME: still need to test with different widths, heights, devices, dtypes
@@ -368,7 +378,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
-    strength: float = Field(default=0.5, description="The strength of the latents to use")
+    strength: float = Field(default=0.7, ge=0, le=1, description="The strength of the latents to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -472,7 +482,7 @@ class LatentsToImageInvocation(BaseInvocation):
             #     and gnenerate unique image_name
             image_dto = context.services.images.create(
                 image=image,
-                image_type=ImageType.RESULT,
+                image_origin=ResourceOrigin.INTERNAL,
                 image_category=ImageCategory.GENERAL,
                 session_id=context.graph_execution_state_id,
                 node_id=self.id,
@@ -482,7 +492,7 @@ class LatentsToImageInvocation(BaseInvocation):
             return ImageOutput(
                 image=ImageField(
                     image_name=image_dto.image_name,
-                    image_type=image_dto.image_type,
+                    image_origin=image_dto.image_origin,
                 ),
                 width=image_dto.width,
                 height=image_dto.height,
@@ -580,7 +590,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         #     self.image.image_type, self.image.image_name
         # )
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         # TODO: this only really needs the vae

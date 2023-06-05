@@ -75,10 +75,10 @@ class AddsMaskLatents:
     initial_image_latents: torch.Tensor
 
     def __call__(
-        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor
+        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor, **kwargs,
     ) -> torch.Tensor:
         model_input = self.add_mask_channels(latents)
-        return self.forward(model_input, t, text_embeddings)
+        return self.forward(model_input, t, text_embeddings, **kwargs)
 
     def add_mask_channels(self, latents):
         batch_size = latents.size(0)
@@ -218,7 +218,7 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 class ControlNetData:
     model: ControlNetModel = Field(default=None)
     image_tensor: torch.Tensor= Field(default=None)
-    weight: Union[float, List[float]]= Field(default=1.0)
+    weight: Union[float, list[float]]= Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
 
@@ -693,7 +693,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                         encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
                                                          conditioning_data.text_embeddings]),
                         controlnet_cond=control_datum.image_tensor,
-                        # conditioning_scale=control_datum.weight,
                         conditioning_scale=controlnet_weight,
                         # cross_attention_kwargs,
                         guess_mode=False,

@@ -12,17 +12,21 @@ export type NormalbaeImageProcessorInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'normalbae_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
   /**
-   * pixel resolution for edge detection
+   * The pixel resolution for detection
    */
   detect_resolution?: number;
   /**
-   * pixel resolution for output image
+   * The pixel resolution for the output image
    */
   image_resolution?: number;
 };

@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import InitialImagePreview from './InitialImagePreview';
-import InitialImageButtons from 'common/components/InitialImageButtons';
 
 const InitialImageDisplay = () => {
   return (
@@ -28,7 +27,6 @@ const InitialImageDisplay = () => {
           gap: 4,
         }}
       >
-        <InitialImageButtons />
         <InitialImagePreview />
       </Flex>
     </Flex>

@@ -1,16 +1,13 @@
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { socketConnected } from 'services/events/actions';
-import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
-} from 'services/thunks/gallery';
+import { appSocketConnected, socketConnected } from 'services/events/actions';
+import { receivedPageOfImages } from 'services/thunks/image';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
-export const addSocketConnectedListener = () => {
+export const addSocketConnectedEventListener = () => {
   startAppListening({
     actionCreator: socketConnected,
     effect: (action, { dispatch, getState }) => {
@@ -18,17 +15,12 @@ export const addSocketConnectedListener = () => {
 
       moduleLog.debug({ timestamp }, 'Connected');
 
-      const { results, uploads, models, nodes, config } = getState();
+      const { models, nodes, config, images } = getState();
 
       const { disabledTabs } = config;
 
-      // These thunks need to be dispatch in middleware; cannot handle in a reducer
-      if (!results.ids.length) {
-        dispatch(receivedResultImagesPage());
-      }
-
-      if (!uploads.ids.length) {
-        dispatch(receivedUploadImagesPage());
+      if (!images.ids.length) {
+        dispatch(receivedPageOfImages());
       }
 
       if (!models.ids.length) {
@@ -38,6 +30,9 @@ export const addSocketConnectedListener = () => {
       if (!nodes.schema && !disabledTabs.includes('nodes')) {
         dispatch(receivedOpenAPISchema());
       }
+
+      // pass along the socket event as an application action
+      dispatch(appSocketConnected(action.payload));
     },
   });
 };

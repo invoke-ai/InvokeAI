@@ -1,15 +1,11 @@
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { selectResultsById } from 'features/gallery/store/resultsSlice';
-import { selectUploadsById } from 'features/gallery/store/uploadsSlice';
 import { t } from 'i18next';
 import { addToast } from 'features/system/store/systemSlice';
 import { startAppListening } from '..';
-import {
-  initialImageSelected,
-  isImageDTO,
-} from 'features/parameters/store/actions';
+import { initialImageSelected } from 'features/parameters/store/actions';
 import { makeToast } from 'app/components/Toaster';
-import { ImageDTO } from 'services/api';
+import { selectImagesById } from 'features/gallery/store/imagesSlice';
+import { isImageDTO } from 'services/types/guards';
 
 export const addInitialImageSelectedListener = () => {
   startAppListening({
@@ -30,16 +26,8 @@ export const addInitialImageSelectedListener = () => {
         return;
       }
 
-      const { image_name, image_type } = action.payload;
-
-      let image: ImageDTO | undefined;
-      const state = getState();
-
-      if (image_type === 'results') {
-        image = selectResultsById(state, image_name);
-      } else if (image_type === 'uploads') {
-        image = selectUploadsById(state, image_name);
-      }
+      const imageName = action.payload;
+      const image = selectImagesById(getState(), imageName);
 
       if (!image) {
         dispatch(

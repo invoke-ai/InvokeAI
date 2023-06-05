@@ -65,7 +65,6 @@ from typing import Optional, Union, List, get_args
 def is_union_subtype(t1, t2):
     t1_args = get_args(t1)
     t2_args = get_args(t2)
-
     if not t1_args:
         # t1 is a single type
         return t1 in t2_args
@@ -86,7 +85,6 @@ def is_list_or_contains_list(t):
         for arg in t_args:
             if get_origin(arg) is list:
                 return True
-
     return False
 
 

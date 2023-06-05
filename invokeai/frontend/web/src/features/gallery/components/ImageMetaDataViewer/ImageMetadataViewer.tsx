@@ -31,6 +31,7 @@ import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { ImageDTO } from 'services/api';
 import { Scheduler } from 'app/constants';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -53,6 +54,11 @@ const MetadataItem = ({
   withCopy = false,
 }: MetadataItemProps) => {
   const { t } = useTranslation();
+
+  if (!value) {
+    return null;
+  }
+
   return (
     <Flex gap={2}>
       {onClick && (
@@ -115,6 +121,21 @@ const memoEqualityCheck = (
  */
 const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   const dispatch = useAppDispatch();
+  const {
+    recallBothPrompts,
+    recallPositivePrompt,
+    recallNegativePrompt,
+    recallSeed,
+    recallInitialImage,
+    recallCfgScale,
+    recallModel,
+    recallScheduler,
+    recallSteps,
+    recallWidth,
+    recallHeight,
+    recallStrength,
+    recallAllParameters,
+  } = useRecallParameters();
 
   useHotkeys('esc', () => {
     dispatch(setShouldShowImageDetails(false));
@@ -161,52 +182,53 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           {metadata.type && (
             <MetadataItem label="Invocation type" value={metadata.type} />
           )}
-          {metadata.width && (
-            <MetadataItem
-              label="Width"
-              value={metadata.width}
-              onClick={() => dispatch(setWidth(Number(metadata.width)))}
-            />
-          )}
-          {metadata.height && (
-            <MetadataItem
-              label="Height"
-              value={metadata.height}
-              onClick={() => dispatch(setHeight(Number(metadata.height)))}
-            />
-          )}
-          {metadata.model && (
-            <MetadataItem label="Model" value={metadata.model} />
-          )}
+          {sessionId && <MetadataItem label="Session ID" value={sessionId} />}
           {metadata.positive_conditioning && (
             <MetadataItem
-              label="Prompt"
+              label="Positive Prompt"
               labelPosition="top"
-              value={
-                typeof metadata.positive_conditioning === 'string'
-                  ? metadata.positive_conditioning
-                  : promptToString(metadata.positive_conditioning)
+              value={metadata.positive_conditioning}
+              onClick={() =>
+                recallPositivePrompt(metadata.positive_conditioning)
               }
-              onClick={() => setPositivePrompt(metadata.positive_conditioning!)}
             />
           )}
           {metadata.negative_conditioning && (
             <MetadataItem
-              label="Prompt"
+              label="Negative Prompt"
               labelPosition="top"
-              value={
-                typeof metadata.negative_conditioning === 'string'
-                  ? metadata.negative_conditioning
-                  : promptToString(metadata.negative_conditioning)
+              value={metadata.negative_conditioning}
+              onClick={() =>
+                recallNegativePrompt(metadata.negative_conditioning)
               }
-              onClick={() => setNegativePrompt(metadata.negative_conditioning!)}
             />
           )}
           {metadata.seed !== undefined && (
             <MetadataItem
               label="Seed"
               value={metadata.seed}
-              onClick={() => dispatch(setSeed(Number(metadata.seed)))}
+              onClick={() => recallSeed(metadata.seed)}
+            />
+          )}
+          {metadata.model !== undefined && (
+            <MetadataItem
+              label="Model"
+              value={metadata.model}
+              onClick={() => recallModel(metadata.model)}
+            />
+          )}
+          {metadata.width && (
+            <MetadataItem
+              label="Width"
+              value={metadata.width}
+              onClick={() => recallWidth(metadata.width)}
+            />
+          )}
+          {metadata.height && (
+            <MetadataItem
+              label="Height"
+              value={metadata.height}
+              onClick={() => recallHeight(metadata.height)}
             />
           )}
           {/* {metadata.threshold !== undefined && (
@@ -227,23 +249,21 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             <MetadataItem
               label="Scheduler"
               value={metadata.scheduler}
-              onClick={() =>
-                dispatch(setScheduler(metadata.scheduler as Scheduler))
-              }
+              onClick={() => recallScheduler(metadata.scheduler)}
             />
           )}
           {metadata.steps && (
             <MetadataItem
               label="Steps"
               value={metadata.steps}
-              onClick={() => dispatch(setSteps(Number(metadata.steps)))}
+              onClick={() => recallSteps(metadata.steps)}
             />
           )}
           {metadata.cfg_scale !== undefined && (
             <MetadataItem
               label="CFG scale"
               value={metadata.cfg_scale}
-              onClick={() => dispatch(setCfgScale(Number(metadata.cfg_scale)))}
+              onClick={() => recallCfgScale(metadata.cfg_scale)}
             />
           )}
           {/* {metadata.variations && metadata.variations.length > 0 && (
@@ -284,9 +304,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             <MetadataItem
               label="Image to image strength"
               value={metadata.strength}
-              onClick={() =>
-                dispatch(setImg2imgStrength(Number(metadata.strength)))
-              }
+              onClick={() => recallStrength(metadata.strength)}
             />
           )}
           {/* {metadata.fit && (

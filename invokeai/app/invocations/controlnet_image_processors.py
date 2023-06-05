@@ -1,13 +1,14 @@
 # InvokeAI nodes for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
+from builtins import float
 
 import numpy as np
 from typing import Literal, Optional, Union, List
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, Field
 
-from ..models.image import ImageField, ImageType, ImageCategory
+from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -95,14 +96,14 @@ CONTROLNET_DEFAULT_MODELS = [
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
 
 class ControlField(BaseModel):
-    image: ImageField = Field(default=None, description="processed image")
-    control_model: Optional[str] = Field(default=None, description="control model used")
+    image: ImageField = Field(default=None, description="The control image")
+    control_model: Optional[str] = Field(default=None, description="The ControlNet model to use")
     # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
-    control_weight: Union[float, List[float]] = Field(default=1, description="weight given to controlnet")
+    control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                                description="% of total steps at which controlnet is first applied")
+                                      description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
-                                    description="% of total steps at which controlnet is last applied")
+                                    description="When the ControlNet is last applied (% of total steps)")
 
     class Config:
         schema_extra = {
@@ -115,12 +116,11 @@ class ControlField(BaseModel):
             }
         }
 
-
 class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
     # fmt: off
     type: Literal["control_output"] = "control_output"
-    control: ControlField = Field(default=None, description="The control info dict")
+    control: ControlField = Field(default=None, description="The control info")
     # fmt: on
 
 
@@ -129,17 +129,15 @@ class ControlNetInvocation(BaseInvocation):
     # fmt: off
     type: Literal["controlnet"] = "controlnet"
     # Inputs
-    image: ImageField = Field(default=None, description="image to process")
+    image: ImageField = Field(default=None, description="The control image")
     control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
                                                   description="control model used")
-    # control_weight: float = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
-    # control_weight: Union[float, List[float]] = Field(default=1.0, ge=0, le=1, description="weight given to controlnet")
-    control_weight: Union[float, List[float]] = Field(default=1.0, description="weight given to controlnet")
+    control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
     # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                        description="% of total steps at which controlnet is first applied")
+                                      description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
-                                      description="% of total steps at which controlnet is last applied")
+                                    description="When the ControlNet is last applied (% of total steps)")
     # fmt: on
 
     class Config(InvocationConfig):
@@ -175,7 +173,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: off
     type: Literal["image_processor"] = "image_processor"
     # Inputs
-    image: ImageField = Field(default=None, description="image to process")
+    image: ImageField = Field(default=None, description="The image to process")
     # fmt: on
 
 
@@ -185,7 +183,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         raw_image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
@@ -199,8 +197,8 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         #    so for now setting image_type to RESULT instead of INTERMEDIATE so will get saved in gallery
         image_dto = context.services.images.create(
             image=processed_image,
-            image_type=ImageType.RESULT,
-            image_category=ImageCategory.GENERAL,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.CONTROL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
             is_intermediate=self.is_intermediate
@@ -209,7 +207,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         """Builds an ImageOutput and its ImageField"""
         processed_image_field = ImageField(
             image_name=image_dto.image_name,
-            image_type=image_dto.image_type,
+            image_origin=image_dto.image_origin,
         )
         return ImageOutput(
             image=processed_image_field,
@@ -226,8 +224,8 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
     # fmt: off
     type: Literal["canny_image_processor"] = "canny_image_processor"
     # Input
-    low_threshold: float = Field(default=100, ge=0, description="low threshold of Canny pixel gradient")
-    high_threshold: float = Field(default=200, ge=0, description="high threshold of Canny pixel gradient")
+    low_threshold: int = Field(default=100, ge=0, le=255, description="The low threshold of the Canny pixel gradient (0-255)")
+    high_threshold: int = Field(default=200, ge=0, le=255, description="The high threshold of the Canny pixel gradient (0-255)")
     # fmt: on
 
     def run_processor(self, image):
@@ -236,16 +234,16 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
         return processed_image
 
 
-class HedImageprocessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+class HedImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies HED edge detection to image"""
     # fmt: off
     type: Literal["hed_image_processor"] = "hed_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # safe not supported in controlnet_aux v0.0.3
     # safe: bool = Field(default=False, description="whether to use safe mode")
-    scribble: bool = Field(default=False, description="whether to use scribble mode")
+    scribble: bool = Field(default=False, description="Whether to use scribble mode")
     # fmt: on
 
     def run_processor(self, image):
@@ -265,9 +263,9 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCon
     # fmt: off
     type: Literal["lineart_image_processor"] = "lineart_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    coarse: bool = Field(default=False, description="whether to use coarse mode")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
+    coarse: bool = Field(default=False, description="Whether to use coarse mode")
     # fmt: on
 
     def run_processor(self, image):
@@ -284,8 +282,8 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocati
     # fmt: off
     type: Literal["lineart_anime_image_processor"] = "lineart_anime_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # fmt: on
 
     def run_processor(self, image):
@@ -302,9 +300,9 @@ class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: off
     type: Literal["openpose_image_processor"] = "openpose_image_processor"
     # Inputs
-    hand_and_face: bool = Field(default=False, description="whether to use hands and face mode")
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    hand_and_face: bool = Field(default=False, description="Whether to use hands and face mode")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # fmt: on
 
     def run_processor(self, image):
@@ -322,8 +320,8 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocation
     # fmt: off
     type: Literal["midas_depth_image_processor"] = "midas_depth_image_processor"
     # Inputs
-    a_mult: float = Field(default=2.0, ge=0, description="Midas parameter a = amult * PI")
-    bg_th: float = Field(default=0.1, ge=0, description="Midas parameter bg_th")
+    a_mult: float = Field(default=2.0, ge=0, description="Midas parameter `a_mult` (a = a_mult * PI)")
+    bg_th: float = Field(default=0.1, ge=0, description="Midas parameter `bg_th`")
     # depth_and_normal not supported in controlnet_aux v0.0.3
     # depth_and_normal: bool = Field(default=False, description="whether to use depth and normal mode")
     # fmt: on
@@ -344,8 +342,8 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationC
     # fmt: off
     type: Literal["normalbae_image_processor"] = "normalbae_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
     # fmt: on
 
     def run_processor(self, image):
@@ -361,10 +359,10 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: off
     type: Literal["mlsd_image_processor"] = "mlsd_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    thr_v: float = Field(default=0.1, ge=0, description="MLSD parameter thr_v")
-    thr_d: float = Field(default=0.1, ge=0, description="MLSD parameter thr_d")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
+    thr_v: float = Field(default=0.1, ge=0, description="MLSD parameter `thr_v`")
+    thr_d: float = Field(default=0.1, ge=0, description="MLSD parameter `thr_d`")
     # fmt: on
 
     def run_processor(self, image):
@@ -382,10 +380,10 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: off
     type: Literal["pidi_image_processor"] = "pidi_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    safe: bool = Field(default=False, description="whether to use safe mode")
-    scribble: bool = Field(default=False, description="whether to use scribble mode")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
+    safe: bool = Field(default=False, description="Whether to use safe mode")
+    scribble: bool = Field(default=False, description="Whether to use scribble mode")
     # fmt: on
 
     def run_processor(self, image):
@@ -403,11 +401,11 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
     # fmt: off
     type: Literal["content_shuffle_image_processor"] = "content_shuffle_image_processor"
     # Inputs
-    detect_resolution: int = Field(default=512, ge=0, description="pixel resolution for edge detection")
-    image_resolution: int = Field(default=512, ge=0, description="pixel resolution for output image")
-    h: Union[int | None] = Field(default=512, ge=0, description="content shuffle h parameter")
-    w: Union[int | None] = Field(default=512, ge=0, description="content shuffle w parameter")
-    f: Union[int | None] = Field(default=256, ge=0, description="cont")
+    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
+    h: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `h` parameter")
+    w: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `w` parameter")
+    f: Union[int, None] = Field(default=256, ge=0, description="Content shuffle `f` parameter")
     # fmt: on
 
     def run_processor(self, image):
@@ -440,8 +438,8 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: off
     type: Literal["mediapipe_face_processor"] = "mediapipe_face_processor"
     # Inputs
-    max_faces: int = Field(default=1, ge=1, description="maximum number of faces to detect")
-    min_confidence: float = Field(default=0.5, ge=0, le=1, description="minimum confidence for face detection")
+    max_faces: int = Field(default=1, ge=1, description="Maximum number of faces to detect")
+    min_confidence: float = Field(default=0.5, ge=0, le=1, description="Minimum confidence for face detection")
     # fmt: on
 
     def run_processor(self, image):

@@ -38,7 +38,7 @@ def get_uc_and_c_and_ec(prompt_string,
                     dtype_for_device_getter=torch_dtype,
                     truncate_long_prompts=False,
                     )
-    
+
     config = get_invokeai_config()
 
     # get rid of any newline characters
@@ -282,6 +282,8 @@ def split_weighted_subprompts(text, skip_normalize=False) -> list:
         (match.group("prompt").replace("\\:", ":"), float(match.group("weight") or 1))
         for match in re.finditer(prompt_parser, text)
     ]
+    if len(parsed_prompts) == 0:
+        return []
     if skip_normalize:
         return parsed_prompts
     weight_sum = sum(map(lambda x: x[1], parsed_prompts))

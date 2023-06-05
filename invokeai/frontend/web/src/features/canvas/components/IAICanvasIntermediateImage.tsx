@@ -1,18 +1,24 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useGetUrl } from 'common/util/getUrl';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { ImageConfig } from 'konva/lib/shapes/Image';
 import { isEqual } from 'lodash-es';
 
 import { useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
+import { canvasSelector } from '../store/canvasSelectors';
 
 const selector = createSelector(
-  [(state: RootState) => state.gallery],
-  (gallery: GalleryState) => {
-    return gallery.intermediateImage ? gallery.intermediateImage : null;
+  [systemSelector, canvasSelector],
+  (system, canvas) => {
+    const { progressImage, sessionId } = system;
+    const { sessionId: canvasSessionId, boundingBox } =
+      canvas.layerState.stagingArea;
+
+    return {
+      boundingBox,
+      progressImage: sessionId === canvasSessionId ? progressImage : undefined,
+    };
   },
   {
     memoizeOptions: {
@@ -25,33 +31,34 @@ type Props = Omit<ImageConfig, 'image'>;
 
 const IAICanvasIntermediateImage = (props: Props) => {
   const { ...rest } = props;
-  const intermediateImage = useAppSelector(selector);
-  const { getUrl } = useGetUrl();
+  const { progressImage, boundingBox } = useAppSelector(selector);
   const [loadedImageElement, setLoadedImageElement] =
     useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    if (!intermediateImage) return;
+    if (!progressImage) {
+      return;
+    }
+
     const tempImage = new Image();
 
     tempImage.onload = () => {
       setLoadedImageElement(tempImage);
     };
-    tempImage.src = getUrl(intermediateImage.url);
-  }, [intermediateImage, getUrl]);
 
-  if (!intermediateImage?.boundingBox) return null;
+    tempImage.src = progressImage.dataURL;
+  }, [progressImage]);
 
-  const {
-    boundingBox: { x, y, width, height },
-  } = intermediateImage;
+  if (!(progressImage && boundingBox)) {
+    return null;
+  }
 
   return loadedImageElement ? (
     <KonvaImage
-      x={x}
-      y={y}
-      width={width}
-      height={height}
+      x={boundingBox.x}
+      y={boundingBox.y}
+      width={boundingBox.width}
+      height={boundingBox.height}
       image={loadedImageElement}
       listening={false}
       {...rest}

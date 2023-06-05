@@ -30,7 +30,7 @@ import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useParameters } from 'features/parameters/hooks/useParameters';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import {
   requestedImageDeletion,
@@ -39,6 +39,7 @@ import {
 } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
+import { useDraggable } from '@dnd-kit/core';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -114,8 +115,15 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
 
-  const { recallSeed, recallPrompt, recallInitialImage, recallAllParameters } =
-    useParameters();
+  const { recallBothPrompts, recallSeed, recallAllParameters } =
+    useRecallParameters();
+
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: `galleryImage_${image_name}`,
+    data: {
+      image,
+    },
+  });
 
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
@@ -144,22 +152,17 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     dispatch(imageSelected(image));
   }, [image, dispatch]);
 
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.setData('invokeai/imageType', image.image_type);
-      e.dataTransfer.effectAllowed = 'move';
-    },
-    [image]
-  );
-
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallPrompt(
+    recallBothPrompts(
       image.metadata?.positive_conditioning,
       image.metadata?.negative_conditioning
     );
-  }, [image, recallPrompt]);
+  }, [
+    image.metadata?.negative_conditioning,
+    image.metadata?.positive_conditioning,
+    recallBothPrompts,
+  ]);
 
   const handleRecallSeed = useCallback(() => {
     recallSeed(image.metadata?.seed);
@@ -209,7 +212,12 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   return (
-    <>
+    <Box
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      sx={{ w: 'full', h: 'full', touchAction: 'none' }}
+    >
       <ContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
         renderMenu={() => (
@@ -288,8 +296,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             onMouseOver={handleMouseOver}
             onMouseOut={handleMouseOut}
             userSelect="none"
-            draggable={true}
-            onDragStart={handleDragStart}
+            // draggable={true}
+            // onDragStart={handleDragStart}
             onClick={handleSelectImage}
             ref={ref}
             sx={{
@@ -370,7 +378,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         onClose={onDeleteDialogClose}
         handleDelete={handleDelete}
       />
-    </>
+    </Box>
   );
 }, memoEqualityCheck);
 

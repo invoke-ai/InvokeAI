@@ -20,7 +20,7 @@ const invokeAIFilledTrack = defineStyle((_props) => ({
 
 const invokeAITrack = defineStyle((_props) => {
   return {
-    bg: 'base.800',
+    bg: 'none',
   };
 });
 

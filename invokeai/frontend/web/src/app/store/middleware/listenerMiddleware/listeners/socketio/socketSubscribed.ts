@@ -1,10 +1,10 @@
 import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
-import { socketSubscribed } from 'services/events/actions';
+import { appSocketSubscribed, socketSubscribed } from 'services/events/actions';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
-export const addSocketSubscribedListener = () => {
+export const addSocketSubscribedEventListener = () => {
   startAppListening({
     actionCreator: socketSubscribed,
     effect: (action, { dispatch, getState }) => {
@@ -12,6 +12,7 @@ export const addSocketSubscribedListener = () => {
         action.payload,
         `Subscribed (${action.payload.sessionId}))`
       );
+      dispatch(appSocketSubscribed(action.payload));
     },
   });
 };

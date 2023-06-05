@@ -26,6 +26,7 @@ const invokeAITablist = defineStyle((_props) => ({
     padding: 2,
     borderRadius: 'base',
     _selected: {
+      borderBottomColor: 'base.800',
       bg: 'accent.700',
       color: 'accent.100',
       _hover: {

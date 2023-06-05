@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional, Union
-from pydantic import BaseModel, Extra, Field, StrictStr
-from invokeai.app.models.image import ImageCategory, ImageType
+from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.misc import get_iso_timestamp
 
@@ -11,8 +11,8 @@ class ImageRecord(BaseModel):
 
     image_name: str = Field(description="The unique name of the image.")
     """The unique name of the image."""
-    image_type: ImageType = Field(description="The type of the image.")
-    """The type of the image."""
+    image_origin: ResourceOrigin = Field(description="The type of the image.")
+    """The origin of the image."""
     image_category: ImageCategory = Field(description="The category of the image.")
     """The category of the image."""
     width: int = Field(description="The width of the image in px.")
@@ -56,6 +56,7 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
     Only limited changes are valid:
       - `image_category`: change the category of an image
       - `session_id`: change the session associated with an image
+      - `is_intermediate`: change the image's `is_intermediate` flag
     """
 
     image_category: Optional[ImageCategory] = Field(
@@ -67,6 +68,10 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
         description="The image's new session ID.",
     )
     """The image's new session ID."""
+    is_intermediate: Optional[StrictBool] = Field(
+        default=None, description="The image's new `is_intermediate` flag."
+    )
+    """The image's new `is_intermediate` flag."""
 
 
 class ImageUrlsDTO(BaseModel):
@@ -74,8 +79,8 @@ class ImageUrlsDTO(BaseModel):
 
     image_name: str = Field(description="The unique name of the image.")
     """The unique name of the image."""
-    image_type: ImageType = Field(description="The type of the image.")
-    """The type of the image."""
+    image_origin: ResourceOrigin = Field(description="The type of the image.")
+    """The origin of the image."""
     image_url: str = Field(description="The URL of the image.")
     """The URL of the image."""
     thumbnail_url: str = Field(description="The URL of the image's thumbnail.")
@@ -105,7 +110,9 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     # Retrieve all the values, setting "reasonable" defaults if they are not present.
 
     image_name = image_dict.get("image_name", "unknown")
-    image_type = ImageType(image_dict.get("image_type", ImageType.RESULT.value))
+    image_origin = ResourceOrigin(
+        image_dict.get("image_origin", ResourceOrigin.INTERNAL.value)
+    )
     image_category = ImageCategory(
         image_dict.get("image_category", ImageCategory.GENERAL.value)
     )
@@ -127,7 +134,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
 
     return ImageRecord(
         image_name=image_name,
-        image_type=image_type,
+        image_origin=image_origin,
         image_category=image_category,
         width=width,
         height=height,
