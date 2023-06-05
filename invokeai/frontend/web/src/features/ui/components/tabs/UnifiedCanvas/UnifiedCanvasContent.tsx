@@ -70,6 +70,7 @@ const UnifiedCanvasContent = () => {
     return (
       <Box
         ref={setDroppableRef}
+        tabIndex={0}
         sx={{
           w: 'full',
           h: 'full',
@@ -109,6 +110,7 @@ const UnifiedCanvasContent = () => {
   return (
     <Box
       ref={setDroppableRef}
+      tabIndex={-1}
       sx={{
         w: 'full',
         h: 'full',
