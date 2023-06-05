@@ -5,6 +5,7 @@ import { log } from 'app/logging/useLogger';
 import { clamp } from 'lodash-es';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
+  imageRemoved,
   selectImagesEntities,
   selectImagesIds,
 } from 'features/gallery/store/imagesSlice';
@@ -56,6 +57,10 @@ export const addRequestedImageDeletionListener = () => {
         }
       }
 
+      // Preemptively remove from gallery
+      dispatch(imageRemoved(image_name));
+
+      // Delete from server
       dispatch(
         imageDeleted({ imageName: image_name, imageOrigin: image_origin })
       );

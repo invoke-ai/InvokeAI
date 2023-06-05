@@ -114,6 +114,7 @@ export type AppConfig = {
   /**
    * Whether or not we need to re-fetch images
    */
+  shouldUpdateImageUrlsOnError: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];

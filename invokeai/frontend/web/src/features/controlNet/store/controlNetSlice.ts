@@ -13,7 +13,7 @@ import {
   ControlNetModel,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
-import { imageDeleted } from 'services/thunks/image';
+import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
 import { forEach } from 'lodash-es';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
@@ -207,6 +207,22 @@ export const controlNetSlice = createSlice({
         }
         if (c.processedControlImage?.image_name === imageName) {
           c.processedControlImage = null;
+        }
+      });
+    });
+
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      forEach(state.controlNets, (c) => {
+        if (c.controlImage?.image_name === image_name) {
+          c.controlImage.image_url = image_url;
+          c.controlImage.thumbnail_url = thumbnail_url;
+        }
+        if (c.processedControlImage?.image_name === image_name) {
+          c.processedControlImage.image_url = image_url;
+          c.processedControlImage.thumbnail_url = thumbnail_url;
         }
       });
     });
