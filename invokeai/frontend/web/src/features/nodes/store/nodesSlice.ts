@@ -93,6 +93,9 @@ const nodesSlice = createSlice({
         console.error(err);
       }
     },
+    nodeEditorReset: () => {
+      return { ...initialNodesState };
+    },
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
@@ -127,6 +130,7 @@ export const {
   connectionEnded,
   shouldShowGraphOverlayChanged,
   parsedOpenAPISchema,
+  nodeEditorReset,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

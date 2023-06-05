@@ -50,7 +50,7 @@ import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/U
 import { useAppToaster } from 'app/components/Toaster';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
-import { DeleteImageButton } from './DeleteModal';
+import { DeleteImageButton } from './DeleteImageModal';
 
 const currentImageButtonsSelector = createSelector(
   [
