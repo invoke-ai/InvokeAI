@@ -198,10 +198,8 @@ class InvokeAIDiffuserComponent:
 
         if isinstance(unconditional_guidance_scale, list):
             guidance_scale = unconditional_guidance_scale[step_index]
-            print("step: ", step_index, "guidance_scale: ", guidance_scale)
         else:
             guidance_scale = unconditional_guidance_scale
-            print("guidance_scale: ", guidance_scale)
 
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
