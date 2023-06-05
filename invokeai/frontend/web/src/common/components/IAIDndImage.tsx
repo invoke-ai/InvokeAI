@@ -1,23 +1,17 @@
-import {
-  Box,
-  Flex,
-  Icon,
-  IconButtonProps,
-  Image,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Flex, Icon, IconButtonProps, Image } from '@chakra-ui/react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useCombinedRefs } from '@dnd-kit/utilities';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useGetUrl } from 'common/util/getUrl';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { ReactElement, SyntheticEvent } from 'react';
 import { memo, useRef } from 'react';
 import { FaImage, FaTimes } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
+import IAIDropOverlay from './IAIDropOverlay';
 
 type IAIDndImageProps = {
   image: ImageDTO | null | undefined;
@@ -138,7 +132,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             </Box>
           )}
           <AnimatePresence>
-            {active && <DropOverlay isOver={isOver} />}
+            {active && <IAIDropOverlay isOver={isOver} />}
           </AnimatePresence>
         </Flex>
       )}
@@ -164,7 +158,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             />
           </Flex>
           <AnimatePresence>
-            {active && <DropOverlay isOver={isOver} />}
+            {active && <IAIDropOverlay isOver={isOver} />}
           </AnimatePresence>
         </>
       )}
@@ -173,86 +167,3 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 };
 
 export default memo(IAIDndImage);
-
-type DropOverlayProps = {
-  isOver: boolean;
-};
-
-const DropOverlay = (props: DropOverlayProps) => {
-  const { isOver } = props;
-  return (
-    <motion.div
-      key="statusText"
-      initial={{
-        opacity: 0,
-      }}
-      animate={{
-        opacity: 1,
-        transition: { duration: 0.1 },
-      }}
-      exit={{
-        opacity: 0,
-        transition: { duration: 0.1 },
-      }}
-    >
-      <Flex
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          w: 'full',
-          h: 'full',
-        }}
-      >
-        <Flex
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            w: 'full',
-            h: 'full',
-            bg: 'base.900',
-            opacity: 0.7,
-            borderRadius: 'base',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transitionProperty: 'common',
-            transitionDuration: '0.1s',
-          }}
-        />
-
-        <Flex
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            w: 'full',
-            h: 'full',
-            opacity: 1,
-            borderWidth: 2,
-            borderColor: isOver ? 'base.200' : 'base.500',
-            borderRadius: 'base',
-            borderStyle: 'dashed',
-            transitionProperty: 'common',
-            transitionDuration: '0.1s',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
-            sx={{
-              fontSize: '2xl',
-              fontWeight: 600,
-              transform: isOver ? 'scale(1.1)' : 'scale(1)',
-              color: isOver ? 'base.100' : 'base.500',
-              transitionProperty: 'common',
-              transitionDuration: '0.1s',
-            }}
-          >
-            Drop
-          </Text>
-        </Flex>
-      </Flex>
-    </motion.div>
-  );
-};

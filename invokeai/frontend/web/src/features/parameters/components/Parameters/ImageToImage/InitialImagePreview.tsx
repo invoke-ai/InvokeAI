@@ -72,9 +72,10 @@ const InitialImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
-        position: 'relative',
+        position: 'absolute',
         alignItems: 'center',
         justifyContent: 'center',
+        p: 4,
       }}
     >
       <IAIDndImage

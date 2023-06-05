@@ -46,9 +46,12 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: { distance: 15 },
   });
-  const keyboardSensor = useSensor(KeyboardSensor);
+  // TODO: Use KeyboardSensor - needs composition of multiple collisionDetection algos
+  // Alternatively, fix `rectIntersection` collection detection to work with the drag overlay
+  // (currently the drag element collision rect is not correctly calculated)
+  // const keyboardSensor = useSensor(KeyboardSensor);
 
-  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
+  const sensors = useSensors(mouseSensor, touchSensor);
 
   return (
     <DndContext
