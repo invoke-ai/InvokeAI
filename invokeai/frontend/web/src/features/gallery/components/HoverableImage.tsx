@@ -21,7 +21,6 @@ import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useGetUrl } from 'common/util/getUrl';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { createSelector } from '@reduxjs/toolkit';
@@ -104,7 +103,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const { image, isSelected } = props;
   const { image_url, thumbnail_url, image_name } = image;
-  const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -208,7 +206,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleOpenInNewTab = () => {
-    window.open(getUrl(image.image_url), '_blank');
+    window.open(image.image_url, '_blank');
   };
 
   return (
@@ -296,8 +294,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             onMouseOver={handleMouseOver}
             onMouseOut={handleMouseOut}
             userSelect="none"
-            // draggable={true}
-            // onDragStart={handleDragStart}
             onClick={handleSelectImage}
             ref={ref}
             sx={{
@@ -317,7 +313,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
               }
               rounded="md"
-              src={getUrl(thumbnail_url || image_url)}
+              src={thumbnail_url || image_url}
               fallback={<FaImage />}
               sx={{
                 width: '100%',
