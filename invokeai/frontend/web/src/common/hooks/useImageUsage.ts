@@ -1,4 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -7,13 +8,20 @@ import { nodesSelecter } from 'features/nodes/store/nodesSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { some } from 'lodash-es';
 
-const selectIsImageInUse = createSelector(
+export type ImageUsage = {
+  isInitialImage: boolean;
+  isCanvasImage: boolean;
+  isNodesImage: boolean;
+  isControlNetImage: boolean;
+};
+
+const selectImageUsage = createSelector(
   [
     generationSelector,
     canvasSelector,
     nodesSelecter,
     controlNetSelector,
-    (state, image_name) => image_name,
+    (state: RootState, image_name?: string) => image_name,
   ],
   (generation, canvas, nodes, controlNet, image_name) => {
     const isInitialImage = generation.initialImage?.image_name === image_name;
@@ -37,18 +45,22 @@ const selectIsImageInUse = createSelector(
         c.processedControlImage?.image_name === image_name
     );
 
-    return {
+    const imageUsage: ImageUsage = {
       isInitialImage,
       isCanvasImage,
       isNodesImage,
       isControlNetImage,
     };
+
+    return imageUsage;
   },
   defaultSelectorOptions
 );
 
-export const useGetIsImageInUse = (image_name?: string) => {
-  const a = useAppSelector((state) => selectIsImageInUse(state, image_name));
+export const useImageUsage = (image_name?: string) => {
+  const imageUsage = useAppSelector((state) =>
+    selectImageUsage(state, image_name)
+  );
 
-  return a;
+  return imageUsage;
 };

@@ -187,6 +187,9 @@ export const controlNetSlice = createSlice({
         processorType
       ].default as RequiredControlNetProcessorNode;
     },
+    controlNetReset: () => {
+      return { ...initialControlNetState };
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -243,6 +246,7 @@ export const {
   controlNetEndStepPctChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
+  controlNetReset,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;
