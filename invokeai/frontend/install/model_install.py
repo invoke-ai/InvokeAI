@@ -40,13 +40,13 @@ from .widgets import (
     TextBox,
     set_min_terminal_size,
 )
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 # minimum size for the UI
 MIN_COLS = 120
 MIN_LINES = 45
 
-config = get_invokeai_config(argv=[])
+config = InvokeAIAppConfig.get_config()
 
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled

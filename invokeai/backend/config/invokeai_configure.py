@@ -56,6 +56,8 @@ from invokeai.backend.config.model_install_backend import (
     recommended_datasets,
 )
 
+from invokeai.app.services.config import InvokeAIAppConfig
+
 warnings.filterwarnings("ignore")
 
 transformers.logging.set_verbosity_error()
@@ -63,7 +65,7 @@ transformers.logging.set_verbosity_error()
 
 # --------------------------globals-----------------------
 
-config = get_invokeai_config(argv=[])
+config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
@@ -635,7 +637,7 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = InvokeAIAppConfig(argv=[])
+    opts = InvokeAIAppConfig.get_config()
     outdir = Path(opts.outdir)
     if not outdir.is_absolute():
         opts.outdir = str(config.root / opts.outdir)
@@ -700,7 +702,7 @@ def write_opts(opts: Namespace, init_file: Path):
     """
 
     # this will load current settings
-    config = InvokeAIAppConfig(argv=[])
+    config = InvokeAIAppConfig.get_config()
     for key,value in opts.__dict__.items():
         if hasattr(config,key):
             setattr(config,key,value)
@@ -732,7 +734,7 @@ def write_default_options(program_opts: Namespace, initfile: Path):
 # yaml format.
 def migrate_init_file(legacy_format:Path):
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
-    new = InvokeAIAppConfig(conf={})
+    new = InvokeAIAppConfig.get_config()
 
     fields = list(get_type_hints(InvokeAIAppConfig).keys())
     for attr in fields:
@@ -821,8 +823,9 @@ def main():
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-            config = get_invokeai_config(argv=[])  # reread defaults
 
+            # Load new init file into config
+            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
 
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)

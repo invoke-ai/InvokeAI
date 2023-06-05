@@ -21,9 +21,11 @@ from compel.prompt_parser import (
 
 import invokeai.backend.util.logging as logger
 
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 from ..stable_diffusion import InvokeAIDiffuserComponent
 from ..util import torch_dtype
+
+config = InvokeAIAppConfig.get_config()
 
 def get_uc_and_c_and_ec(prompt_string,
                         model: InvokeAIDiffuserComponent,
@@ -37,9 +39,7 @@ def get_uc_and_c_and_ec(prompt_string,
                     textual_inversion_manager=model.textual_inversion_manager,
                     dtype_for_device_getter=torch_dtype,
                     truncate_long_prompts=False,
-                    )
-
-    config = get_invokeai_config()
+                   )
 
     # get rid of any newline characters
     prompt_string = prompt_string.replace("\n", " ")

@@ -15,8 +15,10 @@ from transformers import AutoFeatureExtractor
 
 import invokeai.assets.web as web_assets
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 from .util import CPU_DEVICE
+
+config = InvokeAIAppConfig.get_config()
 
 class SafetyChecker(object):
     CAUTION_IMG = "caution.png"
@@ -26,7 +28,6 @@ class SafetyChecker(object):
         caution = Image.open(path)
         self.caution_img = caution.resize((caution.width // 2, caution.height // 2))
         self.device = device
-        config = get_invokeai_config()
 
         try:
             safety_model_id = "CompVis/stable-diffusion-safety-checker"
