@@ -26,6 +26,10 @@ export const addImageMetadataReceivedFulfilledListener = () => {
         );
       } else if (image.is_intermediate) {
         // No further actions needed for intermediate images
+        moduleLog.trace(
+          { data: { image } },
+          'Image metadata received (intermediate), skipping'
+        );
         return;
       }
 

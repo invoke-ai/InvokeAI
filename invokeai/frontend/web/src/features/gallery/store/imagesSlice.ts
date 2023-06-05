@@ -1,5 +1,6 @@
 import {
   PayloadAction,
+  Update,
   createEntityAdapter,
   createSelector,
   createSlice,
@@ -8,7 +9,12 @@ import { RootState } from 'app/store/store';
 import { ImageCategory, ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 import { keyBy } from 'lodash-es';
-import { imageDeleted, receivedPageOfImages } from 'services/thunks/image';
+import {
+  imageDeleted,
+  imageMetadataReceived,
+  imageUrlsReceived,
+  receivedPageOfImages,
+} from 'services/thunks/image';
 
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
@@ -49,6 +55,12 @@ const imagesSlice = createSlice({
     imageUpserted: (state, action: PayloadAction<ImageDTO>) => {
       imagesAdapter.upsertOne(state, action.payload);
     },
+    imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
+      imagesAdapter.updateOne(state, action.payload);
+    },
+    imageRemoved: (state, action: PayloadAction<string>) => {
+      imagesAdapter.removeOne(state, action.payload);
+    },
     imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
       state.categories = action.payload;
     },
@@ -69,9 +81,18 @@ const imagesSlice = createSlice({
       imagesAdapter.upsertMany(state, items);
     });
     builder.addCase(imageDeleted.pending, (state, action) => {
-      // Preemptively remove the image from the gallery
+      // Image deleted
       const { imageName } = action.meta.arg;
       imagesAdapter.removeOne(state, imageName);
+    });
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      imagesAdapter.updateOne(state, {
+        id: image_name,
+        changes: { image_url, thumbnail_url },
+      });
     });
   },
 });
@@ -84,7 +105,12 @@ export const {
   selectTotal: selectImagesTotal,
 } = imagesAdapter.getSelectors<RootState>((state) => state.images);
 
-export const { imageUpserted, imageCategoriesChanged } = imagesSlice.actions;
+export const {
+  imageUpserted,
+  imageUpdatedOne,
+  imageRemoved,
+  imageCategoriesChanged,
+} = imagesSlice.actions;
 
 export default imagesSlice.reducer;
 
