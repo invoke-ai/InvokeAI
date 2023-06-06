@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -210,16 +210,19 @@ const IAICanvasToolbar = () => {
       sx={{
         alignItems: 'center',
         gap: 2,
+        flexWrap: 'wrap',
       }}
     >
-      <IAISelect
-        tooltip={`${t('unifiedCanvas.layer')} (Q)`}
-        tooltipProps={{ hasArrow: true, placement: 'top' }}
-        value={layer}
-        validValues={LAYER_NAMES_DICT}
-        onChange={handleChangeLayer}
-        isDisabled={isStaging}
-      />
+      <Box w={24}>
+        <IAISelect
+          tooltip={`${t('unifiedCanvas.layer')} (Q)`}
+          tooltipProps={{ hasArrow: true, placement: 'top' }}
+          value={layer}
+          validValues={LAYER_NAMES_DICT}
+          onChange={handleChangeLayer}
+          isDisabled={isStaging}
+        />
+      </Box>
 
       <IAICanvasMaskOptions />
       <IAICanvasToolChooserOptions />
