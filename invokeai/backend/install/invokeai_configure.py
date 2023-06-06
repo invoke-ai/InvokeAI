@@ -360,7 +360,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.outdir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
             name="(<tab> autocompletes, ctrl-N advances):",
-            value=str(old_opts.outdir) or str(default_output_dir()),
+            value=str(default_output_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -642,9 +642,6 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig(argv=[])
-    outdir = Path(opts.outdir)
-    if not outdir.is_absolute():
-        opts.outdir = str(config.root / opts.outdir)
     if not init_file.exists():
         opts.nsfw_checker = True
     return opts
@@ -690,7 +687,8 @@ def run_console_ui(
 ) -> (Namespace, Namespace):
     # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
-
+    invokeai_opts.root = program_opts.root
+    
     set_min_terminal_size(MIN_COLS, MIN_LINES)
 
     # the install-models application spawns a subprocess to install
@@ -711,15 +709,16 @@ def write_opts(opts: Namespace, init_file: Path):
     """
     Update the invokeai.yaml file with values from current settings.
     """
-
-    # this will load current settings
-    config = InvokeAIAppConfig(argv=[])
+    
+    # this will load default settings
+    new_config = InvokeAIAppConfig(argv=[])
+    new_config.root = config.root
     for key,value in opts.__dict__.items():
-        if hasattr(config,key):
-            setattr(config,key,value)
+        if hasattr(new_config,key):
+            setattr(new_config,key,value)
 
     with open(init_file,'w', encoding='utf-8') as file:
-        file.write(config.to_yaml())
+        file.write(new_config.to_yaml())
 
 # -------------------------------------
 def default_output_dir() -> Path:
@@ -823,9 +822,12 @@ def main():
     )
     opt = parser.parse_args()
 
-    # setting a global here
-    global config
-    config.root = Path(os.path.expanduser(get_root(opt.root) or ""))
+    invoke_args = []
+    if opt.root:
+        invoke_args.extend(['--root',opt.root])
+    if opt.full_precision:
+        invoke_args.extend(['--precision','float32'])
+    config.parse_args(invoke_args)
 
     errors = set()
 
@@ -838,8 +840,7 @@ def main():
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-            config = get_invokeai_config(argv=[])  # reread defaults
-
+            config.parse_args([])  # reread defaults
 
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)
@@ -862,7 +863,7 @@ def main():
         if opt.skip_support_models:
             print("\n** SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST **")
         else:
-            print("\n** DOWNLOADING SUPPORT MODELS **")
+            print("\n** CHECKING/UPDATING SUPPORT MODELS **")
             download_bert()
             download_sd1_clip()
             download_sd2_clip()
@@ -876,6 +877,7 @@ def main():
         if opt.skip_sd_weights:
             print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
         elif models_to_download:
+            print(models_to_download)
             print("\n** DOWNLOADING DIFFUSION WEIGHTS **")
             process_and_execute(opt, models_to_download)
 

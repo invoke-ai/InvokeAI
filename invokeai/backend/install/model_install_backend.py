@@ -53,8 +53,8 @@ Config_preamble = """
 @dataclass
 class ModelInstallList:
     '''Class for listing models to be installed/removed'''
-    install_models: List[str]
-    remove_models: List[str]
+    install_models: List[str] = field(default_factory=list)
+    remove_models: List[str] = field(default_factory=list)
 
 @dataclass
 class UserSelections():
@@ -108,36 +108,40 @@ def install_requested_models(
     # prevent circular import here
     from ..model_management import ModelManager
     model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
-    model_manager.install_controlnet_models(controlnet.install_models, access_token=access_token)
-    model_manager.delete_controlnet_models(controlnet.remove_models)
+    if controlnet:
+        model_manager.install_controlnet_models(controlnet.install_models, access_token=access_token)
+        model_manager.delete_controlnet_models(controlnet.remove_models)
 
-    model_manager.install_lora_models(lora.install_models, access_token=access_token)
-    model_manager.delete_lora_models(lora.remove_models)
+    if lora:
+        model_manager.install_lora_models(lora.install_models, access_token=access_token)
+        model_manager.delete_lora_models(lora.remove_models)
 
-    model_manager.install_ti_models(ti.install_models, access_token=access_token)
-    model_manager.delete_ti_models(ti.remove_models)
+    if ti:
+        model_manager.install_ti_models(ti.install_models, access_token=access_token)
+        model_manager.delete_ti_models(ti.remove_models)
 
-    # TODO: Replace next three paragraphs with calls into new model manager
-    if diffusers.remove_models and len(diffusers.remove_models) > 0:
-        logger.info("Processing requested deletions")
-        for model in diffusers.remove_models:
-            logger.info(f"{model}...")
-            model_manager.del_model(model, delete_files=purge_deleted)
-        model_manager.commit(config_file_path)
+    if diffusers:
+        # TODO: Replace next three paragraphs with calls into new model manager
+        if diffusers.remove_models and len(diffusers.remove_models) > 0:
+            logger.info("Processing requested deletions")
+            for model in diffusers.remove_models:
+                logger.info(f"{model}...")
+                model_manager.del_model(model, delete_files=purge_deleted)
+            model_manager.commit(config_file_path)
 
-    if diffusers.install_models and len(diffusers.install_models) > 0:
-        logger.info("Installing requested models")
-        downloaded_paths = download_weight_datasets(
-            models=diffusers.install_models,
-            access_token=None,
-            precision=precision,
-        )
-        successful = {x:v for x,v in downloaded_paths.items() if v is not None}
-        if len(successful) > 0:
-            update_config_file(successful, config_file_path)
-        if len(successful) < len(diffusers.install_models):
-            unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
-            logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
+        if diffusers.install_models and len(diffusers.install_models) > 0:
+            logger.info("Installing requested models")
+            downloaded_paths = download_weight_datasets(
+                models=diffusers.install_models,
+                access_token=None,
+                precision=precision,
+            )
+            successful = {x:v for x,v in downloaded_paths.items() if v is not None}
+            if len(successful) > 0:
+                update_config_file(successful, config_file_path)
+            if len(successful) < len(diffusers.install_models):
+                unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
+                logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
 
     # due to above, we have to reload the model manager because conf file
     # was changed behind its back
@@ -188,21 +192,20 @@ def yes_or_no(prompt: str, default_yes=True):
         return response[0] in ("y", "Y")
 
 # ---------------------------------------------
-def recommended_datasets() -> dict:
-    datasets = dict()
+def recommended_datasets() -> List['str']:
+    datasets = set()
     for ds in initial_models().keys():
         if initial_models()[ds].get("recommended", False):
-            datasets[ds] = True
-    return datasets
-
+            datasets.add(ds)
+    return list(datasets)
 
 # ---------------------------------------------
 def default_dataset() -> dict:
-    datasets = dict()
+    datasets = set()
     for ds in initial_models().keys():
         if initial_models()[ds].get("default", False):
-            datasets[ds] = True
-    return datasets
+            datasets.add(ds)
+    return list(datasets)
 
 
 # ---------------------------------------------
@@ -274,6 +277,9 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
 def download_from_hf(
     model_class: object, model_name: str, **kwargs
 ):
+    logger = InvokeAILogger.getLogger('InvokeAI')
+    logger.addFilter(lambda x: 'fp16 is not a valid' not in x.getMessage())
+    
     path = config.cache_dir
     model = model_class.from_pretrained(
         model_name,

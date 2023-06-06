@@ -29,7 +29,7 @@ from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
 
-from ...backend.install.model_install_backend import (
+from invokeai.backend.install.model_install_backend import (
     Dataset_path,
     default_config_file,
     default_dataset,
@@ -38,10 +38,10 @@ from ...backend.install.model_install_backend import (
     ModelInstallList,
     UserSelections,
 )
-from ...backend import ModelManager
-from ...backend.util import choose_precision, choose_torch_device
-from ...backend.util.logging import InvokeAILogger
-from .widgets import (
+from invokeai.backend import ModelManager
+from invokeai.backend.util import choose_precision, choose_torch_device
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.frontend.install.widgets import (
     CenteredTitleText,
     MultiSelectColumns,
     SingleSelectColumns,
@@ -58,7 +58,18 @@ from invokeai.app.services.config import get_invokeai_config
 MIN_COLS = 140
 MIN_LINES = 50
 
-config = get_invokeai_config(argv=[])
+config = get_invokeai_config()
+
+# build a table mapping all non-printable characters to None
+# for stripping control characters
+# from https://stackoverflow.com/questions/92438/stripping-non-printable-characters-from-a-string-in-python
+NOPRINT_TRANS_TABLE = {
+    i: None for i in range(0, sys.maxunicode + 1) if not chr(i).isprintable()
+}
+
+def make_printable(s:str)->str:
+    '''Replace non-printable characters in a string'''
+    return s.translate(NOPRINT_TRANS_TABLE)
 
 class addModelsForm(npyscreen.FormMultiPage):
     # for responsive resizing - disabled
@@ -69,13 +80,17 @@ class addModelsForm(npyscreen.FormMultiPage):
 
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
+        self.subprocess = None
         super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
     def create(self):
         self.keypress_timeout = 10
         self.counter = 0
         self.subprocess_connection = None
-        
+
+        if not config.model_conf_path.exists():
+            with open(config.model_conf_path,'w') as file:
+                print('# InvokeAI model configuration file',file=file)
         model_manager = ModelManager(config.model_conf_path)
         
         self.starter_models = OmegaConf.load(Dataset_path)['diffusers']
@@ -174,7 +189,7 @@ class addModelsForm(npyscreen.FormMultiPage):
         )
         
         self.nextrely += 1
-        done_label = "INSTALL/REMOVE"
+        done_label = "INSTALL/REMOVE NOW"
         back_label = "BACK"
         button_length = len(done_label)
         button_offset = 0
@@ -196,12 +211,13 @@ class addModelsForm(npyscreen.FormMultiPage):
             when_pressed_function=self.on_execute
         )
 
-        self.cancel = self.add_widget_intelligent(
+        label = "INSTALL AND EXIT"
+        self.done = self.add_widget_intelligent(
             npyscreen.ButtonPress,
-            name="QUIT",
+            name=label,
             rely=-3,
-            relx=window_width-20,
-            when_pressed_function=self.on_cancel,
+            relx=window_width-len(label)-15,
+            when_pressed_function=self.on_done,
         )
 
         # This restores the selected page on return from an installation
@@ -472,6 +488,8 @@ class addModelsForm(npyscreen.FormMultiPage):
         p.start()
         child_conn.close()
         self.subprocess_connection = parent_conn
+        self.subprocess = p
+        app.user_selections = UserSelections()
         # process_and_execute(app.opt, app.user_selections)
 
     def on_back(self):
@@ -481,6 +499,12 @@ class addModelsForm(npyscreen.FormMultiPage):
     def on_cancel(self):
         self.parentApp.setNextForm(None)
         self.parentApp.user_cancelled = True
+        self.editing = False
+        
+    def on_done(self):
+        self.marshall_arguments()
+        self.parentApp.setNextForm(None)
+        self.parentApp.user_cancelled = False
         self.editing = False
 
     ########## This routine monitors the child process that is performing model installation and removal #####
@@ -510,6 +534,8 @@ class addModelsForm(npyscreen.FormMultiPage):
 
                 # update the log message box
                 else:
+                    data=make_printable(data)
+                    data=data.replace('[A','')
                     monitor_widget.buffer(
                         textwrap.wrap(data,
                                       width=monitor_widget.width,
@@ -535,10 +561,11 @@ class addModelsForm(npyscreen.FormMultiPage):
         self.display()
         # rebuild the form, saving log messages
         saved_messages = self.monitor.entry_widget.values
+        multipage = self.multipage
         app.main_form = app.addForm(
-            "MAIN", addModelsForm, name="Install Stable Diffusion Models"
+            "MAIN", addModelsForm, name="Install Stable Diffusion Models", multipage=multipage,
         )
-        app.switchForm('MAIN')
+        app.switchForm("MAIN")
         app.main_form.monitor.entry_widget.values = saved_messages
         app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
 
@@ -652,6 +679,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         self.user_selections = UserSelections()
 
     def onStart(self):
+        print('here i am')
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main_form = self.addForm(
             "MAIN", addModelsForm, name="Install Stable Diffusion Models", cycle_widgets=True,
@@ -720,7 +748,7 @@ def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
         
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace,
-                        selections: Namespace,
+                        selections: UserSelections,
                         conn_out: Connection=None,
                         ):
     # set up so that stderr is sent to conn_out
@@ -750,7 +778,7 @@ def process_and_execute(opt: Namespace,
         if opt.full_precision
         else choose_precision(torch.device(choose_torch_device())),
         purge_deleted=selections.purge_deleted_models,
-        config_file_path=Path(opt.config_file) if opt.config_file else None,
+        config_file_path=Path(opt.config_file) if opt.config_file else config.model_conf_path,
         model_config_file_callback = lambda x: ask_user_for_config_file(x,conn_out)
     )
 
@@ -759,6 +787,29 @@ def process_and_execute(opt: Namespace,
         conn_out.close()
 
 
+def do_listings(opt)->bool:
+    """List installed models of various sorts, and return
+    True if any were requested."""
+    model_manager = ModelManager(config.model_conf_path)
+    if opt.list_models == 'diffusers':
+        print("Diffuser models:")
+        model_manager.print_models()
+    elif opt.list_models == 'controlnets':
+        print("Installed Controlnet Models:")
+        cnm = model_manager.list_controlnet_models()
+        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]),prefix='   '))
+    elif opt.list_models == 'loras':
+        print("Installed LoRA/LyCORIS Models:")
+        cnm = model_manager.list_lora_models()
+        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]),prefix='   '))
+    elif opt.list_models == 'tis':
+        print("Installed Textual Inversion Embeddings:")
+        cnm = model_manager.list_ti_models()
+        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]),prefix='   '))
+    else:
+        return False
+    return True
+
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     precision = (
@@ -766,14 +817,31 @@ def select_and_download_models(opt: Namespace):
         if opt.full_precision
         else choose_precision(torch.device(choose_torch_device()))
     )
-    if opt.default_only:
+
+    if do_listings(opt):
+        pass
+    elif opt.diffusers or opt.controlnets or opt.textual_inversions or opt.loras:
+        action = 'remove_models' if opt.delete else 'install_models'
+        diffusers_args = {'diffusers':ModelInstallList(remove_models=opt.diffusers or [])} \
+                          if opt.delete \
+                          else {'external_models':opt.diffusers or []} 
         install_requested_models(
-            install_starter_models=default_dataset(),
+            **diffusers_args,
+            controlnet=ModelInstallList(**{action:opt.controlnets or []}),
+            ti=ModelInstallList(**{action:opt.textual_inversions or []}),
+            lora=ModelInstallList(**{action:opt.loras or []}),
+            precision=precision,
+            purge_deleted=True,
+            model_config_file_callback=lambda x: ask_user_for_config_file(x),
+        )
+    elif opt.default_only:
+        install_requested_models(
+            diffusers=ModelInstallList(install_models=default_dataset()),
             precision=precision,
         )
     elif opt.yes_to_all:
         install_requested_models(
-            install_starter_models=recommended_datasets(),
+            diffusers=ModelInstallList(install_models=recommended_datasets()),
             precision=precision,
         )
     else:
@@ -782,12 +850,44 @@ def select_and_download_models(opt: Namespace):
         
         set_min_terminal_size(MIN_COLS, MIN_LINES)
         installApp = AddModelApplication(opt)
-        installApp.run()
+        try:
+            installApp.run()
+        except:
+            form = installApp.main_form
+            if form.subprocess and form.subprocess.is_alive():
+                logger.info('Terminating subprocesses')
+                form.subprocess.terminate()
+                form.subprocess = None
         process_and_execute(opt, installApp.user_selections)
 
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
+    parser.add_argument(
+        "--diffusers",
+        nargs="*",
+        help="List of URLs or repo_ids of diffusers to install/delete",
+    )
+    parser.add_argument(
+        "--loras",
+        nargs="*",
+        help="List of URLs or repo_ids of LoRA/LyCORIS models to install/delete",
+    )
+    parser.add_argument(
+        "--controlnets",
+        nargs="*",
+        help="List of URLs or repo_ids of controlnet models to install/delete",
+    )
+    parser.add_argument(
+        "--textual-inversions",
+        nargs="*",
+        help="List of URLs or repo_ids of textual inversion embeddings to install/delete",
+    )
+    parser.add_argument(
+        "--delete",
+        action="store_true",
+        help="Delete models listed on command line rather than installing them",
+    )
     parser.add_argument(
         "--full-precision",
         dest="full_precision",
@@ -809,6 +909,11 @@ def main():
         help="only install the default model",
     )
     parser.add_argument(
+        "--list-models",
+        choices=["diffusers","loras","controlnets","tis"],
+        help="list installed models",
+    )
+    parser.add_argument(
         "--config_file",
         "-c",
         dest="config_file",
@@ -824,10 +929,13 @@ def main():
         help="path to root of install directory",
     )
     opt = parser.parse_args()
-
-    # setting a global here
-    if opt.root and Path(opt.root).exists():
-        config.root = Path(opt.root)
+    
+    invoke_args = []
+    if opt.root:
+        invoke_args.extend(['--root',opt.root])
+    if opt.full_precision:
+        invoke_args.extend(['--precision','float32'])
+    config.parse_args(invoke_args)
 
     if not (config.root_dir / config.conf_path.parent).exists():
         logger.info(
@@ -857,7 +965,7 @@ def main():
             logger.error(
                 "Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
-
+    
 
 # -------------------------------------
 if __name__ == "__main__":
