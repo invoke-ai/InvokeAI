@@ -377,6 +377,7 @@ def select_stable_diffusion_config_file(
     options=[
         "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
         "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
+        "Skip installation for now and come back later",
         "Enter config file path manually",
     ]
 
@@ -416,7 +417,7 @@ def select_stable_diffusion_config_file(
 
     def toggle_visible(value):
         value = value[0]
-        if value==2:
+        if value==3:
             file.hidden=False
         else:
             file.hidden=True
@@ -428,6 +429,6 @@ def select_stable_diffusion_config_file(
     F.edit()
     if not F.value:
         return None
-    assert choice.value[0] in range(0,3),'invalid choice'
-    choices = ['epsilon','v',file.value]
+    assert choice.value[0] in range(0,4),'invalid choice'
+    choices = ['epsilon','v','abort',file.value]
     return choices[choice.value[0]]

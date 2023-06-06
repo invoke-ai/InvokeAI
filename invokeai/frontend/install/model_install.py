@@ -696,22 +696,24 @@ class StderrToMessage():
 def ask_user_for_config_file(model_path: Path,
                              tui_conn: Connection=None
                              )->Path:
-    logger.debug('Waiting for user action in dialog box (above).')
     if tui_conn:
+        logger.debug('Waiting for user response...')
         return _ask_user_for_cf_tui(model_path, tui_conn)        
     else:
         return _ask_user_for_cf_cmdline(model_path)
 
 def _ask_user_for_cf_cmdline(model_path):
     choices = [
-        config.model_conf_path / 'stable-diffusion' / x
+        config.legacy_conf_path / x
         for x in ['v2-inference.yaml','v2-inference-v.yaml']
     ]
+    choices.extend([None])
     print(
 f"""
 Please select the type of the V2 checkpoint named {model_path.name}:
 [1] A Stable Diffusion v2.x base model (512 pixels; there should be no 'parameterization:' line in its yaml file)
 [2] A Stable Diffusion v2.x v-predictive model (768 pixels; look for a 'parameterization: "v"' line in its yaml file)
+[3] Skip this model and come back later.
 """
         )
     choice = None
@@ -738,6 +740,9 @@ def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
             return config.legacy_conf_path / 'v2-inference.yaml'
         elif response == 'v':
             return config.legacy_conf_path  / 'v2-inference-v.yaml'
+        elif response == 'abort':
+            logger.info('Conversion aborted')
+            return None
         else:
             return Path(response)
     except:
