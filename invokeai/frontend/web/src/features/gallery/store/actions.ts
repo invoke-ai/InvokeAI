@@ -1,10 +1,15 @@
 import { createAction } from '@reduxjs/toolkit';
-import { ImageNameAndOrigin } from 'features/parameters/store/actions';
+import { ImageUsage } from 'app/contexts/DeleteImageContext';
 import { ImageDTO } from 'services/api';
 
-export const requestedImageDeletion = createAction<
-  ImageDTO | ImageNameAndOrigin | undefined
->('gallery/requestedImageDeletion');
+export type RequestedImageDeletionArg = {
+  image: ImageDTO;
+  imageUsage: ImageUsage;
+};
+
+export const requestedImageDeletion = createAction<RequestedImageDeletionArg>(
+  'gallery/requestedImageDeletion'
+);
 
 export const sentImageToCanvas = createAction('gallery/sentImageToCanvas');
 
