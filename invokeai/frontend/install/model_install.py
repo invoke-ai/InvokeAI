@@ -183,7 +183,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name='Log Messages',
             editable=False,
-            max_height = 15,
+            max_height = 20,
         )
         
         self.nextrely += 1
