@@ -28,6 +28,13 @@ export const addCanvasCopiedToClipboardListener = () => {
       }
 
       copyBlobToClipboard(blob);
+
+      dispatch(
+        addToast({
+          title: 'Canvas Copied to Clipboard',
+          status: 'success',
+        })
+      );
     },
   });
 };

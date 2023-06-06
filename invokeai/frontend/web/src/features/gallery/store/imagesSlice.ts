@@ -1,5 +1,6 @@
 import {
   PayloadAction,
+  Update,
   createEntityAdapter,
   createSelector,
   createSlice,
@@ -7,12 +8,17 @@ import {
 import { RootState } from 'app/store/store';
 import { ImageCategory, ImageDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
-import { isString, keyBy } from 'lodash-es';
-import { receivedPageOfImages } from 'services/thunks/image';
+import { keyBy } from 'lodash-es';
+import {
+  imageDeleted,
+  imageMetadataReceived,
+  imageUrlsReceived,
+  receivedPageOfImages,
+} from 'services/thunks/image';
 
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
-  sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
+  sortComparer: (a, b) => dateComparator(b.updated_at, a.updated_at),
 });
 
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
@@ -49,13 +55,11 @@ const imagesSlice = createSlice({
     imageUpserted: (state, action: PayloadAction<ImageDTO>) => {
       imagesAdapter.upsertOne(state, action.payload);
     },
-    imageRemoved: (state, action: PayloadAction<string | ImageDTO>) => {
-      if (isString(action.payload)) {
-        imagesAdapter.removeOne(state, action.payload);
-        return;
-      }
-
-      imagesAdapter.removeOne(state, action.payload.image_name);
+    imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
+      imagesAdapter.updateOne(state, action.payload);
+    },
+    imageRemoved: (state, action: PayloadAction<string>) => {
+      imagesAdapter.removeOne(state, action.payload);
     },
     imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
       state.categories = action.payload;
@@ -76,6 +80,20 @@ const imagesSlice = createSlice({
       state.total = total;
       imagesAdapter.upsertMany(state, items);
     });
+    builder.addCase(imageDeleted.pending, (state, action) => {
+      // Image deleted
+      const { imageName } = action.meta.arg;
+      imagesAdapter.removeOne(state, imageName);
+    });
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      imagesAdapter.updateOne(state, {
+        id: image_name,
+        changes: { image_url, thumbnail_url },
+      });
+    });
   },
 });
 
@@ -87,8 +105,12 @@ export const {
   selectTotal: selectImagesTotal,
 } = imagesAdapter.getSelectors<RootState>((state) => state.images);
 
-export const { imageUpserted, imageRemoved, imageCategoriesChanged } =
-  imagesSlice.actions;
+export const {
+  imageUpserted,
+  imageUpdatedOne,
+  imageRemoved,
+  imageCategoriesChanged,
+} = imagesSlice.actions;
 
 export default imagesSlice.reducer;
 

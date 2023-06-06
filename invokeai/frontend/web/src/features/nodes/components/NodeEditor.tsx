@@ -11,7 +11,7 @@ const NodeEditor = () => {
       sx={{
         position: 'relative',
         width: 'full',
-        height: { base: '100vh', xl: 'full' },
+        height: 'full',
         borderRadius: 'md',
         bg: 'base.850',
       }}

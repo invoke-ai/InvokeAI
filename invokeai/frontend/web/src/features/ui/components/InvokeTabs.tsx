@@ -152,16 +152,18 @@ const InvokeTabs = () => {
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
       }}
-      flexGrow={1}
-      flexDir={{ base: 'column', xl: 'row' }}
-      gap={{ base: 4 }}
+      sx={{
+        flexGrow: 1,
+        gap: 4,
+      }}
       isLazy
     >
       <TabList
-        pt={2}
-        gap={4}
-        flexDir={{ base: 'row', xl: 'column' }}
-        justifyContent={{ base: 'center', xl: 'start' }}
+        sx={{
+          pt: 2,
+          gap: 4,
+          flexDir: 'column',
+        }}
       >
         {tabs}
         <Spacer />

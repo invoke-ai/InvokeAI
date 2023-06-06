@@ -33,10 +33,11 @@ from PIL import Image, ImageOps
 from transformers import AutoProcessor, CLIPSegForImageSegmentation
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
 CLIPSEG_SIZE = 352
+config = InvokeAIAppConfig.get_config()
 
 class SegmentedGrayscale(object):
     def __init__(self, image: Image, heatmap: torch.Tensor):
@@ -83,7 +84,6 @@ class Txt2Mask(object):
 
     def __init__(self, device="cpu", refined=False):
         logger.info("Initializing clipseg model for text to mask inference")
-        config = get_invokeai_config()
 
         # BUG: we are not doing anything with the device option at this time
         self.device = device

@@ -10,7 +10,7 @@ from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 from .cross_attention_control import (
     Arguments,
@@ -72,7 +72,7 @@ class InvokeAIDiffuserComponent:
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
-        config = get_invokeai_config()
+        config = InvokeAIAppConfig.get_config()
         self.conditioning = None
         self.model = model
         self.is_running_diffusers = is_running_diffusers
@@ -112,25 +112,25 @@ class InvokeAIDiffuserComponent:
             # TODO resuscitate attention map saving
             # self.remove_attention_map_saving()
 
-    # FIXME: this method needs review. It recursively calls itself?
-    #        and doesn't seem to currently get called from anywhere else
-    def override_cross_attention(
-        self, conditioning: ExtraConditioningInfo, step_count: int
-    ) -> Dict[str, AttentionProcessor]:
-        """
-        setup cross attention .swap control. for diffusers this replaces the attention processor, so
-        the previous attention processor is returned so that the caller can restore it later.
-        """
-        self.conditioning = conditioning
-        self.cross_attention_control_context = Context(
-            arguments=self.conditioning.cross_attention_control_args,
-            step_count=step_count,
-        )
-        return override_cross_attention(
-            self.model,
-            self.cross_attention_control_context,
-            is_running_diffusers=self.is_running_diffusers,
-        )
+    # apparently unused code
+    # TODO: delete
+    # def override_cross_attention(
+    #     self, conditioning: ExtraConditioningInfo, step_count: int
+    # ) -> Dict[str, AttentionProcessor]:
+    #     """
+    #     setup cross attention .swap control. for diffusers this replaces the attention processor, so
+    #     the previous attention processor is returned so that the caller can restore it later.
+    #     """
+    #     self.conditioning = conditioning
+    #     self.cross_attention_control_context = Context(
+    #         arguments=self.conditioning.cross_attention_control_args,
+    #         step_count=step_count,
+    #     )
+    #     return override_cross_attention(
+    #         self.model,
+    #         self.cross_attention_control_context,
+    #         is_running_diffusers=self.is_running_diffusers,
+    #     )
 
     def restore_default_cross_attention(
         self, restore_attention_processor: Optional["AttentionProcessor"] = None

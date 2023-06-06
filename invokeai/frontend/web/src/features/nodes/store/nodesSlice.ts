@@ -16,9 +16,10 @@ import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
-import { size } from 'lodash-es';
-import { isAnyGraphBuilt } from './actions';
+import { forEach, size } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
+import { imageUrlsReceived } from 'services/thunks/image';
+import { RootState } from 'app/store/store';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -92,15 +93,29 @@ const nodesSlice = createSlice({
         console.error(err);
       }
     },
+    nodeEditorReset: () => {
+      return { ...initialNodesState };
+    },
   },
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
     });
 
-    builder.addMatcher(isAnyGraphBuilt, (state, action) => {
-      // TODO: Achtung! Side effect in a reducer!
-      log.info({ namespace: 'nodes', data: action.payload }, 'Graph built');
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      state.nodes.forEach((node) => {
+        forEach(node.data.inputs, (input) => {
+          if (input.type === 'image') {
+            if (input.value?.image_name === image_name) {
+              input.value.image_url = image_url;
+              input.value.thumbnail_url = thumbnail_url;
+            }
+          }
+        });
+      });
     });
   },
 });
@@ -115,6 +130,9 @@ export const {
   connectionEnded,
   shouldShowGraphOverlayChanged,
   parsedOpenAPISchema,
+  nodeEditorReset,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
+
+export const nodesSelecter = (state: RootState) => state.nodes;

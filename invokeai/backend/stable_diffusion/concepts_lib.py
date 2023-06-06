@@ -17,15 +17,16 @@ from huggingface_hub import (
     hf_hub_url,
 )
 
-import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.app.services.config import InvokeAIAppConfig
+logger = InvokeAILogger.getLogger()
 
 class HuggingFaceConceptsLibrary(object):
     def __init__(self, root=None):
         """
         Initialize the Concepts object. May optionally pass a root directory.
         """
-        self.config = get_invokeai_config()
+        self.config = InvokeAIAppConfig.get_config()
         self.root = root or self.config.root
         self.hf_api = HfApi()
         self.local_concepts = dict()
