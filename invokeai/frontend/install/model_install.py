@@ -52,13 +52,13 @@ from invokeai.frontend.install.widgets import (
     set_min_terminal_size,
     select_stable_diffusion_config_file,
 )
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 # minimum size for the UI
 MIN_COLS = 140
 MIN_LINES = 50
 
-config = get_invokeai_config()
+config = InvokeAIAppConfig.get_config()
 
 # build a table mapping all non-printable characters to None
 # for stripping control characters
@@ -679,7 +679,6 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         self.user_selections = UserSelections()
 
     def onStart(self):
-        print('here i am')
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main_form = self.addForm(
             "MAIN", addModelsForm, name="Install Stable Diffusion Models", cycle_widgets=True,

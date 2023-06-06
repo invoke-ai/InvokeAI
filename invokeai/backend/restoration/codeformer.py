@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 pretrained_model_url = (
     "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
@@ -18,7 +18,7 @@ class CodeFormerRestoration:
         self, codeformer_dir="models/codeformer", codeformer_model_path="codeformer.pth"
     ) -> None:
 
-        self.globals = get_invokeai_config()
+        self.globals = InvokeAIAppConfig.get_config()
         codeformer_dir = self.globals.root_dir / codeformer_dir
         self.model_path = codeformer_dir / codeformer_model_path
         self.codeformer_model_exists = self.model_path.exists()

@@ -55,6 +55,8 @@ from invokeai.backend.install.model_install_backend import (
     UserSelections,
 )
 
+from invokeai.app.services.config import InvokeAIAppConfig
+
 warnings.filterwarnings("ignore")
 
 transformers.logging.set_verbosity_error()
@@ -62,7 +64,7 @@ transformers.logging.set_verbosity_error()
 
 # --------------------------globals-----------------------
 
-config = get_invokeai_config(argv=[])
+config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
@@ -301,7 +303,7 @@ def download_vaes():
         if not hf_download_with_resume(
             repo_id=repo_id,
             model_name=model_name,
-            model_dir=str(config.root / Model_dir / Weights_dir),
+            model_dir=str(config.root_path / Model_dir / Weights_dir),
         ):
             raise Exception(f"download of {model_name} failed")
     except Exception as e:
@@ -326,7 +328,7 @@ class editOptsForm(npyscreen.FormMultiPage):
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
-        first_time = not (config.root / 'invokeai.yaml').exists()
+        first_time = not (config.root_path / 'invokeai.yaml').exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
         for i in [
@@ -641,7 +643,7 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 
 def default_startup_options(init_file: Path) -> Namespace:
-    opts = InvokeAIAppConfig(argv=[])
+    opts = InvokeAIAppConfig.get_config()
     if not init_file.exists():
         opts.nsfw_checker = True
     return opts
@@ -709,10 +711,10 @@ def write_opts(opts: Namespace, init_file: Path):
     """
     Update the invokeai.yaml file with values from current settings.
     """
-    
-    # this will load default settings
-    new_config = InvokeAIAppConfig(argv=[])
+    # this will load current settings
+    new_config = InvokeAIAppConfig.get_config()
     new_config.root = config.root
+    
     for key,value in opts.__dict__.items():
         if hasattr(new_config,key):
             setattr(new_config,key,value)
@@ -722,19 +724,19 @@ def write_opts(opts: Namespace, init_file: Path):
 
 # -------------------------------------
 def default_output_dir() -> Path:
-    return config.root / "outputs"
+    return config.root_path / "outputs"
 
 # -------------------------------------
 def default_embedding_dir() -> Path:
-    return config.root / "embeddings"
+    return config.root_path / "embeddings"
 
 # -------------------------------------
 def default_lora_dir() -> Path:
-    return config.root / "loras"
+    return config.root_path / "loras"
 
 # -------------------------------------
 def default_controlnet_dir() -> Path:
-    return config.root / "controlnets"
+    return config.root_path / "controlnets"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
@@ -748,7 +750,7 @@ def write_default_options(program_opts: Namespace, initfile: Path):
 # yaml format.
 def migrate_init_file(legacy_format:Path):
     old = legacy_parser.parse_args([f'@{str(legacy_format)}'])
-    new = InvokeAIAppConfig(conf={})
+    new = InvokeAIAppConfig.get_config()
 
     fields = list(get_type_hints(InvokeAIAppConfig).keys())
     for attr in fields:
@@ -840,7 +842,8 @@ def main():
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-            config.parse_args([])  # reread defaults
+            # Load new init file into config
+            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
 
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root, opt.yes_to_all)
@@ -877,7 +880,6 @@ def main():
         if opt.skip_sd_weights:
             print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
         elif models_to_download:
-            print(models_to_download)
             print("\n** DOWNLOADING DIFFUSION WEIGHTS **")
             process_and_execute(opt, models_to_download)
 

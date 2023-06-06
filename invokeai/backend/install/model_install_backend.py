@@ -20,14 +20,16 @@ from tqdm import tqdm
 
 import invokeai.configs as configs
 
-from invokeai.app.services.config import get_invokeai_config
+
+from invokeai.app.services.config import InvokeAIAppConfig
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
 from ..util.logging import InvokeAILogger
 
 warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
-config = get_invokeai_config(argv=[])
+config = InvokeAIAppConfig.get_config()
+
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 

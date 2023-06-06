@@ -30,6 +30,7 @@ import {
 } from './canvasTypes';
 import { ImageDTO } from 'services/api';
 import { sessionCanceled } from 'services/thunks/session';
+import { setShouldUseCanvasBetaLayout } from 'features/ui/store/uiSlice';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -850,6 +851,10 @@ export const canvasSlice = createSlice({
       if (!state.layerState.stagingArea.images.length) {
         state.layerState.stagingArea = initialLayerState.stagingArea;
       }
+    });
+
+    builder.addCase(setShouldUseCanvasBetaLayout, (state, action) => {
+      state.doesCanvasNeedScaling = true;
     });
   },
 });

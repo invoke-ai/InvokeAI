@@ -49,7 +49,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 from ..stable_diffusion import (
     StableDiffusionGeneratorPipeline,
 )
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 from ..install.model_install_backend import (
     Dataset_path,
     hf_download_with_resume,
@@ -104,7 +104,7 @@ class ModelManager(object):
         if not isinstance(config, DictConfig):
             config = OmegaConf.load(config)
         self.config = config
-        self.globals = get_invokeai_config()
+        self.globals = InvokeAIAppConfig.get_config()
         self.precision = precision
         self.device = torch.device(device_type)
         self.max_loaded_models = max_loaded_models
@@ -1063,7 +1063,7 @@ class ModelManager(object):
         """
         # Three transformer models to check: bert, clip and safety checker, and
         # the diffusers as well
-        config = get_invokeai_config()
+        config = InvokeAIAppConfig.get_config()
         models_dir = config.root_dir / "models"
         legacy_locations = [
             Path(
@@ -1293,7 +1293,7 @@ class ModelManager(object):
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):
-        cache_info = scan_cache_dir(get_invokeai_config().cache_dir)
+        cache_info = scan_cache_dir(InvokeAIAppConfig.get_config().cache_dir)
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!
@@ -1310,7 +1310,7 @@ class ModelManager(object):
 
     @staticmethod
     def _abs_path(path: str | Path) -> Path:
-        globals = get_invokeai_config()
+        globals = InvokeAIAppConfig.get_config()
         if path is None or Path(path).is_absolute():
             return path
         return Path(globals.root_dir, path).resolve()

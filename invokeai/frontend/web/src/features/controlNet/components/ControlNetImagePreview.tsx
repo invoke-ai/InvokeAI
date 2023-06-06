@@ -60,7 +60,10 @@ const ControlNetImagePreview = (props: Props) => {
     processorType !== 'none';
 
   return (
-    <Box ref={containerRef} sx={{ position: 'relative', w: 'full', h: 'full' }}>
+    <Box
+      ref={containerRef}
+      sx={{ position: 'relative', w: 'full', h: 'full', aspectRatio: '1/1' }}
+    >
       <IAIDndImage
         image={controlImage}
         onDrop={handleDrop}
