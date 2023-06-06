@@ -12,11 +12,8 @@ import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
 import { PostUploadAction, imageUploaded } from 'services/thunks/image';
-import { FileRejection, useDropzone } from 'react-dropzone';
+import { useDropzone } from 'react-dropzone';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useAppToaster } from 'app/components/Toaster';
-import { useTranslation } from 'react-i18next';
-import { reject } from 'lodash-es';
 
 type IAIDndImageProps = {
   image: ImageDTO | null | undefined;
@@ -111,6 +108,17 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 
   const setNodeRef = useCombinedRefs(setDroppableRef, setDraggableRef);
 
+  const uploadButtonStyles = isUploadDisabled
+    ? {}
+    : {
+        cursor: 'pointer',
+        bg: 'base.800',
+        _hover: {
+          bg: 'base.750',
+          color: 'base.300',
+        },
+      };
+
   return (
     <Flex
       sx={{
@@ -122,7 +130,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         minW: minSize,
         minH: minSize,
         userSelect: 'none',
-        cursor: 'grab',
+        cursor: isDragDisabled || !image ? 'auto' : 'grab',
       }}
       {...attributes}
       {...listeners}
@@ -180,20 +188,15 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           <Flex
             sx={{
               minH: minSize,
-              bg: 'base.800',
               w: 'full',
               h: 'full',
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 'base',
-              cursor: 'pointer',
               transitionProperty: 'common',
               transitionDuration: '0.1s',
               color: 'base.500',
-              _hover: {
-                bg: 'base.750',
-                color: 'base.300',
-              },
+              ...uploadButtonStyles,
             }}
             {...getRootProps()}
           >
