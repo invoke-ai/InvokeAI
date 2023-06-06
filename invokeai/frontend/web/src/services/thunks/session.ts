@@ -2,6 +2,7 @@ import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { GraphExecutionState, SessionsService } from 'services/api';
 import { log } from 'app/logging/useLogger';
 import { isObject } from 'lodash-es';
+import { isAnyOf } from '@reduxjs/toolkit';
 
 const sessionLog = log.child({ namespace: 'session' });
 
@@ -114,4 +115,9 @@ export const listedSessions = createAppAsyncThunk(
 
     return response;
   }
+);
+
+export const isAnySessionRejected = isAnyOf(
+  sessionCreated.rejected,
+  sessionInvoked.rejected
 );

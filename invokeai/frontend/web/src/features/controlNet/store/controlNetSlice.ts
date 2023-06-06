@@ -1,4 +1,4 @@
-import { PayloadAction } from '@reduxjs/toolkit';
+import { PayloadAction, isAnyOf } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { ImageDTO } from 'services/api';
@@ -16,6 +16,8 @@ import {
 import { controlNetImageProcessed } from './actions';
 import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
 import { forEach } from 'lodash-es';
+import { isAnySessionRejected } from 'services/thunks/session';
+import { appSocketInvocationError } from 'services/events/actions';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
@@ -241,6 +243,14 @@ export const controlNetSlice = createSlice({
           c.processedControlImage.thumbnail_url = thumbnail_url;
         }
       });
+    });
+
+    builder.addCase(appSocketInvocationError, (state, action) => {
+      state.pendingControlImages = [];
+    });
+
+    builder.addMatcher(isAnySessionRejected, (state, action) => {
+      state.pendingControlImages = [];
     });
   },
 });
