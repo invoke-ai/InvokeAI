@@ -46,13 +46,13 @@ export type ControlNetConfig = {
 export type ControlNetState = {
   controlNets: Record<string, ControlNetConfig>;
   isEnabled: boolean;
-  isProcessingControlImage: boolean;
+  pendingControlImages: string[];
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
-  isProcessingControlImage: false,
+  pendingControlImages: [],
 };
 
 export const controlNetSlice = createSlice({
@@ -115,7 +115,7 @@ export const controlNetSlice = createSlice({
         controlImage !== null &&
         state.controlNets[controlNetId].processorType !== 'none'
       ) {
-        state.isProcessingControlImage = true;
+        state.pendingControlImages.push(controlNetId);
       }
     },
     controlNetProcessedImageChanged: (
@@ -128,7 +128,9 @@ export const controlNetSlice = createSlice({
       const { controlNetId, processedControlImage } = action.payload;
       state.controlNets[controlNetId].processedControlImage =
         processedControlImage;
-      state.isProcessingControlImage = false;
+      state.pendingControlImages = state.pendingControlImages.filter(
+        (id) => id !== controlNetId
+      );
     },
     controlNetModelChanged: (
       state,
@@ -207,7 +209,7 @@ export const controlNetSlice = createSlice({
       if (
         state.controlNets[action.payload.controlNetId].controlImage !== null
       ) {
-        state.isProcessingControlImage = true;
+        state.pendingControlImages.push(action.payload.controlNetId);
       }
     });
 

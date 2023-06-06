@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { ImageDTO } from 'services/api';
 import {
   ControlNetConfig,
@@ -17,8 +17,8 @@ import { useHoverDirty } from 'react-use';
 const selector = createSelector(
   controlNetSelector,
   (controlNet) => {
-    const { isProcessingControlImage } = controlNet;
-    return { isProcessingControlImage };
+    const { pendingControlImages } = controlNet;
+    return { pendingControlImages };
   },
   defaultSelectorOptions
 );
@@ -31,7 +31,7 @@ const ControlNetImagePreview = (props: Props) => {
   const { controlNetId, controlImage, processedControlImage, processorType } =
     props.controlNet;
   const dispatch = useAppDispatch();
-  const { isProcessingControlImage } = useAppSelector(selector);
+  const { pendingControlImages } = useAppSelector(selector);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const isMouseOverImage = useHoverDirty(containerRef);
@@ -56,7 +56,7 @@ const ControlNetImagePreview = (props: Props) => {
     controlImage &&
     processedControlImage &&
     !isMouseOverImage &&
-    !isProcessingControlImage &&
+    !pendingControlImages.includes(controlNetId) &&
     processorType !== 'none';
 
   return (
@@ -124,7 +124,7 @@ const ControlNetImagePreview = (props: Props) => {
           </motion.div>
         )}
       </AnimatePresence>
-      {isProcessingControlImage && (
+      {pendingControlImages.includes(controlNetId) && (
         <Box
           sx={{
             position: 'absolute',
