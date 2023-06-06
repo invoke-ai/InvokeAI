@@ -110,7 +110,7 @@ export type AppConfig = {
   /**
    * Whether or not we should update image urls when image loading errors
    */
-  shouldUpdateImageUrlsOnError: boolean;
+  shouldUpdateImagesOnConnect: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];

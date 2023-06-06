@@ -4,7 +4,7 @@ import { AppConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
 
 export const initialConfigState: AppConfig = {
-  shouldUpdateImageUrlsOnError: false,
+  shouldUpdateImagesOnConnect: false,
   disabledTabs: [],
   disabledFeatures: [],
   disabledSDFeatures: [],
