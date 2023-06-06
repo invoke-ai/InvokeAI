@@ -12,13 +12,15 @@ import {
   UnorderedList,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
+import {
+  DeleteImageContext,
+  ImageUsage,
+} from 'app/contexts/DeleteImageContext';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
-import { ImageUsage, useImageUsage } from 'common/hooks/useImageUsage';
 import { configSelector } from 'features/system/store/configSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
@@ -42,8 +44,12 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ImageInUseMessage = (props: { imageUsage: ImageUsage }) => {
+const ImageInUseMessage = (props: { imageUsage?: ImageUsage }) => {
   const { imageUsage } = props;
+
+  if (!imageUsage) {
+    return null;
+  }
 
   if (!some(imageUsage)) {
     return null;
@@ -69,13 +75,11 @@ const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isOpen, onClose, onImmediatelyDelete, image } =
+  const { isOpen, onClose, onImmediatelyDelete, image, imageUsage } =
     useContext(DeleteImageContext);
 
   const { shouldConfirmOnDelete, canRestoreDeletedImagesFromBin } =
     useAppSelector(selector);
-
-  const imageUsage = useImageUsage(image?.image_name);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>
