@@ -9,6 +9,7 @@ import {
 } from './types';
 import {
   CONTROLNET_MODELS,
+  CONTROLNET_MODEL_MAP,
   CONTROLNET_PROCESSORS,
   ControlNetModel,
 } from './constants';
@@ -135,6 +136,16 @@ export const controlNetSlice = createSlice({
     ) => {
       const { controlNetId, model } = action.payload;
       state.controlNets[controlNetId].model = model;
+
+      if (!state.controlNets[controlNetId].controlImage) {
+        const processorType = CONTROLNET_MODEL_MAP[model];
+        if (processorType) {
+          state.controlNets[controlNetId].processorType = processorType;
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
+            processorType
+          ].default as RequiredControlNetProcessorNode;
+        }
+      }
     },
     controlNetWeightChanged: (
       state,
