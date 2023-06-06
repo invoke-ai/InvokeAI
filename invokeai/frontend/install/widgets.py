@@ -69,10 +69,11 @@ def _set_terminal_size_unix(width: int, height: int):
 def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=None):
     # make sure there's enough room for the ui
     term_cols, term_lines = get_terminal_size()
+    if term_cols >= min_cols and term_lines >= min_lines:
+        return
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
     set_terminal_size(cols, lines, launch_command)
-
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
@@ -81,7 +82,23 @@ class IntSlider(npyscreen.Slider):
         stri = stri.rjust(l)
         return stri
 
-
+# -------------------------------------
+# fix npyscreen form so that cursor wraps both forward and backward
+class CyclingForm(object):
+    def find_previous_editable(self, *args):
+        done = False
+        n = self.editw-1
+        while not done:
+            if self._widgets__[n].editable and not self._widgets__[n].hidden:
+                self.editw = n
+                done = True
+            n -= 1
+            if n<0:
+                if self.cycle_widgets:
+                    n = len(self._widgets__)-1
+                else:
+                    done = True
+                    
 # -------------------------------------
 class CenteredTitleText(npyscreen.TitleText):
     def __init__(self, *args, **keywords):

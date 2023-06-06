@@ -50,6 +50,7 @@ from invokeai.frontend.install.widgets import (
     FileBox,
     set_min_terminal_size,
     select_stable_diffusion_config_file,
+    CyclingForm,
     MIN_COLS,
     MIN_LINES,
 )
@@ -68,7 +69,7 @@ def make_printable(s:str)->str:
     '''Replace non-printable characters in a string'''
     return s.translate(NOPRINT_TRANS_TABLE)
 
-class addModelsForm(npyscreen.FormMultiPage):
+class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     # for responsive resizing - disabled
     # FIX_MINIMUM_SIZE_WHEN_CREATED = False
     

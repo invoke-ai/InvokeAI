@@ -44,6 +44,7 @@ from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
+    CyclingForm,
     MIN_COLS,
     MIN_LINES,
 )
@@ -310,7 +311,7 @@ def get_root(root: str = None) -> str:
         return str(config.root_path)
 
 # -------------------------------------
-class editOptsForm(npyscreen.FormMultiPage):
+class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
     # for responsive resizing - disabled
     # FIX_MINIMUM_SIZE_WHEN_CREATED = False
 
@@ -548,7 +549,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             self.editing = False
         else:
             self.editing = True
-
+            
     def validate_field_values(self, opt: Namespace) -> bool:
         bad_fields = []
         if not opt.license_acceptance:
@@ -612,6 +613,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             "MAIN",
             editOptsForm,
             name="InvokeAI Startup Options",
+            cycle_widgets=True,
         )
         if not (self.program_opts.skip_sd_weights or self.program_opts.default_only):
             self.model_select = self.addForm(
