@@ -96,8 +96,8 @@ class StepParamEasingInvocation(BaseInvocation):
 
     # Inputs
     # fmt: off
-    easing: EASING_FUNCTION_KEYS = Field(default="linear", description="The easing function to use")
-    num_steps: int = Field(description="number of denoising steps")
+    easing: EASING_FUNCTION_KEYS = Field(default="Linear", description="The easing function to use")
+    num_steps: int = Field(default=20, description="number of denoising steps")
     start_value: float = Field(default=0.0, description="easing starting value")
     end_value: float = Field(default=1.0, description="easing ending value")
     start_step_percent: float = Field(default=0.0, description="fraction of steps at which to start easing")
