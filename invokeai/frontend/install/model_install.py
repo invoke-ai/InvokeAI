@@ -45,18 +45,15 @@ from invokeai.frontend.install.widgets import (
     CenteredTitleText,
     MultiSelectColumns,
     SingleSelectColumns,
-    OffsetButtonPress,
     TextBox,
     BufferBox,
     FileBox,
     set_min_terminal_size,
     select_stable_diffusion_config_file,
+    MIN_COLS,
+    MIN_LINES,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
-
-# minimum size for the UI
-MIN_COLS = 140
-MIN_LINES = 50
 
 config = InvokeAIAppConfig.get_config()
 
@@ -698,7 +695,7 @@ class StderrToMessage():
 def ask_user_for_config_file(model_path: Path,
                              tui_conn: Connection=None
                              )->Path:
-    logger.debug(f'Waiting for user action in dialog box (above).')
+    logger.debug('Waiting for user action in dialog box (above).')
     if tui_conn:
         return _ask_user_for_cf_tui(model_path, tui_conn)        
     else:
@@ -846,8 +843,10 @@ def select_and_download_models(opt: Namespace):
     else:
         # needed because the torch library is loaded, even though we don't use it
         torch.multiprocessing.set_start_method("spawn")
-        
-        set_min_terminal_size(MIN_COLS, MIN_LINES)
+
+        # the third argument is needed in the Windows 11 environment in
+        # order to launch and resize a console window running this program
+        set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-model-install')
         installApp = AddModelApplication(opt)
         try:
             installApp.run()

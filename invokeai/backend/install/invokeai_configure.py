@@ -37,7 +37,6 @@ from transformers import (
 import invokeai.configs as configs
 
 from invokeai.app.services.config import (
-    get_invokeai_config,
     InvokeAIAppConfig,
 )
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
@@ -45,6 +44,8 @@ from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
+    MIN_COLS,
+    MIN_LINES,
 )
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
@@ -55,10 +56,7 @@ from invokeai.backend.install.model_install_backend import (
     UserSelections,
 )
 
-from invokeai.app.services.config import InvokeAIAppConfig
-
 warnings.filterwarnings("ignore")
-
 transformers.logging.set_verbosity_error()
 
 
@@ -71,10 +69,6 @@ Weights_dir = "ldm/stable-diffusion-v1/"
 
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
-
-# minimum size for the UI
-MIN_COLS = 135
-MIN_LINES = 45
 
 PRECISION_CHOICES = ['auto','float16','float32','autocast']
 
@@ -690,8 +684,10 @@ def run_console_ui(
     # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
     invokeai_opts.root = program_opts.root
-    
-    set_min_terminal_size(MIN_COLS, MIN_LINES)
+
+    # The third argument is needed in the Windows 11 environment to
+    # launch a console window running this program.
+    set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-configure')
 
     # the install-models application spawns a subprocess to install
     # models, and will crash unless this is set before running.

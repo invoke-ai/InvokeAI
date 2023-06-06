@@ -16,8 +16,12 @@ from npyscreen import fmPopup
 from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
+# minimum size for UIs
+MIN_COLS = 140
+MIN_LINES = 50
+
 # -------------------------------------
-def set_terminal_size(columns: int, lines: int):
+def set_terminal_size(columns: int, lines: int, launch_command: str=None):
     ts = get_terminal_size()
     width = max(columns,ts.columns)
     height = max(lines,ts.lines)
@@ -29,7 +33,8 @@ def set_terminal_size(columns: int, lines: int):
         # in the Windows 10 environment.
         if 'IA_RELAUNCHED' not in os.environ:
             args=['conhost']
-            args.extend(sys.argv)
+            args.extend([launch_command] if launch_command else [sys.argv[0]])
+            args.extend(sys.argv[1:])
             os.environ['IA_RELAUNCHED'] = 'True'
             os.execvp('conhost',args)
         else:
