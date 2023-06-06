@@ -72,6 +72,7 @@ import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingA
 import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
+import { addUpdateImageUrlsOnConnectListener } from './listeners/updateImageUrlsOnConnect';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -179,3 +180,6 @@ addImageCategoriesChangedListener();
 // ControlNet
 addControlNetImageProcessedListener();
 addControlNetAutoProcessListener();
+
+// Update image URLs on connect
+addUpdateImageUrlsOnConnectListener();
