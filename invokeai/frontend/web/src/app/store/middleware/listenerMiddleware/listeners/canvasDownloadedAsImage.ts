@@ -27,7 +27,8 @@ export const addCanvasDownloadedAsImageListener = () => {
         return;
       }
 
-      downloadBlob(blob, 'mergedCanvas.png');
+      downloadBlob(blob, 'canvas.png');
+      dispatch(addToast({ title: 'Canvas Downloaded', status: 'success' }));
     },
   });
 };
