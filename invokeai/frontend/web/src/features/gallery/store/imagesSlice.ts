@@ -12,7 +12,7 @@ import { receivedPageOfImages } from 'services/thunks/image';
 
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
-  sortComparer: (a, b) => dateComparator(b.created_at, a.created_at),
+  sortComparer: (a, b) => dateComparator(b.updated_at, a.updated_at),
 });
 
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
