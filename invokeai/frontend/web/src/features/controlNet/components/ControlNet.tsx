@@ -193,66 +193,6 @@ const ControlNet = (props: ControlNetProps) => {
       )}
     </Flex>
   );
-
-  return (
-    <Flex sx={{ flexDir: 'column', gap: 3 }}>
-      <ControlNetImagePreview controlNet={props.controlNet} />
-      <ParamControlNetModel controlNetId={controlNetId} model={model} />
-      <Tabs
-        isFitted
-        orientation="horizontal"
-        variant="enclosed"
-        size="sm"
-        colorScheme="accent"
-      >
-        <TabList>
-          <Tab
-            sx={{ 'button&': { _selected: { borderBottomColor: 'base.800' } } }}
-          >
-            Model Config
-          </Tab>
-          <Tab
-            sx={{ 'button&': { _selected: { borderBottomColor: 'base.800' } } }}
-          >
-            Preprocess
-          </Tab>
-        </TabList>
-        <TabPanels sx={{ pt: 2 }}>
-          <TabPanel sx={{ p: 0 }}>
-            <ParamControlNetWeight
-              controlNetId={controlNetId}
-              weight={weight}
-            />
-            <ParamControlNetBeginEnd
-              controlNetId={controlNetId}
-              beginStepPct={beginStepPct}
-              endStepPct={endStepPct}
-            />
-          </TabPanel>
-          <TabPanel sx={{ p: 0 }}>
-            <ParamControlNetProcessorSelect
-              controlNetId={controlNetId}
-              processorNode={processorNode}
-            />
-            <ControlNetProcessorComponent
-              controlNetId={controlNetId}
-              processorNode={processorNode}
-            />
-            <ControlNetPreprocessButton controlNet={props.controlNet} />
-            {/* <IAIButton
-              size="sm"
-              leftIcon={<FaUndo />}
-              onClick={handleReset}
-              isDisabled={Boolean(!processedControlImage)}
-            >
-              Reset Processing
-            </IAIButton> */}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-      <IAIButton onClick={handleDelete}>Remove ControlNet</IAIButton>
-    </Flex>
-  );
 };
 
 export default memo(ControlNet);

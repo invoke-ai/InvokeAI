@@ -70,6 +70,8 @@ const ControlNetImagePreview = (props: Props) => {
         isDropDisabled={Boolean(
           processedControlImage && processorType !== 'none'
         )}
+        isUploadDisabled={Boolean(controlImage)}
+        postUploadAction={{ type: 'SET_CONTROLNET_IMAGE', controlNetId }}
       />
       <AnimatePresence>
         {shouldShowProcessedImage && (
@@ -118,6 +120,7 @@ const ControlNetImagePreview = (props: Props) => {
                   image={processedControlImage}
                   onDrop={handleDrop}
                   payloadImage={controlImage}
+                  isUploadDisabled={true}
                 />
               </Box>
             </Box>

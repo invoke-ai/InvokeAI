@@ -60,6 +60,11 @@ const ImageInputFieldComponent = (
         onDrop={handleDrop}
         onReset={handleReset}
         resetIconSize="sm"
+        postUploadAction={{
+          type: 'SET_NODES_IMAGE',
+          nodeId,
+          fieldName: field.name,
+        }}
       />
     </Flex>
   );

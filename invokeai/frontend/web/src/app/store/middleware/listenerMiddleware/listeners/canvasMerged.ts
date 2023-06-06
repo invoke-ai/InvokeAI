@@ -8,7 +8,6 @@ import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
 
 const moduleLog = log.child({ namespace: 'canvasCopiedToClipboardListener' });
-export const MERGED_CANVAS_FILENAME = 'mergedCanvas.png';
 
 export const addCanvasMergedListener = () => {
   startAppListening({
@@ -49,12 +48,15 @@ export const addCanvasMergedListener = () => {
       const imageUploadedRequest = dispatch(
         imageUploaded({
           formData: {
-            file: new File([blob], MERGED_CANVAS_FILENAME, {
+            file: new File([blob], 'mergedCanvas.png', {
               type: 'image/png',
             }),
           },
           imageCategory: 'general',
           isIntermediate: true,
+          postUploadAction: {
+            type: 'TOAST_CANVAS_MERGED',
+          },
         })
       );
 
