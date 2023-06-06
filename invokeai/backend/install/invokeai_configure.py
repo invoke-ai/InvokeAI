@@ -94,7 +94,7 @@ Command-line client:
    invokeai
 
 If you installed using an installation script, run:
-  {config.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+  {config.root_path}/invoke.{"bat" if sys.platform == "win32" else "sh"}
 
 Add the '--help' argument to see all of the command-line switches available for use.
 """
@@ -206,16 +206,11 @@ def download_realesrgan():
     model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
-    model_dest = os.path.join(
-        config.root, "models/realesrgan/realesr-general-x4v3.pth"
-    )
+    model_dest = config.root_path / "models/realesrgan/realesr-general-x4v3.pth"
+    wdn_model_dest = config.root_path / "models/realesrgan/realesr-general-wdn-x4v3.pth"
 
-    wdn_model_dest = os.path.join(
-        config.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
-    )
-
-    download_with_progress_bar(model_url, model_dest, "RealESRGAN")
-    download_with_progress_bar(wdn_model_url, wdn_model_dest, "RealESRGANwdn")
+    download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
+    download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
 
 
 def download_gfpgan():
@@ -234,8 +229,8 @@ def download_gfpgan():
             "./models/gfpgan/weights/parsing_parsenet.pth",
         ],
     ):
-        model_url, model_dest = model[0], os.path.join(config.root, model[1])
-        download_with_progress_bar(model_url, model_dest, "GFPGAN weights")
+        model_url, model_dest = model[0], config.root_path / model[1]
+        download_with_progress_bar(model_url, str(model_dest), "GFPGAN weights")
 
 
 # ---------------------------------------------
@@ -244,8 +239,8 @@ def download_codeformer():
     model_url = (
         "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     )
-    model_dest = os.path.join(config.root, "models/codeformer/codeformer.pth")
-    download_with_progress_bar(model_url, model_dest, "CodeFormer")
+    model_dest = config.root_path / "models/codeformer/codeformer.pth"
+    download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
 
 
 # ---------------------------------------------
@@ -312,7 +307,7 @@ def get_root(root: str = None) -> str:
     elif os.environ.get("INVOKEAI_ROOT"):
         return os.environ.get("INVOKEAI_ROOT")
     else:
-        return config.root
+        return str(config.root_path)
 
 # -------------------------------------
 class editOptsForm(npyscreen.FormMultiPage):
@@ -656,7 +651,7 @@ def default_user_selections(program_opts: Namespace) -> UserSelections:
 
 
 # -------------------------------------
-def initialize_rootdir(root: str, yes_to_all: bool = False):
+def initialize_rootdir(root: Path, yes_to_all: bool = False):
     print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
 
     for name in (
@@ -672,7 +667,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
         os.makedirs(os.path.join(root, name), exist_ok=True)
 
     configs_src = Path(configs.__path__[0])
-    configs_dest = Path(root) / "configs"
+    configs_dest = root / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
@@ -833,8 +828,8 @@ def main():
         models_to_download = default_user_selections(opt)
 
         # We check for to see if the runtime directory is correctly initialized.
-        old_init_file = Path(config.root, 'invokeai.init')
-        new_init_file = Path(config.root, 'invokeai.yaml')
+        old_init_file = config.root_path / 'invokeai.init'
+        new_init_file = config.root_path / 'invokeai.yaml'
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
@@ -842,7 +837,7 @@ def main():
             config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
 
         if not config.model_conf_path.exists():
-            initialize_rootdir(config.root, opt.yes_to_all)
+            initialize_rootdir(config.root_path, opt.yes_to_all)
 
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
@@ -880,6 +875,7 @@ def main():
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)
+        input('Press any key to continue...')
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
 

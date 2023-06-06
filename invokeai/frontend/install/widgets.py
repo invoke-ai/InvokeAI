@@ -66,12 +66,12 @@ def _set_terminal_size_unix(width: int, height: int):
     sys.stdout.write("\x1b[8;{height};{width}t".format(height=height, width=width))
     sys.stdout.flush()
 
-def set_min_terminal_size(min_cols: int, min_lines: int):
+def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=None):
     # make sure there's enough room for the ui
     term_cols, term_lines = get_terminal_size()
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
-    set_terminal_size(cols, lines)
+    set_terminal_size(cols, lines, launch_command)
 
 
 class IntSlider(npyscreen.Slider):
