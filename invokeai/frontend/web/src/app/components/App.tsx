@@ -76,18 +76,21 @@ const App = ({
         {isLightboxEnabled && <Lightbox />}
         <ImageUploader>
           <Grid
-            gap={4}
-            p={4}
-            gridAutoRows="min-content auto"
-            w={APP_WIDTH}
-            h={APP_HEIGHT}
+            sx={{
+              gap: 4,
+              p: 4,
+              gridAutoRows: 'min-content auto',
+              w: 'full',
+              h: 'full',
+            }}
           >
             {headerComponent || <SiteHeader />}
             <Flex
-              gap={4}
-              w={{ base: '100vw', xl: 'full' }}
-              h="full"
-              flexDir={{ base: 'column', xl: 'row' }}
+              sx={{
+                gap: 4,
+                w: 'full',
+                h: 'full',
+              }}
             >
               <InvokeTabs />
             </Flex>
