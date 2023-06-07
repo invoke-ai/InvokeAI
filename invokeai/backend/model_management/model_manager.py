@@ -532,7 +532,8 @@ class ModelManager(object):
                     **fp_args,
                 )
             except OSError as e:
-                if str(e).startswith("fp16 is not a valid"):
+                if str(e).startswith("fp16 is not a valid") or \
+                   'Invalid rev id: fp16' in str(e):
                     pass
                 else:
                     self.logger.error(
