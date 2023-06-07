@@ -51,6 +51,9 @@ const ControlNetImagePreview = (props: Props) => {
     [controlImage, controlNetId, dispatch]
   );
 
+  const handleResetControlImage = useCallback(() => {
+    dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
+  }, [controlNetId, dispatch]);
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
   }, []);
@@ -149,6 +152,22 @@ const ControlNetImagePreview = (props: Props) => {
         >
           <IAIImageFallback />
         </Box>
+      )}
+      {controlImage && (
+        <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}>
+          <IAIIconButton
+            aria-label="Reset Control Image"
+            tooltip="Reset Control Image"
+            size="sm"
+            onClick={handleResetControlImage}
+            icon={<FaUndo />}
+            variant="link"
+            sx={{
+              p: 2,
+              color: 'base.50',
+            }}
+          />
+        </Flex>
       )}
     </Box>
   );
