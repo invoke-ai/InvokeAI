@@ -1,4 +1,4 @@
-import { PayloadAction, isAnyOf } from '@reduxjs/toolkit';
+import { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { ImageDTO } from 'services/api';
@@ -30,6 +30,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   processorType: 'canny_image_processor',
   processorNode: CONTROLNET_PROCESSORS.canny_image_processor
     .default as RequiredCannyImageProcessorInvocation,
+  shouldAutoConfig: false,
 };
 
 export type ControlNetConfig = {
@@ -43,6 +44,7 @@ export type ControlNetConfig = {
   processedControlImage: ImageDTO | null;
   processorType: ControlNetProcessorType;
   processorNode: RequiredControlNetProcessorNode;
+  shouldAutoConfig: boolean;
 };
 
 export type ControlNetState = {
@@ -140,8 +142,9 @@ export const controlNetSlice = createSlice({
     ) => {
       const { controlNetId, model } = action.payload;
       state.controlNets[controlNetId].model = model;
+      state.controlNets[controlNetId].processedControlImage = null;
 
-      if (!state.controlNets[controlNetId].controlImage) {
+      if (state.controlNets[controlNetId].shouldAutoConfig) {
         const processorType = CONTROLNET_MODEL_MAP[model];
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
@@ -192,6 +195,7 @@ export const controlNetSlice = createSlice({
         ...processorNode,
         ...changes,
       };
+      state.controlNets[controlNetId].shouldAutoConfig = false;
     },
     controlNetProcessorTypeChanged: (
       state,
@@ -201,10 +205,40 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, processorType } = action.payload;
+      state.controlNets[controlNetId].processedControlImage = null;
       state.controlNets[controlNetId].processorType = processorType;
       state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
         processorType
       ].default as RequiredControlNetProcessorNode;
+      state.controlNets[controlNetId].shouldAutoConfig = false;
+    },
+    controlNetAutoConfigToggled: (
+      state,
+      action: PayloadAction<{
+        controlNetId: string;
+      }>
+    ) => {
+      const { controlNetId } = action.payload;
+      const newShouldAutoConfig =
+        !state.controlNets[controlNetId].shouldAutoConfig;
+
+      if (newShouldAutoConfig) {
+        // manage the processor for the user
+        const processorType =
+          CONTROLNET_MODEL_MAP[state.controlNets[controlNetId].model];
+        if (processorType) {
+          state.controlNets[controlNetId].processorType = processorType;
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
+            processorType
+          ].default as RequiredControlNetProcessorNode;
+        } else {
+          state.controlNets[controlNetId].processorType = 'none';
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS
+            .none.default as RequiredControlNetProcessorNode;
+        }
+      }
+
+      state.controlNets[controlNetId].shouldAutoConfig = newShouldAutoConfig;
     },
     controlNetReset: () => {
       return { ...initialControlNetState };
@@ -274,6 +308,7 @@ export const {
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
   controlNetReset,
+  controlNetAutoConfigToggled,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;
