@@ -13,12 +13,13 @@ const NodeGraphOverlay = () => {
       as="pre"
       fontFamily="monospace"
       position="absolute"
-      top={10}
+      top={2}
       right={2}
       opacity={0.7}
       background="base.800"
       p={2}
       maxHeight={500}
+      maxWidth={500}
       overflowY="scroll"
       borderRadius="md"
     >
