@@ -157,6 +157,7 @@ def install_requested_models(
         logger.info("INSTALLING EXTERNAL MODELS")
         for path_url_or_repo in external_models:
             try:
+                logger.debug(f'In install_requested_models; callback = {model_config_file_callback}')
                 model_manager.heuristic_import(
                     path_url_or_repo,
                     commit_to_conf=config_file_path,
@@ -169,6 +170,8 @@ def install_requested_models(
 
     if scan_at_startup and scan_directory.is_dir():
         update_autoconvert_dir(scan_directory)
+    else:
+        update_autoconvert_dir(None)
 
 def update_autoconvert_dir(autodir: Path):
     '''
@@ -176,7 +179,7 @@ def update_autoconvert_dir(autodir: Path):
     '''
     invokeai_config_path = config.init_file_path
     conf = OmegaConf.load(invokeai_config_path)
-    conf.InvokeAI.Paths.autoconvert_dir = str(autodir)
+    conf.InvokeAI.Paths.autoconvert_dir = str(autodir) if autodir else None
     yaml = OmegaConf.to_yaml(conf)
     tmpfile = invokeai_config_path.parent / "new_config.tmp"
     with open(tmpfile, "w", encoding="utf-8") as outfile:

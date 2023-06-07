@@ -321,6 +321,10 @@ class ModelManager(object):
         for name in sorted(self.config, key=str.casefold):
             stanza = self.config[name]
 
+            with open('log.txt','a') as file:
+                print(f'DEBUG: name={name}; stanza = {stanza}',file=file)
+
+
             # don't include VAEs in listing (legacy style)
             if "config" in stanza and "/VAE/" in stanza["config"]:
                 continue
@@ -820,7 +824,9 @@ class ModelManager(object):
                     Path(thing).rglob("*.safetensors")
                 ):
                     if model_name := self.heuristic_import(
-                        str(m), commit_to_conf=commit_to_conf
+                            str(m),
+                            commit_to_conf=commit_to_conf,
+                            config_file_callback=config_file_callback,
                     ):
                         self.logger.info(f"{model_name} successfully imported")
                 return model_name

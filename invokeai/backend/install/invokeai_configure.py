@@ -13,6 +13,7 @@ import argparse
 import io
 import os
 import shutil
+import textwrap
 import traceback
 import warnings
 from argparse import Namespace
@@ -321,11 +322,11 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
         first_time = not (config.root_path / 'invokeai.yaml').exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
-        for i in [
-            "Configure startup settings. You can come back and change these later.",
-            "Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.",
-            "Use cursor arrows to make a checkbox selection, and space to toggle.",
-        ]:
+        label = """Configure startup settings. You can come back and change these later. 
+Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.
+Use cursor arrows to make a checkbox selection, and space to toggle.
+"""
+        for i in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
@@ -375,14 +376,13 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
             scroll_exit=True,
         )
         self.nextrely += 1
-        for i in [
-            "If you have an account at HuggingFace you may optionally paste your access token here",
-            'to allow InvokeAI to download restricted styles & subjects from the "Concept Library".',
-            "See https://huggingface.co/settings/tokens",
-        ]:
+        label = """If you have an account at HuggingFace you may optionally paste your access token here
+to allow InvokeAI to download restricted styles & subjects from the "Concept Library". See https://huggingface.co/settings/tokens.
+"""
+        for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
-                value=i,
+                value=line,
                 editable=False,
                 color="CONTROL",
             )
@@ -506,11 +506,11 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
             scroll_exit=True,
         )
         self.nextrely -= 1
-        for i in [
-            "BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ",
-            "AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT",
-            "https://huggingface.co/spaces/CompVis/stable-diffusion-license",
-        ]:
+        label = """BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ
+AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT
+https://huggingface.co/spaces/CompVis/stable-diffusion-license
+"""
+        for i in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
@@ -621,6 +621,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
                 addModelsForm,
                 name="Install Stable Diffusion Models",
                 multipage=True,
+                cycle_widgets=True,
             )
 
     def new_opts(self):

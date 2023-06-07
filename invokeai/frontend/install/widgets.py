@@ -17,7 +17,7 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 140
+MIN_COLS = 120
 MIN_LINES = 50
 
 # -------------------------------------
@@ -247,7 +247,7 @@ class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
     def h_cursor_line_right(self,ch):
         self.h_exit_down('bye bye')
 
-class TextBox(npyscreen.MultiLineEdit):
+class TextBoxInner(npyscreen.MultiLineEdit):
 
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
@@ -292,54 +292,57 @@ class TextBox(npyscreen.MultiLineEdit):
         if bstate & (BUTTON2_CLICKED|BUTTON3_CLICKED):
             self.h_paste()
 
-    def update(self, clear=True):
-        if clear:
-            self.clear()
+    # def update(self, clear=True):
+    #     if clear:
+    #         self.clear()
 
-        HEIGHT = self.height
-        WIDTH = self.width
-        # draw box.
-        self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-        self.parent.curses_pad.hline(
-            self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-        )
-        self.parent.curses_pad.vline(
-            self.rely, self.relx, curses.ACS_VLINE, self.height
-        )
-        self.parent.curses_pad.vline(
-            self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-        )
+    #     HEIGHT = self.height
+    #     WIDTH = self.width
+    #     # draw box.
+    #     self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
+    #     self.parent.curses_pad.hline(
+    #         self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
+    #     )
+    #     self.parent.curses_pad.vline(
+    #         self.rely, self.relx, curses.ACS_VLINE, self.height
+    #     )
+    #     self.parent.curses_pad.vline(
+    #         self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
+    #     )
 
-        # draw corners
-        self.parent.curses_pad.addch(
-            self.rely,
-            self.relx,
-            curses.ACS_ULCORNER,
-        )
-        self.parent.curses_pad.addch(
-            self.rely,
-            self.relx + WIDTH,
-            curses.ACS_URCORNER,
-        )
-        self.parent.curses_pad.addch(
-            self.rely + HEIGHT,
-            self.relx,
-            curses.ACS_LLCORNER,
-        )
-        self.parent.curses_pad.addch(
-            self.rely + HEIGHT,
-            self.relx + WIDTH,
-            curses.ACS_LRCORNER,
-        )
+        # # draw corners
+        # self.parent.curses_pad.addch(
+        #     self.rely,
+        #     self.relx,
+        #     curses.ACS_ULCORNER,
+        # )
+        # self.parent.curses_pad.addch(
+        #     self.rely,
+        #     self.relx + WIDTH,
+        #     curses.ACS_URCORNER,
+        # )
+        # self.parent.curses_pad.addch(
+        #     self.rely + HEIGHT,
+        #     self.relx,
+        #     curses.ACS_LLCORNER,
+        # )
+        # self.parent.curses_pad.addch(
+        #     self.rely + HEIGHT,
+        #     self.relx + WIDTH,
+        #     curses.ACS_LRCORNER,
+        # )
 
-        # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
-        (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
-        self.relx += 1
-        self.rely += 1
-        self.height -= 1
-        self.width -= 1
-        super().update(clear=False)
-        (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
+        # # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
+        # (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
+        # self.relx += 1
+        # self.rely += 1
+        # self.height -= 1
+        # self.width -= 1
+        # super().update(clear=False)
+        # (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
+
+class TextBox(npyscreen.BoxTitle):
+    _contained_widget = TextBoxInner
 
 class BufferBox(npyscreen.BoxTitle):
     _contained_widget = npyscreen.BufferPager
@@ -353,6 +356,9 @@ class ConfirmCancelPopup(fmPopup.ActionPopup):
         
 class FileBox(npyscreen.BoxTitle):
     _contained_widget = npyscreen.Filename
+    
+class PrettyTextBox(npyscreen.BoxTitle):
+    _contained_widget = TextBox
     
 def _wrap_message_lines(message, line_length):
     lines = []

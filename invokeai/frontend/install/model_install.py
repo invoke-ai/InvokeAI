@@ -14,6 +14,7 @@ import curses
 import os
 import sys
 import textwrap
+import traceback
 from argparse import Namespace
 from multiprocessing import Process
 from multiprocessing.connection import Connection, Pipe
@@ -128,10 +129,10 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             SingleSelectColumns,
             values=[
                 'STARTER MODELS',
-                'MORE DIFFUSION MODELS',
-                'CONTROLNET MODELS',
-                'LORA/LYCORIS MODELS',
-                'TEXTUAL INVERSION MODELS',
+                'MORE MODELS',
+                'CONTROLNETS',
+                'LORA/LYCORIS',
+                'TEXTUAL INVERSION',
             ],
             value=[self.current_tab],
             columns = 5,
@@ -183,33 +184,28 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name='Log Messages',
             editable=False,
-            max_height = 20,
+            max_height = 16,
         )
         
         self.nextrely += 1
-        done_label = "INSTALL/REMOVE NOW"
+        done_label = "APPLY CHANGES"
         back_label = "BACK"
-        button_length = len(done_label)
-        button_offset = 0
         if self.multipage:
-            button_length += len(back_label) + 1
-            button_offset += len(back_label) + 1
             self.back_button = self.add_widget_intelligent(
                 npyscreen.ButtonPress,
                 name=back_label,
-                relx=(window_width - button_length) // 2,
                 rely=-3,
                 when_pressed_function=self.on_back,
             )
         self.ok_button = self.add_widget_intelligent(
-            npyscreen.ButtonPress, # OffsetButtonPress,
+            npyscreen.ButtonPress,
             name=done_label,
-            relx=button_offset + 1 + (window_width - button_length) // 2,
+            relx=(window_width - len(done_label)) // 2,
             rely=-3,
             when_pressed_function=self.on_execute
         )
 
-        label = "INSTALL AND EXIT"
+        label = "APPLY CHANGES & EXIT"
         self.done = self.add_widget_intelligent(
             npyscreen.ButtonPress,
             name=label,
@@ -289,13 +285,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                           model_type: str,
                           window_width: int=120,
                           install_prompt: str=None,
+                          add_purge_deleted: bool=False,
                           )->dict[str,npyscreen.widget]:
         '''Generic code to create model selection widgets'''
         widgets = dict()
         model_list = sorted(predefined_models.keys())
         if len(model_list) > 0:
             max_width = max([len(x) for x in model_list])
-            columns = window_width // (max_width+6)  # 6 characters for "[x] " and padding
+            columns = window_width // (max_width+8)  # 8 characters for "[x] " and padding
             columns = min(len(model_list),columns) or 1
             prompt = install_prompt or f"Select the desired {model_type} models to install. Unchecked models will be purged from disk."
 
@@ -324,27 +321,28 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     scroll_exit=True,
                 )
             )
-        
-        self.nextrely += 1
-        widgets.update(
-            label2 = self.add_widget_intelligent(
-                npyscreen.TitleFixedText,
-                name="Additional URLs or HuggingFace repo_ids to install (Space separated. Use shift-control-V to paste):",
-                relx=4,
-                color='CONTROL',
-                editable=False,
-                scroll_exit=True
-            )
-        )
 
-        self.nextrely -= 1
+            if add_purge_deleted:
+                self.nextrely += 1
+                widgets.update(
+                    purge_deleted = self.add_widget_intelligent(
+                        npyscreen.Checkbox,
+                        name="Purge unchecked diffusers models from disk",
+                        value=False,
+                        scroll_exit=True,
+                        relx=4,
+                    )
+                )
+                widgets['purge_deleted'].when_value_edited = lambda: self.sync_purge_buttons(widgets['purge_deleted'])
+
+        self.nextrely += 1
         widgets.update(
             download_ids = self.add_widget_intelligent(
                 TextBox,
+                name = "Additional URLs, or HuggingFace repo_ids to install (Space separated. Use shift-control-V to paste):",
                 max_height=4,
                 scroll_exit=True,
                 editable=True,
-                relx=4
             )
         )
         return widgets
@@ -361,27 +359,18 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             predefined_models,
             'Diffusers',
             window_width,
-            install_prompt="Additional diffusers models already installed. Uncheck to purge from disk.",
+            install_prompt="Additional diffusers models already installed.",
+            add_purge_deleted=True
         )
 
-        self.nextrely += 2
-        widgets.update(
-            purge_deleted = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name="Purge unchecked diffusers models from disk",
-                value=False,
-                scroll_exit=True,
-                relx=4,
-            )
-        )
         label = "Directory to scan for models to automatically import (<tab> autocompletes):"
-        self.nextrely += 2
+        self.nextrely += 1
         widgets.update(
             autoload_directory = self.add_widget_intelligent(
-#                npyscreen.TitleFilename,
                 FileBox,
                 max_height=3,
                 name=label,
+                value=str(config.autoconvert_dir) if config.autoconvert_dir else None,
                 select_dir=True,
                 must_exist=True,
                 use_two_lines=False,
@@ -394,12 +383,11 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             autoscan_on_startup = self.add_widget_intelligent(
                 npyscreen.Checkbox,
                 name="Scan and import from this directory each time InvokeAI starts",
-                value=False,
+                value=config.autoconvert_dir is not None,
                 relx=4,
                 scroll_exit=True,
             )
         )
-        widgets['purge_deleted'].when_value_edited = lambda: self.sync_purge_buttons(widgets['purge_deleted'])
         return widgets
 
     def sync_purge_buttons(self,checkbox):
@@ -557,16 +545,22 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.subprocess_connection = None
         self.monitor.entry_widget.buffer(['** Action Complete **'])
         self.display()
-        # rebuild the form, saving log messages
+        
+        # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        multipage = self.multipage
+        autoload_dir = self.diffusers_models['autoload_directory'].value
+        autoscan = self.diffusers_models['autoscan_on_startup'].value
+        
         app.main_form = app.addForm(
-            "MAIN", addModelsForm, name="Install Stable Diffusion Models", multipage=multipage,
+            "MAIN", addModelsForm, name="Install Stable Diffusion Models", multipage=self.multipage,
         )
         app.switchForm("MAIN")
+        
         app.main_form.monitor.entry_widget.values = saved_messages
         app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
-
+        app.main_form.diffusers_models['autoload_directory'].value = autoload_dir
+        app.main_form.diffusers_models['autoscan_on_startup'].value = autoscan
+        
     ###############################################################
     
     def list_additional_diffusers_models(self,
@@ -822,6 +816,7 @@ def select_and_download_models(opt: Namespace):
 
     if do_listings(opt):
         pass
+    # this processes command line additions/removals
     elif opt.diffusers or opt.controlnets or opt.textual_inversions or opt.loras:
         action = 'remove_models' if opt.delete else 'install_models'
         diffusers_args = {'diffusers':ModelInstallList(remove_models=opt.diffusers or [])} \
@@ -846,6 +841,8 @@ def select_and_download_models(opt: Namespace):
             diffusers=ModelInstallList(install_models=recommended_datasets()),
             precision=precision,
         )
+
+    # this is where the TUI is called
     else:
         # needed because the torch library is loaded, even though we don't use it
         torch.multiprocessing.set_start_method("spawn")
@@ -856,12 +853,14 @@ def select_and_download_models(opt: Namespace):
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
-        except KeyboardInterrupt:
-            form = installApp.main_form
-            if form.subprocess and form.subprocess.is_alive():
-                logger.info('Terminating subprocesses')
-                form.subprocess.terminate()
-                form.subprocess = None
+        except KeyboardInterrupt as e:
+            if hasattr(installApp,'main_form'):
+                if installApp.main_form.subprocess \
+                   and installApp.main_form.subprocess.is_alive():
+                    logger.info('Terminating subprocesses')
+                    installApp.main_form.subprocess.terminate()
+                    installApp.main_form.subprocess = None
+            raise e
         process_and_execute(opt, installApp.user_selections)
 
 # -------------------------------------
@@ -970,7 +969,8 @@ def main():
                 "Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
     except Exception as e:
-        print(f'An exception has occurred: {str(e)}')
+        print(f'An exception has occurred: {str(e)} Details:')
+        print(traceback.format_exc(), file=sys.stderr)
         input('Press any key to continue...')
     
 
