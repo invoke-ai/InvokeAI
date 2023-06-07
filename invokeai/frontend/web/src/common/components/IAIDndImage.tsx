@@ -1,4 +1,11 @@
-import { Box, Flex, Icon, IconButtonProps, Image } from '@chakra-ui/react';
+import {
+  Box,
+  ChakraProps,
+  Flex,
+  Icon,
+  IconButtonProps,
+  Image,
+} from '@chakra-ui/react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useCombinedRefs } from '@dnd-kit/utilities';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -31,6 +38,7 @@ type IAIDndImageProps = {
   payloadImage?: ImageDTO | null | undefined;
   minSize?: number;
   postUploadAction?: PostUploadAction;
+  imageSx?: ChakraProps['sx'];
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -49,6 +57,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     payloadImage,
     minSize = 24,
     postUploadAction,
+    imageSx,
   } = props;
   const dispatch = useAppDispatch();
   const dndId = useRef(uuidv4());
@@ -56,7 +65,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   const {
     isOver,
     setNodeRef: setDroppableRef,
-    active,
+    active: isDropActive,
   } = useDroppable({
     id: dndId.current,
     disabled: isDropDisabled,
@@ -69,6 +78,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     attributes,
     listeners,
     setNodeRef: setDraggableRef,
+    isDragging,
   } = useDraggable({
     id: dndId.current,
     data: {
@@ -83,8 +93,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
       if (!file) {
         return;
       }
-
-      console.log(postUploadAction);
 
       dispatch(
         imageUploaded({
@@ -141,7 +149,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           sx={{
             w: 'full',
             h: 'full',
-            position: 'relative',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -157,6 +164,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               maxW: 'full',
               maxH: 'full',
               borderRadius: 'base',
+              ...imageSx,
             }}
           />
           {withMetadataOverlay && <ImageMetadataOverlay image={image} />}
@@ -179,7 +187,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             </Box>
           )}
           <AnimatePresence>
-            {active && <IAIDropOverlay isOver={isOver} />}
+            {isDropActive && <IAIDropOverlay isOver={isOver} />}
           </AnimatePresence>
         </Flex>
       )}
@@ -209,7 +217,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             />
           </Flex>
           <AnimatePresence>
-            {active && <IAIDropOverlay isOver={isOver} />}
+            {isDropActive && <IAIDropOverlay isOver={isOver} />}
           </AnimatePresence>
         </>
       )}
