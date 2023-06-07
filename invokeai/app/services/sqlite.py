@@ -26,7 +26,6 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
         self._lock = Lock()
-
         self._conn = sqlite3.connect(
             self._filename, check_same_thread=False
         )  # TODO: figure out a better threading solution

@@ -39,7 +39,7 @@ from .services.model_manager_service import ModelManagerService
 from .services.processor import DefaultInvocationProcessor
 from .services.restoration_services import RestorationServices
 from .services.sqlite import SqliteItemStorage
-
+from .services.config import InvokeAIAppConfig
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -198,7 +198,8 @@ logger = logger.InvokeAILogger.getLogger()
 
 def invoke_cli():
     # this gets the basic configuration
-    config = get_invokeai_config()
+    config = InvokeAIAppConfig.get_config()
+    config.parse_args()
 
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()

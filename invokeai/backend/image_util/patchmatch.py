@@ -6,7 +6,8 @@ be suppressed or deferred
 """
 import numpy as np
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
+config = InvokeAIAppConfig.get_config()
 
 class PatchMatch:
     """
@@ -21,7 +22,6 @@ class PatchMatch:
 
     @classmethod
     def _load_patch_match(self):
-        config = get_invokeai_config()
         if self.tried_load:
             return
         if config.try_patchmatch:

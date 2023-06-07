@@ -9,19 +9,6 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useGetUrl } from 'common/util/getUrl';
-import promptToString from 'common/util/promptToString';
-import {
-  setCfgScale,
-  setHeight,
-  setImg2imgStrength,
-  setNegativePrompt,
-  setPositivePrompt,
-  setScheduler,
-  setSeed,
-  setSteps,
-  setWidth,
-} from 'features/parameters/store/generationSlice';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -30,7 +17,6 @@ import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { ImageDTO } from 'services/api';
-import { Scheduler } from 'app/constants';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 
 type MetadataItemProps = {
@@ -146,7 +132,6 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   const metadata = image?.metadata;
 
   const { t } = useTranslation();
-  const { getUrl } = useGetUrl();
 
   const metadataJSON = JSON.stringify(image, null, 2);
 
@@ -168,11 +153,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
     >
       <Flex gap={2}>
         <Text fontWeight="semibold">File:</Text>
-        <Link
-          href={getUrl(image.image_url)}
-          isExternal
-          maxW="calc(100% - 3rem)"
-        >
+        <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
           {image.image_name}
           <ExternalLinkIcon mx="2px" />
         </Link>

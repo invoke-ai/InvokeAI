@@ -26,7 +26,7 @@ import torch
 from safetensors.torch import load_file
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 from .model_manager import ModelManager, SDLegacyType
 from .model_cache import ModelCache
@@ -857,7 +857,7 @@ def convert_ldm_bert_checkpoint(checkpoint, config):
 
 def convert_ldm_clip_checkpoint(checkpoint):
     text_model = CLIPTextModel.from_pretrained(
-        "openai/clip-vit-large-patch14", cache_dir=get_invokeai_config().cache_dir
+        "openai/clip-vit-large-patch14", cache_dir=InvokeAIAppConfig.get_config().cache_dir
     )
 
     keys = list(checkpoint.keys())
@@ -912,7 +912,7 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 
 
 def convert_paint_by_example_checkpoint(checkpoint):
-    cache_dir = get_invokeai_config().cache_dir
+    cache_dir = InvokeAIAppConfig.get_config().cache_dir
     config = CLIPVisionConfig.from_pretrained(
         "openai/clip-vit-large-patch14", cache_dir=cache_dir
     )
@@ -984,7 +984,7 @@ def convert_paint_by_example_checkpoint(checkpoint):
 
 
 def convert_open_clip_checkpoint(checkpoint):
-    cache_dir = get_invokeai_config().cache_dir
+    cache_dir = InvokeAIAppConfig.get_config().cache_dir
     text_model = CLIPTextModel.from_pretrained(
         "stabilityai/stable-diffusion-2", subfolder="text_encoder", cache_dir=cache_dir
     )
@@ -1120,7 +1120,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param vae: A diffusers VAE to load into the pipeline.
     :param vae_path: Path to a checkpoint VAE that will be converted into diffusers and loaded into the pipeline.
     """
-    config = get_invokeai_config()
+    config = InvokeAIAppConfig.get_config()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         verbosity = dlogging.get_verbosity()

@@ -6,10 +6,13 @@ import { clamp } from 'lodash-es';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
   imageRemoved,
-  imagesAdapter,
   selectImagesEntities,
   selectImagesIds,
 } from 'features/gallery/store/imagesSlice';
+import { resetCanvas } from 'features/canvas/store/canvasSlice';
+import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 
 const moduleLog = log.child({ namespace: 'addRequestedImageDeletionListener' });
 
@@ -20,11 +23,7 @@ export const addRequestedImageDeletionListener = () => {
   startAppListening({
     actionCreator: requestedImageDeletion,
     effect: (action, { dispatch, getState }) => {
-      const image = action.payload;
-      if (!image) {
-        moduleLog.warn('No image provided');
-        return;
-      }
+      const { image, imageUsage } = action.payload;
 
       const { image_name, image_origin } = image;
 
@@ -58,8 +57,28 @@ export const addRequestedImageDeletionListener = () => {
         }
       }
 
+      // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
+
+      if (imageUsage.isCanvasImage) {
+        dispatch(resetCanvas());
+      }
+
+      if (imageUsage.isControlNetImage) {
+        dispatch(controlNetReset());
+      }
+
+      if (imageUsage.isInitialImage) {
+        dispatch(clearInitialImage());
+      }
+
+      if (imageUsage.isNodesImage) {
+        dispatch(nodeEditorReset());
+      }
+
+      // Preemptively remove from gallery
       dispatch(imageRemoved(image_name));
 
+      // Delete from server
       dispatch(
         imageDeleted({ imageName: image_name, imageOrigin: image_origin })
       );
@@ -74,9 +93,7 @@ export const addImageDeletedPendingListener = () => {
   startAppListening({
     actionCreator: imageDeleted.pending,
     effect: (action, { dispatch, getState }) => {
-      const { imageName, imageOrigin } = action.meta.arg;
-      // Preemptively remove the image from the gallery
-      imagesAdapter.removeOne(getState().images, imageName);
+      //
     },
   });
 };

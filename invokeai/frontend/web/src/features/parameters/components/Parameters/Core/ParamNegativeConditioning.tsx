@@ -25,6 +25,7 @@ const ParamNegativeConditioning = () => {
           borderColor: 'error.600',
         }}
         fontSize="sm"
+        minH={16}
       />
     </FormControl>
   );

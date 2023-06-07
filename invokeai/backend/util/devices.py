@@ -4,15 +4,15 @@ from contextlib import nullcontext
 
 import torch
 from torch import autocast
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
+config = InvokeAIAppConfig.get_config()
 
 def choose_torch_device() -> torch.device:
     """Convenience routine for guessing which GPU device to run model on"""
-    config = get_invokeai_config()    
     if config.always_use_cpu:
         return CPU_DEVICE
     if torch.cuda.is_available():
@@ -32,7 +32,6 @@ def choose_precision(device: torch.device) -> str:
 
 
 def torch_dtype(device: torch.device) -> torch.dtype:
-    config = get_invokeai_config()
     if config.full_precision:
         return torch.float32
     if choose_precision(device) == "float16":

@@ -18,7 +18,7 @@ export type ImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
 };

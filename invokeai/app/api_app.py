@@ -39,7 +39,8 @@ socket_io = SocketIO(app)
 
 # initialize config
 # this is a module global
-app_config = InvokeAIAppConfig()
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
 
 # Add startup event to load dependencies
 @app.on_event("startup")

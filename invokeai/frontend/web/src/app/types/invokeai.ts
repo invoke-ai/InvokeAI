@@ -95,6 +95,7 @@ export type AppFeature =
  * A disable-able Stable Diffusion feature
  */
 export type SDFeature =
+  | 'controlNet'
   | 'noise'
   | 'variation'
   | 'symmetry'
@@ -107,12 +108,9 @@ export type SDFeature =
  */
 export type AppConfig = {
   /**
-   * Whether or not URLs should be transformed to use a different host
+   * Whether or not we should update image urls when image loading errors
    */
-  shouldTransformUrls: boolean;
-  /**
-   * Whether or not we need to re-fetch images
-   */
+  shouldUpdateImagesOnConnect: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];

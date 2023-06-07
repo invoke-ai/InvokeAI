@@ -14,6 +14,8 @@ const ImageFallbackSpinner = (props: ImageFallbackSpinnerProps) => {
         justifyContent: 'center',
         position: 'absolute',
         color: 'base.400',
+        minH: 36,
+        minW: 36,
       }}
     >
       <Spinner size={size} {...rest} />

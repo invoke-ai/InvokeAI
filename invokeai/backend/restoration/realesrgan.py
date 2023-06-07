@@ -6,8 +6,8 @@ from PIL import Image
 from PIL.Image import Image as ImageType
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
-config = get_invokeai_config()
+from invokeai.app.services.config import InvokeAIAppConfig
+config = InvokeAIAppConfig.get_config()
 
 class ESRGAN:
     def __init__(self, bg_tile_size=400) -> None:

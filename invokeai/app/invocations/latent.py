@@ -4,11 +4,12 @@ from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
 import einops
+
+from pydantic import BaseModel, Field, validator
 import torch
 from diffusers import ControlNetModel
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
-from pydantic import BaseModel, Field, validator
 
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.app.util.step_callback import stable_diffusion_step_callback

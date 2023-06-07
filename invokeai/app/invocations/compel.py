@@ -4,12 +4,10 @@ from contextlib import ExitStack
 import re
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
-
 from .model import ClipField
 
-from ...backend.util.devices import choose_torch_device, torch_dtype
+from ...backend.util.devices import torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
 from ...backend.model_management import SDModelType
 from ...backend.model_management.lora import ModelPatcher
 
@@ -18,7 +16,7 @@ from compel.prompt_parser import (
     Blend,
     CrossAttentionControlSubstitute,
     FlattenedPrompt,
-    Fragment,
+    Fragment, Conjunction,
 )
 
 
@@ -81,7 +79,7 @@ class CompelInvocation(BaseInvocation):
                             context.services.model_manager.get_model(model_name=name, model_type=SDModelType.TextualInversion)
                         )
                     )
-                except Exception as e:
+                except Exception:
                     #print(e)
                     #import traceback
                     #print(traceback.format_exc())
@@ -98,7 +96,6 @@ class CompelInvocation(BaseInvocation):
                     truncate_long_prompts=True, # TODO:
                 )
                 
-
                 conjunction = Compel.parse_prompt_string(self.prompt)
                 prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
@@ -106,16 +103,15 @@ class CompelInvocation(BaseInvocation):
                     log_tokenization_for_prompt_object(prompt, tokenizer)
 
                 c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
-
+                
                 # TODO: long prompt support
                 #if not self.truncate_long_prompts:
                 #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
-
                 ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-                    tokens_count_including_eos_bos=get_max_token_count(tokenizer, prompt),
+                    tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
                     cross_attention_control_args=options.get("cross_attention_control", None),
                 )
-            
+                
             conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
             # TODO: hacky but works ;D maybe rename latents somehow?
@@ -129,14 +125,22 @@ class CompelInvocation(BaseInvocation):
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=False
+    tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction], truncate_if_too_long=False
 ) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
         return max(
             [
-                get_max_token_count(tokenizer, c, truncate_if_too_long)
-                for c in blend.prompts
+                get_max_token_count(tokenizer, p, truncate_if_too_long)
+                for p in blend.prompts
+            ]
+        )
+    elif type(prompt) is Conjunction:
+        conjunction: Conjunction = prompt
+        return sum(
+            [
+                get_max_token_count(tokenizer, p, truncate_if_too_long)
+                for p in conjunction.prompts
             ]
         )
     else:
@@ -169,6 +173,22 @@ def get_tokens_for_prompt_object(
         max_tokens_length = tokenizer.model_max_length - 2  # typically 75
         tokens = tokens[0:max_tokens_length]
     return tokens
+
+
+def log_tokenization_for_conjunction(
+    c: Conjunction, tokenizer, display_label_prefix=None
+):
+    display_label_prefix = display_label_prefix or ""
+    for i, p in enumerate(c.prompts):
+        if len(c.prompts)>1:
+            this_display_label_prefix = f"{display_label_prefix}(conjunction part {i + 1}, weight={c.weights[i]})"
+        else:
+            this_display_label_prefix = display_label_prefix
+        log_tokenization_for_prompt_object(
+            p,
+            tokenizer,
+            display_label_prefix=this_display_label_prefix
+        )
 
 
 def log_tokenization_for_prompt_object(

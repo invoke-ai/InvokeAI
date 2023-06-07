@@ -149,7 +149,7 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import download_with_resume
 
 from ..util import CUDA_DEVICE
@@ -224,7 +224,7 @@ class ModelManager(object):
             raise ValueError('config argument must be an OmegaConf object, a Path or a string')
 
         # check config version number and update on disk/RAM if necessary
-        self.globals = get_invokeai_config()
+        self.globals = InvokeAIAppConfig.get_config()
         self._update_config_file_version()
         self.logger = logger
         self.cache = ModelCache(
@@ -1149,13 +1149,17 @@ class ModelManager(object):
             """\
             # This file describes the alternative machine learning models
             # available to InvokeAI script.
-            """
+            #
+            # To add a new model, follow the examples below. Each
+            # model requires a model config file, a weights file,
+            # and the width and height of the images it
+            # was trained on.
+        """
         )
-
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):
-        cache_info = scan_cache_dir(get_invokeai_config().cache_dir)
+        cache_info = scan_cache_dir(InvokeAIAppConfig.get_config().cache_dir)
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!
@@ -1172,7 +1176,7 @@ class ModelManager(object):
 
     @staticmethod
     def _abs_path(path: str | Path) -> Path:
-        globals = get_invokeai_config()
+        globals = InvokeAIAppConfig.get_config()
         if path is None or Path(path).is_absolute():
             return path
         return Path(globals.root_dir, path).resolve()

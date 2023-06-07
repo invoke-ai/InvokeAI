@@ -21,6 +21,7 @@ import { ReactNode, memo, useCallback, useEffect, useState } from 'react';
 import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
 
 const DEFAULT_CONFIG = {};
 
@@ -76,18 +77,21 @@ const App = ({
         {isLightboxEnabled && <Lightbox />}
         <ImageUploader>
           <Grid
-            gap={4}
-            p={4}
-            gridAutoRows="min-content auto"
-            w={APP_WIDTH}
-            h={APP_HEIGHT}
+            sx={{
+              gap: 4,
+              p: 4,
+              gridAutoRows: 'min-content auto',
+              w: 'full',
+              h: 'full',
+            }}
           >
             {headerComponent || <SiteHeader />}
             <Flex
-              gap={4}
-              w={{ base: '100vw', xl: 'full' }}
-              h="full"
-              flexDir={{ base: 'column', xl: 'row' }}
+              sx={{
+                gap: 4,
+                w: 'full',
+                h: 'full',
+              }}
             >
               <InvokeTabs />
             </Flex>
@@ -130,6 +134,7 @@ const App = ({
           <FloatingGalleryButton />
         </Portal>
       </Grid>
+      <DeleteImageModal />
       <Toaster />
       <GlobalHotkeys />
     </>

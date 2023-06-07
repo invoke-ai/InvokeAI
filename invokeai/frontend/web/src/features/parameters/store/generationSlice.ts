@@ -17,6 +17,7 @@ import {
   StrengthParam,
   WidthParam,
 } from './parameterZodSchemas';
+import { imageUrlsReceived } from 'services/thunks/image';
 
 export interface GenerationState {
   cfgScale: CfgScaleParam;
@@ -229,6 +230,16 @@ export const generationSlice = createSlice({
       const defaultModel = action.payload.sd?.defaultModel;
       if (defaultModel && !state.model) {
         state.model = defaultModel;
+      }
+    });
+
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      if (state.initialImage?.image_name === image_name) {
+        state.initialImage.image_url = image_url;
+        state.initialImage.thumbnail_url = thumbnail_url;
       }
     });
   },

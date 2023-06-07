@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
 import { imageUrlsReceived } from 'services/thunks/image';
-import { imagesAdapter } from 'features/gallery/store/imagesSlice';
+import { imageUpdatedOne } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -14,13 +14,12 @@ export const addImageUrlsReceivedFulfilledListener = () => {
 
       const { image_name, image_url, thumbnail_url } = image;
 
-      imagesAdapter.updateOne(getState().images, {
-        id: image_name,
-        changes: {
-          image_url,
-          thumbnail_url,
-        },
-      });
+      dispatch(
+        imageUpdatedOne({
+          id: image_name,
+          changes: { image_url, thumbnail_url },
+        })
+      );
     },
   });
 };

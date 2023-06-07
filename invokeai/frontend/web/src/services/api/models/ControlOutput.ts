@@ -10,7 +10,7 @@ import type { ControlField } from './ControlField';
 export type ControlOutput = {
   type?: 'control_output';
   /**
-   * The control info dict
+   * The output control image
    */
   control?: ControlField;
 };

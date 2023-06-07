@@ -18,7 +18,7 @@ export type ZoeDepthImageProcessorInvocation = {
   is_intermediate?: boolean;
   type?: 'zoe_depth_image_processor';
   /**
-   * image to process
+   * The image to process
    */
   image?: ImageField;
 };

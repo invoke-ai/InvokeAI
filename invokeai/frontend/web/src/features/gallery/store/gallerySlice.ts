@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { ImageDTO } from 'services/api';
 import { imageUpserted } from './imagesSlice';
+import { imageUrlsReceived } from 'services/thunks/image';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -50,8 +51,20 @@ export const gallerySlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(imageUpserted, (state, action) => {
-      if (state.shouldAutoSwitchToNewImages) {
+      if (
+        state.shouldAutoSwitchToNewImages &&
+        action.payload.image_category === 'general'
+      ) {
         state.selectedImage = action.payload;
+      }
+    });
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      if (state.selectedImage?.image_name === image_name) {
+        state.selectedImage.image_url = image_url;
+        state.selectedImage.thumbnail_url = thumbnail_url;
       }
     });
   },
