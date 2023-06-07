@@ -856,12 +856,14 @@ def select_and_download_models(opt: Namespace):
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
-        except:
-            form = installApp.main_form
-            if form.subprocess and form.subprocess.is_alive():
-                logger.info('Terminating subprocesses')
-                form.subprocess.terminate()
-                form.subprocess = None
+        except Exception as e:
+            print(str(e))
+            if hasattr(installApp,'main_form'):
+                form = installApp.main_form
+                if form.subprocess and form.subprocess.is_alive():
+                    logger.info('Terminating subprocesses')
+                    form.subprocess.terminate()
+                    form.subprocess = None
         process_and_execute(opt, installApp.user_selections)
 
 # -------------------------------------
