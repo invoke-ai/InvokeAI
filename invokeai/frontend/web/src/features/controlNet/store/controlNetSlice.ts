@@ -148,6 +148,10 @@ export const controlNetSlice = createSlice({
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
             processorType
           ].default as RequiredControlNetProcessorNode;
+        } else {
+          state.controlNets[controlNetId].processorType = 'none';
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS
+            .none.default as RequiredControlNetProcessorNode;
         }
       }
     },
