@@ -4,14 +4,69 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { requestedImageDeletion } from 'features/gallery/store/actions';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { PropsWithChildren, createContext, useCallback, useState } from 'react';
+import {
+  PropsWithChildren,
+  createContext,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { ImageDTO } from 'services/api';
+import { RootState } from 'app/store/store';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
+import { nodesSelecter } from 'features/nodes/store/nodesSlice';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
+import { some } from 'lodash-es';
 
-import { useImageUsage } from 'common/hooks/useImageUsage';
-import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+export type ImageUsage = {
+  isInitialImage: boolean;
+  isCanvasImage: boolean;
+  isNodesImage: boolean;
+  isControlNetImage: boolean;
+};
+
+export const selectImageUsage = createSelector(
+  [
+    generationSelector,
+    canvasSelector,
+    nodesSelecter,
+    controlNetSelector,
+    (state: RootState, image_name?: string) => image_name,
+  ],
+  (generation, canvas, nodes, controlNet, image_name) => {
+    const isInitialImage = generation.initialImage?.image_name === image_name;
+
+    const isCanvasImage = canvas.layerState.objects.some(
+      (obj) => obj.kind === 'image' && obj.image.image_name === image_name
+    );
+
+    const isNodesImage = nodes.nodes.some((node) => {
+      return some(
+        node.data.inputs,
+        (input) =>
+          input.type === 'image' && input.value?.image_name === image_name
+      );
+    });
+
+    const isControlNetImage = some(
+      controlNet.controlNets,
+      (c) =>
+        c.controlImage?.image_name === image_name ||
+        c.processedControlImage?.image_name === image_name
+    );
+
+    const imageUsage: ImageUsage = {
+      isInitialImage,
+      isCanvasImage,
+      isNodesImage,
+      isControlNetImage,
+    };
+
+    return imageUsage;
+  },
+  defaultSelectorOptions
+);
 
 type DeleteImageContextValue = {
   /**
@@ -30,6 +85,10 @@ type DeleteImageContextValue = {
    * The image pending deletion
    */
   image?: ImageDTO;
+  /**
+   * The features in which this image is used
+   */
+  imageUsage?: ImageUsage;
   /**
    * Immediately deletes an image.
    *
@@ -65,41 +124,28 @@ export const DeleteImageContextProvider = (props: Props) => {
   const [imageToDelete, setImageToDelete] = useState<ImageDTO>();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const imageUsage = useImageUsage(imageToDelete?.image_name);
 
-  const handleActualDeletion = useCallback(
-    (image: ImageDTO) => {
-      dispatch(requestedImageDeletion(image));
-
-      if (imageUsage.isCanvasImage) {
-        dispatch(resetCanvas());
-      }
-
-      if (imageUsage.isControlNetImage) {
-        dispatch(controlNetReset());
-      }
-
-      if (imageUsage.isInitialImage) {
-        dispatch(clearInitialImage());
-      }
-
-      if (imageUsage.isControlNetImage) {
-        dispatch(nodeEditorReset());
-      }
-    },
-    [
-      dispatch,
-      imageUsage.isCanvasImage,
-      imageUsage.isControlNetImage,
-      imageUsage.isInitialImage,
-    ]
+  // Check where the image to be deleted is used (eg init image, controlnet, etc.)
+  const imageUsage = useAppSelector((state) =>
+    selectImageUsage(state, imageToDelete?.image_name)
   );
 
+  // Clean up after deleting or dismissing the modal
   const closeAndClearImageToDelete = useCallback(() => {
     setImageToDelete(undefined);
     onClose();
   }, [onClose]);
 
+  // Dispatch the actual deletion action, to be handled by listener middleware
+  const handleActualDeletion = useCallback(
+    (image: ImageDTO) => {
+      dispatch(requestedImageDeletion({ image, imageUsage }));
+      closeAndClearImageToDelete();
+    },
+    [closeAndClearImageToDelete, dispatch, imageUsage]
+  );
+
+  // This is intended to be called by the delete button in the dialog
   const onImmediatelyDelete = useCallback(() => {
     if (canDeleteImage && imageToDelete) {
       handleActualDeletion(imageToDelete);
@@ -114,25 +160,31 @@ export const DeleteImageContextProvider = (props: Props) => {
 
   const handleGatedDeletion = useCallback(
     (image: ImageDTO) => {
-      if (shouldConfirmOnDelete || imageUsage) {
+      if (shouldConfirmOnDelete || some(imageUsage)) {
+        // If we should confirm on delete, or if the image is in use, open the dialog
         onOpen();
       } else {
         handleActualDeletion(image);
       }
     },
-    [shouldConfirmOnDelete, imageUsage, onOpen, handleActualDeletion]
+    [imageUsage, shouldConfirmOnDelete, onOpen, handleActualDeletion]
   );
 
-  const onDelete = useCallback(
-    (image?: ImageDTO) => {
-      if (!image) {
-        return;
-      }
-      setImageToDelete(image);
-      handleGatedDeletion(image);
-    },
-    [handleGatedDeletion]
-  );
+  // Consumers of the context call this to delete an image
+  const onDelete = useCallback((image?: ImageDTO) => {
+    if (!image) {
+      return;
+    }
+    // Set the image to delete, then let the effect call the actual deletion
+    setImageToDelete(image);
+  }, []);
+
+  useEffect(() => {
+    // We need to use an effect here to trigger the image usage selector, else we get a stale value
+    if (imageToDelete) {
+      handleGatedDeletion(imageToDelete);
+    }
+  }, [handleGatedDeletion, imageToDelete]);
 
   return (
     <DeleteImageContext.Provider
@@ -142,6 +194,7 @@ export const DeleteImageContextProvider = (props: Props) => {
         onClose: closeAndClearImageToDelete,
         onDelete,
         onImmediatelyDelete,
+        imageUsage,
       }}
     >
       {props.children}
