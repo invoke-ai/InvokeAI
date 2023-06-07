@@ -22,7 +22,6 @@ const NodeGraphOverlay = () => {
       maxWidth={500}
       overflowY="scroll"
       borderRadius="md"
-      boxShadow="0px 10px 10px rgba(0, 0, 0, 0.25)"
     >
       {JSON.stringify(graph, null, 2)}
     </Box>
