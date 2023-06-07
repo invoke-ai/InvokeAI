@@ -13,14 +13,20 @@ from typing import (
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
+
+# This should come early so that the logger can pick up its configuration options
+from .services.config import InvokeAIAppConfig
+from invokeai.backend.util.logging import InvokeAILogger
+config = InvokeAIAppConfig.get_config()
+config.parse_args()
+logger = InvokeAILogger().getLogger(config=config)
+
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 
-
-import invokeai.backend.util.logging as logger
 from .services.default_graphs import create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
@@ -38,7 +44,7 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
-from .services.config import InvokeAIAppConfig
+
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore
@@ -46,7 +52,6 @@ class CliCommand(BaseModel):
 
 class InvalidArgs(Exception):
     pass
-
 
 def add_invocation_args(command_parser):
     # Add linking capability
@@ -191,15 +196,8 @@ def invoke_all(context: CliContext):
         
         raise SessionError()
 
-
-logger = logger.InvokeAILogger.getLogger()
-
-
 def invoke_cli():
-    # this gets the basic configuration
-    config = InvokeAIAppConfig.get_config()
-    config.parse_args()
-
+    
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()
     parser.add_argument('commands',nargs='*')

@@ -181,9 +181,11 @@ class InvokeAILogger(object):
     loggers = dict()
 
     @classmethod
-    def getLogger(cls, name: str = 'InvokeAI') -> logging.Logger:
-        config = get_invokeai_config()
-        
+    def getLogger(cls, name: str = 'InvokeAI', config: InvokeAIAppConfig=None) -> logging.Logger:
+        if not config:
+            config = InvokeAIAppConfig()
+            config.parse_args()
+            
         if name not in cls.loggers:
             logger = logging.getLogger(name)
             logger.setLevel(config.log_level.upper()) # yes, strings work here
@@ -195,15 +197,16 @@ class InvokeAILogger(object):
     @classmethod
     def getLoggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
         handler_strs = config.log_handlers
-        print(f'handler_strs={handler_strs}')
         handlers = list()
         for handler in handler_strs:
             handler_name,*args = handler.split('=',2)
             args = args[0] if len(args) > 0 else None
 
-            # console is the only handler that gets a custom formatter
+            # console and file get the fancy formatter.
+            # syslog gets a simple one
+            # http gets no custom formatter
+            formatter = LOG_FORMATTERS[config.log_format]
             if handler_name=='console':
-                formatter = LOG_FORMATTERS[config.log_format]
                 ch = logging.StreamHandler()
                 ch.setFormatter(formatter())
                 handlers.append(ch)
@@ -214,7 +217,9 @@ class InvokeAILogger(object):
                 handlers.append(ch)
                 
             elif handler_name=='file':
-                handlers.append(cls._parse_file_args(args))
+                ch = cls._parse_file_args(args)
+                ch.setFormatter(formatter())
+                handlers.append(ch)
                 
             elif handler_name=='http':
                 handlers.append(cls._parse_http_args(args))
