@@ -20,6 +20,8 @@ import {
   Tab,
   TabPanel,
   Box,
+  VStack,
+  ChakraProps,
 } from '@chakra-ui/react';
 import { FaCopy, FaPlus, FaTrash, FaWrench } from 'react-icons/fa';
 
@@ -34,6 +36,8 @@ import ControlNetPreprocessButton from './ControlNetPreprocessButton';
 import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
+
+const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
 type ControlNetProps = {
   controlNet: ControlNetConfig;
@@ -53,7 +57,7 @@ const ControlNet = (props: ControlNetProps) => {
     processorType,
   } = props.controlNet;
   const dispatch = useAppDispatch();
-  const [shouldShowAdvanced, onToggleAdvanced] = useToggle(false);
+  const [isExpanded, toggleIsExpanded] = useToggle(false);
 
   const handleDelete = useCallback(() => {
     dispatch(controlNetRemoved({ controlNetId }));
@@ -116,16 +120,14 @@ const ControlNet = (props: ControlNetProps) => {
         <IAIIconButton
           size="sm"
           aria-label="Expand"
-          onClick={onToggleAdvanced}
+          onClick={toggleIsExpanded}
           variant="link"
           icon={
             <ChevronUpIcon
               sx={{
                 boxSize: 4,
                 color: 'base.300',
-                transform: shouldShowAdvanced
-                  ? 'rotate(0deg)'
-                  : 'rotate(180deg)',
+                transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
                 transitionDuration: 'normal',
               }}
@@ -135,7 +137,7 @@ const ControlNet = (props: ControlNetProps) => {
       </Flex>
       {isEnabled && (
         <>
-          <Flex sx={{ gap: 4 }}>
+          <Flex sx={{ gap: 4, w: 'full' }}>
             <Flex
               sx={{
                 flexDir: 'column',
@@ -143,7 +145,7 @@ const ControlNet = (props: ControlNetProps) => {
                 w: 'full',
                 h: 24,
                 paddingInlineStart: 1,
-                paddingInlineEnd: shouldShowAdvanced ? 1 : 0,
+                paddingInlineEnd: isExpanded ? 1 : 0,
                 pb: 2,
                 justifyContent: 'space-between',
               }}
@@ -160,7 +162,7 @@ const ControlNet = (props: ControlNetProps) => {
                 mini
               />
             </Flex>
-            {!shouldShowAdvanced && (
+            {!isExpanded && (
               <Flex
                 sx={{
                   alignItems: 'center',
@@ -174,10 +176,13 @@ const ControlNet = (props: ControlNetProps) => {
               </Flex>
             )}
           </Flex>
-          {shouldShowAdvanced && (
+          {isExpanded && (
             <>
-              <Box pt={2}>
-                <ControlNetImagePreview controlNet={props.controlNet} />
+              <Box mt={2}>
+                <ControlNetImagePreview
+                  controlNet={props.controlNet}
+                  imageSx={expandedControlImageSx}
+                />
               </Box>
               <ParamControlNetProcessorSelect
                 controlNetId={controlNetId}

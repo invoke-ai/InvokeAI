@@ -3,7 +3,6 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  KeyboardSensor,
   MouseSensor,
   TouchSensor,
   pointerWithin,
@@ -15,6 +14,7 @@ import OverlayDragImage from './OverlayDragImage';
 import { ImageDTO } from 'services/api';
 import { isImageDTO } from 'services/types/guards';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type ImageDndContextProps = PropsWithChildren;
 
@@ -62,7 +62,25 @@ const ImageDndContext = (props: ImageDndContextProps) => {
     >
       {props.children}
       <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
-        {draggedImage && <OverlayDragImage image={draggedImage} />}
+        <AnimatePresence>
+          {draggedImage && (
+            <motion.div
+              layout
+              key="overlay-drag-image"
+              initial={{
+                opacity: 0,
+                scale: 0.7,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                transition: { duration: 0.1 },
+              }}
+            >
+              <OverlayDragImage image={draggedImage} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </DragOverlay>
     </DndContext>
   );
