@@ -7,12 +7,12 @@ import {
 import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 
-type ParamIsControlNetModelProps = {
+type ParamControlNetModelProps = {
   controlNetId: string;
   model: ControlNetModel;
 };
 
-const ParamIsControlNetModel = (props: ParamIsControlNetModelProps) => {
+const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model } = props;
   const dispatch = useAppDispatch();
 
@@ -38,4 +38,4 @@ const ParamIsControlNetModel = (props: ParamIsControlNetModelProps) => {
   );
 };
 
-export default memo(ParamIsControlNetModel);
+export default memo(ParamControlNetModel);

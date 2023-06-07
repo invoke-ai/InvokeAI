@@ -8,22 +8,8 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
-import {
-  Checkbox,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  TabList,
-  TabPanels,
-  Tabs,
-  Tab,
-  TabPanel,
-  Box,
-  VStack,
-  ChakraProps,
-} from '@chakra-ui/react';
-import { FaCopy, FaPlus, FaTrash, FaWrench } from 'react-icons/fa';
+import { Flex, Box, ChakraProps } from '@chakra-ui/react';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ControlNetImagePreview from './ControlNetImagePreview';
@@ -32,10 +18,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { useToggle } from 'react-use';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
-import ControlNetPreprocessButton from './ControlNetPreprocessButton';
-import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
-import { ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
+import { ChevronUpIcon } from '@chakra-ui/icons';
+import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
 
 const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
@@ -55,6 +40,7 @@ const ControlNet = (props: ControlNetProps) => {
     processedControlImage,
     processorNode,
     processorType,
+    shouldAutoConfig,
   } = props.controlNet;
   const dispatch = useAppDispatch();
   const [isExpanded, toggleIsExpanded] = useToggle(false);
@@ -81,6 +67,7 @@ const ControlNet = (props: ControlNetProps) => {
         p: 3,
         bg: 'base.850',
         borderRadius: 'base',
+        position: 'relative',
       }}
     >
       <Flex sx={{ gap: 2 }}>
@@ -119,7 +106,7 @@ const ControlNet = (props: ControlNetProps) => {
         />
         <IAIIconButton
           size="sm"
-          aria-label="Expand"
+          aria-label="Show All Options"
           onClick={toggleIsExpanded}
           variant="link"
           icon={
@@ -134,6 +121,19 @@ const ControlNet = (props: ControlNetProps) => {
             />
           }
         />
+        {!shouldAutoConfig && (
+          <Box
+            sx={{
+              position: 'absolute',
+              w: 1.5,
+              h: 1.5,
+              borderRadius: 'full',
+              bg: 'error.200',
+              top: 4,
+              insetInlineEnd: 4,
+            }}
+          />
+        )}
       </Flex>
       {isEnabled && (
         <>
@@ -191,6 +191,10 @@ const ControlNet = (props: ControlNetProps) => {
               <ControlNetProcessorComponent
                 controlNetId={controlNetId}
                 processorNode={processorNode}
+              />
+              <ParamControlNetShouldAutoConfig
+                controlNetId={controlNetId}
+                shouldAutoConfig={shouldAutoConfig}
               />
             </>
           )}
