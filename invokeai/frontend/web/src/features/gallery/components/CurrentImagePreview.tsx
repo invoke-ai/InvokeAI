@@ -117,7 +117,7 @@ const CurrentImagePreview = () => {
           />
         </Flex>
       )}
-      {shouldShowImageDetails && image && image.metadata && (
+      {shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',

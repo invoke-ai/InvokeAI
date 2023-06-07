@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGetUrl } from 'common/util/getUrl';
 import {
   clearInitialImage,
   initialImageChanged,
@@ -30,7 +29,6 @@ const selector = createSelector(
 const InitialImagePreview = () => {
   const { initialImage } = useAppSelector(selector);
   const { shouldFetchImages } = useAppSelector(configSelector);
-  const { getUrl } = useGetUrl();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const toaster = useAppToaster();

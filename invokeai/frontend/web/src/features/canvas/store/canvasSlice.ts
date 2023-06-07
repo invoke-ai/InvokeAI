@@ -31,6 +31,7 @@ import {
 import { ImageDTO } from 'services/api';
 import { sessionCanceled } from 'services/thunks/session';
 import { setShouldUseCanvasBetaLayout } from 'features/ui/store/uiSlice';
+import { imageUrlsReceived } from 'services/thunks/image';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -855,6 +856,26 @@ export const canvasSlice = createSlice({
 
     builder.addCase(setShouldUseCanvasBetaLayout, (state, action) => {
       state.doesCanvasNeedScaling = true;
+    });
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      state.layerState.objects.forEach((object) => {
+        if (object.kind === 'image') {
+          if (object.image.image_name === image_name) {
+            object.image.image_url = image_url;
+            object.image.thumbnail_url = thumbnail_url;
+          }
+        }
+      });
+
+      state.layerState.stagingArea.images.forEach((stagedImage) => {
+        if (stagedImage.image.image_name === image_name) {
+          stagedImage.image.image_url = image_url;
+          stagedImage.image.thumbnail_url = thumbnail_url;
+        }
+      });
     });
   },
 });

@@ -82,7 +82,7 @@ const ParamPositiveConditioning = () => {
           onKeyDown={handleKeyDown}
           resize="vertical"
           ref={promptRef}
-          minH={{ base: 20, lg: 40 }}
+          minH={32}
         />
       </FormControl>
     </Box>
