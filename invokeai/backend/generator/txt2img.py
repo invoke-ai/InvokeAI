@@ -6,7 +6,7 @@ import torch
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+from diffusers.pipelines.controlnet import MultiControlNetModel
 
 from ..stable_diffusion import (
     ConditioningData,
