@@ -856,15 +856,12 @@ def select_and_download_models(opt: Namespace):
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
-        except Exception as e:
-            print(f'An exception has occurred: {str(e)}')
-            input('Press any key to continue...')
-            if hasattr(installApp,'main_form'):
-                form = installApp.main_form
-                if form.subprocess and form.subprocess.is_alive():
-                    logger.info('Terminating subprocesses')
-                    form.subprocess.terminate()
-                    form.subprocess = None
+        except KeyboardInterrupt:
+            form = installApp.main_form
+            if form.subprocess and form.subprocess.is_alive():
+                logger.info('Terminating subprocesses')
+                form.subprocess.terminate()
+                form.subprocess = None
         process_and_execute(opt, installApp.user_selections)
 
 # -------------------------------------
@@ -972,6 +969,9 @@ def main():
             logger.error(
                 "Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
+    except Exception as e:
+        print(f'An exception has occurred: {str(e)}')
+        input('Press any key to continue...')
     
 
 # -------------------------------------
