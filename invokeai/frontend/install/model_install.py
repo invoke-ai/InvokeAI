@@ -857,7 +857,8 @@ def select_and_download_models(opt: Namespace):
         try:
             installApp.run()
         except Exception as e:
-            print(str(e))
+            print(f'An exception has occurred: {str(e)}')
+            input('Press any key to continue...')
             if hasattr(installApp,'main_form'):
                 form = installApp.main_form
                 if form.subprocess and form.subprocess.is_alive():
