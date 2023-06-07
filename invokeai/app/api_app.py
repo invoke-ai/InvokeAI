@@ -3,7 +3,7 @@ import asyncio
 from inspect import signature
 
 import uvicorn
-from invokeai.backend.util.logging import InvokeAILogger
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -13,13 +13,18 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 
+# Do this early so that other modules pick up configuration
+from .services.config import InvokeAIAppConfig
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
+
+from invokeai.backend.util.logging import InvokeAILogger
+logger = InvokeAILogger.getLogger()
+
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
-from .services.config import InvokeAIAppConfig
-
-logger = InvokeAILogger.getLogger()
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -36,11 +41,6 @@ app.add_middleware(
 )
 
 socket_io = SocketIO(app)
-
-# initialize config
-# this is a module global
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
 
 # Add startup event to load dependencies
 @app.on_event("startup")

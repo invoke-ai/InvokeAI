@@ -11,7 +11,7 @@ from typing import Union, get_type_hints
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
 
-import invokeai.backend.util.logging as logger
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import CoreMetadataService
@@ -22,7 +22,6 @@ from .cli.commands import (BaseCommand, CliContext, ExitCli,
                            SortedHelpFormatter, add_graph_parsers, add_parsers)
 from .cli.completer import set_autocompleter
 from .invocations.baseinvocation import BaseInvocation
-from .services.config import get_invokeai_config
 from .services.default_graphs import (create_system_graphs,
                                       default_text_to_image_graph_id)
 from .services.events import EventServiceBase
@@ -192,14 +191,11 @@ def invoke_all(context: CliContext):
         
         raise SessionError()
 
-
-logger = logger.InvokeAILogger.getLogger()
-
-
 def invoke_cli():
     # this gets the basic configuration
     config = InvokeAIAppConfig.get_config()
     config.parse_args()
+    logger = InvokeAILogger.getLogger()
 
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()

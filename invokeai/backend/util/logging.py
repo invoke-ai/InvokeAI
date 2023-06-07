@@ -195,13 +195,12 @@ class InvokeAILogger(object):
     @classmethod
     def getLoggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
         handler_strs = config.log_handlers
-        print(f'handler_strs={handler_strs}')
         handlers = list()
         for handler in handler_strs:
             handler_name,*args = handler.split('=',2)
             args = args[0] if len(args) > 0 else None
 
-            # console is the only handler that gets a custom formatter
+            # console and file are the only handlers that gets a custom formatter
             if handler_name=='console':
                 formatter = LOG_FORMATTERS[config.log_format]
                 ch = logging.StreamHandler()
@@ -210,14 +209,16 @@ class InvokeAILogger(object):
                 
             elif handler_name=='syslog':
                 ch = cls._parse_syslog_args(args)
-                ch.setFormatter(InvokeAISyslogFormatter())
                 handlers.append(ch)
                 
             elif handler_name=='file':
-                handlers.append(cls._parse_file_args(args))
+                ch = cls._parse_file_args(args)
+                ch.setFormatter(InvokeAISyslogFormatter())
+                handlers.append(ch)
                 
             elif handler_name=='http':
-                handlers.append(cls._parse_http_args(args))
+                ch = cls._parse_http_args(args)
+                handlers.append(ch)
         return handlers
 
     @staticmethod

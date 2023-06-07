@@ -16,18 +16,19 @@ context. Use like this:
 
 """
 
-import contextlib
 import gc
 import os
 import sys
 import hashlib
+import json
 import warnings
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Sequence, Union, types, Optional, List, Type, Any
+from typing import Dict, Union, types, Optional, List, Type, Any
 
 import torch
+import transformers
 
 from diffusers import DiffusionPipeline, SchedulerMixin, ConfigMixin
 from diffusers import logging as diffusers_logging
@@ -63,6 +64,11 @@ def calc_model_size_by_fs(
     if subfolder is not None:
         model_path = os.path.join(model_path, subfolder)
 
+    # this can happen when, for example, the safety checker
+    # is not downloaded.
+    if not os.path.exists(model_path):
+        return 0
+
     all_files = os.listdir(model_path)
     all_files = [f for f in all_files if os.path.isfile(os.path.join(model_path, f))]
 
@@ -88,7 +94,7 @@ def calc_model_size_by_fs(
         if not file.endswith(index_postfix):
             continue
         try:
-            with open(os.path.join(model_path, index_file), "r") as f:
+            with open(os.path.join(model_path, file), "r") as f:
                 index_data = json.loads(f.read())
             return int(index_data["metadata"]["total_size"])
         except:
@@ -277,7 +283,7 @@ class ClassifierModelInfo(ModelInfoBase):
         self.child_sizes: Dict[str, int] = dict()
 
         try:
-            main_config = EmptyConfigLoader.load_config(repo_id_or_path, config_name="config.json")
+            main_config = EmptyConfigLoader.load_config(self.repo_id_or_path, config_name="config.json")
             #main_config = json.loads(os.path.join(self.model_path, "config.json"))
         except:
             raise Exception("Invalid classifier model! (config.json not found or invalid)")
@@ -289,7 +295,7 @@ class ClassifierModelInfo(ModelInfoBase):
 
     def _load_tokenizer(self, main_config: dict):
         try:
-            tokenizer_config = EmptyConfigLoader.load_config(repo_id_or_path, config_name="tokenizer_config.json")
+            tokenizer_config = EmptyConfigLoader.load_config(self.repo_id_or_path, config_name="tokenizer_config.json")
             #tokenizer_config = json.loads(os.path.join(self.model_path, "tokenizer_config.json"))
         except:
             raise Exception("Invalid classifier model! (Failed to load tokenizer_config.json)")
@@ -314,13 +320,13 @@ class ClassifierModelInfo(ModelInfoBase):
             raise Exception("Invalid classifier model! (Failed to detect text_encoder type)")
 
         self.child_types[SDModelType.TextEncoder] = self._definition_to_type(["transformers", text_encoder_class_name])
-        self.child_sizes[SDModelType.TextEncoder] = calc_model_size_by_fs(repo_id_or_path)
+        self.child_sizes[SDModelType.TextEncoder] = calc_model_size_by_fs(self.repo_id_or_path)
 
 
     def _load_feature_extractor(self, main_config: dict):
         self.child_sizes[SDModelType.FeatureExtractor] = 0
         try:
-            feature_extractor_config = EmptyConfigLoader.load_config(repo_id_or_path, config_name="preprocessor_config.json")
+            feature_extractor_config = EmptyConfigLoader.load_config(self.repo_id_or_path, config_name="preprocessor_config.json")
         except:
             return # feature extractor not passed with t5
 
