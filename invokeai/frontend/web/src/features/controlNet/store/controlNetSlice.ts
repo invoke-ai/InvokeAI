@@ -30,7 +30,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   processorType: 'canny_image_processor',
   processorNode: CONTROLNET_PROCESSORS.canny_image_processor
     .default as RequiredCannyImageProcessorInvocation,
-  shouldAutoConfig: false,
+  shouldAutoConfig: true,
 };
 
 export type ControlNetConfig = {
