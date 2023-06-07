@@ -77,6 +77,7 @@ const CurrentImagePreview = () => {
           src={progressImage.dataURL}
           width={progressImage.width}
           height={progressImage.height}
+          draggable={false}
           sx={{
             objectFit: 'contain',
             maxWidth: 'full',
