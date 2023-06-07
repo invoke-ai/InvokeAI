@@ -877,7 +877,8 @@ def main():
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)
-        input('Press any key to continue...')
+        if not opt.yes_to_all:
+            input('Press any key to continue...')
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
 
