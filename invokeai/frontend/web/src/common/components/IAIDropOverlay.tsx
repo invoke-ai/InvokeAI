@@ -30,7 +30,7 @@ export const IAIDropOverlay = (props: Props) => {
         sx={{
           position: 'absolute',
           top: 0,
-          left: 0,
+          insetInlineStart: 0,
           w: 'full',
           h: 'full',
         }}
@@ -39,7 +39,7 @@ export const IAIDropOverlay = (props: Props) => {
           sx={{
             position: 'absolute',
             top: 0,
-            left: 0,
+            insetInlineStart: 0,
             w: 'full',
             h: 'full',
             bg: 'base.900',
@@ -56,7 +56,7 @@ export const IAIDropOverlay = (props: Props) => {
           sx={{
             position: 'absolute',
             top: 0,
-            left: 0,
+            insetInlineStart: 0,
             w: 'full',
             h: 'full',
             opacity: 1,

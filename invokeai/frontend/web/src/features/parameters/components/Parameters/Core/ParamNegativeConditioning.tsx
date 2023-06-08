@@ -20,10 +20,7 @@ const ParamNegativeConditioning = () => {
         name="negativePrompt"
         value={negativePrompt}
         onChange={(e) => dispatch(setNegativePrompt(e.target.value))}
-        placeholder={t('parameters.negativePrompts')}
-        _focusVisible={{
-          borderColor: 'error.600',
-        }}
+        placeholder={t('parameters.negativePromptPlaceholder')}
         fontSize="sm"
         minH={16}
       />
