@@ -22,7 +22,8 @@ class Invoker:
     def invoke(
         self, graph_execution_state: GraphExecutionState, invoke_all: bool = False
     ) -> str | None:
-        """Determines the next node to invoke and returns the id of the invoked node, or None if there are no nodes to execute"""
+        """Determines the next node to invoke and enqueues it, preparing if needed.
+        Returns the id of the queued node, or `None` if there are no nodes left to enqueue."""
 
         # Get the next invocation
         invocation = graph_execution_state.next()
