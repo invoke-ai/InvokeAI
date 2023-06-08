@@ -320,11 +320,7 @@ class ModelManager(object):
         models = {}
         for name in sorted(self.config, key=str.casefold):
             stanza = self.config[name]
-
-            with open('log.txt','a') as file:
-                print(f'DEBUG: name={name}; stanza = {stanza}',file=file)
-
-
+            
             # don't include VAEs in listing (legacy style)
             if "config" in stanza and "/VAE/" in stanza["config"]:
                 continue
@@ -1355,8 +1351,6 @@ class ModelManager(object):
         
         short_names = OmegaConf.load(Dataset_path).get('lora') or {}
         for name in model_names:
-            print(name)
-
             name = short_names.get(name) or name
 
             # HuggingFace style LoRA
