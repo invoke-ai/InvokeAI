@@ -57,6 +57,7 @@ class ApiDependencies:
 
         # TODO: build a file/path manager?
         db_location = config.db_path
+        db_location.parent.mkdir(parents=True,exist_ok=True)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
