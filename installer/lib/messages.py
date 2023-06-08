@@ -293,6 +293,8 @@ def introduction() -> None:
                 "3. Create initial configuration files.",
                 "",
                 "[i]At any point you may interrupt this program and resume later.",
+                "",
+                "[b]For the best user experience, please enlarge or maximize this window",
             ),
         )
     )
