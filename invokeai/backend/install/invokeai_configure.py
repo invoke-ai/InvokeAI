@@ -12,8 +12,8 @@ print("Loading Python libraries...\n",file=sys.stderr)
 import argparse
 import io
 import os
-import re
 import shutil
+import textwrap
 import traceback
 import warnings
 from argparse import Namespace
@@ -38,7 +38,6 @@ from transformers import (
 import invokeai.configs as configs
 
 from invokeai.app.services.config import (
-    get_invokeai_config,
     InvokeAIAppConfig,
 )
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
@@ -46,20 +45,20 @@ from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
+    CyclingForm,
+    MIN_COLS,
+    MIN_LINES,
 )
-
-from invokeai.backend.config.legacy_arg_parsing import legacy_parser
-from invokeai.backend.config.model_install_backend import (
+from invokeai.backend.install.legacy_arg_parsing import legacy_parser
+from invokeai.backend.install.model_install_backend import (
     default_dataset,
     download_from_hf,
     hf_download_with_resume,
     recommended_datasets,
+    UserSelections,
 )
 
-from invokeai.app.services.config import InvokeAIAppConfig
-
 warnings.filterwarnings("ignore")
-
 transformers.logging.set_verbosity_error()
 
 
@@ -70,17 +69,8 @@ config = InvokeAIAppConfig.get_config()
 Model_dir = "models"
 Weights_dir = "ldm/stable-diffusion-v1/"
 
-# the initial "configs" dir is now bundled in the `invokeai.configs` package
-Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
-
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
-
-Datasets = OmegaConf.load(Dataset_path)
-
-# minimum size for the UI
-MIN_COLS = 135
-MIN_LINES = 45
 
 PRECISION_CHOICES = ['auto','float16','float32','autocast']
 
@@ -106,7 +96,7 @@ Command-line client:
    invokeai
 
 If you installed using an installation script, run:
-  {config.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+  {config.root_path}/invoke.{"bat" if sys.platform == "win32" else "sh"}
 
 Add the '--help' argument to see all of the command-line switches available for use.
 """
@@ -218,16 +208,11 @@ def download_realesrgan():
     model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
-    model_dest = os.path.join(
-        config.root, "models/realesrgan/realesr-general-x4v3.pth"
-    )
+    model_dest = config.root_path / "models/realesrgan/realesr-general-x4v3.pth"
+    wdn_model_dest = config.root_path / "models/realesrgan/realesr-general-wdn-x4v3.pth"
 
-    wdn_model_dest = os.path.join(
-        config.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
-    )
-
-    download_with_progress_bar(model_url, model_dest, "RealESRGAN")
-    download_with_progress_bar(wdn_model_url, wdn_model_dest, "RealESRGANwdn")
+    download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
+    download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
 
 
 def download_gfpgan():
@@ -246,8 +231,8 @@ def download_gfpgan():
             "./models/gfpgan/weights/parsing_parsenet.pth",
         ],
     ):
-        model_url, model_dest = model[0], os.path.join(config.root, model[1])
-        download_with_progress_bar(model_url, model_dest, "GFPGAN weights")
+        model_url, model_dest = model[0], config.root_path / model[1]
+        download_with_progress_bar(model_url, str(model_dest), "GFPGAN weights")
 
 
 # ---------------------------------------------
@@ -256,8 +241,8 @@ def download_codeformer():
     model_url = (
         "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     )
-    model_dest = os.path.join(config.root, "models/codeformer/codeformer.pth")
-    download_with_progress_bar(model_url, model_dest, "CodeFormer")
+    model_dest = config.root_path / "models/codeformer/codeformer.pth"
+    download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
 
 
 # ---------------------------------------------
@@ -309,7 +294,7 @@ def download_vaes():
         if not hf_download_with_resume(
             repo_id=repo_id,
             model_name=model_name,
-            model_dir=str(config.root / Model_dir / Weights_dir),
+            model_dir=str(config.root_path / Model_dir / Weights_dir),
         ):
             raise Exception(f"download of {model_name} failed")
     except Exception as e:
@@ -324,24 +309,24 @@ def get_root(root: str = None) -> str:
     elif os.environ.get("INVOKEAI_ROOT"):
         return os.environ.get("INVOKEAI_ROOT")
     else:
-        return config.root
+        return str(config.root_path)
 
 # -------------------------------------
-class editOptsForm(npyscreen.FormMultiPage):
+class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
     # for responsive resizing - disabled
     # FIX_MINIMUM_SIZE_WHEN_CREATED = False
 
     def create(self):
         program_opts = self.parentApp.program_opts
         old_opts = self.parentApp.invokeai_opts
-        first_time = not (config.root / 'invokeai.yaml').exists()
+        first_time = not (config.root_path / 'invokeai.yaml').exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
-        for i in [
-            "Configure startup settings. You can come back and change these later.",
-            "Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.",
-            "Use cursor arrows to make a checkbox selection, and space to toggle.",
-        ]:
+        label = """Configure startup settings. You can come back and change these later. 
+Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.
+Use cursor arrows to make a checkbox selection, and space to toggle.
+"""
+        for i in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
@@ -368,7 +353,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.outdir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
             name="(<tab> autocompletes, ctrl-N advances):",
-            value=str(old_opts.outdir) or str(default_output_dir()),
+            value=str(default_output_dir()),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -391,14 +376,13 @@ class editOptsForm(npyscreen.FormMultiPage):
             scroll_exit=True,
         )
         self.nextrely += 1
-        for i in [
-            "If you have an account at HuggingFace you may optionally paste your access token here",
-            'to allow InvokeAI to download restricted styles & subjects from the "Concept Library".',
-            "See https://huggingface.co/settings/tokens",
-        ]:
+        label = """If you have an account at HuggingFace you may optionally paste your access token here
+to allow InvokeAI to download restricted styles & subjects from the "Concept Library". See https://huggingface.co/settings/tokens.
+"""
+        for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
-                value=i,
+                value=line,
                 editable=False,
                 color="CONTROL",
             )
@@ -475,7 +459,7 @@ class editOptsForm(npyscreen.FormMultiPage):
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Directories containing textual inversion and LoRA models (<tab> autocompletes, ctrl-N advances):",
+            value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
         )
@@ -501,6 +485,17 @@ class editOptsForm(npyscreen.FormMultiPage):
             begin_entry_at=32,
             scroll_exit=True,
         )
+        self.controlnet_dir = self.add_widget_intelligent(
+            npyscreen.TitleFilename,
+            name="             ControlNets:",
+            value=str(default_controlnet_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=32,
+            scroll_exit=True,
+        )
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -511,11 +506,11 @@ class editOptsForm(npyscreen.FormMultiPage):
             scroll_exit=True,
         )
         self.nextrely -= 1
-        for i in [
-            "BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ",
-            "AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT",
-            "https://huggingface.co/spaces/CompVis/stable-diffusion-license",
-        ]:
+        label = """BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ
+AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT
+https://huggingface.co/spaces/CompVis/stable-diffusion-license
+"""
+        for i in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
                 value=i,
@@ -554,7 +549,7 @@ class editOptsForm(npyscreen.FormMultiPage):
             self.editing = False
         else:
             self.editing = True
-
+            
     def validate_field_values(self, opt: Namespace) -> bool:
         bad_fields = []
         if not opt.license_acceptance:
@@ -590,6 +585,7 @@ class editOptsForm(npyscreen.FormMultiPage):
                 "always_use_cpu",
                 "embedding_dir",
                 "lora_dir",
+                "controlnet_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
@@ -617,6 +613,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             "MAIN",
             editOptsForm,
             name="InvokeAI Startup Options",
+            cycle_widgets=True,
         )
         if not (self.program_opts.skip_sd_weights or self.program_opts.default_only):
             self.model_select = self.addForm(
@@ -624,6 +621,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
                 addModelsForm,
                 name="Install Stable Diffusion Models",
                 multipage=True,
+                cycle_widgets=True,
             )
 
     def new_opts(self):
@@ -638,16 +636,13 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
-    outdir = Path(opts.outdir)
-    if not outdir.is_absolute():
-        opts.outdir = str(config.root / opts.outdir)
     if not init_file.exists():
         opts.nsfw_checker = True
     return opts
 
-def default_user_selections(program_opts: Namespace) -> Namespace:
-    return Namespace(
-        starter_models=default_dataset()
+def default_user_selections(program_opts: Namespace) -> UserSelections:
+    return UserSelections(
+        install_models=default_dataset()
         if program_opts.default_only
         else recommended_datasets()
         if program_opts.yes_to_all
@@ -655,26 +650,27 @@ def default_user_selections(program_opts: Namespace) -> Namespace:
         purge_deleted_models=False,
         scan_directory=None,
         autoscan_on_startup=None,
-        import_model_paths=None,
-        convert_to_diffusers=None,
     )
 
 
 # -------------------------------------
-def initialize_rootdir(root: str, yes_to_all: bool = False):
+def initialize_rootdir(root: Path, yes_to_all: bool = False):
     print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
 
     for name in (
-        "models",
-        "configs",
-        "embeddings",
-        "text-inversion-output",
-        "text-inversion-training-data",
+            "models",
+            "configs",
+            "embeddings",
+            "databases",
+            "loras",
+            "controlnets",
+            "text-inversion-output",
+            "text-inversion-training-data",
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
 
     configs_src = Path(configs.__path__[0])
-    configs_dest = Path(root) / "configs"
+    configs_dest = root / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
@@ -685,8 +681,17 @@ def run_console_ui(
 ) -> (Namespace, Namespace):
     # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
+    invokeai_opts.root = program_opts.root
 
-    set_min_terminal_size(MIN_COLS, MIN_LINES)
+    # The third argument is needed in the Windows 11 environment to
+    # launch a console window running this program.
+    set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-configure')
+
+    # the install-models application spawns a subprocess to install
+    # models, and will crash unless this is set before running.
+    import torch
+    torch.multiprocessing.set_start_method("spawn")
+    
     editApp = EditOptApplication(program_opts, invokeai_opts)
     editApp.run()
     if editApp.user_cancelled:
@@ -700,27 +705,32 @@ def write_opts(opts: Namespace, init_file: Path):
     """
     Update the invokeai.yaml file with values from current settings.
     """
-
     # this will load current settings
-    config = InvokeAIAppConfig.get_config()
+    new_config = InvokeAIAppConfig.get_config()
+    new_config.root = config.root
+    
     for key,value in opts.__dict__.items():
-        if hasattr(config,key):
-            setattr(config,key,value)
+        if hasattr(new_config,key):
+            setattr(new_config,key,value)
 
     with open(init_file,'w', encoding='utf-8') as file:
-        file.write(config.to_yaml())
+        file.write(new_config.to_yaml())
 
 # -------------------------------------
 def default_output_dir() -> Path:
-    return config.root / "outputs"
+    return config.root_path / "outputs"
 
 # -------------------------------------
 def default_embedding_dir() -> Path:
-    return config.root / "embeddings"
+    return config.root_path / "embeddings"
 
 # -------------------------------------
 def default_lora_dir() -> Path:
-    return config.root / "loras"
+    return config.root_path / "loras"
+
+# -------------------------------------
+def default_controlnet_dir() -> Path:
+    return config.root_path / "controlnets"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
@@ -808,9 +818,12 @@ def main():
     )
     opt = parser.parse_args()
 
-    # setting a global here
-    global config
-    config.root = Path(os.path.expanduser(get_root(opt.root) or ""))
+    invoke_args = []
+    if opt.root:
+        invoke_args.extend(['--root',opt.root])
+    if opt.full_precision:
+        invoke_args.extend(['--precision','float32'])
+    config.parse_args(invoke_args)
 
     errors = set()
 
@@ -818,17 +831,16 @@ def main():
         models_to_download = default_user_selections(opt)
 
         # We check for to see if the runtime directory is correctly initialized.
-        old_init_file = Path(config.root, 'invokeai.init')
-        new_init_file = Path(config.root, 'invokeai.yaml')
+        old_init_file = config.root_path / 'invokeai.init'
+        new_init_file = config.root_path / 'invokeai.yaml'
         if old_init_file.exists() and not new_init_file.exists():
             print('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
-
             # Load new init file into config
             config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
 
         if not config.model_conf_path.exists():
-            initialize_rootdir(config.root, opt.yes_to_all)
+            initialize_rootdir(config.root_path, opt.yes_to_all)
 
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
@@ -848,7 +860,7 @@ def main():
         if opt.skip_support_models:
             print("\n** SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST **")
         else:
-            print("\n** DOWNLOADING SUPPORT MODELS **")
+            print("\n** CHECKING/UPDATING SUPPORT MODELS **")
             download_bert()
             download_sd1_clip()
             download_sd2_clip()
@@ -866,6 +878,8 @@ def main():
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)
+        if not opt.yes_to_all:
+            input('Press any key to continue...')
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
 

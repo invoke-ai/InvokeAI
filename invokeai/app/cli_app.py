@@ -219,7 +219,7 @@ def invoke_cli():
     if config.use_memory_db:
         db_location = ":memory:"
     else:
-        db_location = os.path.join(output_folder, "invokeai.db")
+        db_location = config.db_path
 
     logger.info(f'InvokeAI database location is "{db_location}"')
 

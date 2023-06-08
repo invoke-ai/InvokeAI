@@ -30,7 +30,6 @@ import invokeai.backend.util.logging as IAILogger
 IAILogger.debug('this is a debugging message')
 """
 
-import logging
 import logging.handlers
 import socket
 import urllib.parse
@@ -195,7 +194,6 @@ class InvokeAILogger(object):
     @classmethod
     def getLoggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
         handler_strs = config.log_handlers
-        print(f'handler_strs={handler_strs}')
         handlers = list()
         for handler in handler_strs:
             handler_name,*args = handler.split('=',2)

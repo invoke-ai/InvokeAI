@@ -6,23 +6,24 @@ import re
 import shutil
 import sys
 import warnings
+from dataclasses import dataclass,field
 from pathlib import Path
 from tempfile import TemporaryFile
-from typing import List
+from typing import List, Dict, Callable
 
 import requests
 from diffusers import AutoencoderKL
-from huggingface_hub import hf_hub_url
+from huggingface_hub import hf_hub_url, HfFolder
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
 
 import invokeai.configs as configs
 
-from invokeai.app.services.config import InvokeAIAppConfig
-from ..model_management import ModelManager
-from ..stable_diffusion import StableDiffusionGeneratorPipeline
 
+from invokeai.app.services.config import InvokeAIAppConfig
+from ..stable_diffusion import StableDiffusionGeneratorPipeline
+from ..util.logging import InvokeAILogger
 
 warnings.filterwarnings("ignore")
 
@@ -38,6 +39,9 @@ Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
 # initial models omegaconf
 Datasets = None
 
+# logger
+logger = InvokeAILogger.getLogger(name='InvokeAI')
+
 Config_preamble = """
 # This file describes the alternative machine learning models
 # available to InvokeAI script.
@@ -48,10 +52,29 @@ Config_preamble = """
 # was trained on.
 """
 
+@dataclass
+class ModelInstallList:
+    '''Class for listing models to be installed/removed'''
+    install_models: List[str] = field(default_factory=list)
+    remove_models: List[str] = field(default_factory=list)
 
+@dataclass
+class UserSelections():
+    install_models: List[str]= field(default_factory=list)
+    remove_models: List[str]=field(default_factory=list)
+    purge_deleted_models: bool=field(default_factory=list)
+    install_cn_models: List[str] = field(default_factory=list)
+    remove_cn_models: List[str] = field(default_factory=list)
+    install_lora_models: List[str] = field(default_factory=list)
+    remove_lora_models: List[str] = field(default_factory=list)
+    install_ti_models: List[str] = field(default_factory=list)
+    remove_ti_models: List[str] = field(default_factory=list)
+    scan_directory: Path = None
+    autoscan_on_startup: bool=False
+    import_model_paths: str=None
+        
 def default_config_file():
     return config.model_conf_path
-
 
 def sd_configs():
     return config.legacy_conf_path
@@ -60,45 +83,67 @@ def initial_models():
     global Datasets
     if Datasets:
         return Datasets
-    return (Datasets := OmegaConf.load(Dataset_path))
-
+    return (Datasets := OmegaConf.load(Dataset_path)['diffusers'])
 
 def install_requested_models(
-    install_initial_models: List[str] = None,
-    remove_models: List[str] = None,
-    scan_directory: Path = None,
-    external_models: List[str] = None,
-    scan_at_startup: bool = False,
-    precision: str = "float16",
-    purge_deleted: bool = False,
-    config_file_path: Path = None,
+        diffusers: ModelInstallList = None,
+        controlnet: ModelInstallList = None,
+        lora: ModelInstallList = None,
+        ti: ModelInstallList = None,
+        cn_model_map: Dict[str,str] = None, # temporary - move to model manager
+        scan_directory: Path = None,
+        external_models: List[str] = None,
+        scan_at_startup: bool = False,
+        precision: str = "float16",
+        purge_deleted: bool = False,
+        config_file_path: Path = None,
+        model_config_file_callback:  Callable[[Path],Path] = None
 ):
     """
     Entry point for installing/deleting starter models, or installing external models.
     """
+    access_token = HfFolder.get_token()
     config_file_path = config_file_path or default_config_file()
     if not config_file_path.exists():
         open(config_file_path, "w")
 
+    # prevent circular import here
+    from ..model_management import ModelManager
     model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
+    if controlnet:
+        model_manager.install_controlnet_models(controlnet.install_models, access_token=access_token)
+        model_manager.delete_controlnet_models(controlnet.remove_models)
 
-    if remove_models and len(remove_models) > 0:
-        print("== DELETING UNCHECKED STARTER MODELS ==")
-        for model in remove_models:
-            print(f"{model}...")
-            model_manager.del_model(model, delete_files=purge_deleted)
-        model_manager.commit(config_file_path)
+    if lora:
+        model_manager.install_lora_models(lora.install_models, access_token=access_token)
+        model_manager.delete_lora_models(lora.remove_models)
 
-    if install_initial_models and len(install_initial_models) > 0:
-        print("== INSTALLING SELECTED STARTER MODELS ==")
-        successfully_downloaded = download_weight_datasets(
-            models=install_initial_models,
-            access_token=None,
-            precision=precision,
-        )  # FIX: for historical reasons, we don't use model manager here
-        update_config_file(successfully_downloaded, config_file_path)
-        if len(successfully_downloaded) < len(install_initial_models):
-            print("** Some of the model downloads were not successful")
+    if ti:
+        model_manager.install_ti_models(ti.install_models, access_token=access_token)
+        model_manager.delete_ti_models(ti.remove_models)
+
+    if diffusers:
+        # TODO: Replace next three paragraphs with calls into new model manager
+        if diffusers.remove_models and len(diffusers.remove_models) > 0:
+            logger.info("Processing requested deletions")
+            for model in diffusers.remove_models:
+                logger.info(f"{model}...")
+                model_manager.del_model(model, delete_files=purge_deleted)
+            model_manager.commit(config_file_path)
+
+        if diffusers.install_models and len(diffusers.install_models) > 0:
+            logger.info("Installing requested models")
+            downloaded_paths = download_weight_datasets(
+                models=diffusers.install_models,
+                access_token=None,
+                precision=precision,
+            )
+            successful = {x:v for x,v in downloaded_paths.items() if v is not None}
+            if len(successful) > 0:
+                update_config_file(successful, config_file_path)
+            if len(successful) < len(diffusers.install_models):
+                unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
+                logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
 
     # due to above, we have to reload the model manager because conf file
     # was changed behind its back
@@ -109,12 +154,14 @@ def install_requested_models(
         external_models.append(str(scan_directory))
 
     if len(external_models) > 0:
-        print("== INSTALLING EXTERNAL MODELS ==")
+        logger.info("INSTALLING EXTERNAL MODELS")
         for path_url_or_repo in external_models:
             try:
+                logger.debug(f'In install_requested_models; callback = {model_config_file_callback}')
                 model_manager.heuristic_import(
                     path_url_or_repo,
                     commit_to_conf=config_file_path,
+                    config_file_callback = model_config_file_callback,
                 )
             except KeyboardInterrupt:
                 sys.exit(-1)
@@ -122,18 +169,22 @@ def install_requested_models(
                 pass
 
     if scan_at_startup and scan_directory.is_dir():
-        argument = "--autoconvert"
-        print('** The global initfile is no longer supported; rewrite to support new yaml format **')
-        initfile = Path(config.root, 'invokeai.init')
-        replacement = Path(config.root, f"invokeai.init.new")
-        directory = str(scan_directory).replace("\\", "/")
-        with open(initfile, "r") as input:
-            with open(replacement, "w") as output:
-                while line := input.readline():
-                    if not line.startswith(argument):
-                        output.writelines([line])
-                output.writelines([f"{argument} {directory}"])
-        os.replace(replacement, initfile)
+        update_autoconvert_dir(scan_directory)
+    else:
+        update_autoconvert_dir(None)
+
+def update_autoconvert_dir(autodir: Path):
+    '''
+    Update the "autoconvert_dir" option in invokeai.yaml
+    '''
+    invokeai_config_path = config.init_file_path
+    conf = OmegaConf.load(invokeai_config_path)
+    conf.InvokeAI.Paths.autoconvert_dir = str(autodir) if autodir else None
+    yaml = OmegaConf.to_yaml(conf)
+    tmpfile = invokeai_config_path.parent / "new_config.tmp"
+    with open(tmpfile, "w", encoding="utf-8") as outfile:
+        outfile.write(yaml)
+    tmpfile.replace(invokeai_config_path)
 
 
 # -------------------------------------
@@ -145,33 +196,21 @@ def yes_or_no(prompt: str, default_yes=True):
     else:
         return response[0] in ("y", "Y")
 
-
-# -------------------------------------
-def get_root(root: str = None) -> str:
-    if root:
-        return root
-    elif os.environ.get("INVOKEAI_ROOT"):
-        return os.environ.get("INVOKEAI_ROOT")
-    else:
-        return config.root
-
-
 # ---------------------------------------------
-def recommended_datasets() -> dict:
-    datasets = dict()
+def recommended_datasets() -> List['str']:
+    datasets = set()
     for ds in initial_models().keys():
         if initial_models()[ds].get("recommended", False):
-            datasets[ds] = True
-    return datasets
-
+            datasets.add(ds)
+    return list(datasets)
 
 # ---------------------------------------------
 def default_dataset() -> dict:
-    datasets = dict()
+    datasets = set()
     for ds in initial_models().keys():
         if initial_models()[ds].get("default", False):
-            datasets[ds] = True
-    return datasets
+            datasets.add(ds)
+    return list(datasets)
 
 
 # ---------------------------------------------
@@ -186,14 +225,14 @@ def all_datasets() -> dict:
 # look for legacy model.ckpt in models directory and offer to
 # normalize its name
 def migrate_models_ckpt():
-    model_path = os.path.join(config.root, Model_dir, Weights_dir)
+    model_path = os.path.join(config.root_dir, Model_dir, Weights_dir)
     if not os.path.exists(os.path.join(model_path, "model.ckpt")):
         return
     new_name = initial_models()["stable-diffusion-1.4"]["file"]
-    print(
+    logger.warning(
         'The Stable Diffusion v4.1 "model.ckpt" is already installed. The name will be changed to {new_name} to avoid confusion.'
     )
-    print(f"model.ckpt => {new_name}")
+    logger.warning(f"model.ckpt => {new_name}")
     os.replace(
         os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name)
     )
@@ -206,7 +245,7 @@ def download_weight_datasets(
     migrate_models_ckpt()
     successful = dict()
     for mod in models:
-        print(f"Downloading {mod}:")
+        logger.info(f"Downloading {mod}:")
         successful[mod] = _download_repo_or_file(
             initial_models()[mod], access_token, precision=precision
         )
@@ -227,11 +266,10 @@ def _download_repo_or_file(
             )
     return path
 
-
 def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
     repo_id = mconfig["repo_id"]
     filename = mconfig["file"]
-    cache_dir = os.path.join(config.root, Model_dir, Weights_dir)
+    cache_dir = os.path.join(config.root_dir, Model_dir, Weights_dir)
     return hf_download_with_resume(
         repo_id=repo_id,
         model_dir=cache_dir,
@@ -244,6 +282,9 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
 def download_from_hf(
     model_class: object, model_name: str, **kwargs
 ):
+    logger = InvokeAILogger.getLogger('InvokeAI')
+    logger.addFilter(lambda x: 'fp16 is not a valid' not in x.getMessage())
+    
     path = config.cache_dir
     model = model_class.from_pretrained(
         model_name,
@@ -275,10 +316,10 @@ def _download_diffusion_weights(
                 **extra_args,
             )
         except OSError as e:
-            if str(e).startswith("fp16 is not a valid"):
+            if 'Revision Not Found' in str(e):
                 pass
             else:
-                print(f"An unexpected error occurred while downloading the model: {e})")
+                logger.error(str(e))
         if path:
             break
     return path
@@ -286,9 +327,13 @@ def _download_diffusion_weights(
 
 # ---------------------------------------------
 def hf_download_with_resume(
-    repo_id: str, model_dir: str, model_name: str, access_token: str = None
+        repo_id: str,
+        model_dir: str,
+        model_name: str,
+        model_dest: Path = None,
+        access_token: str = None,
 ) -> Path:
-    model_dest = Path(os.path.join(model_dir, model_name))
+    model_dest = model_dest or Path(os.path.join(model_dir, model_name))
     os.makedirs(model_dir, exist_ok=True)
 
     url = hf_hub_url(repo_id, model_name)
@@ -308,20 +353,19 @@ def hf_download_with_resume(
     if (
         resp.status_code == 416
     ):  # "range not satisfiable", which means nothing to return
-        print(f"* {model_name}: complete file found. Skipping.")
+        logger.info(f"{model_name}: complete file found. Skipping.")
         return model_dest
+    elif resp.status_code == 404:
+        logger.warning("File not found")
+        return None
     elif resp.status_code != 200:
-        print(f"** An error occurred during downloading {model_name}: {resp.reason}")
+        logger.warning(f"{model_name}: {resp.reason}")
     elif exist_size > 0:
-        print(f"* {model_name}: partial file found. Resuming...")
+        logger.info(f"{model_name}: partial file found. Resuming...")
     else:
-        print(f"* {model_name}: Downloading...")
+        logger.info(f"{model_name}: Downloading...")
 
     try:
-        if total < 2000:
-            print(f"*** ERROR DOWNLOADING {model_name}: {resp.text}")
-            return None
-
         with open(model_dest, open_mode) as file, tqdm(
             desc=model_name,
             initial=exist_size,
@@ -334,7 +378,7 @@ def hf_download_with_resume(
                 size = file.write(data)
                 bar.update(size)
     except Exception as e:
-        print(f"An error occurred while downloading {model_name}: {str(e)}")
+        logger.error(f"An error occurred while downloading {model_name}: {str(e)}")
         return None
     return model_dest
 
@@ -359,8 +403,8 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
     try:
         backup = None
         if os.path.exists(config_file):
-            print(
-                f"** {config_file.name} exists. Renaming to {config_file.stem}.yaml.orig"
+            logger.warning(
+                f"{config_file.name} exists. Renaming to {config_file.stem}.yaml.orig"
             )
             backup = config_file.with_suffix(".yaml.orig")
             ## Ugh. Windows is unable to overwrite an existing backup file, raises a WinError 183
@@ -377,16 +421,16 @@ def update_config_file(successfully_downloaded: dict, config_file: Path):
                 new_config.write(tmp.read())
 
     except Exception as e:
-        print(f"**Error creating config file {config_file}: {str(e)} **")
+        logger.error(f"Error creating config file {config_file}: {str(e)}")
         if backup is not None:
-            print("restoring previous config file")
+            logger.info("restoring previous config file")
             ## workaround, for WinError 183, see above
             if sys.platform == "win32" and config_file.is_file():
                 config_file.unlink()
             backup.rename(config_file)
         return
-
-    print(f"Successfully created new configuration file {config_file}")
+    
+    logger.info(f"Successfully created new configuration file {config_file}")
 
 
 # ---------------------------------------------
@@ -420,7 +464,7 @@ def new_config_file_contents(
             stanza["height"] = mod["height"]
         if "file" in mod:
             stanza["weights"] = os.path.relpath(
-                successfully_downloaded[model], start=config.root
+                successfully_downloaded[model], start=config.root_dir
             )
             stanza["config"] = os.path.normpath(
                 os.path.join(sd_configs(), mod["config"])
@@ -453,14 +497,14 @@ def delete_weights(model_name: str, conf_stanza: dict):
     if re.match("/VAE/", conf_stanza.get("config")):
         return
 
-    print(
-        f"\n** The checkpoint version of {model_name} is superseded by the diffusers version. Deleting the original file {weights}?"
+    logger.warning(
+        f"\nThe checkpoint version of {model_name} is superseded by the diffusers version. Deleting the original file {weights}?"
     )
 
     weights = Path(weights)
     if not weights.is_absolute():
-        weights = Path(config.root) / weights
+        weights = config.root_dir / weights
         try:
             weights.unlink()
         except OSError as e:
-            print(str(e))
+            logger.error(str(e))

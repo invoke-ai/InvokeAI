@@ -16,6 +16,5 @@ def main():
     from invokeai.app.cli_app import invoke_cli
     invoke_cli()
 
-
 if __name__ == '__main__':
     main()
