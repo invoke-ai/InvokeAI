@@ -1,4 +1,5 @@
 dist/
+static/
 .husky/
 node_modules/
 patches/

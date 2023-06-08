@@ -8,20 +8,8 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
-import {
-  Checkbox,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  TabList,
-  TabPanels,
-  Tabs,
-  Tab,
-  TabPanel,
-  Box,
-} from '@chakra-ui/react';
-import { FaCopy, FaPlus, FaTrash, FaWrench } from 'react-icons/fa';
+import { Flex, Box, ChakraProps } from '@chakra-ui/react';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ControlNetImagePreview from './ControlNetImagePreview';
@@ -30,10 +18,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { useToggle } from 'react-use';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
-import ControlNetPreprocessButton from './ControlNetPreprocessButton';
-import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
-import { ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
+import { ChevronUpIcon } from '@chakra-ui/icons';
+import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
+
+const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
 type ControlNetProps = {
   controlNet: ControlNetConfig;
@@ -51,9 +40,10 @@ const ControlNet = (props: ControlNetProps) => {
     processedControlImage,
     processorNode,
     processorType,
+    shouldAutoConfig,
   } = props.controlNet;
   const dispatch = useAppDispatch();
-  const [shouldShowAdvanced, onToggleAdvanced] = useToggle(false);
+  const [isExpanded, toggleIsExpanded] = useToggle(false);
 
   const handleDelete = useCallback(() => {
     dispatch(controlNetRemoved({ controlNetId }));
@@ -77,6 +67,7 @@ const ControlNet = (props: ControlNetProps) => {
         p: 3,
         bg: 'base.850',
         borderRadius: 'base',
+        position: 'relative',
       }}
     >
       <Flex sx={{ gap: 2 }}>
@@ -115,27 +106,38 @@ const ControlNet = (props: ControlNetProps) => {
         />
         <IAIIconButton
           size="sm"
-          aria-label="Expand"
-          onClick={onToggleAdvanced}
+          aria-label="Show All Options"
+          onClick={toggleIsExpanded}
           variant="link"
           icon={
             <ChevronUpIcon
               sx={{
                 boxSize: 4,
                 color: 'base.300',
-                transform: shouldShowAdvanced
-                  ? 'rotate(0deg)'
-                  : 'rotate(180deg)',
+                transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
                 transitionDuration: 'normal',
               }}
             />
           }
         />
+        {!shouldAutoConfig && (
+          <Box
+            sx={{
+              position: 'absolute',
+              w: 1.5,
+              h: 1.5,
+              borderRadius: 'full',
+              bg: 'error.200',
+              top: 4,
+              insetInlineEnd: 4,
+            }}
+          />
+        )}
       </Flex>
       {isEnabled && (
         <>
-          <Flex sx={{ gap: 4 }}>
+          <Flex sx={{ gap: 4, w: 'full' }}>
             <Flex
               sx={{
                 flexDir: 'column',
@@ -143,7 +145,7 @@ const ControlNet = (props: ControlNetProps) => {
                 w: 'full',
                 h: 24,
                 paddingInlineStart: 1,
-                paddingInlineEnd: shouldShowAdvanced ? 1 : 0,
+                paddingInlineEnd: isExpanded ? 1 : 0,
                 pb: 2,
                 justifyContent: 'space-between',
               }}
@@ -160,7 +162,7 @@ const ControlNet = (props: ControlNetProps) => {
                 mini
               />
             </Flex>
-            {!shouldShowAdvanced && (
+            {!isExpanded && (
               <Flex
                 sx={{
                   alignItems: 'center',
@@ -174,10 +176,13 @@ const ControlNet = (props: ControlNetProps) => {
               </Flex>
             )}
           </Flex>
-          {shouldShowAdvanced && (
+          {isExpanded && (
             <>
-              <Box pt={2}>
-                <ControlNetImagePreview controlNet={props.controlNet} />
+              <Box mt={2}>
+                <ControlNetImagePreview
+                  controlNet={props.controlNet}
+                  imageSx={expandedControlImageSx}
+                />
               </Box>
               <ParamControlNetProcessorSelect
                 controlNetId={controlNetId}
@@ -187,70 +192,14 @@ const ControlNet = (props: ControlNetProps) => {
                 controlNetId={controlNetId}
                 processorNode={processorNode}
               />
+              <ParamControlNetShouldAutoConfig
+                controlNetId={controlNetId}
+                shouldAutoConfig={shouldAutoConfig}
+              />
             </>
           )}
         </>
       )}
-    </Flex>
-  );
-
-  return (
-    <Flex sx={{ flexDir: 'column', gap: 3 }}>
-      <ControlNetImagePreview controlNet={props.controlNet} />
-      <ParamControlNetModel controlNetId={controlNetId} model={model} />
-      <Tabs
-        isFitted
-        orientation="horizontal"
-        variant="enclosed"
-        size="sm"
-        colorScheme="accent"
-      >
-        <TabList>
-          <Tab
-            sx={{ 'button&': { _selected: { borderBottomColor: 'base.800' } } }}
-          >
-            Model Config
-          </Tab>
-          <Tab
-            sx={{ 'button&': { _selected: { borderBottomColor: 'base.800' } } }}
-          >
-            Preprocess
-          </Tab>
-        </TabList>
-        <TabPanels sx={{ pt: 2 }}>
-          <TabPanel sx={{ p: 0 }}>
-            <ParamControlNetWeight
-              controlNetId={controlNetId}
-              weight={weight}
-            />
-            <ParamControlNetBeginEnd
-              controlNetId={controlNetId}
-              beginStepPct={beginStepPct}
-              endStepPct={endStepPct}
-            />
-          </TabPanel>
-          <TabPanel sx={{ p: 0 }}>
-            <ParamControlNetProcessorSelect
-              controlNetId={controlNetId}
-              processorNode={processorNode}
-            />
-            <ControlNetProcessorComponent
-              controlNetId={controlNetId}
-              processorNode={processorNode}
-            />
-            <ControlNetPreprocessButton controlNet={props.controlNet} />
-            {/* <IAIButton
-              size="sm"
-              leftIcon={<FaUndo />}
-              onClick={handleReset}
-              isDisabled={Boolean(!processedControlImage)}
-            >
-              Reset Processing
-            </IAIButton> */}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-      <IAIButton onClick={handleDelete}>Remove ControlNet</IAIButton>
     </Flex>
   );
 };

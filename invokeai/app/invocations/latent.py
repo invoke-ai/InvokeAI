@@ -346,7 +346,6 @@ class TextToLatentsInvocation(BaseInvocation):
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(context, model)
 
-        print("type of control input: ", type(self.control))
         control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
                                               latents_shape=noise.shape,
                                               do_classifier_free_guidance=(self.cfg_scale >= 1.0))

@@ -6,8 +6,6 @@ import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
-export const SAVED_CANVAS_FILENAME = 'savedCanvas.png';
-
 const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
 
 export const addCanvasSavedToGalleryListener = () => {
@@ -33,12 +31,15 @@ export const addCanvasSavedToGalleryListener = () => {
       const imageUploadedRequest = dispatch(
         imageUploaded({
           formData: {
-            file: new File([blob], SAVED_CANVAS_FILENAME, {
+            file: new File([blob], 'savedCanvas.png', {
               type: 'image/png',
             }),
           },
           imageCategory: 'general',
           isIntermediate: false,
+          postUploadAction: {
+            type: 'TOAST_CANVAS_SAVED_TO_GALLERY',
+          },
         })
       );
 

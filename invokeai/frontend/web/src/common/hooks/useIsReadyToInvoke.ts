@@ -9,24 +9,13 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 const readinessSelector = createSelector(
   [generationSelector, systemSelector, activeTabNameSelector],
   (generation, system, activeTabName) => {
-    const {
-      positivePrompt: prompt,
-      shouldGenerateVariations,
-      seedWeights,
-      initialImage,
-      seed,
-    } = generation;
+    const { shouldGenerateVariations, seedWeights, initialImage, seed } =
+      generation;
 
     const { isProcessing, isConnected } = system;
 
     let isReady = true;
     const reasonsWhyNotReady: string[] = [];
-
-    // Cannot generate without a prompt
-    if (!prompt || Boolean(prompt.match(/^[\s\r\n]+$/))) {
-      isReady = false;
-      reasonsWhyNotReady.push('Missing prompt');
-    }
 
     if (activeTabName === 'img2img' && !initialImage) {
       isReady = false;

@@ -37,7 +37,43 @@
         "statusUpscaling": "アップスケーリング",
         "statusUpscalingESRGAN": "アップスケーリング (ESRGAN)",
         "statusLoadingModel": "モデルを読み込む",
-        "statusModelChanged": "モデルを変更"
+        "statusModelChanged": "モデルを変更",
+        "cancel": "キャンセル",
+        "accept": "同意",
+        "langBrPortuguese": "Português do Brasil",
+        "langRussian": "Русский",
+        "langSimplifiedChinese": "简体中文",
+        "langUkranian": "Украї́нська",
+        "langSpanish": "Español",
+        "img2img": "img2img",
+        "unifiedCanvas": "Unified Canvas",
+        "statusMergingModels": "モデルのマージ",
+        "statusModelConverted": "変換済モデル",
+        "statusGeneratingInpainting": "Inpaintingを生成",
+        "statusIterationComplete": "Iteration Complete",
+        "statusGeneratingOutpainting": "Outpaintingを生成",
+        "loading": "ロード中",
+        "loadingInvokeAI": "Invoke AIをロード中",
+        "statusConvertingModel": "モデルの変換",
+        "statusMergedModels": "マージ済モデル",
+        "pinOptionsPanel": "オプションパネルを固定",
+        "githubLabel": "Github",
+        "hotkeysLabel": "ホットキー",
+        "langHebrew": "עברית",
+        "discordLabel": "Discord",
+        "langItalian": "Italiano",
+        "langEnglish": "English",
+        "oceanTheme": "オーシャン",
+        "langArabic": "アラビア語",
+        "langDutch": "Nederlands",
+        "langFrench": "Français",
+        "langGerman": "Deutsch",
+        "langPortuguese": "Português",
+        "nodes": "ノード",
+        "langKorean": "한국어",
+        "langPolish": "Polski",
+        "txt2img": "txt2img",
+        "postprocessing": "Post Processing"
     },
     "gallery": {
         "uploads": "アップロード",
@@ -46,11 +82,14 @@
         "galleryImageResetSize": "サイズをリセット",
         "gallerySettings": "ギャラリーの設定",
         "maintainAspectRatio": "アスペクト比を維持",
-        "singleColumnLayout": "シングルカラムレイアウト",
+        "singleColumnLayout": "1カラムレイアウト",
         "pinGallery": "ギャラリーにピン留め",
         "allImagesLoaded": "すべての画像を読み込む",
         "loadMore": "さらに読み込む",
-        "noImagesInGallery": "ギャラリーに画像がありません"
+        "noImagesInGallery": "ギャラリーに画像がありません",
+        "generations": "生成",
+        "showGenerations": "生成過程を見る",
+        "autoSwitchNewImages": "新しい画像に自動切替"
     },
     "hotkeys": {
         "keyboardShortcuts": "キーボードショートカット",
@@ -59,14 +98,16 @@
         "galleryHotkeys": "ギャラリーのホットキー",
         "unifiedCanvasHotkeys": "Unified Canvasのホットキー",
         "invoke": {
-            "desc": "画像を生成"
+            "desc": "画像を生成",
+            "title": "Invoke"
         },
         "cancel": {
             "title": "キャンセル",
             "desc": "画像の生成をキャンセル"
         },
         "focusPrompt": {
-            "desc": "プロンプトテキストボックスにフォーカス"
+            "desc": "プロンプトテキストボックスにフォーカス",
+            "title": "プロジェクトにフォーカス"
         },
         "toggleOptions": {
             "title": "オプションパネルのトグル",
@@ -410,5 +451,27 @@
         "accept": "同意",
         "showHide": "表示/非表示",
         "discardAll": "すべて破棄"
+    },
+    "accessibility": {
+        "modelSelect": "モデルを選択",
+        "invokeProgressBar": "進捗バー",
+        "reset": "リセット",
+        "uploadImage": "画像をアップロード",
+        "previousImage": "前の画像",
+        "nextImage": "次の画像",
+        "useThisParameter": "このパラメータを使用する",
+        "copyMetadataJson": "メタデータをコピー(JSON)",
+        "zoomIn": "ズームイン",
+        "exitViewer": "ExitViewer",
+        "zoomOut": "ズームアウト",
+        "rotateCounterClockwise": "反時計回りに回転",
+        "rotateClockwise": "時計回りに回転",
+        "flipHorizontally": "水平方向に反転",
+        "flipVertically": "垂直方向に反転",
+        "toggleAutoscroll": "自動スクロールの切替",
+        "modifyConfig": "Modify Config",
+        "toggleLogViewer": "Log Viewerの切替",
+        "showGallery": "ギャラリーを表示",
+        "showOptionsPanel": "オプションパネルを表示"
     }
 }

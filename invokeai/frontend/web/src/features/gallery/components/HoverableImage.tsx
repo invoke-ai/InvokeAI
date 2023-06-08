@@ -279,6 +279,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               objectFit={
                 shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
               }
+              draggable={false}
               rounded="md"
               src={thumbnail_url || image_url}
               fallback={<FaImage />}

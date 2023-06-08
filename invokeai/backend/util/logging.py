@@ -30,7 +30,6 @@ import invokeai.backend.util.logging as IAILogger
 IAILogger.debug('this is a debugging message')
 """
 
-import logging
 import logging.handlers
 import socket
 import urllib.parse

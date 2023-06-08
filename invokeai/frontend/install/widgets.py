@@ -5,35 +5,75 @@ import curses
 import math
 import os
 import platform
+import pyperclip
 import struct
+import subprocess
 import sys
-from shutil import get_terminal_size
-
 import npyscreen
+import textwrap
+import npyscreen.wgmultiline as wgmultiline
+from npyscreen import fmPopup
+from shutil import get_terminal_size
+from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
+# minimum size for UIs
+MIN_COLS = 120
+MIN_LINES = 50
 
 # -------------------------------------
-def set_terminal_size(columns: int, lines: int):
+def set_terminal_size(columns: int, lines: int, launch_command: str=None):
+    ts = get_terminal_size()
+    width = max(columns,ts.columns)
+    height = max(lines,ts.lines)
+
     OS = platform.uname().system
     if OS == "Windows":
-        os.system(f"mode con: cols={columns} lines={lines}")
+        # The new Windows Terminal doesn't resize, so we relaunch in a CMD window.
+        # Would prefer to use execvpe() here, but somehow it is not working properly
+        # in the Windows 10 environment.
+        if 'IA_RELAUNCHED' not in os.environ:
+            args=['conhost']
+            args.extend([launch_command] if launch_command else [sys.argv[0]])
+            args.extend(sys.argv[1:])
+            os.environ['IA_RELAUNCHED'] = 'True'
+            os.execvp('conhost',args)
+        else:
+            _set_terminal_size_powershell(width,height)
     elif OS in ["Darwin", "Linux"]:
-        import fcntl
-        import termios
+        _set_terminal_size_unix(width,height)
 
-        winsize = struct.pack("HHHH", lines, columns, 0, 0)
-        fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
-        sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=lines, cols=columns))
-        sys.stdout.flush()
+def _set_terminal_size_powershell(width: int, height: int):
+    script=f'''
+$pshost = get-host
+$pswindow = $pshost.ui.rawui
+$newsize = $pswindow.buffersize
+$newsize.height = 3000
+$newsize.width = {width}
+$pswindow.buffersize = $newsize
+$newsize = $pswindow.windowsize
+$newsize.height = {height}
+$newsize.width = {width}
+$pswindow.windowsize = $newsize
+'''
+    subprocess.run(["powershell","-Command","-"],input=script,text=True)
 
+def _set_terminal_size_unix(width: int, height: int):
+    import fcntl
+    import termios
 
-def set_min_terminal_size(min_cols: int, min_lines: int):
+    winsize = struct.pack("HHHH", height, width, 0, 0)
+    fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
+    sys.stdout.write("\x1b[8;{height};{width}t".format(height=height, width=width))
+    sys.stdout.flush()
+
+def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=None):
     # make sure there's enough room for the ui
     term_cols, term_lines = get_terminal_size()
+    if term_cols >= min_cols and term_lines >= min_lines:
+        return
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
-    set_terminal_size(cols, lines)
-
+    set_terminal_size(cols, lines, launch_command)
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
@@ -42,7 +82,23 @@ class IntSlider(npyscreen.Slider):
         stri = stri.rjust(l)
         return stri
 
-
+# -------------------------------------
+# fix npyscreen form so that cursor wraps both forward and backward
+class CyclingForm(object):
+    def find_previous_editable(self, *args):
+        done = False
+        n = self.editw-1
+        while not done:
+            if self._widgets__[n].editable and not self._widgets__[n].hidden:
+                self.editw = n
+                done = True
+            n -= 1
+            if n<0:
+                if self.cycle_widgets:
+                    n = len(self._widgets__)-1
+                else:
+                    done = True
+                    
 # -------------------------------------
 class CenteredTitleText(npyscreen.TitleText):
     def __init__(self, *args, **keywords):
@@ -93,14 +149,7 @@ class FloatSlider(npyscreen.Slider):
 class FloatTitleSlider(npyscreen.TitleText):
     _entry_type = FloatSlider
 
-
-class MultiSelectColumns(npyscreen.MultiSelect):
-    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
-        self.columns = columns
-        self.value_cnt = len(values)
-        self.rows = math.ceil(self.value_cnt / self.columns)
-        super().__init__(screen, values=values, **keywords)
-
+class SelectColumnBase():
     def make_contained_widgets(self):
         self._my_widgets = []
         column_width = self.width // self.columns
@@ -150,53 +199,242 @@ class MultiSelectColumns(npyscreen.MultiSelect):
     def h_cursor_line_right(self, ch):
         super().h_cursor_line_down(ch)
 
+    def handle_mouse_event(self, mouse_event):
+        mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
+        column_width = self.width // self.columns
+        column_height = math.ceil(self.value_cnt / self.columns)
+        column_no = rel_x // column_width
+        row_no = rel_y // self._contained_widget_height
+        self.cursor_line = column_no * column_height + row_no
+        if bstate & curses.BUTTON1_DOUBLE_CLICKED:
+            if hasattr(self,'on_mouse_double_click'):
+                self.on_mouse_double_click(self.cursor_line)
+        self.display()
 
-class TextBox(npyscreen.MultiLineEdit):
-    def update(self, clear=True):
-        if clear:
-            self.clear()
+class MultiSelectColumns( SelectColumnBase, npyscreen.MultiSelect):
+    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
+        self.columns = columns
+        self.value_cnt = len(values)
+        self.rows = math.ceil(self.value_cnt / self.columns)
+        super().__init__(screen, values=values, **keywords)
 
-        HEIGHT = self.height
-        WIDTH = self.width
-        # draw box.
-        self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-        self.parent.curses_pad.hline(
-            self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-        )
-        self.parent.curses_pad.vline(
-            self.rely, self.relx, curses.ACS_VLINE, self.height
-        )
-        self.parent.curses_pad.vline(
-            self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-        )
+    def on_mouse_double_click(self, cursor_line):
+        self.h_select_toggle(cursor_line)
 
-        # draw corners
-        self.parent.curses_pad.addch(
-            self.rely,
-            self.relx,
-            curses.ACS_ULCORNER,
-        )
-        self.parent.curses_pad.addch(
-            self.rely,
-            self.relx + WIDTH,
-            curses.ACS_URCORNER,
-        )
-        self.parent.curses_pad.addch(
-            self.rely + HEIGHT,
-            self.relx,
-            curses.ACS_LLCORNER,
-        )
-        self.parent.curses_pad.addch(
-            self.rely + HEIGHT,
-            self.relx + WIDTH,
-            curses.ACS_LRCORNER,
-        )
+class SingleSelectWithChanged(npyscreen.SelectOne):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
 
-        # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
-        (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
-        self.relx += 1
-        self.rely += 1
-        self.height -= 1
-        self.width -= 1
-        super().update(clear=False)
-        (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
+    def h_select(self,ch):
+        super().h_select(ch)
+        if self.on_changed:
+            self.on_changed(self.value)
+
+class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
+    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
+        self.columns = columns
+        self.value_cnt = len(values)
+        self.rows = math.ceil(self.value_cnt / self.columns)
+        self.on_changed = None
+        super().__init__(screen, values=values, **keywords)
+
+    def when_value_edited(self):
+        self.h_select(self.cursor_line)
+
+    def when_cursor_moved(self):
+        self.h_select(self.cursor_line)
+
+    def h_cursor_line_right(self,ch):
+        self.h_exit_down('bye bye')
+
+class TextBoxInner(npyscreen.MultiLineEdit):
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.yank = None
+        self.handlers.update({
+            "^A": self.h_cursor_to_start,
+            "^E": self.h_cursor_to_end,
+            "^K": self.h_kill,
+            "^F": self.h_cursor_right,
+            "^B": self.h_cursor_left,
+            "^Y": self.h_yank,
+            "^V": self.h_paste,
+        })
+
+    def h_cursor_to_start(self, input):
+        self.cursor_position = 0
+
+    def h_cursor_to_end(self, input):
+        self.cursor_position = len(self.value)
+
+    def h_kill(self, input):
+        self.yank = self.value[self.cursor_position:]
+        self.value = self.value[:self.cursor_position]
+
+    def h_yank(self, input):
+        if self.yank:
+            self.paste(self.yank)
+
+    def paste(self, text: str):
+        self.value = self.value[:self.cursor_position] + text + self.value[self.cursor_position:]
+        self.cursor_position += len(text)
+
+    def h_paste(self, input: int=0):
+        try:
+            text = pyperclip.paste()
+        except ModuleNotFoundError:
+            text = "To paste with the mouse on Linux, please install the 'xclip' program."
+        self.paste(text)
+        
+    def handle_mouse_event(self, mouse_event):
+        mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
+        if bstate & (BUTTON2_CLICKED|BUTTON3_CLICKED):
+            self.h_paste()
+
+    # def update(self, clear=True):
+    #     if clear:
+    #         self.clear()
+
+    #     HEIGHT = self.height
+    #     WIDTH = self.width
+    #     # draw box.
+    #     self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
+    #     self.parent.curses_pad.hline(
+    #         self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
+    #     )
+    #     self.parent.curses_pad.vline(
+    #         self.rely, self.relx, curses.ACS_VLINE, self.height
+    #     )
+    #     self.parent.curses_pad.vline(
+    #         self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
+    #     )
+
+        # # draw corners
+        # self.parent.curses_pad.addch(
+        #     self.rely,
+        #     self.relx,
+        #     curses.ACS_ULCORNER,
+        # )
+        # self.parent.curses_pad.addch(
+        #     self.rely,
+        #     self.relx + WIDTH,
+        #     curses.ACS_URCORNER,
+        # )
+        # self.parent.curses_pad.addch(
+        #     self.rely + HEIGHT,
+        #     self.relx,
+        #     curses.ACS_LLCORNER,
+        # )
+        # self.parent.curses_pad.addch(
+        #     self.rely + HEIGHT,
+        #     self.relx + WIDTH,
+        #     curses.ACS_LRCORNER,
+        # )
+
+        # # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
+        # (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
+        # self.relx += 1
+        # self.rely += 1
+        # self.height -= 1
+        # self.width -= 1
+        # super().update(clear=False)
+        # (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
+
+class TextBox(npyscreen.BoxTitle):
+    _contained_widget = TextBoxInner
+
+class BufferBox(npyscreen.BoxTitle):
+    _contained_widget = npyscreen.BufferPager
+
+class ConfirmCancelPopup(fmPopup.ActionPopup):
+    DEFAULT_COLUMNS = 100
+    def on_ok(self):
+        self.value = True
+    def on_cancel(self):
+        self.value = False
+        
+class FileBox(npyscreen.BoxTitle):
+    _contained_widget = npyscreen.Filename
+    
+class PrettyTextBox(npyscreen.BoxTitle):
+    _contained_widget = TextBox
+    
+def _wrap_message_lines(message, line_length):
+    lines = []
+    for line in message.split('\n'):
+        lines.extend(textwrap.wrap(line.rstrip(), line_length))
+    return lines
+    
+def _prepare_message(message):
+    if isinstance(message, list) or isinstance(message, tuple):
+        return "\n".join([ s.rstrip() for s in message])
+        #return "\n".join(message)
+    else:
+        return message
+    
+def select_stable_diffusion_config_file(
+        form_color: str='DANGER',
+        wrap:bool =True,
+        model_name:str='Unknown',
+):
+    message = "Please select the correct base model for the V2 checkpoint named {model_name}. Press <CANCEL> to skip installation."
+    title = "CONFIG FILE SELECTION"
+    options=[
+        "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
+        "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
+        "Skip installation for now and come back later",
+        "Enter config file path manually",
+    ]
+
+    F = ConfirmCancelPopup(
+        name=title,
+        color=form_color,
+        cycle_widgets=True,
+        lines=16,
+    )
+    F.preserve_selected_widget = True
+    
+    mlw = F.add(
+        wgmultiline.Pager,
+        max_height=4,
+        editable=False,
+    )
+    mlw_width = mlw.width-1
+    if wrap:
+        message = _wrap_message_lines(message, mlw_width)
+    mlw.values = message
+
+    choice = F.add(
+        SingleSelectWithChanged,
+        values = options,
+        value = [0],
+        max_height = len(options)+1,
+        scroll_exit=True,
+    )
+    file = F.add(
+        FileBox,
+        name='Path to config file',
+        max_height=3,
+        hidden=True,
+        must_exist=True,
+        scroll_exit=True
+    )
+
+    def toggle_visible(value):
+        value = value[0]
+        if value==3:
+            file.hidden=False
+        else:
+            file.hidden=True
+        F.display()
+        
+    choice.on_changed = toggle_visible
+
+    F.editw = 1
+    F.edit()
+    if not F.value:
+        return None
+    assert choice.value[0] in range(0,4),'invalid choice'
+    choices = ['epsilon','v','abort',file.value]
+    return choices[choice.value[0]]

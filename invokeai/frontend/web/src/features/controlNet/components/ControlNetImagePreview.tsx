@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { ImageDTO } from 'services/api';
 import {
   ControlNetConfig,
@@ -6,47 +6,61 @@ import {
   controlNetSelector,
 } from '../store/controlNetSlice';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Box } from '@chakra-ui/react';
+import { Box, ChakraProps, Flex } from '@chakra-ui/react';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
-import { useHoverDirty } from 'react-use';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { FaUndo } from 'react-icons/fa';
 
 const selector = createSelector(
   controlNetSelector,
   (controlNet) => {
-    const { isProcessingControlImage } = controlNet;
-    return { isProcessingControlImage };
+    const { pendingControlImages } = controlNet;
+    return { pendingControlImages };
   },
   defaultSelectorOptions
 );
 
 type Props = {
   controlNet: ControlNetConfig;
+  imageSx?: ChakraProps['sx'];
 };
 
 const ControlNetImagePreview = (props: Props) => {
+  const { imageSx } = props;
   const { controlNetId, controlImage, processedControlImage, processorType } =
     props.controlNet;
   const dispatch = useAppDispatch();
-  const { isProcessingControlImage } = useAppSelector(selector);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { pendingControlImages } = useAppSelector(selector);
 
-  const isMouseOverImage = useHoverDirty(containerRef);
+  const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
   const handleDrop = useCallback(
     (droppedImage: ImageDTO) => {
       if (controlImage?.image_name === droppedImage.image_name) {
         return;
       }
+      setIsMouseOverImage(false);
       dispatch(
         controlNetImageChanged({ controlNetId, controlImage: droppedImage })
       );
     },
     [controlImage, controlNetId, dispatch]
   );
+
+  const handleResetControlImage = useCallback(() => {
+    dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
+  }, [controlNetId, dispatch]);
+  const handleMouseEnter = useCallback(() => {
+    setIsMouseOverImage(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsMouseOverImage(false);
+  }, []);
 
   const shouldShowProcessedImageBackdrop =
     Number(controlImage?.width) > Number(processedControlImage?.width) ||
@@ -56,13 +70,14 @@ const ControlNetImagePreview = (props: Props) => {
     controlImage &&
     processedControlImage &&
     !isMouseOverImage &&
-    !isProcessingControlImage &&
+    !pendingControlImages.includes(controlNetId) &&
     processorType !== 'none';
 
   return (
     <Box
-      ref={containerRef}
-      sx={{ position: 'relative', w: 'full', h: 'full', aspectRatio: '1/1' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      sx={{ position: 'relative', w: 'full', h: 'full' }}
     >
       <IAIDndImage
         image={controlImage}
@@ -70,10 +85,14 @@ const ControlNetImagePreview = (props: Props) => {
         isDropDisabled={Boolean(
           processedControlImage && processorType !== 'none'
         )}
+        isUploadDisabled={Boolean(controlImage)}
+        postUploadAction={{ type: 'SET_CONTROLNET_IMAGE', controlNetId }}
+        imageSx={imageSx}
       />
       <AnimatePresence>
         {shouldShowProcessedImage && (
           <motion.div
+            style={{ width: '100%' }}
             initial={{
               opacity: 0,
             }}
@@ -86,18 +105,13 @@ const ControlNetImagePreview = (props: Props) => {
               transition: { duration: 0.1 },
             }}
           >
-            <Box
-              sx={{
-                position: 'absolute',
-                w: 'full',
-                h: 'full',
-                top: 0,
-                insetInlineStart: 0,
-              }}
-            >
+            <>
               {shouldShowProcessedImageBackdrop && (
                 <Box
                   sx={{
+                    position: 'absolute',
+                    top: 0,
+                    insetInlineStart: 0,
                     w: 'full',
                     h: 'full',
                     bg: 'base.900',
@@ -118,13 +132,15 @@ const ControlNetImagePreview = (props: Props) => {
                   image={processedControlImage}
                   onDrop={handleDrop}
                   payloadImage={controlImage}
+                  isUploadDisabled={true}
+                  imageSx={imageSx}
                 />
               </Box>
-            </Box>
+            </>
           </motion.div>
         )}
       </AnimatePresence>
-      {isProcessingControlImage && (
+      {pendingControlImages.includes(controlNetId) && (
         <Box
           sx={{
             position: 'absolute',
@@ -136,6 +152,22 @@ const ControlNetImagePreview = (props: Props) => {
         >
           <IAIImageFallback />
         </Box>
+      )}
+      {controlImage && (
+        <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}>
+          <IAIIconButton
+            aria-label="Reset Control Image"
+            tooltip="Reset Control Image"
+            size="sm"
+            onClick={handleResetControlImage}
+            icon={<FaUndo />}
+            variant="link"
+            sx={{
+              p: 2,
+              color: 'base.50',
+            }}
+          />
+        </Flex>
       )}
     </Box>
   );

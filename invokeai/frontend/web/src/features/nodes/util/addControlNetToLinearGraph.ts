@@ -63,7 +63,7 @@ export const addControlNetToLinearGraph = (
           image_name,
           image_origin,
         };
-      } else if (controlImage && processorType !== 'none') {
+      } else if (controlImage) {
         // The control image is preprocessed
         const { image_name, image_origin } = controlImage;
         controlNetNode.image = {
