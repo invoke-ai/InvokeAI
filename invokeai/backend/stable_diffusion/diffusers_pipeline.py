@@ -218,7 +218,7 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 class ControlNetData:
     model: ControlNetModel = Field(default=None)
     image_tensor: torch.Tensor= Field(default=None)
-    weight: Union[float, list[float]]= Field(default=1.0)
+    weight: Union[float, List[float]]= Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
 

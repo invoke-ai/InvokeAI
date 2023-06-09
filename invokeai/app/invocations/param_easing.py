@@ -1,5 +1,5 @@
 import io
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 # from PIL.Image import Image
 import PIL.Image
@@ -29,6 +29,7 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
+from ...backend.util.logging import InvokeAILogger
 from .collections import FloatCollectionOutput
 
 
@@ -83,7 +84,7 @@ EASING_FUNCTIONS_MAP = {
     "BounceInOut": BounceEaseInOut,
 }
 
-EASING_FUNCTION_KEYS = Literal[
+EASING_FUNCTION_KEYS: Any = Literal[
     tuple(list(EASING_FUNCTIONS_MAP.keys()))
 ]
 
@@ -114,7 +115,7 @@ class StepParamEasingInvocation(BaseInvocation):
 
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
-        print_diagnostics = False
+        log_diagnostics = False
         # convert from start_step_percent to nearest step <= (steps * start_step_percent)
         # start_step = int(np.floor(self.num_steps * self.start_step_percent))
         start_step = int(np.round(self.num_steps * self.start_step_percent))
@@ -131,19 +132,21 @@ class StepParamEasingInvocation(BaseInvocation):
         prelist = list(num_presteps * [self.pre_start_value])
         postlist = list(num_poststeps * [self.post_end_value])
 
-        if print_diagnostics:
-            print("start_step", start_step)
-            print("end_step", end_step)
-            print("num_easing_steps", num_easing_steps)
-            print("num_presteps", num_presteps)
-            print("num_poststeps", num_poststeps)
-            print("prelist size", len(prelist))
-            print("postlist size", len(postlist))
-            print("prelist", prelist)
-            print("postlist", postlist)
+        if log_diagnostics:
+            logger = InvokeAILogger.getLogger(name="StepParamEasing")
+            logger.debug("start_step: " + str(start_step))
+            logger.debug("end_step: " + str(end_step))
+            logger.debug("num_easing_steps: " + str(num_easing_steps))
+            logger.debug("num_presteps: " + str(num_presteps))
+            logger.debug("num_poststeps: " + str(num_poststeps))
+            logger.debug("prelist size: " + str(len(prelist)))
+            logger.debug("postlist size: " + str(len(postlist)))
+            logger.debug("prelist: " + str(prelist))
+            logger.debug("postlist: " + str(postlist))
 
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
-        if print_diagnostics: print(easing_class)
+        if log_diagnostics:
+            logger.debug("easing class: " + str(easing_class))
         easing_list = list()
         if self.mirror:  # "expected" mirroring
             # if number of steps is even, squeeze duration down to (number_of_steps)/2
@@ -153,7 +156,7 @@ class StepParamEasingInvocation(BaseInvocation):
             # but if even then number_of_steps/2 === ceil(number_of_steps/2), so can just use ceil always
 
             base_easing_duration = int(np.ceil(num_easing_steps/2.0))
-            if print_diagnostics: print("base easing duration: ", base_easing_duration)
+            if log_diagnostics: logger.debug("base easing duration: " + str(base_easing_duration))
             even_num_steps = (num_easing_steps % 2 == 0)  # even number of steps
             easing_function = easing_class(start=self.start_value,
                                            end=self.end_value,
@@ -162,14 +165,15 @@ class StepParamEasingInvocation(BaseInvocation):
             for step_index in range(base_easing_duration):
                 easing_val = easing_function.ease(step_index)
                 base_easing_vals.append(easing_val)
-                if print_diagnostics: print("step_index: ", step_index, "easing_val: ", easing_val)
+                if log_diagnostics:
+                    logger.debug("step_index: " + str(step_index) + ", easing_val: " + str(easing_val))
             if even_num_steps:
                 mirror_easing_vals = list(reversed(base_easing_vals))
             else:
                 mirror_easing_vals = list(reversed(base_easing_vals[0:-1]))
-            if print_diagnostics:
-                print("base easing vals: ", base_easing_vals)
-                print("mirror easing vals: ", mirror_easing_vals)
+            if log_diagnostics:
+                logger.debug("base easing vals: " + str(base_easing_vals))
+                logger.debug("mirror easing vals: " + str(mirror_easing_vals))
             easing_list = base_easing_vals + mirror_easing_vals
 
         # FIXME: add alt_mirror option (alternative to default or mirror), or remove entirely
@@ -191,7 +195,7 @@ class StepParamEasingInvocation(BaseInvocation):
         #         else:
         #             step_val = mirror_function.ease(step_index - half_ease_duration)
         #         easing_list.append(step_val)
-        #         if print_diagnostics: print(step_index, step_val)
+        #         if log_diagnostics: logger.debug(step_index, step_val)
         #
 
         else:  # no mirroring (default)
@@ -201,12 +205,13 @@ class StepParamEasingInvocation(BaseInvocation):
             for step_index in range(num_easing_steps):
                 step_val = easing_function.ease(step_index)
                 easing_list.append(step_val)
-                if print_diagnostics: print(step_index, step_val)
+                if log_diagnostics:
+                    logger.debug("step_index: " + str(step_index) + ", easing_val: " + str(step_val))
 
-        if print_diagnostics:
-            print("prelist size", len(prelist))
-            print("easing_list size", len(easing_list))
-            print("postlist size", len(postlist))
+        if log_diagnostics:
+            logger.debug("prelist size: " + str(len(prelist)))
+            logger.debug("easing_list size: " + str(len(easing_list)))
+            logger.debug("postlist size: " + str(len(postlist)))
 
         param_list = prelist + easing_list + postlist
 
