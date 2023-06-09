@@ -15,10 +15,7 @@ InvokeAI:
     conf_path: configs/models.yaml
     legacy_conf_dir: configs/stable-diffusion
     outdir: outputs
-    embedding_dir: embeddings
-    lora_dir: loras
     autoconvert_dir: null
-    gfpgan_model_dir: models/gfpgan/GFPGANv1.4.pth
   Models:
     model: stable-diffusion-1.5
     embeddings: true
@@ -171,7 +168,7 @@ from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Literal, Type, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
 DB_FILE   = Path('invokeai.db')
@@ -379,19 +376,15 @@ setting environment variables INVOKEAI_<setting>.
     root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
     autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
-    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory', category='Paths')
-    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
-    controlnet_dir      : Path = Field(default="controlnets", description='Path to directory of ControlNet models.', category='Paths')
+    models_dir          : Path = Field(default='./models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
-    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
-
+    
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
-    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
-
+    
     log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
@@ -492,46 +485,11 @@ setting environment variables INVOKEAI_<setting>.
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def cache_dir(self)->Path:
-        '''
-        Path to the global cache directory for HuggingFace hub-managed models
-        '''
-        return self.models_dir / "hub"
-
-    @property
-    def models_dir(self)->Path:
+    def models_path(self)->Path:
         '''
         Path to the models directory
         '''
-        return self._resolve("models")
-
-    @property
-    def converted_ckpts_dir(self)->Path:
-        '''
-        Path to the converted models
-        '''
-        return self._resolve("models/converted_ckpts")
-
-    @property
-    def embedding_path(self)->Path:
-        '''
-        Path to the textual inversion embeddings directory.
-        '''
-        return self._resolve(self.embedding_dir) if self.embedding_dir else None
-
-    @property
-    def lora_path(self)->Path:
-        '''
-        Path to the LoRA models directory.
-        '''
-        return self._resolve(self.lora_dir) if self.lora_dir else None
-
-    @property
-    def controlnet_path(self)->Path:
-        '''
-        Path to the controlnet models directory.
-        '''
-        return self._resolve(self.controlnet_dir) if self.controlnet_dir else None
+        return self._resolve(self.models_dir)
 
     @property
     def autoconvert_path(self)->Path:
@@ -539,13 +497,6 @@ setting environment variables INVOKEAI_<setting>.
         Path to the directory containing models to be imported automatically at startup.
         '''
         return self._resolve(self.autoconvert_dir) if self.autoconvert_dir else None
-
-    @property
-    def gfpgan_model_path(self)->Path:
-        '''
-        Path to the GFPGAN model.
-        '''
-        return self._resolve(self.gfpgan_model_dir) if self.gfpgan_model_dir else None
 
     # the following methods support legacy calls leftover from the Globals era
     @property

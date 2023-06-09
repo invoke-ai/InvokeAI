@@ -162,7 +162,12 @@ class SDModelType(str, Enum):
     Scheduler = "scheduler"
     Lora = "lora"
     TextualInversion = "textual_inversion"
+    ControlNet = "control_net"
 
+class BaseModel(str, Enum):
+    StableDiffusion1_5 = "SD-1"
+    StableDiffusion2Base = "SD-2-base"   # 512 pixels; this will have epsilon parameterization
+    StableDiffusion2 = "SD-2"            # 768 pixels; this will have v-prediction parameterization
 
 class ModelInfoBase:
     #model_path: str

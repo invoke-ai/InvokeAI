@@ -54,15 +54,17 @@ MODELS.YAML
 The general format of a models.yaml section is:
 
  type-of-model/name-of-model:
-     format: folder|ckpt|safetensors
-     repo_id: owner/repo
      path: /path/to/local/file/or/directory
+     description: a description
+     format: folder|ckpt|safetensors|pt
+     base: SD-1|SD-2
      subfolder: subfolder-name
 
 The type of model is given in the stanza key, and is one of
 {diffusers, ckpt, vae, text_encoder, tokenizer, unet, scheduler,
-safety_checker, feature_extractor, lora, textual_inversion}, and
-correspond to items in the SDModelType enum defined in model_cache.py
+safety_checker, feature_extractor, lora, textual_inversion,
+controlnet}, and correspond to items in the SDModelType enum defined
+in model_cache.py
 
 The format indicates whether the model is organized as a folder with
 model subdirectories, or is contained in a single checkpoint or
@@ -80,12 +82,12 @@ This example summarizes the two ways of getting a non-diffuser model:
 
  text_encoder/clip-test-1:
    format: folder
-   repo_id: openai/clip-vit-large-patch14
+   path: /path/to/folder
    description: Returns standalone CLIPTextModel
 
  text_encoder/clip-test-2:
    format: folder
-   repo_id: stabilityai/stable-diffusion-2
+   repo_id: /path/to/folder
    subfolder: text_encoder
    description: Returns the text_encoder in the subfolder of the diffusers model (just the encoder in RAM)
 
@@ -99,6 +101,14 @@ model. Use the `submodel` parameter to select which part:
     print(type(my_vae))
     # "AutoencoderKL"
 
+DIRECTORY_SCANNING:
+
+Loras, textual_inversion and controlnet models are usually not listed
+explicitly in models.yaml, but are added to the in-memory data
+structure at initialization time by scanning the models directory. The
+in-memory data structure can be resynchronized by calling
+`manager.scan_models_directory`.
+
 DISAMBIGUATION:
 
 You may wish to use the same name for a related family of models. To
@@ -107,12 +117,12 @@ separated by "/". Example:
 
  tokenizer/clip-large:
    format: tokenizer
-   repo_id: openai/clip-vit-large-patch14
+   path: /path/to/folder
    description: Returns standalone tokenizer
 
  text_encoder/clip-large:
    format: text_encoder
-   repo_id: openai/clip-vit-large-patch14
+   path: /path/to/folder
    description: Returns standalone text encoder
 
 You can now use the `model_type` argument to indicate which model you
@@ -126,6 +136,14 @@ OTHER FUNCTIONS:
 Other methods provided by ModelManager support importing, editing,
 converting and deleting models.
 
+IMPORTANT CHANGES AND LIMITATIONS SINCE 2.3:
+
+1. Only local paths are supported. Repo_ids are no longer accepted. This
+simplifies the logic.
+
+2. VAEs can't be swapped in and out at load time. They must be baked
+into the model when downloaded or converted.
+
 """
 from __future__ import annotations
 
@@ -133,17 +151,13 @@ import os
 import re
 import textwrap
 import shutil
-import sys
-import time
 import traceback
-import warnings
 from dataclasses import dataclass
 from enum import Enum, auto
 from packaging import version
 from pathlib import Path
-from typing import Callable, Optional, List, Tuple, Union, types
-from shutil import move, rmtree
-from typing import Any, Optional, Union, Callable, Dict, List, types
+from typing import Callable, Dict, Optional, List, Tuple, Union, types
+from shutil import rmtree
 
 import safetensors
 import safetensors.torch
@@ -156,7 +170,7 @@ from omegaconf.dictconfig import DictConfig
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import CUDA_DEVICE, ask_user, download_with_resume
+from invokeai.backend.util import CUDA_DEVICE, download_with_resume
 from ..install.model_install_backend import Dataset_path, hf_download_with_resume
 from .model_cache import (ModelCache, ModelLocker, SDModelType,
                           SilenceWarnings)
@@ -196,6 +210,25 @@ class SDLegacyType(Enum):
     UNKNOWN = auto()
 
 MAX_CACHE_SIZE = 6.0  # GB
+
+
+# layout of the models directory:
+# models
+# ├── SD-1
+# │   ├── controlnet
+# │   ├── lora
+# │   ├── diffusers
+# │   └── textual_inversion
+# ├── SD-2
+# │   ├── controlnet
+# │   ├── lora
+# │   ├── diffusers
+# │   └── textual_inversion
+# └── support
+#     ├── codeformer
+#     ├── gfpgan
+#     └── realesrgan
+
 
 class ModelManager(object):
     """
@@ -240,6 +273,9 @@ class ModelManager(object):
             logger = logger,
         )
         self.cache_keys = dict()
+
+        # add controlnet, lora and textual_inversion models from disk
+        self.scan_models_directory(include_diffusers=False)
 
     def model_exists(
         self,
@@ -1258,6 +1294,67 @@ class ModelManager(object):
             if self.config_path:
                 self.commit()
 
+    def _delete_defunct_models(self):
+        '''
+        Remove models no longer on disk.
+        '''
+        config = self.config
+        
+        to_delete = set()
+        for key in config:
+            if 'path' not in config[key]:
+                continue
+            path = self.globals.root_dir / config[key].path
+            if path.exists():
+                continue
+            to_delete.add(key)
+            
+        for key in to_delete:
+            self.logger.warn(f'Removing model {key} from in-memory config because its path is no longer on disk')
+            config.pop(key)
+
+    def scan_models_directory(self, include_diffusers:bool=False):
+        '''
+        Scan the models directory for loras, textual_inversions and controlnets
+        and create appropriate entries in the in-memory omegaconf. Diffusers
+        will not be added unless include_diffusers is true.
+        '''
+        self._delete_defunct_models()
+        
+        model_directory = self.globals.models_path
+        config = self.config
+        
+        for root, dirs, files in os.walk(model_directory):
+            parents = root.split('/')
+            subpaths = parents[parents.index('models')+1:]
+            if len(subpaths) < 2:
+                continue
+            base, model_type, *_ = subpaths
+            
+            if model_type == "diffusers" and not include_diffusers:
+                continue
+            
+            for d in dirs:
+                config[f'{model_type}/{d}'] = dict(
+                    path = os.path.join(root,d),
+                    description = f'{model_type} model {d}',
+                    format = 'folder',
+                    base = base,
+                )
+
+            for f in files:
+                basename = Path(f).stem
+                format = Path(f).suffix[1:]
+                config[f'{model_type}/{basename}'] = dict(
+                    path = os.path.join(root,f),
+                    description = f'{model_type} model {basename}',
+                    format = format,
+                    base = base,
+                )
+                
+        
+    ##### NONE OF THE METHODS BELOW WORK NOW BECAUSE OF MODEL DIRECTORY REORGANIZATION
+    ##### AND NEED TO BE REWRITTEN
     def list_lora_models(self)->Dict[str,bool]:
         '''Return a dict of installed lora models; key is either the shortname
         defined in INITIAL_MODELS, or the basename of the file in the LoRA
