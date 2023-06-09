@@ -70,13 +70,11 @@ const ParamPositiveConditioning = () => {
 
   return (
     <Box>
-      <FormControl
-        isInvalid={prompt.length === 0 || Boolean(prompt.match(/^[\s\r\n]+$/))}
-      >
+      <FormControl>
         <IAITextarea
           id="prompt"
           name="prompt"
-          placeholder={t('parameters.promptPlaceholder')}
+          placeholder={t('parameters.positivePromptPlaceholder')}
           value={prompt}
           onChange={handleChangePrompt}
           onKeyDown={handleKeyDown}

@@ -1,17 +1,13 @@
 import { Box } from '@chakra-ui/react';
-import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { ResourceKey } from 'i18next';
 import {
   KeyboardEvent,
   memo,
   ReactNode,
   useCallback,
   useEffect,
-  useMemo,
-  useRef,
   useState,
 } from 'react';
 import { FileRejection, useDropzone } from 'react-dropzone';
@@ -19,10 +15,8 @@ import { useTranslation } from 'react-i18next';
 import { imageUploaded } from 'services/thunks/image';
 import ImageUploadOverlay from './ImageUploadOverlay';
 import { useAppToaster } from 'app/components/Toaster';
-import { filter, map, some } from 'lodash-es';
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { ErrorCode } from 'react-dropzone';
 
 const selector = createSelector(
   [systemSelector, activeTabNameSelector],
@@ -71,6 +65,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
           formData: { file },
           imageCategory: 'user',
           isIntermediate: false,
+          postUploadAction: { type: 'TOAST_UPLOADED' },
         })
       );
     },

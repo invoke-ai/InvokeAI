@@ -53,12 +53,11 @@ class ApiDependencies:
 
         events = FastAPIEventService(event_handler_id)
 
-        output_folder = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../../../outputs")
-        )
+        output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_location = os.path.join(output_folder, "invokeai.db")
+        db_location = config.db_path
+        db_location.parent.mkdir(parents=True,exist_ok=True)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"

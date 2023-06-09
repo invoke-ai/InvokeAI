@@ -1121,6 +1121,8 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param vae_path: Path to a checkpoint VAE that will be converted into diffusers and loaded into the pipeline.
     """
     config = InvokeAIAppConfig.get_config()
+    cache_dir = config.cache_dir
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         verbosity = dlogging.get_verbosity()
@@ -1133,7 +1135,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         else:
             checkpoint = load_file(checkpoint_path)
 
-        cache_dir = config.cache_dir
         pipeline_class = (
             StableDiffusionGeneratorPipeline
             if return_generator_pipeline

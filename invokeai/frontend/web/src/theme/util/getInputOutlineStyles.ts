@@ -35,6 +35,6 @@ export const getInputOutlineStyles = (_props?: StyleFunctionProps) => ({
     },
   },
   _placeholder: {
-    color: 'base.400',
+    color: 'base.500',
   },
 });

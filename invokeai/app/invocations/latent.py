@@ -346,7 +346,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 scheduler_info=self.unet.scheduler,
                 scheduler_name=self.scheduler,
             )
-
+            
             pipeline = self.create_pipeline(unet, scheduler)
             conditioning_data = self.get_conditioning_data(context, scheduler)
 

@@ -506,8 +506,8 @@
             "isScheduled": "Canceling",
             "setType": "Set cancel type"
         },
-        "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
-        "negativePrompts": "Negative Prompts",
+        "positivePromptPlaceholder": "Positive Prompt",
+        "negativePromptPlaceholder": "Negative Prompt",
         "sendTo": "Send to",
         "sendToImg2Img": "Send to Image to Image",
         "sendToUnifiedCanvas": "Send To Unified Canvas",
