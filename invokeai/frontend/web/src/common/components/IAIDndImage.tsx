@@ -14,7 +14,7 @@ import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { AnimatePresence } from 'framer-motion';
 import { ReactElement, SyntheticEvent, useCallback } from 'react';
 import { memo, useRef } from 'react';
-import { FaImage, FaTimes, FaUpload } from 'react-icons/fa';
+import { FaImage, FaTimes, FaUndo, FaUpload } from 'react-icons/fa';
 import { ImageDTO } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
@@ -174,14 +174,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 position: 'absolute',
                 top: 0,
                 right: 0,
-                p: 2,
               }}
             >
               <IAIIconButton
                 size={resetIconSize}
                 tooltip="Reset Image"
                 aria-label="Reset Image"
-                icon={<FaTimes />}
+                icon={<FaUndo />}
                 onClick={onReset}
               />
             </Box>
