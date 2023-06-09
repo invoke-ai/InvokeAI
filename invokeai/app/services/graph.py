@@ -1131,13 +1131,13 @@ class GraphExecutionState(BaseModel):
         """Gets the deepest node that is ready to be executed"""
         g = self.execution_graph.nx_graph()
 
-        # we need to traverse the graph in from bottom up
-        reversed_sorted_nodes = reversed(list(nx.topological_sort(g)))
+        # Depth-first search with pre-order traversal is a depth-first topological sort
+        sorted_nodes = nx.dfs_preorder_nodes(g)
         
         next_node = next(
             (
                 n
-                for n in reversed_sorted_nodes
+                for n in sorted_nodes
                 if n not in self.executed # the node must not already be executed...
                 and all((e[0] in self.executed for e in g.in_edges(n))) # ...and all its inputs must be executed
             ),
