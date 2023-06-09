@@ -16,7 +16,6 @@ import {
   setShouldShowIntermediates,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
@@ -159,7 +158,6 @@ const IAICanvasSettingsButtonPopover = () => {
           onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
         />
         <ClearCanvasHistoryButtonModal />
-        <EmptyTempFolderButtonModal />
       </Flex>
     </IAIPopover>
   );

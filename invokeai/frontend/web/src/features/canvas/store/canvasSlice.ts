@@ -30,7 +30,10 @@ import {
 } from './canvasTypes';
 import { ImageDTO } from 'services/api';
 import { sessionCanceled } from 'services/thunks/session';
-import { setShouldUseCanvasBetaLayout } from 'features/ui/store/uiSlice';
+import {
+  setActiveTab,
+  setShouldUseCanvasBetaLayout,
+} from 'features/ui/store/uiSlice';
 import { imageUrlsReceived } from 'services/thunks/image';
 
 export const initialLayerState: CanvasLayerState = {
@@ -857,6 +860,11 @@ export const canvasSlice = createSlice({
     builder.addCase(setShouldUseCanvasBetaLayout, (state, action) => {
       state.doesCanvasNeedScaling = true;
     });
+
+    builder.addCase(setActiveTab, (state, action) => {
+      state.doesCanvasNeedScaling = true;
+    });
+
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
       const { image_name, image_origin, image_url, thumbnail_url } =
         action.payload;
