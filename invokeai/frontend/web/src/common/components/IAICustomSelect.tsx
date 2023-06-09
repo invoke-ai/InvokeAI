@@ -113,7 +113,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
       )}
       <Tooltip label={tooltip} {...tooltipProps}>
         <Flex
-          {...getToggleButtonProps({ ref: refs.setReference })}
+          {...getToggleButtonProps({ ref: refs.reference })}
           sx={{
             alignItems: 'center',
             userSelect: 'none',
@@ -154,7 +154,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
         {isOpen && (
           <List
             as={Flex}
-            ref={refs.setFloating}
+            ref={refs.floating}
             sx={{
               ...floatingStyles,
               top: 0,
