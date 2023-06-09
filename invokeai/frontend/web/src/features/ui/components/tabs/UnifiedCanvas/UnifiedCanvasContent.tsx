@@ -55,8 +55,6 @@ const UnifiedCanvasContent = () => {
   });
 
   useLayoutEffect(() => {
-    dispatch(requestCanvasRescale());
-
     const resizeCallback = () => {
       dispatch(requestCanvasRescale());
     };
