@@ -1,16 +1,25 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAICustomSelect from 'common/components/IAICustomSelect';
+import IAICustomSelect, {
+  IAICustomSelectOption,
+} from 'common/components/IAICustomSelect';
 import {
   CONTROLNET_MODELS,
-  ControlNetModel,
+  ControlNetModelName,
 } from 'features/controlNet/store/constants';
 import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
+import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 
 type ParamControlNetModelProps = {
   controlNetId: string;
-  model: ControlNetModel;
+  model: ControlNetModelName;
 };
+
+const DATA: IAICustomSelectOption[] = map(CONTROLNET_MODELS, (m) => ({
+  value: m.type,
+  label: m.label,
+  tooltip: m.type,
+}));
 
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model } = props;
@@ -19,7 +28,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const handleModelChanged = useCallback(
     (val: string | null | undefined) => {
       // TODO: do not cast
-      const model = val as ControlNetModel;
+      const model = val as ControlNetModelName;
       dispatch(controlNetModelChanged({ controlNetId, model }));
     },
     [controlNetId, dispatch]
@@ -29,9 +38,9 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
     <IAICustomSelect
       tooltip={model}
       tooltipProps={{ placement: 'top', hasArrow: true }}
-      items={CONTROLNET_MODELS}
-      selectedItem={model}
-      setSelectedItem={handleModelChanged}
+      data={DATA}
+      value={model}
+      onChange={handleModelChanged}
       ellipsisPosition="start"
       withCheckIcon
     />

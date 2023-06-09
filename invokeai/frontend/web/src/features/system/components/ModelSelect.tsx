@@ -4,34 +4,29 @@ import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  selectModelsAll,
-  selectModelsById,
-  selectModelsIds,
-} from '../store/modelSlice';
+import { selectModelsAll, selectModelsById } from '../store/modelSlice';
 import { RootState } from 'app/store/store';
 import { modelSelected } from 'features/parameters/store/generationSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import IAICustomSelect, {
-  ItemTooltips,
+  IAICustomSelectOption,
 } from 'common/components/IAICustomSelect';
 
 const selector = createSelector(
   [(state: RootState) => state, generationSelector],
   (state, generation) => {
     const selectedModel = selectModelsById(state, generation.model);
-    const allModelNames = selectModelsIds(state).map((id) => String(id));
-    const allModelTooltips = selectModelsAll(state).reduce(
-      (allModelTooltips, model) => {
-        allModelTooltips[model.name] = model.description ?? '';
-        return allModelTooltips;
-      },
-      {} as ItemTooltips
-    );
+
+    const modelData = selectModelsAll(state)
+      .map<IAICustomSelectOption>((m) => ({
+        value: m.name,
+        label: m.name,
+        tooltip: m.description,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
     return {
-      allModelNames,
-      allModelTooltips,
       selectedModel,
+      modelData,
     };
   },
   {
@@ -44,8 +39,7 @@ const selector = createSelector(
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { allModelNames, allModelTooltips, selectedModel } =
-    useAppSelector(selector);
+  const { selectedModel, modelData } = useAppSelector(selector);
   const handleChangeModel = useCallback(
     (v: string | null | undefined) => {
       if (!v) {
@@ -60,10 +54,9 @@ const ModelSelect = () => {
     <IAICustomSelect
       label={t('modelManager.model')}
       tooltip={selectedModel?.description}
-      items={allModelNames}
-      itemTooltips={allModelTooltips}
-      selectedItem={selectedModel?.name ?? ''}
-      setSelectedItem={handleChangeModel}
+      data={modelData}
+      value={selectedModel?.name ?? ''}
+      onChange={handleChangeModel}
       withCheckIcon={true}
       tooltipProps={{ placement: 'top', hasArrow: true }}
     />
