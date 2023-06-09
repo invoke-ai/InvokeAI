@@ -784,7 +784,7 @@ class ModelManager(object):
 
         self.logger.info(f"Probing {thing} for import")
 
-        if thing.startswith(("http:", "https:", "ftp:")):
+        if str(thing).startswith(("http:", "https:", "ftp:")):
             self.logger.info(f"{thing} appears to be a URL")
             model_path = self._resolve_path(
                 thing, "models/ldm/stable-diffusion-v1"
