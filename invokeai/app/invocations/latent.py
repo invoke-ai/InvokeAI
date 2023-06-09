@@ -182,6 +182,18 @@ class TextToLatentsInvocation(BaseInvocation):
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
+    @validator("cfg_scale")
+    def ge_one(cls, v):
+        """validate that all cfg_scale values are >= 1"""
+        if isinstance(v, list):
+            for i in v:
+                if i < 1:
+                    raise ValueError('cfg_scale must be greater than 1')
+        else:
+            if v < 1:
+                raise ValueError('cfg_scale must be greater than 1')
+        return v
+
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {

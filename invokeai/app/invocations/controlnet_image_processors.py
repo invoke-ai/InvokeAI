@@ -6,7 +6,7 @@ from builtins import float
 import numpy as np
 from typing import Literal, Optional, Union, List
 from PIL import Image, ImageFilter, ImageOps
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
@@ -104,7 +104,17 @@ class ControlField(BaseModel):
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
-
+    @validator("control_weight")
+    def abs_le_one(cls, v):
+        """validate that all abs(values) are <=1"""
+        if isinstance(v, list):
+            for i in v:
+                if abs(i) > 1:
+                    raise ValueError('all abs(control_weight) must be <= 1')
+        else:
+            if abs(v) > 1:
+                raise ValueError('abs(control_weight) must be <= 1')
+        return v
     class Config:
         schema_extra = {
             "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"],
@@ -115,6 +125,7 @@ class ControlField(BaseModel):
                 }
             }
         }
+
 
 class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
