@@ -50,20 +50,7 @@ const CurrentImagePreview = () => {
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
-  const { shouldFetchImages } = useAppSelector(configSelector);
-  const toaster = useAppToaster();
   const dispatch = useAppDispatch();
-
-  const handleError = useCallback(() => {
-    dispatch(imageSelected());
-    if (shouldFetchImages) {
-      toaster({
-        title: 'Something went wrong, please refresh',
-        status: 'error',
-        isClosable: true,
-      });
-    }
-  }, [dispatch, toaster, shouldFetchImages]);
 
   const handleDrop = useCallback(
     (droppedImage: ImageDTO) => {
@@ -90,6 +77,7 @@ const CurrentImagePreview = () => {
           src={progressImage.dataURL}
           width={progressImage.width}
           height={progressImage.height}
+          draggable={false}
           sx={{
             objectFit: 'contain',
             maxWidth: 'full',
@@ -112,8 +100,8 @@ const CurrentImagePreview = () => {
           <IAIDndImage
             image={image}
             onDrop={handleDrop}
-            onError={handleError}
             fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
+            isUploadDisabled={true}
           />
         </Flex>
       )}

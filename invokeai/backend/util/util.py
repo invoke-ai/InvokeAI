@@ -322,8 +322,8 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         logger.warning("corrupt existing file found. re-downloading")
         os.remove(dest)
         exist_size = 0
-
-    if resp.status_code == 416 or exist_size == content_length:
+        
+    if resp.status_code == 416 or (content_length > 0 and exist_size == content_length):
         logger.warning(f"{dest}: complete file found. Skipping.")
         return dest
     elif resp.status_code == 206 or exist_size > 0:
@@ -331,7 +331,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     elif resp.status_code != 200:
         logger.error(f"An error occurred during downloading {dest}: {resp.reason}")
     else:
-        logger.error(f"{dest}: Downloading...")
+        logger.info(f"{dest}: Downloading...")
 
     try:
         if content_length < 2000:

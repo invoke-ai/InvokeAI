@@ -9,12 +9,15 @@ import {
 } from './types';
 import {
   CONTROLNET_MODELS,
+  CONTROLNET_MODEL_MAP,
   CONTROLNET_PROCESSORS,
   ControlNetModel,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
 import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
 import { forEach } from 'lodash-es';
+import { isAnySessionRejected } from 'services/thunks/session';
+import { appSocketInvocationError } from 'services/events/actions';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
@@ -27,6 +30,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   processorType: 'canny_image_processor',
   processorNode: CONTROLNET_PROCESSORS.canny_image_processor
     .default as RequiredCannyImageProcessorInvocation,
+  shouldAutoConfig: true,
 };
 
 export type ControlNetConfig = {
@@ -40,18 +44,19 @@ export type ControlNetConfig = {
   processedControlImage: ImageDTO | null;
   processorType: ControlNetProcessorType;
   processorNode: RequiredControlNetProcessorNode;
+  shouldAutoConfig: boolean;
 };
 
 export type ControlNetState = {
   controlNets: Record<string, ControlNetConfig>;
   isEnabled: boolean;
-  isProcessingControlImage: boolean;
+  pendingControlImages: string[];
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
-  isProcessingControlImage: false,
+  pendingControlImages: [],
 };
 
 export const controlNetSlice = createSlice({
@@ -114,7 +119,7 @@ export const controlNetSlice = createSlice({
         controlImage !== null &&
         state.controlNets[controlNetId].processorType !== 'none'
       ) {
-        state.isProcessingControlImage = true;
+        state.pendingControlImages.push(controlNetId);
       }
     },
     controlNetProcessedImageChanged: (
@@ -127,7 +132,9 @@ export const controlNetSlice = createSlice({
       const { controlNetId, processedControlImage } = action.payload;
       state.controlNets[controlNetId].processedControlImage =
         processedControlImage;
-      state.isProcessingControlImage = false;
+      state.pendingControlImages = state.pendingControlImages.filter(
+        (id) => id !== controlNetId
+      );
     },
     controlNetModelChanged: (
       state,
@@ -135,6 +142,21 @@ export const controlNetSlice = createSlice({
     ) => {
       const { controlNetId, model } = action.payload;
       state.controlNets[controlNetId].model = model;
+      state.controlNets[controlNetId].processedControlImage = null;
+
+      if (state.controlNets[controlNetId].shouldAutoConfig) {
+        const processorType = CONTROLNET_MODEL_MAP[model];
+        if (processorType) {
+          state.controlNets[controlNetId].processorType = processorType;
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
+            processorType
+          ].default as RequiredControlNetProcessorNode;
+        } else {
+          state.controlNets[controlNetId].processorType = 'none';
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS
+            .none.default as RequiredControlNetProcessorNode;
+        }
+      }
     },
     controlNetWeightChanged: (
       state,
@@ -173,6 +195,7 @@ export const controlNetSlice = createSlice({
         ...processorNode,
         ...changes,
       };
+      state.controlNets[controlNetId].shouldAutoConfig = false;
     },
     controlNetProcessorTypeChanged: (
       state,
@@ -182,10 +205,40 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, processorType } = action.payload;
+      state.controlNets[controlNetId].processedControlImage = null;
       state.controlNets[controlNetId].processorType = processorType;
       state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
         processorType
       ].default as RequiredControlNetProcessorNode;
+      state.controlNets[controlNetId].shouldAutoConfig = false;
+    },
+    controlNetAutoConfigToggled: (
+      state,
+      action: PayloadAction<{
+        controlNetId: string;
+      }>
+    ) => {
+      const { controlNetId } = action.payload;
+      const newShouldAutoConfig =
+        !state.controlNets[controlNetId].shouldAutoConfig;
+
+      if (newShouldAutoConfig) {
+        // manage the processor for the user
+        const processorType =
+          CONTROLNET_MODEL_MAP[state.controlNets[controlNetId].model];
+        if (processorType) {
+          state.controlNets[controlNetId].processorType = processorType;
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
+            processorType
+          ].default as RequiredControlNetProcessorNode;
+        } else {
+          state.controlNets[controlNetId].processorType = 'none';
+          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS
+            .none.default as RequiredControlNetProcessorNode;
+        }
+      }
+
+      state.controlNets[controlNetId].shouldAutoConfig = newShouldAutoConfig;
     },
     controlNetReset: () => {
       return { ...initialControlNetState };
@@ -196,7 +249,7 @@ export const controlNetSlice = createSlice({
       if (
         state.controlNets[action.payload.controlNetId].controlImage !== null
       ) {
-        state.isProcessingControlImage = true;
+        state.pendingControlImages.push(action.payload.controlNetId);
       }
     });
 
@@ -229,6 +282,14 @@ export const controlNetSlice = createSlice({
         }
       });
     });
+
+    builder.addCase(appSocketInvocationError, (state, action) => {
+      state.pendingControlImages = [];
+    });
+
+    builder.addMatcher(isAnySessionRejected, (state, action) => {
+      state.pendingControlImages = [];
+    });
   },
 });
 
@@ -247,6 +308,7 @@ export const {
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
   controlNetReset,
+  controlNetAutoConfigToggled,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

@@ -1,15 +1,11 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import { PayloadAction, isAnyOf } from '@reduxjs/toolkit';
+import { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../../../app/components/Toaster';
-import {
-  sessionCanceled,
-  sessionCreated,
-  sessionInvoked,
-} from 'services/thunks/session';
+import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
 import { receivedModels } from 'services/thunks/model';
 import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 import { LogLevelName } from 'roarr';
@@ -462,8 +458,3 @@ export const {
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
-
-const isAnySessionRejected = isAnyOf(
-  sessionCreated.rejected,
-  sessionInvoked.rejected
-);

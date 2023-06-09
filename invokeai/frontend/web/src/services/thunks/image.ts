@@ -32,7 +32,49 @@ export const imageMetadataReceived = createAppAsyncThunk(
   }
 );
 
-type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
+type ControlNetAction = {
+  type: 'SET_CONTROLNET_IMAGE';
+  controlNetId: string;
+};
+
+type InitialImageAction = {
+  type: 'SET_INITIAL_IMAGE';
+};
+
+type NodesAction = {
+  type: 'SET_NODES_IMAGE';
+  nodeId: string;
+  fieldName: string;
+};
+
+type CanvasInitialImageAction = {
+  type: 'SET_CANVAS_INITIAL_IMAGE';
+};
+
+type CanvasMergedAction = {
+  type: 'TOAST_CANVAS_MERGED';
+};
+
+type CanvasSavedToGalleryAction = {
+  type: 'TOAST_CANVAS_SAVED_TO_GALLERY';
+};
+
+type UploadedToastAction = {
+  type: 'TOAST_UPLOADED';
+};
+
+export type PostUploadAction =
+  | ControlNetAction
+  | InitialImageAction
+  | NodesAction
+  | CanvasInitialImageAction
+  | CanvasMergedAction
+  | CanvasSavedToGalleryAction
+  | UploadedToastAction;
+
+type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0] & {
+  postUploadAction?: PostUploadAction;
+};
 
 /**
  * `ImagesService.uploadImage()` thunk
@@ -40,8 +82,9 @@ type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0];
 export const imageUploaded = createAppAsyncThunk(
   'api/imageUploaded',
   async (arg: ImageUploadedArg) => {
-    // strip out `activeTabName` from arg - the route does not need it
-    const response = await ImagesService.uploadImage(arg);
+    // `postUploadAction` is only used by the listener middleware - destructure it out
+    const { postUploadAction, ...rest } = arg;
+    const response = await ImagesService.uploadImage(rest);
     return response;
   }
 );
