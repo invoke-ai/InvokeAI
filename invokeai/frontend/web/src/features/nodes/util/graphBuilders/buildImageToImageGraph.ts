@@ -342,7 +342,10 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     });
   }
 
-  if (shouldFitToWidthHeight) {
+  if (
+    shouldFitToWidthHeight &&
+    (initialImage.width !== width || initialImage.height !== height)
+  ) {
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
 
     // Create a resize node, explicitly setting its image
