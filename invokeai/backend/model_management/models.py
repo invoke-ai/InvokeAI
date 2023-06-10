@@ -5,9 +5,6 @@ import safetensors.torch
 from diffusers.utils import is_safetensors_available
 
 class BaseModelType(str, Enum):
-    #StableDiffusion1_5 = "stable_diffusion_1_5"
-    #StableDiffusion2 = "stable_diffusion_2"
-    #StableDiffusion2Base = "stable_diffusion_2_base"
     # TODO: maybe then add sample size(512/768)?
     StableDiffusion1_5 = "SD-1"
     StableDiffusion2Base = "SD-2-base"   # 512 pixels; this will have epsilon parameterization
@@ -18,7 +15,6 @@ class ModelType(str, Enum):
     Pipeline = "pipeline"
     Classifier = "classifier"
     Vae = "vae"
-
     Lora = "lora"
     ControlNet = "controlnet"
     TextualInversion = "embedding"
@@ -420,8 +416,6 @@ class ClassifierModel(ModelBase):
             model_path = Path(model_path)
         return model_path
 
-
-
 class VaeModel(ModelBase):
     #vae_class: Type
     #model_size: int
@@ -547,14 +541,6 @@ class TextualInversionModel(ModelBase):
         if not isinstance(model_path, Path):
             model_path = Path(model_path)
         return model_path
-
-
-
-
-
-
-
-
 
 def calc_model_size_by_fs(
     model_path: str,

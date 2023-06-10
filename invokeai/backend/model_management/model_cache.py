@@ -20,27 +20,19 @@ import gc
 import os
 import sys
 import hashlib
-import json
 import warnings
 from contextlib import suppress
-from enum import Enum
 from pathlib import Path
-from typing import Dict, Union, types, Optional, List, Type, Any
+from typing import Dict, Union, types, Optional, Type, Any
 
 import torch
-import transformers
 
-from diffusers import DiffusionPipeline, SchedulerMixin, ConfigMixin
 from diffusers import logging as diffusers_logging
-from huggingface_hub import HfApi, scan_cache_dir
 from transformers import logging as transformers_logging
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
 
-from .lora import LoRAModel, TextualInversionModel
-
-from .models import MODEL_CLASSES
+from .model_manager import SDModelInfo, ModelType, SubModelType, ModelBase
 
 
 # Maximum size of the cache, in gigs
@@ -113,7 +105,7 @@ class ModelCache(object):
         #max_cache_size = 9999
         execution_device = torch.device('cuda')
 
-        self.model_infos: Dict[str, ModelInfoBase] = dict()
+        self.model_infos: Dict[str, SDModelInfo] = dict()
         self.lazy_offloading = lazy_offloading
         #self.sequential_offload: bool=sequential_offload
         self.precision: torch.dtype=precision
@@ -129,8 +121,8 @@ class ModelCache(object):
     def get_key(
         self,
         model_path: str,
-        model_type: SDModelType,
-        submodel_type: Optional[SDModelType] = None,
+        model_type: ModelType,
+        submodel_type: Optional[ModelType] = None,
     ):
 
         key = f"{model_path}:{model_type}"
@@ -141,11 +133,11 @@ class ModelCache(object):
     #def get_model(
     #    self,
     #    repo_id_or_path: Union[str, Path],
-    #    model_type: SDModelType = SDModelType.Diffusers,
+    #    model_type: ModelType = ModelType.Diffusers,
     #    subfolder: Path = None,
-    #    submodel: SDModelType = None,
+    #    submodel: ModelType = None,
     #    revision: str = None,
-    #    attach_model_part: Tuple[SDModelType, str] = (None, None),
+    #    attach_model_part: Tuple[ModelType, str] = (None, None),
     #    gpu_load: bool = True,
     #) -> ModelLocker:  # ?? what does it return
     def _get_model_info(
@@ -155,14 +147,14 @@ class ModelCache(object):
     ):
         model_info_key = self.get_key(
             model_path=model_path,
-            model_type=model_type,
+            model_type=model_class,
             submodel_type=None,
         )
 
         if model_info_key not in self.model_infos:
             self.model_infos[model_info_key] = model_class(
                 model_path,
-                model_type,
+                model_class,
             )
 
         return self.model_infos[model_info_key]
@@ -188,14 +180,14 @@ class ModelCache(object):
         )
         key = self.get_key(
             model_path=model_path,
-            model_type=model_type, # TODO:
+            model_type=model_class, # TODO:
             submodel_type=submodel,
         )
 
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
-            self.logger.info(f'Loading model {model_path}, type {model_type}:{submodel}')
+            self.logger.info(f'Loading model {model_path}, type {model_class}:{submodel}')
 
             # this will remove older cached models until
             # there is sufficient room to load the requested model
@@ -203,7 +195,7 @@ class ModelCache(object):
 
             # clean memory to make MemoryUsage() more accurate
             gc.collect()
-            model = model_info.get_model(submodel, torch_dtype=self.precision, variant=)
+            model = model_info.get_model(submodel, torch_dtype=self.precision)
             if mem_used := model_info.get_size(submodel):
                 self.logger.debug(f'CPU RAM used for load: {(mem_used/GIG):.2f} GB')
 
