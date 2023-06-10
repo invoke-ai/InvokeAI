@@ -248,7 +248,6 @@ class TextToLatentsInvocation(BaseInvocation):
             feature_extractor=None,
             requires_safety_checker=False,
             precision="float16" if unet.dtype == torch.float16 else "float32",
-            #precision="float16", # TODO:
         )
     
     def prep_control_data(self,
