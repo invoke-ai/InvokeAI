@@ -58,6 +58,7 @@ const InitialImagePreview = () => {
         onReset={handleReset}
         fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
         postUploadAction={{ type: 'SET_INITIAL_IMAGE' }}
+        withResetIcon
       />
     </Flex>
   );

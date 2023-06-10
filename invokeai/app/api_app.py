@@ -14,13 +14,12 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
 from pydantic.schema import schema
 
-# Do this early so that other modules pick up configuration
+#This should come early so that modules can log their initialization properly
 from .services.config import InvokeAIAppConfig
+from ..backend.util.logging import InvokeAILogger
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
-
-from invokeai.backend.util.logging import InvokeAILogger
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.getLogger(config=app_config)
 
 import invokeai.frontend.web as web_dir
 

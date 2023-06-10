@@ -14,9 +14,11 @@ const selector = createSelector(
   (ui, generation) => {
     // TODO: DPMSolverSinglestepScheduler is fixed in https://github.com/huggingface/diffusers/pull/3413
     // but we need to wait for the next release before removing this special handling.
-    const allSchedulers = ui.schedulers.filter((scheduler) => {
-      return !['dpmpp_2s'].includes(scheduler);
-    });
+    const allSchedulers = ui.schedulers
+      .filter((scheduler) => {
+        return !['dpmpp_2s'].includes(scheduler);
+      })
+      .sort((a, b) => a.localeCompare(b));
 
     return {
       scheduler: generation.scheduler,
@@ -45,9 +47,9 @@ const ParamScheduler = () => {
   return (
     <IAICustomSelect
       label={t('parameters.scheduler')}
-      selectedItem={scheduler}
-      setSelectedItem={handleChange}
-      items={allSchedulers}
+      value={scheduler}
+      data={allSchedulers}
+      onChange={handleChange}
       withCheckIcon
     />
   );

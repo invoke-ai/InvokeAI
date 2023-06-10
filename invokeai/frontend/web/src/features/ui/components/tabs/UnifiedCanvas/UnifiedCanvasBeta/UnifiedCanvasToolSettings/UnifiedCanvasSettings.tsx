@@ -12,7 +12,6 @@ import {
   setShouldShowCanvasDebugInfo,
   setShouldShowIntermediates,
 } from 'features/canvas/store/canvasSlice';
-import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 
 import { FaWrench } from 'react-icons/fa';
 
@@ -105,7 +104,6 @@ const UnifiedCanvasSettings = () => {
           onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
         />
         <ClearCanvasHistoryButtonModal />
-        <EmptyTempFolderButtonModal />
       </Flex>
     </IAIPopover>
   );

@@ -9,9 +9,8 @@ import {
 } from './types';
 import {
   CONTROLNET_MODELS,
-  CONTROLNET_MODEL_MAP,
   CONTROLNET_PROCESSORS,
-  ControlNetModel,
+  ControlNetModelName,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
 import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
@@ -21,7 +20,7 @@ import { appSocketInvocationError } from 'services/events/actions';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
-  model: CONTROLNET_MODELS[0],
+  model: CONTROLNET_MODELS['lllyasviel/control_v11p_sd15_canny'].type,
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
@@ -36,7 +35,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
 export type ControlNetConfig = {
   controlNetId: string;
   isEnabled: boolean;
-  model: ControlNetModel;
+  model: ControlNetModelName;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -138,14 +137,17 @@ export const controlNetSlice = createSlice({
     },
     controlNetModelChanged: (
       state,
-      action: PayloadAction<{ controlNetId: string; model: ControlNetModel }>
+      action: PayloadAction<{
+        controlNetId: string;
+        model: ControlNetModelName;
+      }>
     ) => {
       const { controlNetId, model } = action.payload;
       state.controlNets[controlNetId].model = model;
       state.controlNets[controlNetId].processedControlImage = null;
 
       if (state.controlNets[controlNetId].shouldAutoConfig) {
-        const processorType = CONTROLNET_MODEL_MAP[model];
+        const processorType = CONTROLNET_MODELS[model].defaultProcessor;
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
@@ -225,7 +227,8 @@ export const controlNetSlice = createSlice({
       if (newShouldAutoConfig) {
         // manage the processor for the user
         const processorType =
-          CONTROLNET_MODEL_MAP[state.controlNets[controlNetId].model];
+          CONTROLNET_MODELS[state.controlNets[controlNetId].model]
+            .defaultProcessor;
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
