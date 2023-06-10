@@ -40,456 +40,7 @@ from invokeai.app.services.config import get_invokeai_config
 
 from .lora import LoRAModel, TextualInversionModel
 
-def get_model_path(repo_id_or_path: str):
-    globals = get_invokeai_config()
-    
-    if os.path.exists(repo_id_or_path):
-        return repo_id_or_path
-
-    cache = scan_cache_dir(globals.cache_dir)
-    for repo in cache.repos:
-        if repo.repo_id != repo_id_or_path:
-            continue
-        for rev in repo.revisions:
-            if "main" in rev.refs:
-                return rev.snapshot_path
-    raise Exception(f"{repo_id_or_path} - not found")
-
-def calc_model_size_by_fs(
-    repo_id_or_path: str,
-    subfolder: Optional[str] = None,
-    variant: Optional[str] = None
-):
-    model_path = get_model_path(repo_id_or_path)
-    if subfolder is not None:
-        model_path = os.path.join(model_path, subfolder)
-
-    # this can happen when, for example, the safety checker
-    # is not downloaded.
-    if not os.path.exists(model_path):
-        return 0
-
-    all_files = os.listdir(model_path)
-    all_files = [f for f in all_files if os.path.isfile(os.path.join(model_path, f))]
-
-    fp16_files = set([f for f in all_files if ".fp16." in f or ".fp16-" in f])
-    bit8_files = set([f for f in all_files if ".8bit." in f or ".8bit-" in f])
-    other_files = set(all_files) - fp16_files - bit8_files
-
-    if variant is None:
-        files = other_files
-    elif variant == "fp16":
-        files = fp16_files
-    elif variant == "8bit":
-        files = bit8_files
-    else:
-        raise NotImplementedError(f"Unknown variant: {variant}")
-
-    # try read from index if exists
-    index_postfix = ".index.json"
-    if variant is not None:
-        index_postfix = f".index.{variant}.json"
-
-    for file in files:
-        if not file.endswith(index_postfix):
-            continue
-        try:
-            with open(os.path.join(model_path, file), "r") as f:
-                index_data = json.loads(f.read())
-            return int(index_data["metadata"]["total_size"])
-        except:
-            pass
-
-    # calculate files size if there is no index file
-    formats = [
-        (".safetensors",), # safetensors
-        (".bin",), # torch
-        (".onnx", ".pb"), # onnx
-        (".msgpack",), # flax
-        (".ckpt",), # tf
-        (".h5",), # tf2
-    ]
-
-    for file_format in formats:
-        model_files = [f for f in files if f.endswith(file_format)]
-        if len(model_files) == 0:
-            continue
-
-        model_size = 0
-        for model_file in model_files:
-            file_stats = os.stat(os.path.join(model_path, model_file))
-            model_size += file_stats.st_size
-        return model_size
-    
-    #raise NotImplementedError(f"Unknown model structure! Files: {all_files}")
-    return 0 # scheduler/feature_extractor/tokenizer - models without loading to gpu
-
-
-def calc_model_size_by_data(model) -> int:
-    if isinstance(model, DiffusionPipeline):
-        return _calc_pipeline_by_data(model)
-    elif isinstance(model, torch.nn.Module):
-        return _calc_model_by_data(model)
-    else:
-        return 0
-
-
-def _calc_pipeline_by_data(pipeline) -> int:
-    res = 0
-    for submodel_key in pipeline.components.keys():
-        submodel = getattr(pipeline, submodel_key)
-        if submodel is not None and isinstance(submodel, torch.nn.Module):
-            res += _calc_model_by_data(submodel)
-    return res
-    
-
-def _calc_model_by_data(model) -> int:
-    mem_params = sum([param.nelement()*param.element_size() for param in model.parameters()])
-    mem_bufs = sum([buf.nelement()*buf.element_size() for buf in model.buffers()])
-    mem = mem_params + mem_bufs # in bytes
-    return mem
-
-
-
-
-class SDModelType(str, Enum):
-    Diffusers = "diffusers"
-    Classifier = "classifier"
-    UNet = "unet"
-    TextEncoder = "text_encoder"
-    Tokenizer = "tokenizer"
-    Vae = "vae"
-    Scheduler = "scheduler"
-    Lora = "lora"
-    TextualInversion = "textual_inversion"
-    ControlNet = "control_net"
-
-class BaseModel(str, Enum):
-    StableDiffusion1_5 = "SD-1"
-    StableDiffusion2Base = "SD-2-base"   # 512 pixels; this will have epsilon parameterization
-    StableDiffusion2 = "SD-2"            # 768 pixels; this will have v-prediction parameterization
-
-class ModelInfoBase:
-    #model_path: str
-    #model_type: SDModelType
-
-    def __init__(self, repo_id_or_path: str, model_type: SDModelType):
-        self.repo_id_or_path = repo_id_or_path # TODO: or use allways path?
-        self.model_path = get_model_path(repo_id_or_path)
-        self.model_type = model_type
-
-    def _definition_to_type(self, subtypes: List[str]) -> Type:
-        if len(subtypes) < 2:
-            raise Exception("Invalid subfolder definition!")
-        if subtypes[0] in ["diffusers", "transformers"]:
-            res_type = sys.modules[subtypes[0]]
-            subtypes = subtypes[1:]
-
-        else:
-            res_type = sys.modules["diffusers"]
-            res_type = getattr(res_type, "pipelines")
-
-
-        for subtype in subtypes:
-            res_type = getattr(res_type, subtype)
-        return res_type
-
-
-class DiffusersModelInfo(ModelInfoBase):
-    #child_types: Dict[str, Type]
-    #child_sizes: Dict[str, int]
-
-    def __init__(self, repo_id_or_path: str, model_type: SDModelType):
-        assert model_type == SDModelType.Diffusers
-        super().__init__(repo_id_or_path, model_type)
-
-        self.child_types: Dict[str, Type] = dict()
-        self.child_sizes: Dict[str, int] = dict()
-
-        try:
-            config_data = DiffusionPipeline.load_config(repo_id_or_path)
-            #config_data = json.loads(os.path.join(self.model_path, "model_index.json"))
-        except:
-            raise Exception("Invalid diffusers model! (model_index.json not found or invalid)")
-
-        config_data.pop("_ignore_files", None)
-
-        # retrieve all folder_names that contain relevant files
-        child_components = [k for k, v in config_data.items() if isinstance(v, list)]
-
-        for child_name in child_components:
-            child_type = self._definition_to_type(config_data[child_name])
-            self.child_types[child_name] = child_type
-            self.child_sizes[child_name] = calc_model_size_by_fs(repo_id_or_path, subfolder=child_name)
-
-
-    def get_size(self, child_type: Optional[SDModelType] = None):
-        if child_type is None:
-            return sum(self.child_sizes.values())
-        else:
-            return self.child_sizes[child_type]
-
-
-    def get_model(
-        self,
-        child_type: Optional[SDModelType] = None,
-        torch_dtype: Optional[torch.dtype] = None,
-    ):
-        # return pipeline in different function to pass more arguments
-        if child_type is None:
-            raise Exception("Child model type can't be null on diffusers model")
-        if child_type not in self.child_types:
-            return None # TODO: or raise
-
-        # TODO:
-        for variant in ["fp16", "main", None]:
-            try:
-                model = self.child_types[child_type].from_pretrained(
-                    self.repo_id_or_path,
-                    subfolder=child_type.value,
-                    cache_dir=get_invokeai_config().cache_dir,
-                    torch_dtype=torch_dtype,
-                    variant=variant,
-                )
-                break
-            except Exception as e:
-                print("====ERR LOAD====")
-                print(f"{variant}: {e}")
-
-        # calc more accurate size
-        self.child_sizes[child_type] = calc_model_size_by_data(model)
-        return model
-
-
-    def get_pipeline(self, **kwargs):
-        return DiffusionPipeline.from_pretrained(
-            self.repo_id_or_path,
-            **kwargs,
-        )
-
-
-class EmptyConfigLoader(ConfigMixin):
-
-    @classmethod
-    def load_config(cls, *args, **kwargs):
-        cls.config_name = kwargs.pop("config_name")
-        return super().load_config(*args, **kwargs)
-
-
-class ClassifierModelInfo(ModelInfoBase):
-    #child_types: Dict[str, Type]
-    #child_sizes: Dict[str, int]
-
-    def __init__(self, repo_id_or_path: str, model_type: SDModelType):
-        assert model_type == SDModelType.Classifier
-        super().__init__(repo_id_or_path, model_type)
-
-        self.child_types: Dict[str, Type] = dict()
-        self.child_sizes: Dict[str, int] = dict()
-
-        try:
-            main_config = EmptyConfigLoader.load_config(self.repo_id_or_path, config_name="config.json")
-            #main_config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
-            raise Exception("Invalid classifier model! (config.json not found or invalid)")
-
-        self._load_tokenizer(main_config)
-        self._load_text_encoder(main_config)
-        self._load_feature_extractor(main_config)
-
-
-    def _load_tokenizer(self, main_config: dict):
-        try:
-            tokenizer_config = EmptyConfigLoader.load_config(self.repo_id_or_path, config_name="tokenizer_config.json")
-            #tokenizer_config = json.loads(os.path.join(self.model_path, "tokenizer_config.json"))
-        except:
-            raise Exception("Invalid classifier model! (Failed to load tokenizer_config.json)")
-
-        if "tokenizer_class" in tokenizer_config:
-            tokenizer_class_name = tokenizer_config["tokenizer_class"]
-        elif "model_type" in main_config:
-            tokenizer_class_name = transformers.models.auto.tokenization_auto.TOKENIZER_MAPPING_NAMES[main_config["model_type"]]
-        else:
-            raise Exception("Invalid classifier model! (Failed to detect tokenizer type)")
-
-        self.child_types[SDModelType.Tokenizer] = self._definition_to_type(["transformers", tokenizer_class_name])
-        self.child_sizes[SDModelType.Tokenizer] = 0
-
-
-    def _load_text_encoder(self, main_config: dict):
-        if "architectures" in main_config and len(main_config["architectures"]) > 0:
-            text_encoder_class_name = main_config["architectures"][0]
-        elif "model_type" in main_config:
-            text_encoder_class_name = transformers.models.auto.modeling_auto.MODEL_FOR_PRETRAINING_MAPPING_NAMES[main_config["model_type"]]
-        else:
-            raise Exception("Invalid classifier model! (Failed to detect text_encoder type)")
-
-        self.child_types[SDModelType.TextEncoder] = self._definition_to_type(["transformers", text_encoder_class_name])
-        self.child_sizes[SDModelType.TextEncoder] = calc_model_size_by_fs(self.repo_id_or_path)
-
-
-    def _load_feature_extractor(self, main_config: dict):
-        self.child_sizes[SDModelType.FeatureExtractor] = 0
-        try:
-            feature_extractor_config = EmptyConfigLoader.load_config(self.repo_id_or_path, config_name="preprocessor_config.json")
-        except:
-            return # feature extractor not passed with t5
-
-        try:
-            feature_extractor_class_name = feature_extractor_config["feature_extractor_type"]
-            self.child_types[SDModelType.FeatureExtractor] = self._definition_to_type(["transformers", feature_extractor_class_name])
-        except:
-            raise Exception("Invalid classifier model! (Unknown feature_extrator type)")
-
-
-    def get_size(self, child_type: Optional[SDModelType] = None):
-        if child_type is None:
-            return sum(self.child_sizes.values())
-        else:
-            return self.child_sizes[child_type]
-
-
-    def get_model(
-        self,
-        child_type: Optional[SDModelType] = None,
-        torch_dtype: Optional[torch.dtype] = None,
-    ):
-        if child_type is None:
-            raise Exception("Child model type can't be null on classififer model")
-        if child_type not in self.child_types:
-            return None # TODO: or raise
-        
-        model = self.child_types[child_type].from_pretrained(
-            self.repo_id_or_path,
-            subfolder=child_type.value,
-            cache_dir=get_invokeai_config().cache_dir,
-            torch_dtype=torch_dtype,
-        )
-        # calc more accurate size
-        self.child_sizes[child_type] = calc_model_size_by_data(model)
-        return model
-
-
-
-class VaeModelInfo(ModelInfoBase):
-    #vae_class: Type
-    #model_size: int
-
-    def __init__(self, repo_id_or_path: str, model_type: SDModelType):
-        assert model_type == SDModelType.Vae
-        super().__init__(repo_id_or_path, model_type)
-
-        try:
-            config = EmptyConfigLoader.load_config(repo_id_or_path, config_name="config.json")
-            #config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
-            raise Exception("Invalid vae model! (config.json not found or invalid)")
-
-        try:
-            vae_class_name = config.get("_class_name", "AutoencoderKL")
-            self.vae_class = self._definition_to_type(["diffusers", vae_class_name])
-            self.model_size = calc_model_size_by_fs(repo_id_or_path)
-        except:
-            raise Exception("Invalid vae model! (Unkown vae type)")
-
-    def get_size(self, child_type: Optional[SDModelType] = None):
-        if child_type is not None:
-            raise Exception("There is no child models in vae model")
-        return self.model_size
-
-    def get_model(
-        self,
-        child_type: Optional[SDModelType] = None,
-        torch_dtype: Optional[torch.dtype] = None,
-    ):
-        if child_type is not None:
-            raise Exception("There is no child models in vae model")
-
-        model = self.vae_class.from_pretrained(
-            self.repo_id_or_path,
-            cache_dir=get_invokeai_config().cache_dir,
-            torch_dtype=torch_dtype,
-        )
-        # calc more accurate size
-        self.model_size = calc_model_size_by_data(model)
-        return model
-
-
-class LoRAModelInfo(ModelInfoBase):
-    #model_size: int
-
-    def __init__(self, file_path: str, model_type: SDModelType):
-        assert model_type == SDModelType.Lora
-        # check manualy as super().__init__ will try to resolve repo_id too
-        if not os.path.exists(file_path):
-            raise Exception("Model not found")
-        super().__init__(file_path, model_type)
-
-        self.model_size = os.path.getsize(file_path)
-
-    def get_size(self, child_type: Optional[SDModelType] = None):
-        if child_type is not None:
-            raise Exception("There is no child models in lora")
-        return self.model_size
-
-    def get_model(
-        self,
-        child_type: Optional[SDModelType] = None,
-        torch_dtype: Optional[torch.dtype] = None,
-    ):
-        if child_type is not None:
-            raise Exception("There is no child models in lora")
-
-        model = LoRAModel.from_checkpoint(
-            file_path=self.model_path,
-            dtype=torch_dtype,
-        )
-
-        self.model_size = model.calc_size()
-        return model
-
-
-class TextualInversionModelInfo(ModelInfoBase):
-    #model_size: int
-
-    def __init__(self, file_path: str, model_type: SDModelType):
-        assert model_type == SDModelType.TextualInversion
-        # check manualy as super().__init__ will try to resolve repo_id too
-        if not os.path.exists(file_path):
-            raise Exception("Model not found")
-        super().__init__(file_path, model_type)
-
-        self.model_size = os.path.getsize(file_path)
-
-    def get_size(self, child_type: Optional[SDModelType] = None):
-        if child_type is not None:
-            raise Exception("There is no child models in textual inversion")
-        return self.model_size
-
-    def get_model(
-        self,
-        child_type: Optional[SDModelType] = None,
-        torch_dtype: Optional[torch.dtype] = None,
-    ):
-        if child_type is not None:
-            raise Exception("There is no child models in textual inversion")
-
-        model = TextualInversionModel.from_checkpoint(
-            file_path=self.model_path,
-            dtype=torch_dtype,
-        )
-
-        self.model_size = model.embedding.nelement() * model.embedding.element_size()
-        return model
-
-
-MODEL_TYPES = {
-    SDModelType.Diffusers: DiffusersModelInfo,
-    SDModelType.Classifier: ClassifierModelInfo,
-    SDModelType.Vae: VaeModelInfo,
-    SDModelType.Lora: LoRAModelInfo,
-    SDModelType.TextualInversion: TextualInversionModelInfo,
-}
+from .models import MODEL_CLASSES
 
 
 # Maximum size of the cache, in gigs
@@ -498,10 +49,6 @@ DEFAULT_MAX_CACHE_SIZE = 6.0
 
 # actual size of a gig
 GIG = 1073741824
-
-# TODO:
-class EmptyScheduler(SchedulerMixin, ConfigMixin):
-    pass
 
 class ModelLocker(object):
     "Forward declaration"
@@ -583,12 +130,10 @@ class ModelCache(object):
         self,
         model_path: str,
         model_type: SDModelType,
-        revision: Optional[str] = None,
         submodel_type: Optional[SDModelType] = None,
     ):
-        revision = revision or "main"
 
-        key = f"{model_path}:{model_type}:{revision}"
+        key = f"{model_path}:{model_type}"
         if submodel_type:
             key += f":{submodel_type}"
         return key
@@ -606,55 +151,51 @@ class ModelCache(object):
     def _get_model_info(
         self,
         model_path: str,
-        model_type: SDModelType,
-        revision: str,
+        model_class: Type[ModelBase],
     ):
         model_info_key = self.get_key(
             model_path=model_path,
             model_type=model_type,
-            revision=revision,
             submodel_type=None,
         )
 
         if model_info_key not in self.model_infos:
-            if model_type not in MODEL_TYPES:
-                raise Exception(f"Unknown/unsupported model type: {model_type}")
-
-            self.model_infos[model_info_key] = MODEL_TYPES[model_type](
+            self.model_infos[model_info_key] = model_class(
                 model_path,
                 model_type,
             )
 
         return self.model_infos[model_info_key]
 
+    # TODO: args
     def get_model(
         self,
-        repo_id_or_path: Union[str, Path],
-        model_type: SDModelType = SDModelType.Diffusers,
-        submodel: Optional[SDModelType] = None,
-        revision: Optional[str] = None,
-        variant: Optional[str] = None,
+        model_path: Union[str, Path],
+        model_class: Type[ModelBase],
+        submodel: Optional[SubModelType] = None,
         gpu_load: bool = True,
     ) -> Any:
 
-        model_path = get_model_path(repo_id_or_path)
+        if not isinstance(model_path, Path):
+            model_path = Path(model_path)
+
+        if not os.path.exists(model_path):
+            raise Exception(f"Model not found: {model_path}")
+
         model_info = self._get_model_info(
             model_path=model_path,
-            model_type=model_type,
-            revision=revision,
+            model_class=model_class,
         )
-        # TODO: variant
         key = self.get_key(
             model_path=model_path,
-            model_type=model_type,
-            revision=revision,
+            model_type=model_type, # TODO:
             submodel_type=submodel,
         )
 
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
-            self.logger.info(f'Loading model {repo_id_or_path}, type {model_type}:{submodel}')
+            self.logger.info(f'Loading model {model_path}, type {model_type}:{submodel}')
 
             # this will remove older cached models until
             # there is sufficient room to load the requested model
@@ -662,7 +203,7 @@ class ModelCache(object):
 
             # clean memory to make MemoryUsage() more accurate
             gc.collect()
-            model = model_info.get_model(submodel, torch_dtype=self.precision)
+            model = model_info.get_model(submodel, torch_dtype=self.precision, variant=)
             if mem_used := model_info.get_size(submodel):
                 self.logger.debug(f'CPU RAM used for load: {(mem_used/GIG):.2f} GB')
 
@@ -732,20 +273,14 @@ class ModelCache(object):
 
     def model_hash(
         self,
-        repo_id_or_path: Union[str, Path],
-        revision: str = "main",
+        model_path: Union[str, Path],
     ) -> str:
         '''
         Given the HF repo id or path to a model on disk, returns a unique
         hash. Works for legacy checkpoint files, HF models on disk, and HF repo IDs
-        :param repo_id_or_path: repo_id string or Path to model file/directory on disk.
-        :param revision: optional revision string (if fetching a HF repo_id)
+        :param model_path: Path to model file/directory on disk.
         '''
-        revision = revision or "main"
-        if Path(repo_id_or_path).is_dir():
-            return self._local_model_hash(repo_id_or_path)
-        else:
-            return self._hf_commit_hash(repo_id_or_path,revision)
+        return self._local_model_hash(model_path)
 
     def cache_size(self) -> float:
         "Return the current size of the cache, in GB"
@@ -840,17 +375,6 @@ class ModelCache(object):
         with open(hashpath, "w") as f:
             f.write(hash)
         return hash
-    
-    def _hf_commit_hash(self, repo_id: str, revision: str='main') -> str:
-        api = HfApi()
-        info = api.list_repo_refs(
-            repo_id=repo_id,
-            repo_type='model',
-        )
-        desired_revisions = [branch for branch in info.branches if branch.name==revision]
-        if not desired_revisions:
-            raise KeyError(f"Revision '{revision}' not found in {repo_id}")
-        return desired_revisions[0].target_commit
 
 class SilenceWarnings(object):
     def __init__(self):
