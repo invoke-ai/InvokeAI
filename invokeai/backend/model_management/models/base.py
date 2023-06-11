@@ -1,19 +1,21 @@
 import sys
+import typing
+import inspect
 from enum import Enum
 import torch
 from diffusers import DiffusionPipeline, ConfigMixin
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Type
+from typing import List, Dict, Optional, Type, Literal
 
 class BaseModelType(str, Enum):
     #StableDiffusion1_5 = "stable_diffusion_1_5"
     #StableDiffusion2 = "stable_diffusion_2"
     #StableDiffusion2Base = "stable_diffusion_2_base"
     # TODO: maybe then add sample size(512/768)?
-    StableDiffusion1_5 = "SD-1"
-    StableDiffusion2Base = "SD-2-base"   # 512 pixels; this will have epsilon parameterization
-    StableDiffusion2 = "SD-2"            # 768 pixels; this will have v-prediction parameterization
+    StableDiffusion1_5 = "sd-1.5"
+    StableDiffusion2Base = "sd-2-base"   # 512 pixels; this will have epsilon parameterization
+    StableDiffusion2 = "sd-2"            # 768 pixels; this will have v-prediction parameterization
     #Kandinsky2_1 = "kandinsky_2_1"
 
 class ModelType(str, Enum):
@@ -21,7 +23,7 @@ class ModelType(str, Enum):
     Vae = "vae"
 
     Lora = "lora"
-    ControlNet = "controlnet"
+    #ControlNet = "controlnet"
     TextualInversion = "embedding"
 
 class SubModelType(str, Enum):

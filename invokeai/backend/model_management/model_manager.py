@@ -185,9 +185,10 @@ CONFIG_FILE_VERSION='3.0.0'
 class SDModelInfo():
     context: ModelLocker
     name: str
-    type: SDModelType
+    base_model: BaseModelType
+    type: ModelType
     hash: str
-    location: Union[Path,str]
+    location: Union[Path, str]
     precision: torch.dtype
     revision: str = None
     _cache: ModelCache = None
@@ -233,6 +234,38 @@ class ModelManager(object):
 
     logger: types.ModuleType = logger
 
+    # TODO:
+    def _convert_2_3_models(self, config: DictConfig):
+        for model_name, model_config in config.items():
+            if model_config["format"] == "diffusers":
+                pass
+            elif model_config["format"] == "ckpt":
+
+                if any(model_config["config"].endswith(file) for file in {
+                    "v1-finetune.yaml",
+                    "v1-finetune_style.yaml",
+                    "v1-inference.yaml",
+                    "v1-inpainting-inference.yaml",
+                    "v1-m1-finetune.yaml",
+                }):
+                    # copy as as sd1.5
+                    pass
+
+                # ~99% accurate should be
+                elif model_config["config"].endswith("v2-inference-v.yaml"):
+                    # copy as sd 2.x (768)
+                    pass
+
+                # for real don't know how accurate it
+                elif model_config["config"].endswith("v2-inference.yaml"):
+                    # copy as sd 2.x-base (512)
+                    pass
+
+                else:
+                    # TODO:
+                    raise Exception("Unknown model")
+
+
     def __init__(
         self,
         config: Union[Path, DictConfig, str],
@@ -257,7 +290,10 @@ class ModelManager(object):
         elif not isinstance(config, DictConfig):
             raise ValueError('config argument must be an OmegaConf object, a Path or a string')
 
-        config_meta = ConfigMeta(config.pop("__metadata__")) # TODO: naming
+        #if "__meta__" not in config:
+        #    config = self._convert_2_3_models(config)
+
+        config_meta = ConfigMeta(**config.pop("__metadata__")) # TODO: naming
         # TODO: metadata not found
 
         self.models = dict()
@@ -268,7 +304,6 @@ class ModelManager(object):
 
         # check config version number and update on disk/RAM if necessary
         self.globals = InvokeAIAppConfig.get_config()
-        self._update_config_file_version()
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
@@ -280,7 +315,7 @@ class ModelManager(object):
         self.cache_keys = dict()
 
         # add controlnet, lora and textual_inversion models from disk
-        self.scan_models_directory(include_diffusers=False)
+        self.scan_models_directory()
 
     def model_exists(
         self,
@@ -306,7 +341,7 @@ class ModelManager(object):
     def parse_key(self, model_key: str) -> Tuple[str, BaseModelType, ModelType]:
         base_model_str, model_type_str, model_name = model_key.split('/', 2)
         try:
-            model_type = SDModelType(model_type_str)
+            model_type = ModelType(model_type_str)
         except:
             raise Exception(f"Unknown model type: {model_type_str}")
 
@@ -492,7 +527,7 @@ class ModelManager(object):
     def list_models(
         self,
         base_model: Optional[BaseModelType] = None,
-        model_type: Optional[SDModelType] = None,
+        model_type: Optional[ModelType] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
         Return a dict of models, in format [base_model][model_type][model_name]
@@ -519,9 +554,9 @@ class ModelManager(object):
             if cur_model_type not in models[cur_base_model]:
                 models[cur_base_model][cur_model_type] = dict()
 
-            models[m_base_model][stanza_type][model_name] = dict(
+            models[cur_base_model][cur_model_type][cur_model_name] = dict(
                 **model_config.dict(exclude_defaults=True),
-                name=model_name,
+                name=cur_model_name,
                 base_model=cur_base_model,
                 type=cur_model_type,
             )
@@ -631,6 +666,7 @@ class ModelManager(object):
         path to the configuration file, then the new entry will be committed to the
         models.yaml file.
         """
+        raise NotImlementedError("TODO: ")
         model_name = model_name or Path(repo_or_path).stem
         model_description = description or f"Imported diffusers model {model_name}"
         new_config = dict(
@@ -658,6 +694,7 @@ class ModelManager(object):
         Creates an entry for the indicated lora file. Call
         mgr.commit() to write out the configuration to models.yaml
         """
+        raise NotImlementedError("TODO: ")
         path = Path(path)
         model_name = model_name or path.stem
         model_description = description or f"LoRA model {model_name}"
@@ -682,6 +719,7 @@ class ModelManager(object):
         Creates an entry for the indicated lora file. Call
         mgr.commit() to write out the configuration to models.yaml
         """
+        raise NotImlementedError("TODO: ")
         path = Path(path)
         if path.is_directory() and (path / "learned_embeds.bin").exists():
             weights = path / "learned_embeds.bin"
@@ -717,6 +755,7 @@ class ModelManager(object):
         Convert a legacy ckpt weights file to diffuser model and import
         into models.yaml.
         """
+        raise NotImlementedError("TODO: ")
         ckpt_path = self._resolve_path(ckpt_path, "models/ldm/stable-diffusion-v1")
         if original_config_file:
             original_config_file = self._resolve_path(
@@ -883,15 +922,11 @@ class ModelManager(object):
             resolved_path = self.globals.root_dir / source
         return resolved_path
 
-    def _update_config_file_version(self):
-        # TODO: 
-        raise Exception("TODO: ")
-
     def scan_models_directory(self):
 
         for model_key in list(self.models.keys()):
             model_name, base_model, model_type = self.parse_key(model_key)
-            if not os.path.exists(model_config.path):
+            if not os.path.exists(self.models[model_key].path):
                 if model_class.save_to_config:
                     self.models[model_key].error = ModelError.NotFound
                 else:
@@ -904,6 +939,9 @@ class ModelManager(object):
                 model_class = MODEL_CLASSES[base_model][model_type]
                 models_dir = os.path.join(self.globals.models_path, base_model, model_type)
                 
+                if not os.path.exists(models_dir):
+                    continue # TODO: or create all folders?
+
                 for entry_name in os.listdir(models_dir):
                     model_path = os.path.join(models_dir, entry_name)
                     model_name = Path(model_path).stem
