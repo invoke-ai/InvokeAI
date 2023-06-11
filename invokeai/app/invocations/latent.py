@@ -337,12 +337,14 @@ class TextToLatentsInvocation(BaseInvocation):
                     # num_images_per_prompt=num_images_per_prompt,
                     device=control_model.device,
                     dtype=control_model.dtype,
+                    guess_mode=control_info.guess_mode,
                 )
                 control_item = ControlNetData(model=control_model,
                                               image_tensor=control_image,
                                               weight=control_info.control_weight,
                                               begin_step_percent=control_info.begin_step_percent,
-                                              end_step_percent=control_info.end_step_percent)
+                                              end_step_percent=control_info.end_step_percent,
+                                              guess_mode=control_info.guess_mode,)
                 control_data.append(control_item)
                 # MultiControlNetModel has been refactored out, just need list[ControlNetData]
         return control_data

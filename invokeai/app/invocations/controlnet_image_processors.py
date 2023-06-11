@@ -1,7 +1,7 @@
 # InvokeAI nodes for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
-from builtins import float
+from builtins import float, bool
 
 import numpy as np
 from typing import Literal, Optional, Union, List
@@ -94,6 +94,7 @@ CONTROLNET_DEFAULT_MODELS = [
 ]
 
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
+# CONTROLNET_MODE_VALUES = Literal[tuple(["BALANCED", "PROMPT", "CONTROL"])]
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
@@ -104,6 +105,7 @@ class ControlField(BaseModel):
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
+    guess_mode: bool = Field(default=False, description="Toggle for guess mode")
     @validator("control_weight")
     def abs_le_one(cls, v):
         """validate that all abs(values) are <=1"""
@@ -149,6 +151,7 @@ class ControlNetInvocation(BaseInvocation):
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
+    guess_mode: bool = Field(default=False, description="Toggle for guess mode")
     # fmt: on
 
     class Config(InvocationConfig):
@@ -174,6 +177,7 @@ class ControlNetInvocation(BaseInvocation):
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
+                guess_mode=self.guess_mode,
             ),
         )
 
