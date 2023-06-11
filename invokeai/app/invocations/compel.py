@@ -8,7 +8,7 @@ from .model import ClipField
 
 from ...backend.util.devices import torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.model_management import SDModelType
+from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from ...backend.model_management.lora import ModelPatcher
 
 from compel import Compel
@@ -76,7 +76,11 @@ class CompelInvocation(BaseInvocation):
                 try:
                     ti_list.append(
                         stack.enter_context(
-                            context.services.model_manager.get_model(model_name=name, model_type=SDModelType.TextualInversion)
+                            context.services.model_manager.get_model(
+                                model_name=name,
+                                base_model=self.clip.text_encoder.base_model,
+                                model_type=ModelType.TextualInversion,
+                            )
                         )
                     )
                 except Exception:

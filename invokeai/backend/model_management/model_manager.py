@@ -160,6 +160,8 @@ from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
+from pydantic import BaseModel
+
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, download_with_resume
@@ -184,9 +186,10 @@ class ModelCache(object):
 class ModelInfo():
     context: ModelLocker
     name: str
+    base_model: BaseModelType
     type: ModelType
     hash: str
-    location: Union[Path,str]
+    location: Union[Path, str]
     precision: torch.dtype
     revision: str = None
     _cache: ModelCache = None
@@ -222,12 +225,47 @@ MAX_CACHE_SIZE = 6.0  # GB
 #     └── realesrgan
 
 
+class ConfigMeta(BaseModel):
+    version: str
+
 class ModelManager(object):
     """
     High-level interface to model management.
     """
 
     logger: types.ModuleType = logger
+
+    # TODO:
+    def _convert_2_3_models(self, config: DictConfig):
+        for model_name, model_config in config.items():
+            if model_config["format"] == "diffusers":
+                pass
+            elif model_config["format"] == "ckpt":
+
+                if any(model_config["config"].endswith(file) for file in {
+                    "v1-finetune.yaml",
+                    "v1-finetune_style.yaml",
+                    "v1-inference.yaml",
+                    "v1-inpainting-inference.yaml",
+                    "v1-m1-finetune.yaml",
+                }):
+                    # copy as as sd1.5
+                    pass
+
+                # ~99% accurate should be
+                elif model_config["config"].endswith("v2-inference-v.yaml"):
+                    # copy as sd 2.x (768)
+                    pass
+
+                # for real don't know how accurate it
+                elif model_config["config"].endswith("v2-inference.yaml"):
+                    # copy as sd 2.x-base (512)
+                    pass
+
+                else:
+                    # TODO:
+                    raise Exception("Unknown model")
+
 
     def __init__(
         self,
@@ -244,18 +282,29 @@ class ModelManager(object):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-        if isinstance(config, DictConfig):
-            self.config_path = None
-            self.config = config
-        elif isinstance(config,(str,Path)):
-            self.config_path = config
-            self.config = OmegaConf.load(self.config_path)
-        else:
+
+        self.config_path = None
+        if isinstance(config, (str, Path)):
+            self.config_path = Path(config)
+            config = OmegaConf.load(self.config_path)
+
+        elif not isinstance(config, DictConfig):
             raise ValueError('config argument must be an OmegaConf object, a Path or a string')
+
+        #if "__meta__" not in config:
+        #    config = self._convert_2_3_models(config)
+
+        config_meta = ConfigMeta(**config.pop("__metadata__")) # TODO: naming
+        # TODO: metadata not found
+
+        self.models = dict()
+        for model_key, model_config in config.items():
+            model_name, base_model, model_type = self.parse_key(model_key)
+            model_class = MODEL_CLASSES[base_model][model_type]
+            self.models[model_key] = model_class.build_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
         self.globals = InvokeAIAppConfig.get_config()
-        self._update_config_file_version()
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
@@ -267,7 +316,7 @@ class ModelManager(object):
         self.cache_keys = dict()
 
         # add controlnet, lora and textual_inversion models from disk
-        self.scan_models_directory(include_diffusers=False)
+        self.scan_models_directory()
 
     def model_exists(
         self,
@@ -280,7 +329,7 @@ class ModelManager(object):
         identifier.
         """
         model_key = self.create_key(model_name, base_model, model_type)
-        return model_key in self.config
+        return model_key in self.models
 
     def create_key(
         self,
@@ -350,38 +399,49 @@ class ModelManager(object):
 
         """
         model_class = MODEL_CLASSES[base_model][model_type]
-        model_dir = self.globals.models_path
-        if not model_class.has_config:
-            model_config = None
+        model_key = self.create_key(model_name, base_model, model_type)
 
-            for ext in {"pt", "ckpt", "safetensors"}:
-                model_path = os.path.join(model_dir, base_model, model_type, f"{model_name}.{ext}")
-                if os.path.exists(model_path):
-                    break
-            else:
-                model_path = os.path.join(model_dir, base_model, model_type, model_name)
-                if not os.path.exists(model_path):
-                    raise InvalidModelError(
-                        f"Model not found - \"{base_model}/{model_type}/{model_name}\" "
-                    )
-
-        else:
-            # find in config
-            model_key = self.create_key(model_name, base_model, model_type)
-            if model_key not in self.config:
-                raise InvalidModelError(
-                    f'"{model_key}" is not a known model name. Please check your models.yaml file'
+        # if model not found try to find it (maybe file just pasted)
+        if model_key not in self.models:
+            # TODO: find by mask or try rescan?
+            path_mask = f"/models/{base_model}/{model_type}/{model_name}*"
+            if False: # model_path = next(find_by_mask(path_mask)):
+                model_path = None # TODO:
+                model_config = model_class.build_config(
+                    path=model_path,
                 )
+                self.models[model_key] = model_config
+            else:
+                raise Exception(f"Model not found - {model_key}")
 
-            model_config = self.config[model_key]
-            model_path = model_config.path
+        # if it known model check that target path exists (if manualy deleted)
+        else:
+            # logic repeated twice(in rescan too) any way to optimize?
+            if not os.path.exists(self.models[model_key].path):
+                if model_class.save_to_config:
+                    self.models[model_key].error = ModelError.NotFound
+                    raise Exception(f"Files for model \"{model_key}\" not found")
 
-            # vae/movq override
-            # TODO: 
-            if submodel_type is not None and submodel_type in model_config:
-                model_path = model_config[submodel_type]["path"]
-                model_type = submodel_type
-                submodel_type = None
+                else:
+                    self.models.pop(model_key, None)
+                    raise Exception(f"Model not found - {model_key}")
+
+            # reset model errors?
+
+
+
+        model_config = self.models[model_key]
+            
+        # /models/{base_model}/{model_type}/{name}.ckpt or .safentesors
+        # /models/{base_model}/{model_type}/{name}/
+        model_path = model_config.path
+
+        # vae/movq override
+        # TODO: 
+        if submodel is not None and submodel in model_config:
+            model_path = model_config[submodel]
+            model_type = submodel
+            submodel = None
 
         dst_convert_path = None # TODO:
         model_path = model_class.convert_if_required(
@@ -414,11 +474,11 @@ class ModelManager(object):
         Returns the name of the default model, or None
         if none is defined.
         """
-        for model_key, model_config in self.config.items():
-            if model_config.get("default", False):
+        for model_key, model_config in self.models.items():
+            if model_config.default:
                 return self.parse_key(model_key)
 
-        for model_key, _ in self.config.items():
+        for model_key, _ in self.models.items():
             return self.parse_key(model_key)
         else:
             return None # TODO: or redo as (None, None, None)
@@ -435,14 +495,11 @@ class ModelManager(object):
         """
 
         model_key = self.model_key(model_name, base_model, model_type)
-        if model_key not in self.config:
+        if model_key not in self.models:
             raise Exception(f"Unknown model: {model_key}")
 
-        for cur_model_key, config in self.config.items():
-            if cur_model_key == model_key:
-                config["default"] = True
-            else:
-                config.pop("default", None)
+        for cur_model_key, config in self.models.items():
+            config.default = cur_model_key == model_key
 
     def model_info(
         self,
@@ -454,14 +511,17 @@ class ModelManager(object):
         Given a model name returns the OmegaConf (dict-like) object describing it.
         """
         model_key = self.create_key(model_name, base_model, model_type)
-        return self.config.get(model_key, None)
+        if model_key in self.models:
+            return self.models[model_key].dict(exclude_defaults=True)
+        else:
+            return None # TODO: None or empty dict on not found
 
     def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
         """
         Return a list of (str, BaseModelType, ModelType) corresponding to all models 
         known to the configuration.
         """
-        return [(self.parse_key(x)) for x in self.config.keys() if isinstance(self.config[x], DictConfig)]
+        return [(self.parse_key(x)) for x in self.models.keys()]
 
     def list_models(
         self,
@@ -479,61 +539,52 @@ class ModelManager(object):
         assert not(model_type is not None and base_model is None), "model_type must be provided with base_model"
 
         models = dict()
-        for model_key in sorted(self.config, key=str.casefold):
-            stanza = self.config[model_key]
+        for model_key in sorted(self.models, key=str.casefold):
+            model_config = self.models[model_key]
 
-            if model_key.startswith('_'):
+            cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
+            if base_model is not None and cur_base_model != base_model:
+                continue
+            if model_type is not None and cur_model_type != model_type:
                 continue
 
-            model_name, m_base_model, stanza_type = self.parse_key(model_key)
-            if base_model is not None and m_base_model != base_model:
-                continue
-            if model_type is not None and model_type != stanza_type:
-                continue
+            if cur_base_model not in models:
+                models[cur_base_model] = dict()
+            if cur_model_type not in models[cur_base_model]:
+                models[cur_base_model][cur_model_type] = dict()
 
-            if m_base_model not in models:
-                models[m_base_model] = dict()
-            if stanza_type not in models:
-                models[m_base_model][stanza_type] = dict()
-
-            model_class = MODEL_CLASSES[m_base_model][stanza_type]
-            models[m_base_model][stanza_type][model_name] = model_class.build_config(
-                **stanza,
-                name=model_name,
-                base_model=base_model,
-                type=stanza_type,
+            models[cur_base_model][cur_model_type][cur_model_name] = dict(
+                **model_config.dict(exclude_defaults=True),
+                name=cur_model_name,
+                base_model=cur_base_model,
+                type=cur_model_type,
             )
-            #models[m_base_model][stanza_type][model_name] = model_class.Config(
-            #    **stanza,
-            #    name=model_name,
-            #    base_model=base_model,
-            #    type=stanza_type,
-            #).dict()
 
         return models
 
     def print_models(self) -> None:
         """
-        Print a table of models, their descriptions, and load status
+        Print a table of models, their descriptions
         """
+        # TODO: redo
         for model_type, model_dict in self.list_models().items():
             for model_name, model_info in model_dict.items():
-                line = f'{model_info["name"]:25s} {model_info["status"]:>15s}  {model_info["type"]:10s} {model_info["description"]}'
-                if model_info["status"] in ["in gpu","locked in gpu"]:
-                    line = f"\033[1m{line}\033[0m"
+                line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
 
     def del_model(
         self,
         model_name: str,
-        model_type: ModelType.Diffusers,
+        base_model: BaseModelType,
+        model_type: ModelType,
         delete_files: bool = False,
     ):
         """
         Delete the named model.
         """
-        model_key = self.create_key(model_name, model_type)
-        model_cfg = self.pop(model_key, None)
+        raise Exception("TODO: del_model") # TODO: redo
+        model_key = self.create_key(model_name, base_model, model_type)
+        model_cfg = self.models.pop(model_key, None)
 
         if model_cfg is None:
             self.logger.error(
@@ -581,27 +632,14 @@ class ModelManager(object):
         """
 
         model_class = MODEL_CLASSES[base_model][model_type]
-
-        model_class.build_config(
-            **model_attributes,
-            name=model_name,
-            base_model=base_model,
-            type=model_type,
-        )
-        #model_cfg = model_class.Config(
-        #    **model_attributes,
-        #    name=model_name,
-        #    base_model=base_model,
-        #    type=model_type,
-        #)
-
+        model_config = model_class.build_config(**model_attributes)
         model_key = self.create_key(model_name, base_model, model_type)
 
         assert (
-            clobber or model_key not in self.config
+            clobber or model_key not in self.models
         ), f'attempt to overwrite existing model definition "{model_key}"'
 
-        self.config[model_key] = model_attributes
+        self.models[model_key] = model_config
             
         if clobber and model_key in self.cache_keys:
             # TODO:
@@ -633,7 +671,15 @@ class ModelManager(object):
         """
         Write current configuration out to the indicated file.
         """
-        yaml_str = OmegaConf.to_yaml(self.config)
+        data_to_save = dict()
+        for model_key, model_config in self.models.items():
+            model_name, base_model, model_type = self.parse_key(model_key)
+            model_class = MODEL_CLASSES[base_model][model_type]
+            if model_class.save_to_config:
+                # TODO: or exclude_unset better fits here?
+                data_to_save[model_key] = model_config.dict(exclude_defaults=True)
+
+        yaml_str = OmegaConf.to_yaml(data_to_save)
         config_file_path = conf_file or self.config_path
         assert config_file_path is not None,'no config file path to write to'
         config_file_path = self.globals.root_dir / config_file_path
@@ -696,62 +742,4 @@ class ModelManager(object):
         else:
             resolved_path = self.globals.root_dir / source
         return resolved_path
-
-    def _update_config_file_version(self):
-        """
-        This gets called at object init time and will update
-        from older versions of the config file to new ones
-        as necessary.
-        """
-        current_version = self.config.get("_version","1.0.0")
-        if version.parse(current_version) < version.parse(CONFIG_FILE_VERSION):
-            self.logger.warning(f'models.yaml version {current_version} detected. Updating to {CONFIG_FILE_VERSION}')
-            self.logger.warning('The original file will be renamed models.yaml.orig')
-            if self.config_path:
-                old_file = Path(self.config_path)
-                new_name = old_file.parent / 'models.yaml.orig'
-                old_file.replace(new_name)
-            
-            new_config = OmegaConf.create()
-            new_config["_version"] = CONFIG_FILE_VERSION
-            
-            for model_key in self.config:
-
-                old_stanza = self.config[model_key]
-                if not isinstance(old_stanza,DictConfig):
-                    continue
-
-                # ignore old and ugly way of associating a legacy
-                # vae with a legacy checkpont model
-                if old_stanza.get("config") and '/VAE/' in old_stanza.get("config"):
-                    continue
-
-                # bare keys are updated to be prefixed with 'diffusers/'
-                if '/' not in model_key:
-                    new_key = f'diffusers/{model_key}'
-                else:
-                    new_key = model_key
-
-                if old_stanza.get('format')=='diffusers':
-                    model_format = 'folder'
-                elif old_stanza.get('weights') and Path(old_stanza.get('weights')).suffix == '.ckpt':
-                    model_format = 'ckpt'
-                elif old_stanza.get('weights') and Path(old_stanza.get('weights')).suffix == '.safetensors':
-                    model_format = 'safetensors'
-                else:
-                    model_format = old_stanza.get('format')
-
-                # copy fields over manually rather than doing a copy() or deepcopy()
-                # in order to avoid bringing in unwanted fields.
-                new_config[new_key] = dict(
-                    description = old_stanza.get('description'),
-                    format = model_format,
-                )
-                for field in ["repo_id", "path", "weights", "config", "vae"]:
-                    if field_value :=  old_stanza.get(field):
-                        new_config[new_key].update({field: field_value})
-            
-            self.config = new_config
-            if self.config_path:
-                self.commit()
 

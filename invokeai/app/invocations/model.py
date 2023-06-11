@@ -5,12 +5,13 @@ import copy
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
-from ...backend.model_management import SDModelType
+from ...backend.model_management import BaseModelType, ModelType, SubModelType
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
-    model_type: SDModelType = Field(description="Info to load submodel")
-    submodel: Optional[SDModelType] = Field(description="Info to load submodel")
+    base_model: BaseModelType = Field(description="Base model")
+    model_type: ModelType = Field(description="Info to load submodel")
+    submodel: Optional[SubModelType] = Field(description="Info to load submodel")
 
 class LoraInfo(ModelInfo):
     weight: float = Field(description="Lora's weight which to use when apply to model")
@@ -63,10 +64,13 @@ class ModelLoaderInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
 
+        base_model = BaseModelType.StableDiffusion2 # TODO:
+
         # TODO: not found exceptions
         if not context.services.model_manager.model_exists(
             model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
+            base_model=base_model,
+            model_type=ModelType.Pipeline,
         ):
             raise Exception(f"Unkown model name: {self.model_name}!")
 
@@ -104,12 +108,14 @@ class ModelLoaderInvocation(BaseInvocation):
             unet=UNetField(
                 unet=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.Diffusers,
-                    submodel=SDModelType.UNet,
+                    base_model=base_model,
+                    model_type=ModelType.Pipeline,
+                    submodel=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.Diffusers,
+                    base_model=base_model,
+                    model_type=ModelType.Pipeline,
                     submodel=SDModelType.Scheduler,
                 ),
                 loras=[],
@@ -117,12 +123,14 @@ class ModelLoaderInvocation(BaseInvocation):
             clip=ClipField(
                 tokenizer=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.Diffusers,
+                    base_model=base_model,
+                    model_type=ModelType.Pipeline,
                     submodel=SDModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.Diffusers,
+                    base_model=base_model,
+                    model_type=ModelType.Pipeline,
                     submodel=SDModelType.TextEncoder,
                 ),
                 loras=[],
@@ -130,7 +138,8 @@ class ModelLoaderInvocation(BaseInvocation):
             vae=VaeField(
                 vae=ModelInfo(
                     model_name=self.model_name,
-                    model_type=SDModelType.Diffusers,
+                    base_model=base_model,
+                    model_type=ModelType.Pipeline,
                     submodel=SDModelType.Vae,
                 ),
             )

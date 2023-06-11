@@ -1,12 +1,12 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and 2023 Kent Keirsey (https://github.com/hipsterusername)
 
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union, Dict
 
 from fastapi import Query
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from ..dependencies import ApiDependencies
-from invokeai.backend import SDModelType
+from invokeai.backend import BaseModelType, ModelType
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -60,7 +60,8 @@ class ConvertedModelResponse(BaseModel):
     info: DiffusersModelInfo = Field(description="The converted model info")
 
 class ModelsList(BaseModel):
-    models: dict[SDModelType, dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]]
+    models: Dict[BaseModelType, Dict[ModelType, Dict[str, dict]]] # TODO: collect all configs
+    #models: dict[SDModelType, dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]]
 
 
 @models_router.get(
@@ -69,9 +70,12 @@ class ModelsList(BaseModel):
     responses={200: {"model": ModelsList }},
 )
 async def list_models(
-        model_type: SDModelType = Query(
-            default=None, description="The type of model to get"
-        ),
+    base_model: BaseModelType = Query(
+        default=None, description="Base model"
+    ),
+    model_type: ModelType = Query(
+        default=None, description="The type of model to get"
+    ),
 ) -> ModelsList:
     """Gets a list of models"""
     models_raw = ApiDependencies.invoker.services.model_manager.list_models(model_type)
