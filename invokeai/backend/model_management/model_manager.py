@@ -221,6 +221,9 @@ MAX_CACHE_SIZE = 6.0  # GB
 #     └── realesrgan
 
 
+class ConfigMeta(BaseModel):
+    version: str
+
 class ModelManager(object):
     """
     High-level interface to model management.
@@ -243,14 +246,23 @@ class ModelManager(object):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-        if isinstance(config, DictConfig):
-            self.config_path = None
-            self.config = config
-        elif isinstance(config,(str,Path)):
-            self.config_path = config
-            self.config = OmegaConf.load(self.config_path)
-        else:
+
+        self.config_path = None
+        if isinstance(config, (str, Path)):
+            self.config_path = Path(config)
+            config = OmegaConf.load(self.config_path)
+
+        elif not isinstance(config, DictConfig):
             raise ValueError('config argument must be an OmegaConf object, a Path or a string')
+
+        config_meta = ConfigMeta(config.pop("__metadata__")) # TODO: naming
+        # TODO: metadata not found
+
+        self.models = dict()
+        for model_key, model_config in config.items():
+            model_name, base_model, model_type = self.parse_key(model_key)
+            model_class = MODEL_CLASSES[base_model][model_type]
+            self.models[model_key] = model_class.build_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
         self.globals = InvokeAIAppConfig.get_config()
@@ -279,7 +291,7 @@ class ModelManager(object):
         identifier.
         """
         model_key = self.create_key(model_name, base_model, model_type)
-        return model_key in self.config
+        return model_key in self.models
 
     def create_key(
         self,
@@ -351,52 +363,49 @@ class ModelManager(object):
 
         model_class = MODEL_CLASSES[base_model][model_type]
 
-        #if model_type in {
-        #    ModelType.Lora,
-        #    ModelType.ControlNet,
-        #    ModelType.TextualInversion,
-        #    ModelType.Vae,
-        #}:
-        if not model_class.has_config:
-        #if model_class.Config is None:
-            # skip config
-            # load from
-            # /models/{base_model}/{model_type}/{model_name}
-            # /models/{base_model}/{model_type}/{model_name}.{ext}
+        model_key = self.create_key(model_name, base_model, model_type)
 
-            model_config = None
-
-            for ext in {"pt", "ckpt", "safetensors"}:
-                model_path = os.path.join(model_dir, base_model, model_type, f"{model_name}.{ext}")
-                if os.path.exists(model_path):
-                    break
-            else:
-                model_path = os.path.join(model_dir, base_model, model_type, model_name)
-                if not os.path.exists(model_path):
-                    raise InvalidModelError(
-                        f"Model not found - \"{base_model}/{model_type}/{model_name}\" "
-                    )
-
-        else:
-            # find in config
-            model_key = self.create_key(model_name, base_model, model_type)
-            if model_key not in self.config:
-                raise InvalidModelError(
-                    f'"{model_key}" is not a known model name. Please check your models.yaml file'
+        # if model not found try to find it (maybe file just pasted)
+        if model_key not in self.models:
+            # TODO: find by mask or try rescan?
+            path_mask = f"/models/{base_model}/{model_type}/{model_name}*"
+            if False: # model_path = next(find_by_mask(path_mask)):
+                model_path = None # TODO:
+                model_config = model_class.build_config(
+                    path=model_path,
                 )
+                self.models[model_key] = model_config
+            else:
+                raise Exception(f"Model not found - {model_key}")
 
-            model_config = self.config[model_key]
+        # if it known model check that target path exists (if manualy deleted)
+        else:
+            # logic repeated twice(in rescan too) any way to optimize?
+            if not os.path.exists(self.models[model_key].path):
+                if model_class.save_to_config:
+                    self.models[model_key].error = ModelError.NotFound
+                    raise Exception(f"Files for model \"{model_key}\" not found")
+
+                else:
+                    self.models.pop(model_key, None)
+                    raise Exception(f"Model not found - {model_key}")
+
+            # reset model errors?
+
+
+
+        model_config = self.models[model_key]
             
-            # /models/{base_model}/{model_type}/{name}.ckpt or .safentesors
-            # /models/{base_model}/{model_type}/{name}/
-            model_path = model_config.path
+        # /models/{base_model}/{model_type}/{name}.ckpt or .safentesors
+        # /models/{base_model}/{model_type}/{name}/
+        model_path = model_config.path
 
-            # vae/movq override
-            # TODO: 
-            if submodel is not None and submodel in model_config:
-                model_path = model_config[submodel]["path"]
-                model_type = submodel
-                submodel = None
+        # vae/movq override
+        # TODO: 
+        if submodel is not None and submodel in model_config:
+            model_path = model_config[submodel]
+            model_type = submodel
+            submodel = None
 
         dst_convert_path = None # TODO:
         model_path = model_class.convert_if_required(
@@ -429,11 +438,11 @@ class ModelManager(object):
         Returns the name of the default model, or None
         if none is defined.
         """
-        for model_key, model_config in self.config.items():
-            if model_config.get("default", False):
+        for model_key, model_config in self.models.items():
+            if model_config.default:
                 return self.parse_key(model_key)
 
-        for model_key, _ in self.config.items():
+        for model_key, _ in self.models.items():
             return self.parse_key(model_key)
         else:
             return None # TODO: or redo as (None, None, None)
@@ -450,14 +459,11 @@ class ModelManager(object):
         """
 
         model_key = self.model_key(model_name, base_model, model_type)
-        if model_key not in self.config:
+        if model_key not in self.models:
             raise Exception(f"Unknown model: {model_key}")
 
-        for cur_model_key, config in self.config.items():
-            if cur_model_key == model_key:
-                config["default"] = True
-            else:
-                config.pop("default", None)
+        for cur_model_key, config in self.models.items():
+            config.default = cur_model_key == model_key
 
     def model_info(
         self,
@@ -469,14 +475,17 @@ class ModelManager(object):
         Given a model name returns the OmegaConf (dict-like) object describing it.
         """
         model_key = self.create_key(model_name, base_model, model_type)
-        return self.config.get(model_key, None)
+        if model_key in self.models:
+            return self.models[model_key].dict(exclude_defaults=True)
+        else:
+            return None # TODO: None or empty dict on not found
 
     def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
         """
         Return a list of (str, BaseModelType, ModelType) corresponding to all models 
         known to the configuration.
         """
-        return [(self.parse_key(x)) for x in self.config.keys() if isinstance(self.config[x], DictConfig)]
+        return [(self.parse_key(x)) for x in self.models.keys()]
 
     def list_models(
         self,
@@ -494,48 +503,37 @@ class ModelManager(object):
         assert not(model_type is not None and base_model is None), "model_type must be provided with base_model"
 
         models = dict()
-        for model_key in sorted(self.config, key=str.casefold):
-            stanza = self.config[model_key]
+        for model_key in sorted(self.models, key=str.casefold):
+            model_config = self.models[model_key]
 
-            if model_key.startswith('_'):
+            cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
+            if base_model is not None and cur_base_model != base_model:
+                continue
+            if model_type is not None and cur_model_type != model_type:
                 continue
 
-            model_name, m_base_model, stanza_type = self.parse_key(model_key)
-            if base_model is not None and m_base_model != base_model:
-                continue
-            if model_type is not None and model_type != stanza_type:
-                continue
+            if cur_base_model not in models:
+                models[cur_base_model] = dict()
+            if cur_model_type not in models[cur_base_model]:
+                models[cur_base_model][cur_model_type] = dict()
 
-            if m_base_model not in models:
-                models[m_base_model] = dict()
-            if stanza_type not in models:
-                models[m_base_model][stanza_type] = dict()
-
-            model_class = MODEL_CLASSES[m_base_model][stanza_type]
-            models[m_base_model][stanza_type][model_name] = model_class.build_config(
-                **stanza,
+            models[m_base_model][stanza_type][model_name] = dict(
+                **model_config.dict(exclude_defaults=True),
                 name=model_name,
-                base_model=base_model,
-                type=stanza_type,
+                base_model=cur_base_model,
+                type=cur_model_type,
             )
-            #models[m_base_model][stanza_type][model_name] = model_class.Config(
-            #    **stanza,
-            #    name=model_name,
-            #    base_model=base_model,
-            #    type=stanza_type,
-            #).dict()
 
         return models
 
     def print_models(self) -> None:
         """
-        Print a table of models, their descriptions, and load status
+        Print a table of models, their descriptions
         """
+        # TODO: redo
         for model_type, model_dict in self.list_models().items():
             for model_name, model_info in model_dict.items():
-                line = f'{model_info["name"]:25s} {model_info["status"]:>15s}  {model_info["type"]:10s} {model_info["description"]}'
-                if model_info["status"] in ["in gpu","locked in gpu"]:
-                    line = f"\033[1m{line}\033[0m"
+                line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
 
     def del_model(
@@ -596,27 +594,14 @@ class ModelManager(object):
         """
 
         model_class = MODEL_CLASSES[base_model][model_type]
-
-        model_class.build_config(
-            **model_attributes,
-            name=model_name,
-            base_model=base_model,
-            type=model_type,
-        )
-        #model_cfg = model_class.Config(
-        #    **model_attributes,
-        #    name=model_name,
-        #    base_model=base_model,
-        #    type=model_type,
-        #)
-
+        model_config = model_class.build_config(**model_attributes)
         model_key = self.create_key(model_name, base_model, model_type)
 
         assert (
-            clobber or model_key not in self.config
+            clobber or model_key not in self.models
         ), f'attempt to overwrite existing model definition "{model_key}"'
 
-        self.config[model_key] = model_attributes
+        self.models[model_key] = model_config
             
         if clobber and model_key in self.cache_keys:
             # TODO:
@@ -822,7 +807,15 @@ class ModelManager(object):
         """
         Write current configuration out to the indicated file.
         """
-        yaml_str = OmegaConf.to_yaml(self.config)
+        data_to_save = dict()
+        for model_key, model_config in self.models.items():
+            model_name, base_model, model_type = self.parse_key(model_key)
+            model_class = MODEL_CLASSES[base_model][model_type]
+            if model_class.save_to_config:
+                # TODO: or exclude_unset better fits here?
+                data_to_save[model_key] = model_config.dict(exclude_defaults=True)
+
+        yaml_str = OmegaConf.to_yaml(data_to_save)
         config_file_path = conf_file or self.config_path
         assert config_file_path is not None,'no config file path to write to'
         config_file_path = self.globals.root_dir / config_file_path
@@ -887,146 +880,41 @@ class ModelManager(object):
         return resolved_path
 
     def _update_config_file_version(self):
-        """
-        This gets called at object init time and will update
-        from older versions of the config file to new ones
-        as necessary.
-        """
-        current_version = self.config.get("_version","1.0.0")
-        if version.parse(current_version) < version.parse(CONFIG_FILE_VERSION):
-            self.logger.warning(f'models.yaml version {current_version} detected. Updating to {CONFIG_FILE_VERSION}')
-            self.logger.warning('The original file will be renamed models.yaml.orig')
-            if self.config_path:
-                old_file = Path(self.config_path)
-                new_name = old_file.parent / 'models.yaml.orig'
-                old_file.replace(new_name)
-            
-            new_config = OmegaConf.create()
-            new_config["_version"] = CONFIG_FILE_VERSION
-            
-            for model_key in self.config:
+        # TODO: 
+        raise Exception("TODO: ")
 
-                old_stanza = self.config[model_key]
-                if not isinstance(old_stanza,DictConfig):
-                    continue
+    def scan_models_directory(self):
 
-                # ignore old and ugly way of associating a legacy
-                # vae with a legacy checkpont model
-                if old_stanza.get("config") and '/VAE/' in old_stanza.get("config"):
-                    continue
-
-                # bare keys are updated to be prefixed with 'diffusers/'
-                if '/' not in model_key:
-                    new_key = f'diffusers/{model_key}'
+        for model_key in list(self.models.keys()):
+            model_name, base_model, model_type = self.parse_key(model_key)
+            if not os.path.exists(model_config.path):
+                if model_class.save_to_config:
+                    self.models[model_key].error = ModelError.NotFound
                 else:
-                    new_key = model_key
+                    self.models.pop(model_key, None)
 
-                if old_stanza.get('format')=='diffusers':
-                    model_format = 'folder'
-                elif old_stanza.get('weights') and Path(old_stanza.get('weights')).suffix == '.ckpt':
-                    model_format = 'ckpt'
-                elif old_stanza.get('weights') and Path(old_stanza.get('weights')).suffix == '.safetensors':
-                    model_format = 'safetensors'
-                else:
-                    model_format = old_stanza.get('format')
 
-                # copy fields over manually rather than doing a copy() or deepcopy()
-                # in order to avoid bringing in unwanted fields.
-                new_config[new_key] = dict(
-                    description = old_stanza.get('description'),
-                    format = model_format,
-                )
-                for field in ["repo_id", "path", "weights", "config", "vae"]:
-                    if field_value :=  old_stanza.get(field):
-                        new_config[new_key].update({field: field_value})
-            
-            self.config = new_config
-            if self.config_path:
-                self.commit()
+        for base_model in BaseModelType:
+            for model_type in ModelType:
 
-    def _delete_defunct_models(self):
-        '''
-        Remove models no longer on disk.
-        '''
-        config = self.config
+                model_class = MODEL_CLASSES[base_model][model_type]
+                models_dir = os.path.join(self.globals.models_path, base_model, model_type)
+                
+                for entry_name in os.listdir(models_dir):
+                    model_path = os.path.join(models_dir, entry_name)
+                    model_name = Path(model_path).stem
+                    model_config: ModelConfigBase = model_class.build_config(
+                        path=model_path,
+                    )
+
+                    model_key = self.create_key(model_name, base_model, model_type)
+                    if model_key not in self.models:
+                        self.models[model_key] = model_config
         
-        to_delete = set()
-        for key in config:
-            if 'path' not in config[key]:
-                continue
-            path = self.globals.root_dir / config[key].path
-            if path.exists():
-                continue
-            to_delete.add(key)
-            
-        for key in to_delete:
-            self.logger.warn(f'Removing model {key} from in-memory config because its path is no longer on disk')
-            config.pop(key)
-
-    def scan_models_directory(self, include_diffusers:bool=False):
-        '''
-        Scan the models directory for loras, textual_inversions and controlnets
-        and create appropriate entries in the in-memory omegaconf. Diffusers
-        will not be added unless include_diffusers is true.
-        '''
-        self._delete_defunct_models()
-        
-        model_directory = self.globals.models_path
-        config = self.config
-        
-        for root, dirs, files in os.walk(model_directory):
-            parents = root.split('/')
-            subpaths = parents[parents.index('models')+1:]
-            if len(subpaths) < 2:
-                continue
-            base, model_type, *_ = subpaths
-            
-            if model_type == "diffusers" and not include_diffusers:
-                continue
-            
-            for d in dirs:
-                config[f'{model_type}/{d}'] = dict(
-                    path = os.path.join(root,d),
-                    description = f'{model_type} model {d}',
-                    format = 'folder',
-                    base = base,
-                )
-
-            for f in files:
-                basename = Path(f).stem
-                format = Path(f).suffix[1:]
-                config[f'{model_type}/{basename}'] = dict(
-                    path = os.path.join(root,f),
-                    description = f'{model_type} model {basename}',
-                    format = format,
-                    base = base,
-                )
                 
         
     ##### NONE OF THE METHODS BELOW WORK NOW BECAUSE OF MODEL DIRECTORY REORGANIZATION
-    ##### AND NEED TO BE REWRITTEN
-    def list_lora_models(self)->Dict[str,bool]:
-        '''Return a dict of installed lora models; key is either the shortname
-        defined in INITIAL_MODELS, or the basename of the file in the LoRA
-        directory. Value is True if installed'''
-
-        models = OmegaConf.load(Dataset_path).get('lora') or {}
-        installed_models = {x: False for x in models.keys()}
-        
-        dir = self.globals.lora_path
-        installed_models = dict()
-        for root, dirs, files in os.walk(dir):
-            for name in files:
-                if Path(name).suffix not in ['.safetensors','.ckpt','.pt','.bin']:
-                    continue
-                if name == 'pytorch_lora_weights.bin':
-                    name = Path(root,name).parent.stem #Path(root,name).stem
-                else:
-                    name = Path(name).stem
-                installed_models.update({name: True})
-
-        return installed_models
-    
+    ##### AND NEED TO BE REWRITTEN    
     def install_lora_models(self, model_names: list[str], access_token:str=None):
         '''Download list of LoRA/LyCORIS models'''
         
@@ -1051,38 +939,6 @@ class ModelManager(object):
 
             else:
                 self.logger.error(f"Unknown repo_id or URL: {name}")
-    
-    def delete_lora_models(self, model_names: List[str]):
-        '''Remove the list of lora models'''
-        for name in model_names:
-            file_or_directory = self.globals.lora_path / name
-            if file_or_directory.is_dir():
-                self.logger.info(f'Purging LoRA/LyCORIS {name}')
-                shutil.rmtree(str(file_or_directory))
-            else:
-                for path in self.globals.lora_path.glob(f'{name}.*'):
-                    self.logger.info(f'Purging LoRA/LyCORIS {name}')
-                    path.unlink()
-                
-    def list_ti_models(self)->Dict[str,bool]:
-        '''Return a dict of installed textual models; key is either the shortname
-        defined in INITIAL_MODELS, or the basename of the file in the LoRA
-        directory. Value is True if installed'''
-
-        models = OmegaConf.load(Dataset_path).get('textual_inversion') or {}
-        installed_models = {x: False for x in models.keys()}
-        
-        dir = self.globals.embedding_path
-        for root, dirs, files in os.walk(dir):
-            for name in files:
-                if not Path(name).suffix in ['.bin','.pt','.ckpt','.safetensors']:
-                    continue
-                if name == 'learned_embeds.bin':
-                    name = Path(root,name).parent.stem #Path(root,name).stem
-                else:
-                    name = Path(name).stem
-                installed_models.update({name: True})
-        return installed_models
 
     def install_ti_models(self, model_names: list[str], access_token: str=None):
         '''Download list of textual inversion embeddings'''
@@ -1104,32 +960,7 @@ class ModelManager(object):
                 download_with_resume(name, self.globals.embedding_path)
             else:
                 self.logger.error(f'{name} does not look like either a HuggingFace repo_id or a downloadable URL')
-    
-    def delete_ti_models(self, model_names: list[str]):
-        '''Remove TI embeddings from disk'''
-        for name in model_names:
-            file_or_directory = self.globals.embedding_path / name
-            if file_or_directory.is_dir():
-                self.logger.info(f'Purging textual inversion embedding {name}')
-                shutil.rmtree(str(file_or_directory))
-            else:
-                for path in self.globals.embedding_path.glob(f'{name}.*'):
-                    self.logger.info(f'Purging textual inversion embedding {name}')
-                    path.unlink()
 
-    def list_controlnet_models(self)->Dict[str,bool]:
-        '''Return a dict of installed controlnet models; key is repo_id or short name
-        of model (defined in INITIAL_MODELS), and value is True if installed'''
-
-        cn_models = OmegaConf.load(Dataset_path).get('controlnet') or {}
-        installed_models = {x: False for x in cn_models.keys()}
-        
-        cn_dir = self.globals.controlnet_path
-        for root, dirs, files in os.walk(cn_dir):
-            for name in dirs:
-                if Path(root, name, '.download_complete').exists():
-                    installed_models.update({name.replace('--','/'): True})
-        return installed_models
 
     def install_controlnet_models(self, model_names: list[str], access_token: str=None):
         '''Download list of controlnet models; provide either repo_id or short name listed in INITIAL_MODELS.yaml'''
@@ -1175,12 +1006,4 @@ class ModelManager(object):
                     (path.parent / '.download_complete').touch()
                     break
 
-    def delete_controlnet_models(self, model_names: List[str]):
-        '''Remove the list of controlnet models'''
-        for name in model_names:
-            safe_name = name.replace('/','--')
-            directory = self.globals.controlnet_path / safe_name
-            if directory.exists():
-                self.logger.info(f'Purging controlnet model {name}')
-                shutil.rmtree(str(directory))
 

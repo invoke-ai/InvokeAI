@@ -30,7 +30,6 @@ from typing import Dict, Union, types, Optional, List, Type, Any
 import torch
 import transformers
 
-from diffusers import DiffusionPipeline, SchedulerMixin, ConfigMixin
 from diffusers import logging as diffusers_logging
 from huggingface_hub import HfApi, scan_cache_dir
 from transformers import logging as transformers_logging
@@ -40,7 +39,7 @@ from invokeai.app.services.config import get_invokeai_config
 
 from .lora import LoRAModel, TextualInversionModel
 
-from .models import MODEL_CLASSES
+from .models import BaseModelType, ModelType, SubModelType
 
 
 # Maximum size of the cache, in gigs
@@ -129,11 +128,12 @@ class ModelCache(object):
     def get_key(
         self,
         model_path: str,
-        model_type: SDModelType,
-        submodel_type: Optional[SDModelType] = None,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel_type: Optional[SubModelType] = None,
     ):
 
-        key = f"{model_path}:{model_type}"
+        key = f"{model_path}:{base_model}:{model_type}"
         if submodel_type:
             key += f":{submodel_type}"
         return key
@@ -152,9 +152,12 @@ class ModelCache(object):
         self,
         model_path: str,
         model_class: Type[ModelBase],
+        base_model: BaseModelType,
+        model_type: ModelType,
     ):
         model_info_key = self.get_key(
             model_path=model_path,
+            base_model=base_model,
             model_type=model_type,
             submodel_type=None,
         )
@@ -172,6 +175,8 @@ class ModelCache(object):
         self,
         model_path: Union[str, Path],
         model_class: Type[ModelBase],
+        base_model: BaseModelType,
+        model_type: ModelType,
         submodel: Optional[SubModelType] = None,
         gpu_load: bool = True,
     ) -> Any:
@@ -185,17 +190,20 @@ class ModelCache(object):
         model_info = self._get_model_info(
             model_path=model_path,
             model_class=model_class,
+            base_model=base_model,
+            model_type=model_type,
         )
         key = self.get_key(
             model_path=model_path,
-            model_type=model_type, # TODO:
+            base_model=base_model,
+            model_type=model_type,
             submodel_type=submodel,
         )
 
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
-            self.logger.info(f'Loading model {model_path}, type {model_type}:{submodel}')
+            self.logger.info(f'Loading model {model_path}, type {base_model}:{model_type}:{submodel}')
 
             # this will remove older cached models until
             # there is sufficient room to load the requested model
@@ -203,7 +211,7 @@ class ModelCache(object):
 
             # clean memory to make MemoryUsage() more accurate
             gc.collect()
-            model = model_info.get_model(submodel, torch_dtype=self.precision, variant=)
+            model = model_info.get_model(submodel, torch_dtype=self.precision)
             if mem_used := model_info.get_size(submodel):
                 self.logger.debug(f'CPU RAM used for load: {(mem_used/GIG):.2f} GB')
 
