@@ -10,7 +10,9 @@ from dataclasses import dataclass
 
 from invokeai.backend.model_management.model_manager import (
     ModelManager,
-    SDModelType,
+    BaseModelType,
+    ModelType,
+    SubModelType,
     SDModelInfo,
 )
 from invokeai.app.models.exceptions import CanceledException
@@ -20,12 +22,6 @@ from ...backend.util import choose_precision, choose_torch_device
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import BaseInvocation, InvocationContext
 
-@dataclass
-class LastUsedModel:
-    model_name: str=None
-    model_type: SDModelType=None
-
-last_used_model = LastUsedModel()
 
 class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory"""
@@ -48,8 +44,9 @@ class ModelManagerServiceBase(ABC):
     def get_model(
         self,
         model_name: str,
-        model_type: SDModelType = SDModelType.Diffusers,
-        submodel: Optional[SDModelType] = None,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: Optional[SubModelType] = None,
         node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
     ) -> SDModelInfo:
@@ -67,12 +64,13 @@ class ModelManagerServiceBase(ABC):
     def model_exists(
         self,
         model_name: str,
-        model_type: SDModelType,
+        base_model: BaseModelType,
+        model_type: ModelType,
     ) -> bool:
         pass
 
     @abstractmethod
-    def default_model(self) -> Optional[Tuple[str, SDModelType]]:
+    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
         """
         Returns the name and typeof the default model, or None
         if none is defined.
@@ -80,26 +78,26 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def set_default_model(self, model_name: str, model_type: SDModelType):
+    def set_default_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType):
         """Sets the default model to the indicated name."""
         pass
 
     @abstractmethod
-    def model_info(self, model_name: str, model_type: SDModelType) -> dict:
+    def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
         """
         pass
 
     @abstractmethod
-    def model_names(self) -> List[Tuple[str, SDModelType]]:
+    def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
         """
         Returns a list of all the model names known.
         """
         pass
 
     @abstractmethod
-    def list_models(self, model_type: SDModelType=None) -> dict:
+    def list_models(self, base_model: Optional[BaseModelType] = None, model_type: Optional[ModelType] = None) -> dict:
         """
         Return a dict of models in the format:
         { model_type1:
@@ -122,7 +120,8 @@ class ModelManagerServiceBase(ABC):
     def add_model(
         self,
         model_name: str,
-        model_type: SDModelType,
+        base_model: BaseModelType,
+        model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False
     ) -> None:
@@ -139,7 +138,8 @@ class ModelManagerServiceBase(ABC):
     def del_model(
         self,
         model_name: str,
-        model_type: SDModelType,
+        base_model: BaseModelType,
+        model_type: ModelType,
         delete_files: bool = False,
     ):
         """
@@ -297,8 +297,9 @@ class ModelManagerService(ModelManagerServiceBase):
     def get_model(
         self,
         model_name: str,
-        model_type: SDModelType = SDModelType.Diffusers,
-        submodel: Optional[SDModelType] = None,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: Optional[SubModelType] = None,
         node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
     ) -> SDModelInfo:
@@ -306,23 +307,6 @@ class ModelManagerService(ModelManagerServiceBase):
         Retrieve the indicated model. submodel can be used to get a
         part (such as the vae) of a diffusers mode.
         """
-        
-        # Temporary hack here: we remember the last model fetched
-        # so that when executing a graph, the first node called gets
-        # to set default model for subsequent nodes in the event that
-        # they do not set the model explicitly. This should be
-        # displaced by model loader mechanism.
-        # This is to work around lack of model loader at current time,
-        # which was causing inconsistent model usage throughout graph.
-        global last_used_model
-        
-        if not model_name:
-            self.logger.debug('No model name provided, defaulting to last loaded model')
-            model_name = last_used_model.model_name
-            model_type = model_type or last_used_model.model_type
-        else:
-            last_used_model.model_name = model_name
-            last_used_model.model_type = model_type
 
         # if we are called from within a node, then we get to emit
         # load start and complete events
@@ -331,12 +315,14 @@ class ModelManagerService(ModelManagerServiceBase):
                 node=node,
                 context=context,
                 model_name=model_name,
+                base_model=base_model,
                 model_type=model_type,
-                submodel=submodel
+                submodel=submodel,
             )
 
         model_info = self.mgr.get_model(
             model_name,
+            base_model,
             model_type,
             submodel,
         )
@@ -346,6 +332,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 node=node,
                 context=context,
                 model_name=model_name,
+                base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
                 model_info=model_info
@@ -356,7 +343,8 @@ class ModelManagerService(ModelManagerServiceBase):
     def model_exists(
         self,
         model_name: str,
-        model_type: SDModelType,
+        base_model: BaseModelType,
+        model_type: ModelType,
     ) -> bool:
         """
         Given a model name, returns True if it is a valid
@@ -364,33 +352,38 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         return self.mgr.model_exists(
             model_name,
+            base_model,
             model_type,
         )
 
-    def default_model(self) -> Optional[Tuple[str, SDModelType]]:
+    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
         """
         Returns the name of the default model, or None
         if none is defined.
         """
         return self.mgr.default_model()
 
-    def set_default_model(self, model_name: str, model_type: SDModelType):
+    def set_default_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType):
         """Sets the default model to the indicated name."""
-        self.mgr.set_default_model(model_name)
+        self.mgr.set_default_model(model_name, base_model, model_type)
 
-    def model_info(self, model_name: str, model_type: SDModelType) -> dict:
+    def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
         """
-        return self.mgr.model_info(model_name)
+        return self.mgr.model_info(model_name, base_model, model_type)
 
-    def model_names(self) -> List[Tuple[str, SDModelType]]:
+    def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
         """
         Returns a list of all the model names known.
         """
         return self.mgr.model_names()
 
-    def list_models(self, model_type: SDModelType=None) -> dict:
+    def list_models(
+        self,
+        base_model: Optional[BaseModelType] = None,
+        model_type: Optional[ModelType] = None
+    ) -> dict:
         """
         Return a dict of models in the format:
         { model_type1:
@@ -406,12 +399,13 @@ class ModelManagerService(ModelManagerServiceBase):
             { model_name_n: etc
         }
         """
-        return self.mgr.list_models()
+        return self.mgr.list_models(base_model, model_type)
 
     def add_model(
         self,
         model_name: str,
-        model_type: SDModelType,
+        base_model: BaseModelType,
+        model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False,
     )->None:
@@ -422,13 +416,14 @@ class ModelManagerService(ModelManagerServiceBase):
         with an assertion error if provided attributes are incorrect or 
         the model name is missing. Call commit() to write changes to disk.
         """
-        return self.mgr.add_model(model_name, model_type, model_attributes, clobber)
+        return self.mgr.add_model(model_name, base_model, model_type, model_attributes, clobber)
 
 
     def del_model(
         self,
         model_name: str,
-        model_type: SDModelType = SDModelType.Diffusers,
+        base_model: BaseModelType,
+        model_type: ModelType,
         delete_files: bool = False,
     ):
         """
@@ -436,7 +431,7 @@ class ModelManagerService(ModelManagerServiceBase):
         then the underlying weight file or diffusers directory will be deleted 
         as well. Call commit() to write to disk.
         """
-        self.mgr.del_model(model_name, model_type, delete_files)
+        self.mgr.del_model(model_name, base_model, model_type, delete_files)
 
     def import_diffuser_model(
         self,
@@ -541,8 +536,9 @@ class ModelManagerService(ModelManagerServiceBase):
         node,
         context,
         model_name: str,
-        model_type: SDModelType,
-        submodel: SDModelType,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: SubModelType,
         model_info: Optional[SDModelInfo] = None,
     ):
         if context.services.queue.is_canceled(context.graph_execution_state_id):
@@ -555,6 +551,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 node=node.dict(),
                 source_node_id=source_node_id,
                 model_name=model_name,
+                base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
                 model_info=model_info
@@ -565,6 +562,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 node=node.dict(),
                 source_node_id=source_node_id,
                 model_name=model_name,
+                base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
             )

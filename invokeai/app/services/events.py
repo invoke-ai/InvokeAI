@@ -3,7 +3,7 @@
 from typing import Any
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.util.misc import get_timestamp
-from invokeai.app.services.model_manager_service import SDModelType, SDModelInfo
+from invokeai.app.services.model_manager_service import BaseModelType, ModelType, SubModelType, SDModelInfo
 from invokeai.app.models.exceptions import CanceledException
 
 class EventServiceBase:
@@ -109,8 +109,9 @@ class EventServiceBase:
             node: dict,
             source_node_id: str,
             model_name: str,
-            model_type: SDModelType,
-            submodel: SDModelType,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            submodel: SubModelType,
     ) -> None:
         """Emitted when a model is requested"""
         self.__emit_session_event(
@@ -120,6 +121,7 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 model_name=model_name,
+                base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
             ),
@@ -131,8 +133,9 @@ class EventServiceBase:
             node: dict,
             source_node_id: str,
             model_name: str,
-            model_type: SDModelType,
-            submodel: SDModelType,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            submodel: SubModelType,
             model_info: SDModelInfo,
     ) -> None:
         """Emitted when a model is correctly loaded (returns model info)"""
@@ -143,6 +146,7 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 model_name=model_name,
+                base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
                 model_info=model_info,

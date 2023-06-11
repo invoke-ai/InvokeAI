@@ -167,6 +167,8 @@ from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
+from pydantic import BaseModel
+
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, download_with_resume
@@ -539,14 +541,16 @@ class ModelManager(object):
     def del_model(
         self,
         model_name: str,
-        model_type: SDModelType.Diffusers,
+        base_model: BaseModelType,
+        model_type: ModelType,
         delete_files: bool = False,
     ):
         """
         Delete the named model.
         """
-        model_key = self.create_key(model_name, model_type)
-        model_cfg = self.pop(model_key, None)
+        raise Exception("TODO: del_model") # TODO: redo
+        model_key = self.create_key(model_name, base_model, model_type)
+        model_cfg = self.models.pop(model_key, None)
 
         if model_cfg is None:
             self.logger.error(

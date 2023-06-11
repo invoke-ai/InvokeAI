@@ -39,7 +39,7 @@ from invokeai.app.services.config import get_invokeai_config
 
 from .lora import LoRAModel, TextualInversionModel
 
-from .models import BaseModelType, ModelType, SubModelType
+from .models import BaseModelType, ModelType, SubModelType, ModelBase
 
 
 # Maximum size of the cache, in gigs

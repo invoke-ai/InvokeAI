@@ -24,7 +24,7 @@ class ModelType(str, Enum):
     ControlNet = "controlnet"
     TextualInversion = "embedding"
 
-class SubModelType:
+class SubModelType(str, Enum):
     UNet = "unet"
     TextEncoder = "text_encoder"
     Tokenizer = "tokenizer"
