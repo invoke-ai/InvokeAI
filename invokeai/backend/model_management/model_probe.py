@@ -4,13 +4,14 @@ import torch
 import safetensors.torch
 
 from dataclasses import dataclass
-from diffusers import ModelMixin
+from diffusers import ModelMixin, ConfigMixin, StableDiffusionPipeline, AutoencoderKL, ControlNetModel
 from pathlib import Path
 from typing import Callable, Literal, Union, Dict
 from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from .models import BaseModelType, ModelType, VariantType
+from .model_cache import SilenceWarnings
 
 @dataclass
 class ModelVariantInfo(object):
@@ -30,10 +31,9 @@ class ModelProbe(object):
     }
 
     CLASS2TYPE = {
-        "StableDiffusionPipeline" : ModelType.Pipeline,
-        "AutoencoderKL": ModelType.Vae,
-        "ControlNetModel" : ModelType.ControlNet,
-        
+        'StableDiffusionPipeline' : ModelType.Pipeline,
+        'AutoencoderKL' : ModelType.Vae,
+        'ControlNetModel' : ModelType.ControlNet,
     }
     
     @classmethod
@@ -56,7 +56,11 @@ class ModelProbe(object):
         the path to the model and returns the BaseModelType. It is called to distinguish
         between V2-Base and V2-768 SD models.
         '''
-        format = 'folder' if model_path.is_dir() else 'file'
+        if model_path:
+            format = 'folder' if model_path.is_dir() else 'checkpoint'
+        else:
+            format = 'folder' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
+            
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
@@ -102,32 +106,37 @@ class ModelProbe(object):
         '''
         Get the model type of a hugging-face style folder.
         '''
-        if (folder_path / 'learned_embeds.bin').exists():
-            return ModelType.TextualInversion
+        if model:
+            class_name = model.__class__.__name__
+        else:
+            if (folder_path / 'learned_embeds.bin').exists():
+                return ModelType.TextualInversion
 
-        if (folder_path / 'pytorch_lora_weights.bin').exists():
-            return ModelType.Lora
+            if (folder_path / 'pytorch_lora_weights.bin').exists():
+                return ModelType.Lora
 
-        i  = folder_path / 'model_index.json'
-        c = folder_path / 'config.json'
-        config_path = i if i.exists() else c if c.exists() else None
-        
-        if config_path:
-            conf = json.loads(config_path)
-            class_name = conf['_class_name']
-            if type := cls.CLASS2TYPE.get(class_name):
-                return type
+            i  = folder_path / 'model_index.json'
+            c = folder_path / 'config.json'
+            config_path = i if i.exists() else c if c.exists() else None
+
+            if config_path:
+                conf = json.load(open(config_path,'r'))
+                class_name = conf['_class_name']
+
+        if type := cls.CLASS2TYPE.get(class_name):
+            return type
 
         # give up
-        raise ValueError("Unable to determine model type of {model_path}")
+        raise ValueError("Unable to determine model type")
 
     @classmethod
     def _scan_and_load_checkpoint(cls,model_path: Path)->dict:
-        if model_path.suffix.endswith((".ckpt", ".pt", ".bin")):
-            cls._scan_model(model_path, model_path)
-            return torch.load(model_path)
-        else:
-            return safetensors.torch.load_file(model_path)
+        with SilenceWarnings():
+            if model_path.suffix.endswith((".ckpt", ".pt", ".bin")):
+                cls._scan_model(model_path, model_path)
+                return torch.load(model_path)
+            else:
+                return safetensors.torch.load_file(model_path)
 
     @classmethod
     def _scan_model(cls, model_name, checkpoint):
@@ -255,44 +264,59 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
 #######################################################
 class FolderProbeBase(ProbeBase):
     def __init__(self,
-                 model: ModelMixin,
                  folder_path: Path,
+                 model: ModelMixin = None,
                  helper: Callable=None  # not used
                  ):
         self.model = model
         self.folder_path = folder_path
 
     def get_variant_type(self)->VariantType:
-
-        # only works for pipelines
-        config_file = self.folder_path / 'unet' / 'config.json'
-        if not config_file.exists():
-            return VariantType.Normal
-
-        conf = json.loads(config_file)
-        channels = conf['in_channels']
-        if channels == 9:
-            return VariantType.Inpainting
-        elif channels == 5:
-            return VariantType.Depth
-        elif channels == 4:
-            return VariantType.Normal
-        else:
-            return VariantType.Normal
+        return VariantType.Normal
 
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
-        config_file = self.folder_path / 'scheduler' / 'scheduler_config.json'
-        if not config_file.exists():
-            return None
-        conf = json.load(config_file)
-        if conf['prediction_type'] == "v_prediction":
-            return BaseModelType.StableDiffusion2
-        elif conf['prediction_type'] == 'epsilon':
-            return BaseModelType.StableDiffusion2Base
+        if self.model:
+            unet_conf = self.model.unet.config
+            scheduler_conf = self.model.scheduler.config
         else:
-            return BaseModelType.StableDiffusion2
+            unet_conf = json.load(open(self.folder_path / 'unet' / 'config.json','r'))
+            scheduler_conf = json.load(open(self.folder_path / 'scheduler' / 'scheduler_config.json','r'))
+            
+        if unet_conf['cross_attention_dim'] == 768:
+          return BaseModelType.StableDiffusion1_5  
+        elif unet_conf['cross_attention_dim'] == 1024:
+            if scheduler_conf['prediction_type'] == "v_prediction":
+                return BaseModelType.StableDiffusion2
+            elif scheduler_conf['prediction_type'] == 'epsilon':
+                return BaseModelType.StableDiffusion2Base
+            else:
+                return BaseModelType.StableDiffusion2
+        else:
+            raise ValueError(f'Unknown base model for {self.folder_path}')
         
+    def get_variant_type(self)->VariantType:
+        # This only works for pipelines! Any kind of
+        # exception results in our returning the
+        # "normal" variant type
+        try:
+            if self.model:
+                conf = self.model.unet.config
+            else:
+                config_file = self.folder_path / 'unet' / 'config.json'
+                conf = json.load(open(config_file,'r'))
+                
+            in_channels = conf['in_channels']
+            if in_channels == 9:
+                return VariantType.Inpainting
+            elif in_channels == 5:
+                return VariantType.Depth
+            elif in_channels == 4:
+                return VariantType.Normal
+        except:
+            pass
+        return VariantType.Normal
+
 class VaeFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
         return BaseModelType.StableDiffusion1_5

@@ -21,9 +21,8 @@ class BaseModelType(str, Enum):
 class ModelType(str, Enum):
     Pipeline = "pipeline"
     Vae = "vae"
-
     Lora = "lora"
-    #ControlNet = "controlnet"
+    ControlNet = "controlnet" # used by model_probe
     TextualInversion = "embedding"
 
 class SubModelType(str, Enum):

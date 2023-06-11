@@ -29,6 +29,7 @@ import torch
 
 from diffusers import logging as diffusers_logging
 from transformers import logging as transformers_logging
+import logging
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import get_invokeai_config
 from .lora import LoRAModel, TextualInversionModel

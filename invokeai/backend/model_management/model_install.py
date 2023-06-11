@@ -4,6 +4,8 @@ Routines for downloading and installing models.
 import json
 import safetensors
 import safetensors.torch
+import shutil
+import tempfile
 import torch
 import traceback
 from dataclasses import dataclass
@@ -14,8 +16,10 @@ from pathlib import Path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from .models import BaseModelType, ModelType
+from . import ModelManager
+from .models import BaseModelType, ModelType, VariantType
 from .model_probe import ModelProbe, ModelVariantInfo
+from .model_cache import SilenceWarnings
 
 class ModelInstall(object):
     '''
@@ -53,33 +57,50 @@ class ModelInstall(object):
         model_info = self.prober.probe(checkpoint, self.helper)
         if not model_info:
             raise ValueError(f"Unable to determine type of checkpoint file {checkpoint}")
+
+        key = ModelManager.create_key(
+            model_name = checkpoint.stem,
+            base_model = model_info.base_type,
+            model_type = model_info.model_type,
+        )
+        destination_path = self._dest_path(model_info) / checkpoint
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        self._check_for_collision(destination_path)
+        stanza = {
+            key: dict(
+                name = checkpoint.stem,
+                description = f'{model_info.model_type} model {checkpoint.stem}',
+                base = model_info.base_model.value,
+                type = model_info.model_type.value,
+                variant = model_info.variant_type.value,
+                path = str(destination_path),
+            )
+       }
         
         # non-pipeline; no conversion needed, just copy into right place
         if model_info.model_type != ModelType.Pipeline:
-            destination_path = self._dest_path(model_info) / checkpoint.name
-            self._check_for_collision(destination_path)
             shutil.copyfile(checkpoint, destination_path)
-            key = ModelManager.create_key(
-                model_name = checkpoint.stem,
-                base_model = model_info.base_type
-                model_type = model_info.model_type
-            )
-            return {
-                key: dict(
-                    name = model_name,
-                    description = f'{model_info.model_type} model {model_name}',
-                    path = str(destination_path),
-                    format = 'checkpoint',
-                    base = str(base_model),
-                    type = str(model_type),
-                    variant = str(model_info.variant_type),
-                )
-            }
-                                        
+            stanza[key].update({'format': 'checkpoint'})
             
-        destination_path = self._dest_path(model_info) / checkpoint.stem
+        # pipeline - conversion needed here
+        else:
+            destination_path = self._dest_path(model_info) / checkpoint.stem
+            config_file = self._pipeline_type_to_config_file(model_info.model_type)
 
-
+            from .convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
+            with SilenceWarnings:
+                convert_ckpt_to_diffusers(
+                    checkpoint,
+                    destination_path,
+                    extract_ema=True,
+                    original_config_file=config_file,
+                    scan_needed=False,
+                )
+            stanza[key].update({'format': 'folder',
+                                'path': destination_path, # no suffix on this
+                                })
+            
+        return stanza
 
 
     def _check_for_collision(self, path: Path):

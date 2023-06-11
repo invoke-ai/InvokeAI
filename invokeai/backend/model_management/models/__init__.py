@@ -1,4 +1,4 @@
-from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase
+from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, VariantType
 from .stable_diffusion import StableDiffusion15Model, StableDiffusion2Model, StableDiffusion2BaseModel
 from .vae import VaeModel
 from .lora import LoRAModel
