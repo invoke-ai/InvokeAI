@@ -9,5 +9,8 @@ from .generator import (
     Img2Img,
     Inpaint
 )
-from .model_management import ModelManager, ModelCache, BaseModelType, ModelType, SubmodelType, ModelInfo
+from .model_management import (
+    ModelManager, ModelCache, BaseModelType,
+    ModelType, SubModelType, ModelInfo
+    )
 from .safety_checker import SafetyChecker

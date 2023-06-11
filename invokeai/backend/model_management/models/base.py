@@ -35,6 +35,11 @@ class SubModelType(str, Enum):
     SafetyChecker = "safety_checker"
     #MoVQ = "movq"
 
+class VariantType(str, Enum):
+    Normal = "normal"
+    Inpaint = "inpaint"
+    Depth = "depth"
+    
 class ModelError(str, Enum):
     NotFound = "not_found"
 

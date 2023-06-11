@@ -331,8 +331,9 @@ class ModelManager(object):
         model_key = self.create_key(model_name, base_model, model_type)
         return model_key in self.models
 
+    @classmethod
     def create_key(
-        self,
+        cls,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
