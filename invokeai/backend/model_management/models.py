@@ -1,8 +1,14 @@
 import sys
+from dataclasses import dataclass
 from enum import Enum
 import torch
 import safetensors.torch
+from diffusers import ConfigMixin
 from diffusers.utils import is_safetensors_available
+from omegaconf import DictConfig
+from pathlib import Path
+from pydantic import BaseModel, Field, root_validator
+from typing import Union, List, Type, Optional
 
 class BaseModelType(str, Enum):
     # TODO: maybe then add sample size(512/768)?
@@ -26,42 +32,13 @@ class SubModelType:
     Vae = "vae"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
+    FeatureExtractor = "feature_extractor"
     #MoVQ = "movq"
 
-MODEL_CLASSES = {
-    BaseModel.StableDiffusion1_5: {
-        ModelType.Pipeline: StableDiffusionModel,
-        ModelType.Classifier: ClassifierModel,
-        ModelType.Vae: VaeModel,
-        ModelType.Lora: LoraModel,
-        ModelType.ControlNet: ControlNetModel,
-        ModelType.TextualInversion: TextualInversionModel,
-    },
-    BaseModel.StableDiffusion2: {
-        ModelType.Pipeline: StableDiffusionModel,
-        ModelType.Classifier: ClassifierModel,
-        ModelType.Vae: VaeModel,
-        ModelType.Lora: LoraModel,
-        ModelType.ControlNet: ControlNetModel,
-        ModelType.TextualInversion: TextualInversionModel,
-    },
-    BaseModel.StableDiffusion2Base: {
-        ModelType.Pipeline: StableDiffusionModel,
-        ModelType.Classifier: ClassifierModel,
-        ModelType.Vae: VaeModel,
-        ModelType.Lora: LoraModel,
-        ModelType.ControlNet: ControlNetModel,
-        ModelType.TextualInversion: TextualInversionModel,
-    },
-    #BaseModel.Kandinsky2_1: {
-    #    ModelType.Pipeline: Kandinsky2_1Model,
-    #    ModelType.Classifier: ClassifierModel,
-    #    ModelType.MoVQ: MoVQModel,
-    #    ModelType.Lora: LoraModel,
-    #    ModelType.ControlNet: ControlNetModel,
-    #    ModelType.TextualInversion: TextualInversionModel,
-    #},
-}
+class VariantType(str, Enum):
+    Normal = "normal"
+    Inpaint = "inpaint"
+    Depth = "depth"
 
 class EmptyConfigLoader(ConfigMixin):
     @classmethod
@@ -323,7 +300,7 @@ class ClassifierModel(ModelBase):
     #child_sizes: Dict[str, int]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
-        assert model_type == SDModelType.Classifier
+        assert model_type == ModelType.Classifier
         super().__init__(model_path, base_model, model_type)
 
         self.child_types: Dict[str, Type] = dict()
@@ -354,8 +331,8 @@ class ClassifierModel(ModelBase):
         else:
             raise Exception("Invalid classifier model! (Failed to detect tokenizer type)")
 
-        self.child_types[SDModelType.Tokenizer] = self._hf_definition_to_type(["transformers", tokenizer_class_name])
-        self.child_sizes[SDModelType.Tokenizer] = 0
+        self.child_types[SubModelType.Tokenizer] = self._hf_definition_to_type(["transformers", tokenizer_class_name])
+        self.child_sizes[SubModelType.Tokenizer] = 0
 
 
     def _load_text_encoder(self, main_config: dict):
@@ -366,12 +343,12 @@ class ClassifierModel(ModelBase):
         else:
             raise Exception("Invalid classifier model! (Failed to detect text_encoder type)")
 
-        self.child_types[SDModelType.TextEncoder] = self._hf_definition_to_type(["transformers", text_encoder_class_name])
-        self.child_sizes[SDModelType.TextEncoder] = calc_model_size_by_fs(self.model_path)
+        self.child_types[SubModelType.TextEncoder] = self._hf_definition_to_type(["transformers", text_encoder_class_name])
+        self.child_sizes[SubModelType.TextEncoder] = calc_model_size_by_fs(self.model_path)
 
 
     def _load_feature_extractor(self, main_config: dict):
-        self.child_sizes[SDModelType.FeatureExtractor] = 0
+        self.child_sizes[SubModelType.FeatureExtractor] = 0
         try:
             feature_extractor_config = EmptyConfigLoader.load_config(self.model_path, config_name="preprocessor_config.json")
         except:
@@ -379,12 +356,12 @@ class ClassifierModel(ModelBase):
 
         try:
             feature_extractor_class_name = feature_extractor_config["feature_extractor_type"]
-            self.child_types[SDModelType.FeatureExtractor] = self._hf_definition_to_type(["transformers", feature_extractor_class_name])
+            self.child_types[SubModelType.FeatureExtractor] = self._hf_definition_to_type(["transformers", feature_extractor_class_name])
         except:
             raise Exception("Invalid classifier model! (Unknown feature_extrator type)")
 
 
-    def get_size(self, child_type: Optional[SDModelType] = None):
+    def get_size(self, child_type: Optional[SubModelType] = None):
         if child_type is None:
             return sum(self.child_sizes.values())
         else:
@@ -394,7 +371,7 @@ class ClassifierModel(ModelBase):
     def get_model(
         self,
         torch_dtype: Optional[torch.dtype],
-        child_type: Optional[SDModelType] = None,
+        child_type: Optional[SubModelType] = None,
     ):
         if child_type is None:
             raise Exception("Child model type can't be null on classififer model")
@@ -437,7 +414,7 @@ class VaeModel(ModelBase):
         except:
             raise Exception("Invalid vae model! (Unkown vae type)")
 
-    def get_size(self, child_type: Optional[SDModelType] = None):
+    def get_size(self, child_type: Optional[SubModelType] = None):
         if child_type is not None:
             raise Exception("There is no child models in vae model")
         return self.model_size
@@ -445,7 +422,7 @@ class VaeModel(ModelBase):
     def get_model(
         self,
         torch_dtype: Optional[torch.dtype],
-        child_type: Optional[SDModelType] = None,
+        child_type: Optional[SubModelType] = None,
     ):
         if child_type is not None:
             raise Exception("There is no child models in vae model")
@@ -476,7 +453,7 @@ class LoRAModel(ModelBase):
 
         self.model_size = os.path.getsize(self.model_path)
 
-    def get_size(self, child_type: Optional[SDModelType] = None):
+    def get_size(self, child_type: Optional[SubModelType] = None):
         if child_type is not None:
             raise Exception("There is no child models in lora")
         return self.model_size
@@ -484,7 +461,7 @@ class LoRAModel(ModelBase):
     def get_model(
         self,
         torch_dtype: Optional[torch.dtype],
-        child_type: Optional[SDModelType] = None,
+        child_type: Optional[SubModelType] = None,
     ):
         if child_type is not None:
             raise Exception("There is no child models in lora")
@@ -505,7 +482,6 @@ class LoRAModel(ModelBase):
         # TODO: add diffusers lora when it stabilizes a bit
         return model_path
 
-
 class TextualInversionModel(ModelBase):
     #model_size: int
 
@@ -515,7 +491,7 @@ class TextualInversionModel(ModelBase):
 
         self.model_size = os.path.getsize(self.model_path)
 
-    def get_size(self, child_type: Optional[SDModelType] = None):
+    def get_size(self, child_type: Optional[SubModelType] = None):
         if child_type is not None:
             raise Exception("There is no child models in textual inversion")
         return self.model_size
@@ -523,7 +499,7 @@ class TextualInversionModel(ModelBase):
     def get_model(
         self,
         torch_dtype: Optional[torch.dtype],
-        child_type: Optional[SDModelType] = None,
+        child_type: Optional[SubModelType] = None,
     ):
         if child_type is not None:
             raise Exception("There is no child models in textual inversion")
@@ -541,6 +517,10 @@ class TextualInversionModel(ModelBase):
         if not isinstance(model_path, Path):
             model_path = Path(model_path)
         return model_path
+
+class ControlNetModel(ModelBase):
+    """requires implementation"""
+    pass
 
 def calc_model_size_by_fs(
     model_path: str,
@@ -710,3 +690,39 @@ def _convert_vae_ckpt_and_cache(self, mconfig: DictConfig) -> Path:
         safe_serialization=is_safetensors_available()
     )
     return diffusers_path
+
+MODEL_CLASSES = {
+    BaseModelType.StableDiffusion1_5: {
+        ModelType.Pipeline: StableDiffusionModel,
+        ModelType.Classifier: ClassifierModel,
+        ModelType.Vae: VaeModel,
+        ModelType.Lora: LoRAModel,
+        ModelType.ControlNet: ControlNetModel,
+        ModelType.TextualInversion: TextualInversionModel,
+    },
+    BaseModelType.StableDiffusion2: {
+        ModelType.Pipeline: StableDiffusionModel,
+        ModelType.Classifier: ClassifierModel,
+        ModelType.Vae: VaeModel,
+        ModelType.Lora: LoRAModel,
+        ModelType.ControlNet: ControlNetModel,
+        ModelType.TextualInversion: TextualInversionModel,
+    },
+    BaseModelType.StableDiffusion2Base: {
+        ModelType.Pipeline: StableDiffusionModel,
+        ModelType.Classifier: ClassifierModel,
+        ModelType.Vae: VaeModel,
+        ModelType.Lora: LoRAModel,
+        ModelType.ControlNet: ControlNetModel,
+        ModelType.TextualInversion: TextualInversionModel,
+    },
+    #BaseModel.Kandinsky2_1: {
+    #    ModelType.Pipeline: Kandinsky2_1Model,
+    #    ModelType.Classifier: ClassifierModel,
+    #    ModelType.MoVQ: MoVQModel,
+    #    ModelType.Lora: LoraModel,
+    #    ModelType.ControlNet: ControlNetModel,
+    #    ModelType.TextualInversion: TextualInversionModel,
+    #},
+}
+

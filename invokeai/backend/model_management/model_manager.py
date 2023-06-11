@@ -3,13 +3,13 @@ symbolic diffusers model names to the paths and repo_ids used
 by the underlying `from_pretrained()` call.
 
 For fetching models, use manager.get_model('symbolic name'). This will
-return a SDModelInfo object that contains the following attributes:
+return a ModelInfo object that contains the following attributes:
    
    * context -- a context manager Generator that loads and locks the 
                 model into GPU VRAM and returns the model for use. 
                 See below for usage.
    * name -- symbolic name of the model
-   * type -- SDModelType of the model
+   * type -- SubModelType of the model
    * hash -- unique hash for the model
    * location -- path or repo_id of the model
    * revision -- revision of the model if coming from a repo id,
@@ -25,7 +25,7 @@ Typical usage:
                  max_cache_size=8
              ) # gigabytes
 
-   model_info = manager.get_model('stable-diffusion-1.5', SDModelType.Diffusers)
+   model_info = manager.get_model('stable-diffusion-1.5', SubModelType.Diffusers)
    with model_info.context as my_model:
       my_model.latents_from_embeddings(...)
 
@@ -43,7 +43,7 @@ parameter:
 
     model_info = manager.get_model(
                       'clip-tokenizer',
-                       model_type=SDModelType.Tokenizer
+                       model_type=SubModelType.Tokenizer
                       )
 
 This will raise an InvalidModelError if the format defined in the
@@ -63,7 +63,7 @@ The general format of a models.yaml section is:
 The type of model is given in the stanza key, and is one of
 {diffusers, ckpt, vae, text_encoder, tokenizer, unet, scheduler,
 safety_checker, feature_extractor, lora, textual_inversion,
-controlnet}, and correspond to items in the SDModelType enum defined
+controlnet}, and correspond to items in the SubModelType enum defined
 in model_cache.py
 
 The format indicates whether the model is organized as a folder with
@@ -96,7 +96,7 @@ SUBMODELS:
 It is also possible to fetch an isolated submodel from a diffusers
 model. Use the `submodel` parameter to select which part:
 
- vae = manager.get_model('stable-diffusion-1.5',submodel=SDModelType.Vae)
+ vae = manager.get_model('stable-diffusion-1.5',submodel=SubModelType.Vae)
  with vae.context as my_vae:
     print(type(my_vae))
     # "AutoencoderKL"
@@ -128,8 +128,8 @@ separated by "/". Example:
 You can now use the `model_type` argument to indicate which model you
 want:
 
- tokenizer = mgr.get('clip-large',model_type=SDModelType.Tokenizer)
- encoder = mgr.get('clip-large',model_type=SDModelType.TextEncoder)
+ tokenizer = mgr.get('clip-large',model_type=SubModelType.Tokenizer)
+ encoder = mgr.get('clip-large',model_type=SubModelType.TextEncoder)
 
 OTHER FUNCTIONS:
 
@@ -164,15 +164,24 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, download_with_resume
 from .model_cache import ModelCache, ModelLocker
-from .models import BaseModelType, ModelType, SubModelType, MODEL_CLASSES
+from .models import BaseModelType, SubModelType, MODEL_CLASSES
+
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
 # reduce confusion.
 CONFIG_FILE_VERSION='3.0.0'
 
-# wanted to use pydantic here, but Generator objects not supported
+# temporary forward definitions to avoid circular import errors.
+class ModelLocker(object):
+    "Forward declaration"
+    pass
+
+class ModelCache(object):
+    "Forward declaration"
+    pass
+
 @dataclass
-class SDModelInfo():
+class ModelInfo():
     context: ModelLocker
     name: str
     type: ModelType
@@ -303,7 +312,7 @@ class ModelManager(object):
         submodel_type: Optional[SubModelType] = None
     ):
         """Given a model named identified in models.yaml, return
-        an SDModelInfo object describing it.
+        an ModelInfo object describing it.
         :param model_name: symbolic name of the model in models.yaml
         :param model_type: ModelType enum indicating the type of model to return
         :param submode_typel: an ModelType enum indicating the portion of 
@@ -389,7 +398,7 @@ class ModelManager(object):
 
         hash = "<NO_HASH>" # TODO:
             
-        return SDModelInfo(
+        return ModelInfo(
             context = model_context,
             name = model_name,
             base_model = base_model,
@@ -746,62 +755,3 @@ class ModelManager(object):
             if self.config_path:
                 self.commit()
 
-    def _delete_defunct_models(self):
-        '''
-        Remove models no longer on disk.
-        '''
-        config = self.config
-        
-        to_delete = set()
-        for key in config:
-            if 'path' not in config[key]:
-                continue
-            path = self.globals.root_dir / config[key].path
-            if path.exists():
-                continue
-            to_delete.add(key)
-            
-        for key in to_delete:
-            self.logger.warn(f'Removing model {key} from in-memory config because its path is no longer on disk')
-            config.pop(key)
-
-    def scan_models_directory(self, include_diffusers:bool=False):
-        '''
-        Scan the models directory for loras, textual_inversions and controlnets
-        and create appropriate entries in the in-memory omegaconf. Diffusers
-        will not be added unless include_diffusers is true.
-        '''
-        self._delete_defunct_models()
-        
-        model_directory = self.globals.models_path
-        config = self.config
-        
-        for root, dirs, files in os.walk(model_directory):
-            parents = root.split('/')
-            subpaths = parents[parents.index('models')+1:]
-            if len(subpaths) < 2:
-                continue
-            base, model_type, *_ = subpaths
-            
-            if model_type == "diffusers" and not include_diffusers:
-                continue
-            
-            for d in dirs:
-                config[f'{model_type}/{d}'] = dict(
-                    path = os.path.join(root,d),
-                    description = f'{model_type} model {d}',
-                    format = 'folder',
-                    base = base,
-                )
-
-            for f in files:
-                basename = Path(f).stem
-                format = Path(f).suffix[1:]
-                config[f'{model_type}/{basename}'] = dict(
-                    path = os.path.join(root,f),
-                    description = f'{model_type} model {basename}',
-                    format = format,
-                    base = base,
-                )
-                
-        

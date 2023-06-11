@@ -29,11 +29,8 @@ import torch
 
 from diffusers import logging as diffusers_logging
 from transformers import logging as transformers_logging
-
 import invokeai.backend.util.logging as logger
-
-from .model_manager import SDModelInfo, ModelType, SubModelType, ModelBase
-
+from .models import ModelType, SubModelType, ModelBase
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -48,6 +45,10 @@ class ModelLocker(object):
 
 class ModelCache(object):
     "Forward declaration"
+    pass
+
+class SDModelInfo(object):
+    """Forward declaration"""
     pass
 
 class _CacheRecord:
