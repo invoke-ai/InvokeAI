@@ -18,6 +18,8 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   ColorField: 'color',
   ControlField: 'control',
   control: 'control',
+  cfg_scale: 'float',
+  control_weight: 'float',
 };
 
 const COLOR_TOKEN_VALUE = 500;

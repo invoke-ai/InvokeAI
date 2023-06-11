@@ -65,7 +65,6 @@ from typing import Optional, Union, List, get_args
 def is_union_subtype(t1, t2):
     t1_args = get_args(t1)
     t2_args = get_args(t2)
-    
     if not t1_args:
         # t1 is a single type
         return t1 in t2_args
@@ -86,7 +85,6 @@ def is_list_or_contains_list(t):
         for arg in t_args:
             if get_origin(arg) is list:
                 return True
-                
     return False
 
 
@@ -393,7 +391,7 @@ class Graph(BaseModel):
             from_node = self.get_node(edge.source.node_id)
             to_node = self.get_node(edge.destination.node_id)
         except NodeNotFoundError:
-            raise InvalidEdgeError("One or both nodes don't exist")
+            raise InvalidEdgeError("One or both nodes don't exist: {edge.source.node_id} -> {edge.destination.node_id}")
 
         # Validate that an edge to this node+field doesn't already exist
         input_edges = self._get_input_edges(edge.destination.node_id, edge.destination.field)
@@ -404,41 +402,41 @@ class Graph(BaseModel):
         g = self.nx_graph_flat()
         g.add_edge(edge.source.node_id, edge.destination.node_id)
         if not nx.is_directed_acyclic_graph(g):
-            raise InvalidEdgeError(f'Edge creates a cycle in the graph')
+            raise InvalidEdgeError(f'Edge creates a cycle in the graph: {edge.source.node_id} -> {edge.destination.node_id}')
 
         # Validate that the field types are compatible
         if not are_connections_compatible(
             from_node, edge.source.field, to_node, edge.destination.field
         ):
-            raise InvalidEdgeError(f'Fields are incompatible')
+            raise InvalidEdgeError(f'Fields are incompatible: cannot connect {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if iterator output type matches iterator input type (if this edge results in both being set)
         if isinstance(to_node, IterateInvocation) and edge.destination.field == "collection":
             if not self._is_iterator_connection_valid(
                 edge.destination.node_id, new_input=edge.source
             ):
-                raise InvalidEdgeError(f'Iterator input type does not match iterator output type')
+                raise InvalidEdgeError(f'Iterator input type does not match iterator output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if iterator input type matches output type (if this edge results in both being set)
         if isinstance(from_node, IterateInvocation) and edge.source.field == "item":
             if not self._is_iterator_connection_valid(
                 edge.source.node_id, new_output=edge.destination
             ):
-                raise InvalidEdgeError(f'Iterator output type does not match iterator input type')
+                raise InvalidEdgeError(f'Iterator output type does not match iterator input type:, {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if collector input type matches output type (if this edge results in both being set)
         if isinstance(to_node, CollectInvocation) and edge.destination.field == "item":
             if not self._is_collector_connection_valid(
                 edge.destination.node_id, new_input=edge.source
             ):
-                raise InvalidEdgeError(f'Collector output type does not match collector input type')
+                raise InvalidEdgeError(f'Collector output type does not match collector input type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if collector output type matches input type (if this edge results in both being set)
         if isinstance(from_node, CollectInvocation) and edge.source.field == "collection":
             if not self._is_collector_connection_valid(
                 edge.source.node_id, new_output=edge.destination
             ):
-                raise InvalidEdgeError(f'Collector input type does not match collector output type')
+                raise InvalidEdgeError(f'Collector input type does not match collector output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
 
     def has_node(self, node_path: str) -> bool:
