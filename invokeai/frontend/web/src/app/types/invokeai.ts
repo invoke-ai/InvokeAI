@@ -1,3 +1,7 @@
+import {
+  CONTROLNET_MODELS,
+  CONTROLNET_PROCESSORS,
+} from 'features/controlNet/store/constants';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { O } from 'ts-toolbelt';
 
@@ -117,8 +121,8 @@ export type AppConfig = {
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     defaultModel?: string;
-    disabledControlNetModels: string[];
-    disabledControlNetProcessors: string[];
+    disabledControlNetModels: (keyof typeof CONTROLNET_MODELS)[];
+    disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
     iterations: {
       initial: number;
       min: number;

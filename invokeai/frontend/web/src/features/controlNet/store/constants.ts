@@ -181,7 +181,7 @@ type ControlNetModel = {
   defaultProcessor?: ControlNetProcessorType;
 };
 
-export const CONTROLNET_MODELS: Record<string, ControlNetModel> = {
+export const CONTROLNET_MODELS = {
   'lllyasviel/control_v11p_sd15_canny': {
     type: 'lllyasviel/control_v11p_sd15_canny',
     label: 'Canny',
