@@ -3,10 +3,10 @@ import { isEqual } from 'lodash-es';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Select } from '@mantine/core';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAICustomSelectOption } from 'common/components/IAICustomSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { modelSelected } from 'features/parameters/store/generationSlice';
 import { selectModelsAll, selectModelsById } from '../store/modelSlice';
@@ -62,12 +62,11 @@ const ModelSelect = () => {
   // );
 
   return (
-    <Select
+    <IAIMantineSelect
       label={t('modelManager.model')}
       value={selectedModel?.name ?? ''}
       placeholder="Pick one"
       data={modelData}
-      searchable
       onChange={handleChangeModel}
     />
   );
