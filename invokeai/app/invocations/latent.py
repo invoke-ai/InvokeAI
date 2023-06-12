@@ -5,7 +5,7 @@ import einops
 from typing import Literal, Optional, Union, List
 
 from compel import Compel
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+from diffusers.pipelines.controlnet import MultiControlNetModel
 
 from pydantic import BaseModel, Field, validator
 import torch
