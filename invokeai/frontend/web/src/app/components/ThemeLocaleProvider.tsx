@@ -53,7 +53,7 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   }, [direction]);
 
   return (
-    <MantineProvider withGlobalStyles withNormalizeCSS theme={mantineTheme}>
+    <MantineProvider withGlobalStyles theme={mantineTheme}>
       <ChakraProvider theme={theme} colorModeManager={manager}>
         {children}
       </ChakraProvider>
