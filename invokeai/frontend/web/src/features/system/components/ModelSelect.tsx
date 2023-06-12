@@ -63,6 +63,7 @@ const ModelSelect = () => {
 
   return (
     <IAIMantineSelect
+      tooltip={selectedModel?.description}
       label={t('modelManager.model')}
       value={selectedModel?.name ?? ''}
       placeholder="Pick one"
