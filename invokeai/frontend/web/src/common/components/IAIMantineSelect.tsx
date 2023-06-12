@@ -9,7 +9,6 @@ const IAIMantineSelect = (props: IAISelectProps) => {
     <Select
       searchable={searchable}
       styles={() => ({
-        root: {},
         label: {
           color: 'var(--invokeai-colors-base-300)',
           fontWeight: 'normal',

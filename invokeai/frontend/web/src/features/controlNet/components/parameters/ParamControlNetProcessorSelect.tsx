@@ -1,17 +1,15 @@
-import IAICustomSelect, {
-  IAICustomSelectOption,
-} from 'common/components/IAICustomSelect';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAICustomSelectOption } from 'common/components/IAICustomSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { map } from 'lodash-es';
 import { ChangeEvent, memo, useCallback } from 'react';
+import { CONTROLNET_PROCESSORS } from '../../store/constants';
+import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
 import {
   ControlNetProcessorNode,
   ControlNetProcessorType,
 } from '../../store/types';
-import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CONTROLNET_PROCESSORS } from '../../store/constants';
-import { map } from 'lodash-es';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
-import IAISelect from 'common/components/IAISelect';
 import { createSelector } from '@reduxjs/toolkit';
 import { configSelector } from 'features/system/store/configSelectors';
 
@@ -68,36 +66,36 @@ const ParamControlNetProcessorSelect = (
   const isReady = useIsReadyToInvoke();
   const controlNetProcessors = useAppSelector(selector);
 
-  const handleProcessorTypeChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(
-        controlNetProcessorTypeChanged({
-          controlNetId,
-          processorType: e.target.value as ControlNetProcessorType,
-        })
-      );
-    },
-    [controlNetId, dispatch]
-  );
   // const handleProcessorTypeChanged = useCallback(
-  //   (v: string | null | undefined) => {
+  //   (e: ChangeEvent<HTMLSelectElement>) => {
   //     dispatch(
   //       controlNetProcessorTypeChanged({
   //         controlNetId,
-  //         processorType: v as ControlNetProcessorType,
+  //         processorType: e.target.value as ControlNetProcessorType,
   //       })
   //     );
   //   },
   //   [controlNetId, dispatch]
   // );
+  const handleProcessorTypeChanged = useCallback(
+    (v: string | null) => {
+      dispatch(
+        controlNetProcessorTypeChanged({
+          controlNetId,
+          processorType: v as ControlNetProcessorType,
+        })
+      );
+    },
+    [controlNetId, dispatch]
+  );
 
   return (
-    <IAISelect
+    <IAIMantineSelect
       label="Processor"
       value={processorNode.type ?? 'canny_image_processor'}
-      validValues={controlNetProcessors}
+      data={controlNetProcessors}
       onChange={handleProcessorTypeChanged}
-      isDisabled={!isReady}
+      disabled={!isReady}
     />
   );
   // return (

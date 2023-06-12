@@ -5,6 +5,7 @@ import IAICustomSelect, {
 } from 'common/components/IAICustomSelect';
 import IAISelect from 'common/components/IAISelect';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   CONTROLNET_MODELS,
   ControlNetModelName,
@@ -26,11 +27,11 @@ const selector = createSelector(configSelector, (config) => {
   })).filter((d) => !config.sd.disabledControlNetModels.includes(d.value));
 });
 
-// const DATA: IAICustomSelectOption[] = map(CONTROLNET_MODELS, (m) => ({
-//   value: m.type,
-//   label: m.label,
-//   tooltip: m.type,
-// }));
+const DATA = map(CONTROLNET_MODELS, (m) => ({
+  value: m.type,
+  label: m.label,
+  tooltip: m.type,
+}));
 
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model } = props;
@@ -39,33 +40,20 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const isReady = useIsReadyToInvoke();
 
   const handleModelChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
+    (val: string | null) => {
       // TODO: do not cast
-      const model = e.target.value as ControlNetModelName;
+      const model = val as ControlNetModelName;
       dispatch(controlNetModelChanged({ controlNetId, model }));
     },
     [controlNetId, dispatch]
   );
 
-  // const handleModelChanged = useCallback(
-  //   (val: string | null | undefined) => {
-  //     // TODO: do not cast
-  //     const model = val as ControlNetModelName;
-  //     dispatch(controlNetModelChanged({ controlNetId, model }));
-  //   },
-  //   [controlNetId, dispatch]
-  // );
-
   return (
-    <IAISelect
-      tooltip={model}
-      tooltipProps={{ placement: 'top', hasArrow: true }}
-      validValues={controlNetModels}
+    <IAIMantineSelect
+      data={DATA}
       value={model}
       onChange={handleModelChanged}
-      isDisabled={!isReady}
-      // ellipsisPosition="start"
-      // withCheckIcon
+      disabled={!isReady}
     />
   );
   // return (
