@@ -13,9 +13,9 @@ export const LAYER_NAMES = ['base', 'mask'] as const;
 export type CanvasLayer = (typeof LAYER_NAMES)[number];
 
 export const BOUNDING_BOX_SCALES_DICT = [
-  { key: 'Auto', value: 'auto' },
-  { key: 'Manual', value: 'manual' },
-  { key: 'None', value: 'none' },
+  { label: 'Auto', value: 'auto' },
+  { label: 'Manual', value: 'manual' },
+  { label: 'None', value: 'none' },
 ];
 
 export const BOUNDING_BOX_SCALES = ['none', 'auto', 'manual'] as const;

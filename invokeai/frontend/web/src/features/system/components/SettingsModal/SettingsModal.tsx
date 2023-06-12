@@ -13,19 +13,21 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAISwitch from 'common/components/IAISwitch';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
+  SystemState,
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
-  SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
@@ -37,15 +39,13 @@ import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
-  cloneElement,
   ReactElement,
+  cloneElement,
   useCallback,
   useEffect,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
-import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import SettingsSchedulers from './SettingsSchedulers';
 
 const selector = createSelector(
@@ -157,8 +157,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   }, [onSettingsModalClose, onRefreshModalOpen]);
 
   const handleLogLevelChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(consoleLogLevelChanged(e.target.value as LogLevelName));
+    (v: string) => {
+      dispatch(consoleLogLevelChanged(v as LogLevelName));
     },
     [dispatch]
   );
@@ -255,14 +255,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     isChecked={shouldLogToConsole}
                     onChange={handleLogToConsoleChanged}
                   />
-                  <IAISelect
-                    horizontal
-                    spaceEvenly
-                    isDisabled={!shouldLogToConsole}
+                  <IAIMantineSelect
+                    disabled={!shouldLogToConsole}
                     label={t('settings.consoleLogLevel')}
                     onChange={handleLogLevelChanged}
                     value={consoleLogLevel}
-                    validValues={VALID_LOG_LEVELS.concat()}
+                    data={VALID_LOG_LEVELS.concat()}
                   />
                   <IAISwitch
                     label={t('settings.enableImageDebugging')}
