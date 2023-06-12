@@ -43,7 +43,15 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
         }}
       >
         <IAIScrollArea>
-          <Flex sx={{ flexDirection: 'column', gap: 2 }}>{props.children}</Flex>
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              gap: 2,
+              width: PARAMETERS_PANEL_WIDTH,
+            }}
+          >
+            {props.children}
+          </Flex>
         </IAIScrollArea>
       </Flex>
 
