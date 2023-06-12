@@ -162,7 +162,8 @@ class ModelCache(object):
         if model_info_key not in self.model_infos:
             self.model_infos[model_info_key] = model_class(
                 model_path,
-                model_class,
+                base_model,
+                model_type,
             )
 
         return self.model_infos[model_info_key]
@@ -208,7 +209,7 @@ class ModelCache(object):
 
             # clean memory to make MemoryUsage() more accurate
             gc.collect()
-            model = model_info.get_model(submodel, torch_dtype=self.precision)
+            model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
             if mem_used := model_info.get_size(submodel):
                 self.logger.debug(f'CPU RAM used for load: {(mem_used/GIG):.2f} GB')
 

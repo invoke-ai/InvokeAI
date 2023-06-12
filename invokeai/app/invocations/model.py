@@ -64,7 +64,7 @@ class ModelLoaderInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
 
-        base_model = BaseModelType.StableDiffusion2 # TODO:
+        base_model = BaseModelType.StableDiffusion1_5 # TODO:
 
         # TODO: not found exceptions
         if not context.services.model_manager.model_exists(
@@ -116,7 +116,7 @@ class ModelLoaderInvocation(BaseInvocation):
                     model_name=self.model_name,
                     base_model=base_model,
                     model_type=ModelType.Pipeline,
-                    submodel=SDModelType.Scheduler,
+                    submodel=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
@@ -125,13 +125,13 @@ class ModelLoaderInvocation(BaseInvocation):
                     model_name=self.model_name,
                     base_model=base_model,
                     model_type=ModelType.Pipeline,
-                    submodel=SDModelType.Tokenizer,
+                    submodel=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
                     model_name=self.model_name,
                     base_model=base_model,
                     model_type=ModelType.Pipeline,
-                    submodel=SDModelType.TextEncoder,
+                    submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
             ),
@@ -140,7 +140,7 @@ class ModelLoaderInvocation(BaseInvocation):
                     model_name=self.model_name,
                     base_model=base_model,
                     model_type=ModelType.Pipeline,
-                    submodel=SDModelType.Vae,
+                    submodel=SubModelType.Vae,
                 ),
             )
         )

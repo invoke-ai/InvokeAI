@@ -430,10 +430,10 @@ class ModelManager(object):
 
         # vae/movq override
         # TODO: 
-        if submodel is not None and submodel in model_config:
-            model_path = model_config[submodel]
-            model_type = submodel
-            submodel = None
+        if submodel_type is not None and submodel_type in model_config:
+            model_path = model_config[submodel_type]
+            model_type = submodel_type
+            submodel_type = None
 
         dst_convert_path = None # TODO:
         model_path = model_class.convert_if_required(
@@ -443,9 +443,11 @@ class ModelManager(object):
         )
 
         model_context = self.cache.get_model(
-            model_path,
-            model_class,
-            submodel_type,
+            model_path=model_path,
+            model_class=model_class,
+            base_model=base_model,
+            model_type=model_type,
+            submodel=submodel_type,
         )
 
         hash = "<NO_HASH>" # TODO:
