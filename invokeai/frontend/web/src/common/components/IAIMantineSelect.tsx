@@ -1,4 +1,4 @@
-import { Tooltip, forwardRef } from '@chakra-ui/react';
+import { Tooltip } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { memo } from 'react';
 
@@ -6,12 +6,11 @@ type IAISelectProps = SelectProps & {
   tooltip?: string;
 };
 
-const IAIMantineSelect = forwardRef((props: IAISelectProps, ref) => {
+const IAIMantineSelect = (props: IAISelectProps) => {
   const { searchable = true, tooltip, ...rest } = props;
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
       <Select
-        ref={ref}
         searchable={searchable}
         styles={() => ({
           root: {},
@@ -24,6 +23,7 @@ const IAIMantineSelect = forwardRef((props: IAISelectProps, ref) => {
             borderWidth: '2px',
             borderColor: 'var(--invokeai-colors-base-800)',
             color: 'var(--invokeai-colors-base-100)',
+            paddingRight: 24,
             fontWeight: 600,
             '&:hover': { borderColor: 'var(--invokeai-colors-base-700)' },
             '&:focus': {
@@ -58,11 +58,14 @@ const IAIMantineSelect = forwardRef((props: IAISelectProps, ref) => {
               },
             },
           },
+          rightSection: {
+            width: 24,
+          },
         })}
         {...rest}
       />
     </Tooltip>
   );
-});
+};
 
 export default memo(IAIMantineSelect);
