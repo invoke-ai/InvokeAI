@@ -14,8 +14,7 @@ class BaseModelType(str, Enum):
     #StableDiffusion2 = "stable_diffusion_2"
     #StableDiffusion2Base = "stable_diffusion_2_base"
     # TODO: maybe then add sample size(512/768)?
-    StableDiffusion1_5 = "sd-1.5"
-    StableDiffusion2Base = "sd-2-base"   # 512 pixels; this will have epsilon parameterization
+    StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"            # 768 pixels; this will have v-prediction parameterization
     #Kandinsky2_1 = "kandinsky_2_1"
 
@@ -35,10 +34,15 @@ class SubModelType(str, Enum):
     SafetyChecker = "safety_checker"
     #MoVQ = "movq"
 
-class VariantType(str, Enum):
+class ModelVariantType(str, Enum):
     Normal = "normal"
     Inpaint = "inpaint"
     Depth = "depth"
+
+class SchedulerPredictionType(str, Enum):
+    Epsilon = "epsilon"
+    VPrediction = "v_prediction"
+    Sample = "sample"
     
 class ModelError(str, Enum):
     NotFound = "not_found"

@@ -1,4 +1,4 @@
-from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, VariantType
+from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType
 from .stable_diffusion import StableDiffusion15Model, StableDiffusion2Model, StableDiffusion2BaseModel
 from .vae import VaeModel
 from .lora import LoRAModel
@@ -10,7 +10,7 @@ class ControlNetModel:
     pass
 
 MODEL_CLASSES = {
-    BaseModelType.StableDiffusion1_5: {
+    BaseModelType.StableDiffusion1: {
         ModelType.Pipeline: StableDiffusion15Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
@@ -19,13 +19,6 @@ MODEL_CLASSES = {
     },
     BaseModelType.StableDiffusion2: {
         ModelType.Pipeline: StableDiffusion2Model,
-        ModelType.Vae: VaeModel,
-        ModelType.Lora: LoRAModel,
-        ModelType.ControlNet: ControlNetModel,
-        ModelType.TextualInversion: TextualInversionModel,
-    },
-    BaseModelType.StableDiffusion2Base: {
-        ModelType.Pipeline: StableDiffusion2BaseModel,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,

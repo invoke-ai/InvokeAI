@@ -10,13 +10,10 @@ from .base import (
     BaseModelType,
     ModelType,
     SubModelType,
-    VariantType,
+    ModelVariantType,
     DiffusersModel,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
-
-ModelVariantType = VariantType # TODO:
-
 
 # TODO: how to name properly
 class StableDiffusion15Model(DiffusersModel):

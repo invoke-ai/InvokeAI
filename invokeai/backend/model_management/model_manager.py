@@ -200,20 +200,27 @@ MAX_CACHE_SIZE = 6.0  # GB
 
 # layout of the models directory:
 # models
-# ├── SD-1
+# ├── sd-1
 # │   ├── controlnet
 # │   ├── lora
 # │   ├── diffusers
 # │   └── textual_inversion
-# ├── SD-2
+# ├── sd-2
 # │   ├── controlnet
 # │   ├── lora
 # │   ├── diffusers
-# │   └── textual_inversion
-# └── support
-#     ├── codeformer
-#     ├── gfpgan
-#     └── realesrgan
+# │   └── textual_inversion
+# └── core
+#     ├── face_reconstruction
+#     │   ├── codeformer
+#     │   └── gfpgan
+#     ├── sd-conversion
+#     │   ├── clip-vit-large-patch14 - tokenizer, text_encoder subdirs
+#     │   ├── stable-diffusion-2 - tokenizer, text_encoder subdirs
+#     │   └── stable-diffusion-safety-checker
+#     └── upscaling
+#         └─── esrgan
+
 
 
 class ConfigMeta(BaseModel):
