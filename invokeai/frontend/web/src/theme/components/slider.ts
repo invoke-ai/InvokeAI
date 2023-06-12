@@ -30,7 +30,7 @@ const invokeAIMark = defineStyle((_props) => {
   return {
     fontSize: 'xs',
     fontWeight: '500',
-    color: 'base.200',
+    color: 'base.400',
     mt: 2,
     insetInlineStart: 'unset',
   };

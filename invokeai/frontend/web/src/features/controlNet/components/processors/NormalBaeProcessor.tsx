@@ -54,6 +54,7 @@ const NormalBaeProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Image Resolution"
@@ -64,6 +65,7 @@ const NormalBaeProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
     </ProcessorWrapper>
   );

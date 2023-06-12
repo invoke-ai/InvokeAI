@@ -54,6 +54,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         min={0}
         max={255}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="High Threshold"
@@ -64,6 +65,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         min={0}
         max={255}
         withInput
+        withSliderMarks
       />
     </ProcessorWrapper>
   );

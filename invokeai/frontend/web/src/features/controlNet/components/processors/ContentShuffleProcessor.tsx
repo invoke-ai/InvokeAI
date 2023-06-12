@@ -93,6 +93,7 @@ const ContentShuffleProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Image Resolution"
@@ -103,6 +104,7 @@ const ContentShuffleProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="W"
@@ -113,6 +115,7 @@ const ContentShuffleProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="H"
@@ -123,6 +126,7 @@ const ContentShuffleProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="F"
@@ -133,6 +137,7 @@ const ContentShuffleProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
     </ProcessorWrapper>
   );
