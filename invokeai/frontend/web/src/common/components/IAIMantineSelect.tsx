@@ -1,12 +1,14 @@
+import { forwardRef } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { memo } from 'react';
 
 type IAISelectProps = SelectProps;
 
-const IAIMantineSelect = (props: IAISelectProps) => {
+const IAIMantineSelect = forwardRef((props: IAISelectProps, ref) => {
   const { searchable = true, ...rest } = props;
   return (
     <Select
+      ref={ref}
       searchable={searchable}
       styles={() => ({
         label: {
@@ -31,6 +33,7 @@ const IAIMantineSelect = (props: IAISelectProps) => {
         item: {
           backgroundColor: 'var(--invokeai-colors-base-800)',
           color: 'var(--invokeai-colors-base-200)',
+          padding: 6,
           '&[data-hovered]': {
             color: 'var(--invokeai-colors-base-100)',
             backgroundColor: 'var(--invokeai-colors-base-750)',
@@ -44,10 +47,10 @@ const IAIMantineSelect = (props: IAISelectProps) => {
           },
           '&[data-selected]': {
             color: 'var(--invokeai-colors-base-50)',
-            backgroundColor: 'var(--invokeai-colors-accent-750)',
+            backgroundColor: 'var(--invokeai-colors-accent-650)',
             fontWeight: 600,
             '&:hover': {
-              backgroundColor: 'var(--invokeai-colors-accent-700)',
+              backgroundColor: 'var(--invokeai-colors-accent-600)',
             },
           },
         },
@@ -55,6 +58,6 @@ const IAIMantineSelect = (props: IAISelectProps) => {
       {...rest}
     />
   );
-};
+});
 
 export default memo(IAIMantineSelect);
