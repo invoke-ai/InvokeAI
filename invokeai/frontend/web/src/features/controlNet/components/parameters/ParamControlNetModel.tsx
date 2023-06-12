@@ -3,9 +3,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAICustomSelect, {
   IAICustomSelectOption,
 } from 'common/components/IAICustomSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAISelect from 'common/components/IAISelect';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   CONTROLNET_MODELS,
   ControlNetModelName,
@@ -22,7 +22,7 @@ type ParamControlNetModelProps = {
 
 const selector = createSelector(configSelector, (config) => {
   return map(CONTROLNET_MODELS, (m) => ({
-    key: m.label,
+    label: m.label,
     value: m.type,
   })).filter((d) => !config.sd.disabledControlNetModels.includes(d.value));
 });
@@ -50,7 +50,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
 
   return (
     <IAIMantineSelect
-      data={DATA}
+      data={controlNetModels}
       value={model}
       onChange={handleModelChanged}
       disabled={!isReady}

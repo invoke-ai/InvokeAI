@@ -1,12 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash-es';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { IAICustomSelectOption } from 'common/components/IAICustomSelect';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { modelSelected } from 'features/parameters/store/generationSlice';
 import { selectModelsAll, selectModelsById } from '../store/modelSlice';
@@ -17,11 +18,11 @@ const selector = createSelector(
     const selectedModel = selectModelsById(state, generation.model);
 
     const modelData = selectModelsAll(state)
-      .map((m) => ({
+      .map<IAISelectDataType>((m) => ({
         value: m.name,
-        key: m.name,
+        label: m.name,
       }))
-      .sort((a, b) => a.key.localeCompare(b.key));
+      .sort((a, b) => a.label.localeCompare(b.label));
     // const modelData = selectModelsAll(state)
     //   .map<IAICustomSelectOption>((m) => ({
     //     value: m.name,
@@ -45,21 +46,21 @@ const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { selectedModel, modelData } = useAppSelector(selector);
-  const handleChangeModel = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(modelSelected(e.target.value));
-    },
-    [dispatch]
-  );
   // const handleChangeModel = useCallback(
-  //   (v: string | null | undefined) => {
-  //     if (!v) {
-  //       return;
-  //     }
-  //     dispatch(modelSelected(v));
+  //   (e: ChangeEvent<HTMLSelectElement>) => {
+  //     dispatch(modelSelected(e.target.value));
   //   },
   //   [dispatch]
   // );
+  const handleChangeModel = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+      dispatch(modelSelected(v));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIMantineSelect
