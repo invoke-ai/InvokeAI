@@ -3,11 +3,11 @@ import {
   createLocalStorageManager,
   extendTheme,
 } from '@chakra-ui/react';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme as invokeAITheme } from 'theme/theme';
-import { RootState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
 
 import { greenTeaThemeColors } from 'theme/colors/greenTea';
 import { invokeAIThemeColors } from 'theme/colors/invokeAI';
@@ -15,6 +15,7 @@ import { lightThemeColors } from 'theme/colors/lightTheme';
 import { oceanBlueColors } from 'theme/colors/oceanBlue';
 
 import '@fontsource/inter/variable.css';
+import { MantineProvider } from '@mantine/core';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'theme/css/overlayscrollbars.css';
 
@@ -51,9 +52,15 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   }, [direction]);
 
   return (
-    <ChakraProvider theme={theme} colorModeManager={manager}>
-      {children}
-    </ChakraProvider>
+    <MantineProvider
+      withGlobalStyles
+      withNormalizeCSS
+      theme={{ colorScheme: 'dark' }}
+    >
+      <ChakraProvider theme={theme} colorModeManager={manager}>
+        {children}
+      </ChakraProvider>
+    </MantineProvider>
   );
 }
 
