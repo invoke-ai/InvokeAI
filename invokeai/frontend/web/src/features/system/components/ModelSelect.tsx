@@ -1,17 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { ChangeEvent, memo, useCallback } from 'react';
 import { isEqual } from 'lodash-es';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectModelsAll, selectModelsById } from '../store/modelSlice';
+import { Select } from '@mantine/core';
 import { RootState } from 'app/store/store';
-import { modelSelected } from 'features/parameters/store/generationSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAICustomSelectOption } from 'common/components/IAICustomSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
-import IAICustomSelect, {
-  IAICustomSelectOption,
-} from 'common/components/IAICustomSelect';
-import IAISelect from 'common/components/IAISelect';
+import { modelSelected } from 'features/parameters/store/generationSlice';
+import { selectModelsAll, selectModelsById } from '../store/modelSlice';
 
 const selector = createSelector(
   [(state: RootState) => state, generationSelector],
@@ -64,13 +62,13 @@ const ModelSelect = () => {
   // );
 
   return (
-    <IAISelect
+    <Select
       label={t('modelManager.model')}
-      tooltip={selectedModel?.description}
-      validValues={modelData}
       value={selectedModel?.name ?? ''}
+      placeholder="Pick one"
+      data={modelData}
+      searchable
       onChange={handleChangeModel}
-      tooltipProps={{ placement: 'top', hasArrow: true }}
     />
   );
 
