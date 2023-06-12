@@ -69,6 +69,7 @@ const PidiProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Image Resolution"
@@ -79,6 +80,7 @@ const PidiProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISwitch
         label="Scribble"

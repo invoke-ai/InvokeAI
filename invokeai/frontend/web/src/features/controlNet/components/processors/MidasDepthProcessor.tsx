@@ -51,6 +51,7 @@ const MidasDepthProcessor = (props: Props) => {
         max={20}
         step={0.01}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="bg_th"
@@ -62,6 +63,7 @@ const MidasDepthProcessor = (props: Props) => {
         max={20}
         step={0.01}
         withInput
+        withSliderMarks
       />
     </ProcessorWrapper>
   );

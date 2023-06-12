@@ -50,6 +50,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         min={1}
         max={20}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Min Confidence"
@@ -61,6 +62,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         max={1}
         step={0.01}
         withInput
+        withSliderMarks
       />
     </ProcessorWrapper>
   );

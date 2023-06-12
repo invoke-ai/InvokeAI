@@ -62,6 +62,7 @@ const OpenposeProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Image Resolution"
@@ -72,6 +73,7 @@ const OpenposeProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISwitch
         label="Hand and Face"

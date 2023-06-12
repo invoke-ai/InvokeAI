@@ -76,6 +76,7 @@ const MlsdImageProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Image Resolution"
@@ -86,6 +87,7 @@ const MlsdImageProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="W"
@@ -97,6 +99,7 @@ const MlsdImageProcessor = (props: Props) => {
         max={1}
         step={0.01}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="H"
@@ -108,6 +111,7 @@ const MlsdImageProcessor = (props: Props) => {
         max={1}
         step={0.01}
         withInput
+        withSliderMarks
       />
     </ProcessorWrapper>
   );

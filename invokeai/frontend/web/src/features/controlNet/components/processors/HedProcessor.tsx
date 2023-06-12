@@ -65,6 +65,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISlider
         label="Image Resolution"
@@ -75,6 +76,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
       />
       <IAISwitch
         label="Scribble"
