@@ -40,11 +40,11 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   );
 
   const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: { delay: 250, tolerance: 5 },
+    activationConstraint: { delay: 150, tolerance: 5 },
   });
 
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 250, tolerance: 5 },
+    activationConstraint: { delay: 150, tolerance: 5 },
   });
   // TODO: Use KeyboardSensor - needs composition of multiple collisionDetection algos
   // Alternatively, fix `rectIntersection` collection detection to work with the drag overlay

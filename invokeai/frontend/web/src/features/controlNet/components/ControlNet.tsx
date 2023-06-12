@@ -143,7 +143,7 @@ const ControlNet = (props: ControlNetProps) => {
                 flexDir: 'column',
                 gap: 2,
                 w: 'full',
-                h: 24,
+                h: isExpanded ? 28 : 24,
                 paddingInlineStart: 1,
                 paddingInlineEnd: isExpanded ? 1 : 0,
                 pb: 2,
@@ -153,13 +153,13 @@ const ControlNet = (props: ControlNetProps) => {
               <ParamControlNetWeight
                 controlNetId={controlNetId}
                 weight={weight}
-                mini
+                mini={!isExpanded}
               />
               <ParamControlNetBeginEnd
                 controlNetId={controlNetId}
                 beginStepPct={beginStepPct}
                 endStepPct={endStepPct}
-                mini
+                mini={!isExpanded}
               />
             </Flex>
             {!isExpanded && (

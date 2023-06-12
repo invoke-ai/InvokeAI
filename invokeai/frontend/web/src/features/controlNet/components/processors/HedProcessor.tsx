@@ -5,6 +5,7 @@ import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/t
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor.default;
 
@@ -18,7 +19,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
     controlNetId,
     processorNode: { detect_resolution, image_resolution, scribble },
   } = props;
-
+  const isReady = useIsReadyToInvoke();
   const processorChanged = useProcessorNodeChanged();
 
   const handleDetectResolutionChanged = useCallback(
@@ -65,6 +66,8 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="Image Resolution"
@@ -75,11 +78,14 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISwitch
         label="Scribble"
         isChecked={scribble}
         onChange={handleScribbleChanged}
+        isDisabled={!isReady}
       />
     </ProcessorWrapper>
   );

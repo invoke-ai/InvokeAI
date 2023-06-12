@@ -4,6 +4,7 @@ import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor.default;
 
@@ -16,6 +17,7 @@ const MlsdImageProcessor = (props: Props) => {
   const { controlNetId, processorNode } = props;
   const { image_resolution, detect_resolution, thr_d, thr_v } = processorNode;
   const processorChanged = useProcessorNodeChanged();
+  const isReady = useIsReadyToInvoke();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -76,6 +78,8 @@ const MlsdImageProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="Image Resolution"
@@ -86,6 +90,8 @@ const MlsdImageProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="W"
@@ -97,6 +103,8 @@ const MlsdImageProcessor = (props: Props) => {
         max={1}
         step={0.01}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="H"
@@ -108,6 +116,8 @@ const MlsdImageProcessor = (props: Props) => {
         max={1}
         step={0.01}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
     </ProcessorWrapper>
   );

@@ -5,6 +5,7 @@ import { RequiredPidiImageProcessorInvocation } from 'features/controlNet/store/
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor.default;
 
@@ -17,6 +18,7 @@ const PidiProcessor = (props: Props) => {
   const { controlNetId, processorNode } = props;
   const { image_resolution, detect_resolution, scribble, safe } = processorNode;
   const processorChanged = useProcessorNodeChanged();
+  const isReady = useIsReadyToInvoke();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -69,6 +71,8 @@ const PidiProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="Image Resolution"
@@ -79,13 +83,20 @@ const PidiProcessor = (props: Props) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISwitch
         label="Scribble"
         isChecked={scribble}
         onChange={handleScribbleChanged}
       />
-      <IAISwitch label="Safe" isChecked={safe} onChange={handleSafeChanged} />
+      <IAISwitch
+        label="Safe"
+        isChecked={safe}
+        onChange={handleSafeChanged}
+        isDisabled={!isReady}
+      />
     </ProcessorWrapper>
   );
 };

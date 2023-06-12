@@ -1,11 +1,12 @@
 # InvokeAI nodes for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
+from builtins import float
 
 import numpy as np
 from typing import Literal, Optional, Union, List
 from PIL import Image, ImageFilter, ImageOps
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
@@ -14,6 +15,7 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
+
 from controlnet_aux import (
     CannyDetector,
     HEDdetector,
@@ -96,15 +98,32 @@ CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
     control_model: Optional[str] = Field(default=None, description="The ControlNet model to use")
-    control_weight: Optional[float] = Field(default=1, description="The weight given to the ControlNet")
+    # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
+    control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                                description="When the ControlNet is first applied (% of total steps)")
+                                      description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
-
+    @validator("control_weight")
+    def abs_le_one(cls, v):
+        """validate that all abs(values) are <=1"""
+        if isinstance(v, list):
+            for i in v:
+                if abs(i) > 1:
+                    raise ValueError('all abs(control_weight) must be <= 1')
+        else:
+            if abs(v) > 1:
+                raise ValueError('abs(control_weight) must be <= 1')
+        return v
     class Config:
         schema_extra = {
-            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"]
+            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"],
+            "ui": {
+                "type_hints": {
+                    "control_weight": "float",
+                    # "control_weight": "number",
+                }
+            }
         }
 
 
@@ -112,7 +131,7 @@ class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
     # fmt: off
     type: Literal["control_output"] = "control_output"
-    control: ControlField = Field(default=None, description="The output control image")
+    control: ControlField = Field(default=None, description="The control info")
     # fmt: on
 
 
@@ -123,15 +142,28 @@ class ControlNetInvocation(BaseInvocation):
     # Inputs
     image: ImageField = Field(default=None, description="The control image")
     control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
-                                                  description="The ControlNet model to use")
-    control_weight: float = Field(default=1.0, ge=0, le=1, description="The weight given to the ControlNet")
+                                                  description="control model used")
+    control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
     # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                        description="When the ControlNet is first applied (% of total steps)")
+                                      description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
-                                      description="When the ControlNet is last applied (% of total steps)")
+                                    description="When the ControlNet is last applied (% of total steps)")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents"],
+                "type_hints": {
+                  "model": "model",
+                  "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number",
+                  "control_weight": "float",
+                }
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ControlOutput:
 
@@ -161,7 +193,6 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         return image
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-
         raw_image = context.services.images.get_pil_image(
             self.image.image_origin, self.image.image_name
         )

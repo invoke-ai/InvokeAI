@@ -40,6 +40,7 @@ import invokeai.configs as configs
 from invokeai.app.services.config import (
     InvokeAIAppConfig,
 )
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
@@ -80,6 +81,7 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # or renaming it and then running invokeai-configure again.
 """
 
+logger=None
 
 # --------------------------------------------
 def postscript(errors: None):
@@ -824,6 +826,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(['--precision','float32'])
     config.parse_args(invoke_args)
+    logger = InvokeAILogger().getLogger(config=config)
 
     errors = set()
 

@@ -5,6 +5,7 @@ import { RequiredLineartImageProcessorInvocation } from 'features/controlNet/sto
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor.default;
 
@@ -17,6 +18,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
   const { controlNetId, processorNode } = props;
   const { image_resolution, detect_resolution, coarse } = processorNode;
   const processorChanged = useProcessorNodeChanged();
+  const isReady = useIsReadyToInvoke();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -62,6 +64,8 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="Image Resolution"
@@ -72,11 +76,14 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         min={0}
         max={4096}
         withInput
+        withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISwitch
         label="Coarse"
         isChecked={coarse}
         onChange={handleCoarseChanged}
+        isDisabled={!isReady}
       />
     </ProcessorWrapper>
   );

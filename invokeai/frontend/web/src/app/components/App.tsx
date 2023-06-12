@@ -22,6 +22,7 @@ import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
 import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 
 const DEFAULT_CONFIG = {};
 
@@ -66,10 +67,17 @@ const App = ({
       setIsReady(true);
     }
 
+    if (isApplicationReady) {
+      // TODO: This is a jank fix for canvas not filling the screen on first load
+      setTimeout(() => {
+        dispatch(requestCanvasRescale());
+      }, 200);
+    }
+
     return () => {
       setIsReady && setIsReady(false);
     };
-  }, [isApplicationReady, setIsReady]);
+  }, [dispatch, isApplicationReady, setIsReady]);
 
   return (
     <>

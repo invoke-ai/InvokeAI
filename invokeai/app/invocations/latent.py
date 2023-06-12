@@ -174,22 +174,36 @@ class TextToLatentsInvocation(BaseInvocation):
     negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    cfg_scale: Union[float, List[float]] = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
-    control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
+    control: Union[ControlField, List[ControlField]] = Field(default=None, description="The control to use")
     # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
+
+    @validator("cfg_scale")
+    def ge_one(cls, v):
+        """validate that all cfg_scale values are >= 1"""
+        if isinstance(v, list):
+            for i in v:
+                if i < 1:
+                    raise ValueError('cfg_scale must be greater than 1')
+        else:
+            if v < 1:
+                raise ValueError('cfg_scale must be greater than 1')
+        return v
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["latents", "image"],
+                "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
                   "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number"
                 }
             },
         }
@@ -244,10 +258,10 @@ class TextToLatentsInvocation(BaseInvocation):
         [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
 
         conditioning_data = ConditioningData(
-            uc,
-            c,
-            self.cfg_scale,
-            extra_conditioning_info,
+            unconditioned_embeddings=uc,
+            text_embeddings=c,
+            guidance_scale=self.cfg_scale,
+            extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,#threshold,
                 warmup=0.2,#warmup,
@@ -348,7 +362,8 @@ class TextToLatentsInvocation(BaseInvocation):
 
         control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
                                               latents_shape=noise.shape,
-                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              do_classifier_free_guidance=True,)
 
         # TODO: Verify the noise is the right size
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
@@ -385,6 +400,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 "type_hints": {
                     "model": "model",
                     "control": "control",
+                    "cfg_scale": "number",
                 }
             },
         }
@@ -403,10 +419,11 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(context, model)
 
-        print("type of control input: ", type(self.control))
         control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
                                               latents_shape=noise.shape,
-                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              do_classifier_free_guidance=True,
+                                              )
 
         # TODO: Verify the noise is the right size
 

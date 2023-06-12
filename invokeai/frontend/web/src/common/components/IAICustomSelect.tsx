@@ -2,7 +2,6 @@ import { CheckIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import {
   Box,
   Flex,
-  FlexProps,
   FormControl,
   FormControlProps,
   FormLabel,
@@ -16,41 +15,63 @@ import {
 } from '@chakra-ui/react';
 import { autoUpdate, offset, shift, useFloating } from '@floating-ui/react-dom';
 import { useSelect } from 'downshift';
+import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
-import { memo, useMemo } from 'react';
+import { memo, useLayoutEffect, useMemo } from 'react';
 import { getInputOutlineStyles } from 'theme/util/getInputOutlineStyles';
 
 export type ItemTooltips = { [key: string]: string };
 
+export type IAICustomSelectOption = {
+  value: string;
+  label: string;
+  tooltip?: string;
+};
+
 type IAICustomSelectProps = {
   label?: string;
-  items: string[];
-  itemTooltips?: ItemTooltips;
-  selectedItem: string;
-  setSelectedItem: (v: string | null | undefined) => void;
+  value: string;
+  data: IAICustomSelectOption[] | string[];
+  onChange: (v: string) => void;
   withCheckIcon?: boolean;
   formControlProps?: FormControlProps;
-  buttonProps?: FlexProps;
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
   ellipsisPosition?: 'start' | 'end';
+  isDisabled?: boolean;
 };
 
 const IAICustomSelect = (props: IAICustomSelectProps) => {
   const {
     label,
-    items,
-    itemTooltips,
-    setSelectedItem,
-    selectedItem,
     withCheckIcon,
     formControlProps,
     tooltip,
-    buttonProps,
     tooltipProps,
     ellipsisPosition = 'end',
+    data,
+    value,
+    onChange,
+    isDisabled = false,
   } = props;
+
+  const values = useMemo(() => {
+    return data.map<IAICustomSelectOption>((v) => {
+      if (isString(v)) {
+        return { value: v, label: v };
+      }
+      return v;
+    });
+  }, [data]);
+
+  const stringValues = useMemo(() => {
+    return values.map((v) => v.value);
+  }, [values]);
+
+  const valueData = useMemo(() => {
+    return values.find((v) => v.value === value);
+  }, [values, value]);
 
   const {
     isOpen,
@@ -60,16 +81,23 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
     highlightedIndex,
     getItemProps,
   } = useSelect({
-    items,
-    selectedItem,
-    onSelectedItemChange: ({ selectedItem: newSelectedItem }) =>
-      setSelectedItem(newSelectedItem),
+    items: stringValues,
+    selectedItem: value,
+    onSelectedItemChange: ({ selectedItem: newSelectedItem }) => {
+      newSelectedItem && onChange(newSelectedItem);
+    },
   });
 
-  const { refs, floatingStyles } = useFloating<HTMLButtonElement>({
-    whileElementsMounted: autoUpdate,
+  const { refs, floatingStyles, update } = useFloating<HTMLButtonElement>({
+    // whileElementsMounted: autoUpdate,
     middleware: [offset(4), shift({ crossAxis: true, padding: 8 })],
   });
+
+  useLayoutEffect(() => {
+    if (isOpen && refs.reference.current && refs.floating.current) {
+      return autoUpdate(refs.reference.current, refs.floating.current, update);
+    }
+  }, [isOpen, update, refs.floating, refs.reference]);
 
   const labelTextDirection = useMemo(() => {
     if (ellipsisPosition === 'start') {
@@ -93,8 +121,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
       )}
       <Tooltip label={tooltip} {...tooltipProps}>
         <Flex
-          {...getToggleButtonProps({ ref: refs.setReference })}
-          {...buttonProps}
+          {...getToggleButtonProps({ ref: refs.reference })}
           sx={{
             alignItems: 'center',
             userSelect: 'none',
@@ -105,6 +132,8 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             px: 2,
             gap: 2,
             justifyContent: 'space-between',
+            pointerEvents: isDisabled ? 'none' : undefined,
+            opacity: isDisabled ? 0.5 : undefined,
             ...getInputOutlineStyles(),
           }}
         >
@@ -119,7 +148,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
               direction: labelTextDirection,
             }}
           >
-            {selectedItem}
+            {valueData?.label}
           </Text>
           <ChevronUpIcon
             sx={{
@@ -135,7 +164,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
         {isOpen && (
           <List
             as={Flex}
-            ref={refs.setFloating}
+            ref={refs.floating}
             sx={{
               ...floatingStyles,
               top: 0,
@@ -155,8 +184,8 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             }}
           >
             <OverlayScrollbarsComponent>
-              {items.map((item, index) => {
-                const isSelected = selectedItem === item;
+              {values.map((v, index) => {
+                const isSelected = value === v.value;
                 const isHighlighted = highlightedIndex === index;
                 const fontWeight = isSelected ? 700 : 500;
                 const bg = isHighlighted
@@ -166,9 +195,9 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
                   : undefined;
                 return (
                   <Tooltip
-                    isDisabled={!itemTooltips}
-                    key={`${item}${index}`}
-                    label={itemTooltips?.[item]}
+                    isDisabled={!v.tooltip}
+                    key={`${v.value}${index}`}
+                    label={v.tooltip}
                     hasArrow
                     placement="right"
                   >
@@ -182,8 +211,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
                         transitionProperty: 'common',
                         transitionDuration: '0.15s',
                       }}
-                      key={`${item}${index}`}
-                      {...getItemProps({ item, index })}
+                      {...getItemProps({ item: v.value, index })}
                     >
                       {withCheckIcon ? (
                         <Grid gridTemplateColumns="1.25rem auto">
@@ -198,7 +226,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
                                 fontWeight,
                               }}
                             >
-                              {item}
+                              {v.label}
                             </Text>
                           </GridItem>
                         </Grid>
@@ -210,7 +238,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
                             fontWeight,
                           }}
                         >
-                          {item}
+                          {v.label}
                         </Text>
                       )}
                     </ListItem>

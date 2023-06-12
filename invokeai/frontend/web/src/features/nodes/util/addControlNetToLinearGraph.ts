@@ -1,5 +1,5 @@
 import { RootState } from 'app/store/store';
-import { forEach, size } from 'lodash-es';
+import { filter, forEach, size } from 'lodash-es';
 import { CollectInvocation, ControlNetInvocation } from 'services/api';
 import { NonNullableGraph } from '../types/types';
 
@@ -12,8 +12,16 @@ export const addControlNetToLinearGraph = (
 ): void => {
   const { isEnabled: isControlNetEnabled, controlNets } = state.controlNet;
 
+  const validControlNets = filter(
+    controlNets,
+    (c) =>
+      c.isEnabled &&
+      (Boolean(c.processedControlImage) ||
+        (c.processorType === 'none' && Boolean(c.controlImage)))
+  );
+
   // Add ControlNet
-  if (isControlNetEnabled) {
+  if (isControlNetEnabled && validControlNets.length > 0) {
     if (size(controlNets) > 1) {
       const controlNetIterateNode: CollectInvocation = {
         id: CONTROL_NET_COLLECT,
