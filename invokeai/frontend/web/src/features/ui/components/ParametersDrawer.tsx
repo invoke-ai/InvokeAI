@@ -83,7 +83,9 @@ const ParametersDrawer = () => {
           <PinParametersPanelButton />
         </Flex>
         <IAIScrollArea>
-          <Flex sx={{ flexDir: 'column', gap: 2 }}>{drawerContent}</Flex>
+          <Flex sx={{ flexDir: 'column', gap: 2, paddingLeft: 2 }}>
+            {drawerContent}
+          </Flex>
         </IAIScrollArea>
       </Flex>
     </ResizableDrawer>
