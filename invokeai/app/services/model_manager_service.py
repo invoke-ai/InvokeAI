@@ -13,7 +13,7 @@ from invokeai.backend.model_management.model_manager import (
     BaseModelType,
     ModelType,
     SubModelType,
-    SDModelInfo,
+    ModelInfo,
 )
 from invokeai.app.models.exceptions import CanceledException
 from .config import InvokeAIAppConfig
@@ -49,7 +49,7 @@ class ModelManagerServiceBase(ABC):
         submodel: Optional[SubModelType] = None,
         node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
-    ) -> SDModelInfo:
+    ) -> ModelInfo:
         """Retrieve the indicated model with name and type. 
         submodel can be used to get a part (such as the vae) 
         of a diffusers pipeline."""
@@ -302,7 +302,7 @@ class ModelManagerService(ModelManagerServiceBase):
         submodel: Optional[SubModelType] = None,
         node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
-    ) -> SDModelInfo:
+    ) -> ModelInfo:
         """
         Retrieve the indicated model. submodel can be used to get a
         part (such as the vae) of a diffusers mode.
@@ -539,7 +539,7 @@ class ModelManagerService(ModelManagerServiceBase):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: SubModelType,
-        model_info: Optional[SDModelInfo] = None,
+        model_info: Optional[ModelInfo] = None,
     ):
         if context.services.queue.is_canceled(context.graph_execution_state_id):
             raise CanceledException()

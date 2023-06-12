@@ -166,21 +166,12 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, download_with_resume
 from .model_cache import ModelCache, ModelLocker
-from .models import BaseModelType, SubModelType, MODEL_CLASSES
+from .models import BaseModelType, ModelType, SubModelType, MODEL_CLASSES
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
 # reduce confusion.
 CONFIG_FILE_VERSION='3.0.0'
-
-# temporary forward definitions to avoid circular import errors.
-class ModelLocker(object):
-    "Forward declaration"
-    pass
-
-class ModelCache(object):
-    "Forward declaration"
-    pass
 
 @dataclass
 class ModelInfo():
@@ -744,3 +735,37 @@ class ModelManager(object):
             resolved_path = self.globals.root_dir / source
         return resolved_path
 
+    def scan_models_directory(self):
+        loaded_files = set()
+
+        for model_key, model_config in list(self.models.items()):
+            model_name, base_model, model_type = self.parse_key(model_key)
+            if not os.path.exists(model_config.path):
+                if model_class.save_to_config:
+                    model_config.error = ModelError.NotFound
+                else:
+                    self.models.pop(model_key, None)
+            else:
+                loaded_files.add(model_config.path)
+
+        for base_model in BaseModelType:
+            for model_type in ModelType:
+                model_class = MODEL_CLASSES[base_model][model_type]
+                models_dir = os.path.join(self.globals.models_path, base_model, model_type)
+
+                if not os.path.exists(models_dir):
+                    continue # TODO: or create all folders?
+                
+                for entry_name in os.listdir(models_dir):
+                    model_path = os.path.join(models_dir, entry_name)
+                    if model_path not in loaded_files: # TODO: check
+                        model_name = Path(model_path).stem
+                        model_key = self.create_key(model_name, base_model, model_type)
+
+                        if model_key in self.models:
+                            raise Exception(f"Model with key {model_key} added twice")
+
+                        model_config: ModelConfigBase = model_class.build_config(
+                            path=model_path,
+                        )
+                        self.models[model_key] = model_config

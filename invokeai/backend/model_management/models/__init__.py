@@ -5,26 +5,30 @@ from .lora import LoRAModel
 #from .controlnet import ControlNetModel # TODO:
 from .textual_inversion import TextualInversionModel
 
+# TODO:
+class ControlNetModel:
+    pass
+
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1_5: {
         ModelType.Pipeline: StableDiffusion15Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
-        #ModelType.ControlNet: ControlNetModel,
+        ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     BaseModelType.StableDiffusion2: {
         ModelType.Pipeline: StableDiffusion2Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
-        #ModelType.ControlNet: ControlNetModel,
+        ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     BaseModelType.StableDiffusion2Base: {
         ModelType.Pipeline: StableDiffusion2BaseModel,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
-        #ModelType.ControlNet: ControlNetModel,
+        ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     #BaseModelType.Kandinsky2_1: {
@@ -35,3 +39,11 @@ MODEL_CLASSES = {
     #    ModelType.TextualInversion: TextualInversionModel,
     #},
 }
+
+# TODO: check with openapi annotation
+def get_all_model_configs():
+    configs = []
+    for models in MODEL_CLASSES.values():
+        for model in models.values():
+            configs.extend(model._get_configs())
+    return configs
