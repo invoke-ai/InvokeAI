@@ -47,7 +47,6 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
             sx={{
               flexDirection: 'column',
               gap: 2,
-              width: PARAMETERS_PANEL_WIDTH,
             }}
           >
             {props.children}
