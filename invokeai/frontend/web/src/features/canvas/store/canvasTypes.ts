@@ -4,8 +4,8 @@ import { RgbaColor } from 'react-colorful';
 import { ImageDTO } from 'services/api';
 
 export const LAYER_NAMES_DICT = [
-  { key: 'Base', value: 'base' },
-  { key: 'Mask', value: 'mask' },
+  { label: 'Base', value: 'base' },
+  { label: 'Mask', value: 'mask' },
 ];
 
 export const LAYER_NAMES = ['base', 'mask'] as const;
