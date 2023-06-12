@@ -2,6 +2,12 @@ import { Tooltip } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { memo } from 'react';
 
+export type IAISelectDataType = {
+  value: string;
+  label: string;
+  tooltip?: string;
+};
+
 type IAISelectProps = SelectProps & {
   tooltip?: string;
 };

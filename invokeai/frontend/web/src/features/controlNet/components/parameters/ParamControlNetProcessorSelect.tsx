@@ -1,6 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { IAICustomSelectOption } from 'common/components/IAICustomSelect';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { map } from 'lodash-es';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
@@ -18,12 +20,20 @@ type ParamControlNetProcessorSelectProps = {
   processorNode: ControlNetProcessorNode;
 };
 
-const CONTROLNET_PROCESSOR_TYPES = map(CONTROLNET_PROCESSORS, (p) => ({
-  value: p.type,
-  key: p.label,
-})).sort((a, b) =>
+const CONTROLNET_PROCESSOR_TYPES: IAISelectDataType[] = map(
+  CONTROLNET_PROCESSORS,
+  (p) => ({
+    value: p.type,
+    label: p.label,
+    tooltip: p.description,
+  })
+).sort((a, b) =>
   // sort 'none' to the top
-  a.value === 'none' ? -1 : b.value === 'none' ? 1 : a.key.localeCompare(b.key)
+  a.value === 'none'
+    ? -1
+    : b.value === 'none'
+    ? 1
+    : a.label.localeCompare(b.label)
 );
 
 const selector = createSelector(configSelector, (config) => {
