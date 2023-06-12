@@ -12,8 +12,10 @@ export const addControlNetToLinearGraph = (
 ): void => {
   const { isEnabled: isControlNetEnabled, controlNets } = state.controlNet;
 
+  const controlNetCount = size(controlNets);
+
   // Add ControlNet
-  if (isControlNetEnabled) {
+  if (isControlNetEnabled && controlNetCount > 0) {
     if (size(controlNets) > 1) {
       const controlNetIterateNode: CollectInvocation = {
         id: CONTROL_NET_COLLECT,
