@@ -117,6 +117,8 @@ export type AppConfig = {
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     defaultModel?: string;
+    disabledControlNetModels: string[];
+    disabledControlNetProcessors: string[];
     iterations: {
       initial: number;
       min: number;
