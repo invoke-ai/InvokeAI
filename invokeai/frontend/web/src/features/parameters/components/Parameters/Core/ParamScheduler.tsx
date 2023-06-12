@@ -3,10 +3,11 @@ import { Scheduler } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICustomSelect from 'common/components/IAICustomSelect';
+import IAISelect from 'common/components/IAISelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-import { memo, useCallback } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -35,24 +36,39 @@ const ParamScheduler = () => {
   const { t } = useTranslation();
 
   const handleChange = useCallback(
-    (v: string | null | undefined) => {
-      if (!v) {
-        return;
-      }
-      dispatch(setScheduler(v as Scheduler));
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(setScheduler(e.target.value as Scheduler));
     },
     [dispatch]
   );
+  // const handleChange = useCallback(
+  //   (v: string | null | undefined) => {
+  //     if (!v) {
+  //       return;
+  //     }
+  //     dispatch(setScheduler(v as Scheduler));
+  //   },
+  //   [dispatch]
+  // );
 
   return (
-    <IAICustomSelect
+    <IAISelect
       label={t('parameters.scheduler')}
       value={scheduler}
-      data={allSchedulers}
+      validValues={allSchedulers}
       onChange={handleChange}
-      withCheckIcon
     />
   );
+
+  // return (
+  //   <IAICustomSelect
+  //     label={t('parameters.scheduler')}
+  //     value={scheduler}
+  //     data={allSchedulers}
+  //     onChange={handleChange}
+  //     withCheckIcon
+  //   />
+  // );
 };
 
 export default memo(ParamScheduler);
