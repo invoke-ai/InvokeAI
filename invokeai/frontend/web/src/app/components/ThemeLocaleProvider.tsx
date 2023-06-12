@@ -16,6 +16,7 @@ import { oceanBlueColors } from 'theme/colors/oceanBlue';
 
 import '@fontsource/inter/variable.css';
 import { MantineProvider } from '@mantine/core';
+import { mantineTheme } from 'mantine-theme/theme';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'theme/css/overlayscrollbars.css';
 
@@ -52,11 +53,7 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   }, [direction]);
 
   return (
-    <MantineProvider
-      withGlobalStyles
-      withNormalizeCSS
-      theme={{ colorScheme: 'dark' }}
-    >
+    <MantineProvider withGlobalStyles withNormalizeCSS theme={mantineTheme}>
       <ChakraProvider theme={theme} colorModeManager={manager}>
         {children}
       </ChakraProvider>
