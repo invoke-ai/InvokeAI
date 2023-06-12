@@ -18,7 +18,7 @@ import { useSelect } from 'downshift';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
-import { memo, useMemo } from 'react';
+import { memo, useLayoutEffect, useMemo } from 'react';
 import { getInputOutlineStyles } from 'theme/util/getInputOutlineStyles';
 
 export type ItemTooltips = { [key: string]: string };
@@ -39,6 +39,7 @@ type IAICustomSelectProps = {
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
   ellipsisPosition?: 'start' | 'end';
+  isDisabled?: boolean;
 };
 
 const IAICustomSelect = (props: IAICustomSelectProps) => {
@@ -52,6 +53,7 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
     data,
     value,
     onChange,
+    isDisabled = false,
   } = props;
 
   const values = useMemo(() => {
@@ -86,10 +88,16 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
     },
   });
 
-  const { refs, floatingStyles } = useFloating<HTMLButtonElement>({
-    whileElementsMounted: autoUpdate,
+  const { refs, floatingStyles, update } = useFloating<HTMLButtonElement>({
+    // whileElementsMounted: autoUpdate,
     middleware: [offset(4), shift({ crossAxis: true, padding: 8 })],
   });
+
+  useLayoutEffect(() => {
+    if (isOpen && refs.reference.current && refs.floating.current) {
+      return autoUpdate(refs.reference.current, refs.floating.current, update);
+    }
+  }, [isOpen, update, refs.floating, refs.reference]);
 
   const labelTextDirection = useMemo(() => {
     if (ellipsisPosition === 'start') {
@@ -124,6 +132,8 @@ const IAICustomSelect = (props: IAICustomSelectProps) => {
             px: 2,
             gap: 2,
             justifyContent: 'space-between',
+            pointerEvents: isDisabled ? 'none' : undefined,
+            opacity: isDisabled ? 0.5 : undefined,
             ...getInputOutlineStyles(),
           }}
         >

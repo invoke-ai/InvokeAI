@@ -47,3 +47,6 @@ export const languageSelector = createSelector(
   (system) => system.language,
   defaultSelectorOptions
 );
+
+export const isProcessingSelector = (state: RootState) =>
+  state.system.isProcessing;

@@ -4,6 +4,7 @@ import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlNet/
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor.default;
 
@@ -16,6 +17,7 @@ const MidasDepthProcessor = (props: Props) => {
   const { controlNetId, processorNode } = props;
   const { a_mult, bg_th } = processorNode;
   const processorChanged = useProcessorNodeChanged();
+  const isReady = useIsReadyToInvoke();
 
   const handleAMultChanged = useCallback(
     (v: number) => {
@@ -52,6 +54,7 @@ const MidasDepthProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="bg_th"
@@ -64,6 +67,7 @@ const MidasDepthProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
+        isDisabled={!isReady}
       />
     </ProcessorWrapper>
   );

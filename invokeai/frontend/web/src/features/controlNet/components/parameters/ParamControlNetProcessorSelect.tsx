@@ -7,9 +7,11 @@ import {
   ControlNetProcessorType,
 } from '../../store/types';
 import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
 import { map } from 'lodash-es';
+import { isProcessingSelector } from 'features/system/store/systemSelectors';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 type ParamControlNetProcessorSelectProps = {
   controlNetId: string;
@@ -37,6 +39,8 @@ const ParamControlNetProcessorSelect = (
 ) => {
   const { controlNetId, processorNode } = props;
   const dispatch = useAppDispatch();
+  const isReady = useIsReadyToInvoke();
+
   const handleProcessorTypeChanged = useCallback(
     (v: string | null | undefined) => {
       dispatch(
@@ -55,6 +59,7 @@ const ParamControlNetProcessorSelect = (
       data={CONTROLNET_PROCESSOR_TYPES}
       onChange={handleProcessorTypeChanged}
       withCheckIcon
+      isDisabled={!isReady}
     />
   );
 };

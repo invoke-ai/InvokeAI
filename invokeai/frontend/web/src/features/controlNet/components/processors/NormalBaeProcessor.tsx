@@ -4,6 +4,7 @@ import { RequiredNormalbaeImageProcessorInvocation } from 'features/controlNet/s
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.normalbae_image_processor.default;
 
@@ -16,6 +17,7 @@ const NormalBaeProcessor = (props: Props) => {
   const { controlNetId, processorNode } = props;
   const { image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
+  const isReady = useIsReadyToInvoke();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -55,6 +57,7 @@ const NormalBaeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
+        isDisabled={!isReady}
       />
       <IAISlider
         label="Image Resolution"
@@ -66,6 +69,7 @@ const NormalBaeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
+        isDisabled={!isReady}
       />
     </ProcessorWrapper>
   );
