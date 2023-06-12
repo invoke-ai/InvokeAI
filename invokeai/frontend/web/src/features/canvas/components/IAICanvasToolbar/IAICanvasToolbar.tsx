@@ -215,11 +215,10 @@ const IAICanvasToolbar = () => {
       <Box w={24}>
         <IAIMantineSelect
           tooltip={`${t('unifiedCanvas.layer')} (Q)`}
-          tooltipProps={{ hasArrow: true, placement: 'top' }}
           value={layer}
           data={LAYER_NAMES_DICT}
           onChange={handleChangeLayer}
-          isDisabled={isStaging}
+          disabled={isStaging}
         />
       </Box>
 

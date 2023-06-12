@@ -61,11 +61,10 @@ export default function UnifiedCanvasLayerSelect() {
     <IAIMantineSelect
       tooltip={`${t('unifiedCanvas.layer')} (Q)`}
       aria-label={`${t('unifiedCanvas.layer')} (Q)`}
-      tooltipProps={{ hasArrow: true, placement: 'top' }}
       value={layer}
       data={LAYER_NAMES_DICT}
       onChange={handleChangeLayer}
-      isDisabled={isStaging}
+      disabled={isStaging}
       w="full"
     />
   );
