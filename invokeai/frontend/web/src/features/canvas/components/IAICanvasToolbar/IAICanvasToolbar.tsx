@@ -2,7 +2,6 @@ import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import IAISelect from 'common/components/IAISelect';
 import useImageUploader from 'common/hooks/useImageUploader';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 import {
@@ -25,7 +24,13 @@ import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 
-import { ChangeEvent } from 'react';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import {
+  canvasCopiedToClipboard,
+  canvasDownloadedAsImage,
+  canvasMerged,
+  canvasSavedToGallery,
+} from 'features/canvas/store/actions';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -43,12 +48,6 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
-import {
-  canvasCopiedToClipboard,
-  canvasDownloadedAsImage,
-  canvasMerged,
-  canvasSavedToGallery,
-} from 'features/canvas/store/actions';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -197,8 +196,8 @@ const IAICanvasToolbar = () => {
     dispatch(canvasDownloadedAsImage());
   };
 
-  const handleChangeLayer = (e: ChangeEvent<HTMLSelectElement>) => {
-    const newLayer = e.target.value as CanvasLayer;
+  const handleChangeLayer = (v: string) => {
+    const newLayer = v as CanvasLayer;
     dispatch(setLayer(newLayer));
     if (newLayer === 'mask' && !isMaskEnabled) {
       dispatch(setIsMaskEnabled(true));
@@ -214,11 +213,11 @@ const IAICanvasToolbar = () => {
       }}
     >
       <Box w={24}>
-        <IAISelect
+        <IAIMantineSelect
           tooltip={`${t('unifiedCanvas.layer')} (Q)`}
           tooltipProps={{ hasArrow: true, placement: 'top' }}
           value={layer}
-          validValues={LAYER_NAMES_DICT}
+          data={LAYER_NAMES_DICT}
           onChange={handleChangeLayer}
           isDisabled={isStaging}
         />
