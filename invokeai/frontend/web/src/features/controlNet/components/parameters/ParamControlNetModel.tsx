@@ -54,6 +54,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       value={model}
       onChange={handleModelChanged}
       disabled={!isReady}
+      tooltip={model}
     />
   );
   // return (
