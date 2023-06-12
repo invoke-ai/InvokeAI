@@ -14,7 +14,10 @@ export const addControlNetToLinearGraph = (
 
   const validControlNets = filter(
     controlNets,
-    (c) => c.isEnabled && Boolean(c.processedControlImage)
+    (c) =>
+      c.isEnabled &&
+      (Boolean(c.processedControlImage) ||
+        (c.processorType === 'none' && Boolean(c.controlImage)))
   );
 
   // Add ControlNet
