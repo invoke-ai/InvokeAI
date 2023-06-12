@@ -10,6 +10,8 @@ export const initialConfigState: AppConfig = {
   disabledSDFeatures: [],
   canRestoreDeletedImagesFromBin: true,
   sd: {
+    disabledControlNetModels: [],
+    disabledControlNetProcessors: [],
     iterations: {
       initial: 1,
       min: 1,
