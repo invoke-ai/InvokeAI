@@ -9,32 +9,46 @@ const IAIMantineSelect = (props: IAISelectProps) => {
     <Select
       searchable={searchable}
       styles={() => ({
+        root: {},
         label: {
           color: 'var(--invokeai-colors-base-300)',
           fontWeight: 'normal',
         },
         input: {
           backgroundColor: 'var(--invokeai-colors-base-900)',
-          border: 'none',
+          borderWidth: '2px',
+          borderColor: 'var(--invokeai-colors-base-800)',
           color: 'var(--invokeai-colors-base-100)',
-          fontWeight: 500,
+          fontWeight: 600,
+          '&:hover': { borderColor: 'var(--invokeai-colors-base-700)' },
+          '&:focus': {
+            borderColor: 'var(--invokeai-colors-accent-600)',
+          },
         },
         dropdown: {
           backgroundColor: 'var(--invokeai-colors-base-800)',
           borderColor: 'var(--invokeai-colors-base-700)',
         },
         item: {
-          color: 'var(--invokeai-colors-base-300)',
-          ':hover': {
-            color: 'var(--invokeai-colors-base-300)',
-            backgroundColor: 'var(--invokeai-colors-accent-750)',
+          backgroundColor: 'var(--invokeai-colors-base-800)',
+          color: 'var(--invokeai-colors-base-200)',
+          '&[data-hovered]': {
+            color: 'var(--invokeai-colors-base-100)',
+            backgroundColor: 'var(--invokeai-colors-base-750)',
+          },
+          '&[data-active]': {
+            backgroundColor: 'var(--invokeai-colors-base-750)',
+            '&:hover': {
+              color: 'var(--invokeai-colors-base-100)',
+              backgroundColor: 'var(--invokeai-colors-base-750)',
+            },
           },
           '&[data-selected]': {
-            color: 'var(--invokeai-colors-base-300)',
+            color: 'var(--invokeai-colors-base-50)',
             backgroundColor: 'var(--invokeai-colors-accent-750)',
-            fontWeight: 500,
-            ':hover': {
-              backgroundColor: 'var(--invokeai-colors-accent-750)',
+            fontWeight: 600,
+            '&:hover': {
+              backgroundColor: 'var(--invokeai-colors-accent-700)',
             },
           },
         },
