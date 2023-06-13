@@ -5,7 +5,6 @@ import {
   InvocationCompleteEvent,
   InvocationErrorEvent,
   InvocationStartedEvent,
-  InvocationWarningEvent,
 } from 'services/events/types';
 
 // Common socket action payload data
@@ -131,24 +130,6 @@ export const socketInvocationError = createAction<
 export const appSocketInvocationError = createAction<
   BaseSocketPayload & { data: InvocationErrorEvent }
 >('socket/appSocketInvocationError');
-
-/**
- * Socket.IO Invocation Warning
- *
- * Do not use. Only for use in middleware.
- */
-export const socketInvocationWarning = createAction<
-  BaseSocketPayload & { data: InvocationWarningEvent }
->('socket/socketInvocationWarning');
-
-/**
- * Socket.IO Invocation Warning
- *
- * Do not use. Only for use in middleware.
- */
-export const appSocketInvocationWarning = createAction<
-  BaseSocketPayload & { data: InvocationWarningEvent }
->('socket/appSocketInvocationWarning');
 
 /**
  * Socket.IO Graph Execution State Complete

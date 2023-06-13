@@ -64,18 +64,6 @@ export type InvocationErrorEvent = {
 };
 
 /**
- * A `invocation_warning` socket.io event.
- *
- * @example socket.on('invocation_warning', (data: InvocationWarningEvent) => { ... }
- */
-export type InvocationWarningEvent = {
-  graph_execution_state_id: string;
-  node: BaseNode;
-  source_node_id: string;
-  warning: string;
-};
-
-/**
  * A `invocation_started` socket.io event.
  *
  * @example socket.on('invocation_started', (data: InvocationStartedEvent) => { ... }
@@ -107,7 +95,6 @@ export type ServerToClientEvents = {
   generator_progress: (payload: GeneratorProgressEvent) => void;
   invocation_complete: (payload: InvocationCompleteEvent) => void;
   invocation_error: (payload: InvocationErrorEvent) => void;
-  invocation_warning: (payload: InvocationWarningEvent) => void;
   invocation_started: (payload: InvocationStartedEvent) => void;
   graph_execution_state_complete: (
     payload: GraphExecutionStateCompleteEvent
