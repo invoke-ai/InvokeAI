@@ -9,7 +9,8 @@ import { IRect } from 'konva/lib/types';
  */
 const createMaskStage = async (
   lines: CanvasMaskLine[],
-  boundingBox: IRect
+  boundingBox: IRect,
+  shouldInvertMask: boolean
 ): Promise<Konva.Stage> => {
   // create an offscreen canvas and add the mask to it
   const { width, height } = boundingBox;
@@ -29,7 +30,7 @@ const createMaskStage = async (
   baseLayer.add(
     new Konva.Rect({
       ...boundingBox,
-      fill: 'white',
+      fill: shouldInvertMask ? 'black' : 'white',
     })
   );
 
@@ -37,7 +38,7 @@ const createMaskStage = async (
     maskLayer.add(
       new Konva.Line({
         points: line.points,
-        stroke: 'black',
+        stroke: shouldInvertMask ? 'white' : 'black',
         strokeWidth: line.strokeWidth * 2,
         tension: 0,
         lineCap: 'round',

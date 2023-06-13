@@ -1,10 +1,6 @@
-import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { InvokeTabName } from 'features/ui/store/tabMap';
+import { selectImagesAll } from 'features/gallery/store/imagesSlice';
 import { ImagesService } from 'services/api';
-import { getHeaders } from 'services/util/getHeaders';
-
-const imagesLog = log.child({ namespace: 'image' });
 
 type imageUrlsReceivedArg = Parameters<
   (typeof ImagesService)['getImageUrls']
@@ -17,7 +13,6 @@ export const imageUrlsReceived = createAppAsyncThunk(
   'api/imageUrlsReceived',
   async (arg: imageUrlsReceivedArg) => {
     const response = await ImagesService.getImageUrls(arg);
-    imagesLog.info({ arg, response }, 'Received image urls');
     return response;
   }
 );
@@ -33,15 +28,52 @@ export const imageMetadataReceived = createAppAsyncThunk(
   'api/imageMetadataReceived',
   async (arg: imageMetadataReceivedArg) => {
     const response = await ImagesService.getImageMetadata(arg);
-    imagesLog.info({ arg, response }, 'Received image record');
     return response;
   }
 );
 
+type ControlNetAction = {
+  type: 'SET_CONTROLNET_IMAGE';
+  controlNetId: string;
+};
+
+type InitialImageAction = {
+  type: 'SET_INITIAL_IMAGE';
+};
+
+type NodesAction = {
+  type: 'SET_NODES_IMAGE';
+  nodeId: string;
+  fieldName: string;
+};
+
+type CanvasInitialImageAction = {
+  type: 'SET_CANVAS_INITIAL_IMAGE';
+};
+
+type CanvasMergedAction = {
+  type: 'TOAST_CANVAS_MERGED';
+};
+
+type CanvasSavedToGalleryAction = {
+  type: 'TOAST_CANVAS_SAVED_TO_GALLERY';
+};
+
+type UploadedToastAction = {
+  type: 'TOAST_UPLOADED';
+};
+
+export type PostUploadAction =
+  | ControlNetAction
+  | InitialImageAction
+  | NodesAction
+  | CanvasInitialImageAction
+  | CanvasMergedAction
+  | CanvasSavedToGalleryAction
+  | UploadedToastAction;
+
 type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0] & {
-  // extra arg to determine post-upload actions - we check for this when the image is uploaded
-  // to determine if we should set the init image
-  activeTabName?: InvokeTabName;
+  postUploadAction?: PostUploadAction;
 };
 
 /**
@@ -50,14 +82,10 @@ type ImageUploadedArg = Parameters<(typeof ImagesService)['uploadImage']>[0] & {
 export const imageUploaded = createAppAsyncThunk(
   'api/imageUploaded',
   async (arg: ImageUploadedArg) => {
-    // strip out `activeTabName` from arg - the route does not need it
-    const { activeTabName, ...rest } = arg;
+    // `postUploadAction` is only used by the listener middleware - destructure it out
+    const { postUploadAction, ...rest } = arg;
     const response = await ImagesService.uploadImage(rest);
-    const { location } = getHeaders(response);
-
-    imagesLog.debug({ arg: '<Blob>', response, location }, 'Image uploaded');
-
-    return { response, location };
+    return response;
   }
 );
 
@@ -70,9 +98,48 @@ export const imageDeleted = createAppAsyncThunk(
   'api/imageDeleted',
   async (arg: ImageDeletedArg) => {
     const response = await ImagesService.deleteImage(arg);
+    return response;
+  }
+);
 
-    imagesLog.debug({ arg, response }, 'Image deleted');
+type ImageUpdatedArg = Parameters<(typeof ImagesService)['updateImage']>[0];
 
+/**
+ * `ImagesService.updateImage()` thunk
+ */
+export const imageUpdated = createAppAsyncThunk(
+  'api/imageUpdated',
+  async (arg: ImageUpdatedArg) => {
+    const response = await ImagesService.updateImage(arg);
+    return response;
+  }
+);
+
+type ImagesListedArg = Parameters<
+  (typeof ImagesService)['listImagesWithMetadata']
+>[0];
+
+export const IMAGES_PER_PAGE = 20;
+
+/**
+ * `ImagesService.listImagesWithMetadata()` thunk
+ */
+export const receivedPageOfImages = createAppAsyncThunk(
+  'api/receivedPageOfImages',
+  async (_, { getState }) => {
+    const state = getState();
+    const { categories } = state.images;
+
+    const totalImagesInFilter = selectImagesAll(state).filter((i) =>
+      categories.includes(i.image_category)
+    ).length;
+
+    const response = await ImagesService.listImagesWithMetadata({
+      categories,
+      isIntermediate: false,
+      offset: totalImagesInFilter,
+      limit: IMAGES_PER_PAGE,
+    });
     return response;
   }
 );

@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { setShouldPreserveMaskedArea } from 'features/canvas/store/canvasSlice';
 import { useTranslation } from 'react-i18next';
 
@@ -13,7 +13,7 @@ export default function UnifiedCanvasPreserveMask() {
   );
 
   return (
-    <IAICheckbox
+    <IAISimpleCheckbox
       label={t('unifiedCanvas.betaPreserveMasked')}
       isChecked={shouldPreserveMaskedArea}
       onChange={(e) => dispatch(setShouldPreserveMaskedArea(e.target.checked))}

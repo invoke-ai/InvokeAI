@@ -122,7 +122,9 @@
         "noImagesInGallery": "No Images In Gallery",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
-        "deleteImagePermanent": "Deleted images cannot be restored."
+        "deleteImagePermanent": "Deleted images cannot be restored.",
+        "images": "Images",
+        "assets": "Assets"
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",
@@ -452,6 +454,8 @@
         "height": "Height",
         "scheduler": "Scheduler",
         "seed": "Seed",
+        "boundingBoxWidth": "Bounding Box Width",
+        "boundingBoxHeight": "Bounding Box Height",
         "imageToImage": "Image to Image",
         "randomizeSeed": "Randomize Seed",
         "shuffle": "Shuffle Seed",
@@ -502,8 +506,8 @@
             "isScheduled": "Canceling",
             "setType": "Set cancel type"
         },
-        "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
-        "negativePrompts": "Negative Prompts",
+        "positivePromptPlaceholder": "Positive Prompt",
+        "negativePromptPlaceholder": "Negative Prompt",
         "sendTo": "Send to",
         "sendToImg2Img": "Send to Image to Image",
         "sendToUnifiedCanvas": "Send To Unified Canvas",
@@ -524,7 +528,7 @@
     },
     "settings": {
         "models": "Models",
-        "displayInProgress": "Display In-Progress Images",
+        "displayInProgress": "Display Progress Images",
         "saveSteps": "Save images every n steps",
         "confirmOnDelete": "Confirm On Delete",
         "displayHelpIcons": "Display Help Icons",
@@ -564,6 +568,8 @@
         "canvasMerged": "Canvas Merged",
         "sentToImageToImage": "Sent To Image To Image",
         "sentToUnifiedCanvas": "Sent to Unified Canvas",
+        "parameterSet": "Parameter set",
+        "parameterNotSet": "Parameter not set",
         "parametersSet": "Parameters Set",
         "parametersNotSet": "Parameters Not Set",
         "parametersNotSetDesc": "No metadata found for this image.",

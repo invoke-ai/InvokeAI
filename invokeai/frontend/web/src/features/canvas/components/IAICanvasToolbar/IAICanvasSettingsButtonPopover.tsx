@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -16,7 +16,6 @@ import {
   setShouldShowIntermediates,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 import { isEqual } from 'lodash-es';
 
 import { ChangeEvent } from 'react';
@@ -102,50 +101,50 @@ const IAICanvasSettingsButtonPopover = () => {
       }
     >
       <Flex direction="column" gap={2}>
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.showIntermediates')}
           isChecked={shouldShowIntermediates}
           onChange={(e) =>
             dispatch(setShouldShowIntermediates(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.showGrid')}
           isChecked={shouldShowGrid}
           onChange={(e) => dispatch(setShouldShowGrid(e.target.checked))}
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.snapToGrid')}
           isChecked={shouldSnapToGrid}
           onChange={handleChangeShouldSnapToGrid}
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.darkenOutsideSelection')}
           isChecked={shouldDarkenOutsideBoundingBox}
           onChange={(e) =>
             dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.autoSaveToGallery')}
           isChecked={shouldAutoSave}
           onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.saveBoxRegionOnly')}
           isChecked={shouldCropToBoundingBoxOnSave}
           onChange={(e) =>
             dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.limitStrokesToBox')}
           isChecked={shouldRestrictStrokesToBox}
           onChange={(e) =>
             dispatch(setShouldRestrictStrokesToBox(e.target.checked))
           }
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.showCanvasDebugInfo')}
           isChecked={shouldShowCanvasDebugInfo}
           onChange={(e) =>
@@ -153,13 +152,12 @@ const IAICanvasSettingsButtonPopover = () => {
           }
         />
 
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('unifiedCanvas.antialiasing')}
           isChecked={shouldAntialias}
           onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
         />
         <ClearCanvasHistoryButtonModal />
-        <EmptyTempFolderButtonModal />
       </Flex>
     </IAIPopover>
   );

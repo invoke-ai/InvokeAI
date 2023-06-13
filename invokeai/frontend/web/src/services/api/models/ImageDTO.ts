@@ -4,7 +4,7 @@
 
 import type { ImageCategory } from './ImageCategory';
 import type { ImageMetadata } from './ImageMetadata';
-import type { ImageType } from './ImageType';
+import type { ResourceOrigin } from './ResourceOrigin';
 
 /**
  * Deserialized image record, enriched for the frontend with URLs.
@@ -17,7 +17,7 @@ export type ImageDTO = {
   /**
    * The type of the image.
    */
-  image_type: ImageType;
+  image_origin: ResourceOrigin;
   /**
    * The URL of the image.
    */
@@ -50,6 +50,10 @@ export type ImageDTO = {
    * The deleted timestamp of the image.
    */
   deleted_at?: string;
+  /**
+   * Whether this is an intermediate image.
+   */
+  is_intermediate: boolean;
   /**
    * The session ID that generated this image, if it is a generated image.
    */

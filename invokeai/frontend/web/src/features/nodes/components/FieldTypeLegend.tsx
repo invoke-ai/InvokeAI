@@ -6,7 +6,7 @@ import { memo } from 'react';
 
 const FieldTypeLegend = () => {
   return (
-    <Flex gap={2} flexDirection={{ base: 'column', xl: 'row' }}>
+    <Flex sx={{ gap: 2, flexDir: 'column' }}>
       {map(FIELDS, ({ title, description, color }, key) => (
         <Tooltip key={key} label={description}>
           <Badge

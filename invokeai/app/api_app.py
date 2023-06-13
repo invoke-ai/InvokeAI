@@ -3,7 +3,7 @@ import asyncio
 from inspect import signature
 
 import uvicorn
-from invokeai.backend.util.logging import InvokeAILogger
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -11,15 +11,22 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
+from pathlib import Path
 from pydantic.schema import schema
+
+#This should come early so that modules can log their initialization properly
+from .services.config import InvokeAIAppConfig
+from ..backend.util.logging import InvokeAILogger
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
+logger = InvokeAILogger.getLogger(config=app_config)
+
+import invokeai.frontend.web as web_dir
 
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
-from .services.config import InvokeAIAppConfig
-
-logger = InvokeAILogger.getLogger()
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -36,10 +43,6 @@ app.add_middleware(
 )
 
 socket_io = SocketIO(app)
-
-# initialize config
-# this is a module global
-app_config = InvokeAIAppConfig()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
@@ -120,8 +123,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 # Override API doc favicons
-app.mount("/static", StaticFiles(directory="static/dream_web"), name="static")
-
+app.mount("/static", StaticFiles(directory=Path(web_dir.__path__[0], 'static/dream_web')), name="static")
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
@@ -142,10 +144,11 @@ def overridden_redoc():
 
 
 # Must mount *after* the other routes else it borks em
-app.mount(
-    "/", StaticFiles(directory="invokeai/frontend/web/dist", html=True), name="ui"
-)
-
+app.mount("/", 
+          StaticFiles(directory=Path(web_dir.__path__[0],"dist"), 
+                      html=True
+                     ), name="ui"
+         )
 
 def invoke_api():
     # Start our own event loop for eventing usage

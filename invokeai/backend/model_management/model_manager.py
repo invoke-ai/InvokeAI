@@ -11,14 +11,16 @@ import gc
 import hashlib
 import os
 import re
+import shutil
 import sys
 import textwrap
 import time
+import traceback
 import warnings
 from enum import Enum, auto
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Optional, Union, Callable, types
+from typing import Any, Optional, Union, Callable, Dict, List, types
 
 import safetensors
 import safetensors.torch
@@ -47,7 +49,11 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 from ..stable_diffusion import (
     StableDiffusionGeneratorPipeline,
 )
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
+from ..install.model_install_backend import (
+    Dataset_path,
+    hf_download_with_resume,
+)
 from ..util import CUDA_DEVICE, ask_user, download_with_resume
 
 class SDLegacyType(Enum):
@@ -98,7 +104,7 @@ class ModelManager(object):
         if not isinstance(config, DictConfig):
             config = OmegaConf.load(config)
         self.config = config
-        self.globals = get_invokeai_config()
+        self.globals = InvokeAIAppConfig.get_config()
         self.precision = precision
         self.device = torch.device(device_type)
         self.max_loaded_models = max_loaded_models
@@ -314,7 +320,7 @@ class ModelManager(object):
         models = {}
         for name in sorted(self.config, key=str.casefold):
             stanza = self.config[name]
-
+            
             # don't include VAEs in listing (legacy style)
             if "config" in stanza and "/VAE/" in stanza["config"]:
                 continue
@@ -526,7 +532,8 @@ class ModelManager(object):
                     **fp_args,
                 )
             except OSError as e:
-                if str(e).startswith("fp16 is not a valid"):
+                if str(e).startswith("fp16 is not a valid") or \
+                   'Invalid rev id: fp16' in str(e):
                     pass
                 else:
                     self.logger.error(
@@ -773,11 +780,11 @@ class ModelManager(object):
 
         """
         model_path: Path = None
-        thing = path_url_or_repo  # to save typing
+        thing = str(path_url_or_repo)  # to save typing
 
         self.logger.info(f"Probing {thing} for import")
 
-        if thing.startswith(("http:", "https:", "ftp:")):
+        if str(thing).startswith(("http:", "https:", "ftp:")):
             self.logger.info(f"{thing} appears to be a URL")
             model_path = self._resolve_path(
                 thing, "models/ldm/stable-diffusion-v1"
@@ -813,7 +820,9 @@ class ModelManager(object):
                     Path(thing).rglob("*.safetensors")
                 ):
                     if model_name := self.heuristic_import(
-                        str(m), commit_to_conf=commit_to_conf
+                            str(m),
+                            commit_to_conf=commit_to_conf,
+                            config_file_callback=config_file_callback,
                     ):
                         self.logger.info(f"{model_name} successfully imported")
                 return model_name
@@ -859,7 +868,7 @@ class ModelManager(object):
                     model_config_file = self.globals.legacy_conf_path / "v1-inference.yaml"
                 elif model_type == SDLegacyType.V1_INPAINT:
                     self.logger.debug("SD-v1 inpainting model detected")
-                    model_config_file = self.globals.legacy_conf_path / "v1-inpainting-inference.yaml",
+                    model_config_file = self.globals.legacy_conf_path / "v1-inpainting-inference.yaml"
                 elif model_type == SDLegacyType.V2_v:
                     self.logger.debug("SD-v2-v model detected")
                     model_config_file = self.globals.legacy_conf_path / "v2-inference-v.yaml"
@@ -868,14 +877,12 @@ class ModelManager(object):
                     model_config_file = self.globals.legacy_conf_path / "v2-inference.yaml"
                 elif model_type == SDLegacyType.V2:
                     self.logger.warning(
-                        f"{thing} is a V2 checkpoint file, but its parameterization cannot be determined. Please provide configuration file path."
+                        f"{thing} is a V2 checkpoint file, but its parameterization cannot be determined."
                     )
-                    return
                 else:
                     self.logger.warning(
-                        f"{thing} is a legacy checkpoint file but not a known Stable Diffusion model. Please provide configuration file path."
+                        f"{thing} is a legacy checkpoint file but not a known Stable Diffusion model."
                     )
-                    return
 
         if not model_config_file and config_file_callback:
             model_config_file = config_file_callback(model_path)
@@ -932,34 +939,35 @@ class ModelManager(object):
 
         from . import convert_ckpt_to_diffusers
 
-        if diffusers_path.exists():
-            self.logger.error(
-                f"The path {str(diffusers_path)} already exists. Please move or remove it and try again."
-            )
-            return
-
         model_name = model_name or diffusers_path.name
         model_description = model_description or f"Converted version of {model_name}"
-        self.logger.debug(f"Converting {model_name} to diffusers (30-60s)")
+        
         try:
-            # By passing the specified VAE to the conversion function, the autoencoder
-            # will be built into the model rather than tacked on afterward via the config file
-            vae_model = None
-            if vae:
-                vae_model = self._load_vae(vae)
-                vae_path = None
-            convert_ckpt_to_diffusers(
-                ckpt_path,
-                diffusers_path,
-                extract_ema=True,
-                original_config_file=original_config_file,
-                vae=vae_model,
-                vae_path=vae_path,
-                scan_needed=scan_needed,
-            )
-            self.logger.debug(
-                f"Success. Converted model is now located at {str(diffusers_path)}"
-            )
+            if diffusers_path.exists():
+                self.logger.error(
+                    f"The path {str(diffusers_path)} already exists. Installing previously-converted path."
+                )
+            else:
+                self.logger.debug(f"Converting {model_name} to diffusers (30-60s)")
+
+                # By passing the specified VAE to the conversion function, the autoencoder
+                # will be built into the model rather than tacked on afterward via the config file
+                vae_model = None
+                if vae:
+                    vae_model = self._load_vae(vae)
+                    vae_path = None
+                convert_ckpt_to_diffusers(
+                    ckpt_path,
+                    diffusers_path,
+                    extract_ema=True,
+                    original_config_file=original_config_file,
+                    vae=vae_model,
+                    vae_path=vae_path,
+                    scan_needed=scan_needed,
+                )
+                self.logger.debug(
+                    f"Success. Converted model is now located at {str(diffusers_path)}"
+                )
             self.logger.debug(f"Writing new config file entry for {model_name}")
             new_config = dict(
                 path=str(diffusers_path),
@@ -971,9 +979,10 @@ class ModelManager(object):
             self.add_model(model_name, new_config, True)
             if commit_to_conf:
                 self.commit(commit_to_conf)
-            self.logger.debug("Conversion succeeded")
+            self.logger.debug(f"Model {model_name} installed")
         except Exception as e:
             self.logger.warning(f"Conversion failed: {str(e)}")
+            self.logger.warning(traceback.format_exc())
             self.logger.warning(
                 "If you are trying to convert an inpainting or 2.X model, please indicate the correct config file (e.g. v1-inpainting-inference.yaml)"
             )
@@ -1057,7 +1066,7 @@ class ModelManager(object):
         """
         # Three transformer models to check: bert, clip and safety checker, and
         # the diffusers as well
-        config = get_invokeai_config()
+        config = InvokeAIAppConfig.get_config()
         models_dir = config.root_dir / "models"
         legacy_locations = [
             Path(
@@ -1287,7 +1296,7 @@ class ModelManager(object):
 
     @classmethod
     def _delete_model_from_cache(cls,repo_id):
-        cache_info = scan_cache_dir(get_invokeai_config().cache_dir)
+        cache_info = scan_cache_dir(InvokeAIAppConfig.get_config().cache_dir)
 
         # I'm sure there is a way to do this with comprehensions
         # but the code quickly became incomprehensible!
@@ -1304,7 +1313,7 @@ class ModelManager(object):
 
     @staticmethod
     def _abs_path(path: str | Path) -> Path:
-        globals = get_invokeai_config()
+        globals = InvokeAIAppConfig.get_config()
         if path is None or Path(path).is_absolute():
             return path
         return Path(globals.root_dir, path).resolve()
@@ -1314,3 +1323,185 @@ class ModelManager(object):
         return (
             os.getenv("HF_HOME") is not None or os.getenv("XDG_CACHE_HOME") is not None
         )
+
+    def list_lora_models(self)->Dict[str,bool]:
+        '''Return a dict of installed lora models; key is either the shortname
+        defined in INITIAL_MODELS, or the basename of the file in the LoRA
+        directory. Value is True if installed'''
+
+        models = OmegaConf.load(Dataset_path).get('lora') or {}
+        installed_models = {x: False for x in models.keys()}
+        
+        dir = self.globals.lora_path
+        installed_models = dict()
+        for root, dirs, files in os.walk(dir):
+            for name in files:
+                if Path(name).suffix not in ['.safetensors','.ckpt','.pt','.bin']:
+                    continue
+                if name == 'pytorch_lora_weights.bin':
+                    name = Path(root,name).parent.stem #Path(root,name).stem
+                else:
+                    name = Path(name).stem
+                installed_models.update({name: True})
+
+        return installed_models
+    
+    def install_lora_models(self, model_names: list[str], access_token:str=None):
+        '''Download list of LoRA/LyCORIS models'''
+        
+        short_names = OmegaConf.load(Dataset_path).get('lora') or {}
+        for name in model_names:
+            name = short_names.get(name) or name
+
+            # HuggingFace style LoRA
+            if re.match(r"^[\w.+-]+/([\w.+-]+)$", name):
+                self.logger.info(f'Downloading LoRA/LyCORIS model {name}')
+                _,dest_dir = name.split("/")
+                
+                hf_download_with_resume(
+                    repo_id = name,
+                    model_dir = self.globals.lora_path / dest_dir,
+                    model_name = 'pytorch_lora_weights.bin',
+                    access_token = access_token,
+                )
+
+            elif name.startswith(("http:", "https:", "ftp:")):
+                download_with_resume(name, self.globals.lora_path)
+
+            else:
+                self.logger.error(f"Unknown repo_id or URL: {name}")
+    
+    def delete_lora_models(self, model_names: List[str]):
+        '''Remove the list of lora models'''
+        for name in model_names:
+            file_or_directory = self.globals.lora_path / name
+            if file_or_directory.is_dir():
+                self.logger.info(f'Purging LoRA/LyCORIS {name}')
+                shutil.rmtree(str(file_or_directory))
+            else:
+                for path in self.globals.lora_path.glob(f'{name}.*'):
+                    self.logger.info(f'Purging LoRA/LyCORIS {name}')
+                    path.unlink()
+                
+    def list_ti_models(self)->Dict[str,bool]:
+        '''Return a dict of installed textual models; key is either the shortname
+        defined in INITIAL_MODELS, or the basename of the file in the LoRA
+        directory. Value is True if installed'''
+
+        models = OmegaConf.load(Dataset_path).get('textual_inversion') or {}
+        installed_models = {x: False for x in models.keys()}
+        
+        dir = self.globals.embedding_path
+        for root, dirs, files in os.walk(dir):
+            for name in files:
+                if not Path(name).suffix in ['.bin','.pt','.ckpt','.safetensors']:
+                    continue
+                if name == 'learned_embeds.bin':
+                    name = Path(root,name).parent.stem #Path(root,name).stem
+                else:
+                    name = Path(name).stem
+                installed_models.update({name: True})
+        return installed_models
+
+    def install_ti_models(self, model_names: list[str], access_token: str=None):
+        '''Download list of textual inversion embeddings'''
+
+        short_names = OmegaConf.load(Dataset_path).get('textual_inversion') or {}
+        for name in model_names:
+            name = short_names.get(name) or name
+            
+            if re.match(r"^[\w.+-]+/([\w.+-]+)$", name):
+                self.logger.info(f'Downloading Textual Inversion embedding {name}')
+                _,dest_dir = name.split("/")
+                hf_download_with_resume(
+                    repo_id = name,
+                    model_dir = self.globals.embedding_path / dest_dir,
+                    model_name = 'learned_embeds.bin',
+                    access_token = access_token
+                )
+            elif name.startswith(('http:','https:','ftp:')):
+                download_with_resume(name, self.globals.embedding_path)
+            else:
+                self.logger.error(f'{name} does not look like either a HuggingFace repo_id or a downloadable URL')
+    
+    def delete_ti_models(self, model_names: list[str]):
+        '''Remove TI embeddings from disk'''
+        for name in model_names:
+            file_or_directory = self.globals.embedding_path / name
+            if file_or_directory.is_dir():
+                self.logger.info(f'Purging textual inversion embedding {name}')
+                shutil.rmtree(str(file_or_directory))
+            else:
+                for path in self.globals.embedding_path.glob(f'{name}.*'):
+                    self.logger.info(f'Purging textual inversion embedding {name}')
+                    path.unlink()
+
+    def list_controlnet_models(self)->Dict[str,bool]:
+        '''Return a dict of installed controlnet models; key is repo_id or short name
+        of model (defined in INITIAL_MODELS), and value is True if installed'''
+
+        cn_models = OmegaConf.load(Dataset_path).get('controlnet') or {}
+        installed_models = {x: False for x in cn_models.keys()}
+        
+        cn_dir = self.globals.controlnet_path
+        for root, dirs, files in os.walk(cn_dir):
+            for name in dirs:
+                if Path(root, name, '.download_complete').exists():
+                    installed_models.update({name.replace('--','/'): True})
+        return installed_models
+
+    def install_controlnet_models(self, model_names: list[str], access_token: str=None):
+        '''Download list of controlnet models; provide either repo_id or short name listed in INITIAL_MODELS.yaml'''
+        short_names = OmegaConf.load(Dataset_path).get('controlnet') or {}
+        dest_dir = self.globals.controlnet_path
+        dest_dir.mkdir(parents=True,exist_ok=True)
+        
+        # The model file may be fp32 or fp16, and may be either a
+        # .bin file or a .safetensors. We try each until we get one,
+        # preferring 'fp16' if using half precision, and preferring
+        # safetensors over over bin.
+        precisions = ['.fp16',''] if self.precision=='float16' else ['']
+        formats = ['.safetensors','.bin']
+        possible_filenames = list()
+        for p in precisions:
+            for f in formats:
+                possible_filenames.append(Path(f'diffusion_pytorch_model{p}{f}'))
+        
+        for directory_name in model_names:
+            repo_id = short_names.get(directory_name) or directory_name
+            safe_name = directory_name.replace('/','--')
+            self.logger.info(f'Downloading ControlNet model {directory_name} ({repo_id})')
+            hf_download_with_resume(
+                repo_id = repo_id,
+                model_dir = dest_dir / safe_name,
+                model_name = 'config.json',
+                access_token = access_token
+            )
+
+            path = None
+            for filename in possible_filenames:
+                suffix = filename.suffix
+                dest_filename = Path(f'diffusion_pytorch_model{suffix}')
+                self.logger.info(f'Checking availability of {directory_name}/{filename}...')
+                path = hf_download_with_resume(
+                    repo_id = repo_id,
+                    model_dir = dest_dir / safe_name,
+                    model_name = str(filename),
+                    access_token = access_token,
+                    model_dest = Path(dest_dir, safe_name, dest_filename),
+                )
+                if path:
+                    (path.parent / '.download_complete').touch()
+                    break
+
+    def delete_controlnet_models(self, model_names: List[str]):
+        '''Remove the list of controlnet models'''
+        for name in model_names:
+            safe_name = name.replace('/','--')
+            directory = self.globals.controlnet_path / safe_name
+            if directory.exists():
+                self.logger.info(f'Purging controlnet model {name}')
+                shutil.rmtree(str(directory))
+
+
+        

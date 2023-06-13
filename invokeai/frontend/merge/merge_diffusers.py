@@ -20,12 +20,12 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
-from invokeai.services.config import get_invokeai_config
+from invokeai.services.config import InvokeAIAppConfig
 from ...backend.model_management import ModelManager
 from ...frontend.install.widgets import FloatTitleSlider
 
 DEST_MERGED_MODEL_DIR = "merged_models"
-config = get_invokeai_config()
+config = InvokeAIAppConfig.get_config()
 
 def merge_diffusion_models(
     model_ids_or_paths: List[Union[str, Path]],

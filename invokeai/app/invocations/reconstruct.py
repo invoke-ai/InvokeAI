@@ -2,7 +2,7 @@ from typing import Literal, Union
 
 from pydantic import Field
 
-from invokeai.app.models.image import ImageCategory, ImageField, ImageType
+from invokeai.app.models.image import ImageCategory, ImageField, ResourceOrigin
 
 from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
 from .image import ImageOutput
@@ -29,7 +29,7 @@ class RestoreFaceInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
         results = context.services.restoration.upscale_and_reconstruct(
             image_list=[[image, 0]],
@@ -43,16 +43,17 @@ class RestoreFaceInvocation(BaseInvocation):
         # TODO: can this return multiple results?
         image_dto = context.services.images.create(
             image=results[0][0],
-            image_type=ImageType.INTERMEDIATE,
+            image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
         )
 
         return ImageOutput(
             image=ImageField(
                 image_name=image_dto.image_name,
-                image_type=image_dto.image_type,
+                image_origin=image_dto.image_origin,
             ),
             width=image_dto.width,
             height=image_dto.height,

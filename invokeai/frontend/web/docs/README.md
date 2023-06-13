@@ -12,7 +12,14 @@ Code in `invokeai/frontend/web/` if you want to have a look.
 
 ## Stack
 
-State management is Redux via [Redux Toolkit](https://github.com/reduxjs/redux-toolkit). Communication with server is a mix of HTTP and [socket.io](https://github.com/socketio/socket.io-client) (with a custom redux middleware to help).
+State management is Redux via [Redux Toolkit](https://github.com/reduxjs/redux-toolkit). We lean heavily on RTK:
+- `createAsyncThunk` for HTTP requests
+- `createEntityAdapter` for fetching images and models
+- `createListenerMiddleware` for workflows
+
+The API client and associated types are generated from the OpenAPI schema. See API_CLIENT.md.
+
+Communication with server is a mix of HTTP and [socket.io](https://github.com/socketio/socket.io-client) (with a simple socket.io redux middleware to help).
 
 [Chakra-UI](https://github.com/chakra-ui/chakra-ui) for components and styling.
 
@@ -37,8 +44,14 @@ From `invokeai/frontend/web/` run `yarn install` to get everything set up.
 Start everything in dev mode:
 
 1. Start the dev server: `yarn dev`
-2. Start the InvokeAI Nodes backend: `python scripts/invokeai-new.py --web # run from the repo root`
+2. Start the InvokeAI Nodes backend: `python scripts/invokeai-web.py # run from the repo root`
 3. Point your browser to the dev server address e.g. <http://localhost:5173/>
+
+#### VSCode Remote Dev
+
+We've noticed an intermittent issue with the VSCode Remote Dev port forwarding. If you use this feature of VSCode, you may intermittently click the Invoke button and then get nothing until the request times out. Suggest disabling the IDE's port forwarding feature and doing it manually via SSH:
+
+`ssh -L 9090:localhost:9090 -L 5173:localhost:5173 user@host`
 
 ### Production builds
 

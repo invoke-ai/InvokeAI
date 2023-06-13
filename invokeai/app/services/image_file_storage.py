@@ -9,7 +9,7 @@ from PIL.Image import Image as PILImageType
 from PIL import Image, PngImagePlugin
 from send2trash import send2trash
 
-from invokeai.app.models.image import ImageType
+from invokeai.app.models.image import ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
@@ -40,13 +40,13 @@ class ImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
 
     @abstractmethod
-    def get(self, image_type: ImageType, image_name: str) -> PILImageType:
+    def get(self, image_origin: ResourceOrigin, image_name: str) -> PILImageType:
         """Retrieves an image as PIL Image."""
         pass
 
     @abstractmethod
     def get_path(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
     ) -> str:
         """Gets the internal path to an image or thumbnail."""
         pass
@@ -62,7 +62,7 @@ class ImageFileStorageBase(ABC):
     def save(
         self,
         image: PILImageType,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_name: str,
         metadata: Optional[ImageMetadata] = None,
         thumbnail_size: int = 256,
@@ -71,7 +71,7 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
         """Deletes an image and its thumbnail (if one exists)."""
         pass
 
@@ -93,17 +93,17 @@ class DiskImageFileStorage(ImageFileStorageBase):
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
         # TODO: don't hard-code. get/save/delete should maybe take subpath?
-        for image_type in ImageType:
-            Path(os.path.join(output_folder, image_type)).mkdir(
+        for image_origin in ResourceOrigin:
+            Path(os.path.join(output_folder, image_origin)).mkdir(
                 parents=True, exist_ok=True
             )
-            Path(os.path.join(output_folder, image_type, "thumbnails")).mkdir(
+            Path(os.path.join(output_folder, image_origin, "thumbnails")).mkdir(
                 parents=True, exist_ok=True
             )
 
-    def get(self, image_type: ImageType, image_name: str) -> PILImageType:
+    def get(self, image_origin: ResourceOrigin, image_name: str) -> PILImageType:
         try:
-            image_path = self.get_path(image_type, image_name)
+            image_path = self.get_path(image_origin, image_name)
             cache_item = self.__get_cache(image_path)
             if cache_item:
                 return cache_item
@@ -117,13 +117,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def save(
         self,
         image: PILImageType,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_name: str,
         metadata: Optional[ImageMetadata] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
-            image_path = self.get_path(image_type, image_name)
+            image_path = self.get_path(image_origin, image_name)
 
             if metadata is not None:
                 pnginfo = PngImagePlugin.PngInfo()
@@ -133,7 +133,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 image.save(image_path, "PNG")
 
             thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(image_type, thumbnail_name, thumbnail=True)
+            thumbnail_path = self.get_path(image_origin, thumbnail_name, thumbnail=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
             thumbnail_image.save(thumbnail_path)
 
@@ -142,10 +142,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except Exception as e:
             raise ImageFileSaveException from e
 
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
         try:
             basename = os.path.basename(image_name)
-            image_path = self.get_path(image_type, basename)
+            image_path = self.get_path(image_origin, basename)
 
             if os.path.exists(image_path):
                 send2trash(image_path)
@@ -153,7 +153,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 del self.__cache[image_path]
 
             thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(image_type, thumbnail_name, True)
+            thumbnail_path = self.get_path(image_origin, thumbnail_name, True)
 
             if os.path.exists(thumbnail_path):
                 send2trash(thumbnail_path)
@@ -164,7 +164,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
+        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
     ) -> str:
         # strip out any relative path shenanigans
         basename = os.path.basename(image_name)
@@ -172,10 +172,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
         if thumbnail:
             thumbnail_name = get_thumbnail_name(basename)
             path = os.path.join(
-                self.__output_folder, image_type, "thumbnails", thumbnail_name
+                self.__output_folder, image_origin, "thumbnails", thumbnail_name
             )
         else:
-            path = os.path.join(self.__output_folder, image_type, basename)
+            path = os.path.join(self.__output_folder, image_origin, basename)
 
         abspath = os.path.abspath(path)
 

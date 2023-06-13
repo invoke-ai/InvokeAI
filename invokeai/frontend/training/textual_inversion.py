@@ -22,7 +22,7 @@ from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
 
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 from ...backend.training import (
     do_textual_inversion_training,
     parse_args
@@ -423,7 +423,7 @@ def do_front_end(args: Namespace):
         save_args(args)
 
         try:
-            do_textual_inversion_training(get_invokeai_config(),**args)
+            do_textual_inversion_training(InvokeAIAppConfig.get_config(),**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
             logger.error("An exception occurred during training. The exception was:")
@@ -436,7 +436,7 @@ def main():
     global config
     
     args = parse_args()
-    config = get_invokeai_config(argv=[])
+    config = InvokeAIAppConfig.get_config()
 
     # change root if needed
     if args.root_dir:

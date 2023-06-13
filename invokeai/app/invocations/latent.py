@@ -1,8 +1,12 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 import random
-from typing import Literal, Optional, Union
 import einops
+from typing import Literal, Optional, Union, List
+
+from compel import Compel
+from diffusers.pipelines.controlnet import MultiControlNetModel
+
 from pydantic import BaseModel, Field, validator
 import torch
 
@@ -11,24 +15,28 @@ from invokeai.app.models.image import ImageCategory
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from .controlnet_image_processors import ControlField
 
 from ...backend.model_management.model_manager import ModelManager
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.image_util.seamless import configure_model_padding
 from ...backend.prompting.conditioning import get_uc_and_c_and_ec
+
 from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline, image_resized_to_grid_as_tensor
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from ...backend.stable_diffusion.diffusers_pipeline import ControlNetData
+
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 import numpy as np
-from ..services.image_file_storage import ImageType
+from ..services.image_file_storage import ResourceOrigin
 from .baseinvocation import BaseInvocation, InvocationContext
 from .image import ImageField, ImageOutput
 from .compel import ConditioningField
 from ...backend.stable_diffusion import PipelineIntermediateState
 from diffusers.schedulers import SchedulerMixin as Scheduler
 import diffusers
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, ControlNetModel
 
 
 class LatentsField(BaseModel):
@@ -84,13 +92,13 @@ SAMPLER_NAME_VALUES = Literal[
 
 def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
-    
+
     scheduler_config = model.scheduler.config
     if "_backup" in scheduler_config:
         scheduler_config = scheduler_config["_backup"]
     scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
     scheduler = scheduler_class.from_config(scheduler_config)
-    
+
     # hack copied over from generate.py
     if not hasattr(scheduler, 'uses_inpainting_model'):
         scheduler.uses_inpainting_model = lambda: False
@@ -166,20 +174,36 @@ class TextToLatentsInvocation(BaseInvocation):
     negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    cfg_scale: float = Field(default=7.5, gt=0, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="lms", description="The scheduler to use" )
+    cfg_scale: Union[float, List[float]] = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     model:       str = Field(default="", description="The model to use (currently ignored)")
+    control: Union[ControlField, List[ControlField]] = Field(default=None, description="The control to use")
     # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
+
+    @validator("cfg_scale")
+    def ge_one(cls, v):
+        """validate that all cfg_scale values are >= 1"""
+        if isinstance(v, list):
+            for i in v:
+                if i < 1:
+                    raise ValueError('cfg_scale must be greater than 1')
+        else:
+            if v < 1:
+                raise ValueError('cfg_scale must be greater than 1')
+        return v
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["latents", "image"],
+                "tags": ["latents"],
                 "type_hints": {
-                  "model": "model"
+                  "model": "model",
+                  "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number"
                 }
             },
         }
@@ -224,11 +248,20 @@ class TextToLatentsInvocation(BaseInvocation):
         c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
 
+        compel = Compel(
+            tokenizer=model.tokenizer,
+            text_encoder=model.text_encoder,
+            textual_inversion_manager=model.textual_inversion_manager,
+            dtype_for_device_getter=torch_dtype,
+            truncate_long_prompts=False,
+        )
+        [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+
         conditioning_data = ConditioningData(
-            uc,
-            c,
-            self.cfg_scale,
-            extra_conditioning_info,
+            unconditioned_embeddings=uc,
+            text_embeddings=c,
+            guidance_scale=self.cfg_scale,
+            extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,#threshold,
                 warmup=0.2,#warmup,
@@ -238,6 +271,81 @@ class TextToLatentsInvocation(BaseInvocation):
         ).add_scheduler_args_if_applicable(model.scheduler, eta=0.0)#ddim_eta)
         return conditioning_data
 
+    def prep_control_data(self,
+                          context: InvocationContext,
+                          model: StableDiffusionGeneratorPipeline, # really only need model for dtype and device
+                          control_input: List[ControlField],
+                          latents_shape: List[int],
+                          do_classifier_free_guidance: bool = True,
+                          ) -> List[ControlNetData]:
+        # assuming fixed dimensional scaling of 8:1 for image:latents
+        control_height_resize = latents_shape[2] * 8
+        control_width_resize = latents_shape[3] * 8
+        if control_input is None:
+            # print("control input is None")
+            control_list = None
+        elif isinstance(control_input, list) and len(control_input) == 0:
+            # print("control input is empty list")
+            control_list = None
+        elif isinstance(control_input, ControlField):
+            # print("control input is ControlField")
+            control_list = [control_input]
+        elif isinstance(control_input, list) and len(control_input) > 0 and isinstance(control_input[0], ControlField):
+            # print("control input is list[ControlField]")
+            control_list = control_input
+        else:
+            # print("input control is unrecognized:", type(self.control))
+            control_list = None
+        if (control_list is None):
+            control_data = None
+            # from above handling, any control that is not None should now be of type list[ControlField]
+        else:
+            # FIXME: add checks to skip entry if model or image is None
+            #        and if weight is None, populate with default 1.0?
+            control_data = []
+            control_models = []
+            for control_info in control_list:
+                # handle control models
+                if ("," in control_info.control_model):
+                    control_model_split = control_info.control_model.split(",")
+                    control_name = control_model_split[0]
+                    control_subfolder = control_model_split[1]
+                    print("Using HF model subfolders")
+                    print("    control_name: ", control_name)
+                    print("    control_subfolder: ", control_subfolder)
+                    control_model = ControlNetModel.from_pretrained(control_name,
+                                                                    subfolder=control_subfolder,
+                                                                    torch_dtype=model.unet.dtype).to(model.device)
+                else:
+                    control_model = ControlNetModel.from_pretrained(control_info.control_model,
+                                                                    torch_dtype=model.unet.dtype).to(model.device)
+                control_models.append(control_model)
+                control_image_field = control_info.image
+                input_image = context.services.images.get_pil_image(control_image_field.image_origin,
+                                                                    control_image_field.image_name)
+                # self.image.image_type, self.image.image_name
+                # FIXME: still need to test with different widths, heights, devices, dtypes
+                #        and add in batch_size, num_images_per_prompt?
+                #        and do real check for classifier_free_guidance?
+                # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
+                control_image = model.prepare_control_image(
+                    image=input_image,
+                    do_classifier_free_guidance=do_classifier_free_guidance,
+                    width=control_width_resize,
+                    height=control_height_resize,
+                    # batch_size=batch_size * num_images_per_prompt,
+                    # num_images_per_prompt=num_images_per_prompt,
+                    device=control_model.device,
+                    dtype=control_model.dtype,
+                )
+                control_item = ControlNetData(model=control_model,
+                                              image_tensor=control_image,
+                                              weight=control_info.control_weight,
+                                              begin_step_percent=control_info.begin_step_percent,
+                                              end_step_percent=control_info.end_step_percent)
+                control_data.append(control_item)
+                # MultiControlNetModel has been refactored out, just need list[ControlNetData]
+        return control_data
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
@@ -252,14 +360,19 @@ class TextToLatentsInvocation(BaseInvocation):
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(context, model)
 
-        # TODO: Verify the noise is the right size
+        control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
+                                              latents_shape=noise.shape,
+                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              do_classifier_free_guidance=True,)
 
+        # TODO: Verify the noise is the right size
         result_latents, result_attention_map_saver = model.latents_from_embeddings(
             latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
             noise=noise,
             num_inference_steps=self.steps,
             conditioning_data=conditioning_data,
-            callback=step_callback
+            control_data=control_data,  # list[ControlNetData]
+            callback=step_callback,
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
@@ -277,7 +390,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
-    strength: float = Field(default=0.5, description="The strength of the latents to use")
+    strength: float = Field(default=0.7, ge=0, le=1, description="The strength of the latents to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -285,7 +398,9 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             "ui": {
                 "tags": ["latents"],
                 "type_hints": {
-                    "model": "model"
+                    "model": "model",
+                    "control": "control",
+                    "cfg_scale": "number",
                 }
             },
         }
@@ -304,6 +419,12 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         model = self.get_model(context.services.model_manager)
         conditioning_data = self.get_conditioning_data(context, model)
 
+        control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
+                                              latents_shape=noise.shape,
+                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                                              do_classifier_free_guidance=True,
+                                              )
+
         # TODO: Verify the noise is the right size
 
         initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
@@ -318,6 +439,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             noise=noise,
             num_inference_steps=self.steps,
             conditioning_data=conditioning_data,
+            control_data=control_data,  # list[ControlNetData]
             callback=step_callback
         )
 
@@ -362,20 +484,27 @@ class LatentsToImageInvocation(BaseInvocation):
             np_image = model.decode_latents(latents)
             image = model.numpy_to_pil(np_image)[0]
 
+            # what happened to metadata?
+            # metadata = context.services.metadata.build_metadata(
+            #     session_id=context.graph_execution_state_id, node=self
+
             torch.cuda.empty_cache()
 
+            # new (post Image service refactor) way of using services to save image
+            #     and gnenerate unique image_name
             image_dto = context.services.images.create(
                 image=image,
-                image_type=ImageType.RESULT,
+                image_origin=ResourceOrigin.INTERNAL,
                 image_category=ImageCategory.GENERAL,
                 session_id=context.graph_execution_state_id,
                 node_id=self.id,
+                is_intermediate=self.is_intermediate
             )
 
             return ImageOutput(
                 image=ImageField(
                     image_name=image_dto.image_name,
-                    image_type=image_dto.image_type,
+                    image_origin=image_dto.image_origin,
                 ),
                 width=image_dto.width,
                 height=image_dto.height,
@@ -413,6 +542,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
+        # context.services.latents.set(name, resized_latents)
         context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
@@ -443,6 +573,7 @@ class ScaleLatentsInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
+        # context.services.latents.set(name, resized_latents)
         context.services.latents.save(name, resized_latents)
         return build_latents_output(latents_name=name, latents=resized_latents)
 
@@ -467,8 +598,11 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
+        # image = context.services.images.get(
+        #     self.image.image_type, self.image.image_name
+        # )
         image = context.services.images.get_pil_image(
-            self.image.image_type, self.image.image_name
+            self.image.image_origin, self.image.image_name
         )
 
         # TODO: this only really needs the vae
@@ -487,6 +621,6 @@ class ImageToLatentsInvocation(BaseInvocation):
         )
 
         name = f"{context.graph_execution_state_id}__{self.id}"
+        # context.services.latents.set(name, latents)
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents)
-        

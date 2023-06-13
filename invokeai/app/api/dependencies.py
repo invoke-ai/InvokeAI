@@ -5,6 +5,7 @@ import os
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import CoreMetadataService
+from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -52,12 +53,11 @@ class ApiDependencies:
 
         events = FastAPIEventService(event_handler_id)
 
-        output_folder = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../../../outputs")
-        )
+        output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_location = os.path.join(output_folder, "invokeai.db")
+        db_location = config.db_path
+        db_location.parent.mkdir(parents=True,exist_ok=True)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
@@ -67,7 +67,7 @@ class ApiDependencies:
         metadata = CoreMetadataService()
         image_record_storage = SqliteImageRecordStorage(db_location)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
-
+        names = SimpleNameService()
         latents = ForwardCacheLatentsStorage(
             DiskLatentsStorage(f"{output_folder}/latents")
         )
@@ -78,6 +78,7 @@ class ApiDependencies:
             metadata=metadata,
             url=urls,
             logger=logger,
+            names=names,
             graph_execution_manager=graph_execution_manager,
         )
 

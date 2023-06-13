@@ -60,6 +60,8 @@
     "@chakra-ui/styled-system": "^2.9.0",
     "@chakra-ui/theme-tools": "^2.0.16",
     "@dagrejs/graphlib": "^2.1.12",
+    "@dnd-kit/core": "^6.0.8",
+    "@dnd-kit/modifiers": "^6.0.1",
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
     "@floating-ui/react-dom": "^2.0.0",
@@ -87,7 +89,7 @@
     "react-dropzone": "^14.2.3",
     "react-hotkeys-hook": "4.4.0",
     "react-i18next": "^12.2.2",
-    "react-icons": "^4.7.1",
+    "react-icons": "^4.9.0",
     "react-konva": "^18.2.7",
     "react-redux": "^8.0.5",
     "react-resizable-panels": "^0.0.42",
@@ -101,7 +103,8 @@
     "serialize-error": "^11.0.0",
     "socket.io-client": "^4.6.0",
     "use-image": "^1.1.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "zod": "^3.21.4"
   },
   "peerDependencies": {
     "@chakra-ui/cli": "^2.4.0",

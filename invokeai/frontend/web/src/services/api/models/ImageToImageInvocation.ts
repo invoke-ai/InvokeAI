@@ -12,6 +12,10 @@ export type ImageToImageInvocation = {
    * The id of this node. Must be unique among all nodes.
    */
   id: string;
+  /**
+   * Whether or not this node is an intermediate node.
+   */
+  is_intermediate?: boolean;
   type?: 'img2img';
   /**
    * The prompt to generate an image from
@@ -45,6 +49,18 @@ export type ImageToImageInvocation = {
    * The model to use (currently ignored)
    */
   model?: string;
+  /**
+   * Whether or not to produce progress images during generation
+   */
+  progress_images?: boolean;
+  /**
+   * The control model to use
+   */
+  control_model?: string;
+  /**
+   * The processed control image
+   */
+  control_image?: ImageField;
   /**
    * The input image
    */

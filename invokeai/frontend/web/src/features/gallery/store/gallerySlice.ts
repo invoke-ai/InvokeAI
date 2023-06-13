@@ -1,10 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
-} from '../../../services/thunks/gallery';
 import { ImageDTO } from 'services/api';
+import { imageUpserted } from './imagesSlice';
+import { imageUrlsReceived } from 'services/thunks/image';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
@@ -14,7 +12,6 @@ export interface GalleryState {
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
   shouldUseSingleGalleryColumn: boolean;
-  currentCategory: 'results' | 'uploads';
 }
 
 export const initialGalleryState: GalleryState = {
@@ -22,7 +19,6 @@ export const initialGalleryState: GalleryState = {
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
   shouldUseSingleGalleryColumn: false,
-  currentCategory: 'results',
 };
 
 export const gallerySlice = createSlice({
@@ -46,12 +42,6 @@ export const gallerySlice = createSlice({
     setShouldAutoSwitchToNewImages: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitchToNewImages = action.payload;
     },
-    setCurrentCategory: (
-      state,
-      action: PayloadAction<'results' | 'uploads'>
-    ) => {
-      state.currentCategory = action.payload;
-    },
     setShouldUseSingleGalleryColumn: (
       state,
       action: PayloadAction<boolean>
@@ -59,37 +49,22 @@ export const gallerySlice = createSlice({
       state.shouldUseSingleGalleryColumn = action.payload;
     },
   },
-  extraReducers(builder) {
-    builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
-      // rehydrate selectedImage URL when results list comes in
-      // solves case when outdated URL is in local storage
-      const selectedImage = state.selectedImage;
-      if (selectedImage) {
-        const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === selectedImage.image_name
-        );
-
-        if (selectedImageInResults) {
-          selectedImage.image_url = selectedImageInResults.image_url;
-          selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
-          state.selectedImage = selectedImage;
-        }
+  extraReducers: (builder) => {
+    builder.addCase(imageUpserted, (state, action) => {
+      if (
+        state.shouldAutoSwitchToNewImages &&
+        action.payload.image_category === 'general'
+      ) {
+        state.selectedImage = action.payload;
       }
     });
-    builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
-      // rehydrate selectedImage URL when results list comes in
-      // solves case when outdated URL is in local storage
-      const selectedImage = state.selectedImage;
-      if (selectedImage) {
-        const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === selectedImage.image_name
-        );
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
 
-        if (selectedImageInResults) {
-          selectedImage.image_url = selectedImageInResults.image_url;
-          selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
-          state.selectedImage = selectedImage;
-        }
+      if (state.selectedImage?.image_name === image_name) {
+        state.selectedImage.image_url = image_url;
+        state.selectedImage.thumbnail_url = thumbnail_url;
       }
     });
   },
@@ -101,7 +76,6 @@ export const {
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
   setShouldUseSingleGalleryColumn,
-  setCurrentCategory,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

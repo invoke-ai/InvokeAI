@@ -1,17 +1,8 @@
-import {
-  Box,
-  Flex,
-  Icon,
-  Image,
-  MenuItem,
-  MenuList,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { Box, Flex, Icon, Image, MenuItem, MenuList } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { DragEvent, MouseEvent, memo, useCallback, useState } from 'react';
+import { memo, useCallback, useContext, useState } from 'react';
 import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
-import DeleteImageModal from './DeleteImageModal';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import {
   resizeAndScaleCanvas,
@@ -21,7 +12,6 @@ import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useGetUrl } from 'common/util/getUrl';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { createSelector } from '@reduxjs/toolkit';
@@ -30,15 +20,13 @@ import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useParameters } from 'features/parameters/hooks/useParameters';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
-import {
-  requestedImageDeletion,
-  sentImageToCanvas,
-  sentImageToImg2Img,
-} from '../store/actions';
+import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
+import { useDraggable } from '@dnd-kit/core';
+import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -92,71 +80,50 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     galleryImageMinimumWidth,
     canDeleteImage,
     shouldUseSingleGalleryColumn,
-    shouldConfirmOnDelete,
   } = useAppSelector(selector);
-
-  const {
-    isOpen: isDeleteDialogOpen,
-    onOpen: onDeleteDialogOpen,
-    onClose: onDeleteDialogClose,
-  } = useDisclosure();
 
   const { image, isSelected } = props;
   const { image_url, thumbnail_url, image_name } = image;
-  const { getUrl } = useGetUrl();
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
-
   const toaster = useAppToaster();
 
   const { t } = useTranslation();
-
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
 
-  const { recallSeed, recallPrompt, recallInitialImage, recallAllParameters } =
-    useParameters();
+  const { onDelete } = useContext(DeleteImageContext);
+  const handleDelete = useCallback(() => {
+    onDelete(image);
+  }, [image, onDelete]);
+  const { recallBothPrompts, recallSeed, recallAllParameters } =
+    useRecallParameters();
+
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: `galleryImage_${image_name}`,
+    data: {
+      image,
+    },
+  });
 
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
-
-  // Immediately deletes an image
-  const handleDelete = useCallback(() => {
-    if (canDeleteImage && image) {
-      dispatch(requestedImageDeletion(image));
-    }
-  }, [dispatch, image, canDeleteImage]);
-
-  // Opens the alert dialog to check if user is sure they want to delete
-  const handleInitiateDelete = useCallback(
-    (e: MouseEvent) => {
-      e.stopPropagation();
-      if (shouldConfirmOnDelete) {
-        onDeleteDialogOpen();
-      } else {
-        handleDelete();
-      }
-    },
-    [handleDelete, onDeleteDialogOpen, shouldConfirmOnDelete]
-  );
 
   const handleSelectImage = useCallback(() => {
     dispatch(imageSelected(image));
   }, [image, dispatch]);
 
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.setData('invokeai/imageType', image.image_type);
-      e.dataTransfer.effectAllowed = 'move';
-    },
-    [image]
-  );
-
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallPrompt(image.metadata?.positive_conditioning);
-  }, [image, recallPrompt]);
+    recallBothPrompts(
+      image.metadata?.positive_conditioning,
+      image.metadata?.negative_conditioning
+    );
+  }, [
+    image.metadata?.negative_conditioning,
+    image.metadata?.positive_conditioning,
+    recallBothPrompts,
+  ]);
 
   const handleRecallSeed = useCallback(() => {
     recallSeed(image.metadata?.seed);
@@ -202,11 +169,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleOpenInNewTab = () => {
-    window.open(getUrl(image.image_url), '_blank');
+    window.open(image.image_url, '_blank');
   };
 
   return (
-    <>
+    <Box
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      sx={{ w: 'full', h: 'full', touchAction: 'none' }}
+    >
       <ContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
         renderMenu={() => (
@@ -248,7 +220,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               icon={<IoArrowUndoCircleOutline />}
               onClickCapture={handleUseAllParameters}
               isDisabled={
-                !['txt2img', 'img2img', 'inpaint'].includes(
+                // what should these be
+                !['t2l', 'l2l', 'inpaint'].includes(
                   String(image?.metadata?.type)
                 )
               }
@@ -271,7 +244,11 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 {t('parameters.sendToUnifiedCanvas')}
               </MenuItem>
             )}
-            <MenuItem icon={<FaTrash />} onClickCapture={onDeleteDialogOpen}>
+            <MenuItem
+              sx={{ color: 'error.300' }}
+              icon={<FaTrash />}
+              onClickCapture={handleDelete}
+            >
               {t('gallery.deleteImage')}
             </MenuItem>
           </MenuList>
@@ -284,8 +261,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             onMouseOver={handleMouseOver}
             onMouseOut={handleMouseOut}
             userSelect="none"
-            draggable={true}
-            onDragStart={handleDragStart}
             onClick={handleSelectImage}
             ref={ref}
             sx={{
@@ -304,8 +279,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               objectFit={
                 shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
               }
+              draggable={false}
               rounded="md"
-              src={getUrl(thumbnail_url || image_url)}
+              src={thumbnail_url || image_url}
               fallback={<FaImage />}
               sx={{
                 width: '100%',
@@ -349,7 +325,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 }}
               >
                 <IAIIconButton
-                  onClickCapture={handleInitiateDelete}
+                  onClickCapture={handleDelete}
                   aria-label={t('gallery.deleteImage')}
                   icon={<FaTrash />}
                   size="xs"
@@ -361,12 +337,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           </Box>
         )}
       </ContextMenu>
-      <DeleteImageModal
-        isOpen={isDeleteDialogOpen}
-        onClose={onDeleteDialogClose}
-        handleDelete={handleDelete}
-      />
-    </>
+    </Box>
   );
 }, memoEqualityCheck);
 

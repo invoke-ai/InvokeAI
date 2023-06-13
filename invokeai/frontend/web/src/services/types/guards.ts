@@ -1,5 +1,3 @@
-import { ResultsImageDTO } from 'features/gallery/store/resultsSlice';
-import { UploadsImageDTO } from 'features/gallery/store/uploadsSlice';
 import { get, isObject, isString } from 'lodash-es';
 import {
   GraphExecutionState,
@@ -9,17 +7,27 @@ import {
   PromptOutput,
   IterateInvocationOutput,
   CollectInvocationOutput,
-  ImageType,
   ImageField,
   LatentsOutput,
+  ResourceOrigin,
   ImageDTO,
 } from 'services/api';
 
-export const isUploadsImageDTO = (image: ImageDTO): image is UploadsImageDTO =>
-  image.image_type === 'uploads';
-
-export const isResultsImageDTO = (image: ImageDTO): image is ResultsImageDTO =>
-  image.image_type === 'results';
+export const isImageDTO = (obj: unknown): obj is ImageDTO => {
+  return (
+    isObject(obj) &&
+    'image_name' in obj &&
+    isString(obj?.image_name) &&
+    'thumbnail_url' in obj &&
+    isString(obj?.thumbnail_url) &&
+    'image_url' in obj &&
+    isString(obj?.image_url) &&
+    'image_origin' in obj &&
+    isString(obj?.image_origin) &&
+    'created_at' in obj &&
+    isString(obj?.created_at)
+  );
+};
 
 export const isImageOutput = (
   output: GraphExecutionState['results'][string]
@@ -49,10 +57,10 @@ export const isCollectOutput = (
   output: GraphExecutionState['results'][string]
 ): output is CollectInvocationOutput => output.type === 'collect_output';
 
-export const isImageType = (t: unknown): t is ImageType =>
-  isString(t) && ['results', 'uploads', 'intermediates'].includes(t);
+export const isResourceOrigin = (t: unknown): t is ResourceOrigin =>
+  isString(t) && ['internal', 'external'].includes(t);
 
 export const isImageField = (imageField: unknown): imageField is ImageField =>
   isObject(imageField) &&
   isString(get(imageField, 'image_name')) &&
-  isImageType(get(imageField, 'image_type'));
+  isResourceOrigin(get(imageField, 'image_origin'));

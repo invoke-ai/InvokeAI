@@ -18,7 +18,7 @@
         "training": "Training",
         "trainingDesc1": "Ein spezieller Arbeitsablauf zum Trainieren Ihrer eigenen Embeddings und Checkpoints mit Textual Inversion und Dreambooth über die Weboberfläche.",
         "trainingDesc2": "InvokeAI unterstützt bereits das Training von benutzerdefinierten Embeddings mit Textual Inversion unter Verwendung des Hauptskripts.",
-        "upload": "Upload",
+        "upload": "Hochladen",
         "close": "Schließen",
         "load": "Laden",
         "statusConnected": "Verbunden",
@@ -41,12 +41,34 @@
         "statusUpscaling": "Hochskalierung",
         "statusUpscalingESRGAN": "Hochskalierung (ESRGAN)",
         "statusLoadingModel": "Laden des Modells",
-        "statusModelChanged": "Modell Geändert"
+        "statusModelChanged": "Modell Geändert",
+        "cancel": "Abbruch",
+        "accept": "Annehmen",
+        "back": "Zurück",
+        "langEnglish": "Englisch",
+        "langDutch": "Niederländisch",
+        "langFrench": "Französisch",
+        "oceanTheme": "Ozean",
+        "langItalian": "Italienisch",
+        "langPortuguese": "Portogisisch",
+        "langRussian": "Russisch",
+        "langUkranian": "Ukrainisch",
+        "hotkeysLabel": "Tastenkombinationen",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "txt2img": "Text zu Bild",
+        "postprocessing": "Nachbearbeitung",
+        "langPolish": "Polnisch",
+        "langJapanese": "Japanisch",
+        "langArabic": "Arabisch",
+        "langKorean": "Koreanisch",
+        "langHebrew": "Hebräisch",
+        "langSpanish": "Spanisch"
     },
     "gallery": {
         "generations": "Erzeugungen",
         "showGenerations": "Zeige Erzeugnisse",
-        "uploads": "Uploads",
+        "uploads": "Hochgelades",
         "showUploads": "Zeige Uploads",
         "galleryImageSize": "Bildgröße",
         "galleryImageResetSize": "Größe zurücksetzen",
@@ -312,7 +334,11 @@
         "deleteModel": "Model löschen",
         "deleteConfig": "Konfiguration löschen",
         "deleteMsg1": "Möchten Sie diesen Model-Eintrag wirklich aus InvokeAI löschen?",
-        "deleteMsg2": "Dadurch wird die Modellprüfpunktdatei nicht von Ihrer Festplatte gelöscht. Sie können sie bei Bedarf erneut hinzufügen."
+        "deleteMsg2": "Dadurch wird die Modellprüfpunktdatei nicht von Ihrer Festplatte gelöscht. Sie können sie bei Bedarf erneut hinzufügen.",
+        "customConfig": "Benutzerdefinierte Konfiguration",
+        "invokeRoot": "InvokeAI Ordner",
+        "formMessageDiffusersVAELocationDesc": "Falls nicht angegeben, sucht InvokeAI nach der VAE-Datei innerhalb des oben angegebenen Modell Speicherortes.",
+        "checkpointModels": "Kontrollpunkte"
     },
     "parameters": {
         "images": "Bilder",
@@ -370,7 +396,10 @@
         "useInitImg": "Ausgangsbild verwenden",
         "deleteImage": "Bild löschen",
         "initialImage": "Ursprüngliches Bild",
-        "showOptionsPanel": "Optionsleiste zeigen"
+        "showOptionsPanel": "Optionsleiste zeigen",
+        "cancel": {
+            "setType": "Abbruchart festlegen"
+        }
     },
     "settings": {
         "displayInProgress": "Bilder in Bearbeitung anzeigen",
@@ -489,5 +518,25 @@
         "betaDarkenOutside": "Außen abdunkeln",
         "betaLimitToBox": "Begrenzung auf das Feld",
         "betaPreserveMasked": "Maskiertes bewahren"
+    },
+    "accessibility": {
+        "modelSelect": "Model Auswahl",
+        "uploadImage": "Bild hochladen",
+        "previousImage": "Voriges Bild",
+        "useThisParameter": "Benutze diesen Parameter",
+        "copyMetadataJson": "Kopiere metadata JSON",
+        "zoomIn": "Vergrößern",
+        "rotateClockwise": "Im Uhrzeigersinn drehen",
+        "flipHorizontally": "Horizontal drehen",
+        "flipVertically": "Vertikal drehen",
+        "modifyConfig": "Optionen einstellen",
+        "toggleAutoscroll": "Auroscroll ein/ausschalten",
+        "toggleLogViewer": "Log Betrachter ein/ausschalten",
+        "showGallery": "Zeige Galerie",
+        "showOptionsPanel": "Zeige Optionen",
+        "reset": "Zurücksetzen",
+        "nextImage": "Nächstes Bild",
+        "zoomOut": "Verkleinern",
+        "rotateCounterClockwise": "Gegen den Uhrzeigersinn verdrehen"
     }
 }

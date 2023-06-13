@@ -1,43 +1,54 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/types/invokeai';
-import promptToString from 'common/util/promptToString';
-import { clamp, sample } from 'lodash-es';
-import { setAllParametersReducer } from './setAllParametersReducer';
+import { clamp, sortBy } from 'lodash-es';
 import { receivedModels } from 'services/thunks/model';
 import { Scheduler } from 'app/constants';
 import { ImageDTO } from 'services/api';
+import { configChanged } from 'features/system/store/configSlice';
+import {
+  CfgScaleParam,
+  HeightParam,
+  ModelParam,
+  NegativePromptParam,
+  PositivePromptParam,
+  SchedulerParam,
+  SeedParam,
+  StepsParam,
+  StrengthParam,
+  WidthParam,
+} from './parameterZodSchemas';
+import { imageUrlsReceived } from 'services/thunks/image';
 
 export interface GenerationState {
-  cfgScale: number;
-  height: number;
-  img2imgStrength: number;
+  cfgScale: CfgScaleParam;
+  height: HeightParam;
+  img2imgStrength: StrengthParam;
   infillMethod: string;
   initialImage?: ImageDTO;
   iterations: number;
   perlin: number;
-  positivePrompt: string;
-  negativePrompt: string;
-  scheduler: Scheduler;
+  positivePrompt: PositivePromptParam;
+  negativePrompt: NegativePromptParam;
+  scheduler: SchedulerParam;
   seamBlur: number;
   seamSize: number;
   seamSteps: number;
   seamStrength: number;
-  seed: number;
+  seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
   shouldUseNoiseSettings: boolean;
-  steps: number;
+  steps: StepsParam;
   threshold: number;
   tileSize: number;
   variationAmount: number;
-  width: number;
+  width: WidthParam;
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: string;
+  model: ModelParam;
   shouldUseSeamless: boolean;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -52,7 +63,7 @@ export const initialGenerationState: GenerationState = {
   perlin: 0,
   positivePrompt: '',
   negativePrompt: '',
-  scheduler: 'lms',
+  scheduler: 'euler',
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,
@@ -83,27 +94,11 @@ export const generationSlice = createSlice({
   name: 'generation',
   initialState,
   reducers: {
-    setPositivePrompt: (
-      state,
-      action: PayloadAction<string | InvokeAI.Prompt>
-    ) => {
-      const newPrompt = action.payload;
-      if (typeof newPrompt === 'string') {
-        state.positivePrompt = newPrompt;
-      } else {
-        state.positivePrompt = promptToString(newPrompt);
-      }
+    setPositivePrompt: (state, action: PayloadAction<string>) => {
+      state.positivePrompt = action.payload;
     },
-    setNegativePrompt: (
-      state,
-      action: PayloadAction<string | InvokeAI.Prompt>
-    ) => {
-      const newPrompt = action.payload;
-      if (typeof newPrompt === 'string') {
-        state.negativePrompt = newPrompt;
-      } else {
-        state.negativePrompt = promptToString(newPrompt);
-      }
+    setNegativePrompt: (state, action: PayloadAction<string>) => {
+      state.negativePrompt = action.payload;
     },
     setIterations: (state, action: PayloadAction<number>) => {
       state.iterations = action.payload;
@@ -174,7 +169,6 @@ export const generationSlice = createSlice({
       state.shouldGenerateVariations = true;
       state.variationAmount = 0;
     },
-    allParametersSet: setAllParametersReducer,
     resetParametersState: (state) => {
       return {
         ...state,
@@ -227,10 +221,25 @@ export const generationSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(receivedModels.fulfilled, (state, action) => {
       if (!state.model) {
-        const randomModel = sample(action.payload);
-        if (randomModel) {
-          state.model = randomModel.name;
-        }
+        const firstModel = sortBy(action.payload, 'name')[0];
+        state.model = firstModel.name;
+      }
+    });
+
+    builder.addCase(configChanged, (state, action) => {
+      const defaultModel = action.payload.sd?.defaultModel;
+      if (defaultModel && !state.model) {
+        state.model = defaultModel;
+      }
+    });
+
+    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+      const { image_name, image_origin, image_url, thumbnail_url } =
+        action.payload;
+
+      if (state.initialImage?.image_name === image_name) {
+        state.initialImage.image_url = image_url;
+        state.initialImage.thumbnail_url = thumbnail_url;
       }
     });
   },
@@ -273,7 +282,6 @@ export const {
   setSeamless,
   setSeamlessXAxis,
   setSeamlessYAxis,
-  allParametersSet,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

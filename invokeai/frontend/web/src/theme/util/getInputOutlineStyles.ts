@@ -1,6 +1,6 @@
 import { StyleFunctionProps } from '@chakra-ui/theme-tools';
 
-export const getInputOutlineStyles = (_props: StyleFunctionProps) => ({
+export const getInputOutlineStyles = (_props?: StyleFunctionProps) => ({
   outline: 'none',
   borderWidth: 2,
   borderStyle: 'solid',
@@ -35,6 +35,6 @@ export const getInputOutlineStyles = (_props: StyleFunctionProps) => ({
     },
   },
   _placeholder: {
-    color: 'base.400',
+    color: 'base.500',
   },
 });

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union, List
 from pydantic import BaseModel, Extra, Field, StrictFloat, StrictInt, StrictStr
 
 
@@ -47,7 +47,9 @@ class ImageMetadata(BaseModel):
         default=None, description="The seed used for noise generation."
     )
     """The seed used for noise generation"""
-    cfg_scale: Optional[StrictFloat] = Field(
+    # cfg_scale: Optional[StrictFloat] = Field(
+    # cfg_scale: Union[float, list[float]] = Field(
+    cfg_scale: Union[StrictFloat, List[StrictFloat]] = Field(
         default=None, description="The classifier-free guidance scale."
     )
     """The classifier-free guidance scale"""

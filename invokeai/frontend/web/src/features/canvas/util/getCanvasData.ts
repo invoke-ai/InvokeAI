@@ -25,6 +25,7 @@ export const getCanvasData = async (state: RootState) => {
     boundingBoxCoordinates,
     boundingBoxDimensions,
     isMaskEnabled,
+    shouldPreserveMaskedArea,
   } = state.canvas;
 
   const boundingBox = {
@@ -58,7 +59,8 @@ export const getCanvasData = async (state: RootState) => {
   // For the mask layer, use the normal boundingBox
   const maskStage = await createMaskStage(
     isMaskEnabled ? objects.filter(isCanvasMaskLine) : [], // only include mask lines, and only if mask is enabled
-    boundingBox
+    boundingBox,
+    shouldPreserveMaskedArea
   );
   const maskBlob = await konvaNodeToBlob(maskStage, boundingBox);
   const maskImageData = await konvaNodeToImageData(maskStage, boundingBox);
