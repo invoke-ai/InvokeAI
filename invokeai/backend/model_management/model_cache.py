@@ -20,15 +20,12 @@ import gc
 import os
 import sys
 import hashlib
-import warnings
 from contextlib import suppress
 from pathlib import Path
 from typing import Dict, Union, types, Optional, Type, Any
 
 import torch
 
-from diffusers import logging as diffusers_logging
-from transformers import logging as transformers_logging
 import logging
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import get_invokeai_config
@@ -381,21 +378,6 @@ class ModelCache(object):
         with open(hashpath, "w") as f:
             f.write(hash)
         return hash
-
-class SilenceWarnings(object):
-    def __init__(self):
-        self.transformers_verbosity = transformers_logging.get_verbosity()
-        self.diffusers_verbosity = diffusers_logging.get_verbosity()
-        
-    def __enter__(self):
-        transformers_logging.set_verbosity_error()
-        diffusers_logging.set_verbosity_error()
-        warnings.simplefilter('ignore')
-
-    def __exit__(self,type,value,traceback):
-        transformers_logging.set_verbosity(self.transformers_verbosity)
-        diffusers_logging.set_verbosity(self.diffusers_verbosity)
-        warnings.simplefilter('default')
 
 class VRAMUsage(object):
     def __init__(self):

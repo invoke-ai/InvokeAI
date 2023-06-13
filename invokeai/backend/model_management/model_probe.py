@@ -12,8 +12,7 @@ from typing import Callable, Literal, Union, Dict
 from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
-from .models import BaseModelType, ModelType, ModelVariantType, SchedulerPredictionType
-from .model_cache import SilenceWarnings
+from .models import BaseModelType, ModelType, ModelVariantType, SchedulerPredictionType, SilenceWarnings
 
 @dataclass
 class ModelVariantInfo(object):
@@ -21,6 +20,7 @@ class ModelVariantInfo(object):
     base_type: BaseModelType
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
+    upcast_attention: bool
     format: Literal['folder','checkpoint']
     image_size: int
 
@@ -95,10 +95,12 @@ class ModelProbe(object):
                 base_type = base_type,
                 variant_type = variant_type,
                 prediction_type = prediction_type,
+                upcast_attention = (base_type==BaseModelType.StableDiffusion2 \
+                                     and prediction_type==SchedulerPredictionType.VPrediction),
                 format = format,
                 image_size = 768 if (base_type==BaseModelType.StableDiffusion2 \
                                      and prediction_type==SchedulerPredictionType.VPrediction \
-                                     ) else 512
+                                     ) else 512,
             )
         except Exception as e:
             return None

@@ -1,5 +1,6 @@
 import os
 import torch
+from pathlib import Path
 from typing import Optional
 from .base import (
     ModelBase,
@@ -7,11 +8,14 @@ from .base import (
     BaseModelType,
     ModelType,
     SubModelType,
+    ModelVariantType,
     EmptyConfigLoader,
     calc_model_size_by_fs,
     calc_model_size_by_data,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
+from diffusers.utils import is_safetensors_available
+from omegaconf import OmegaConf
 
 class VaeModel(ModelBase):
     #vae_class: Type
@@ -70,39 +74,72 @@ class VaeModel(ModelBase):
             return "checkpoint"
 
     @classmethod
-    def convert_if_required(cls, model_path: str, dst_cache_path: str, config: Optional[dict]) -> str:
+    def convert_if_required(
+        cls,
+        model_path: str,
+        output_path: str,
+        config: ModelConfigBase, # empty config or config of parent model
+        base_model: BaseModelType,
+    ) -> str:
         if cls.detect_format(model_path) != "diffusers":
-            # TODO:
-            #_convert_vae_ckpt_and_cache
-            raise NotImplementedError("TODO: vae convert")
+            return _convert_vae_ckpt_and_cache(
+                weights_path=model_path,
+                output_path=output_path,
+                base_model=base_model,
+                model_config=config,
+            )
         else:
             return model_path
 
 # TODO: rework
-DictConfig = dict
-def _convert_vae_ckpt_and_cache(self, mconfig: DictConfig) -> str:
+def _convert_vae_ckpt_and_cache(
+    weights_path: str,
+    output_path: str,
+    base_model: BaseModelType,
+    model_config: ModelConfigBase,
+) -> str:
     """
     Convert the VAE indicated in mconfig into a diffusers AutoencoderKL
     object, cache it to disk, and return Path to converted
     file. If already on disk then just returns Path.
     """
     app_config = InvokeAIAppConfig.get_config()
-    root = app_config.root_dir
-    weights_file = root / mconfig.path
-    config_file = root / mconfig.config
-    diffusers_path = app_config.converted_ckpts_dir / weights_file.stem
-    image_size = mconfig.get('width') or mconfig.get('height') or 512
+    weights_path = app_config.root_dir / weights_path
+    output_path = Path(output_path)
+
+    """
+    this size used only in when tiling enabled to separate input in tiles
+    sizes in configs from stable diffusion githubs(1 and 2) set to 256
+    on huggingface it:
+    1.5 - 512
+    1.5-inpainting - 256
+    2-inpainting - 512
+    2-depth - 256
+    2-base - 512
+    2 - 768
+    2.1-base - 768
+    2.1 - 768
+    """
+    image_size = 512
         
     # return cached version if it exists
-    if diffusers_path.exists():
-        return diffusers_path
+    if output_path.exists():
+        return output_path
+
+    if base_model in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
+        from .stable_diffusion import _select_ckpt_config
+        # all sd models use same vae settings
+        config_file = _select_ckpt_config(base_model, ModelVariantType.Normal)
+
+    else:
+        raise Exception(f"Vae conversion not supported for model type: {base_model}")
 
     # this avoids circular import error
-    from .convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
-    if weights_file.suffix == '.safetensors':
-        checkpoint = safetensors.torch.load_file(weights_file)
+    from ..convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
+    if weights_path.suffix == '.safetensors':
+        checkpoint = safetensors.torch.load_file(weights_path, device="cpu")
     else:
-        checkpoint = torch.load(weights_file, map_location="cpu")
+        checkpoint = torch.load(weights_path, map_location="cpu")
 
     # sometimes weights are hidden under "state_dict", and sometimes not
     if "state_dict" in checkpoint:
@@ -117,7 +154,7 @@ def _convert_vae_ckpt_and_cache(self, mconfig: DictConfig) -> str:
         model_root = app_config.models_path,
     )
     vae_model.save_pretrained(
-        diffusers_path,
+        output_path,
         safe_serialization=is_safetensors_available()
     )
-    return diffusers_path
+    return output_path

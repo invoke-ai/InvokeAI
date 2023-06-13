@@ -148,6 +148,7 @@ into the model when downloaded or converted.
 from __future__ import annotations
 
 import os
+import hashlib
 import textwrap
 from dataclasses import dataclass
 from packaging import version
@@ -166,7 +167,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, download_with_resume
 from .model_cache import ModelCache, ModelLocker
-from .models import BaseModelType, ModelType, SubModelType, MODEL_CLASSES
+from .models import BaseModelType, ModelType, SubModelType, ModelError, MODEL_CLASSES
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
@@ -299,7 +300,7 @@ class ModelManager(object):
         for model_key, model_config in config.items():
             model_name, base_model, model_type = self.parse_key(model_key)
             model_class = MODEL_CLASSES[base_model][model_type]
-            self.models[model_key] = model_class.build_config(**model_config)
+            self.models[model_key] = model_class.create_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
         self.globals = InvokeAIAppConfig.get_config()
@@ -406,9 +407,7 @@ class ModelManager(object):
             path_mask = f"/models/{base_model}/{model_type}/{model_name}*"
             if False: # model_path = next(find_by_mask(path_mask)):
                 model_path = None # TODO:
-                model_config = model_class.build_config(
-                    path=model_path,
-                )
+                model_config = model_class.probe_config(model_path)
                 self.models[model_key] = model_config
             else:
                 raise Exception(f"Model not found - {model_key}")
@@ -430,23 +429,29 @@ class ModelManager(object):
 
 
         model_config = self.models[model_key]
-            
+
         # /models/{base_model}/{model_type}/{name}.ckpt or .safentesors
         # /models/{base_model}/{model_type}/{name}/
         model_path = model_config.path
 
         # vae/movq override
         # TODO: 
-        if submodel_type is not None and submodel_type in model_config:
-            model_path = model_config[submodel_type]
-            model_type = submodel_type
-            submodel_type = None
+        if submodel_type is not None and hasattr(model_config, submodel_type):
+            override_path = getattr(model_config, submodel_type)
+            if override_path:
+                model_path = override_path
+                model_type = submodel_type
+                submodel_type = None
+                model_class = MODEL_CLASSES[base_model][model_type]
 
-        dst_convert_path = None # TODO:
+        # TODO: path
+        # TODO: is it accurate to use path as id
+        dst_convert_path = self.globals.models_dir / ".cache" / hashlib.md5(model_path.encode()).hexdigest()
         model_path = model_class.convert_if_required(
-            model_path,
-            dst_convert_path,
-            model_config,
+            base_model=base_model,
+            model_path=model_path,
+            output_path=dst_convert_path,
+            config=model_config,
         )
 
         model_context = self.cache.get_model(
@@ -457,14 +462,14 @@ class ModelManager(object):
             submodel=submodel_type,
         )
 
-        hash = "<NO_HASH>" # TODO:
+        model_hash = "<NO_HASH>" # TODO:
             
         return ModelInfo(
             context = model_context,
             name = model_name,
             base_model = base_model,
             type = submodel_type or model_type,
-            hash = hash,
+            hash = model_hash,
             location = model_path, # TODO:
             precision = self.cache.precision,
             _cache = self.cache,
@@ -633,7 +638,7 @@ class ModelManager(object):
         """
 
         model_class = MODEL_CLASSES[base_model][model_type]
-        model_config = model_class.build_config(**model_attributes)
+        model_config = model_class.create_config(**model_attributes)
         model_key = self.create_key(model_name, base_model, model_type)
 
         assert (
@@ -749,13 +754,15 @@ class ModelManager(object):
 
         for model_key, model_config in list(self.models.items()):
             model_name, base_model, model_type = self.parse_key(model_key)
-            if not os.path.exists(model_config.path):
+            model_path = str(self.globals.root / model_config.path)
+            if not os.path.exists(model_path):
+                model_class = MODEL_CLASSES[base_model][model_type]
                 if model_class.save_to_config:
                     model_config.error = ModelError.NotFound
                 else:
                     self.models.pop(model_key, None)
             else:
-                loaded_files.add(model_config.path)
+                loaded_files.add(model_path)
 
         for base_model in BaseModelType:
             for model_type in ModelType:
@@ -774,7 +781,5 @@ class ModelManager(object):
                         if model_key in self.models:
                             raise Exception(f"Model with key {model_key} added twice")
 
-                        model_config: ModelConfigBase = model_class.build_config(
-                            path=model_path,
-                        )
+                        model_config: ModelConfigBase = model_class.probe_config(model_path)
                         self.models[model_key] = model_config

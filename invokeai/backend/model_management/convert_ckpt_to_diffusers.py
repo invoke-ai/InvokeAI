@@ -28,8 +28,9 @@ from safetensors.torch import load_file
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
-from .model_manager import ModelManager, SDLegacyType
+from .model_manager import ModelManager
 from .model_cache import ModelCache
+from .models import SchedulerPredictionType, BaseModelType, ModelVariantType
 
 try:
     from omegaconf import OmegaConf
@@ -57,10 +58,6 @@ from diffusers import logging as dlogging
 from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import (
     LDMBertConfig,
     LDMBertModel,
-)
-from diffusers.pipelines.paint_by_example import (
-    PaintByExampleImageEncoder,
-    PaintByExamplePipeline,
 )
 from diffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
@@ -911,8 +908,10 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 
 
 def convert_open_clip_checkpoint(checkpoint):
-    cache_dir = InvokeAIAppConfig.get_config().cache_dir
-    text_model = CLIPTextModel.from_pretrained(MODEL_ROOT / 'stable-diffusion-2-text_encoder')
+    text_model = CLIPTextModel.from_pretrained(
+        MODEL_ROOT / 'stable-diffusion-2-clip',
+        subfolder='text_encoder',
+    )
 
     keys = list(checkpoint.keys())
 
@@ -1002,20 +1001,15 @@ def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size:
 
 def load_pipeline_from_original_stable_diffusion_ckpt(
     checkpoint_path: str,
-    original_config_file: str = None,
-    num_in_channels: int = None,
-    scheduler_type: str = "pndm",
-    pipeline_type: str = None,
-    image_size: int = None,
-    prediction_type: str = None,
+    model_version: BaseModelType,
+    model_variant: ModelVariantType,
+    original_config_file: str,
     extract_ema: bool = True,
-    upcast_attn: bool = False,
-    vae: AutoencoderKL = None,
-    vae_path: str = None,
     precision: torch.dtype = torch.float32,
-    return_generator_pipeline: bool = False,
-    scan_needed:bool=True,
-) -> Union[StableDiffusionPipeline, StableDiffusionGeneratorPipeline]:
+    upcast_attention: bool = False,
+    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon,
+    scan_needed: bool = True,
+) -> StableDiffusionPipeline:
     """
     Load a Stable Diffusion pipeline object from a CompVis-style `.ckpt`/`.safetensors` file and (ideally) a `.yaml`
     config file.
@@ -1027,148 +1021,68 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param checkpoint_path: Path to `.ckpt` file.
     :param original_config_file: Path to `.yaml` config file corresponding to the original architecture.
       If `None`, will be automatically inferred by looking for a key that only exists in SD2.0 models.
-    :param image_size: The image size that the model was trained on. Use 512 for Stable Diffusion v1.X and Stable Diffusion v2
-      Base. Use 768 for Stable Diffusion v2.
     :param prediction_type: The prediction type that the model was trained on. Use `'epsilon'` for Stable Diffusion
      v1.X and Stable Diffusion v2 Base. Use `'v-prediction'` for Stable Diffusion v2.
-    :param num_in_channels: The number of input channels. If `None` number of input channels will be automatically
-    inferred.
     :param scheduler_type: Type of scheduler to use. Should be one of `["pndm", "lms", "heun", "euler",
      "euler-ancestral", "dpm", "ddim"]`. :param model_type: The pipeline type. `None` to automatically infer, or one of
-     `["FrozenOpenCLIPEmbedder", "FrozenCLIPEmbedder", "PaintByExample"]`. :param extract_ema: Only relevant for
+     `["FrozenOpenCLIPEmbedder", "FrozenCLIPEmbedder"]`. :param extract_ema: Only relevant for
      checkpoints that have both EMA and non-EMA weights. Whether to extract the EMA weights
      or not. Defaults to `False`. Pass `True` to extract the EMA weights. EMA weights usually yield higher
      quality images for inference. Non-EMA weights are usually better to continue fine-tuning.
     :param precision: precision to use - torch.float16, torch.float32 or torch.autocast
     :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
     running stable diffusion 2.1.
-    :param vae: A diffusers VAE to load into the pipeline.
-    :param vae_path: Path to a checkpoint VAE that will be converted into diffusers and loaded into the pipeline.
     """
     config = InvokeAIAppConfig.get_config()
-    cache_dir = config.cache_dir
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
 
-        if Path(checkpoint_path).suffix == '.ckpt':
-            if scan_needed:
-                ModelCache.scan_model(checkpoint_path,checkpoint_path)
-            checkpoint = torch.load(checkpoint_path)
-        else:
+        if str(checkpoint_path).endswith(".safetensors"):
             checkpoint = load_file(checkpoint_path)
-
-        pipeline_class = (
-            StableDiffusionGeneratorPipeline
-            if return_generator_pipeline
-            else StableDiffusionPipeline
-        )
-
-        # Sometimes models don't have the global_step item
-        if "global_step" in checkpoint:
-            global_step = checkpoint["global_step"]
         else:
-            logger.debug("global_step key not found in model")
-            global_step = None
+            if scan_needed:
+                ModelCache.scan_model(checkpoint_path, checkpoint_path)
+            checkpoint = torch.load(checkpoint_path)
 
         # sometimes there is a state_dict key and sometimes not
         if "state_dict" in checkpoint:
             checkpoint = checkpoint["state_dict"]
 
-        upcast_attention = False
-        if original_config_file is None:
-            model_type = ModelManager.probe_model_type(checkpoint)
-
-            if model_type == SDLegacyType.V2_v:
-                original_config_file = (
-                    config.legacy_conf_path / "v2-inference-v.yaml"
-                )
-                if global_step == 110000:
-                    # v2.1 needs to upcast attention
-                    upcast_attention = True
-            elif model_type == SDLegacyType.V2_e:
-                original_config_file = (
-                    config.legacy_conf_path / "v2-inference.yaml"
-                )
-            elif model_type == SDLegacyType.V1_INPAINT:
-                original_config_file = (
-                    config.legacy_conf_path / "v1-inpainting-inference.yaml"
-                )
-
-            elif model_type == SDLegacyType.V1:
-                original_config_file = (
-                    config.legacy_conf_path / "v1-inference.yaml"
-                )
-
-            else:
-                raise Exception("Unknown checkpoint type")
-
         original_config = OmegaConf.load(original_config_file)
 
-        if num_in_channels is not None:
-            original_config["model"]["params"]["unet_config"]["params"][
-                "in_channels"
-            ] = num_in_channels
-
-        if (
-            "parameterization" in original_config["model"]["params"]
-            and original_config["model"]["params"]["parameterization"] == "v"
-        ):
-            if prediction_type is None:
-                # NOTE: For stable diffusion 2 base it is recommended to pass `prediction_type=="epsilon"`
-                # as it relies on a brittle global step parameter here
-                prediction_type = "epsilon" if global_step == 875000 else "v_prediction"
-            if image_size is None:
-                # NOTE: For stable diffusion 2 base one has to pass `image_size==512`
-                # as it relies on a brittle global step parameter here
-                image_size = 512 if global_step == 875000 else 768
+        if model_version == BaseModelType.StableDiffusion2 and prediction_type == SchedulerPredictionType.VPrediction:
+            image_size = 768
         else:
-            if prediction_type is None:
-                prediction_type = "epsilon"
-            if image_size is None:
-                image_size = 512
+            image_size = 512
+
+        #
+        # convert scheduler
+        #
 
         num_train_timesteps = original_config.model.params.timesteps
         beta_start = original_config.model.params.linear_start
         beta_end = original_config.model.params.linear_end
 
-        scheduler = DDIMScheduler(
+        scheduler = PNDMScheduler(
             beta_end=beta_end,
             beta_schedule="scaled_linear",
             beta_start=beta_start,
             num_train_timesteps=num_train_timesteps,
             steps_offset=1,
-            clip_sample=False,
             set_alpha_to_one=False,
             prediction_type=prediction_type,
+            skip_prk_steps=True
         )
         # make sure scheduler works correctly with DDIM
         scheduler.register_to_config(clip_sample=False)
 
-        if scheduler_type == "pndm":
-            config = dict(scheduler.config)
-            config["skip_prk_steps"] = True
-            scheduler = PNDMScheduler.from_config(config)
-        elif scheduler_type == "lms":
-            scheduler = LMSDiscreteScheduler.from_config(scheduler.config)
-        elif scheduler_type == "heun":
-            scheduler = HeunDiscreteScheduler.from_config(scheduler.config)
-        elif scheduler_type == "euler":
-            scheduler = EulerDiscreteScheduler.from_config(scheduler.config)
-        elif scheduler_type == "euler-ancestral":
-            scheduler = EulerAncestralDiscreteScheduler.from_config(scheduler.config)
-        elif scheduler_type == "dpm":
-            scheduler = DPMSolverMultistepScheduler.from_config(scheduler.config)
-        elif scheduler_type == 'unipc':
-            scheduler = UniPCMultistepScheduler.from_config(scheduler.config)
-        elif scheduler_type == "ddim":
-            scheduler = scheduler
-        else:
-            raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
+        #
+        # convert unet
+        #
 
-        # Convert the UNet2DConditionModel model.
         unet_config = create_unet_diffusers_config(
             original_config, image_size=image_size
         )
@@ -1181,35 +1095,25 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         unet.load_state_dict(converted_unet_checkpoint)
 
-        # If a replacement VAE path was specified, we'll incorporate that into
-        # the checkpoint model and then convert it
-        if vae_path:
-            logger.debug(f"Converting VAE {vae_path}")
-            replace_checkpoint_vae(checkpoint,vae_path)
-        # otherwise we use the original VAE, provided that
-        # an externally loaded diffusers VAE was not passed
-        elif not vae:
-            logger.debug("Using checkpoint model's original VAE")
+        #
+        # convert vae
+        #
 
-        if vae:
-            logger.debug("Using replacement diffusers VAE")
-        else:  # convert the original or replacement VAE
-            vae = convert_ldm_vae_to_diffusers(
-                checkpoint,
-                original_config,
-                image_size)
+        vae = convert_ldm_vae_to_diffusers(
+            checkpoint,
+            original_config,
+            image_size,
+        )
 
         # Convert the text model.
-        model_type = pipeline_type
-        if model_type is None:
-            model_type = original_config.model.params.cond_stage_config.target.split(
-                "."
-            )[-1]
-
+        model_type = original_config.model.params.cond_stage_config.target.split(".")[-1]
         if model_type == "FrozenOpenCLIPEmbedder":
             text_model = convert_open_clip_checkpoint(checkpoint)
-            tokenizer = CLIPTokenizer.from_pretrained(MODEL_ROOT / 'stable-diffusion-2-tokenizer')
-            pipe = pipeline_class(
+            tokenizer = CLIPTokenizer.from_pretrained(
+                MODEL_ROOT / 'stable-diffusion-2-clip',
+                subfolder='tokenizer',
+            )
+            pipe = StableDiffusionPipeline(
                 vae=vae.to(precision),
                 text_encoder=text_model.to(precision),
                 tokenizer=tokenizer,
@@ -1219,20 +1123,22 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
                 feature_extractor=None,
                 requires_safety_checker=False,
             )
+
         elif model_type in ["FrozenCLIPEmbedder", "WeightedFrozenCLIPEmbedder"]:
             text_model = convert_ldm_clip_checkpoint(checkpoint)
             tokenizer = CLIPTokenizer.from_pretrained(MODEL_ROOT / 'clip-vit-large-patch14')
             safety_checker = StableDiffusionSafetyChecker.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker')
-            feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker-extractor')
-            pipe = pipeline_class(
+            feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker')
+            pipe = StableDiffusionPipeline(
                 vae=vae.to(precision),
                 text_encoder=text_model.to(precision),
                 tokenizer=tokenizer,
                 unet=unet.to(precision),
                 scheduler=scheduler,
-                safety_checker=None if return_generator_pipeline else safety_checker.to(precision),
+                safety_checker=safety_checker.to(precision),
                 feature_extractor=feature_extractor,
             )
+
         else:
             text_config = create_ldm_bert_config(original_config)
             text_model = convert_ldm_bert_checkpoint(checkpoint, text_config)

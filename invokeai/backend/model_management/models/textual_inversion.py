@@ -51,6 +51,12 @@ class TextualInversionModel(ModelBase):
     def detect_format(cls, path: str):
         return None
 
-    @staticmethod
-    def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:
+    @classmethod
+    def convert_if_required(
+        cls,
+        model_path: str,
+        output_path: str,
+        config: ModelConfigBase,
+        base_model: BaseModelType,
+    ) -> str:
         return model_path

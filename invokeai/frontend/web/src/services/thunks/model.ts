@@ -14,7 +14,7 @@ export const receivedModels = createAppAsyncThunk(
     const response = await ModelsService.listModels();
 
     const deserializedModels = reduce(
-      response.models['sd-1.5']['pipeline'],
+      response.models['sd-1']['pipeline'],
       (modelsAccumulator, model, modelName) => {
         modelsAccumulator[modelName] = { ...model, name: modelName };
 
@@ -25,7 +25,7 @@ export const receivedModels = createAppAsyncThunk(
 
     models.info(
       { response },
-      `Received ${size(response.models['sd-1.5']['pipeline'])} models`
+      `Received ${size(response.models['sd-1']['pipeline'])} models`
     );
 
     return deserializedModels;

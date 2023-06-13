@@ -100,45 +100,45 @@ def migrate_conversion_models(dest_directory: Path):
     # These are needed for the conversion script
     kwargs = dict(
         cache_dir = Path('./models/hub'),
-        local_files_only = True
+        #local_files_only = True
     )
     try:
         logger.info('Migrating core tokenizers and text encoders')
-        target_dir = dest_directory/'core/convert'
+        target_dir = dest_directory / 'core' / 'convert'
         
         # bert
         bert = BertTokenizerFast.from_pretrained("bert-base-uncased", **kwargs)
-        bert.save_pretrained(target_dir/'bert-base-uncased', safe_serialization=True)
+        bert.save_pretrained(target_dir / 'bert-base-uncased', safe_serialization=True)
         
         # sd-1
         repo_id = 'openai/clip-vit-large-patch14'
         pipeline = CLIPTokenizer.from_pretrained(repo_id, **kwargs)
-        pipeline.save_pretrained(target_dir/'clip-vit-large-patch14', safe_serialization=True)
+        pipeline.save_pretrained(target_dir / 'clip-vit-large-patch14', safe_serialization=True)
 
         pipeline = CLIPTextModel.from_pretrained(repo_id, **kwargs)
-        pipeline.save_pretrained(target_dir/'clip-vit-large-patch14', safe_serialization=True)
+        pipeline.save_pretrained(target_dir / 'clip-vit-large-patch14', safe_serialization=True)
 
         # sd-2
         repo_id = "stabilityai/stable-diffusion-2"
-        pipeline = CLIPTokenizer.from_pretrained(repo_id, subfolder = "tokenizer", **kwargs)
-        pipeline.save_pretrained(target_dir/'stable-diffusion-2-tokenizer', safe_serialization=True)
+        pipeline = CLIPTokenizer.from_pretrained(repo_id, subfolder="tokenizer", **kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'tokenizer', safe_serialization=True)
 
-        pipeline = CLIPTextModel.from_pretrained(repo_id,subfolder = "text_encoder", **kwargs)
-        pipeline.save_pretrained(target_dir/'stable-diffusion-2-text_encoder', safe_serialization=True)
+        pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'text_encoder', safe_serialization=True)
 
         # VAE
         logger.info('Migrating stable diffusion VAE')
         vae = AutoencoderKL.from_pretrained('stabilityai/sd-vae-ft-mse', **kwargs)
-        vae.save_pretrained(target_dir/'sd-vae-ft-mse', safe_serialization=True)
+        vae.save_pretrained(target_dir / 'sd-vae-ft-mse', safe_serialization=True)
 
         # safety checking
         logger.info('Migrating safety checker')
         repo_id = "CompVis/stable-diffusion-safety-checker"
         pipeline = AutoFeatureExtractor.from_pretrained(repo_id,**kwargs)
-        pipeline.save_pretrained(target_dir/'stable-diffusion-safety-checker-extractor', safe_serialization=True)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-safety-checker', safe_serialization=True)
 
         pipeline = StableDiffusionSafetyChecker.from_pretrained(repo_id,**kwargs)
-        pipeline.save_pretrained(target_dir/'stable-diffusion-safety-checker', safe_serialization=True)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-safety-checker', safe_serialization=True)
     except KeyboardInterrupt:
         raise
     except Exception as e:

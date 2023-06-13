@@ -10,13 +10,9 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Type, Literal
 
 class BaseModelType(str, Enum):
-    #StableDiffusion1_5 = "stable_diffusion_1_5"
-    #StableDiffusion2 = "stable_diffusion_2"
-    #StableDiffusion2Base = "stable_diffusion_2_base"
-    # TODO: maybe then add sample size(512/768)?
     StableDiffusion1 = "sd-1"
-    StableDiffusion2 = "sd-2"            # 768 pixels; this will have v-prediction parameterization
-    #Kandinsky2_1 = "kandinsky_2_1"
+    StableDiffusion2 = "sd-2"
+    #Kandinsky2_1 = "kandinsky-2.1"
 
 class ModelType(str, Enum):
     Pipeline = "pipeline"
@@ -107,7 +103,7 @@ class ModelBase:
                     continue
 
                 fields = inspect.get_annotations(value)
-                if "format" not in fields or typing.get_origin(fields["format"]) != Literal:
+                if "format" not in fields:
                     raise Exception("Invalid config definition - format field not found")
 
                 format_type = typing.get_origin(fields["format"])
@@ -125,12 +121,19 @@ class ModelBase:
         return cls.__configs
 
     @classmethod
-    def build_config(cls, **kwargs):
+    def create_config(cls, **kwargs):
         if "format" not in kwargs:
-            kwargs["format"] = cls.detect_format(kwargs["path"])
-            
+            raise Exception("Field 'format' not found in model config")
+
         configs = cls._get_configs()
         return configs[kwargs["format"]](**kwargs)
+
+    @classmethod
+    def probe_config(cls, path: str, **kwargs):
+        return cls.create_config(
+            path=path,
+            format=cls.detect_format(path),
+        )
 
     @classmethod
     def detect_format(cls, path: str) -> str:
@@ -304,3 +307,62 @@ def _calc_model_by_data(model) -> int:
     mem_bufs = sum([buf.nelement()*buf.element_size() for buf in model.buffers()])
     mem = mem_params + mem_bufs # in bytes
     return mem
+
+
+def _fast_safetensors_reader(path: str):
+    checkpoint = dict()
+    device = torch.device("meta")
+    with open(path, "rb") as f:
+        definition_len = int.from_bytes(f.read(8), 'little')
+        definition_json = f.read(definition_len)
+        definition = json.loads(definition_json)
+
+        if "__metadata__" in definition and definition["__metadata__"].get("format", "pt") not in {"pt", "torch", "pytorch"}:
+            raise Exception("Supported only pytorch safetensors files")
+        definition.pop("__metadata__", None)
+
+        for key, info in definition.items():
+            dtype = {
+                "I8": torch.int8,
+                "I16": torch.int16,
+                "I32": torch.int32,
+                "I64": torch.int64,
+                "F16": torch.float16,
+                "F32": torch.float32,
+                "F64": torch.float64,
+            }[info["dtype"]]
+
+            checkpoint[key] = torch.empty(info["shape"], dtype=dtype, device=device)
+
+    return checkpoint
+
+
+def read_checkpoint_meta(path: str):
+    if path.endswith(".safetensors"):
+        try:
+            checkpoint = _fast_safetensors_reader(path)
+        except:
+            # TODO: create issue for support "meta"?
+            checkpoint = safetensors.torch.load_file(path, device="cpu")
+    else:
+        checkpoint = torch.load(path, map_location=torch.device("meta"))
+    return checkpoint
+
+import warnings
+from diffusers import logging as diffusers_logging
+from transformers import logging as transformers_logging
+
+class SilenceWarnings(object):
+    def __init__(self):
+        self.transformers_verbosity = transformers_logging.get_verbosity()
+        self.diffusers_verbosity = diffusers_logging.get_verbosity()
+        
+    def __enter__(self):
+        transformers_logging.set_verbosity_error()
+        diffusers_logging.set_verbosity_error()
+        warnings.simplefilter('ignore')
+
+    def __exit__(self, type, value, traceback):
+        transformers_logging.set_verbosity(self.transformers_verbosity)
+        diffusers_logging.set_verbosity(self.diffusers_verbosity)
+        warnings.simplefilter('default')

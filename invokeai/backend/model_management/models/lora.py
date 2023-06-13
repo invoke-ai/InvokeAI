@@ -54,8 +54,14 @@ class LoRAModel(ModelBase):
         else:
             return "lycoris"
 
-    @staticmethod
-    def convert_if_required(cls, model_path: str, dst_cache_path: str, config: Optional[dict]) -> str:
+    @classmethod
+    def convert_if_required(
+        cls,
+        model_path: str,
+        output_path: str,
+        config: ModelConfigBase,
+        base_model: BaseModelType,
+    ) -> str:
         if cls.detect_format(model_path) == "diffusers":
             # TODO: add diffusers lora when it stabilizes a bit
             raise NotImplementedError("Diffusers lora not supported")
