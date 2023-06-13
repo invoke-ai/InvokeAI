@@ -11,6 +11,7 @@ import {
   socketConnected,
   socketDisconnected,
   socketSubscribed,
+  socketInvocationWarning,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
 import { Logger } from 'roarr';
@@ -92,6 +93,13 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    */
   socket.on('invocation_error', (data) => {
     dispatch(socketInvocationError({ data, timestamp: getTimestamp() }));
+  });
+
+  /**
+   * Invocation warning
+   */
+  socket.on('invocation_warning', (data) => {
+    dispatch(socketInvocationWarning({ data, timestamp: getTimestamp() }));
   });
 
   /**

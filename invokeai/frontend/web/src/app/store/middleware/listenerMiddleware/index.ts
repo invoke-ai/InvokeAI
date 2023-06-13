@@ -73,6 +73,7 @@ import { addImageCategoriesChangedListener } from './listeners/imageCategoriesCh
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addUpdateImageUrlsOnConnectListener } from './listeners/updateImageUrlsOnConnect';
+import { addInvocationWarningEventListener } from './listeners/socketio/socketInvocationWarning';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -149,6 +150,7 @@ addGeneratorProgressListener();
 addGraphExecutionStateCompleteListener();
 addInvocationCompleteListener();
 addInvocationErrorListener();
+addInvocationWarningEventListener();
 addInvocationStartedListener();
 addSocketConnectedListener();
 addSocketDisconnectedListener();
