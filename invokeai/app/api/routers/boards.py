@@ -19,7 +19,8 @@ async def create_board(
 ):
     """Creates a board"""
     try:
-        ApiDependencies.invoker.services.boards.save(board_name=board_name)
+        result = ApiDependencies.invoker.services.boards.save(board_name=board_name)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to create board")
 

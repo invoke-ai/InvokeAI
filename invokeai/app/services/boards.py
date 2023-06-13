@@ -55,11 +55,6 @@ class BoardStorageBase(ABC):
     """Low-level service responsible for interfacing with the board record store."""
 
     @abstractmethod
-    def get(self, board_id: str) -> BoardRecord:
-        """Gets an board record."""
-        pass
-
-    @abstractmethod
     def delete(self, board_id: str) -> None:
         """Deletes a board record."""
         pass
@@ -165,6 +160,18 @@ class SqliteBoardStorage(BoardStorageBase):
                 (board_id, board_name),
             )
             self._conn.commit()
+
+            self._cursor.execute(
+                """--sql
+                SELECT *
+                FROM boards
+                WHERE id = ?;
+                """,
+                (board_id,),
+            )
+
+            result = self._cursor.fetchone()
+            return result
         except sqlite3.Error as e:
             self._conn.rollback()
             raise BoardRecordSaveException from e
