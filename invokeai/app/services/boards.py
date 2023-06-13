@@ -26,6 +26,23 @@ class BoardRecord(BaseModel):
         description="The updated timestamp of the board."
     )
 
+class BoardRecordInList(BaseModel):
+    """Deserialized board record in a list."""
+
+    id: str = Field(description="The unique ID of the board.")
+    name: str = Field(description="The name of the board.")
+    most_recent_image_url: Optional[str] = Field(
+        description="The URL of the most recent image in the board."
+    )
+    """The name of the board."""
+    created_at: Union[datetime, str] = Field(
+        description="The created timestamp of the board."
+    )
+    """The created timestamp of the image."""
+    updated_at: Union[datetime, str] = Field(
+        description="The updated timestamp of the board."
+    )
+
 class BoardRecordChanges(BaseModel, extra=Extra.forbid):
     name: Optional[str] = Field(
         description="The board's new name."
@@ -65,6 +82,18 @@ class BoardStorageBase(ABC):
         board_name: str,
     ):
         """Saves a board record."""
+        pass
+
+    def get_cover_photo(self, board_id: str) -> Optional[str]:
+        """Gets the cover photo for a board."""
+        pass
+
+    def get_many(
+        self,
+        offset: int,
+        limit: int,
+    ):
+        """Gets many board records."""
         pass
 
 
@@ -177,3 +206,48 @@ class SqliteBoardStorage(BoardStorageBase):
             raise BoardRecordSaveException from e
         finally:
             self._lock.release()
+    
+
+    def get_many(
+        self,
+        offset: int,
+        limit: int,
+    ) -> OffsetPaginatedResults[BoardRecord]:
+        try:
+
+            self._lock.acquire()
+
+            count_query = f"""SELECT COUNT(*) FROM images WHERE 1=1\n"""
+            images_query = f"""SELECT * FROM images WHERE 1=1\n"""
+
+            query_conditions = ""
+            query_params = []
+
+            query_pagination = f"""ORDER BY created_at DESC LIMIT ? OFFSET ?\n"""
+
+            # Final images query with pagination
+            images_query += query_conditions + query_pagination + ";"
+            # Add all the parameters
+            images_params = query_params.copy()
+            images_params.append(limit)
+            images_params.append(offset)
+            # Build the list of images, deserializing each row
+            self._cursor.execute(images_query, images_params)
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            boards = [BoardRecord(**dict(row)) for row in result]
+
+            # Set up and execute the count query, without pagination
+            count_query += query_conditions + ";"
+            count_params = query_params.copy()
+            self._cursor.execute(count_query, count_params)
+            count = self._cursor.fetchone()[0]
+
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise BoardRecordSaveException from e
+        finally:
+            self._lock.release()
+        
+        return OffsetPaginatedResults(
+            items=boards, offset=offset, limit=limit, total=count
+        )

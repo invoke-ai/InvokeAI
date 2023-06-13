@@ -95,6 +95,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_board_cover_photo(self, board_id: str) -> Optional[ImageRecord]:
+        """Gets the cover photo for a board."""
+        pass
+
+    @abstractmethod
     def save(
         self,
         image_name: str,
@@ -280,6 +285,32 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
+    def get_board_cover_photo(self, board_id: str) -> ImageRecord | None:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """
+                    SELECT *
+                    FROM images
+                    WHERE board_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """,
+                (board_id),
+            )
+            self._conn.commit()
+            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordNotFoundException from e
+        finally:
+            self._lock.release()
+
+        if not result:
+            raise ImageRecordNotFoundException
+
+        return deserialize_image_record(dict(result))
+    
     def get_many(
         self,
         offset: int = 0,
