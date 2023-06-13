@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.config import InvokeAISettings
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.invoker import InvocationProcessorABC
+    from invokeai.app.services.boards import BoardStorageBase
 
 
 class InvocationServices:
@@ -27,6 +28,7 @@ class InvocationServices:
     restoration: "RestorationServices"
     configuration: "InvokeAISettings"
     images: "ImageService"
+    boards: "BoardStorageBase"
 
     # NOTE: we must forward-declare any types that include invocations, since invocations can use services
     graph_library: "ItemStorageABC"["LibraryGraph"]
@@ -46,6 +48,7 @@ class InvocationServices:
         processor: "InvocationProcessorABC",
         restoration: "RestorationServices",
         configuration: "InvokeAISettings",
+        boards: "BoardStorageBase",
     ):
         self.model_manager = model_manager
         self.events = events
@@ -58,3 +61,4 @@ class InvocationServices:
         self.processor = processor
         self.restoration = restoration
         self.configuration = configuration
+        self.boards = boards

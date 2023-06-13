@@ -2,6 +2,7 @@
 
 from logging import Logger
 import os
+from invokeai.app.services import boards
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService
 from invokeai.app.services.metadata import CoreMetadataService
@@ -20,6 +21,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
+from ..services.boards import SqliteBoardStorage
 from .events import FastAPIEventService
 
 
@@ -71,6 +73,7 @@ class ApiDependencies:
         latents = ForwardCacheLatentsStorage(
             DiskLatentsStorage(f"{output_folder}/latents")
         )
+        boards = SqliteBoardStorage(db_location)
 
         images = ImageService(
             image_record_storage=image_record_storage,
@@ -96,6 +99,7 @@ class ApiDependencies:
             restoration=RestorationServices(config, logger),
             configuration=config,
             logger=logger,
+            boards=boards
         )
 
         create_system_graphs(services.graph_library)
