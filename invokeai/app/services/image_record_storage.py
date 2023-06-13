@@ -135,7 +135,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._lock.release()
 
     def _create_tables(self) -> None:
-        """Creates the tables for the `images` database."""
+        """Creates the `images` table."""
 
         # Create the `images` table.
         self._cursor.execute(
@@ -152,6 +152,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 node_id TEXT,
                 metadata TEXT,
                 is_intermediate BOOLEAN DEFAULT FALSE,
+                board_id TEXT,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
