@@ -33,10 +33,12 @@ MODEL_CLASSES = {
     #},
 }
 
-# TODO: check with openapi annotation
 def get_all_model_configs():
-    configs = []
+    configs = set()
     for models in MODEL_CLASSES.values():
-        for model in models.values():
-            configs.extend(model._get_configs())
-    return configs
+        for type, model in models.items():
+            if type == ModelType.ControlNet:
+                continue # TODO:
+            configs.update(model._get_configs().values())
+    configs.discard(None)
+    return list(configs) # TODO: set, list or tuple

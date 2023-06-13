@@ -3,6 +3,8 @@
 from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
+import einops
+
 from pydantic import BaseModel, Field, validator
 import torch
 from diffusers import ControlNetModel
@@ -235,11 +237,12 @@ class TextToLatentsInvocation(BaseInvocation):
         return conditioning_data
 
     def create_pipeline(self, unet, scheduler) -> StableDiffusionGeneratorPipeline:
-        configure_model_padding(
-            unet,
-            self.seamless,
-            self.seamless_axes,
-        )
+        # TODO:
+        #configure_model_padding(
+        #    unet,
+        #    self.seamless,
+        #    self.seamless_axes,
+        #)
 
         class FakeVae:
             class FakeVaeConfig:
@@ -261,13 +264,15 @@ class TextToLatentsInvocation(BaseInvocation):
             precision="float16" if unet.dtype == torch.float16 else "float32",
         )
     
-    def prep_control_data(self,
-                          context: InvocationContext,
-                          model: StableDiffusionGeneratorPipeline, # really only need model for dtype and device
-                          control_input: List[ControlField],
-                          latents_shape: List[int],
-                          do_classifier_free_guidance: bool = True,
-                          ) -> List[ControlNetData]:
+    def prep_control_data(
+        self,
+        context: InvocationContext,
+        model: StableDiffusionGeneratorPipeline, # really only need model for dtype and device
+        control_input: List[ControlField],
+        latents_shape: List[int],
+        do_classifier_free_guidance: bool = True,
+    ) -> List[ControlNetData]:
+
         # assuming fixed dimensional scaling of 8:1 for image:latents
         control_height_resize = latents_shape[2] * 8
         control_width_resize = latents_shape[3] * 8
@@ -362,10 +367,12 @@ class TextToLatentsInvocation(BaseInvocation):
 
             loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
 
-            control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
-                                              latents_shape=noise.shape,
-                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                                              do_classifier_free_guidance=True,)
+            control_data = self.prep_control_data(
+                model=pipeline, context=context, control_input=self.control,
+                latents_shape=noise.shape,
+                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                do_classifier_free_guidance=True,
+            )
 
             with ModelPatcher.apply_lora_unet(pipeline.unet, loras):
                 # TODO: Verify the noise is the right size
@@ -434,11 +441,12 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             pipeline = self.create_pipeline(unet, scheduler)
             conditioning_data = self.get_conditioning_data(context, scheduler)
             
-            control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
-                                              latents_shape=noise.shape,
-                                              # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                                              do_classifier_free_guidance=True,
-                                              )
+            control_data = self.prep_control_data(
+                model=pipeline, context=context, control_input=self.control,
+                latents_shape=noise.shape,
+                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                do_classifier_free_guidance=True,
+            )
 
             # TODO: Verify the noise is the right size
             initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
