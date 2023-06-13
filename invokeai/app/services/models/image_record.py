@@ -72,6 +72,10 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
         default=None, description="The image's new `is_intermediate` flag."
     )
     """The image's new `is_intermediate` flag."""
+    board_id: Optional[StrictStr] = Field(
+        default=None, description="The image's new board ID."
+    )
+    """The image's new board ID."""
 
 
 class ImageUrlsDTO(BaseModel):
