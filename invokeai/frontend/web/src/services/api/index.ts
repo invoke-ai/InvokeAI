@@ -24,6 +24,7 @@ export type { CreateModelRequest } from './models/CreateModelRequest';
 export type { CvInpaintInvocation } from './models/CvInpaintInvocation';
 export type { DiffusersModelInfo } from './models/DiffusersModelInfo';
 export type { DivideInvocation } from './models/DivideInvocation';
+export type { DynamicPromptInvocation } from './models/DynamicPromptInvocation';
 export type { Edge } from './models/Edge';
 export type { EdgeConnection } from './models/EdgeConnection';
 export type { FloatCollectionOutput } from './models/FloatCollectionOutput';
@@ -86,6 +87,7 @@ export type { PaginatedResults_GraphExecutionState_ } from './models/PaginatedRe
 export type { ParamFloatInvocation } from './models/ParamFloatInvocation';
 export type { ParamIntInvocation } from './models/ParamIntInvocation';
 export type { PidiImageProcessorInvocation } from './models/PidiImageProcessorInvocation';
+export type { PromptCollectionOutput } from './models/PromptCollectionOutput';
 export type { PromptOutput } from './models/PromptOutput';
 export type { RandomIntInvocation } from './models/RandomIntInvocation';
 export type { RandomRangeInvocation } from './models/RandomRangeInvocation';
