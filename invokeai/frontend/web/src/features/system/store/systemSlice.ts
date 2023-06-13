@@ -23,6 +23,7 @@ import {
   appSocketInvocationComplete,
   appSocketInvocationError,
   appSocketInvocationStarted,
+  appSocketInvocationWarning,
   appSocketSubscribed,
   appSocketUnsubscribed,
 } from 'services/events/actions';
@@ -331,6 +332,20 @@ export const systemSlice = createSlice({
 
       state.toastQueue.push(
         makeToast({ title: t('toast.serverError'), status: 'error' })
+      );
+    });
+
+    /**
+     * Invocation Warning
+     */
+    builder.addCase(appSocketInvocationWarning, (state, action) => {
+      const { data } = action.payload;
+      state.toastQueue.push(
+        makeToast({
+          title: t('toast.serverWarning'),
+          description: data.warning,
+          status: 'warning',
+        })
       );
     });
 
