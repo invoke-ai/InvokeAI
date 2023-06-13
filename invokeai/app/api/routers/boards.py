@@ -1,7 +1,5 @@
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
-from invokeai.app.services.boards import BoardRecord, BoardRecordChanges
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 
 from ..dependencies import ApiDependencies
 
@@ -39,39 +37,3 @@ async def delete_board(
         pass
 
 
-@boards_router.patch(
-    "/{board_id}",
-    operation_id="update_baord"
-)
-async def update_baord(
-    id: str = Path(description="The id of the board to update"),
-    board_changes: BoardRecordChanges = Body(
-        description="The changes to apply to the board"
-    ),
-):
-    """Updates a board"""
-
-    try:
-        return ApiDependencies.invoker.services.boards.update(
-            id, board_changes
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Failed to update board")
-
-@boards_router.get(
-    "/",
-    operation_id="list_boards",
-    response_model=OffsetPaginatedResults[BoardRecord],
-)
-async def list_boards(
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of boards per page"),
-) -> OffsetPaginatedResults[BoardRecord]:
-    """Gets a list of boards"""
-
-    boards = ApiDependencies.invoker.services.boards.get_many(
-        offset,
-        limit,
-    )
-
-    return boards
