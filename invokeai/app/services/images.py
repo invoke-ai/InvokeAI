@@ -322,6 +322,7 @@ class ImageService(ImageServiceABC):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self._services.records.get_many(
@@ -330,6 +331,7 @@ class ImageService(ImageServiceABC):
                 image_origin,
                 categories,
                 is_intermediate,
+                board_id
             )
 
             image_dtos = list(
