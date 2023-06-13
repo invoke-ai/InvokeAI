@@ -6,7 +6,6 @@ export const tabMap = [
   'nodes',
   // 'postprocessing',
   // 'training',
-  'prompt',
 ] as const;
 
 export type InvokeTabName = (typeof tabMap)[number];

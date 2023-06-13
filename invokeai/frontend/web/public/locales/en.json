@@ -551,7 +551,6 @@
     },
     "toast": {
         "serverError": "Server Error",
-        "serverWarning": "Server Warning",
         "disconnected": "Disconnected from Server",
         "connected": "Connected to Server",
         "canceled": "Processing Canceled",
