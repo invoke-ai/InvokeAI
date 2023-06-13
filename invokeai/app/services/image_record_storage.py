@@ -286,6 +286,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
@@ -316,6 +317,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             if is_intermediate is not None:
                 query_conditions += f"""AND is_intermediate = ?\n"""
                 query_params.append(is_intermediate)
+
+            if board_id is not None:
+                query_conditions += f"""AND board_id = ?\n"""
+                query_params.append(board_id)
 
             query_pagination = f"""ORDER BY created_at DESC LIMIT ? OFFSET ?\n"""
 
