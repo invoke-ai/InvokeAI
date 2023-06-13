@@ -105,7 +105,9 @@ class ControlField(BaseModel):
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
-    guess_mode: bool = Field(default=False, description="Toggle for guess mode")
+    # guess_mode: bool = Field(default=False, description="Toggle for guess mode")
+    cfg_injection: bool = Field(default=False, description="Toggle for cfg injection")
+    soft_injection: bool = Field(default=False, description="Toggle for soft injection")
     @validator("control_weight")
     def abs_le_one(cls, v):
         """validate that all abs(values) are <=1"""
@@ -151,7 +153,9 @@ class ControlNetInvocation(BaseInvocation):
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
-    guess_mode: bool = Field(default=False, description="Toggle for guess mode")
+    # guess_mode: bool = Field(default=False, description="Toggle for guess mode")
+    cfg_injection: bool = Field(default=False, description="Toggle for cfg injection")
+    soft_injection: bool = Field(default=False, description="Toggle for soft injection")
     # fmt: on
 
     class Config(InvocationConfig):
@@ -177,7 +181,9 @@ class ControlNetInvocation(BaseInvocation):
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
-                guess_mode=self.guess_mode,
+                # guess_mode=self.guess_mode,
+                cfg_injection=self.cfg_injection,
+                soft_injection=self.soft_injection,
             ),
         )
 
