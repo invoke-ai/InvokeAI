@@ -185,7 +185,7 @@ def migrate_pipelines(dest_dir: Path, dest_yaml: io.TextIOBase):
                         'name': repo_name,
                         'path': str(rel_path),
                         'description': f'diffusers model {repo_id}',
-                        'format': 'folder',
+                        'format': 'diffusers',
                         'image_size': info.image_size,
                         'base': info.base_type.value,
                         'variant': info.variant_type.value,
@@ -261,7 +261,11 @@ def main():
 
     os.chdir(root_directory)
     with open(dest_yaml,'w') as yaml_file:
-        print(yaml.dump({'_version':'3.0.0'}),file=yaml_file,end="")
+        print(yaml.dump({'__metadata__':
+                         {'version':'3.0.0'}
+                         }
+                        ),file=yaml_file,end=""
+              )
         create_directory_structure(dest_directory)
         migrate_support_models(dest_directory)
         migrate_conversion_models(dest_directory)
