@@ -49,14 +49,8 @@ class DynamicPromptInvocation(BaseInvocation):
     combinatorial: bool = Field(
         default=False, description="Whether to use the combinatorial generator"
     )
-    # wildcard_path: Optional[str] = Field(default=None, description="Wildcard path")
 
     def invoke(self, context: InvocationContext) -> PromptListOutput:
-        # if self.wildcard_path is not None:
-        #     try:
-        #         os.stat(self.wildcard_path)
-        #     except FileNotFoundError:
-        #         context.services.logger.warn(f"Invalid wildcard path ({self.wildcard_path}), ignoring")
         try:
             if self.combinatorial:
                 generator = CombinatorialPromptGenerator()
@@ -67,16 +61,6 @@ class DynamicPromptInvocation(BaseInvocation):
         except ParseException as e:
             warning = f"Invalid dynamic prompt: {e}"
             context.services.logger.warn(warning)
-            graph_execution_state = context.services.graph_execution_manager.get(
-                context.graph_execution_state_id
-            )
-            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
-            context.services.events.emit_invocation_warning(
-                warning=warning,
-                graph_execution_state_id=context.graph_execution_state_id,
-                node=self.dict(),
-                source_node_id=source_node_id,
-            )
             return PromptListOutput(prompts=[self.prompt], count=1)
 
         return PromptListOutput(prompts=prompts, count=len(prompts))
