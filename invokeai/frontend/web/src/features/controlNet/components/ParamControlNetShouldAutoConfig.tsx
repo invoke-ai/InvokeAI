@@ -1,5 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import { controlNetAutoConfigToggled } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 
@@ -11,7 +12,7 @@ type Props = {
 const ParamControlNetShouldAutoConfig = (props: Props) => {
   const { controlNetId, shouldAutoConfig } = props;
   const dispatch = useAppDispatch();
-
+  const isReady = useIsReadyToInvoke();
   const handleShouldAutoConfigChanged = useCallback(() => {
     dispatch(controlNetAutoConfigToggled({ controlNetId }));
   }, [controlNetId, dispatch]);
@@ -22,6 +23,7 @@ const ParamControlNetShouldAutoConfig = (props: Props) => {
       aria-label="Auto configure processor"
       isChecked={shouldAutoConfig}
       onChange={handleShouldAutoConfigChanged}
+      isDisabled={!isReady}
     />
   );
 };

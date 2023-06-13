@@ -23,7 +23,7 @@ type ControlNetProcessorsDict = Record<
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
+export const CONTROLNET_PROCESSORS = {
   none: {
     type: 'none',
     label: 'none',
@@ -129,7 +129,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   normalbae_image_processor: {
     type: 'normalbae_image_processor',
-    label: 'NormalBae',
+    label: 'Normal BAE',
     description: '',
     default: {
       id: 'normalbae_image_processor',
@@ -181,7 +181,7 @@ type ControlNetModel = {
   defaultProcessor?: ControlNetProcessorType;
 };
 
-export const CONTROLNET_MODELS: Record<string, ControlNetModel> = {
+export const CONTROLNET_MODELS = {
   'lllyasviel/control_v11p_sd15_canny': {
     type: 'lllyasviel/control_v11p_sd15_canny',
     label: 'Canny',
@@ -208,7 +208,7 @@ export const CONTROLNET_MODELS: Record<string, ControlNetModel> = {
   },
   'lllyasviel/control_v11p_sd15_seg': {
     type: 'lllyasviel/control_v11p_sd15_seg',
-    label: 'Segment Anything',
+    label: 'Segmentation',
   },
   'lllyasviel/control_v11p_sd15_lineart': {
     type: 'lllyasviel/control_v11p_sd15_lineart',

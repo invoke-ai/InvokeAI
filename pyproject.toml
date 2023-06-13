@@ -42,8 +42,9 @@ dependencies = [
   "controlnet-aux>=0.0.4",
   "timm==0.6.13",           # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
-  "diffusers[torch]~=0.16.1",
+  "diffusers[torch]~=0.17.0",
   "dnspython==2.2.1",
+  "easing-functions",
   "einops",
   "eventlet",
   "facexlib",
@@ -56,6 +57,7 @@ dependencies = [
   "flaskwebgui==1.0.3",
   "gfpgan==1.3.8",
   "huggingface-hub>=0.11.1",
+  "matplotlib",            # needed for plotting of Penner easing functions
   "mediapipe",             # needed for "mediapipeface" controlnet model
   "npyscreen",
   "numpy<1.24",

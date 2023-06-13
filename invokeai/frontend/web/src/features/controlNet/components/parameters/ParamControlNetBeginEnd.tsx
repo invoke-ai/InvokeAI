@@ -1,4 +1,5 @@
 import {
+  ChakraProps,
   FormControl,
   FormLabel,
   HStack,
@@ -10,14 +11,19 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
 import {
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BiReset } from 'react-icons/bi';
+
+const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
+  mt: 1.5,
+  fontSize: '2xs',
+  fontWeight: '500',
+  color: 'base.400',
+};
 
 type Props = {
   controlNetId: string;
@@ -29,7 +35,7 @@ type Props = {
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
 const ParamControlNetBeginEnd = (props: Props) => {
-  const { controlNetId, beginStepPct, endStepPct, mini = false } = props;
+  const { controlNetId, beginStepPct, mini = false, endStepPct } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -75,12 +81,9 @@ const ParamControlNetBeginEnd = (props: Props) => {
               <RangeSliderMark
                 value={0}
                 sx={{
-                  fontSize: 'xs',
-                  fontWeight: '500',
-                  color: 'base.200',
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
-                  mt: 1.5,
+                  ...SLIDER_MARK_STYLES,
                 }}
               >
                 0%
@@ -88,10 +91,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
               <RangeSliderMark
                 value={0.5}
                 sx={{
-                  fontSize: 'xs',
-                  fontWeight: '500',
-                  color: 'base.200',
-                  mt: 1.5,
+                  ...SLIDER_MARK_STYLES,
                 }}
               >
                 50%
@@ -99,12 +99,9 @@ const ParamControlNetBeginEnd = (props: Props) => {
               <RangeSliderMark
                 value={1}
                 sx={{
-                  fontSize: 'xs',
-                  fontWeight: '500',
-                  color: 'base.200',
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
-                  mt: 1.5,
+                  ...SLIDER_MARK_STYLES,
                 }}
               >
                 100%
@@ -112,16 +109,6 @@ const ParamControlNetBeginEnd = (props: Props) => {
             </>
           )}
         </RangeSlider>
-
-        {!mini && (
-          <IAIIconButton
-            size="sm"
-            aria-label={t('accessibility.reset')}
-            tooltip={t('accessibility.reset')}
-            icon={<BiReset />}
-            onClick={handleStepPctReset}
-          />
-        )}
       </HStack>
     </FormControl>
   );
