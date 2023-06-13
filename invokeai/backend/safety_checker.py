@@ -30,18 +30,10 @@ class SafetyChecker(object):
         self.device = device
 
         try:
-            safety_model_id = "CompVis/stable-diffusion-safety-checker"
-            safety_model_path = config.cache_dir
-            self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-                safety_model_id,
-                local_files_only=True,
-                cache_dir=safety_model_path,
-            )
-            self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(
-                safety_model_id,
-                local_files_only=True,
-                cache_dir=safety_model_path,
-            )
+            safety_model_id = config.models_path / 'core/convert/stable-diffusion-safety-checker'
+            feature_extractor_id = config.models_path / 'core/convert/stable-diffusion-safety-checker-extractor'
+            self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id)
+            self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(feature_extractor_id)
         except Exception:
             logger.error(
                 "An error was encountered while installing the safety checker:"

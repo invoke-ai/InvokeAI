@@ -21,6 +21,7 @@ class ModelVariantInfo(object):
     base_type: BaseModelType
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
+    format: Literal['folder','checkpoint']
     image_size: int
 
 class ProbeBase(object):
@@ -76,7 +77,7 @@ class ModelProbe(object):
             format = 'folder' if model_path.is_dir() else 'checkpoint'
         else:
             format = 'folder' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
-            
+
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
@@ -94,18 +95,22 @@ class ModelProbe(object):
                 base_type = base_type,
                 variant_type = variant_type,
                 prediction_type = prediction_type,
+                format = format,
                 image_size = 768 if (base_type==BaseModelType.StableDiffusion2 \
                                      and prediction_type==SchedulerPredictionType.VPrediction \
                                      ) else 512
             )
-        except (KeyError, ValueError) as e:
-            logger.error(f'An error occurred while probing {model_path}: {str(e)}')
-            logger.error(traceback.format_exc())
+        except Exception as e:
+            return None
 
         return model_info
 
     @classmethod
     def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict)->ModelType:
+        if model_path.suffix not in ('.bin','.pt','.ckpt','.safetensors'):
+            return None
+        if model_path.name=='learned_embeds.bin':
+            return ModelType.TextualInversion
         checkpoint = checkpoint or cls._scan_and_load_checkpoint(model_path)
         state_dict = checkpoint.get("state_dict") or checkpoint
         if any([x.startswith("model.diffusion_model") for x in state_dict.keys()]):
@@ -127,6 +132,7 @@ class ModelProbe(object):
         '''
         Get the model type of a hugging-face style folder.
         '''
+        class_name = None
         if model:
             class_name = model.__class__.__name__
         else:
@@ -145,7 +151,7 @@ class ModelProbe(object):
                     conf = json.load(file)
                 class_name = conf['_class_name']
 
-        if type := cls.CLASS2TYPE.get(class_name):
+        if class_name and (type := cls.CLASS2TYPE.get(class_name)):
             return type
 
         # give up
@@ -209,8 +215,10 @@ class CheckpointProbeBase(ProbeBase):
             return ModelVariantType.Inpaint
         elif in_channels == 5:
             return ModelVariantType.Depth
+        elif in_channels == 4:
+            return ModelVariantType.Normal
         else:
-            return None
+            raise Exception("Cannot determine variant type")
 
 class PipelineCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self)->BaseModelType:
@@ -291,8 +299,11 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
                 continue
             if checkpoint[key_name].shape[-1] == 768:
                 return BaseModelType.StableDiffusion1
+            elif checkpoint[key_name].shape[-1] == 1024:
+                return BaseModelType.StableDiffusion2
             elif self.checkpoint_path and self.helper:
                 return self.helper(self.checkpoint_path)
+        raise Exception("Unable to determine base type for {self.checkpoint_path}")
 
 ########################################################
 # classes for probing folders
@@ -373,14 +384,15 @@ class TextualInversionFolderProbe(FolderProbeBase):
         if not path.exists():
             return None
         checkpoint = ModelProbe._scan_and_load_checkpoint(path)
-        return TextualInversionCheckpointProbe(checkpoint).get_base_type
+        return TextualInversionCheckpointProbe(None,checkpoint=checkpoint).get_base_type()
 
 class ControlNetFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
-        config_file = self.folder_path / 'scheduler_config.json'
+        config_file = self.folder_path / 'config.json'
         if not config_file.exists():
-            return None
-        config = json.load(config_file)
+            raise Exception(f"Cannot determine base type for {self.folder_path}")
+        with open(config_file,'r') as file:
+            config = json.load(file)
         # no obvious way to distinguish between sd2-base and sd2-768
         return BaseModelType.StableDiffusion1 \
             if config['cross_attention_dim']==768 \

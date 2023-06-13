@@ -255,5 +255,6 @@ def _convert_ckpt_and_cache(
             vae=vae_model,
             vae_path=str(app_config.root_dir / vae_ckpt_path) if vae_ckpt_path else None,
             scan_needed=True,
+            model_root=app_config.models_path,
         )
     return diffusers_path

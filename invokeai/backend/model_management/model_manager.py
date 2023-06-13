@@ -203,12 +203,12 @@ MAX_CACHE_SIZE = 6.0  # GB
 # ├── sd-1
 # │   ├── controlnet
 # │   ├── lora
-# │   ├── diffusers
+# │   ├── pipeline
 # │   └── textual_inversion
 # ├── sd-2
 # │   ├── controlnet
 # │   ├── lora
-# │   ├── diffusers
+# │   ├── pipeline
 # │   └── textual_inversion
 # └── core
 #     ├── face_reconstruction

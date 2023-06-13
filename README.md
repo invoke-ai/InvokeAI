@@ -43,6 +43,23 @@ _Note: InvokeAI is rapidly evolving. Please use the
 [Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
 requests. Be sure to use the provided templates. They will help us diagnose issues faster._
 
+## FOR DEVELOPERS - MIGRATING TO THE 3.0.0 MODELS FORMAT
+
+The models directory and models.yaml have changed. To migrate to the
+new layout, please follow this recipe:
+
+1. Run `python scripts/migrate_models_to_3.0.py <path_to_root_directory>
+
+2. This will create a new models directory named `models-3.0` and a
+   new config directory named `models.yaml-3.0`, both in the current
+   working directory. If you prefer to name them something else, pass
+   the `--dest-directory` and/or `--dest-yaml` arguments.
+
+3. Check that the new models directory and yaml file look ok.
+
+4. Replace the existing directory and file, keeping backup copies just in
+case.
+
 <div align="center">
 
 ![canvas preview](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/canvas_preview.png)

@@ -113,7 +113,8 @@ def _convert_vae_ckpt_and_cache(self, mconfig: DictConfig) -> str:
     vae_model = convert_ldm_vae_to_diffusers(
         checkpoint = checkpoint,
         vae_config = config,
-        image_size = image_size
+        image_size = image_size,
+        model_root = app_config.models_path,
     )
     vae_model.save_pretrained(
         diffusers_path,

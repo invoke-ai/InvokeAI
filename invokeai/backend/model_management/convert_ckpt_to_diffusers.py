@@ -76,6 +76,8 @@ from transformers import (
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
 
+MODEL_ROOT = None
+
 def shave_segments(path, n_shave_prefix_segments=1):
     """
     Removes segments. Positive values shave the first segments, negative shave the last segments.
@@ -856,10 +858,7 @@ def convert_ldm_bert_checkpoint(checkpoint, config):
 
 
 def convert_ldm_clip_checkpoint(checkpoint):
-    text_model = CLIPTextModel.from_pretrained(
-        "openai/clip-vit-large-patch14", cache_dir=InvokeAIAppConfig.get_config().cache_dir
-    )
-
+    text_model = CLIPTextModel.from_pretrained(MODEL_ROOT / 'clip-vit-large-patch14')
     keys = list(checkpoint.keys())
 
     text_model_dict = {}
@@ -911,83 +910,9 @@ protected = {re.escape(x[0]): x[1] for x in textenc_transformer_conversion_lst}
 textenc_pattern = re.compile("|".join(protected.keys()))
 
 
-def convert_paint_by_example_checkpoint(checkpoint):
-    cache_dir = InvokeAIAppConfig.get_config().cache_dir
-    config = CLIPVisionConfig.from_pretrained(
-        "openai/clip-vit-large-patch14", cache_dir=cache_dir
-    )
-    model = PaintByExampleImageEncoder(config)
-
-    keys = list(checkpoint.keys())
-
-    text_model_dict = {}
-
-    for key in keys:
-        if key.startswith("cond_stage_model.transformer"):
-            text_model_dict[key[len("cond_stage_model.transformer.") :]] = checkpoint[
-                key
-            ]
-
-    # load clip vision
-    model.model.load_state_dict(text_model_dict)
-
-    # load mapper
-    keys_mapper = {
-        k[len("cond_stage_model.mapper.res") :]: v
-        for k, v in checkpoint.items()
-        if k.startswith("cond_stage_model.mapper")
-    }
-
-    MAPPING = {
-        "attn.c_qkv": ["attn1.to_q", "attn1.to_k", "attn1.to_v"],
-        "attn.c_proj": ["attn1.to_out.0"],
-        "ln_1": ["norm1"],
-        "ln_2": ["norm3"],
-        "mlp.c_fc": ["ff.net.0.proj"],
-        "mlp.c_proj": ["ff.net.2"],
-    }
-
-    mapped_weights = {}
-    for key, value in keys_mapper.items():
-        prefix = key[: len("blocks.i")]
-        suffix = key.split(prefix)[-1].split(".")[-1]
-        name = key.split(prefix)[-1].split(suffix)[0][1:-1]
-        mapped_names = MAPPING[name]
-
-        num_splits = len(mapped_names)
-        for i, mapped_name in enumerate(mapped_names):
-            new_name = ".".join([prefix, mapped_name, suffix])
-            shape = value.shape[0] // num_splits
-            mapped_weights[new_name] = value[i * shape : (i + 1) * shape]
-
-    model.mapper.load_state_dict(mapped_weights)
-
-    # load final layer norm
-    model.final_layer_norm.load_state_dict(
-        {
-            "bias": checkpoint["cond_stage_model.final_ln.bias"],
-            "weight": checkpoint["cond_stage_model.final_ln.weight"],
-        }
-    )
-
-    # load final proj
-    model.proj_out.load_state_dict(
-        {
-            "bias": checkpoint["proj_out.bias"],
-            "weight": checkpoint["proj_out.weight"],
-        }
-    )
-
-    # load uncond vector
-    model.uncond_vector.data = torch.nn.Parameter(checkpoint["learnable_vector"])
-    return model
-
-
 def convert_open_clip_checkpoint(checkpoint):
     cache_dir = InvokeAIAppConfig.get_config().cache_dir
-    text_model = CLIPTextModel.from_pretrained(
-        "stabilityai/stable-diffusion-2", subfolder="text_encoder", cache_dir=cache_dir
-    )
+    text_model = CLIPTextModel.from_pretrained(MODEL_ROOT / 'stable-diffusion-2-text_encoder')
 
     keys = list(checkpoint.keys())
 
@@ -1283,11 +1208,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         if model_type == "FrozenOpenCLIPEmbedder":
             text_model = convert_open_clip_checkpoint(checkpoint)
-            tokenizer = CLIPTokenizer.from_pretrained(
-                "stabilityai/stable-diffusion-2",
-                subfolder="tokenizer",
-                cache_dir=cache_dir,
-            )
+            tokenizer = CLIPTokenizer.from_pretrained(MODEL_ROOT / 'stable-diffusion-2-tokenizer')
             pipe = pipeline_class(
                 vae=vae.to(precision),
                 text_encoder=text_model.to(precision),
@@ -1298,34 +1219,11 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
                 feature_extractor=None,
                 requires_safety_checker=False,
             )
-        elif model_type == "PaintByExample":
-            vision_model = convert_paint_by_example_checkpoint(checkpoint)
-            tokenizer = CLIPTokenizer.from_pretrained(
-                "openai/clip-vit-large-patch14", cache_dir=cache_dir
-            )
-            feature_extractor = AutoFeatureExtractor.from_pretrained(
-                "CompVis/stable-diffusion-safety-checker", cache_dir=cache_dir
-            )
-            pipe = PaintByExamplePipeline(
-                vae=vae,
-                image_encoder=vision_model,
-                unet=unet,
-                scheduler=scheduler,
-                safety_checker=None,
-                feature_extractor=feature_extractor,
-            )
         elif model_type in ["FrozenCLIPEmbedder", "WeightedFrozenCLIPEmbedder"]:
             text_model = convert_ldm_clip_checkpoint(checkpoint)
-            tokenizer = CLIPTokenizer.from_pretrained(
-                "openai/clip-vit-large-patch14", cache_dir=cache_dir
-            )
-            safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-                "CompVis/stable-diffusion-safety-checker",
-                cache_dir=cache_dir,
-            )
-            feature_extractor = AutoFeatureExtractor.from_pretrained(
-                "CompVis/stable-diffusion-safety-checker", cache_dir=cache_dir
-            )
+            tokenizer = CLIPTokenizer.from_pretrained(MODEL_ROOT / 'clip-vit-large-patch14')
+            safety_checker = StableDiffusionSafetyChecker.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker')
+            feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker-extractor')
             pipe = pipeline_class(
                 vae=vae.to(precision),
                 text_encoder=text_model.to(precision),
@@ -1338,9 +1236,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         else:
             text_config = create_ldm_bert_config(original_config)
             text_model = convert_ldm_bert_checkpoint(checkpoint, text_config)
-            tokenizer = BertTokenizerFast.from_pretrained(
-                "bert-base-uncased", cache_dir=cache_dir
-            )
+            tokenizer = BertTokenizerFast.from_pretrained(MODEL_ROOT / "bert-base-uncased")
             pipe = LDMTextToImagePipeline(
                 vqvae=vae,
                 bert=text_model,
@@ -1354,15 +1250,19 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
 
 def convert_ckpt_to_diffusers(
-    checkpoint_path: Union[str, Path],
-    dump_path: Union[str, Path],
-    **kwargs,
+        checkpoint_path: Union[str, Path],
+        dump_path: Union[str, Path],
+        model_root: Union[str, Path],
+        **kwargs,
 ):
     """
     Takes all the arguments of load_pipeline_from_original_stable_diffusion_ckpt(),
     and in addition a path-like object indicating the location of the desired diffusers
     model to be written.
     """
+    # setting global here to avoid massive changes late at night
+    global MODEL_ROOT
+    MODEL_ROOT = Path(model_root) / 'core/convert'
     pipe = load_pipeline_from_original_stable_diffusion_ckpt(checkpoint_path, **kwargs)
 
     pipe.save_pretrained(
