@@ -69,7 +69,7 @@ class EventServiceBase:
         source_node_id: str,
         error: str,
     ) -> None:
-        """Emitted when an invocation has encountered a fatal error"""
+        """Emitted when an invocation has completed"""
         self.__emit_session_event(
             event_name="invocation_error",
             payload=dict(
@@ -77,24 +77,6 @@ class EventServiceBase:
                 node=node,
                 source_node_id=source_node_id,
                 error=error,
-            ),
-        )
-
-    def emit_invocation_warning(
-        self,
-        graph_execution_state_id: str,
-        node: dict,
-        source_node_id: str,
-        warning: str,
-    ) -> None:
-        """Emitted when an invocation has encountered a state that may be problematic"""
-        self.__emit_session_event(
-            event_name="invocation_warning",
-            payload=dict(
-                graph_execution_state_id=graph_execution_state_id,
-                node=node,
-                source_node_id=source_node_id,
-                warning=warning,
             ),
         )
 
