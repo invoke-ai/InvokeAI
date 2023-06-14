@@ -49,7 +49,7 @@ class ImageServiceABC(ABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        intermediate: bool = False,
+        is_intermediate: bool = False,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -79,7 +79,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_path(self, image_name: str) -> str:
+    def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         """Gets an image's path."""
         pass
 
@@ -322,7 +322,6 @@ class ImageService(ImageServiceABC):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self._services.records.get_many(
@@ -331,7 +330,6 @@ class ImageService(ImageServiceABC):
                 image_origin,
                 categories,
                 is_intermediate,
-                board_id
             )
 
             image_dtos = list(

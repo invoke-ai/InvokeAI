@@ -221,9 +221,6 @@ async def list_images_with_metadata(
     is_intermediate: Optional[bool] = Query(
         default=None, description="Whether to list intermediate images"
     ),
-    board_id: Optional[str] = Query(
-        default=None, description="The board of images to include"
-    ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
 ) -> OffsetPaginatedResults[ImageDTO]:
@@ -235,7 +232,6 @@ async def list_images_with_metadata(
         image_origin,
         categories,
         is_intermediate,
-        board_id
     )
 
     return image_dtos

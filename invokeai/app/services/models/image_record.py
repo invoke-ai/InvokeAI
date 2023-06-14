@@ -48,11 +48,6 @@ class ImageRecord(BaseModel):
         description="A limited subset of the image's generation metadata. Retrieve the image's session for full metadata.",
     )
     """A limited subset of the image's generation metadata. Retrieve the image's session for full metadata."""
-    board_id: Optional[str] = Field(
-        default=None,
-        description="The board ID that this image belongs to.",
-    )
-    """The board ID that this image belongs to."""
 
 
 class ImageRecordChanges(BaseModel, extra=Extra.forbid):
@@ -77,10 +72,6 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
         default=None, description="The image's new `is_intermediate` flag."
     )
     """The image's new `is_intermediate` flag."""
-    board_id: Optional[StrictStr] = Field(
-        default=None, description="The image's new board ID."
-    )
-    """The image's new board ID."""
 
 
 class ImageUrlsDTO(BaseModel):
@@ -131,7 +122,6 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     updated_at = image_dict.get("updated_at", get_iso_timestamp())
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
-    board_id = image_dict.get("board_id", None)
 
     raw_metadata = image_dict.get("metadata")
 
@@ -153,5 +143,4 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
-        board_id=board_id,
     )

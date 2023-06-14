@@ -78,7 +78,7 @@ app.include_router(models.models_router, prefix="/api")
 
 app.include_router(images.images_router, prefix="/api")
 
-app.include_router(boards.boards_router, prefix="/api")
+# app.include_router(boards.boards_router, prefix="/api")
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?

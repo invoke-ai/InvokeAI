@@ -82,7 +82,6 @@ class ImageRecordStorageBase(ABC):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass
@@ -92,11 +91,6 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def delete(self, image_name: str) -> None:
         """Deletes an image record."""
-        pass
-
-    @abstractmethod
-    def get_board_cover_photo(self, board_id: str) -> Optional[ImageRecord]:
-        """Gets the cover photo for a board."""
         pass
 
     @abstractmethod
@@ -197,7 +191,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             AFTER UPDATE
             ON images FOR EACH ROW
             BEGIN
-                UPDATE images SET updated_at = current_timestamp
+                UPDATE images SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
                     WHERE image_name = old.image_name;
             END;
             """
@@ -268,14 +262,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 )
 
             # Change the image's `is_intermediate`` flag
-            if changes.board_id is not None:
+            if changes.is_intermediate is not None:
                 self._cursor.execute(
                     f"""--sql
                     UPDATE images
                     SET board_id = ?
                     WHERE image_name = ?;
                     """,
-                    (changes.board_id, image_name),
+                    (changes.is_intermediate, image_name),
                 )
 
             self._conn.commit()
@@ -284,32 +278,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordSaveException from e
         finally:
             self._lock.release()
-
-    def get_board_cover_photo(self, board_id: str) -> ImageRecord | None:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """
-                    SELECT *
-                    FROM images
-                    WHERE board_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """,
-                (board_id),
-            )
-            self._conn.commit()
-            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
-        except sqlite3.Error as e:
-            self._conn.rollback()
-            raise ImageRecordNotFoundException from e
-        finally:
-            self._lock.release()
-
-        if not result:
-            raise ImageRecordNotFoundException
-
-        return deserialize_image_record(dict(result))
     
     def get_many(
         self,
@@ -318,7 +286,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
@@ -350,10 +317,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_conditions += f"""AND is_intermediate = ?\n"""
                 query_params.append(is_intermediate)
 
-            if board_id is not None:
-                query_conditions += f"""AND board_id = ?\n"""
-                query_params.append(board_id)
-
             query_pagination = f"""ORDER BY created_at DESC LIMIT ? OFFSET ?\n"""
 
             # Final images query with pagination
@@ -371,7 +334,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             count_query += query_conditions + ";"
             count_params = query_params.copy()
             self._cursor.execute(count_query, count_params)
-            count = self._cursor.fetchone()[0]
+            count = cast(int, self._cursor.fetchone()[0])
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
