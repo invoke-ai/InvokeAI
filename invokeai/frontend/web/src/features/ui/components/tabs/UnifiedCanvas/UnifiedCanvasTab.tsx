@@ -6,7 +6,7 @@ import UnifiedCanvasParameters from './UnifiedCanvasParameters';
 
 const UnifiedCanvasTab = () => {
   return (
-    <Flex sx={{ gap: 2, w: 'full', h: 'full' }}>
+    <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       <ParametersPinnedWrapper>
         <UnifiedCanvasParameters />
       </ParametersPinnedWrapper>
