@@ -15,10 +15,6 @@ export type ImageDTO = {
    */
   image_name: string;
   /**
-   * The type of the image.
-   */
-  image_origin: ResourceOrigin;
-  /**
    * The URL of the image.
    */
   image_url: string;
@@ -26,6 +22,10 @@ export type ImageDTO = {
    * The URL of the image's thumbnail.
    */
   thumbnail_url: string;
+  /**
+   * The type of the image.
+   */
+  image_origin: ResourceOrigin;
   /**
    * The category of the image.
    */

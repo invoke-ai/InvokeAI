@@ -59,8 +59,7 @@ export const gallerySlice = createSlice({
       }
     });
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_origin, image_url, thumbnail_url } =
-        action.payload;
+      const { image_name, image_url, thumbnail_url } = action.payload;
 
       if (state.selectedImage?.image_name === image_name) {
         state.selectedImage.image_url = image_url;

@@ -9,6 +9,7 @@ import type { ContentShuffleImageProcessorInvocation } from '../models/ContentSh
 import type { ControlNetInvocation } from '../models/ControlNetInvocation';
 import type { CvInpaintInvocation } from '../models/CvInpaintInvocation';
 import type { DivideInvocation } from '../models/DivideInvocation';
+import type { DynamicPromptInvocation } from '../models/DynamicPromptInvocation';
 import type { Edge } from '../models/Edge';
 import type { FloatLinearRangeInvocation } from '../models/FloatLinearRangeInvocation';
 import type { Graph } from '../models/Graph';
@@ -78,23 +79,23 @@ export class SessionsService {
    * @throws ApiError
    */
   public static listSessions({
-page,
-perPage = 10,
-query = '',
-}: {
-/**
- * The page of results to get
- */
-page?: number,
-/**
- * The number of results per page
- */
-perPage?: number,
-/**
- * The query string to search for
- */
-query?: string,
-}): CancelablePromise<PaginatedResults_GraphExecutionState_> {
+    page,
+    perPage = 10,
+    query = '',
+  }: {
+    /**
+     * The page of results to get
+     */
+    page?: number,
+    /**
+     * The number of results per page
+     */
+    perPage?: number,
+    /**
+     * The query string to search for
+     */
+    query?: string,
+  }): CancelablePromise<PaginatedResults_GraphExecutionState_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/sessions/',
@@ -116,10 +117,10 @@ query?: string,
    * @throws ApiError
    */
   public static createSession({
-requestBody,
-}: {
-requestBody?: Graph,
-}): CancelablePromise<GraphExecutionState> {
+    requestBody,
+  }: {
+    requestBody?: Graph,
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/sessions/',
@@ -139,13 +140,13 @@ requestBody?: Graph,
    * @throws ApiError
    */
   public static getSession({
-sessionId,
-}: {
-/**
- * The id of the session to get
- */
-sessionId: string,
-}): CancelablePromise<GraphExecutionState> {
+    sessionId,
+  }: {
+    /**
+     * The id of the session to get
+     */
+    sessionId: string,
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/sessions/{session_id}',
@@ -166,15 +167,15 @@ sessionId: string,
    * @throws ApiError
    */
   public static addNode({
-sessionId,
-requestBody,
-}: {
-/**
- * The id of the session
- */
-sessionId: string,
-requestBody: (RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | CompelInvocation | LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | CvInpaintInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | FloatLinearRangeInvocation | StepParamEasingInvocation | RestoreFaceInvocation | UpscaleInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageProcessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | ImageToImageInvocation | LatentsToLatentsInvocation | InpaintInvocation),
-}): CancelablePromise<string> {
+    sessionId,
+    requestBody,
+  }: {
+    /**
+     * The id of the session
+     */
+    sessionId: string,
+    requestBody: (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | DynamicPromptInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | FloatLinearRangeInvocation | StepParamEasingInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageProcessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
+  }): CancelablePromise<string> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/sessions/{session_id}/nodes',
@@ -198,20 +199,20 @@ requestBody: (RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | 
    * @throws ApiError
    */
   public static updateNode({
-sessionId,
-nodePath,
-requestBody,
-}: {
-/**
- * The id of the session
- */
-sessionId: string,
-/**
- * The path to the node in the graph
- */
-nodePath: string,
-requestBody: (RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | CompelInvocation | LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | CvInpaintInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | FloatLinearRangeInvocation | StepParamEasingInvocation | RestoreFaceInvocation | UpscaleInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageProcessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | ImageToImageInvocation | LatentsToLatentsInvocation | InpaintInvocation),
-}): CancelablePromise<GraphExecutionState> {
+    sessionId,
+    nodePath,
+    requestBody,
+  }: {
+    /**
+     * The id of the session
+     */
+    sessionId: string,
+    /**
+     * The path to the node in the graph
+     */
+    nodePath: string,
+    requestBody: (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | DynamicPromptInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | FloatLinearRangeInvocation | StepParamEasingInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageProcessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation),
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'PUT',
       url: '/api/v1/sessions/{session_id}/nodes/{node_path}',
@@ -236,18 +237,18 @@ requestBody: (RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | 
    * @throws ApiError
    */
   public static deleteNode({
-sessionId,
-nodePath,
-}: {
-/**
- * The id of the session
- */
-sessionId: string,
-/**
- * The path to the node to delete
- */
-nodePath: string,
-}): CancelablePromise<GraphExecutionState> {
+    sessionId,
+    nodePath,
+  }: {
+    /**
+     * The id of the session
+     */
+    sessionId: string,
+    /**
+     * The path to the node to delete
+     */
+    nodePath: string,
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/sessions/{session_id}/nodes/{node_path}',
@@ -270,15 +271,15 @@ nodePath: string,
    * @throws ApiError
    */
   public static addEdge({
-sessionId,
-requestBody,
-}: {
-/**
- * The id of the session
- */
-sessionId: string,
-requestBody: Edge,
-}): CancelablePromise<GraphExecutionState> {
+    sessionId,
+    requestBody,
+  }: {
+    /**
+     * The id of the session
+     */
+    sessionId: string,
+    requestBody: Edge,
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/sessions/{session_id}/edges',
@@ -302,33 +303,33 @@ requestBody: Edge,
    * @throws ApiError
    */
   public static deleteEdge({
-sessionId,
-fromNodeId,
-fromField,
-toNodeId,
-toField,
-}: {
-/**
- * The id of the session
- */
-sessionId: string,
-/**
- * The id of the node the edge is coming from
- */
-fromNodeId: string,
-/**
- * The field of the node the edge is coming from
- */
-fromField: string,
-/**
- * The id of the node the edge is going to
- */
-toNodeId: string,
-/**
- * The field of the node the edge is going to
- */
-toField: string,
-}): CancelablePromise<GraphExecutionState> {
+    sessionId,
+    fromNodeId,
+    fromField,
+    toNodeId,
+    toField,
+  }: {
+    /**
+     * The id of the session
+     */
+    sessionId: string,
+    /**
+     * The id of the node the edge is coming from
+     */
+    fromNodeId: string,
+    /**
+     * The field of the node the edge is coming from
+     */
+    fromField: string,
+    /**
+     * The id of the node the edge is going to
+     */
+    toNodeId: string,
+    /**
+     * The field of the node the edge is going to
+     */
+    toField: string,
+  }): CancelablePromise<GraphExecutionState> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/sessions/{session_id}/edges/{from_node_id}/{from_field}/{to_node_id}/{to_field}',
@@ -354,18 +355,18 @@ toField: string,
    * @throws ApiError
    */
   public static invokeSession({
-sessionId,
-all = false,
-}: {
-/**
- * The id of the session to invoke
- */
-sessionId: string,
-/**
- * Whether or not to invoke all remaining invocations
- */
-all?: boolean,
-}): CancelablePromise<any> {
+    sessionId,
+    all = false,
+  }: {
+    /**
+     * The id of the session to invoke
+     */
+    sessionId: string,
+    /**
+     * Whether or not to invoke all remaining invocations
+     */
+    all?: boolean,
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'PUT',
       url: '/api/v1/sessions/{session_id}/invoke',
@@ -390,13 +391,13 @@ all?: boolean,
    * @throws ApiError
    */
   public static cancelSessionInvoke({
-sessionId,
-}: {
-/**
- * The id of the session to cancel
- */
-sessionId: string,
-}): CancelablePromise<any> {
+    sessionId,
+  }: {
+    /**
+     * The id of the session to cancel
+     */
+    sessionId: string,
+  }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/sessions/{session_id}/invoke',

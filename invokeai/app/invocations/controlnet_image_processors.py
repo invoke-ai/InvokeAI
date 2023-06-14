@@ -196,9 +196,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         return image
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        raw_image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        raw_image = context.services.images.get_pil_image(self.image.image_name)
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
 
@@ -219,10 +217,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         )
 
         """Builds an ImageOutput and its ImageField"""
-        processed_image_field = ImageField(
-            image_name=image_dto.image_name,
-            image_origin=image_dto.image_origin,
-        )
+        processed_image_field = ImageField(image_name=image_dto.image_name)
         return ImageOutput(
             image=processed_image_field,
             # width=processed_image.width,

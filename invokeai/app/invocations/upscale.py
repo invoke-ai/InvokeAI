@@ -30,9 +30,7 @@ class UpscaleInvocation(BaseInvocation):
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        image = context.services.images.get_pil_image(self.image.image_name)
         results = context.services.restoration.upscale_and_reconstruct(
             image_list=[[image, 0]],
             upscale=(self.level, self.strength),
@@ -53,10 +51,7 @@ class UpscaleInvocation(BaseInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
