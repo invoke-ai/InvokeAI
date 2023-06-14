@@ -75,7 +75,7 @@ class ImageFileStorageBase(ABC):
 class DiskImageFileStorage(ImageFileStorageBase):
     """Stores images on disk"""
 
-    __output_folder: str | Path
+    __output_folder: Path
     __cache_ids: Queue  # TODO: this is an incredibly naive cache
     __cache: Dict[Path, PILImageType]
     __max_cache_size: int
@@ -89,7 +89,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.__thumbnails_folder = self.__output_folder / 'thumbnails'
 
         # Validate required output folders at launch
-        self.validate_storage_folders()
+        self.__validate_storage_folders()
 
     def get(self, image_name: str) -> PILImageType:
         try:
@@ -113,7 +113,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         thumbnail_size: int = 256,
     ) -> None:
         try:
-            self.validate_storage_folders()
+            self.__validate_storage_folders()
             image_path = self.get_path(image_name)
 
             if metadata is not None:
@@ -167,7 +167,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
     
-    def validate_storage_folders(self) -> None:
+    def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""
         folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
         for folder in folders:
