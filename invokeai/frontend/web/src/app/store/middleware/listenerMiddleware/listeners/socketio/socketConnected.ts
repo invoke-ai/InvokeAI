@@ -4,6 +4,7 @@ import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { receivedPageOfImages } from 'services/thunks/image';
 import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { receivedBoards } from '../../../../../../services/thunks/board';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
@@ -18,6 +19,8 @@ export const addSocketConnectedEventListener = () => {
       const { models, nodes, config, images } = getState();
 
       const { disabledTabs } = config;
+
+      dispatch(receivedBoards());
 
       if (!images.ids.length) {
         dispatch(receivedPageOfImages());

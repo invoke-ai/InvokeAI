@@ -22,6 +22,7 @@ import uiReducer from 'features/ui/store/uiSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import modelsReducer from 'features/system/store/modelSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
+import boardsReducer from 'features/gallery/store/boardSlice';
 
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
@@ -47,6 +48,7 @@ const allReducers = {
   hotkeys: hotkeysReducer,
   images: imagesReducer,
   controlNet: controlNetReducer,
+  boards: boardsReducer,
   // session: sessionReducer,
 };
 
@@ -65,6 +67,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'system',
   'ui',
   'controlNet',
+  'boards',
   // 'hotkeys',
   // 'config',
 ];

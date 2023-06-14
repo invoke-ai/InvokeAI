@@ -154,3 +154,16 @@ export const selectFilteredImagesIds = createSelector(
       .map((i) => i.image_name);
   }
 );
+
+// export const selectImageById = createSelector(
+//   (state: RootState, imageId) => state,
+//   (state) => {
+//     const {
+//       images: { categories },
+//     } = state;
+
+//     return selectImagesAll(state)
+//       .filter((i) => categories.includes(i.image_category))
+//       .map((i) => i.image_name);
+//   }
+// );

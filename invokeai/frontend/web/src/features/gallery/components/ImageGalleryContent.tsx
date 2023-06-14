@@ -20,6 +20,7 @@ import {
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
   setShouldUseSingleGalleryColumn,
+  setGalleryView,
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
@@ -36,7 +37,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
+import { FaFolder, FaImage, FaPlus, FaServer, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
@@ -53,22 +54,39 @@ import {
   selectImagesAll,
 } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
+import { boardSelector } from '../store/boardSelectors';
+import { BoardRecord, ImageDTO } from '../../../services/api';
+import { isBoardRecord, isImageDTO } from '../../../services/types/guards';
+import HoverableBoard from './HoverableBoard';
+import IAIInput from '../../../common/components/IAIInput';
+import { boardCreated } from '../../../services/thunks/board';
 
-const categorySelector = createSelector(
+const itemSelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { images } = state;
-    const { categories } = images;
+    const { images, boards, gallery } = state;
 
-    const allImages = selectImagesAll(state);
-    const filteredImages = allImages.filter((i) =>
-      categories.includes(i.image_category)
-    );
+    let items: Array<ImageDTO | BoardRecord> = [];
+    let areMoreAvailable = false;
+    let isLoading = true;
+
+    if (gallery.galleryView === 'images' || gallery.galleryView === 'assets') {
+      const { categories } = images;
+
+      const allImages = selectImagesAll(state);
+      items = allImages.filter((i) => categories.includes(i.image_category));
+      areMoreAvailable = items.length < images.total;
+      isLoading = images.isLoading;
+    } else if (gallery.galleryView === 'boards') {
+      items = Object.values(boards.entities) as BoardRecord[];
+      areMoreAvailable = items.length < boards.total;
+      isLoading = boards.isLoading;
+    }
 
     return {
-      images: filteredImages,
-      isLoading: images.isLoading,
-      areMoreImagesAvailable: filteredImages.length < images.total,
+      items,
+      isLoading,
+      areMoreAvailable,
       categories: images.categories,
     };
   },
@@ -76,17 +94,20 @@ const categorySelector = createSelector(
 );
 
 const mainSelector = createSelector(
-  [gallerySelector, uiSelector],
-  (gallery, ui) => {
+  [gallerySelector, uiSelector, boardSelector],
+  (gallery, ui, boardState) => {
     const {
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldAutoSwitchToNewImages,
       shouldUseSingleGalleryColumn,
       selectedImage,
+      galleryView,
     } = gallery;
 
     const { shouldPinGallery } = ui;
+
+    const { entities: boards } = boardState;
 
     return {
       shouldPinGallery,
@@ -95,6 +116,8 @@ const mainSelector = createSelector(
       shouldAutoSwitchToNewImages,
       shouldUseSingleGalleryColumn,
       selectedImage,
+      galleryView,
+      boards,
     };
   },
   defaultSelectorOptions
@@ -126,21 +149,23 @@ const ImageGalleryContent = () => {
     shouldAutoSwitchToNewImages,
     shouldUseSingleGalleryColumn,
     selectedImage,
+    galleryView,
+    boards,
   } = useAppSelector(mainSelector);
 
-  const { images, areMoreImagesAvailable, isLoading, categories } =
-    useAppSelector(categorySelector);
+  const { items, areMoreAvailable, isLoading, categories } =
+    useAppSelector(itemSelector);
 
   const handleLoadMoreImages = useCallback(() => {
     dispatch(receivedPageOfImages());
   }, [dispatch]);
 
   const handleEndReached = useMemo(() => {
-    if (areMoreImagesAvailable && !isLoading) {
+    if (areMoreAvailable && !isLoading) {
       return handleLoadMoreImages;
     }
     return undefined;
-  }, [areMoreImagesAvailable, handleLoadMoreImages, isLoading]);
+  }, [areMoreAvailable, handleLoadMoreImages, isLoading]);
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
@@ -172,11 +197,23 @@ const ImageGalleryContent = () => {
 
   const handleClickImagesCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
+    dispatch(setGalleryView('images'));
   }, [dispatch]);
 
   const handleClickAssetsCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
+    dispatch(setGalleryView('assets'));
   }, [dispatch]);
+
+  const handleClickBoardsView = useCallback(() => {
+    dispatch(setGalleryView('boards'));
+  }, [dispatch]);
+
+  const [newBoardName, setNewBoardName] = useState('');
+
+  const handleCreateNewBoard = () => {
+    dispatch(boardCreated({ requestBody: newBoardName }));
+  };
 
   return (
     <Flex
@@ -198,7 +235,7 @@ const ImageGalleryContent = () => {
             tooltip={t('gallery.images')}
             aria-label={t('gallery.images')}
             onClick={handleClickImagesCategory}
-            isChecked={categories === IMAGE_CATEGORIES}
+            isChecked={galleryView === 'images'}
             size="sm"
             icon={<FaImage />}
           />
@@ -206,12 +243,47 @@ const ImageGalleryContent = () => {
             tooltip={t('gallery.assets')}
             aria-label={t('gallery.assets')}
             onClick={handleClickAssetsCategory}
-            isChecked={categories === ASSETS_CATEGORIES}
+            isChecked={galleryView === 'assets'}
             size="sm"
             icon={<FaServer />}
           />
+          <IAIIconButton
+            tooltip={t('gallery.boards')}
+            aria-label={t('gallery.boards')}
+            onClick={handleClickBoardsView}
+            isChecked={galleryView === 'boards'}
+            size="sm"
+            icon={<FaFolder />}
+          />
         </ButtonGroup>
         <Flex gap={2}>
+          <IAIPopover
+            triggerComponent={
+              <IAIIconButton
+                tooltip="Add Board"
+                aria-label="Add Board"
+                size="sm"
+                icon={<FaPlus />}
+              />
+            }
+          >
+            <Flex direction="column" gap={2}>
+              <IAIInput
+                label="Board Name"
+                placeholder="Board Name"
+                value={newBoardName}
+                onChange={(e) => setNewBoardName(e.target.value)}
+              />
+              <IAIButton
+                size="sm"
+                onClick={handleCreateNewBoard}
+                disabled={true}
+                isLoading={false}
+              >
+                Create
+              </IAIButton>
+            </Flex>
+          </IAIPopover>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -271,57 +343,75 @@ const ImageGalleryContent = () => {
         </Flex>
       </Flex>
       <Flex direction="column" gap={2} h="full">
-        {images.length || areMoreImagesAvailable ? (
+        {items.length || areMoreAvailable ? (
           <>
             <Box ref={rootRef} data-overlayscrollbars="" h="100%">
               {shouldUseSingleGalleryColumn ? (
                 <Virtuoso
                   style={{ height: '100%' }}
-                  data={images}
+                  data={items}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
-                  itemContent={(index, image) => (
-                    <Flex sx={{ pb: 2 }}>
-                      <HoverableImage
-                        key={`${image.image_name}-${image.thumbnail_url}`}
-                        image={image}
-                        isSelected={
-                          selectedImage?.image_name === image?.image_name
-                        }
-                      />
-                    </Flex>
-                  )}
+                  itemContent={(index, item) => {
+                    if (isImageDTO(item)) {
+                      return (
+                        <Flex sx={{ pb: 2 }}>
+                          <HoverableImage
+                            key={`${item.image_name}-${item.thumbnail_url}`}
+                            image={item}
+                            isSelected={
+                              selectedImage?.image_name === item?.image_name
+                            }
+                          />
+                        </Flex>
+                      );
+                    } else if (isBoardRecord(item)) {
+                      return (
+                        <Flex sx={{ pb: 2 }}>
+                          <HoverableBoard key={item.board_id} board={item} />
+                        </Flex>
+                      );
+                    }
+                  }}
                 />
               ) : (
                 <VirtuosoGrid
                   style={{ height: '100%' }}
-                  data={images}
+                  data={items}
                   endReached={handleEndReached}
                   components={{
                     Item: ItemContainer,
                     List: ListContainer,
                   }}
                   scrollerRef={setScroller}
-                  itemContent={(index, image) => (
-                    <HoverableImage
-                      key={`${image.image_name}-${image.thumbnail_url}`}
-                      image={image}
-                      isSelected={
-                        selectedImage?.image_name === image?.image_name
-                      }
-                    />
-                  )}
+                  itemContent={(index, item) => {
+                    if (isImageDTO(item)) {
+                      return (
+                        <HoverableImage
+                          key={`${item.image_name}-${item.thumbnail_url}`}
+                          image={item}
+                          isSelected={
+                            selectedImage?.image_name === item?.image_name
+                          }
+                        />
+                      );
+                    } else if (isBoardRecord(item)) {
+                      return (
+                        <HoverableBoard key={item.board_id} board={item} />
+                      );
+                    }
+                  }}
                 />
               )}
             </Box>
             <IAIButton
               onClick={handleLoadMoreImages}
-              isDisabled={!areMoreImagesAvailable}
+              isDisabled={!areMoreAvailable}
               isLoading={isLoading}
               loadingText="Loading"
               flexShrink={0}
             >
-              {areMoreImagesAvailable
+              {areMoreAvailable
                 ? t('gallery.loadMore')
                 : t('gallery.allImagesLoaded')}
             </IAIButton>
