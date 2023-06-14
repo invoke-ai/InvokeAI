@@ -16,4 +16,3 @@ export type PromptCollectionOutput = {
    */
   count: number;
 };
-

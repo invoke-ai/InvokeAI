@@ -46,7 +46,7 @@ export type GraphExecutionState = {
   /**
    * The results of node executions
    */
-  results: Record<string, (ImageOutput | MaskOutput | ControlOutput | PromptOutput | PromptCollectionOutput | CompelOutput | IntOutput | FloatOutput | LatentsOutput | NoiseOutput | IntCollectionOutput | FloatCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+  results: Record<string, (IntCollectionOutput | FloatCollectionOutput | CompelOutput | ImageOutput | MaskOutput | ControlOutput | LatentsOutput | NoiseOutput | IntOutput | FloatOutput | PromptOutput | PromptCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
   /**
    * Errors raised when executing nodes
    */
@@ -60,4 +60,3 @@ export type GraphExecutionState = {
    */
   source_prepared_mapping: Record<string, Array<string>>;
 };
-
