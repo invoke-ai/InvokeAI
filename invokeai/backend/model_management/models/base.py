@@ -8,8 +8,9 @@ import torch
 import safetensors.torch
 from diffusers import DiffusionPipeline, ConfigMixin
 
+from contextlib import suppress
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any
+from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 
 class BaseModelType(str, Enum):
     StableDiffusion1 = "sd-1"
@@ -108,32 +109,45 @@ class ModelBase(metaclass=ABCMeta):
 
     @classmethod
     def _get_configs(cls):
-        if not hasattr(cls, "__configs"):
-            configs = dict()
-            for name in dir(cls):
-                if name.startswith("__"):
-                    continue
+        with suppress(Exception):
+            return cls.__configs
+        
+        configs = dict()
+        for name in dir(cls):
+            if name.startswith("__"):
+                continue
 
-                value = getattr(cls, name)
-                if not isinstance(value, type) or not issubclass(value, ModelConfigBase):
-                    continue
+            value = getattr(cls, name)
+            if not isinstance(value, type) or not issubclass(value, ModelConfigBase):
+                continue
 
-                fields = inspect.get_annotations(value)
-                if "format" not in fields:
-                    raise Exception("Invalid config definition - format field not found")
+            fields = inspect.get_annotations(value)
+            if "format" not in fields:
+                raise Exception("Invalid config definition - format field not found")
 
-                format_type = typing.get_origin(fields["format"])
-                if format_type not in {None, Literal}:
-                    raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
+            format_type = typing.get_origin(fields["format"])
+            if format_type not in {None, Literal, Union}:
+                raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
 
-                if format_type is Literal:
-                    format = fields["format"].__args__[0]
+            if format_type is Union and not all(typing.get_origin(v) in {None, Literal} for v in fields["format"].__args__):
+                raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
+
+            if format_type == Union:
+                f_fields = fields["format"].__args__
+            else:
+                f_fields = (fields["format"],)
+                    
+
+            for field in f_fields:
+                if field is None:
+                    format_name = None
                 else:
-                    format = None
-                configs[format] = value # TODO: error when override(multiple)?
+                    format_name = field.__args__[0]
 
-            cls.__configs = configs
+                configs[format_name] = value # TODO: error when override(multiple)?
 
+
+        cls.__configs = configs
         return cls.__configs
 
     @classmethod
@@ -237,8 +251,11 @@ class DiffusersModel(ModelBase):
                 )
                 break
             except Exception as e:
-                print("====ERR LOAD====")
-                print(f"{variant}: {e}")
+                #print("====ERR LOAD====")
+                #print(f"{variant}: {e}")
+                pass
+        else:
+            raise Exception(f"Failed to load {self.base_model}:{self.model_type}:{child_type} model")
 
         # calc more accurate size
         self.child_sizes[child_type] = calc_model_size_by_data(model)

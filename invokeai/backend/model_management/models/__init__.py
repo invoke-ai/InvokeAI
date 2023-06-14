@@ -2,12 +2,8 @@ from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfig
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .vae import VaeModel
 from .lora import LoRAModel
-#from .controlnet import ControlNetModel # TODO:
+from .controlnet import ControlNetModel # TODO:
 from .textual_inversion import TextualInversionModel
-
-# TODO:
-class ControlNetModel:
-    pass
 
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
@@ -36,9 +32,7 @@ MODEL_CLASSES = {
 def get_all_model_configs():
     configs = set()
     for models in MODEL_CLASSES.values():
-        for type, model in models.items():
-            if type == ModelType.ControlNet:
-                continue # TODO:
+        for _, model in models.items():
             configs.update(model._get_configs().values())
     configs.discard(None)
     return list(configs) # TODO: set, list or tuple

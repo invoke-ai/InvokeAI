@@ -1,7 +1,7 @@
 import os
 import torch
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, Literal
 from .base import (
     ModelBase,
     ModelConfigBase,
@@ -23,7 +23,7 @@ class VaeModel(ModelBase):
     #model_size: int
 
     class Config(ModelConfigBase):
-        format: None
+        format: Union[Literal["checkpoint"], Literal["diffusers"]]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.Vae
