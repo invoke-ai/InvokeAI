@@ -79,8 +79,6 @@ class ImageUrlsDTO(BaseModel):
 
     image_name: str = Field(description="The unique name of the image.")
     """The unique name of the image."""
-    image_origin: ResourceOrigin = Field(description="The type of the image.")
-    """The origin of the image."""
     image_url: str = Field(description="The URL of the image.")
     """The URL of the image."""
     thumbnail_url: str = Field(description="The URL of the image's thumbnail.")

@@ -66,13 +66,10 @@ class InvalidImageCategoryException(ValueError):
 class ImageField(BaseModel):
     """An image field used for passing image objects between invocations"""
 
-    image_origin: ResourceOrigin = Field(
-        default=ResourceOrigin.INTERNAL, description="The type of the image"
-    )
     image_name: Optional[str] = Field(default=None, description="The name of the image")
 
     class Config:
-        schema_extra = {"required": ["image_origin", "image_name"]}
+        schema_extra = {"required": ["image_name"]}
 
 
 class ColorField(BaseModel):
