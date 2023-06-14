@@ -2,6 +2,7 @@ import { Flex } from '@chakra-ui/react';
 
 import IAICanvasRedoButton from 'features/canvas/components/IAICanvasToolbar/IAICanvasRedoButton';
 import IAICanvasUndoButton from 'features/canvas/components/IAICanvasToolbar/IAICanvasUndoButton';
+import UnifiedCanvasSettings from './UnifiedCanvasToolSettings/UnifiedCanvasSettings';
 import UnifiedCanvasCopyToClipboard from './UnifiedCanvasToolbar/UnifiedCanvasCopyToClipboard';
 import UnifiedCanvasDownloadImage from './UnifiedCanvasToolbar/UnifiedCanvasDownloadImage';
 import UnifiedCanvasFileUploader from './UnifiedCanvasToolbar/UnifiedCanvasFileUploader';
@@ -13,11 +14,10 @@ import UnifiedCanvasResetCanvas from './UnifiedCanvasToolbar/UnifiedCanvasResetC
 import UnifiedCanvasResetView from './UnifiedCanvasToolbar/UnifiedCanvasResetView';
 import UnifiedCanvasSaveToGallery from './UnifiedCanvasToolbar/UnifiedCanvasSaveToGallery';
 import UnifiedCanvasToolSelect from './UnifiedCanvasToolbar/UnifiedCanvasToolSelect';
-import UnifiedCanvasSettings from './UnifiedCanvasToolSettings/UnifiedCanvasSettings';
 
 const UnifiedCanvasToolbarBeta = () => {
   return (
-    <Flex flexDirection="column" rowGap={2}>
+    <Flex flexDirection="column" rowGap={2} width="min-content">
       <UnifiedCanvasLayerSelect />
       <UnifiedCanvasToolSelect />
 

@@ -1,6 +1,5 @@
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { PropsWithChildren, memo } from 'react';
-
 const OverlayScrollable = (props: PropsWithChildren) => {
   return (
     <OverlayScrollbarsComponent
@@ -20,5 +19,4 @@ const OverlayScrollable = (props: PropsWithChildren) => {
     </OverlayScrollbarsComponent>
   );
 };
-
 export default memo(OverlayScrollable);

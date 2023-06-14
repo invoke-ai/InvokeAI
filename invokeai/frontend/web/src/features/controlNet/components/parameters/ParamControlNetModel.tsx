@@ -1,9 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICustomSelect, {
-  IAICustomSelectOption,
-} from 'common/components/IAICustomSelect';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import {
   CONTROLNET_MODELS,
@@ -12,7 +11,7 @@ import {
 import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
 import { configSelector } from 'features/system/store/configSelectors';
 import { map } from 'lodash-es';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
 type ParamControlNetModelProps = {
   controlNetId: string;
@@ -20,17 +19,18 @@ type ParamControlNetModelProps = {
 };
 
 const selector = createSelector(configSelector, (config) => {
-  return map(CONTROLNET_MODELS, (m) => ({
-    key: m.label,
+  const controlNetModels: IAISelectDataType[] = map(CONTROLNET_MODELS, (m) => ({
+    label: m.label,
     value: m.type,
-  })).filter((d) => !config.sd.disabledControlNetModels.includes(d.value));
-});
+  })).filter(
+    (d) =>
+      !config.sd.disabledControlNetModels.includes(
+        d.value as ControlNetModelName
+      )
+  );
 
-// const DATA: IAICustomSelectOption[] = map(CONTROLNET_MODELS, (m) => ({
-//   value: m.type,
-//   label: m.label,
-//   tooltip: m.type,
-// }));
+  return controlNetModels;
+});
 
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model } = props;
@@ -39,47 +39,23 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const isReady = useIsReadyToInvoke();
 
   const handleModelChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
+    (val: string | null) => {
       // TODO: do not cast
-      const model = e.target.value as ControlNetModelName;
+      const model = val as ControlNetModelName;
       dispatch(controlNetModelChanged({ controlNetId, model }));
     },
     [controlNetId, dispatch]
   );
 
-  // const handleModelChanged = useCallback(
-  //   (val: string | null | undefined) => {
-  //     // TODO: do not cast
-  //     const model = val as ControlNetModelName;
-  //     dispatch(controlNetModelChanged({ controlNetId, model }));
-  //   },
-  //   [controlNetId, dispatch]
-  // );
-
   return (
-    <IAISelect
-      tooltip={model}
-      tooltipProps={{ placement: 'top', hasArrow: true }}
-      validValues={controlNetModels}
+    <IAIMantineSelect
+      data={controlNetModels}
       value={model}
       onChange={handleModelChanged}
-      isDisabled={!isReady}
-      // ellipsisPosition="start"
-      // withCheckIcon
+      disabled={!isReady}
+      tooltip={model}
     />
   );
-  // return (
-  //   <IAICustomSelect
-  //     tooltip={model}
-  //     tooltipProps={{ placement: 'top', hasArrow: true }}
-  //     data={DATA}
-  //     value={model}
-  //     onChange={handleModelChanged}
-  //     isDisabled={!isReady}
-  //     ellipsisPosition="start"
-  //     withCheckIcon
-  //   />
-  // );
 };
 
 export default memo(ParamControlNetModel);
