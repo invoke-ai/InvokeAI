@@ -45,6 +45,7 @@ export const addControlNetToLinearGraph = (
         processedControlImage,
         beginStepPct,
         endStepPct,
+        controlMode,
         model,
         processorType,
         weight,
@@ -60,6 +61,7 @@ export const addControlNetToLinearGraph = (
         type: 'controlnet',
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
+        control_mode: controlMode,
         control_model: model as ControlNetInvocation['control_model'],
         control_weight: weight,
       };

@@ -1,6 +1,5 @@
 import {
   ControlNetProcessorType,
-  RequiredCannyImageProcessorInvocation,
   RequiredControlNetProcessorNode,
 } from './types';
 
@@ -23,7 +22,7 @@ type ControlNetProcessorsDict = Record<
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CONTROLNET_PROCESSORS = {
+export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   none: {
     type: 'none',
     label: 'none',
@@ -174,6 +173,8 @@ export const CONTROLNET_PROCESSORS = {
   },
 };
 
+type ControlNetModelsDict = Record<string, ControlNetModel>;
+
 type ControlNetModel = {
   type: string;
   label: string;
@@ -181,7 +182,7 @@ type ControlNetModel = {
   defaultProcessor?: ControlNetProcessorType;
 };
 
-export const CONTROLNET_MODELS = {
+export const CONTROLNET_MODELS: ControlNetModelsDict = {
   'lllyasviel/control_v11p_sd15_canny': {
     type: 'lllyasviel/control_v11p_sd15_canny',
     label: 'Canny',
@@ -190,6 +191,7 @@ export const CONTROLNET_MODELS = {
   'lllyasviel/control_v11p_sd15_inpaint': {
     type: 'lllyasviel/control_v11p_sd15_inpaint',
     label: 'Inpaint',
+    defaultProcessor: 'none',
   },
   'lllyasviel/control_v11p_sd15_mlsd': {
     type: 'lllyasviel/control_v11p_sd15_mlsd',
@@ -209,6 +211,7 @@ export const CONTROLNET_MODELS = {
   'lllyasviel/control_v11p_sd15_seg': {
     type: 'lllyasviel/control_v11p_sd15_seg',
     label: 'Segmentation',
+    defaultProcessor: 'none',
   },
   'lllyasviel/control_v11p_sd15_lineart': {
     type: 'lllyasviel/control_v11p_sd15_lineart',
@@ -223,6 +226,7 @@ export const CONTROLNET_MODELS = {
   'lllyasviel/control_v11p_sd15_scribble': {
     type: 'lllyasviel/control_v11p_sd15_scribble',
     label: 'Scribble',
+    defaultProcessor: 'none',
   },
   'lllyasviel/control_v11p_sd15_softedge': {
     type: 'lllyasviel/control_v11p_sd15_softedge',
@@ -242,10 +246,12 @@ export const CONTROLNET_MODELS = {
   'lllyasviel/control_v11f1e_sd15_tile': {
     type: 'lllyasviel/control_v11f1e_sd15_tile',
     label: 'Tile (experimental)',
+    defaultProcessor: 'none',
   },
   'lllyasviel/control_v11e_sd15_ip2p': {
     type: 'lllyasviel/control_v11e_sd15_ip2p',
     label: 'Pix2Pix (experimental)',
+    defaultProcessor: 'none',
   },
   'CrucibleAI/ControlNetMediaPipeFace': {
     type: 'CrucibleAI/ControlNetMediaPipeFace',

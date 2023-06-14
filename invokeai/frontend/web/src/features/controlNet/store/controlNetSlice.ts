@@ -1,36 +1,27 @@
-import { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
+import { forEach } from 'lodash-es';
 import { ImageDTO } from 'services/api';
-import {
-  ControlNetProcessorType,
-  RequiredCannyImageProcessorInvocation,
-  RequiredControlNetProcessorNode,
-} from './types';
+import { appSocketInvocationError } from 'services/events/actions';
+import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
+import { isAnySessionRejected } from 'services/thunks/session';
+import { controlNetImageProcessed } from './actions';
 import {
   CONTROLNET_MODELS,
   CONTROLNET_PROCESSORS,
   ControlNetModelName,
 } from './constants';
-import { controlNetImageProcessed } from './actions';
-import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
-import { forEach } from 'lodash-es';
-import { isAnySessionRejected } from 'services/thunks/session';
-import { appSocketInvocationError } from 'services/events/actions';
+import {
+  ControlNetProcessorType,
+  RequiredCannyImageProcessorInvocation,
+  RequiredControlNetProcessorNode,
+} from './types';
 
-export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
-  isEnabled: true,
-  model: CONTROLNET_MODELS['lllyasviel/control_v11p_sd15_canny'].type,
-  weight: 1,
-  beginStepPct: 0,
-  endStepPct: 1,
-  controlImage: null,
-  processedControlImage: null,
-  processorType: 'canny_image_processor',
-  processorNode: CONTROLNET_PROCESSORS.canny_image_processor
-    .default as RequiredCannyImageProcessorInvocation,
-  shouldAutoConfig: true,
-};
+export type ControlModes =
+  | 'balanced'
+  | 'more_prompt'
+  | 'more_control'
+  | 'unbalanced';
 
 export type ControlNetConfig = {
   controlNetId: string;
@@ -39,11 +30,27 @@ export type ControlNetConfig = {
   weight: number;
   beginStepPct: number;
   endStepPct: number;
+  controlMode: ControlModes;
   controlImage: ImageDTO | null;
   processedControlImage: ImageDTO | null;
   processorType: ControlNetProcessorType;
   processorNode: RequiredControlNetProcessorNode;
   shouldAutoConfig: boolean;
+};
+
+export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
+  isEnabled: true,
+  model: CONTROLNET_MODELS['lllyasviel/control_v11p_sd15_canny'].type,
+  weight: 1,
+  beginStepPct: 0,
+  endStepPct: 1,
+  controlMode: 'balanced',
+  controlImage: null,
+  processedControlImage: null,
+  processorType: 'canny_image_processor',
+  processorNode: CONTROLNET_PROCESSORS.canny_image_processor
+    .default as RequiredCannyImageProcessorInvocation,
+  shouldAutoConfig: true,
 };
 
 export type ControlNetState = {
@@ -147,11 +154,13 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId].processedControlImage = null;
 
       if (state.controlNets[controlNetId].shouldAutoConfig) {
-        const processorType = CONTROLNET_MODELS[model].defaultProcessor;
+        const processorType =
+          CONTROLNET_MODELS[model as keyof typeof CONTROLNET_MODELS]
+            .defaultProcessor;
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
-            processorType
+            processorType as keyof typeof CONTROLNET_PROCESSORS
           ].default as RequiredControlNetProcessorNode;
         } else {
           state.controlNets[controlNetId].processorType = 'none';
@@ -180,6 +189,13 @@ export const controlNetSlice = createSlice({
     ) => {
       const { controlNetId, endStepPct } = action.payload;
       state.controlNets[controlNetId].endStepPct = endStepPct;
+    },
+    controlNetControlModeChanged: (
+      state,
+      action: PayloadAction<{ controlNetId: string; controlMode: ControlModes }>
+    ) => {
+      const { controlNetId, controlMode } = action.payload;
+      state.controlNets[controlNetId].controlMode = controlMode;
     },
     controlNetProcessorParamsChanged: (
       state,
@@ -210,7 +226,7 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId].processedControlImage = null;
       state.controlNets[controlNetId].processorType = processorType;
       state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
-        processorType
+        processorType as keyof typeof CONTROLNET_PROCESSORS
       ].default as RequiredControlNetProcessorNode;
       state.controlNets[controlNetId].shouldAutoConfig = false;
     },
@@ -227,12 +243,14 @@ export const controlNetSlice = createSlice({
       if (newShouldAutoConfig) {
         // manage the processor for the user
         const processorType =
-          CONTROLNET_MODELS[state.controlNets[controlNetId].model]
-            .defaultProcessor;
+          CONTROLNET_MODELS[
+            state.controlNets[controlNetId]
+              .model as keyof typeof CONTROLNET_MODELS
+          ].defaultProcessor;
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
-            processorType
+            processorType as keyof typeof CONTROLNET_PROCESSORS
           ].default as RequiredControlNetProcessorNode;
         } else {
           state.controlNets[controlNetId].processorType = 'none';
@@ -271,8 +289,7 @@ export const controlNetSlice = createSlice({
     });
 
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_origin, image_url, thumbnail_url } =
-        action.payload;
+      const { image_name, image_url, thumbnail_url } = action.payload;
 
       forEach(state.controlNets, (c) => {
         if (c.controlImage?.image_name === image_name) {
@@ -286,11 +303,11 @@ export const controlNetSlice = createSlice({
       });
     });
 
-    builder.addCase(appSocketInvocationError, (state, action) => {
+    builder.addCase(appSocketInvocationError, (state) => {
       state.pendingControlImages = [];
     });
 
-    builder.addMatcher(isAnySessionRejected, (state, action) => {
+    builder.addMatcher(isAnySessionRejected, (state) => {
       state.pendingControlImages = [];
     });
   },
@@ -308,6 +325,7 @@ export const {
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
+  controlNetControlModeChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
   controlNetReset,
