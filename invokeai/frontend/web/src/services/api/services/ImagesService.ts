@@ -115,13 +115,8 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageFull({
-    imageOrigin,
     imageName,
   }: {
-    /**
-     * The type of full-resolution image file to get
-     */
-    imageOrigin: ResourceOrigin,
     /**
      * The name of full-resolution image file to get
      */
@@ -129,9 +124,8 @@ export class ImagesService {
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_origin}/{image_name}',
+      url: '/api/v1/images/{image_name}',
       path: {
-        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -148,13 +142,8 @@ export class ImagesService {
    * @throws ApiError
    */
   public static deleteImage({
-    imageOrigin,
     imageName,
   }: {
-    /**
-     * The origin of image to delete
-     */
-    imageOrigin: ResourceOrigin,
     /**
      * The name of the image to delete
      */
@@ -162,9 +151,8 @@ export class ImagesService {
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
-      url: '/api/v1/images/{image_origin}/{image_name}',
+      url: '/api/v1/images/{image_name}',
       path: {
-        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -180,14 +168,9 @@ export class ImagesService {
    * @throws ApiError
    */
   public static updateImage({
-    imageOrigin,
     imageName,
     requestBody,
   }: {
-    /**
-     * The origin of image to update
-     */
-    imageOrigin: ResourceOrigin,
     /**
      * The name of the image to update
      */
@@ -196,9 +179,8 @@ export class ImagesService {
   }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'PATCH',
-      url: '/api/v1/images/{image_origin}/{image_name}',
+      url: '/api/v1/images/{image_name}',
       path: {
-        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       body: requestBody,
@@ -216,13 +198,8 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageMetadata({
-    imageOrigin,
     imageName,
   }: {
-    /**
-     * The origin of image to get
-     */
-    imageOrigin: ResourceOrigin,
     /**
      * The name of image to get
      */
@@ -230,9 +207,8 @@ export class ImagesService {
   }): CancelablePromise<ImageDTO> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_origin}/{image_name}/metadata',
+      url: '/api/v1/images/{image_name}/metadata',
       path: {
-        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -248,13 +224,8 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageThumbnail({
-    imageOrigin,
     imageName,
   }: {
-    /**
-     * The origin of thumbnail image file to get
-     */
-    imageOrigin: ResourceOrigin,
     /**
      * The name of thumbnail image file to get
      */
@@ -262,9 +233,8 @@ export class ImagesService {
   }): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_origin}/{image_name}/thumbnail',
+      url: '/api/v1/images/{image_name}/thumbnail',
       path: {
-        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {
@@ -281,13 +251,8 @@ export class ImagesService {
    * @throws ApiError
    */
   public static getImageUrls({
-    imageOrigin,
     imageName,
   }: {
-    /**
-     * The origin of the image whose URL to get
-     */
-    imageOrigin: ResourceOrigin,
     /**
      * The name of the image whose URL to get
      */
@@ -295,9 +260,8 @@ export class ImagesService {
   }): CancelablePromise<ImageUrlsDTO> {
     return __request(OpenAPI, {
       method: 'GET',
-      url: '/api/v1/images/{image_origin}/{image_name}/urls',
+      url: '/api/v1/images/{image_name}/urls',
       path: {
-        'image_origin': imageOrigin,
         'image_name': imageName,
       },
       errors: {

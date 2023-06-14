@@ -9,15 +9,15 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { ImageDTO } from 'services/api';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -324,7 +324,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               borderRadius: 'base',
               bg: 'whiteAlpha.500',
               _dark: { bg: 'blackAlpha.500' },
-              w: 'max-content',
+              w: 'full',
             }}
           >
             <pre>{metadataJSON}</pre>

@@ -36,13 +36,12 @@ export const addInvocationCompleteEventListener = () => {
 
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
-        const { image_name, image_origin } = result.image;
+        const { image_name } = result.image;
 
         // Get its metadata
         dispatch(
           imageMetadataReceived({
             imageName: image_name,
-            imageOrigin: image_origin,
           })
         );
 

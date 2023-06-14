@@ -25,7 +25,7 @@ export const addRequestedImageDeletionListener = () => {
     effect: (action, { dispatch, getState }) => {
       const { image, imageUsage } = action.payload;
 
-      const { image_name, image_origin } = image;
+      const { image_name } = image;
 
       const state = getState();
       const selectedImage = state.gallery.selectedImage;
@@ -79,9 +79,7 @@ export const addRequestedImageDeletionListener = () => {
       dispatch(imageRemoved(image_name));
 
       // Delete from server
-      dispatch(
-        imageDeleted({ imageName: image_name, imageOrigin: image_origin })
-      );
+      dispatch(imageDeleted({ imageName: image_name }));
     },
   });
 };

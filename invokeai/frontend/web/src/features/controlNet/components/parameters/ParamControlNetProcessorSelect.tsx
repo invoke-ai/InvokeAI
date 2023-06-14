@@ -1,64 +1,55 @@
-import IAICustomSelect, {
-  IAICustomSelectOption,
-} from 'common/components/IAICustomSelect';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
+import { map } from 'lodash-es';
+import { memo, useCallback } from 'react';
+import { CONTROLNET_PROCESSORS } from '../../store/constants';
+import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
 import {
   ControlNetProcessorNode,
   ControlNetProcessorType,
 } from '../../store/types';
-import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CONTROLNET_PROCESSORS } from '../../store/constants';
-import { map } from 'lodash-es';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
-import IAISelect from 'common/components/IAISelect';
 import { createSelector } from '@reduxjs/toolkit';
 import { configSelector } from 'features/system/store/configSelectors';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 type ParamControlNetProcessorSelectProps = {
   controlNetId: string;
   processorNode: ControlNetProcessorNode;
 };
 
-const CONTROLNET_PROCESSOR_TYPES = map(CONTROLNET_PROCESSORS, (p) => ({
-  value: p.type,
-  key: p.label,
-})).sort((a, b) =>
-  // sort 'none' to the top
-  a.value === 'none' ? -1 : b.value === 'none' ? 1 : a.key.localeCompare(b.key)
-);
-
-const selector = createSelector(configSelector, (config) => {
-  return map(CONTROLNET_PROCESSORS, (p) => ({
-    value: p.type,
-    key: p.label,
-  }))
-    .sort((a, b) =>
-      // sort 'none' to the top
-      a.value === 'none'
-        ? -1
-        : b.value === 'none'
-        ? 1
-        : a.key.localeCompare(b.key)
+const selector = createSelector(
+  configSelector,
+  (config) => {
+    const controlNetProcessors: IAISelectDataType[] = map(
+      CONTROLNET_PROCESSORS,
+      (p) => ({
+        value: p.type,
+        label: p.label,
+      })
     )
-    .filter((d) => !config.sd.disabledControlNetProcessors.includes(d.value));
-});
+      .sort((a, b) =>
+        // sort 'none' to the top
+        a.value === 'none'
+          ? -1
+          : b.value === 'none'
+          ? 1
+          : a.label.localeCompare(b.label)
+      )
+      .filter(
+        (d) =>
+          !config.sd.disabledControlNetProcessors.includes(
+            d.value as ControlNetProcessorType
+          )
+      );
 
-// const CONTROLNET_PROCESSOR_TYPES: IAICustomSelectOption[] = map(
-//   CONTROLNET_PROCESSORS,
-//   (p) => ({
-//     value: p.type,
-//     label: p.label,
-//     tooltip: p.description,
-//   })
-// ).sort((a, b) =>
-//   // sort 'none' to the top
-//   a.value === 'none'
-//     ? -1
-//     : b.value === 'none'
-//     ? 1
-//     : a.label.localeCompare(b.label)
-// );
+    return controlNetProcessors;
+  },
+  defaultSelectorOptions
+);
 
 const ParamControlNetProcessorSelect = (
   props: ParamControlNetProcessorSelectProps
@@ -69,47 +60,26 @@ const ParamControlNetProcessorSelect = (
   const controlNetProcessors = useAppSelector(selector);
 
   const handleProcessorTypeChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
+    (v: string | null) => {
       dispatch(
         controlNetProcessorTypeChanged({
           controlNetId,
-          processorType: e.target.value as ControlNetProcessorType,
+          processorType: v as ControlNetProcessorType,
         })
       );
     },
     [controlNetId, dispatch]
   );
-  // const handleProcessorTypeChanged = useCallback(
-  //   (v: string | null | undefined) => {
-  //     dispatch(
-  //       controlNetProcessorTypeChanged({
-  //         controlNetId,
-  //         processorType: v as ControlNetProcessorType,
-  //       })
-  //     );
-  //   },
-  //   [controlNetId, dispatch]
-  // );
 
   return (
-    <IAISelect
+    <IAIMantineSelect
       label="Processor"
       value={processorNode.type ?? 'canny_image_processor'}
-      validValues={controlNetProcessors}
+      data={controlNetProcessors}
       onChange={handleProcessorTypeChanged}
-      isDisabled={!isReady}
+      disabled={!isReady}
     />
   );
-  // return (
-  //   <IAICustomSelect
-  //     label="Processor"
-  //     value={processorNode.type ?? 'canny_image_processor'}
-  //     data={CONTROLNET_PROCESSOR_TYPES}
-  //     onChange={handleProcessorTypeChanged}
-  //     withCheckIcon
-  //     isDisabled={!isReady}
-  //   />
-  // );
 };
 
 export default memo(ParamControlNetProcessorSelect);

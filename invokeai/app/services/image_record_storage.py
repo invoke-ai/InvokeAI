@@ -21,6 +21,7 @@ from invokeai.app.services.models.image_record import (
 
 T = TypeVar("T", bound=BaseModel)
 
+
 class OffsetPaginatedResults(GenericModel, Generic[T]):
     """Offset-paginated results"""
 
@@ -60,7 +61,7 @@ class ImageRecordStorageBase(ABC):
     # TODO: Implement an `update()` method
 
     @abstractmethod
-    def get(self, image_origin: ResourceOrigin, image_name: str) -> ImageRecord:
+    def get(self, image_name: str) -> ImageRecord:
         """Gets an image record."""
         pass
 
@@ -68,7 +69,6 @@ class ImageRecordStorageBase(ABC):
     def update(
         self,
         image_name: str,
-        image_origin: ResourceOrigin,
         changes: ImageRecordChanges,
     ) -> None:
         """Updates an image record."""
@@ -89,7 +89,7 @@ class ImageRecordStorageBase(ABC):
     # TODO: The database has a nullable `deleted_at` column, currently unused.
     # Should we implement soft deletes? Would need coordination with ImageFileStorage.
     @abstractmethod
-    def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
+    def delete(self, image_name: str) -> None:
         """Deletes an image record."""
         pass
 
@@ -196,9 +196,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
-    def get(
-        self, image_origin: ResourceOrigin, image_name: str
-    ) -> Union[ImageRecord, None]:
+    def get(self, image_name: str) -> Union[ImageRecord, None]:
         try:
             self._lock.acquire()
 
@@ -225,7 +223,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     def update(
         self,
         image_name: str,
-        image_origin: ResourceOrigin,
         changes: ImageRecordChanges,
     ) -> None:
         try:
@@ -294,9 +291,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             if categories is not None:
                 ## Convert the enum values to unique list of strings
-                category_strings = list(
-                    map(lambda c: c.value, set(categories))
-                )
+                category_strings = list(map(lambda c: c.value, set(categories)))
                 # Create the correct length of placeholders
                 placeholders = ",".join("?" * len(category_strings))
                 query_conditions += f"AND image_category IN ( {placeholders} )\n"
@@ -337,7 +332,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             items=images, offset=offset, limit=limit, total=count
         )
 
-    def delete(self, image_origin: ResourceOrigin, image_name: str) -> None:
+    def delete(self, image_name: str) -> None:
         try:
             self._lock.acquire()
             self._cursor.execute(

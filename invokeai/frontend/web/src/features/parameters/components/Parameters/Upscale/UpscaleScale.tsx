@@ -1,12 +1,11 @@
 import { UPSCALING_LEVELS } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
-  setUpscalingLevel,
   UpscalingLevel,
+  setUpscalingLevel,
 } from 'features/parameters/store/postprocessingSlice';
-import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function UpscaleScale() {
@@ -21,16 +20,16 @@ export default function UpscaleScale() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const handleChangeLevel = (e: ChangeEvent<HTMLSelectElement>) =>
-    dispatch(setUpscalingLevel(Number(e.target.value) as UpscalingLevel));
+  const handleChangeLevel = (v: string) =>
+    dispatch(setUpscalingLevel(Number(v) as UpscalingLevel));
 
   return (
-    <IAISelect
-      isDisabled={!isESRGANAvailable}
+    <IAIMantineSelect
+      disabled={!isESRGANAvailable}
       label={t('parameters.scale')}
-      value={upscalingLevel}
+      value={String(upscalingLevel)}
       onChange={handleChangeLevel}
-      validValues={UPSCALING_LEVELS}
+      data={UPSCALING_LEVELS}
     />
   );
 }

@@ -1,5 +1,4 @@
 import {
-  Box,
   Menu,
   MenuButton,
   MenuItemOption,
@@ -13,7 +12,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { setSchedulers } from 'features/ui/store/uiSlice';
 import { isArray } from 'lodash-es';
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { useTranslation } from 'react-i18next';
 
 export default function SettingsSchedulers() {

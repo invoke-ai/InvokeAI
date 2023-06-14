@@ -83,9 +83,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         # loading controlnet image (currently requires pre-processed image)
         control_image = (
             None if self.control_image is None
-            else context.services.images.get_pil_image(
-                self.control_image.image_origin, self.control_image.image_name
-            )
+            else context.services.images.get_pil_image(self.control_image.image_name)
         )
         # loading controlnet model
         if (self.control_model is None or self.control_model==''):
@@ -125,10 +123,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
@@ -166,9 +161,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         image = (
             None
             if self.image is None
-            else context.services.images.get_pil_image(
-                self.image.image_origin, self.image.image_name
-            )
+            else context.services.images.get_pil_image(self.image.image_name)
         )
 
         if self.fit:
@@ -206,10 +199,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
@@ -279,14 +269,12 @@ class InpaintInvocation(ImageToImageInvocation):
         image = (
             None
             if self.image is None
-            else context.services.images.get_pil_image(
-                self.image.image_origin, self.image.image_name
-            )
+            else context.services.images.get_pil_image(self.image.image_name)
         )
         mask = (
             None
             if self.mask is None
-            else context.services.images.get_pil_image(self.mask.image_origin, self.mask.image_name)
+            else context.services.images.get_pil_image(self.mask.image_name)
         )
 
         # Handle invalid model parameter
@@ -322,10 +310,7 @@ class InpaintInvocation(ImageToImageInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )

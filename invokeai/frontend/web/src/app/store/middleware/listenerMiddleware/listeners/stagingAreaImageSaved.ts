@@ -11,12 +11,11 @@ export const addStagingAreaImageSavedListener = () => {
   startAppListening({
     actionCreator: stagingAreaImageSaved,
     effect: async (action, { dispatch, getState, take }) => {
-      const { image_name, image_origin } = action.payload;
+      const { image_name } = action.payload;
 
       dispatch(
         imageUpdated({
           imageName: image_name,
-          imageOrigin: image_origin,
           requestBody: {
             is_intermediate: false,
           },
