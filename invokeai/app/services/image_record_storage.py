@@ -261,17 +261,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     (changes.is_intermediate, image_name),
                 )
 
-            # Change the image's `is_intermediate`` flag
-            if changes.is_intermediate is not None:
-                self._cursor.execute(
-                    f"""--sql
-                    UPDATE images
-                    SET board_id = ?
-                    WHERE image_name = ?;
-                    """,
-                    (changes.is_intermediate, image_name),
-                )
-
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
