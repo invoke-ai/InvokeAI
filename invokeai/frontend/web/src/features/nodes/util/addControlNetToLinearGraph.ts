@@ -66,17 +66,15 @@ export const addControlNetToLinearGraph = (
 
       if (processedControlImage && processorType !== 'none') {
         // We've already processed the image in the app, so we can just use the processed image
-        const { image_name, image_origin } = processedControlImage;
+        const { image_name } = processedControlImage;
         controlNetNode.image = {
           image_name,
-          image_origin,
         };
       } else if (controlImage) {
         // The control image is preprocessed
-        const { image_name, image_origin } = controlImage;
+        const { image_name } = controlImage;
         controlNetNode.image = {
           image_name,
-          image_origin,
         };
       } else {
         // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly

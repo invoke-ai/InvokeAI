@@ -20,7 +20,6 @@ export const addImageMetadataReceivedFulfilledListener = () => {
         dispatch(
           imageUpdated({
             imageName: image.image_name,
-            imageOrigin: image.image_origin,
             requestBody: { is_intermediate: false },
           })
         );

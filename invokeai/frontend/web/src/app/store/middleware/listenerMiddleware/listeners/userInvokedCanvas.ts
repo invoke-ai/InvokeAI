@@ -116,7 +116,6 @@ export const addUserInvokedCanvasListener = () => {
         // Update the base node with the image name and type
         baseNode.image = {
           image_name: baseImageDTO.image_name,
-          image_origin: baseImageDTO.image_origin,
         };
       }
 
@@ -143,7 +142,6 @@ export const addUserInvokedCanvasListener = () => {
         // Update the base node with the image name and type
         baseNode.mask = {
           image_name: maskImageDTO.image_name,
-          image_origin: maskImageDTO.image_origin,
         };
       }
 
@@ -160,7 +158,6 @@ export const addUserInvokedCanvasListener = () => {
         dispatch(
           imageUpdated({
             imageName: baseNode.image.image_name,
-            imageOrigin: baseNode.image.image_origin,
             requestBody: { session_id: sessionId },
           })
         );
@@ -171,7 +168,6 @@ export const addUserInvokedCanvasListener = () => {
         dispatch(
           imageUpdated({
             imageName: baseNode.mask.image_name,
-            imageOrigin: baseNode.mask.image_origin,
             requestBody: { session_id: sessionId },
           })
         );

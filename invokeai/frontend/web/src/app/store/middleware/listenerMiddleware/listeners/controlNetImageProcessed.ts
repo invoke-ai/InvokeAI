@@ -34,10 +34,7 @@ export const addControlNetImageProcessedListener = () => {
           [controlNet.processorNode.id]: {
             ...controlNet.processorNode,
             is_intermediate: true,
-            image: pick(controlNet.controlImage, [
-              'image_name',
-              'image_origin',
-            ]),
+            image: pick(controlNet.controlImage, ['image_name']),
           },
         },
       };
