@@ -16,7 +16,7 @@ export type ControlField = {
   /**
    * The weight given to the ControlNet
    */
-  control_weight: number;
+  control_weight: (number | Array<number>);
   /**
    * When the ControlNet is first applied (% of total steps)
    */
