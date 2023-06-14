@@ -6,40 +6,10 @@ import threading
 from typing import Optional, Union
 import uuid
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
+from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
 
 from pydantic import BaseModel, Field, Extra
 
-
-class BoardRecord(BaseModel):
-    """Deserialized board record."""
-
-    board_id: str = Field(description="The unique ID of the board.")
-    """The unique ID of the board."""
-    board_name: str = Field(description="The name of the board.")
-    """The name of the board."""
-    created_at: Union[datetime, str] = Field(
-        description="The created timestamp of the board."
-    )
-    """The created timestamp of the image."""
-    updated_at: Union[datetime, str] = Field(
-        description="The updated timestamp of the board."
-    )
-    """The updated timestamp of the image."""
-    cover_image_name: Optional[str] = Field(
-        description="The name of the cover image of the board."
-    )
-    """The name of the cover image of the board."""
-
-
-class BoardDTO(BoardRecord):
-    """Deserialized board record with cover image URL and image count."""
-
-    cover_image_url: Optional[str] = Field(
-        description="The URL of the thumbnail of the board's cover image."
-    )
-    """The URL of the thumbnail of the most recent image in the board."""
-    image_count: int = Field(description="The number of images in the board.")
-    """The number of images in the board."""
 
 
 class BoardChanges(BaseModel, extra=Extra.forbid):
@@ -221,6 +191,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             return BoardRecord(**result)
         except sqlite3.Error as e:
             self._conn.rollback()
+            print(e)
             raise BoardRecordSaveException from e
         finally:
             self._lock.release()
@@ -307,7 +278,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             )
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            boards = [BoardRecord(**dict(row)) for row in result]
+            boards = list(map(lambda r: deserialize_board_record(dict(r)), result))
 
             # Get the total number of boards
             self._cursor.execute(
