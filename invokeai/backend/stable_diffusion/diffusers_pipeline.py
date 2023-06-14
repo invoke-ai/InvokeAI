@@ -676,7 +676,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 soft_injection = (control_mode == "more_prompt" or control_mode == "more_control")
                 #  cfg_injection = determines whether to apply ControlNet to only the conditional (if True)
                 #      or the default both conditional and unconditional (if False)
-                cfg_injection = (control_mode == "more_control" or control_mode == "even_more_control")
+                cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
 
                 first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
                 last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
@@ -1091,7 +1091,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             repeat_by = num_images_per_prompt
         image = image.repeat_interleave(repeat_by, dim=0)
         image = image.to(device=device, dtype=dtype)
-        cfg_injection = (control_mode == "more_control" or control_mode == "even_more_control")
+        cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
         if do_classifier_free_guidance and not cfg_injection:
             image = torch.cat([image] * 2)
         return image

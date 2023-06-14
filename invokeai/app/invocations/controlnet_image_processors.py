@@ -94,7 +94,7 @@ CONTROLNET_DEFAULT_MODELS = [
 ]
 
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
-CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control", "even_more_control"])]
+CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control", "unbalanced"])]
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
