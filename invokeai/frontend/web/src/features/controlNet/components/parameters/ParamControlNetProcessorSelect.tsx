@@ -1,6 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
@@ -22,17 +24,20 @@ type ParamControlNetProcessorSelectProps = {
 const selector = createSelector(
   configSelector,
   (config) => {
-    return map(CONTROLNET_PROCESSORS, (p) => ({
-      value: p.type,
-      key: p.label,
-    }))
+    const controlNetProcessors: IAISelectDataType[] = map(
+      CONTROLNET_PROCESSORS,
+      (p) => ({
+        value: p.type,
+        label: p.label,
+      })
+    )
       .sort((a, b) =>
         // sort 'none' to the top
         a.value === 'none'
           ? -1
           : b.value === 'none'
           ? 1
-          : a.key.localeCompare(b.key)
+          : a.label.localeCompare(b.label)
       )
       .filter(
         (d) =>
@@ -40,6 +45,8 @@ const selector = createSelector(
             d.value as ControlNetProcessorType
           )
       );
+
+    return controlNetProcessors;
   },
   defaultSelectorOptions
 );
