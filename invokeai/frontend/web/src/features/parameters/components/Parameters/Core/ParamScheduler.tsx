@@ -2,7 +2,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { Scheduler } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
@@ -12,7 +14,9 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [uiSelector, generationSelector],
   (ui, generation) => {
-    const allSchedulers = ui.schedulers.sort((a, b) => a.localeCompare(b));
+    const allSchedulers: string[] = ui.schedulers
+      .slice()
+      .sort((a, b) => a.localeCompare(b));
 
     return {
       scheduler: generation.scheduler,
