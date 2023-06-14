@@ -2,7 +2,6 @@ import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIScrollArea from 'common/components/IAIScrollArea';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import {
@@ -13,6 +12,7 @@ import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import { memo, useMemo } from 'react';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import PinParametersPanelButton from './PinParametersPanelButton';
+import OverlayScrollable from './common/OverlayScrollable';
 import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
 import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
 import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
@@ -82,11 +82,9 @@ const ParametersDrawer = () => {
           <InvokeAILogoComponent />
           <PinParametersPanelButton />
         </Flex>
-        <IAIScrollArea>
-          <Flex sx={{ flexDir: 'column', gap: 2, paddingLeft: 2 }}>
-            {drawerContent}
-          </Flex>
-        </IAIScrollArea>
+        <OverlayScrollable>
+          <Flex sx={{ flexDir: 'column', gap: 2 }}>{drawerContent}</Flex>
+        </OverlayScrollable>
       </Flex>
     </ResizableDrawer>
   );
