@@ -9,9 +9,9 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIScrollArea from 'common/components/IAIScrollArea';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -317,7 +317,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           </Tooltip>
           <Text fontWeight="semibold">Metadata JSON:</Text>
         </Flex>
-        <IAIScrollArea>
+        <OverlayScrollbarsComponent defer>
           <Box
             sx={{
               padding: 4,
@@ -329,7 +329,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           >
             <pre>{metadataJSON}</pre>
           </Box>
-        </IAIScrollArea>
+        </OverlayScrollbarsComponent>
       </Flex>
     </Flex>
   );

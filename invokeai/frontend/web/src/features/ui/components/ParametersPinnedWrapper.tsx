@@ -1,11 +1,11 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIScrollArea from 'common/components/IAIScrollArea';
 import { PropsWithChildren, memo } from 'react';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import { uiSelector } from '../store/uiSelectors';
 import PinParametersPanelButton from './PinParametersPanelButton';
+import OverlayScrollable from './common/OverlayScrollable';
 
 const selector = createSelector(uiSelector, (ui) => {
   const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;
@@ -37,12 +37,14 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
     >
       <Flex
         sx={{
+          gap: 2,
+          flexDirection: 'column',
           h: 'full',
           w: 'full',
           position: 'absolute',
         }}
       >
-        <IAIScrollArea>
+        <OverlayScrollable>
           <Flex
             sx={{
               flexDirection: 'column',
@@ -51,7 +53,7 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
           >
             {props.children}
           </Flex>
-        </IAIScrollArea>
+        </OverlayScrollable>
       </Flex>
 
       <PinParametersPanelButton
