@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import Logger
-    from invokeai.app.services.images import ImageService
+    from invokeai.app.services.board_images import BoardImagesServiceABC
+    from invokeai.app.services.boards import BoardServiceABC
+    from invokeai.app.services.images import ImageServiceABC
     from invokeai.backend import ModelManager
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.latent_storage import LatentsStorageBase
@@ -14,7 +16,6 @@ if TYPE_CHECKING:
     from invokeai.app.services.config import InvokeAISettings
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.invoker import InvocationProcessorABC
-    from invokeai.app.services.boards import BoardStorageBase
 
 
 class InvocationServices:
@@ -27,10 +28,9 @@ class InvocationServices:
     model_manager: "ModelManager"
     restoration: "RestorationServices"
     configuration: "InvokeAISettings"
-    images: "ImageService"
-    boards: "BoardStorageBase"
-
-    # NOTE: we must forward-declare any types that include invocations, since invocations can use services
+    images: "ImageServiceABC"
+    boards: "BoardServiceABC"
+    board_images: "BoardImagesServiceABC"
     graph_library: "ItemStorageABC"["LibraryGraph"]
     graph_execution_manager: "ItemStorageABC"["GraphExecutionState"]
     processor: "InvocationProcessorABC"
@@ -41,20 +41,23 @@ class InvocationServices:
         events: "EventServiceBase",
         logger: "Logger",
         latents: "LatentsStorageBase",
-        images: "ImageService",
+        images: "ImageServiceABC",
+        boards: "BoardServiceABC",
+        board_images: "BoardImagesServiceABC",
         queue: "InvocationQueueABC",
         graph_library: "ItemStorageABC"["LibraryGraph"],
         graph_execution_manager: "ItemStorageABC"["GraphExecutionState"],
         processor: "InvocationProcessorABC",
         restoration: "RestorationServices",
         configuration: "InvokeAISettings",
-        boards: "BoardStorageBase",
     ):
         self.model_manager = model_manager
         self.events = events
         self.logger = logger
         self.latents = latents
         self.images = images
+        self.boards = boards
+        self.board_images = board_images
         self.queue = queue
         self.graph_library = graph_library
         self.graph_execution_manager = graph_execution_manager
