@@ -2,7 +2,14 @@ import { Box, Flex, Icon, Image, MenuItem, MenuList } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useContext, useState } from 'react';
-import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
+import {
+  FaCheck,
+  FaExpand,
+  FaFolder,
+  FaImage,
+  FaShare,
+  FaTrash,
+} from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import {
   resizeAndScaleCanvas,
@@ -168,6 +175,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     // dispatch(setIsLightboxOpen(true));
   };
 
+  const handleAddToFolder = useCallback(() => {
+    // dispatch(addImageToFolder(image));
+  }, []);
+
   const handleOpenInNewTab = () => {
     window.open(image.image_url, '_blank');
   };
@@ -244,6 +255,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 {t('parameters.sendToUnifiedCanvas')}
               </MenuItem>
             )}
+            <MenuItem icon={<FaFolder />} onClickCapture={handleAddToFolder}>
+              Add to Folder
+            </MenuItem>
             <MenuItem
               sx={{ color: 'error.300' }}
               icon={<FaTrash />}

@@ -12,6 +12,7 @@ export interface GalleryState {
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
   shouldUseSingleGalleryColumn: boolean;
+  galleryView: 'images' | 'assets' | 'boards';
 }
 
 export const initialGalleryState: GalleryState = {
@@ -19,6 +20,7 @@ export const initialGalleryState: GalleryState = {
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
   shouldUseSingleGalleryColumn: false,
+  galleryView: 'images',
 };
 
 export const gallerySlice = createSlice({
@@ -48,6 +50,12 @@ export const gallerySlice = createSlice({
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
+    setGalleryView: (
+      state,
+      action: PayloadAction<'images' | 'assets' | 'boards'>
+    ) => {
+      state.galleryView = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(imageUpserted, (state, action) => {
@@ -75,6 +83,7 @@ export const {
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
   setShouldUseSingleGalleryColumn,
+  setGalleryView,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
