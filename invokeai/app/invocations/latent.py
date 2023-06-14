@@ -321,8 +321,7 @@ class TextToLatentsInvocation(BaseInvocation):
                                                                     torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
                 control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(control_image_field.image_origin,
-                                                                    control_image_field.image_name)
+                input_image = context.services.images.get_pil_image(control_image_field.image_name)
                 # self.image.image_type, self.image.image_name
                 # FIXME: still need to test with different widths, heights, devices, dtypes
                 #        and add in batch_size, num_images_per_prompt?
@@ -502,10 +501,7 @@ class LatentsToImageInvocation(BaseInvocation):
             )
 
             return ImageOutput(
-                image=ImageField(
-                    image_name=image_dto.image_name,
-                    image_origin=image_dto.image_origin,
-                ),
+                image=ImageField(image_name=image_dto.image_name),
                 width=image_dto.width,
                 height=image_dto.height,
             )
@@ -601,9 +597,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         # image = context.services.images.get(
         #     self.image.image_type, self.image.image_name
         # )
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        image = context.services.images.get_pil_image(self.image.image_name)
 
         # TODO: this only really needs the vae
         model_info = choose_model(context.services.model_manager, self.model)

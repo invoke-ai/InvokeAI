@@ -36,12 +36,8 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
-        mask = context.services.images.get_pil_image(
-            self.mask.image_origin, self.mask.image_name
-        )
+        image = context.services.images.get_pil_image(self.image.image_name)
+        mask = context.services.images.get_pil_image(self.mask.image_name)
 
         # Convert to cv image/mask
         # TODO: consider making these utility functions
@@ -65,10 +61,7 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )

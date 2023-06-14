@@ -134,9 +134,7 @@ class InfillColorInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        image = context.services.images.get_pil_image(self.image.image_name)
 
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
         infilled = Image.alpha_composite(solid_bg, image.convert("RGBA"))
@@ -153,10 +151,7 @@ class InfillColorInvocation(BaseInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
@@ -179,9 +174,7 @@ class InfillTileInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        image = context.services.images.get_pil_image(self.image.image_name)
 
         infilled = tile_fill_missing(
             image.copy(), seed=self.seed, tile_size=self.tile_size
@@ -198,10 +191,7 @@ class InfillTileInvocation(BaseInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
@@ -217,9 +207,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        image = context.services.images.get_pil_image(self.image.image_name)
 
         if PatchMatch.patchmatch_available():
             infilled = infill_patchmatch(image.copy())
@@ -236,10 +224,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
         )
 
         return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-                image_origin=image_dto.image_origin,
-            ),
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
