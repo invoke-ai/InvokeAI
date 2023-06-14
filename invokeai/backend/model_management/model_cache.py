@@ -47,10 +47,6 @@ class ModelCache(object):
     "Forward declaration"
     pass
 
-class SDModelInfo(object):
-    """Forward declaration"""
-    pass
-
 class _CacheRecord:
     size: int
     model: Any
@@ -106,7 +102,7 @@ class ModelCache(object):
         #max_cache_size = 9999
         execution_device = torch.device('cuda')
 
-        self.model_infos: Dict[str, SDModelInfo] = dict()
+        self.model_infos: Dict[str, ModelBase] = dict()
         self.lazy_offloading = lazy_offloading
         #self.sequential_offload: bool=sequential_offload
         self.precision: torch.dtype=precision
@@ -225,17 +221,16 @@ class ModelCache(object):
             self.cache = cache
             self.key = key
             self.model = model
+            self.cache_entry = self.cache._cached_models[self.key]
 
         def __enter__(self) -> Any:
             if not hasattr(self.model, 'to'):
                 return self.model
 
-            cache_entry = self.cache._cached_models[self.key]
-
             # NOTE that the model has to have the to() method in order for this
             # code to move it into GPU!
             if self.gpu_load:
-                cache_entry.lock()
+                self.cache_entry.lock()
 
                 try:
                     if self.cache.lazy_offloading:
@@ -251,14 +246,14 @@ class ModelCache(object):
                     self.cache._print_cuda_stats()
 
                 except:
-                    cache_entry.unlock()
+                    self.cache_entry.unlock()
                     raise
 
             
             # TODO: not fully understand
             # in the event that the caller wants the model in RAM, we
             # move it into CPU if it is in GPU and not locked
-            elif cache_entry.loaded and not cache_entry.locked:
+            elif self.cache_entry.loaded and not self.cache_entry.locked:
                 self.model.to(self.cache.storage_device)
 
             return self.model
@@ -267,12 +262,16 @@ class ModelCache(object):
             if not hasattr(self.model, 'to'):
                 return
 
-            cache_entry = self.cache._cached_models[self.key]
-            cache_entry.unlock()
+            self.cache_entry.unlock()
             if not self.cache.lazy_offloading:
                 self.cache._offload_unlocked_models()
                 self.cache._print_cuda_stats()
 
+    # TODO: should it be called untrack_model?
+    def uncache_model(self, cache_id: str):
+        with suppress(ValueError):
+            self._cache_stack.remove(cache_id)
+        self._cached_models.pop(cache_id, None)
 
     def model_hash(
         self,

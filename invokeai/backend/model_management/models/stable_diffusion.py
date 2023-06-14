@@ -1,7 +1,5 @@
 import os
 import json
-import torch
-import safetensors.torch
 from pydantic import Field
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -16,6 +14,7 @@ from .base import (
     SchedulerPredictionType,
     SilenceWarnings,
     read_checkpoint_meta,
+    classproperty,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
@@ -87,7 +86,7 @@ class StableDiffusion1Model(DiffusersModel):
             variant=variant,
         )
 
-    @classmethod
+    @classproperty
     def save_to_config(cls) -> bool:
         return True
 
@@ -198,7 +197,7 @@ class StableDiffusion2Model(DiffusersModel):
             upcast_attention=upcast_attention,
         )
 
-    @classmethod
+    @classproperty
     def save_to_config(cls) -> bool:
         return True
 

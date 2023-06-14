@@ -6,6 +6,7 @@ from .base import (
     BaseModelType,
     ModelType,
     SubModelType,
+    classproperty,
 )
 # TODO: naming
 from ..lora import LoRAModel as LoRAModelRaw
@@ -43,7 +44,7 @@ class LoRAModel(ModelBase):
         self.model_size = model.calc_size()
         return model
 
-    @classmethod
+    @classproperty
     def save_to_config(cls) -> bool:
         return False
 

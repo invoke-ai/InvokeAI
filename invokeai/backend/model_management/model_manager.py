@@ -234,38 +234,6 @@ class ModelManager(object):
 
     logger: types.ModuleType = logger
 
-    # TODO:
-    def _convert_2_3_models(self, config: DictConfig):
-        for model_name, model_config in config.items():
-            if model_config["format"] == "diffusers":
-                pass
-            elif model_config["format"] == "ckpt":
-
-                if any(model_config["config"].endswith(file) for file in {
-                    "v1-finetune.yaml",
-                    "v1-finetune_style.yaml",
-                    "v1-inference.yaml",
-                    "v1-inpainting-inference.yaml",
-                    "v1-m1-finetune.yaml",
-                }):
-                    # copy as as sd1.5
-                    pass
-
-                # ~99% accurate should be
-                elif model_config["config"].endswith("v2-inference-v.yaml"):
-                    # copy as sd 2.x (768)
-                    pass
-
-                # for real don't know how accurate it
-                elif model_config["config"].endswith("v2-inference.yaml"):
-                    # copy as sd 2.x-base (512)
-                    pass
-
-                else:
-                    # TODO:
-                    raise Exception("Unknown model")
-
-
     def __init__(
         self,
         config: Union[Path, DictConfig, str],
@@ -290,11 +258,9 @@ class ModelManager(object):
         elif not isinstance(config, DictConfig):
             raise ValueError('config argument must be an OmegaConf object, a Path or a string')
 
-        #if "__meta__" not in config:
-        #    config = self._convert_2_3_models(config)
-
-        config_meta = ConfigMeta(**config.pop("__metadata__")) # TODO: naming
+        self.config_meta = ConfigMeta(**config.pop("__metadata__"))
         # TODO: metadata not found
+        # TODO: version check
 
         self.models = dict()
         for model_key, model_config in config.items():
@@ -462,6 +428,10 @@ class ModelManager(object):
             submodel=submodel_type,
         )
 
+        if model_key not in self.cache_keys:
+            self.cache_keys[model_key] = set()
+        self.cache_keys[model_key].add(model_context.key)
+
         model_hash = "<NO_HASH>" # TODO:
             
         return ModelInfo(
@@ -578,12 +548,12 @@ class ModelManager(object):
                 line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
 
+    # TODO: test when ui implemented
     def del_model(
         self,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        delete_files: bool = False,
     ):
         """
         Delete the named model.
@@ -598,29 +568,20 @@ class ModelManager(object):
             )
             return
 
-        # TODO: some legacy?
-        #if model_name in self.stack:
-        #    self.stack.remove(model_name)
+        # note: it not garantie to release memory(model can has other references)
+        cache_ids = self.cache_keys.pop(model_key, [])
+        for cache_id in cache_ids:
+            self.cache.uncache_model(cache_id)
 
-        if delete_files:
-            repo_id = model_cfg.get("repo_id", None)
-            path    = self._abs_path(model_cfg.get("path", None))
-            weights = self._abs_path(model_cfg.get("weights", None))
-            if "weights" in model_cfg:
-                weights = self._abs_path(model_cfg["weights"])
-                self.logger.info(f"Deleting file {weights}")
-                Path(weights).unlink(missing_ok=True)
+        # if model inside invoke models folder - delete files
+        if model_cfg.path.startswith("models/") or model_cfg.path.startswith("models\\"):
+            model_path = self.globals.root_dir / model_cfg.path
+            if model_path.isdir():
+                shutil.rmtree(str(model_path))
+            else:
+                model_path.unlink()
 
-            elif "path" in model_cfg:
-                path = self._abs_path(model_cfg["path"])
-                self.logger.info(f"Deleting directory {path}")
-                rmtree(path, ignore_errors=True)
-
-            elif "repo_id" in model_cfg:
-                repo_id = model_cfg["repo_id"]
-                self.logger.info(f"Deleting the cached model directory for {repo_id}")
-                self._delete_model_from_cache(repo_id)
-
+    # TODO: test when ui implemented
     def add_model(
         self,
         model_name: str,
@@ -648,9 +609,10 @@ class ModelManager(object):
         self.models[model_key] = model_config
             
         if clobber and model_key in self.cache_keys:
-            # TODO:
-            self.cache.uncache_model(self.cache_keys[model_key])
-            del self.cache_keys[model_key]
+            # note: it not garantie to release memory(model can has other references)
+            cache_ids = self.cache_keys.pop(model_key, [])
+            for cache_id in cache_ids:
+                self.cache.uncache_model(cache_id)
 
     def search_models(self, search_folder):
         self.logger.info(f"Finding Models In: {search_folder}")
@@ -678,6 +640,8 @@ class ModelManager(object):
         Write current configuration out to the indicated file.
         """
         data_to_save = dict()
+        data_to_save["__metadata__"] = self.config_meta.dict()
+
         for model_key, model_config in self.models.items():
             model_name, base_model, model_type = self.parse_key(model_key)
             model_class = MODEL_CLASSES[base_model][model_type]
@@ -711,46 +675,9 @@ class ModelManager(object):
         """
         )
 
-    @classmethod
-    def _delete_model_from_cache(cls,repo_id):
-        cache_info = scan_cache_dir(InvokeAIAppConfig.get_config().cache_dir)
-
-        # I'm sure there is a way to do this with comprehensions
-        # but the code quickly became incomprehensible!
-        hashes_to_delete = set()
-        for repo in cache_info.repos:
-            if repo.repo_id == repo_id:
-                for revision in repo.revisions:
-                    hashes_to_delete.add(revision.commit_hash)
-        strategy = cache_info.delete_revisions(*hashes_to_delete)
-        cls.logger.warning(
-            f"Deletion of this model is expected to free {strategy.expected_freed_size_str}"
-        )
-        strategy.execute()
-
-    @staticmethod
-    def _abs_path(path: str | Path) -> Path:
-        globals = InvokeAIAppConfig.get_config()
-        if path is None or Path(path).is_absolute():
-            return path
-        return Path(globals.root_dir, path).resolve()
-
-    # This is not the same as global_resolve_path(), which prepends
-    # Globals.root.
-    def _resolve_path(
-        self, source: Union[str, Path], dest_directory: str
-    ) -> Optional[Path]:
-        resolved_path = None
-        if str(source).startswith(("http:", "https:", "ftp:")):
-            dest_directory = self.globals.root_dir / dest_directory
-            dest_directory.mkdir(parents=True, exist_ok=True)
-            resolved_path = download_with_resume(str(source), dest_directory)
-        else:
-            resolved_path = self.globals.root_dir / source
-        return resolved_path
-
     def scan_models_directory(self):
         loaded_files = set()
+        new_models_found = False
 
         for model_key, model_config in list(self.models.items()):
             model_name, base_model, model_type = self.parse_key(model_key)
@@ -783,3 +710,7 @@ class ModelManager(object):
 
                         model_config: ModelConfigBase = model_class.probe_config(model_path)
                         self.models[model_key] = model_config
+                        new_models_found = True
+
+        if new_models_found:
+            self.commit()

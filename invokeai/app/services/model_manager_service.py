@@ -140,97 +140,11 @@ class ModelManagerServiceBase(ABC):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        delete_files: bool = False,
     ):
         """
         Delete the named model from configuration. If delete_files is true, 
         then the underlying weight file or diffusers directory will be deleted 
         as well. Call commit() to write to disk.
-        """
-        pass
-
-    @abstractmethod
-    def import_diffuser_model(
-        repo_or_path: Union[str, Path],
-        model_name: Optional[str] = None,
-        description: Optional[str] = None,
-        vae: Optional[dict] = None,
-    ) -> bool:
-        """
-        Install the indicated diffuser model and returns True if successful.
-
-        "repo_or_path" can be either a repo-id or a path-like object corresponding to the
-        top of a downloaded diffusers directory.
-
-        You can optionally provide a model name and/or description. If not provided,
-        then these will be derived from the repo name. Call commit() to write to disk.
-        """
-        pass
-    
-    @abstractmethod
-    def import_lora(
-        self,
-        path: Path,
-        model_name: Optional[str] = None,
-        description: Optional[str] = None,
-    ):
-        """
-        Creates an entry for the indicated lora file. Call
-        mgr.commit() to write out the configuration to models.yaml
-        """
-        pass
-
-    @abstractmethod
-    def import_embedding(
-        self,
-        path: Path,
-        model_name: str=None,
-        description: str=None,
-    ):
-        """
-        Creates an entry for the indicated textual inversion embedding file. 
-        Call commit() to write out the configuration to models.yaml
-        """
-        pass
-
-    @abstractmethod
-    def heuristic_import(
-        self,
-        path_url_or_repo: str,
-        model_name: str = None,
-        description: str = None,
-        model_config_file: Path = None,
-        commit_to_conf: Path = None,
-        config_file_callback: Callable[[Path], Path] = None,
-    ) -> str:
-        """Accept a string which could be:
-           - a HF diffusers repo_id
-           - a URL pointing to a legacy .ckpt or .safetensors file
-           - a local path pointing to a legacy .ckpt or .safetensors file
-           - a local directory containing .ckpt and .safetensors files
-           - a local directory containing a diffusers model
-
-        After determining the nature of the model and downloading it
-        (if necessary), the file is probed to determine the correct
-        configuration file (if needed) and it is imported.
-
-        The model_name and/or description can be provided. If not, they will
-        be generated automatically.
-
-        If commit_to_conf is provided, the newly loaded model will be written
-        to the `models.yaml` file at the indicated path. Otherwise, the changes
-        will only remain in memory.
-
-        The routine will do its best to figure out the config file
-        needed to convert legacy checkpoint file, but if it can't it
-        will call the config_file_callback routine, if provided. The
-        callback accepts a single argument, the Path to the checkpoint
-        file, and returns a Path to the config file to use.
-
-        The (potentially derived) name of the model is returned on
-        success, or None on failure. When multiple models are added
-        from a directory, only the last imported one is returned.
-
         """
         pass
 
@@ -424,103 +338,13 @@ class ModelManagerService(ModelManagerServiceBase):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        delete_files: bool = False,
     ):
         """
         Delete the named model from configuration. If delete_files is true, 
         then the underlying weight file or diffusers directory will be deleted 
         as well. Call commit() to write to disk.
         """
-        self.mgr.del_model(model_name, base_model, model_type, delete_files)
-
-    def import_diffuser_model(
-        self,
-        repo_or_path: Union[str, Path],
-        model_name: Optional[str] = None,
-        description: Optional[str] = None,
-        vae: Optional[dict] = None,
-    ) -> bool:
-        """
-        Install the indicated diffuser model and returns True if successful.
-
-        "repo_or_path" can be either a repo-id or a path-like object corresponding to the
-        top of a downloaded diffusers directory.
-
-        You can optionally provide a model name and/or description. If not provided,
-        then these will be derived from the repo name. Call commit() to write to disk.
-        """
-        return self.mgr.import_diffuser_model(repo_or_path, model_name, description, vae)
-    
-    def import_lora(
-        self,
-        path: Path,
-        model_name: Optional[str] = None,
-        description: Optional[str] = None,
-    ):
-        """
-        Creates an entry for the indicated lora file. Call
-        mgr.commit() to write out the configuration to models.yaml
-        """
-        self.mgr.import_lora(path, model_name, description)
-
-    def import_embedding(
-        self,
-        path: Path,
-        model_name: Optional[str] = None,
-        description: Optional[str] = None,
-    ):
-        """
-        Creates an entry for the indicated textual inversion embedding file. 
-        Call commit() to write out the configuration to models.yaml
-        """
-        self.mgr.import_embedding(path, model_name, description)
-
-    def heuristic_import(
-        self,
-        path_url_or_repo: str,
-        model_name: str = None,
-        description: str = None,
-        model_config_file: Optional[Path] = None,
-        commit_to_conf: Optional[Path] = None,
-        config_file_callback: Optional[Callable[[Path], Path]] = None,
-    ) -> str:
-        """Accept a string which could be:
-           - a HF diffusers repo_id
-           - a URL pointing to a legacy .ckpt or .safetensors file
-           - a local path pointing to a legacy .ckpt or .safetensors file
-           - a local directory containing .ckpt and .safetensors files
-           - a local directory containing a diffusers model
-
-        After determining the nature of the model and downloading it
-        (if necessary), the file is probed to determine the correct
-        configuration file (if needed) and it is imported.
-
-        The model_name and/or description can be provided. If not, they will
-        be generated automatically.
-
-        If commit_to_conf is provided, the newly loaded model will be written
-        to the `models.yaml` file at the indicated path. Otherwise, the changes
-        will only remain in memory.
-
-        The routine will do its best to figure out the config file
-        needed to convert legacy checkpoint file, but if it can't it
-        will call the config_file_callback routine, if provided. The
-        callback accepts a single argument, the Path to the checkpoint
-        file, and returns a Path to the config file to use.
-
-        The (potentially derived) name of the model is returned on
-        success, or None on failure. When multiple models are added
-        from a directory, only the last imported one is returned.
-
-        """
-        return self.mgr.heuristic_import(
-            path_url_or_repo,
-            model_name,
-            description,
-            model_config_file,
-            commit_to_conf,
-            config_file_callback
-        )
+        self.mgr.del_model(model_name, base_model, model_type)
 
 
     def commit(self, conf_file: Optional[Path]=None):

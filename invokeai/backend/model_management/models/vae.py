@@ -12,6 +12,7 @@ from .base import (
     EmptyConfigLoader,
     calc_model_size_by_fs,
     calc_model_size_by_data,
+    classproperty,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 from diffusers.utils import is_safetensors_available
@@ -62,7 +63,7 @@ class VaeModel(ModelBase):
         self.model_size = calc_model_size_by_data(model)
         return model
 
-    @classmethod
+    @classproperty
     def save_to_config(cls) -> bool:
         return False
 
