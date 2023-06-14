@@ -55,7 +55,7 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
       </Flex>
 
       <PinParametersPanelButton
-        sx={{ position: 'absolute', top: 0, insetInlineEnd: 2 }}
+        sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
       />
     </Box>
   );
