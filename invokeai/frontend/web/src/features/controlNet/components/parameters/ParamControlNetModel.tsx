@@ -1,6 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import {
   CONTROLNET_MODELS,
@@ -17,7 +19,7 @@ type ParamControlNetModelProps = {
 };
 
 const selector = createSelector(configSelector, (config) => {
-  return map(CONTROLNET_MODELS, (m) => ({
+  const controlNetModels: IAISelectDataType[] = map(CONTROLNET_MODELS, (m) => ({
     label: m.label,
     value: m.type,
   })).filter(
@@ -26,6 +28,8 @@ const selector = createSelector(configSelector, (config) => {
         d.value as ControlNetModelName
       )
   );
+
+  return controlNetModels;
 });
 
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
