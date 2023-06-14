@@ -1,10 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICustomSelect, {
-  IAICustomSelectOption,
-} from 'common/components/IAICustomSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import IAISelect from 'common/components/IAISelect';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import {
   CONTROLNET_MODELS,
@@ -13,7 +9,7 @@ import {
 import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
 import { configSelector } from 'features/system/store/configSelectors';
 import { map } from 'lodash-es';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
 type ParamControlNetModelProps = {
   controlNetId: string;
@@ -24,14 +20,13 @@ const selector = createSelector(configSelector, (config) => {
   return map(CONTROLNET_MODELS, (m) => ({
     label: m.label,
     value: m.type,
-  })).filter((d) => !config.sd.disabledControlNetModels.includes(d.value));
+  })).filter(
+    (d) =>
+      !config.sd.disabledControlNetModels.includes(
+        d.value as ControlNetModelName
+      )
+  );
 });
-
-const DATA = map(CONTROLNET_MODELS, (m) => ({
-  value: m.type,
-  label: m.label,
-  tooltip: m.type,
-}));
 
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model } = props;
@@ -57,18 +52,6 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       tooltip={model}
     />
   );
-  // return (
-  //   <IAICustomSelect
-  //     tooltip={model}
-  //     tooltipProps={{ placement: 'top', hasArrow: true }}
-  //     data={DATA}
-  //     value={model}
-  //     onChange={handleModelChanged}
-  //     isDisabled={!isReady}
-  //     ellipsisPosition="start"
-  //     withCheckIcon
-  //   />
-  // );
 };
 
 export default memo(ParamControlNetModel);

@@ -23,13 +23,6 @@ const selector = createSelector(
         label: m.name,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-    // const modelData = selectModelsAll(state)
-    //   .map<IAICustomSelectOption>((m) => ({
-    //     value: m.name,
-    //     label: m.name,
-    //     tooltip: m.description,
-    //   }))
-    //   .sort((a, b) => a.label.localeCompare(b.label));
     return {
       selectedModel,
       modelData,
@@ -46,12 +39,6 @@ const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { selectedModel, modelData } = useAppSelector(selector);
-  // const handleChangeModel = useCallback(
-  //   (e: ChangeEvent<HTMLSelectElement>) => {
-  //     dispatch(modelSelected(e.target.value));
-  //   },
-  //   [dispatch]
-  // );
   const handleChangeModel = useCallback(
     (v: string | null) => {
       if (!v) {
@@ -72,18 +59,6 @@ const ModelSelect = () => {
       onChange={handleChangeModel}
     />
   );
-
-  // return (
-  //   <IAICustomSelect
-  //     label={t('modelManager.model')}
-  //     tooltip={selectedModel?.description}
-  //     data={modelData}
-  //     value={selectedModel?.name ?? ''}
-  //     onChange={handleChangeModel}
-  //     withCheckIcon={true}
-  //     tooltipProps={{ placement: 'top', hasArrow: true }}
-  //   />
-  // );
 };
 
 export default memo(ModelSelect);
