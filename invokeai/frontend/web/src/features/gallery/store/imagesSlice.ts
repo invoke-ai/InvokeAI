@@ -86,8 +86,7 @@ const imagesSlice = createSlice({
       imagesAdapter.removeOne(state, imageName);
     });
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_origin, image_url, thumbnail_url } =
-        action.payload;
+      const { image_name, image_url, thumbnail_url } = action.payload;
 
       imagesAdapter.updateOne(state, {
         id: image_name,

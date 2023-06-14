@@ -354,7 +354,6 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
       type: 'img_resize',
       image: {
         image_name: initialImage.image_name,
-        image_origin: initialImage.image_origin,
       },
       is_intermediate: true,
       height,
@@ -392,7 +391,6 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
     set(graph.nodes[IMAGE_TO_LATENTS], 'image', {
       image_name: initialImage.image_name,
-      image_origin: initialImage.image_origin,
     });
 
     // Pass the image's dimensions to the `NOISE` node

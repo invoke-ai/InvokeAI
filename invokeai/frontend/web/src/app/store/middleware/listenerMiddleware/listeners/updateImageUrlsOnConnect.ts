@@ -80,11 +80,10 @@ export const addUpdateImageUrlsOnConnectListener = () => {
         `Fetching new image URLs for ${allUsedImages.length} images`
       );
 
-      allUsedImages.forEach(({ image_name, image_origin }) => {
+      allUsedImages.forEach(({ image_name }) => {
         dispatch(
           imageUrlsReceived({
             imageName: image_name,
-            imageOrigin: image_origin,
           })
         );
       });
