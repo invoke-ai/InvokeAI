@@ -10,6 +10,9 @@ import {
   IntegerInputFieldTemplate,
   LatentsInputFieldTemplate,
   ConditioningInputFieldTemplate,
+  UNetInputFieldTemplate,
+  ClipInputFieldTemplate,
+  VaeInputFieldTemplate,
   ControlInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
@@ -216,6 +219,51 @@ const buildConditioningInputFieldTemplate = ({
   return template;
 };
 
+const buildUNetInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): UNetInputFieldTemplate => {
+  const template: UNetInputFieldTemplate = {
+    ...baseField,
+    type: 'unet',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildClipInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ClipInputFieldTemplate => {
+  const template: ClipInputFieldTemplate = {
+    ...baseField,
+    type: 'clip',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildVaeInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): VaeInputFieldTemplate => {
+  const template: VaeInputFieldTemplate = {
+    ...baseField,
+    type: 'vae',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildControlInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -357,6 +405,15 @@ export const buildInputFieldTemplate = (
   }
   if (['conditioning'].includes(fieldType)) {
     return buildConditioningInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['unet'].includes(fieldType)) {
+    return buildUNetInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['clip'].includes(fieldType)) {
+    return buildClipInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['vae'].includes(fieldType)) {
+    return buildVaeInputFieldTemplate({ schemaObject, baseField });
   }
   if (['control'].includes(fieldType)) {
     return buildControlInputFieldTemplate({ schemaObject, baseField });

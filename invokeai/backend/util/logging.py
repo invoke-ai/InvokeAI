@@ -358,7 +358,6 @@ class InvokeAILogger(object):
                 
             elif handler_name=='syslog':
                 ch = cls._parse_syslog_args(args)
-                ch.setFormatter(InvokeAISyslogFormatter())
                 handlers.append(ch)
                 
             elif handler_name=='file':
@@ -367,7 +366,8 @@ class InvokeAILogger(object):
                 handlers.append(ch)
                 
             elif handler_name=='http':
-                handlers.append(cls._parse_http_args(args))
+                ch = cls._parse_http_args(args)
+                handlers.append(ch)
         return handlers
 
     @staticmethod

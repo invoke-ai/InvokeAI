@@ -3,23 +3,20 @@
 from functools import partial
 from typing import Literal, Optional, Union, get_args
 
-import numpy as np
-from diffusers import ControlNetModel
-from torch import Tensor
 import torch
-
+from diffusers import ControlNetModel
 from pydantic import BaseModel, Field
 
-from invokeai.app.models.image import ColorField, ImageField, ResourceOrigin
-from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.models.image import ImageCategory, ResourceOrigin
+from invokeai.app.models.image import (ColorField, ImageCategory, ImageField,
+                                       ResourceOrigin)
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
-from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
-from .image import ImageOutput
-from ...backend.generator import Txt2Img, Img2Img, Inpaint, InvokeAIGenerator
+
+from ...backend.generator import Img2Img, Inpaint, InvokeAIGenerator, Txt2Img
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ..util.step_callback import stable_diffusion_step_callback
+from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
+from .image import ImageOutput
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
 INFILL_METHODS = Literal[tuple(infill_methods())]
@@ -81,7 +78,7 @@ class TextToImageInvocation(BaseInvocation, SDImageInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Handle invalid model parameter
-        model = choose_model(context.services.model_manager, self.model)
+        model = context.services.model_manager.get_model(self.model,node=self,context=context)
 
         # loading controlnet image (currently requires pre-processed image)
         control_image = (
@@ -171,7 +168,7 @@ class ImageToImageInvocation(TextToImageInvocation):
             image = image.resize((self.width, self.height))
 
         # Handle invalid model parameter
-        model = choose_model(context.services.model_manager, self.model)
+        model = context.services.model_manager.get_model(self.model,node=self,context=context)
 
         # Get the source node id (we are invoking the prepared node)
         graph_execution_state = context.services.graph_execution_manager.get(
@@ -281,7 +278,7 @@ class InpaintInvocation(ImageToImageInvocation):
         )
 
         # Handle invalid model parameter
-        model = choose_model(context.services.model_manager, self.model)
+        model = context.services.model_manager.get_model(self.model,node=self,context=context)
 
         # Get the source node id (we are invoking the prepared node)
         graph_execution_state = context.services.graph_execution_manager.get(

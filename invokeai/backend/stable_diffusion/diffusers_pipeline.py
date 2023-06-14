@@ -1026,8 +1026,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     # Copied from diffusers pipeline_stable_diffusion_controlnet.py
     # Returns torch.Tensor of shape (batch_size, 3, height, width)
+    @staticmethod
     def prepare_control_image(
-        self,
         image,
         # FIXME: need to fix hardwiring of width and height, change to basing on latents dimensions?
         # latents,

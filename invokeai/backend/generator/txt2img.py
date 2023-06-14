@@ -90,7 +90,7 @@ class Txt2Img(Generator):
             elif isinstance(self.control_model, MultiControlNetModel):
                 images = []
                 for image_ in control_image:
-                    image_ = self.model.prepare_control_image(
+                    image_ = pipeline.prepare_control_image(
                         image=image_,
                         do_classifier_free_guidance=do_classifier_free_guidance,
                         width=width,
