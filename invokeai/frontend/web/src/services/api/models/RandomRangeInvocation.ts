@@ -32,4 +32,3 @@ export type RandomRangeInvocation = {
    */
   seed?: number;
 };
-

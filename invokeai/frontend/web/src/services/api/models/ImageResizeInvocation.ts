@@ -34,4 +34,3 @@ export type ImageResizeInvocation = {
    */
   resample_mode?: 'nearest' | 'box' | 'bilinear' | 'hamming' | 'bicubic' | 'lanczos';
 };
-

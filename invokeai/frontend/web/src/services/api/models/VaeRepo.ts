@@ -16,4 +16,3 @@ export type VaeRepo = {
    */
   subfolder?: string;
 };
-

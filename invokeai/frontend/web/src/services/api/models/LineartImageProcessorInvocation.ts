@@ -34,4 +34,3 @@ export type LineartImageProcessorInvocation = {
    */
   coarse?: boolean;
 };
-

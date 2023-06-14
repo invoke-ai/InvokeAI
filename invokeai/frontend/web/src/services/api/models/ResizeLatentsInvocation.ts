@@ -38,4 +38,3 @@ export type ResizeLatentsInvocation = {
    */
   antialias?: boolean;
 };
-

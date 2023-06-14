@@ -24,4 +24,3 @@ export type RandomIntInvocation = {
    */
   high?: number;
 };
-

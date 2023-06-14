@@ -74,4 +74,3 @@ export type ImageToImageInvocation = {
    */
   fit?: boolean;
 };
-

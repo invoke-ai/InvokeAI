@@ -8,4 +8,3 @@ import type { DiffusersModelInfo } from './DiffusersModelInfo';
 export type ModelsList = {
   models: Record<string, (CkptModelInfo | DiffusersModelInfo)>;
 };
-

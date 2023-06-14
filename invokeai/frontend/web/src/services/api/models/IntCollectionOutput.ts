@@ -12,4 +12,3 @@ export type IntCollectionOutput = {
    */
   collection?: Array<number>;
 };
-

@@ -3,9 +3,9 @@
 /* eslint-disable */
 
 /**
- * Generates latent noise.
+ * Creates a range
  */
-export type NoiseInvocation = {
+export type FloatLinearRangeInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -14,17 +14,17 @@ export type NoiseInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'noise';
+  type?: 'float_range';
   /**
-   * The seed to use
+   * The first value of the range
    */
-  seed?: number;
+  start?: number;
   /**
-   * The width of the resulting noise
+   * The last value of the range
    */
-  width?: number;
+  stop?: number;
   /**
-   * The height of the resulting noise
+   * number of values to interpolate over (including start and stop)
    */
-  height?: number;
+  steps?: number;
 };

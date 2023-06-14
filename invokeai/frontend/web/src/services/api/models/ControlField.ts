@@ -16,7 +16,7 @@ export type ControlField = {
   /**
    * The weight given to the ControlNet
    */
-  control_weight: number;
+  control_weight: (number | Array<number>);
   /**
    * When the ControlNet is first applied (% of total steps)
    */
@@ -25,5 +25,8 @@ export type ControlField = {
    * When the ControlNet is last applied (% of total steps)
    */
   end_step_percent: number;
+  /**
+   * The contorl mode to use
+   */
+  control_mode?: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced';
 };
-

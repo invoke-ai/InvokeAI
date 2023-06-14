@@ -5,4 +5,3 @@
 export type Body_upload_image = {
   file: Blob;
 };
-

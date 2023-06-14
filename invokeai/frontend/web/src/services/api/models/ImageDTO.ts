@@ -67,4 +67,3 @@ export type ImageDTO = {
    */
   metadata?: ImageMetadata;
 };
-

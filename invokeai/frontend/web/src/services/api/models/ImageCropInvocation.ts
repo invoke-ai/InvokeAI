@@ -38,4 +38,3 @@ export type ImageCropInvocation = {
    */
   height?: number;
 };
-

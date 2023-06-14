@@ -34,4 +34,3 @@ export type OpenposeImageProcessorInvocation = {
    */
   image_resolution?: number;
 };
-
