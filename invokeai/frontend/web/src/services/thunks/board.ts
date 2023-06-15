@@ -39,3 +39,15 @@ export const boardUpdated = createAppAsyncThunk(
     return response;
   }
 );
+
+type ImageAddedToBoardArg = Parameters<
+  (typeof BoardsService)['createBoardImage']
+>[0];
+
+export const imageAddedToBoard = createAppAsyncThunk(
+  'api/imageAddedToBoard',
+  async (arg: ImageAddedToBoardArg) => {
+    const response = await BoardsService.createBoardImage(arg);
+    return response;
+  }
+);

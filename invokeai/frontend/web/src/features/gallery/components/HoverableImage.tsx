@@ -34,6 +34,9 @@ import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
 import { useDraggable } from '@dnd-kit/core';
 import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
+import { imageAddedToBoard } from '../../../services/thunks/board';
+import { setUpdateBoardModalOpen } from '../store/boardSlice';
+import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -100,6 +103,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
 
   const { onDelete } = useContext(DeleteImageContext);
+  const { onClickAddToBoard } = useContext(AddImageToBoardContext);
   const handleDelete = useCallback(() => {
     onDelete(image);
   }, [image, onDelete]);
@@ -175,9 +179,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     // dispatch(setIsLightboxOpen(true));
   };
 
-  const handleAddToFolder = useCallback(() => {
-    // dispatch(addImageToFolder(image));
-  }, []);
+  const handleAddToBoard = useCallback(() => {
+    onClickAddToBoard(image);
+  }, [image, onClickAddToBoard]);
 
   const handleOpenInNewTab = () => {
     window.open(image.image_url, '_blank');
@@ -255,8 +259,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 {t('parameters.sendToUnifiedCanvas')}
               </MenuItem>
             )}
-            <MenuItem icon={<FaFolder />} onClickCapture={handleAddToFolder}>
-              Add to Folder
+            <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
+              Add to Board
             </MenuItem>
             <MenuItem
               sx={{ color: 'error.300' }}
