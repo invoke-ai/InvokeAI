@@ -1,4 +1,5 @@
 import {
+  EntityId,
   PayloadAction,
   Update,
   createEntityAdapter,
@@ -19,6 +20,7 @@ type AdditionalBoardsState = {
   limit: number;
   total: number;
   isLoading: boolean;
+  selectedBoardId: EntityId | null;
 };
 
 export const initialBoardsState =
@@ -27,6 +29,7 @@ export const initialBoardsState =
     limit: 0,
     total: 0,
     isLoading: false,
+    selectedBoardId: null,
   });
 
 export type BoardsState = typeof initialBoardsState;
@@ -43,6 +46,9 @@ const boardsSlice = createSlice({
     },
     boardRemoved: (state, action: PayloadAction<string>) => {
       boardsAdapter.removeOne(state, action.payload);
+    },
+    boardIdSelected: (state, action: PayloadAction<string>) => {
+      state.selectedBoardId = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -71,7 +77,9 @@ export const {
   selectTotal: selectBoardsTotal,
 } = boardsAdapter.getSelectors<RootState>((state) => state.boards);
 
-export const { boardUpserted, boardUpdatedOne, boardRemoved } =
+export const { boardUpserted, boardUpdatedOne, boardRemoved, boardIdSelected } =
   boardsSlice.actions;
+
+export const boardsSelector = (state: RootState) => state.boards;
 
 export default boardsSlice.reducer;
