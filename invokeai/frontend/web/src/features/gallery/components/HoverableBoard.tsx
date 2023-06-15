@@ -6,7 +6,7 @@ import { ContextMenu } from 'chakra-ui-contextmenu';
 import { useTranslation } from 'react-i18next';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { useAppToaster } from 'app/components/Toaster';
-import { BoardRecord } from 'services/api';
+import { BoardDTO } from 'services/api';
 import { EntityId, createSelector } from '@reduxjs/toolkit';
 import {
   selectFilteredImagesIds,
@@ -17,7 +17,7 @@ import { defaultSelectorOptions } from '../../../app/store/util/defaultMemoizeOp
 import { useSelector } from 'react-redux';
 
 interface HoverableBoardProps {
-  board: BoardRecord;
+  board: BoardDTO;
 }
 
 /**

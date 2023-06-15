@@ -5,11 +5,11 @@ import {
   createSlice,
 } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { BoardRecord } from 'services/api';
+import { BoardDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
 import { receivedBoards } from '../../../services/thunks/board';
 
-export const boardsAdapter = createEntityAdapter<BoardRecord>({
+export const boardsAdapter = createEntityAdapter<BoardDTO>({
   selectId: (board) => board.board_id,
   sortComparer: (a, b) => dateComparator(b.updated_at, a.updated_at),
 });
@@ -35,10 +35,10 @@ const boardsSlice = createSlice({
   name: 'boards',
   initialState: initialBoardsState,
   reducers: {
-    boardUpserted: (state, action: PayloadAction<BoardRecord>) => {
+    boardUpserted: (state, action: PayloadAction<BoardDTO>) => {
       boardsAdapter.upsertOne(state, action.payload);
     },
-    boardUpdatedOne: (state, action: PayloadAction<Update<BoardRecord>>) => {
+    boardUpdatedOne: (state, action: PayloadAction<Update<BoardDTO>>) => {
       boardsAdapter.updateOne(state, action.payload);
     },
     boardRemoved: (state, action: PayloadAction<string>) => {
