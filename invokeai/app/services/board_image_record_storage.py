@@ -102,6 +102,20 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             """
         )
 
+        # Add index for board id
+        self._cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_board_images_board_id ON board_images (board_id);
+            """
+        )
+
+        # Add index for board id, sorted by created_at
+        self._cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_board_images_board_id_created_at ON board_images (board_id, created_at);
+            """
+        )
+
         # Add trigger for `updated_at`.
         self._cursor.execute(
             """--sql
