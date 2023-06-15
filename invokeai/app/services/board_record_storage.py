@@ -154,10 +154,13 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 DELETE FROM boards
                 WHERE board_id = ?;
                 """,
-                (board_id),
+                (board_id,),
             )
             self._conn.commit()
         except sqlite3.Error as e:
+            self._conn.rollback()
+            raise BoardRecordDeleteException from e
+        except Exception as e:
             self._conn.rollback()
             raise BoardRecordDeleteException from e
         finally:
@@ -192,7 +195,6 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             return BoardRecord(**result)
         except sqlite3.Error as e:
             self._conn.rollback()
-            print(e)
             raise BoardRecordSaveException from e
         finally:
             self._lock.release()
