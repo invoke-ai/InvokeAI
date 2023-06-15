@@ -57,9 +57,11 @@ import { receivedPageOfImages } from 'services/thunks/image';
 import { boardSelector } from '../store/boardSelectors';
 import { BoardDTO, ImageDTO } from '../../../services/api';
 import { isBoardDTO, isImageDTO } from '../../../services/types/guards';
-import HoverableBoard from './HoverableBoard';
+import HoverableBoard from './Boards/HoverableBoard';
 import IAIInput from '../../../common/components/IAIInput';
 import { boardCreated } from '../../../services/thunks/board';
+import BoardsList from './Boards/BoardsList';
+import { selectBoardsById } from '../store/boardSlice';
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
@@ -70,24 +72,23 @@ const itemSelector = createSelector(
     let areMoreAvailable = false;
     let isLoading = true;
 
-    if (gallery.galleryView === 'images' || gallery.galleryView === 'assets') {
-      const { categories } = images;
+    const { categories } = images;
 
-      const allImages = selectImagesAll(state);
-      items = allImages.filter((i) => categories.includes(i.image_category));
-      areMoreAvailable = items.length < images.total;
-      isLoading = images.isLoading;
-    } else if (gallery.galleryView === 'boards') {
-      items = Object.values(boards.entities) as BoardDTO[];
-      areMoreAvailable = items.length < boards.total;
-      isLoading = boards.isLoading;
-    }
+    const allImages = selectImagesAll(state);
+    items = allImages.filter((i) => categories.includes(i.image_category));
+    areMoreAvailable = items.length < images.total;
+    isLoading = images.isLoading;
+
+    const selectedBoard = boards.selectedBoardId
+      ? selectBoardsById(state, boards.selectedBoardId)
+      : undefined;
 
     return {
       items,
       isLoading,
       areMoreAvailable,
       categories: images.categories,
+      selectedBoard,
     };
   },
   defaultSelectorOptions
@@ -153,7 +154,7 @@ const ImageGalleryContent = () => {
     boards,
   } = useAppSelector(mainSelector);
 
-  const { items, areMoreAvailable, isLoading, categories } =
+  const { items, areMoreAvailable, isLoading, categories, selectedBoard } =
     useAppSelector(itemSelector);
 
   const handleLoadMoreImages = useCallback(() => {
@@ -247,17 +248,14 @@ const ImageGalleryContent = () => {
             size="sm"
             icon={<FaServer />}
           />
-          <IAIIconButton
-            tooltip={t('gallery.boards')}
-            aria-label={t('gallery.boards')}
-            onClick={handleClickBoardsView}
-            isChecked={galleryView === 'boards'}
-            size="sm"
-            icon={<FaFolder />}
-          />
         </ButtonGroup>
+        {selectedBoard && (
+          <Flex>
+            <Text>{selectedBoard.board_name}</Text>
+          </Flex>
+        )}
         <Flex gap={2}>
-          <IAIPopover
+          {/* <IAIPopover
             triggerComponent={
               <IAIIconButton
                 tooltip="Add Board"
@@ -283,7 +281,7 @@ const ImageGalleryContent = () => {
                 Create
               </IAIButton>
             </Flex>
-          </IAIPopover>
+          </IAIPopover> */}
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -342,6 +340,9 @@ const ImageGalleryContent = () => {
           />
         </Flex>
       </Flex>
+      <Box>
+        <BoardsList />
+      </Box>
       <Flex direction="column" gap={2} h="full">
         {items.length || areMoreAvailable ? (
           <>
