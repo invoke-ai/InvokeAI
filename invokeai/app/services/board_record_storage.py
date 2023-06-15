@@ -128,7 +128,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
         self._cursor.execute(
             """--sql
-            CREATE INDEX IF NOT EXISTS idx_boards_created_at ON boards(created_at);
+            CREATE INDEX IF NOT EXISTS idx_boards_created_at ON boards (created_at);
             """
         )
 
