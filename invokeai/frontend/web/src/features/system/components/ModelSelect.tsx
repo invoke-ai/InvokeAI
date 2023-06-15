@@ -1,17 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { ChangeEvent, memo, useCallback } from 'react';
 import { isEqual } from 'lodash-es';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectModelsAll, selectModelsById } from '../store/modelSlice';
 import { RootState } from 'app/store/store';
-import { modelSelected } from 'features/parameters/store/generationSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIMantineSelect, {
+  IAISelectDataType,
+} from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
-import IAICustomSelect, {
-  IAICustomSelectOption,
-} from 'common/components/IAICustomSelect';
-import IAISelect from 'common/components/IAISelect';
+import { modelSelected } from 'features/parameters/store/generationSlice';
+import { selectModelsAll, selectModelsById } from '../store/modelSlice';
 
 const selector = createSelector(
   [(state: RootState) => state, generationSelector],
@@ -19,18 +18,11 @@ const selector = createSelector(
     const selectedModel = selectModelsById(state, generation.model);
 
     const modelData = selectModelsAll(state)
-      .map((m) => ({
+      .map<IAISelectDataType>((m) => ({
         value: m.name,
-        key: m.name,
+        label: m.name,
       }))
-      .sort((a, b) => a.key.localeCompare(b.key));
-    // const modelData = selectModelsAll(state)
-    //   .map<IAICustomSelectOption>((m) => ({
-    //     value: m.name,
-    //     label: m.name,
-    //     tooltip: m.description,
-    //   }))
-    //   .sort((a, b) => a.label.localeCompare(b.label));
+      .sort((a, b) => a.label.localeCompare(b.label));
     return {
       selectedModel,
       modelData,
@@ -48,43 +40,25 @@ const ModelSelect = () => {
   const { t } = useTranslation();
   const { selectedModel, modelData } = useAppSelector(selector);
   const handleChangeModel = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(modelSelected(e.target.value));
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+      dispatch(modelSelected(v));
     },
     [dispatch]
   );
-  // const handleChangeModel = useCallback(
-  //   (v: string | null | undefined) => {
-  //     if (!v) {
-  //       return;
-  //     }
-  //     dispatch(modelSelected(v));
-  //   },
-  //   [dispatch]
-  // );
 
   return (
-    <IAISelect
-      label={t('modelManager.model')}
+    <IAIMantineSelect
       tooltip={selectedModel?.description}
-      validValues={modelData}
+      label={t('modelManager.model')}
       value={selectedModel?.name ?? ''}
+      placeholder="Pick one"
+      data={modelData}
       onChange={handleChangeModel}
-      tooltipProps={{ placement: 'top', hasArrow: true }}
     />
   );
-
-  // return (
-  //   <IAICustomSelect
-  //     label={t('modelManager.model')}
-  //     tooltip={selectedModel?.description}
-  //     data={modelData}
-  //     value={selectedModel?.name ?? ''}
-  //     onChange={handleChangeModel}
-  //     withCheckIcon={true}
-  //     tooltipProps={{ placement: 'top', hasArrow: true }}
-  //   />
-  // );
 };
 
 export default memo(ModelSelect);

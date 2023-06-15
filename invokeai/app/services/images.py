@@ -57,7 +57,6 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def update(
         self,
-        image_origin: ResourceOrigin,
         image_name: str,
         changes: ImageRecordChanges,
     ) -> ImageDTO:
@@ -65,22 +64,22 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_pil_image(self, image_origin: ResourceOrigin, image_name: str) -> PILImageType:
+    def get_pil_image(self, image_name: str) -> PILImageType:
         """Gets an image as a PIL image."""
         pass
 
     @abstractmethod
-    def get_record(self, image_origin: ResourceOrigin, image_name: str) -> ImageRecord:
+    def get_record(self, image_name: str) -> ImageRecord:
         """Gets an image record."""
         pass
 
     @abstractmethod
-    def get_dto(self, image_origin: ResourceOrigin, image_name: str) -> ImageDTO:
+    def get_dto(self, image_name: str) -> ImageDTO:
         """Gets an image DTO."""
         pass
 
     @abstractmethod
-    def get_path(self, image_origin: ResourceOrigin, image_name: str) -> str:
+    def get_path(self, image_name: str) -> str:
         """Gets an image's path."""
         pass
 
@@ -90,9 +89,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_url(
-        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
-    ) -> str:
+    def get_url(self, image_name: str, thumbnail: bool = False) -> str:
         """Gets an image's or thumbnail's URL."""
         pass
 
@@ -109,7 +106,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete(self, image_origin: ResourceOrigin, image_name: str):
+    def delete(self, image_name: str):
         """Deletes an image."""
         pass
 
@@ -206,16 +203,13 @@ class ImageService(ImageServiceABC):
             )
 
             self._services.files.save(
-                image_origin=image_origin,
                 image_name=image_name,
                 image=image,
                 metadata=metadata,
             )
 
-            image_url = self._services.urls.get_image_url(image_origin, image_name)
-            thumbnail_url = self._services.urls.get_image_url(
-                image_origin, image_name, True
-            )
+            image_url = self._services.urls.get_image_url(image_name)
+            thumbnail_url = self._services.urls.get_image_url(image_name, True)
 
             return ImageDTO(
                 # Non-nullable fields
@@ -249,13 +243,12 @@ class ImageService(ImageServiceABC):
 
     def update(
         self,
-        image_origin: ResourceOrigin,
         image_name: str,
         changes: ImageRecordChanges,
     ) -> ImageDTO:
         try:
-            self._services.records.update(image_name, image_origin, changes)
-            return self.get_dto(image_origin, image_name)
+            self._services.records.update(image_name, changes)
+            return self.get_dto(image_name)
         except ImageRecordSaveException:
             self._services.logger.error("Failed to update image record")
             raise
@@ -263,9 +256,9 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem updating image record")
             raise e
 
-    def get_pil_image(self, image_origin: ResourceOrigin, image_name: str) -> PILImageType:
+    def get_pil_image(self, image_name: str) -> PILImageType:
         try:
-            return self._services.files.get(image_origin, image_name)
+            return self._services.files.get(image_name)
         except ImageFileNotFoundException:
             self._services.logger.error("Failed to get image file")
             raise
@@ -273,9 +266,9 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image file")
             raise e
 
-    def get_record(self, image_origin: ResourceOrigin, image_name: str) -> ImageRecord:
+    def get_record(self, image_name: str) -> ImageRecord:
         try:
-            return self._services.records.get(image_origin, image_name)
+            return self._services.records.get(image_name)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
             raise
@@ -283,14 +276,14 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image record")
             raise e
 
-    def get_dto(self, image_origin: ResourceOrigin, image_name: str) -> ImageDTO:
+    def get_dto(self, image_name: str) -> ImageDTO:
         try:
-            image_record = self._services.records.get(image_origin, image_name)
+            image_record = self._services.records.get(image_name)
 
             image_dto = image_record_to_dto(
                 image_record,
-                self._services.urls.get_image_url(image_origin, image_name),
-                self._services.urls.get_image_url(image_origin, image_name, True),
+                self._services.urls.get_image_url(image_name),
+                self._services.urls.get_image_url(image_name, True),
             )
 
             return image_dto
@@ -301,11 +294,9 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting image DTO")
             raise e
 
-    def get_path(
-        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
-    ) -> str:
+    def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return self._services.files.get_path(image_origin, image_name, thumbnail)
+            return self._services.files.get_path(image_name, thumbnail)
         except Exception as e:
             self._services.logger.error("Problem getting image path")
             raise e
@@ -317,11 +308,9 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem validating image path")
             raise e
 
-    def get_url(
-        self, image_origin: ResourceOrigin, image_name: str, thumbnail: bool = False
-    ) -> str:
+    def get_url(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return self._services.urls.get_image_url(image_origin, image_name, thumbnail)
+            return self._services.urls.get_image_url(image_name, thumbnail)
         except Exception as e:
             self._services.logger.error("Problem getting image path")
             raise e
@@ -347,10 +336,8 @@ class ImageService(ImageServiceABC):
                 map(
                     lambda r: image_record_to_dto(
                         r,
-                        self._services.urls.get_image_url(r.image_origin, r.image_name),
-                        self._services.urls.get_image_url(
-                            r.image_origin, r.image_name, True
-                        ),
+                        self._services.urls.get_image_url(r.image_name),
+                        self._services.urls.get_image_url(r.image_name, True),
                     ),
                     results.items,
                 )
@@ -366,10 +353,10 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting paginated image DTOs")
             raise e
 
-    def delete(self, image_origin: ResourceOrigin, image_name: str):
+    def delete(self, image_name: str):
         try:
-            self._services.files.delete(image_origin, image_name)
-            self._services.records.delete(image_origin, image_name)
+            self._services.files.delete(image_name)
+            self._services.records.delete(image_name)
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image record")
             raise

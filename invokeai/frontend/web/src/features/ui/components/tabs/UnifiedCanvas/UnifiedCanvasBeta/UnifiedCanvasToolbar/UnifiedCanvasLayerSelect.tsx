@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   canvasSelector,
   isStagingSelector,
@@ -12,7 +12,6 @@ import {
 } from 'features/canvas/store/canvasTypes';
 import { isEqual } from 'lodash-es';
 
-import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
@@ -51,22 +50,22 @@ export default function UnifiedCanvasLayerSelect() {
     [layer]
   );
 
-  const handleChangeLayer = (e: ChangeEvent<HTMLSelectElement>) => {
-    const newLayer = e.target.value as CanvasLayer;
+  const handleChangeLayer = (v: string) => {
+    const newLayer = v as CanvasLayer;
     dispatch(setLayer(newLayer));
     if (newLayer === 'mask' && !isMaskEnabled) {
       dispatch(setIsMaskEnabled(true));
     }
   };
   return (
-    <IAISelect
+    <IAIMantineSelect
       tooltip={`${t('unifiedCanvas.layer')} (Q)`}
       aria-label={`${t('unifiedCanvas.layer')} (Q)`}
-      tooltipProps={{ hasArrow: true, placement: 'top' }}
       value={layer}
-      validValues={LAYER_NAMES_DICT}
+      data={LAYER_NAMES_DICT}
       onChange={handleChangeLayer}
-      isDisabled={isStaging}
+      disabled={isStaging}
+      w="full"
     />
   );
 }

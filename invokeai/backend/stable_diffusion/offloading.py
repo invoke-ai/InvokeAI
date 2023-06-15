@@ -157,7 +157,7 @@ class LazilyLoadedModelGroup(ModelGroup):
     def offload_current(self):
         module = self._current_model_ref()
         if module is not NO_MODEL:
-            module.to(device=OFFLOAD_DEVICE)
+            module.to(OFFLOAD_DEVICE)
         self.clear_current_model()
 
     def _load(self, module: torch.nn.Module) -> torch.nn.Module:
@@ -228,7 +228,7 @@ class FullyLoadedModelGroup(ModelGroup):
     def install(self, *models: torch.nn.Module):
         for model in models:
             self._models.add(model)
-            model.to(device=self.execution_device)
+            model.to(self.execution_device)
 
     def uninstall(self, *models: torch.nn.Module):
         for model in models:
@@ -238,11 +238,11 @@ class FullyLoadedModelGroup(ModelGroup):
         self.uninstall(*self._models)
 
     def load(self, model):
-        model.to(device=self.execution_device)
+        model.to(self.execution_device)
 
     def offload_current(self):
         for model in self._models:
-            model.to(device=OFFLOAD_DEVICE)
+            model.to(OFFLOAD_DEVICE)
 
     def ready(self):
         for model in self._models:
@@ -252,7 +252,7 @@ class FullyLoadedModelGroup(ModelGroup):
         self.execution_device = device
         for model in self._models:
             if model.device != OFFLOAD_DEVICE:
-                model.to(device=device)
+                model.to(device)
 
     def device_for(self, model):
         if model not in self:

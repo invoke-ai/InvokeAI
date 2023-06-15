@@ -103,8 +103,7 @@ const nodesSlice = createSlice({
     });
 
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_origin, image_url, thumbnail_url } =
-        action.payload;
+      const { image_name, image_url, thumbnail_url } = action.payload;
 
       state.nodes.forEach((node) => {
         forEach(node.data.inputs, (input) => {

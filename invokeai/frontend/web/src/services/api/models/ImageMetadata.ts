@@ -40,7 +40,7 @@ export type ImageMetadata = {
   /**
    * The classifier-free guidance scale.
    */
-  cfg_scale?: number;
+  cfg_scale?: (number | Array<number>);
   /**
    * The number of steps used for inference.
    */

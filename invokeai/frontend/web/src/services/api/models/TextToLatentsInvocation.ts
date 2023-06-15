@@ -38,7 +38,7 @@ export type TextToLatentsInvocation = {
   /**
    * The Classifier-Free Guidance, higher values may result in a result closer to the prompt
    */
-  cfg_scale?: number;
+  cfg_scale?: (number | Array<number>);
   /**
    * The scheduler to use
    */

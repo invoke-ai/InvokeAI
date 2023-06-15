@@ -18,7 +18,7 @@ class GFPGAN:
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
 
         if not self.gfpgan_model_exists:
-            logger.error("NOT FOUND: GFPGAN model not found at " + self.model_path)
+            logger.error(f"NOT FOUND: GFPGAN model not found at {self.model_path}")
             return None
 
     def model_exists(self):

@@ -30,8 +30,8 @@ class ESRGAN:
             upscale=4,
             act_type="prelu",
         )
-        model_path = config.root_dir / "models/realesrgan/realesr-general-x4v3.pth"
-        wdn_model_path = config.root_dir / "models/realesrgan/realesr-general-wdn-x4v3.pth"
+        model_path = config.models_path / "core/upscaling/realesrgan/realesr-general-x4v3.pth"
+        wdn_model_path = config.models_path / "core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
         scale = 4
 
         bg_upsampler = RealESRGANer(

@@ -11,7 +11,6 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.model_manager_initializer import get_model_manager
 from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_file_storage import DiskImageFileStorage
@@ -20,6 +19,7 @@ from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
+from ..services.model_manager_service import ModelManagerService
 from .events import FastAPIEventService
 
 
@@ -83,7 +83,7 @@ class ApiDependencies:
         )
 
         services = InvocationServices(
-            model_manager=get_model_manager(config, logger),
+            model_manager=ModelManagerService(config,logger),
             events=events,
             latents=latents,
             images=images,
