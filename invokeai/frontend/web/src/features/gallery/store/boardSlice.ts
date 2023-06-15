@@ -8,7 +8,12 @@ import {
 import { RootState } from 'app/store/store';
 import { BoardDTO } from 'services/api';
 import { dateComparator } from 'common/util/dateComparator';
-import { receivedBoards } from '../../../services/thunks/board';
+import {
+  boardCreated,
+  boardDeleted,
+  boardUpdated,
+  receivedBoards,
+} from '../../../services/thunks/board';
 
 export const boardsAdapter = createEntityAdapter<BoardDTO>({
   selectId: (board) => board.board_id,
@@ -26,7 +31,7 @@ type AdditionalBoardsState = {
 export const initialBoardsState =
   boardsAdapter.getInitialState<AdditionalBoardsState>({
     offset: 0,
-    limit: 0,
+    limit: 50,
     total: 0,
     isLoading: false,
     selectedBoardId: null,
@@ -47,7 +52,7 @@ const boardsSlice = createSlice({
     boardRemoved: (state, action: PayloadAction<string>) => {
       boardsAdapter.removeOne(state, action.payload);
     },
-    boardIdSelected: (state, action: PayloadAction<string>) => {
+    boardIdSelected: (state, action: PayloadAction<string | null>) => {
       state.selectedBoardId = action.payload;
     },
   },
@@ -65,6 +70,19 @@ const boardsSlice = createSlice({
       state.limit = limit;
       state.total = total;
       boardsAdapter.upsertMany(state, items);
+    });
+    builder.addCase(boardCreated.fulfilled, (state, action) => {
+      const board = action.payload;
+      boardsAdapter.upsertOne(state, board);
+    });
+    builder.addCase(boardUpdated.fulfilled, (state, action) => {
+      const board = action.payload;
+      boardsAdapter.upsertOne(state, board);
+    });
+    builder.addCase(boardDeleted.pending, (state, action) => {
+      const boardId = action.meta.arg;
+      console.log({ boardId });
+      boardsAdapter.removeOne(state, boardId);
     });
   },
 });

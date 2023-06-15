@@ -21,3 +21,21 @@ export const boardCreated = createAppAsyncThunk(
     return response;
   }
 );
+
+export const boardDeleted = createAppAsyncThunk(
+  'api/boardDeleted',
+  async (boardId: string) => {
+    await BoardsService.deleteBoard({ boardId });
+    return boardId;
+  }
+);
+
+type BoardUpdatedArg = Parameters<(typeof BoardsService)['updateBoard']>[0];
+
+export const boardUpdated = createAppAsyncThunk(
+  'api/boardUpdated',
+  async (arg: BoardUpdatedArg) => {
+    const response = await BoardsService.updateBoard(arg);
+    return response;
+  }
+);

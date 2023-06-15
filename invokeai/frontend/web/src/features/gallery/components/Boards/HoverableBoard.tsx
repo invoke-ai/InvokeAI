@@ -1,48 +1,50 @@
 import {
   Box,
+  Editable,
+  EditableInput,
+  EditablePreview,
   Flex,
   Icon,
   Image,
   MenuItem,
   MenuList,
-  Text,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { PropsWithChildren, memo, useCallback, useState } from 'react';
-import { FaFolder, FaImage } from 'react-icons/fa';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { memo, useCallback } from 'react';
+import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import { useTranslation } from 'react-i18next';
-import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { useAppToaster } from 'app/components/Toaster';
 import { BoardDTO } from 'services/api';
-import { EntityId, createSelector } from '@reduxjs/toolkit';
-import {
-  selectFilteredImagesIds,
-  selectImagesById,
-} from '../../store/imagesSlice';
-import { RootState } from '../../../../app/store/store';
-import { defaultSelectorOptions } from '../../../../app/store/util/defaultMemoizeOptions';
-import { useSelector } from 'react-redux';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/boardSlice';
+import { boardDeleted, boardUpdated } from '../../../../services/thunks/board';
 
 interface HoverableBoardProps {
   board: BoardDTO;
+  isSelected: boolean;
 }
 
-/**
- * Gallery image component with delete/use all/use seed buttons on hover.
- */
-const HoverableBoard = memo(({ board }: HoverableBoardProps) => {
+const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const dispatch = useAppDispatch();
 
   const { board_name, board_id, cover_image_url } = board;
 
-  const { t } = useTranslation();
-
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected(board_id));
   }, [board_id, dispatch]);
+
+  const handleDeleteBoard = useCallback(() => {
+    dispatch(boardDeleted(board_id));
+  }, [board_id, dispatch]);
+
+  const handleUpdateBoardName = (newBoardName: string) => {
+    dispatch(
+      boardUpdated({
+        boardId: board_id,
+        requestBody: { board_name: newBoardName },
+      })
+    );
+  };
 
   return (
     <Box sx={{ touchAction: 'none' }}>
@@ -51,10 +53,11 @@ const HoverableBoard = memo(({ board }: HoverableBoardProps) => {
         renderMenu={() => (
           <MenuList sx={{ visibility: 'visible !important' }}>
             <MenuItem
-              icon={<ExternalLinkIcon />}
-              // onClickCapture={handleOpenInNewTab}
+              sx={{ color: 'error.300' }}
+              icon={<FaTrash />}
+              onClickCapture={handleDeleteBoard}
             >
-              Sample Menu Item
+              Delete Board
             </MenuItem>
           </MenuList>
         )}
@@ -64,7 +67,6 @@ const HoverableBoard = memo(({ board }: HoverableBoardProps) => {
             position="relative"
             key={board_id}
             userSelect="none"
-            onClick={handleSelectBoard}
             ref={ref}
             sx={{
               flexDir: 'column',
@@ -77,12 +79,13 @@ const HoverableBoard = memo(({ board }: HoverableBoardProps) => {
             }}
           >
             <Flex
+              onClick={handleSelectBoard}
               sx={{
                 justifyContent: 'center',
                 alignItems: 'center',
                 borderWidth: '1px',
                 borderRadius: 'base',
-                borderColor: 'base.800',
+                borderColor: isSelected ? 'base.500' : 'base.800',
                 w: 'full',
                 h: 'full',
                 aspectRatio: '1/1',
@@ -102,7 +105,26 @@ const HoverableBoard = memo(({ board }: HoverableBoardProps) => {
                 <Icon boxSize={8} color="base.700" as={FaFolder} />
               )}
             </Flex>
-            <Text sx={{ color: 'base.200', fontSize: 'xs' }}>{board_name}</Text>
+
+            <Editable
+              defaultValue={board_name}
+              submitOnBlur={false}
+              onSubmit={(nextValue) => {
+                handleUpdateBoardName(nextValue);
+              }}
+            >
+              <EditablePreview
+                sx={{ color: 'base.200', fontSize: 'xs', textAlign: 'left' }}
+              />
+              <EditableInput
+                sx={{
+                  color: 'base.200',
+                  fontSize: 'xs',
+                  textAlign: 'left',
+                  borderColor: 'base.500',
+                }}
+              />
+            </Editable>
           </Flex>
         )}
       </ContextMenu>

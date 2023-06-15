@@ -1,9 +1,19 @@
 import { Flex, Icon, Text } from '@chakra-ui/react';
+import { useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
+import { useAppDispatch } from '../../../../app/store/storeHooks';
+import { boardCreated } from '../../../../services/thunks/board';
 
 const AddBoardButton = () => {
+  const dispatch = useAppDispatch();
+
+  const handleCreateBoard = useCallback(() => {
+    dispatch(boardCreated({ requestBody: 'My Board' }));
+  }, [dispatch]);
+
   return (
     <Flex
+      onClick={handleCreateBoard}
       sx={{
         flexDir: 'column',
         justifyContent: 'space-between',
