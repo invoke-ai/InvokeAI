@@ -27,6 +27,7 @@ type AdditionalBoardsState = {
   isLoading: boolean;
   selectedBoardId: EntityId | null;
   searchText?: string;
+  updateBoardModalOpen: boolean;
 };
 
 export const initialBoardsState =
@@ -36,6 +37,7 @@ export const initialBoardsState =
     total: 0,
     isLoading: false,
     selectedBoardId: null,
+    updateBoardModalOpen: false,
   });
 
 export type BoardsState = typeof initialBoardsState;
@@ -58,6 +60,9 @@ const boardsSlice = createSlice({
     },
     setBoardSearchText: (state, action: PayloadAction<string>) => {
       state.searchText = action.payload;
+    },
+    setUpdateBoardModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.updateBoardModalOpen = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -105,6 +110,7 @@ export const {
   boardRemoved,
   boardIdSelected,
   setBoardSearchText,
+  setUpdateBoardModalOpen,
 } = boardsSlice.actions;
 
 export const boardsSelector = (state: RootState) => state.boards;

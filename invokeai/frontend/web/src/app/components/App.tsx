@@ -23,6 +23,7 @@ import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
 import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 
 const DEFAULT_CONFIG = {};
 
@@ -143,6 +144,7 @@ const App = ({
         </Portal>
       </Grid>
       <DeleteImageModal />
+      <UpdateImageBoardModal />
       <Toaster />
       <GlobalHotkeys />
     </>
