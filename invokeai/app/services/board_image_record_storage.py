@@ -12,7 +12,7 @@ from invokeai.app.services.models.image_record import (
 
 
 class BoardImageRecordStorageBase(ABC):
-    """Abstract base class for board-image relationship record storage."""
+    """Abstract base class for the one-to-many board-image relationship record storage."""
 
     @abstractmethod
     def add_image_to_board(
@@ -45,7 +45,7 @@ class BoardImageRecordStorageBase(ABC):
         self,
         board_id: str,
     ) -> OffsetPaginatedResults[BoardRecord]:
-        """Gets images for a board."""
+        """Gets boards for an image."""
         pass
 
     @abstractmethod
@@ -93,7 +93,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                PRIMARY KEY (board_id, image_name),
+                -- enforce one-to-many relationship between boards and images using PK
+                -- (we can extend this to many-to-many later)
+                PRIMARY KEY (image_name),
                 FOREIGN KEY (board_id) REFERENCES boards (board_id) ON DELETE CASCADE,
                 FOREIGN KEY (image_name) REFERENCES images (image_name) ON DELETE CASCADE
             );
@@ -184,7 +186,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 SELECT COUNT(*) FROM images WHERE 1=1;
                 """
             )
-            count = self._cursor.fetchone()[0]
+            count = cast(int, self._cursor.fetchone()[0])
 
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -222,7 +224,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 SELECT COUNT(*) FROM boards WHERE 1=1;
                 """
             )
-            count = self._cursor.fetchone()[0]
+            count = cast(int, self._cursor.fetchone()[0])
 
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -243,11 +245,10 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 """,
                 (board_id,),
             )
-            count = self._cursor.fetchone()[0]
-
+            count = cast(int, self._cursor.fetchone()[0])
+            return count
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
         finally:
             self._lock.release()
-        return count
