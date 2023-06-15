@@ -512,7 +512,6 @@ class ModelManager(object):
         named 'model-name', and model_manager.config to get the full OmegaConf
         object derived from models.yaml
         """
-        assert not(model_type is not None and base_model is None), "model_type must be provided with base_model"
 
         models = dict()
         for model_key in sorted(self.models, key=str.casefold):
