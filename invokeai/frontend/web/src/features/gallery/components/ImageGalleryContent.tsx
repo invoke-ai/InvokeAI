@@ -37,7 +37,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { FaFolder, FaImage, FaPlus, FaServer, FaWrench } from 'react-icons/fa';
+import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
@@ -55,10 +55,6 @@ import {
 } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
 import { boardSelector } from '../store/boardSelectors';
-import { BoardDTO, ImageDTO } from '../../../services/api';
-import { isBoardDTO, isImageDTO } from '../../../services/types/guards';
-import HoverableBoard from './Boards/HoverableBoard';
-import IAIInput from '../../../common/components/IAIInput';
 import { boardCreated } from '../../../services/thunks/board';
 import BoardsList from './Boards/BoardsList';
 import { selectBoardsById } from '../store/boardSlice';
@@ -66,18 +62,16 @@ import { selectBoardsById } from '../store/boardSlice';
 const itemSelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { images, boards, gallery } = state;
-
-    let items: Array<ImageDTO | BoardDTO> = [];
-    let areMoreAvailable = false;
-    let isLoading = true;
+    const { images, boards } = state;
 
     const { categories } = images;
 
     const allImages = selectImagesAll(state);
-    items = allImages.filter((i) => categories.includes(i.image_category));
-    areMoreAvailable = items.length < images.total;
-    isLoading = images.isLoading;
+    const items = allImages.filter((i) =>
+      categories.includes(i.image_category)
+    );
+    const areMoreAvailable = items.length < images.total;
+    const isLoading = images.isLoading;
 
     const selectedBoard = boards.selectedBoardId
       ? selectBoardsById(state, boards.selectedBoardId)
@@ -353,27 +347,17 @@ const ImageGalleryContent = () => {
                   data={items}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
-                  itemContent={(index, item) => {
-                    if (isImageDTO(item)) {
-                      return (
-                        <Flex sx={{ pb: 2 }}>
-                          <HoverableImage
-                            key={`${item.image_name}-${item.thumbnail_url}`}
-                            image={item}
-                            isSelected={
-                              selectedImage?.image_name === item?.image_name
-                            }
-                          />
-                        </Flex>
-                      );
-                    } else if (isBoardDTO(item)) {
-                      return (
-                        <Flex sx={{ pb: 2 }}>
-                          <HoverableBoard key={item.board_id} board={item} />
-                        </Flex>
-                      );
-                    }
-                  }}
+                  itemContent={(index, item) => (
+                    <Flex sx={{ pb: 2 }}>
+                      <HoverableImage
+                        key={`${item.image_name}-${item.thumbnail_url}`}
+                        image={item}
+                        isSelected={
+                          selectedImage?.image_name === item?.image_name
+                        }
+                      />
+                    </Flex>
+                  )}
                 />
               ) : (
                 <VirtuosoGrid
@@ -385,23 +369,15 @@ const ImageGalleryContent = () => {
                     List: ListContainer,
                   }}
                   scrollerRef={setScroller}
-                  itemContent={(index, item) => {
-                    if (isImageDTO(item)) {
-                      return (
-                        <HoverableImage
-                          key={`${item.image_name}-${item.thumbnail_url}`}
-                          image={item}
-                          isSelected={
-                            selectedImage?.image_name === item?.image_name
-                          }
-                        />
-                      );
-                    } else if (isBoardDTO(item)) {
-                      return (
-                        <HoverableBoard key={item.board_id} board={item} />
-                      );
-                    }
-                  }}
+                  itemContent={(index, item) => (
+                    <HoverableImage
+                      key={`${item.image_name}-${item.thumbnail_url}`}
+                      image={item}
+                      isSelected={
+                        selectedImage?.image_name === item?.image_name
+                      }
+                    />
+                  )}
                 />
               )}
             </Box>
