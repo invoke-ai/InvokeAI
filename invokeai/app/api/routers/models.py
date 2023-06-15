@@ -80,7 +80,7 @@ async def list_models(
     ),
 ) -> ModelsList:
     """Gets a list of models"""
-    models_raw = ApiDependencies.invoker.services.model_manager.list_models(model_type)
+    models_raw = ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type)
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
 
