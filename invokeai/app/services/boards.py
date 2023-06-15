@@ -136,11 +136,12 @@ class BoardService(BoardServiceABC):
         board_records = self._services.board_records.get_many(offset, limit)
         board_dtos = []
         for r in board_records.items:
-            cover_image_url = (
-                self._services.urls.get_image_url(r.cover_image_name, True)
-                if r.cover_image_name
-                else None
-            )
+            cover_image = self._services.image_records.get_most_recent_image_for_board(r.board_id)
+            if (cover_image):
+                cover_image_url = self._services.urls.get_image_url(cover_image.image_name, True)
+            else:
+                cover_image_url = None
+
             image_count = self._services.board_image_records.get_image_count_for_board(
                 r.board_id
             )
