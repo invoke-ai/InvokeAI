@@ -55,8 +55,8 @@ import {
 } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
 import { boardSelector } from '../store/boardSelectors';
-import { BoardRecord, ImageDTO } from '../../../services/api';
-import { isBoardRecord, isImageDTO } from '../../../services/types/guards';
+import { BoardDTO, ImageDTO } from '../../../services/api';
+import { isBoardDTO, isImageDTO } from '../../../services/types/guards';
 import HoverableBoard from './HoverableBoard';
 import IAIInput from '../../../common/components/IAIInput';
 import { boardCreated } from '../../../services/thunks/board';
@@ -66,7 +66,7 @@ const itemSelector = createSelector(
   (state) => {
     const { images, boards, gallery } = state;
 
-    let items: Array<ImageDTO | BoardRecord> = [];
+    let items: Array<ImageDTO | BoardDTO> = [];
     let areMoreAvailable = false;
     let isLoading = true;
 
@@ -78,7 +78,7 @@ const itemSelector = createSelector(
       areMoreAvailable = items.length < images.total;
       isLoading = images.isLoading;
     } else if (gallery.galleryView === 'boards') {
-      items = Object.values(boards.entities) as BoardRecord[];
+      items = Object.values(boards.entities) as BoardDTO[];
       areMoreAvailable = items.length < boards.total;
       isLoading = boards.isLoading;
     }
@@ -365,7 +365,7 @@ const ImageGalleryContent = () => {
                           />
                         </Flex>
                       );
-                    } else if (isBoardRecord(item)) {
+                    } else if (isBoardDTO(item)) {
                       return (
                         <Flex sx={{ pb: 2 }}>
                           <HoverableBoard key={item.board_id} board={item} />
@@ -395,7 +395,7 @@ const ImageGalleryContent = () => {
                           }
                         />
                       );
-                    } else if (isBoardRecord(item)) {
+                    } else if (isBoardDTO(item)) {
                       return (
                         <HoverableBoard key={item.board_id} board={item} />
                       );
