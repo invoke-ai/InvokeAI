@@ -121,7 +121,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Soft delete, currently unused
-                deleted_at DATETIME
+                deleted_at DATETIME,
+                FOREIGN KEY (cover_image_name) REFERENCES images (image_name) ON DELETE SET NULL
             );
             """
         )
