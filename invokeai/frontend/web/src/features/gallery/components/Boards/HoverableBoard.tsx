@@ -13,7 +13,6 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import { useTranslation } from 'react-i18next';
 import { BoardDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/boardSlice';
@@ -89,6 +88,7 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 w: 'full',
                 h: 'full',
                 aspectRatio: '1/1',
+                overflow: 'hidden',
               }}
             >
               {cover_image_url ? (
@@ -115,6 +115,7 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
             >
               <EditablePreview
                 sx={{ color: 'base.200', fontSize: 'xs', textAlign: 'left' }}
+                noOfLines={1}
               />
               <EditableInput
                 sx={{
