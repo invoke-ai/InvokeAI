@@ -3,9 +3,9 @@
 /* eslint-disable */
 
 /**
- * Deserialized board record.
+ * Deserialized board record with cover image URL and image count.
  */
-export type BoardRecord = {
+export type BoardDTO = {
   /**
    * The unique ID of the board.
    */
@@ -26,5 +26,13 @@ export type BoardRecord = {
    * The name of the cover image of the board.
    */
   cover_image_name?: string;
+  /**
+   * The URL of the thumbnail of the board's cover image.
+   */
+  cover_image_url?: string;
+  /**
+   * The number of images in the board.
+   */
+  image_count: number;
 };
 

@@ -2,9 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { BoardChanges } from '../models/BoardChanges';
+import type { BoardDTO } from '../models/BoardDTO';
 import type { Body_create_board_image } from '../models/Body_create_board_image';
 import type { Body_remove_board_image } from '../models/Body_remove_board_image';
-import type { OffsetPaginatedResults_BoardRecord_ } from '../models/OffsetPaginatedResults_BoardRecord_';
+import type { OffsetPaginatedResults_BoardDTO_ } from '../models/OffsetPaginatedResults_BoardDTO_';
 import type { OffsetPaginatedResults_ImageDTO_ } from '../models/OffsetPaginatedResults_ImageDTO_';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
@@ -16,7 +17,7 @@ export class BoardsService {
   /**
    * List Boards
    * Gets a list of boards
-   * @returns OffsetPaginatedResults_BoardRecord_ Successful Response
+   * @returns OffsetPaginatedResults_BoardDTO_ Successful Response
    * @throws ApiError
    */
   public static listBoards({
@@ -31,7 +32,7 @@ export class BoardsService {
      * The number of boards per page
      */
     limit?: number,
-  }): CancelablePromise<OffsetPaginatedResults_BoardRecord_> {
+  }): CancelablePromise<OffsetPaginatedResults_BoardDTO_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/boards/',
@@ -48,14 +49,14 @@ export class BoardsService {
   /**
    * Create Board
    * Creates a board
-   * @returns any The board was created successfully
+   * @returns BoardDTO The board was created successfully
    * @throws ApiError
    */
   public static createBoard({
     requestBody,
   }: {
     requestBody: string,
-  }): CancelablePromise<any> {
+  }): CancelablePromise<BoardDTO> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/boards/',
@@ -95,8 +96,8 @@ export class BoardsService {
 
   /**
    * Update Board
-   * Creates a board
-   * @returns any The board was updated successfully
+   * Updates a board
+   * @returns BoardDTO The board was updated successfully
    * @throws ApiError
    */
   public static updateBoard({
@@ -108,7 +109,7 @@ export class BoardsService {
      */
     boardId: string,
     requestBody: BoardChanges,
-  }): CancelablePromise<any> {
+  }): CancelablePromise<BoardDTO> {
     return __request(OpenAPI, {
       method: 'PATCH',
       url: '/api/v1/boards/{board_id}',

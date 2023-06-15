@@ -2,16 +2,16 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { BoardRecord } from './BoardRecord';
+import type { BoardDTO } from './BoardDTO';
 
 /**
  * Offset-paginated results
  */
-export type OffsetPaginatedResults_BoardRecord_ = {
+export type OffsetPaginatedResults_BoardDTO_ = {
   /**
    * Items
    */
-  items: Array<BoardRecord>;
+  items: Array<BoardDTO>;
   /**
    * Offset from which to retrieve items
    */
