@@ -90,7 +90,7 @@ const itemSelector = createSelector(
 
 const mainSelector = createSelector(
   [gallerySelector, uiSelector, boardSelector],
-  (gallery, ui, boardState) => {
+  (gallery, ui, boards) => {
     const {
       galleryImageMinimumWidth,
       galleryImageObjectFit,
@@ -101,9 +101,6 @@ const mainSelector = createSelector(
     } = gallery;
 
     const { shouldPinGallery } = ui;
-
-    const { entities: boards } = boardState;
-
     return {
       shouldPinGallery,
       galleryImageMinimumWidth,

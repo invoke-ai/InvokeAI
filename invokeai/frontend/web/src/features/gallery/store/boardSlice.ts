@@ -26,6 +26,7 @@ type AdditionalBoardsState = {
   total: number;
   isLoading: boolean;
   selectedBoardId: EntityId | null;
+  searchText?: string;
 };
 
 export const initialBoardsState =
@@ -54,6 +55,9 @@ const boardsSlice = createSlice({
     },
     boardIdSelected: (state, action: PayloadAction<string | null>) => {
       state.selectedBoardId = action.payload;
+    },
+    setBoardSearchText: (state, action: PayloadAction<string>) => {
+      state.searchText = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -95,8 +99,13 @@ export const {
   selectTotal: selectBoardsTotal,
 } = boardsAdapter.getSelectors<RootState>((state) => state.boards);
 
-export const { boardUpserted, boardUpdatedOne, boardRemoved, boardIdSelected } =
-  boardsSlice.actions;
+export const {
+  boardUpserted,
+  boardUpdatedOne,
+  boardRemoved,
+  boardIdSelected,
+  setBoardSearchText,
+} = boardsSlice.actions;
 
 export const boardsSelector = (state: RootState) => state.boards;
 
