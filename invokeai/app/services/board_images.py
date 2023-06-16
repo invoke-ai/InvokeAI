@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
+from typing import Union
 from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.board_record_storage import (
     BoardRecord,
@@ -45,11 +46,11 @@ class BoardImagesServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_boards_for_image(
+    def get_board_for_image(
         self,
         image_name: str,
-    ) -> OffsetPaginatedResults[BoardDTO]:
-        """Gets boards for an image."""
+    ) -> Union[str, None]:
+        """Gets an image's board id, if it has one."""
         pass
 
 
@@ -110,6 +111,7 @@ class BoardImagesService(BoardImagesServiceABC):
                     r,
                     self._services.urls.get_image_url(r.image_name),
                     self._services.urls.get_image_url(r.image_name, True),
+                    board_id,
                 ),
                 image_records.items,
             )
@@ -121,38 +123,12 @@ class BoardImagesService(BoardImagesServiceABC):
             total=image_records.total,
         )
 
-    def get_boards_for_image(
+    def get_board_for_image(
         self,
         image_name: str,
-    ) -> OffsetPaginatedResults[BoardDTO]:
-        board_records = self._services.board_image_records.get_boards_for_image(
-            image_name
-        )
-        board_dtos = []
-
-        for r in board_records.items:
-            cover_image_url = (
-                self._services.urls.get_image_url(r.cover_image_name, True)
-                if r.cover_image_name
-                else None
-            )
-            image_count = self._services.board_image_records.get_image_count_for_board(
-                r.board_id
-            )
-            board_dtos.append(
-                board_record_to_dto(
-                    r,
-                    cover_image_url,
-                    image_count,
-                )
-            )
-
-        return OffsetPaginatedResults[BoardDTO](
-            items=board_dtos,
-            offset=board_records.offset,
-            limit=board_records.limit,
-            total=board_records.total,
-        )
+    ) -> Union[str, None]:
+        board_id = self._services.board_image_records.get_board_for_image(image_name)
+        return board_id
 
 
 def board_record_to_dto(

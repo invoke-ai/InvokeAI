@@ -10,6 +10,7 @@ from invokeai.app.models.image import (
     InvalidOriginException,
 )
 from invokeai.app.models.metadata import ImageMetadata
+from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.image_record_storage import (
     ImageRecordDeleteException,
     ImageRecordNotFoundException,
@@ -114,8 +115,9 @@ class ImageServiceABC(ABC):
 class ImageServiceDependencies:
     """Service dependencies for the ImageService."""
 
-    records: ImageRecordStorageBase
-    files: ImageFileStorageBase
+    image_records: ImageRecordStorageBase
+    image_files: ImageFileStorageBase
+    board_image_records: BoardImageRecordStorageBase
     metadata: MetadataServiceBase
     urls: UrlServiceBase
     logger: Logger
@@ -126,14 +128,16 @@ class ImageServiceDependencies:
         self,
         image_record_storage: ImageRecordStorageBase,
         image_file_storage: ImageFileStorageBase,
+        board_image_record_storage: BoardImageRecordStorageBase,
         metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
         names: NameServiceBase,
         graph_execution_manager: ItemStorageABC["GraphExecutionState"],
     ):
-        self.records = image_record_storage
-        self.files = image_file_storage
+        self.image_records = image_record_storage
+        self.image_files = image_file_storage
+        self.board_image_records = board_image_record_storage
         self.metadata = metadata
         self.urls = url
         self.logger = logger
@@ -144,25 +148,8 @@ class ImageServiceDependencies:
 class ImageService(ImageServiceABC):
     _services: ImageServiceDependencies
 
-    def __init__(
-        self,
-        image_record_storage: ImageRecordStorageBase,
-        image_file_storage: ImageFileStorageBase,
-        metadata: MetadataServiceBase,
-        url: UrlServiceBase,
-        logger: Logger,
-        names: NameServiceBase,
-        graph_execution_manager: ItemStorageABC["GraphExecutionState"],
-    ):
-        self._services = ImageServiceDependencies(
-            image_record_storage=image_record_storage,
-            image_file_storage=image_file_storage,
-            metadata=metadata,
-            url=url,
-            logger=logger,
-            names=names,
-            graph_execution_manager=graph_execution_manager,
-        )
+    def __init__(self, services: ImageServiceDependencies):
+        self._services = services
 
     def create(
         self,
@@ -187,7 +174,7 @@ class ImageService(ImageServiceABC):
 
         try:
             # TODO: Consider using a transaction here to ensure consistency between storage and database
-            created_at = self._services.records.save(
+            self._services.image_records.save(
                 # Non-nullable fields
                 image_name=image_name,
                 image_origin=image_origin,
@@ -202,35 +189,15 @@ class ImageService(ImageServiceABC):
                 metadata=metadata,
             )
 
-            self._services.files.save(
+            self._services.image_files.save(
                 image_name=image_name,
                 image=image,
                 metadata=metadata,
             )
 
-            image_url = self._services.urls.get_image_url(image_name)
-            thumbnail_url = self._services.urls.get_image_url(image_name, True)
+            image_dto = self.get_dto(image_name)
 
-            return ImageDTO(
-                # Non-nullable fields
-                image_name=image_name,
-                image_origin=image_origin,
-                image_category=image_category,
-                width=width,
-                height=height,
-                # Nullable fields
-                node_id=node_id,
-                session_id=session_id,
-                metadata=metadata,
-                # Meta fields
-                created_at=created_at,
-                updated_at=created_at,  # this is always the same as the created_at at this time
-                deleted_at=None,
-                is_intermediate=is_intermediate,
-                # Extra non-nullable fields for DTO
-                image_url=image_url,
-                thumbnail_url=thumbnail_url,
-            )
+            return image_dto
         except ImageRecordSaveException:
             self._services.logger.error("Failed to save image record")
             raise
@@ -247,7 +214,7 @@ class ImageService(ImageServiceABC):
         changes: ImageRecordChanges,
     ) -> ImageDTO:
         try:
-            self._services.records.update(image_name, changes)
+            self._services.image_records.update(image_name, changes)
             return self.get_dto(image_name)
         except ImageRecordSaveException:
             self._services.logger.error("Failed to update image record")
@@ -258,7 +225,7 @@ class ImageService(ImageServiceABC):
 
     def get_pil_image(self, image_name: str) -> PILImageType:
         try:
-            return self._services.files.get(image_name)
+            return self._services.image_files.get(image_name)
         except ImageFileNotFoundException:
             self._services.logger.error("Failed to get image file")
             raise
@@ -268,7 +235,7 @@ class ImageService(ImageServiceABC):
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:
-            return self._services.records.get(image_name)
+            return self._services.image_records.get(image_name)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
             raise
@@ -278,12 +245,13 @@ class ImageService(ImageServiceABC):
 
     def get_dto(self, image_name: str) -> ImageDTO:
         try:
-            image_record = self._services.records.get(image_name)
+            image_record = self._services.image_records.get(image_name)
 
             image_dto = image_record_to_dto(
                 image_record,
                 self._services.urls.get_image_url(image_name),
                 self._services.urls.get_image_url(image_name, True),
+                self._services.board_image_records.get_board_for_image(image_name),
             )
 
             return image_dto
@@ -296,14 +264,14 @@ class ImageService(ImageServiceABC):
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return self._services.files.get_path(image_name, thumbnail)
+            return self._services.image_files.get_path(image_name, thumbnail)
         except Exception as e:
             self._services.logger.error("Problem getting image path")
             raise e
 
     def validate_path(self, path: str) -> bool:
         try:
-            return self._services.files.validate_path(path)
+            return self._services.image_files.validate_path(path)
         except Exception as e:
             self._services.logger.error("Problem validating image path")
             raise e
@@ -324,7 +292,7 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
-            results = self._services.records.get_many(
+            results = self._services.image_records.get_many(
                 offset,
                 limit,
                 image_origin,
@@ -338,6 +306,9 @@ class ImageService(ImageServiceABC):
                         r,
                         self._services.urls.get_image_url(r.image_name),
                         self._services.urls.get_image_url(r.image_name, True),
+                        self._services.board_image_records.get_board_for_image(
+                            r.image_name
+                        ),
                     ),
                     results.items,
                 )
@@ -355,8 +326,8 @@ class ImageService(ImageServiceABC):
 
     def delete(self, image_name: str):
         try:
-            self._services.files.delete(image_name)
-            self._services.records.delete(image_name)
+            self._services.image_files.delete(image_name)
+            self._services.image_records.delete(image_name)
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image record")
             raise

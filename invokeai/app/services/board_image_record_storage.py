@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import sqlite3
 import threading
-from typing import cast
+from typing import Union, cast
 from invokeai.app.services.board_record_storage import BoardRecord
 
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
@@ -41,11 +41,11 @@ class BoardImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_boards_for_image(
+    def get_board_for_image(
         self,
-        board_id: str,
-    ) -> OffsetPaginatedResults[BoardRecord]:
-        """Gets boards for an image."""
+        image_name: str,
+    ) -> Union[str, None]:
+        """Gets an image's board id, if it has one."""
         pass
 
     @abstractmethod
@@ -134,7 +134,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         board_id: str,
         image_name: str,
     ) -> None:
-        """Adds an image to a board."""
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -156,7 +155,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         board_id: str,
         image_name: str,
     ) -> None:
-        """Removes an image from a board."""
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -179,7 +177,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         offset: int = 0,
         limit: int = 10,
     ) -> OffsetPaginatedResults[ImageRecord]:
-        """Gets images for a board."""
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -211,46 +208,31 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             items=images, offset=offset, limit=limit, total=count
         )
 
-    def get_boards_for_image(
+    def get_board_for_image(
         self,
-        board_id: str,
-        offset: int = 0,
-        limit: int = 10,
-    ) -> OffsetPaginatedResults[BoardRecord]:
-        """Gets boards for an image."""
+        image_name: str,
+    ) -> Union[str, None]:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT boards.*
+                SELECT board_id
                 FROM board_images
-                INNER JOIN boards ON board_images.board_id = boards.board_id
-                WHERE board_images.image_name = ?
-                ORDER BY board_images.updated_at DESC;
+                WHERE image_name = ?;
                 """,
-                (board_id,),
+                (image_name,),
             )
-            result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            boards = list(map(lambda r: BoardRecord(**r), result))
-
-            self._cursor.execute(
-                """--sql
-                SELECT COUNT(*) FROM boards WHERE 1=1;
-                """
-            )
-            count = cast(int, self._cursor.fetchone()[0])
-
+            result = self._cursor.fetchone()
+            if result is None:
+                return None
+            return cast(str, result[0])
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
         finally:
             self._lock.release()
-        return OffsetPaginatedResults(
-            items=boards, offset=offset, limit=limit, total=count
-        )
 
     def get_image_count_for_board(self, board_id: str) -> int:
-        """Gets the number of images for a board."""
         try:
             self._lock.acquire()
             self._cursor.execute(
