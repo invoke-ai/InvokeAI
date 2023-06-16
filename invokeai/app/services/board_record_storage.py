@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import Optional, cast
 import sqlite3
 import threading
@@ -181,23 +180,12 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 (board_id, board_name),
             )
             self._conn.commit()
-
-            self._cursor.execute(
-                """--sql
-                SELECT *
-                FROM boards
-                WHERE board_id = ?;
-                """,
-                (board_id,),
-            )
-
-            result = self._cursor.fetchone()
-            return BoardRecord(**result)
         except sqlite3.Error as e:
             self._conn.rollback()
             raise BoardRecordSaveException from e
         finally:
             self._lock.release()
+        return self.get(board_id)
 
     def get(
         self,
@@ -228,7 +216,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         self,
         board_id: str,
         changes: BoardChanges,
-    ) -> None:
+    ) -> BoardRecord:
         try:
             self._lock.acquire()
 
@@ -260,6 +248,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             raise BoardRecordSaveException from e
         finally:
             self._lock.release()
+        return self.get(board_id)
 
     def get_many(
         self,
