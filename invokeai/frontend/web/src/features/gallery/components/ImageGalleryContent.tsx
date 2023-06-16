@@ -221,6 +221,7 @@ const ImageGalleryContent = () => {
         ref={resizeObserverRef}
         alignItems="center"
         justifyContent="space-between"
+        gap={1}
       >
         <ButtonGroup isAttached>
           <IAIIconButton
@@ -241,7 +242,9 @@ const ImageGalleryContent = () => {
           />
         </ButtonGroup>
         <Flex>
-          <Text>{selectedBoard ? selectedBoard.board_name : 'All Images'}</Text>
+          <Text noOfLines={1}>
+            {selectedBoard ? selectedBoard.board_name : 'All Images'}
+          </Text>
         </Flex>
         <Flex gap={2}>
           <IAIPopover
