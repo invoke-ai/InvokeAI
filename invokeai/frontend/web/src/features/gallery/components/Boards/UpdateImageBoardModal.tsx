@@ -18,12 +18,11 @@ import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoard
 import { useSelector } from 'react-redux';
 import { selectBoardsAll } from '../../store/boardSlice';
 import IAISelect from '../../../../common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 const UpdateImageBoardModal = () => {
   const boards = useSelector(selectBoardsAll);
-  const [selectedBoard, setSelectedBoard] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedBoard, setSelectedBoard] = useState<string | null>(null);
 
   const { isOpen, onClose, handleAddToBoard, image } = useContext(
     AddImageToBoardContext
@@ -55,10 +54,14 @@ const UpdateImageBoardModal = () => {
                   Moving this image to a board will remove it from its existing
                   board.
                 </Text>
-                <IAISelect
+                <IAIMantineSelect
                   placeholder="Select Board"
-                  onChange={(e) => setSelectedBoard(e.target.value)}
-                  validValues={boards.map((board) => board.board_name)}
+                  onChange={(v) => setSelectedBoard(v)}
+                  value={selectedBoard}
+                  data={boards.map((board) => ({
+                    label: board.board_name,
+                    value: board.board_id,
+                  }))}
                 />
               </Flex>
             </Box>
