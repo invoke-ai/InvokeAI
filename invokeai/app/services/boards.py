@@ -101,15 +101,15 @@ class BoardService(BoardServiceABC):
 
     def get_dto(self, board_id: str) -> BoardDTO:
         board_record = self._services.board_records.get(board_id)
-        cover_image_url = (
-            self._services.urls.get_image_url(board_record.cover_image_name, True)
-            if board_record.cover_image_name
-            else None
-        )
+        cover_image = self._services.image_records.get_most_recent_image_for_board(board_recordboard_id)
+        if (cover_image):
+            cover_image_name = cover_image.image_name
+        else:
+            cover_image_name = None
         image_count = self._services.board_image_records.get_image_count_for_board(
             board_id
         )
-        return board_record_to_dto(board_record, cover_image_url, image_count)
+        return board_record_to_dto(board_record, cover_image_name, image_count)
 
     def update(
         self,
@@ -117,15 +117,16 @@ class BoardService(BoardServiceABC):
         changes: BoardChanges,
     ) -> BoardDTO:
         board_record = self._services.board_records.update(board_id, changes)
-        cover_image_url = (
-            self._services.urls.get_image_url(board_record.cover_image_name, True)
-            if board_record.cover_image_name
-            else None
-        )
+        cover_image = self._services.image_records.get_most_recent_image_for_board(board_record.board_id)
+        if (cover_image):
+            cover_image_name = cover_image.image_name
+        else:
+            cover_image_name = None
+        
         image_count = self._services.board_image_records.get_image_count_for_board(
             board_id
         )
-        return board_record_to_dto(board_record, cover_image_url, image_count)
+        return board_record_to_dto(board_record, cover_image_name, image_count)
 
     def delete(self, board_id: str) -> None:
         self._services.board_records.delete(board_id)
@@ -138,14 +139,14 @@ class BoardService(BoardServiceABC):
         for r in board_records.items:
             cover_image = self._services.image_records.get_most_recent_image_for_board(r.board_id)
             if (cover_image):
-                cover_image_url = self._services.urls.get_image_url(cover_image.image_name, True)
+                cover_image_name = cover_image.image_name
             else:
-                cover_image_url = None
+                cover_image_name = None
 
             image_count = self._services.board_image_records.get_image_count_for_board(
                 r.board_id
             )
-            board_dtos.append(board_record_to_dto(r, cover_image_url, image_count))
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count))
 
         return OffsetPaginatedResults[BoardDTO](
             items=board_dtos, offset=offset, limit=limit, total=len(board_dtos)

@@ -27,8 +27,8 @@ class BoardRecord(BaseModel):
 class BoardDTO(BoardRecord):
     """Deserialized board record with cover image URL and image count."""
 
-    cover_image_url: Optional[str] = Field(
-        description="The URL of the thumbnail of the board's cover image."
+    cover_image_name: Optional[str] = Field(
+        description="The name of the board's cover image."
     )
     """The URL of the thumbnail of the most recent image in the board."""
     image_count: int = Field(description="The number of images in the board.")
