@@ -67,7 +67,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'system',
   'ui',
   'controlNet',
-  'boards',
+  // 'boards',
   // 'hotkeys',
   // 'config',
 ];
