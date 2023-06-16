@@ -20,18 +20,26 @@ import {
   boardUpdated,
   imageAddedToBoard,
 } from '../../../../services/thunks/board';
-import { selectImagesAll } from '../../store/imagesSlice';
+import { selectImagesAll, selectImagesById } from '../../store/imagesSlice';
 import IAIDndImage from '../../../../common/components/IAIDndImage';
 import { defaultSelectorOptions } from '../../../../app/store/util/defaultMemoizeOptions';
 import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from '../../../../app/store/store';
 
-const selector = createSelector(
-  [selectImagesAll],
-  (images) => {
-    return { images };
-  },
-  defaultSelectorOptions
-);
+const coverImageSelector = (imageName: string | undefined) =>
+  createSelector(
+    [(state: RootState) => state],
+    (state) => {
+      const coverImage = imageName
+        ? selectImagesById(state, imageName)
+        : undefined;
+
+      return {
+        coverImage,
+      };
+    },
+    defaultSelectorOptions
+  );
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -40,9 +48,11 @@ interface HoverableBoardProps {
 
 const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const dispatch = useAppDispatch();
-  const { images } = useAppSelector(selector);
+  const { coverImage } = useAppSelector(
+    coverImageSelector(board?.cover_image_name)
+  );
 
-  const { board_name, board_id, cover_image_url } = board;
+  const { board_name, board_id } = board;
 
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected(board_id));
@@ -125,7 +135,7 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               }}
             >
               <IAIDndImage
-                image={cover_image_url ? images[0] : undefined}
+                image={coverImage}
                 onDrop={handleDrop}
                 fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
                 isUploadDisabled={true}
