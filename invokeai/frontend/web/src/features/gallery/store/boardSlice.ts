@@ -25,7 +25,7 @@ type AdditionalBoardsState = {
   limit: number;
   total: number;
   isLoading: boolean;
-  selectedBoardId: EntityId | null;
+  selectedBoardId?: string;
   searchText?: string;
   updateBoardModalOpen: boolean;
 };
@@ -36,7 +36,6 @@ export const initialBoardsState =
     limit: 50,
     total: 0,
     isLoading: false,
-    selectedBoardId: null,
     updateBoardModalOpen: false,
   });
 
@@ -55,7 +54,7 @@ const boardsSlice = createSlice({
     boardRemoved: (state, action: PayloadAction<string>) => {
       boardsAdapter.removeOne(state, action.payload);
     },
-    boardIdSelected: (state, action: PayloadAction<string | null>) => {
+    boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
       state.selectedBoardId = action.payload;
     },
     setBoardSearchText: (state, action: PayloadAction<string>) => {
