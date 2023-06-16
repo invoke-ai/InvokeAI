@@ -1,8 +1,11 @@
 <div align="center">
 
-![project logo](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/invoke_ai_banner.png)
+![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/1a917d94-e099-4fa1-a70f-7dd8d0691018)
 
-# InvokeAI: A Stable Diffusion Toolkit
+# Invoke AI - Generative AI for Professional Creatives
+## Image Generation for Stable Diffusion, Custom-Trained Models, and more. 
+  Learn more about us and get started instantly at [invoke.ai](https://invoke.ai)
+
 
 [![discord badge]][discord link]
 
@@ -33,8 +36,6 @@
 
 </div>
 
-_**Note: The UI is not fully functional on `main`. If you need a stable UI based on `main`, use the `pre-nodes` tag while we [migrate to a new backend](https://github.com/invoke-ai/InvokeAI/discussions/3246).**_
-
 InvokeAI is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. InvokeAI offers an industry leading Web Interface, interactive Command Line Interface, and also serves as the foundation for multiple commercial products.
 
 **Quick links**: [[How to Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
@@ -51,18 +52,23 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 
 ## Table of Contents
 
-1. [Quick Start](#getting-started-with-invokeai)
-2. [Installation](#detailed-installation-instructions)
-3. [Hardware Requirements](#hardware-requirements)
-4. [Features](#features)
-5. [Latest Changes](#latest-changes)
-6. [Troubleshooting](#troubleshooting)
-7. [Contributing](#contributing)
-8. [Contributors](#contributors)
-9. [Support](#support)
-10. [Further Reading](#further-reading)
+Table of Contents 📝
 
-## Getting Started with InvokeAI
+**Getting Started**
+1. 🏁 [Quick Start](#quick-start) 
+3. 🖥️ [Hardware Requirements](#hardware-requirements) 
+
+**More About Invoke**
+1. 🌟 [Features](#features) 
+2. 📣 [Latest Changes](#latest-changes) 
+3. 🛠️ [Troubleshooting](#troubleshooting) 
+
+**Supporting the Project**
+1. 🤝 [Contributing](#contributing) 
+2. 👥 [Contributors](#contributors) 
+3. 💕 [Support](#support) 
+
+## Quick Start
 
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
@@ -75,9 +81,8 @@ For full installation and upgrade instructions, please see:
 
 3. Unzip the file.
 
-4. If you are on Windows, double-click on the `install.bat` script. On
-macOS, open a Terminal window, drag the file `install.sh` from Finder
-into the Terminal, and press return. On Linux, run `install.sh`.
+4. **Windows:** double-click on the `install.bat` script. **macOS:** Open a Terminal window, drag the file `install.sh` from Finder
+into the Terminal, and press return. **Linux:** run `install.sh`.
 
 5. You'll be asked to confirm the location of the folder in which
 to install InvokeAI and its image generation model files. Pick a
@@ -103,89 +108,9 @@ and go to http://localhost:9090.
 
 10. Type `banana sushi` in the box on the top left and click `Invoke`
 
-### Command-Line Installation (for users familiar with Terminals)
+### Command-Line Installation (for developers and users familiar with Terminals)
 
-You must have Python 3.9 or 3.10 installed on your machine. Earlier or later versions are
-not supported.
-
-1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
-2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:
-
-    ```terminal
-    mkdir invokeai
-    ````
-
-3. Create a virtual environment named `.venv` inside this directory and activate it:
-
-    ```terminal
-    cd invokeai
-    python -m venv .venv --prompt InvokeAI
-    ```
-
-4. Activate the virtual environment (do it every time you run InvokeAI)
-
-    _For Linux/Mac users:_
-
-    ```sh
-    source .venv/bin/activate
-    ```
-
-    _For Windows users:_
-
-    ```ps
-    .venv\Scripts\activate
-    ```
-
-5. Install the InvokeAI module and its dependencies. Choose the command suited for your platform & GPU.
-
-    _For Windows/Linux with an NVIDIA GPU:_
-
-    ```terminal
-    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
-    ```
-
-    _For Linux with an AMD GPU:_
-
-    ```sh
-    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
-    ```
-
-    _For non-GPU systems:_
-    ```terminal
-    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
-    ``` 
-
-    _For Macintoshes, either Intel or M1/M2:_
-
-    ```sh
-    pip install InvokeAI --use-pep517
-    ```
-
-6. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
-
-    ```terminal
-    invokeai-configure
-    ```
-
-7. Launch the web server (do it every time you run InvokeAI):
-
-    ```terminal
-    invokeai --web
-    ```
-
-8. Point your browser to http://localhost:9090 to bring up the web interface.
-9. Type `banana sushi` in the box on the top left and click `Invoke`.
-
-Be sure to activate the virtual environment each time before re-launching InvokeAI,
-using `source .venv/bin/activate` or `.venv\Scripts\activate`.
-
-### Detailed Installation Instructions
-
-This fork is supported across Linux, Windows and Macintosh. Linux
-users can use either an Nvidia-based card (with CUDA support) or an
-AMD card (using the ROCm driver). For full installation and upgrade
-instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_SOURCE/)
+Please see [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/) for more details on installing and managing your virtual environment manually.
 
 ## Hardware Requirements
 
@@ -205,13 +130,9 @@ We do not recommend the GTX 1650 or 1660 series video cards. They are
 unable to run in half-precision mode and do not have sufficient VRAM
 to render 512x512 images.
 
-### Memory
+**Memory** - At least 12 GB Main Memory RAM.
 
-- At least 12 GB Main Memory RAM.
-
-### Disk
-
-- At least 12 GB of free disk space for the machine learning model, Python, and all its dependencies.
+**Disk** - At least 12 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
 ## Features
 
@@ -227,7 +148,7 @@ The Unified Canvas is a fully integrated canvas implementation with support for 
 
 ### *Advanced Prompt Syntax*
 
-InvokeAI's advanced prompt syntax allows for token weighting, cross-attention control, and prompt blending, allowing for fine-tuned tweaking of your invocations and exploration of the latent space.
+Invoke AI's advanced prompt syntax allows for token weighting, cross-attention control, and prompt blending, allowing for fine-tuned tweaking of your invocations and exploration of the latent space. 
 
 ### *Command Line Interface*
 
@@ -237,16 +158,12 @@ For users utilizing a terminal-based environment, or who want to take advantage 
 
 - *Support for both ckpt and diffusers models*
 - *SD 2.0, 2.1 support*
-- *Noise Control & Tresholding*
-- *Popular Sampler Support*
 - *Upscaling & Face Restoration Tools*
 - *Embedding Manager & Support*
 - *Model Manager & Support*
-
-### Coming Soon
-
-- *Node-Based Architecture & UI*
-- And more...
+- *Node-Based Architecture*
+- *Node-Based Plug-&-Play UI (Beta)*
+- *Boards & Gallery Management
 
 ### Latest Changes
 
@@ -254,12 +171,12 @@ For our latest changes, view our [Release
 Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 [CHANGELOG](docs/CHANGELOG.md).
 
-## Troubleshooting
+### Troubleshooting
 
 Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
 problems and other issues.
 
-## Contributing
+## 🤝 Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
 cleanup, testing, or code reviews, is very much encouraged to do so.
@@ -278,13 +195,11 @@ to become part of our community.
 
 Welcome to InvokeAI!
 
-### Contributors
+### 👥 Contributors
 
 This fork is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for
 their time, hard work and effort.
-
-Thanks to [Weblate](https://weblate.org/) for generously providing translation services to this project.
 
 ### Support
 
