@@ -317,6 +317,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         requires_safety_checker: bool = False,
         precision: str = "float32",
         control_model: ControlNetModel = None,
+        execution_device: Optional[torch.device] = None,
     ):
         super().__init__(
             vae,
@@ -356,7 +357,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             textual_inversion_manager=self.textual_inversion_manager,
         )
 
-        self._model_group = FullyLoadedModelGroup(self.unet.device)
+        self._model_group = FullyLoadedModelGroup(execution_device or self.unet.device)
         self._model_group.install(*self._submodels)
         self.control_model = control_model
 
