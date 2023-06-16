@@ -22,11 +22,10 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 const UpdateImageBoardModal = () => {
   const boards = useSelector(selectBoardsAll);
-  const [selectedBoard, setSelectedBoard] = useState<string | null>(null);
-
   const { isOpen, onClose, handleAddToBoard, image } = useContext(
     AddImageToBoardContext
   );
+  const [selectedBoard, setSelectedBoard] = useState<string | null>();
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -50,10 +49,12 @@ const UpdateImageBoardModal = () => {
           <AlertDialogBody>
             <Box>
               <Flex direction="column" gap={3}>
-                <Text>
-                  Moving this image to a board will remove it from its existing
-                  board.
-                </Text>
+                {currentBoard && (
+                  <Text>
+                    Moving this image from{' '}
+                    <strong>{currentBoard.board_name}</strong> to
+                  </Text>
+                )}
                 <IAIMantineSelect
                   placeholder="Select Board"
                   onChange={(v) => setSelectedBoard(v)}

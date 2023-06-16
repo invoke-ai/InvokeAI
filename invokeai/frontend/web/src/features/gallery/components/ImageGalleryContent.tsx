@@ -240,39 +240,10 @@ const ImageGalleryContent = () => {
             icon={<FaServer />}
           />
         </ButtonGroup>
-        {selectedBoard && (
-          <Flex>
-            <Text>{selectedBoard.board_name}</Text>
-          </Flex>
-        )}
+        <Flex>
+          <Text>{selectedBoard ? selectedBoard.board_name : 'All Images'}</Text>
+        </Flex>
         <Flex gap={2}>
-          {/* <IAIPopover
-            triggerComponent={
-              <IAIIconButton
-                tooltip="Add Board"
-                aria-label="Add Board"
-                size="sm"
-                icon={<FaPlus />}
-              />
-            }
-          >
-            <Flex direction="column" gap={2}>
-              <IAIInput
-                label="Board Name"
-                placeholder="Board Name"
-                value={newBoardName}
-                onChange={(e) => setNewBoardName(e.target.value)}
-              />
-              <IAIButton
-                size="sm"
-                onClick={handleCreateNewBoard}
-                disabled={true}
-                isLoading={false}
-              >
-                Create
-              </IAIButton>
-            </Flex>
-          </IAIPopover> */}
           <IAIPopover
             triggerComponent={
               <IAIIconButton
