@@ -4,19 +4,34 @@ import {
   EditableInput,
   EditablePreview,
   Flex,
-  Icon,
-  Image,
   MenuItem,
   MenuList,
 } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
-import { FaFolder, FaTrash } from 'react-icons/fa';
+import { FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import { BoardDTO } from 'services/api';
+import { BoardDTO, ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/boardSlice';
-import { boardDeleted, boardUpdated } from '../../../../services/thunks/board';
+import {
+  boardDeleted,
+  boardUpdated,
+  imageAddedToBoard,
+} from '../../../../services/thunks/board';
+import { selectImagesAll } from '../../store/imagesSlice';
+import IAIDndImage from '../../../../common/components/IAIDndImage';
+import { defaultSelectorOptions } from '../../../../app/store/util/defaultMemoizeOptions';
+import { createSelector } from '@reduxjs/toolkit';
+
+const selector = createSelector(
+  [selectImagesAll],
+  (images) => {
+    return { images };
+  },
+  defaultSelectorOptions
+);
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -25,6 +40,7 @@ interface HoverableBoardProps {
 
 const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const dispatch = useAppDispatch();
+  const { images } = useAppSelector(selector);
 
   const { board_name, board_id, cover_image_url } = board;
 
@@ -44,6 +60,23 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
       })
     );
   };
+
+  const handleDrop = useCallback(
+    (droppedImage: ImageDTO) => {
+      if (droppedImage.board_id === board_id) {
+        return;
+      }
+      dispatch(
+        imageAddedToBoard({
+          requestBody: {
+            board_id,
+            image_name: droppedImage.image_name,
+          },
+        })
+      );
+    },
+    [board_id, dispatch]
+  );
 
   return (
     <Box sx={{ touchAction: 'none' }}>
@@ -91,19 +124,12 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 overflow: 'hidden',
               }}
             >
-              {cover_image_url ? (
-                <Image
-                  loading="lazy"
-                  objectFit="cover"
-                  draggable={false}
-                  rounded="md"
-                  src={cover_image_url}
-                  fallback={<IAIImageFallback />}
-                  sx={{}}
-                />
-              ) : (
-                <Icon boxSize={8} color="base.700" as={FaFolder} />
-              )}
+              <IAIDndImage
+                image={cover_image_url ? images[0] : undefined}
+                onDrop={handleDrop}
+                fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
+                isUploadDisabled={true}
+              />
             </Flex>
 
             <Editable
