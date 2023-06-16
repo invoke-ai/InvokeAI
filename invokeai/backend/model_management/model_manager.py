@@ -305,7 +305,8 @@ class ModelManager(object):
     ) -> str:
         return f"{base_model}/{model_type}/{model_name}"
 
-    def parse_key(self, model_key: str) -> Tuple[str, BaseModelType, ModelType]:
+    @classmethod
+    def parse_key(cls, model_key: str) -> Tuple[str, BaseModelType, ModelType]:
         base_model_str, model_type_str, model_name = model_key.split('/', 2)
         try:
             model_type = ModelType(model_type_str)
@@ -548,7 +549,7 @@ class ModelManager(object):
                 line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
 
-    # TODO: test when ui implemented
+    # Tested - LS
     def del_model(
         self,
         model_name: str,
@@ -558,7 +559,6 @@ class ModelManager(object):
         """
         Delete the named model.
         """
-        raise Exception("TODO: del_model") # TODO: redo
         model_key = self.create_key(model_name, base_model, model_type)
         model_cfg = self.models.pop(model_key, None)
 
@@ -574,10 +574,11 @@ class ModelManager(object):
             self.cache.uncache_model(cache_id)
 
         # if model inside invoke models folder - delete files
-        if model_cfg.path.startswith("models/") or model_cfg.path.startswith("models\\"):
-            model_path = self.globals.root_dir / model_cfg.path
-            if model_path.isdir():
-                shutil.rmtree(str(model_path))
+        model_path = self.globals.root_path / model_cfg.path
+
+        if model_path.is_relative_to(self.globals.models_path):
+            if model_path.is_dir():
+                rmtree(str(model_path))
             else:
                 model_path.unlink()
 
@@ -712,5 +713,5 @@ class ModelManager(object):
                         self.models[model_key] = model_config
                         new_models_found = True
 
-        if new_models_found:
+        if new_models_found and self.config_path:
             self.commit()

@@ -9,7 +9,7 @@ import warnings
 from dataclasses import dataclass,field
 from pathlib import Path
 from tempfile import TemporaryFile
-from typing import List, Dict, Callable
+from typing import List, Dict, Set, Callable
 
 import requests
 from diffusers import AutoencoderKL
@@ -20,8 +20,8 @@ from tqdm import tqdm
 
 import invokeai.configs as configs
 
-
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
 from ..util.logging import InvokeAILogger
 
@@ -62,7 +62,6 @@ class ModelInstallList:
 class UserSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-    purge_deleted_models: bool=field(default_factory=list)
     install_cn_models: List[str] = field(default_factory=list)
     remove_cn_models: List[str] = field(default_factory=list)
     install_lora_models: List[str] = field(default_factory=list)
@@ -72,6 +71,64 @@ class UserSelections():
     scan_directory: Path = None
     autoscan_on_startup: bool=False
     import_model_paths: str=None
+
+@dataclass
+class ModelLoadInfo():
+    name: str
+    model_type: ModelType
+    base_type: BaseModelType
+    path: Path = None
+    repo_id: str = None
+    description: str = ''
+    installed: bool = False
+    recommended: bool = False
+    
+class ModelInstall(object):
+    def __init__(self,config:InvokeAIAppConfig):
+        self.config = config
+        self.mgr = ModelManager(config.model_conf_path)
+        self.datasets = OmegaConf.load(Dataset_path)
+
+    def all_models(self)->Dict[str,ModelLoadInfo]:
+        '''
+        Return dict of model_key=>ModelStatus
+        '''
+        model_dict = dict()
+        # first populate with the entries in INITIAL_MODELS.yaml
+        for key, value in self.datasets.items():
+            name,base,model_type = ModelManager.parse_key(key)
+            value['name'] = name
+            value['base_type'] = base
+            value['model_type'] = model_type
+            model_dict[key] = ModelLoadInfo(**value)
+
+        # supplement with entries in models.yaml
+        installed_models = self.mgr.list_models()
+        for base in installed_models.keys():
+            for model_type in installed_models[base].keys():
+                for name, value in installed_models[base][model_type].items():
+                    key = ModelManager.create_key(name, base, model_type)
+                    if key in model_dict:
+                        model_dict[key].installed = True
+                    else:
+                        model_dict[key] = ModelLoadInfo(
+                            name = name,
+                            base_type = base,
+                            model_type = model_type,
+                            description = value.get('description'),
+                            path = value.get('path'),
+                            installed = True,
+                        )
+        return {x : model_dict[x] for x in sorted(model_dict.keys(),key=lambda y: model_dict[y].name.lower())}
+
+    def starter_models(self)->Set[str]:
+        models = set()
+        for key, value in self.datasets.items():
+            name,base,model_type = ModelManager.parse_key(key)
+            if model_type==ModelType.Pipeline:
+                models.add(key)
+        return models
+        
         
 def default_config_file():
     return config.model_conf_path
@@ -85,6 +142,15 @@ def initial_models():
         return Datasets
     return (Datasets := OmegaConf.load(Dataset_path)['diffusers'])
 
+def add_models(model_manager, config_file_path: Path, models: List[tuple[str,str,str]]):
+    print(f'Installing {models}')
+
+def del_models(model_manager, config_file_path: Path, models: List[tuple[str,str,str]]):
+    for base, model_type, name in models:
+                logger.info(f"Deleting {name}...")
+                model_manager.del_model(name, base, model_type)
+    model_manager.commit(config_file_path)
+        
 def install_requested_models(
         diffusers: ModelInstallList = None,
         controlnet: ModelInstallList = None,
@@ -95,9 +161,8 @@ def install_requested_models(
         external_models: List[str] = None,
         scan_at_startup: bool = False,
         precision: str = "float16",
-        purge_deleted: bool = False,
         config_file_path: Path = None,
-        model_config_file_callback:  Callable[[Path],Path] = None
+        model_config_file_callback:  Callable[[Path],Path] = None,
 ):
     """
     Entry point for installing/deleting starter models, or installing external models.
@@ -110,40 +175,27 @@ def install_requested_models(
     # prevent circular import here
     from ..model_management import ModelManager
     model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
-    if controlnet:
-        model_manager.install_controlnet_models(controlnet.install_models, access_token=access_token)
-        model_manager.delete_controlnet_models(controlnet.remove_models)
 
-    if lora:
-        model_manager.install_lora_models(lora.install_models, access_token=access_token)
-        model_manager.delete_lora_models(lora.remove_models)
+    for x in [controlnet, lora, ti, diffusers]:
+        if x:
+            add_models(model_manager, config_file_path, x.install_models)
+            del_models(model_manager, config_file_path, x.remove_models)
+            
+    # if diffusers:
 
-    if ti:
-        model_manager.install_ti_models(ti.install_models, access_token=access_token)
-        model_manager.delete_ti_models(ti.remove_models)
-
-    if diffusers:
-        # TODO: Replace next three paragraphs with calls into new model manager
-        if diffusers.remove_models and len(diffusers.remove_models) > 0:
-            logger.info("Processing requested deletions")
-            for model in diffusers.remove_models:
-                logger.info(f"{model}...")
-                model_manager.del_model(model, delete_files=purge_deleted)
-            model_manager.commit(config_file_path)
-
-        if diffusers.install_models and len(diffusers.install_models) > 0:
-            logger.info("Installing requested models")
-            downloaded_paths = download_weight_datasets(
-                models=diffusers.install_models,
-                access_token=None,
-                precision=precision,
-            )
-            successful = {x:v for x,v in downloaded_paths.items() if v is not None}
-            if len(successful) > 0:
-                update_config_file(successful, config_file_path)
-            if len(successful) < len(diffusers.install_models):
-                unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
-                logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
+    #     if diffusers.install_models and len(diffusers.install_models) > 0:
+    #         logger.info("Installing requested models")
+    #         downloaded_paths = download_weight_datasets(
+    #             models=diffusers.install_models,
+    #             access_token=None,
+    #             precision=precision,
+    #         )
+    #         successful = {x:v for x,v in downloaded_paths.items() if v is not None}
+    #         if len(successful) > 0:
+    #             update_config_file(successful, config_file_path)
+    #         if len(successful) < len(diffusers.install_models):
+    #             unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
+    #             logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
 
     # due to above, we have to reload the model manager because conf file
     # was changed behind its back
@@ -156,8 +208,8 @@ def install_requested_models(
     if len(external_models) > 0:
         logger.info("INSTALLING EXTERNAL MODELS")
         for path_url_or_repo in external_models:
+            logger.debug(path_url_or_repo)
             try:
-                logger.debug(f'In install_requested_models; callback = {model_config_file_callback}')
                 model_manager.heuristic_import(
                     path_url_or_repo,
                     commit_to_conf=config_file_path,
@@ -280,21 +332,18 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
 
 # ---------------------------------------------
 def download_from_hf(
-    model_class: object, model_name: str, **kwargs
+        model_class: object, model_name: str, destination: Path, **kwargs
 ):
     logger = InvokeAILogger.getLogger('InvokeAI')
     logger.addFilter(lambda x: 'fp16 is not a valid' not in x.getMessage())
     
-    path = config.cache_dir
     model = model_class.from_pretrained(
         model_name,
-        cache_dir=path,
         resume_download=True,
         **kwargs,
     )
-    model_name = "--".join(("models", *model_name.split("/")))
-    return path / model_name if model else None
-
+    model.save_pretrained(destination, safe_serialization=True)
+    return destination
 
 def _download_diffusion_weights(
     mconfig: DictConfig, access_token: str, precision: str = "float32"

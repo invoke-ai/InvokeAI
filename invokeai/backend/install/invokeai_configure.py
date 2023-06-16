@@ -16,6 +16,7 @@ import shutil
 import textwrap
 import traceback
 import warnings
+import yaml
 from argparse import Namespace
 from pathlib import Path
 from shutil import get_terminal_size
@@ -25,6 +26,7 @@ from urllib import request
 import npyscreen
 import transformers
 from diffusers import AutoencoderKL
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
@@ -34,6 +36,8 @@ from transformers import (
     CLIPSegForImageSegmentation,
     CLIPTextModel,
     CLIPTokenizer,
+    AutoFeatureExtractor,
+    BertTokenizerFast,
 )
 import invokeai.configs as configs
 
@@ -58,6 +62,9 @@ from invokeai.backend.install.model_install_backend import (
     recommended_datasets,
     UserSelections,
 )
+from invokeai.backend.model_management.model_probe import (
+    ModelProbe, ModelType, BaseModelType, SchedulerPredictionType
+    )
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -81,7 +88,7 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # or renaming it and then running invokeai-configure again.
 """
 
-logger=None
+logger=InvokeAILogger.getLogger()
 
 # --------------------------------------------
 def postscript(errors: None):
@@ -162,75 +169,91 @@ class ProgressBar:
 # ---------------------------------------------
 def download_with_progress_bar(model_url: str, model_dest: str, label: str = "the"):
     try:
-        print(f"Installing {label} model file {model_url}...", end="", file=sys.stderr)
+        logger.info(f"Installing {label} model file {model_url}...")
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
             request.urlretrieve(
                 model_url, model_dest, ProgressBar(os.path.basename(model_dest))
             )
-            print("...downloaded successfully", file=sys.stderr)
+            logger.info("...downloaded successfully")
         else:
-            print("...exists", file=sys.stderr)
+            logger.info("...exists")
     except Exception:
-        print("...download failed", file=sys.stderr)
-        print(f"Error downloading {label} model", file=sys.stderr)
+        logger.info("...download failed")
+        logger.info(f"Error downloading {label} model")
         print(traceback.format_exc(), file=sys.stderr)
 
 
-# ---------------------------------------------
-# this will preload the Bert tokenizer fles
-def download_bert():
-    print("Installing bert tokenizer...", file=sys.stderr)
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        from transformers import BertTokenizerFast
+def download_conversion_models():
+    target_dir = config.root_path / 'models/core/convert'
+    kwargs = dict()  # for future use
+    try:
+        logger.info('Downloading core tokenizers and text encoders')
 
-        download_from_hf(BertTokenizerFast, "bert-base-uncased")
+        # bert
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            bert = BertTokenizerFast.from_pretrained("bert-base-uncased", **kwargs)
+            bert.save_pretrained(target_dir / 'bert-base-uncased', safe_serialization=True)
+        
+        # sd-1
+        repo_id = 'openai/clip-vit-large-patch14'
+        download_from_hf(CLIPTokenizer, repo_id, target_dir / 'clip-vit-large-patch14')
+        download_from_hf(CLIPTextModel, repo_id, target_dir / 'clip-vit-large-patch14')
 
+        # sd-2
+        repo_id = "stabilityai/stable-diffusion-2"
+        pipeline = CLIPTokenizer.from_pretrained(repo_id, subfolder="tokenizer", **kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'tokenizer', safe_serialization=True)
 
-# ---------------------------------------------
-def download_sd1_clip():
-    print("Installing SD1 clip model...", file=sys.stderr)
-    version = "openai/clip-vit-large-patch14"
-    download_from_hf(CLIPTokenizer, version)
-    download_from_hf(CLIPTextModel, version)
+        pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'text_encoder', safe_serialization=True)
 
+        # VAE
+        logger.info('Downloading stable diffusion VAE')
+        vae = AutoencoderKL.from_pretrained('stabilityai/sd-vae-ft-mse', **kwargs)
+        vae.save_pretrained(target_dir / 'sd-vae-ft-mse', safe_serialization=True)
 
-# ---------------------------------------------
-def download_sd2_clip():
-    version = "stabilityai/stable-diffusion-2"
-    print("Installing SD2 clip model...", file=sys.stderr)
-    download_from_hf(CLIPTokenizer, version, subfolder="tokenizer")
-    download_from_hf(CLIPTextModel, version, subfolder="text_encoder")
+        # safety checking
+        logger.info('Downloading safety checker')
+        repo_id = "CompVis/stable-diffusion-safety-checker"
+        pipeline = AutoFeatureExtractor.from_pretrained(repo_id,**kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-safety-checker', safe_serialization=True)
 
+        pipeline = StableDiffusionSafetyChecker.from_pretrained(repo_id,**kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-safety-checker', safe_serialization=True)
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        logger.error(str(e))
 
 # ---------------------------------------------
 def download_realesrgan():
-    print("Installing models from RealESRGAN...", file=sys.stderr)
+    logger.info("Installing models from RealESRGAN...")
     model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
-    model_dest = config.root_path / "models/realesrgan/realesr-general-x4v3.pth"
-    wdn_model_dest = config.root_path / "models/realesrgan/realesr-general-wdn-x4v3.pth"
+    model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-x4v3.pth"
+    wdn_model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
 
     download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
     download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
 
 
 def download_gfpgan():
-    print("Installing GFPGAN models...", file=sys.stderr)
+    logger.info("Installing GFPGAN models...")
     for model in (
         [
             "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
-            "./models/gfpgan/GFPGANv1.4.pth",
+            "./models/core/face_restoration/gfpgan/GFPGANv1.4.pth",
         ],
         [
             "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-            "./models/gfpgan/weights/detection_Resnet50_Final.pth",
+            "./models/core/face_restoration/gfpgan/weights/detection_Resnet50_Final.pth",
         ],
         [
             "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
-            "./models/gfpgan/weights/parsing_parsenet.pth",
+            "./models/core/face_restoration/gfpgan/weights/parsing_parsenet.pth",
         ],
     ):
         model_url, model_dest = model[0], config.root_path / model[1]
@@ -239,70 +262,32 @@ def download_gfpgan():
 
 # ---------------------------------------------
 def download_codeformer():
-    print("Installing CodeFormer model file...", file=sys.stderr)
+    logger.info("Installing CodeFormer model file...")
     model_url = (
         "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     )
-    model_dest = config.root_path / "models/codeformer/codeformer.pth"
+    model_dest = config.root_path / "models/core/face_restoration/codeformer/codeformer.pth"
     download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
 
 
 # ---------------------------------------------
 def download_clipseg():
-    print("Installing clipseg model for text-based masking...", file=sys.stderr)
+    logger.info("Installing clipseg model for text-based masking...")
     CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
     try:
-        download_from_hf(AutoProcessor, CLIPSEG_MODEL)
-        download_from_hf(CLIPSegForImageSegmentation, CLIPSEG_MODEL)
+        download_from_hf(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
+        download_from_hf(CLIPSegForImageSegmentation, CLIPSEG_MODEL,'models/core/misc/clipseg')
     except Exception:
-        print("Error installing clipseg model:")
-        print(traceback.format_exc())
+        logger.info("Error installing clipseg model:")
+        logger.info(traceback.format_exc())
 
 
-# -------------------------------------
-def download_safety_checker():
-    print("Installing model for NSFW content detection...", file=sys.stderr)
-    try:
-        from diffusers.pipelines.stable_diffusion.safety_checker import (
-            StableDiffusionSafetyChecker,
-        )
-        from transformers import AutoFeatureExtractor
-    except ModuleNotFoundError:
-        print("Error installing NSFW checker model:")
-        print(traceback.format_exc())
-        return
-    safety_model_id = "CompVis/stable-diffusion-safety-checker"
-    print("AutoFeatureExtractor...", file=sys.stderr)
-    download_from_hf(AutoFeatureExtractor, safety_model_id)
-    print("StableDiffusionSafetyChecker...", file=sys.stderr)
-    download_from_hf(StableDiffusionSafetyChecker, safety_model_id)
-
-
-# -------------------------------------
-def download_vaes():
-    print("Installing stabilityai VAE...", file=sys.stderr)
-    try:
-        # first the diffusers version
-        repo_id = "stabilityai/sd-vae-ft-mse"
-        args = dict(
-            cache_dir=config.cache_dir,
-        )
-        if not AutoencoderKL.from_pretrained(repo_id, **args):
-            raise Exception(f"download of {repo_id} failed")
-
-        repo_id = "stabilityai/sd-vae-ft-mse-original"
-        model_name = "vae-ft-mse-840000-ema-pruned.ckpt"
-        # next the legacy checkpoint version
-        if not hf_download_with_resume(
-            repo_id=repo_id,
-            model_name=model_name,
-            model_dir=str(config.root_path / Model_dir / Weights_dir),
-        ):
-            raise Exception(f"download of {model_name} failed")
-    except Exception as e:
-        print(f"Error downloading StabilityAI standard VAE: {str(e)}", file=sys.stderr)
-        print(traceback.format_exc(), file=sys.stderr)
-
+def download_support_models():
+    download_realesrgan()
+    download_gfpgan()
+    download_codeformer()
+    download_clipseg()
+    download_conversion_models()
 
 # -------------------------------------
 def get_root(root: str = None) -> str:
@@ -657,17 +642,13 @@ def default_user_selections(program_opts: Namespace) -> UserSelections:
 
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
-    print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
-
+    logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
     for name in (
             "models",
-            "configs",
-            "embeddings",
             "databases",
-            "loras",
-            "controlnets",
             "text-inversion-output",
             "text-inversion-training-data",
+            "configs"
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
 
@@ -675,6 +656,22 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
     configs_dest = root / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
+
+    dest = root / 'models'
+    for model_base in [BaseModelType.StableDiffusion1,BaseModelType.StableDiffusion2]:
+        for model_type in [ModelType.Pipeline, ModelType.Vae, ModelType.Lora,
+                           ModelType.ControlNet,ModelType.TextualInversion]:
+            path = dest / model_base.value / model_type.value
+            path.mkdir(parents=True, exist_ok=True)
+    path = dest / 'core'
+    path.mkdir(parents=True, exist_ok=True)
+
+    with open(root / 'configs' / 'models.yaml','w') as yaml_file:
+        yaml_file.write(yaml.dump({'__metadata__':
+                                   {'version':'3.0.0'}
+                                   }
+                                  )
+                        )
 
 
 # -------------------------------------
@@ -837,7 +834,7 @@ def main():
         old_init_file = config.root_path / 'invokeai.init'
         new_init_file = config.root_path / 'invokeai.yaml'
         if old_init_file.exists() and not new_init_file.exists():
-            print('** Migrating invokeai.init to invokeai.yaml')
+            logger.info('** Migrating invokeai.init to invokeai.yaml')
             migrate_init_file(old_init_file)
             # Load new init file into config
             config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
@@ -855,29 +852,21 @@ def main():
             if init_options:
                 write_opts(init_options, new_init_file)
             else:
-                print(
+                logger.info(
                     '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'
                 )
                 sys.exit(0)
 
         if opt.skip_support_models:
-            print("\n** SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST **")
+            logger.info("SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST")
         else:
-            print("\n** CHECKING/UPDATING SUPPORT MODELS **")
-            download_bert()
-            download_sd1_clip()
-            download_sd2_clip()
-            download_realesrgan()
-            download_gfpgan()
-            download_codeformer()
-            download_clipseg()
-            download_safety_checker()
-            download_vaes()
+            logger.info("CHECKING/UPDATING SUPPORT MODELS")
+            download_support_models()
 
         if opt.skip_sd_weights:
-            print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
+            logger.info("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
         elif models_to_download:
-            print("\n** DOWNLOADING DIFFUSION WEIGHTS **")
+            logger.info("\n** DOWNLOADING DIFFUSION WEIGHTS **")
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)

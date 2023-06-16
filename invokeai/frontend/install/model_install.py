@@ -31,17 +31,17 @@ from omegaconf import OmegaConf
 from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
-    Dataset_path,
+    Dataset_path,  # most of these should go!!
     default_config_file,
     default_dataset,
     install_requested_models,
     recommended_datasets,
     ModelInstallList,
     UserSelections,
+    ModelInstall
 )
-from invokeai.backend import ModelManager
+from invokeai.backend.model_management import ModelManager, BaseModelType, ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import (
     CenteredTitleText,
     MultiSelectColumns,
@@ -58,6 +58,7 @@ from invokeai.frontend.install.widgets import (
 from invokeai.app.services.config import InvokeAIAppConfig
 
 config = InvokeAIAppConfig.get_config()
+logger = InvokeAILogger.getLogger()
 
 # build a table mapping all non-printable characters to None
 # for stripping control characters
@@ -90,25 +91,10 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         if not config.model_conf_path.exists():
             with open(config.model_conf_path,'w') as file:
                 print('# InvokeAI model configuration file',file=file)
-        model_manager = ModelManager(config.model_conf_path)
-        
-        self.starter_models = OmegaConf.load(Dataset_path)['diffusers']
-        self.installed_diffusers_models = self.list_additional_diffusers_models(
-             model_manager,
-             self.starter_models,
-        )
-        self.installed_cn_models = model_manager.list_controlnet_models()
-        self.installed_lora_models = model_manager.list_lora_models()
-        self.installed_ti_models = model_manager.list_ti_models()
-
-        try:
-            self.existing_models = OmegaConf.load(default_config_file())
-        except:
-            self.existing_models = dict()
-            
-        self.starter_model_list = list(self.starter_models.keys())
-        self.installed_models = dict()
-
+        self.installer = ModelInstall(config)
+        self.all_models = self.installer.all_models()
+        self.starter_models = self.installer.starter_models()
+        self.model_labels = self._get_model_labels()        
         window_width, window_height = get_terminal_size()
 
         self.nextrely -= 1
@@ -141,39 +127,36 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             scroll_exit = True,
         )
         self.tabs.on_changed = self._toggle_tables
-        
+
         top_of_table = self.nextrely
-        self.starter_diffusers_models = self.add_starter_diffusers()
+        self.starter_pipelines = self.add_starter_pipelines()
         bottom_of_table = self.nextrely
 
         self.nextrely = top_of_table
-        self.diffusers_models = self.add_diffusers_widgets(
-            predefined_models=self.installed_diffusers_models,
-            model_type='Diffusers',
+        self.pipeline_models = self.add_model_widgets(
+            model_type=ModelType.Pipeline,
             window_width=window_width,
+            exclude = self.starter_models
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
         self.controlnet_models = self.add_model_widgets(
-            predefined_models=self.installed_cn_models,
-            model_type='ControlNet',
+            model_type=ModelType.ControlNet,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
         self.lora_models = self.add_model_widgets(
-            predefined_models=self.installed_lora_models,
-            model_type="LoRA/LyCORIS",
+            model_type=ModelType.Lora,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
         self.ti_models = self.add_model_widgets(
-            predefined_models=self.installed_ti_models,
-            model_type="Textual Inversion Embeddings",
+            model_type=ModelType.TextualInversion,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
@@ -220,18 +203,20 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self._toggle_tables([self.current_tab])
 
     ############# diffusers tab ##########        
-    def add_starter_diffusers(self)->dict[str, npyscreen.widget]:
+    def add_starter_pipelines(self)->dict[str, npyscreen.widget]:
         '''Add widgets responsible for selecting diffusers models'''
         widgets = dict()
-
-        starter_model_labels = self._get_starter_model_labels()
-        recommended_models = [
+        models = self.all_models
+        starters = self.starter_models
+        starter_model_labels = self.model_labels
+        
+        recommended_models = set([
             x
-            for x in self.starter_model_list
-            if self.starter_models[x].get("recommended", False)
-        ]
+            for x in starters
+            if models[x].recommended
+        ])
         self.installed_models = sorted(
-            [x for x in list(self.starter_models.keys()) if x in self.existing_models]
+            [x for x in starters if models[x].installed]
         )
 
         widgets.update(
@@ -246,55 +231,46 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.nextrely -= 1
         # if user has already installed some initial models, then don't patronize them
         # by showing more recommendations
-        show_recommended = not self.existing_models
+        show_recommended = len(self.installed_models)==0
+        keys = [x for x in models.keys() if x in starters]
         widgets.update(
             models_selected = self.add_widget_intelligent(
                 MultiSelectColumns,
                 columns=1,
                 name="Install Starter Models",
-                values=starter_model_labels,
+                values=[starter_model_labels[x] for x in keys],
                 value=[
-                    self.starter_model_list.index(x)
-                    for x in self.starter_model_list
-                    if (show_recommended and x in recommended_models)\
-                    or (x in self.existing_models)
+                    keys.index(x)
+                    for x in keys
+                    if (show_recommended and models[x].recommended) \
+                    or (x in self.installed_models)
                 ],
-                max_height=len(starter_model_labels) + 1,
+                max_height=len(starters) + 1,
                 relx=4,
                 scroll_exit=True,
-            )
+            ),
+            models = keys,
         )
 
-        widgets.update(
-            purge_deleted = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name="Purge unchecked diffusers models from disk",
-                value=False,
-                scroll_exit=True,
-                relx=4,
-            )
-        )
-        widgets['purge_deleted'].when_value_edited = lambda: self.sync_purge_buttons(widgets['purge_deleted'])
-        
         self.nextrely += 1
         return widgets
 
     ############# Add a set of model install widgets ########
     def add_model_widgets(self,
-                          predefined_models: dict[str,bool],
-                          model_type: str,
+                          model_type: ModelType,
                           window_width: int=120,
                           install_prompt: str=None,
-                          add_purge_deleted: bool=False,
+                          exclude: set=set(),
                           )->dict[str,npyscreen.widget]:
         '''Generic code to create model selection widgets'''
         widgets = dict()
-        model_list = sorted(predefined_models.keys())
+        model_list = [x for x in self.all_models if self.all_models[x].model_type==model_type and not x in exclude]
+        model_labels = [self.model_labels[x] for x in model_list]
         if len(model_list) > 0:
-            max_width = max([len(x) for x in model_list])
+            max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width+8)  # 8 characters for "[x] " and padding
             columns = min(len(model_list),columns) or 1
-            prompt = install_prompt or f"Select the desired {model_type} models to install. Unchecked models will be purged from disk."
+            prompt = install_prompt or f"Select the desired {model_type.value.title()} models to install. Unchecked models will be purged from disk."
 
             widgets.update(
                 label1 = self.add_widget_intelligent(
@@ -310,30 +286,18 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     MultiSelectColumns,
                     columns=columns,
                     name=f"Install {model_type} Models",
-                    values=model_list,
+                    values=model_labels,
                     value=[
                         model_list.index(x)
                         for x in model_list
-                        if predefined_models[x]
+                        if self.all_models[x].installed
                     ],
                     max_height=len(model_list)//columns + 1,
                     relx=4,
                     scroll_exit=True,
-                )
+                ),
+                models = model_list,
             )
-
-            if add_purge_deleted:
-                self.nextrely += 1
-                widgets.update(
-                    purge_deleted = self.add_widget_intelligent(
-                        npyscreen.Checkbox,
-                        name="Purge unchecked diffusers models from disk",
-                        value=False,
-                        scroll_exit=True,
-                        relx=4,
-                    )
-                )
-                widgets['purge_deleted'].when_value_edited = lambda: self.sync_purge_buttons(widgets['purge_deleted'])
 
         self.nextrely += 1
         widgets.update(
@@ -349,18 +313,15 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
     ### Tab for arbitrary diffusers widgets ###
     def add_diffusers_widgets(self,
-                              predefined_models: dict[str,bool],
-                              model_type: str='Diffusers',
+                              model_type: ModelType=ModelType.Pipeline,
                               window_width: int=120,
                               )->dict[str,npyscreen.widget]:
         '''Similar to add_model_widgets() but adds some additional widgets at the bottom
         to support the autoload directory'''
         widgets = self.add_model_widgets(
-            predefined_models,
-            'Diffusers',
-            window_width,
-            install_prompt="Additional diffusers models already installed.",
-            add_purge_deleted=True
+            model_type = model_type,
+            window_width = window_width,
+            install_prompt=f"Additional {model_type.value.title()} models already installed.",
         )
 
         label = "Directory to scan for models to automatically import (<tab> autocompletes):"
@@ -390,21 +351,17 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         )
         return widgets
 
-    def sync_purge_buttons(self,checkbox):
-        value = checkbox.value
-        self.starter_diffusers_models['purge_deleted'].value = value
-        self.diffusers_models['purge_deleted'].value = value
-        
     def resize(self):
         super().resize()
-        if (s := self.starter_diffusers_models.get("models_selected")):
-            s.values = self._get_starter_model_labels()
+        if (s := self.starter_pipelines.get("models_selected")):
+            keys = [x for x in self.all_models.keys() if x in self.starter_models]
+            s.values = [self.model_labels[x] for x in keys]
 
     def _toggle_tables(self, value=None):
         selected_tab = value[0]
         widgets = [
-            self.starter_diffusers_models,
-            self.diffusers_models,
+            self.starter_pipelines,
+            self.pipeline_models,
             self.controlnet_models,
             self.lora_models,
             self.ti_models,
@@ -412,34 +369,38 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         for group in widgets:
             for k,v in group.items():
-                v.hidden = True
-                v.editable = False
+                try:
+                    v.hidden = True
+                    v.editable = False
+                except:
+                    pass
         for k,v in widgets[selected_tab].items():
-            v.hidden = False
-            if not isinstance(v,(npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
-                v.editable = True
+            try:
+                v.hidden = False
+                if not isinstance(v,(npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
+                    v.editable = True
+            except:
+                pass
         self.__class__.current_tab = selected_tab  # for persistence
         self.display()
 
-    def _get_starter_model_labels(self) -> List[str]:
+    def _get_model_labels(self) -> dict[str,str]:
         window_width, window_height = get_terminal_size()
-        label_width = 25
         checkbox_width = 4
         spacing_width = 2
+        
+        models = self.all_models
+        label_width = max([len(models[x].name) for x in models])
         description_width = window_width - label_width - checkbox_width - spacing_width
-        im = self.starter_models
-        names = self.starter_model_list
-        descriptions = [
-            im[x].description[0 : description_width - 3] + "..."
-            if len(im[x].description) > description_width
-            else im[x].description
-            for x in names
-        ]
-        return [
-            f"%-{label_width}s %s" % (names[x], descriptions[x])
-            for x in range(0, len(names))
-        ]
 
+        result = dict()
+        for x in models.keys():
+            description = models[x].description
+            description = description[0 : description_width - 3] + "..." \
+                if description and len(description) > description_width \
+                   else description if description else ''
+            result[x] =  f"%-{label_width}s %s" % (models[x].name, description)
+        return result
             
     def _get_columns(self) -> int:
         window_width, window_height = get_terminal_size()
@@ -548,8 +509,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        autoload_dir = self.diffusers_models['autoload_directory'].value
-        autoscan = self.diffusers_models['autoscan_on_startup'].value
+        autoload_dir = self.pipeline_models['autoload_directory'].value
+        autoscan = self.pipeline_models['autoscan_on_startup'].value
         
         app.main_form = app.addForm(
             "MAIN", addModelsForm, name="Install Stable Diffusion Models", multipage=self.multipage,
@@ -558,23 +519,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         app.main_form.monitor.entry_widget.values = saved_messages
         app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
-        app.main_form.diffusers_models['autoload_directory'].value = autoload_dir
-        app.main_form.diffusers_models['autoscan_on_startup'].value = autoscan
-        
-    ###############################################################
-    
-    def list_additional_diffusers_models(self,
-                                         manager: ModelManager,
-                                         starters:dict
-                                         )->dict[str,bool]:
-        '''Return a dict of all the currently installed models that are not on the starter list'''
-        model_info = manager.list_models()
-        additional_models = {
-            x:True for x in model_info \
-            if model_info[x]['format']=='diffusers' \
-            and x not in starters
-        }
-        return additional_models
+        app.main_form.pipeline_models['autoload_directory'].value = autoload_dir
+        app.main_form.pipeline_models['autoscan_on_startup'].value = autoscan
         
     def marshall_arguments(self):
         """
@@ -591,24 +537,20 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         selections = self.parentApp.user_selections
 
         # Starter models to install/remove
-        starter_models = dict(
-            map(
-                lambda x: (self.starter_model_list[x], True),
-                self.starter_diffusers_models['models_selected'].value,
-            )
-        )
-        selections.purge_deleted_models = self.starter_diffusers_models['purge_deleted'].value or \
-            self.diffusers_models['purge_deleted'].value
-        
-        selections.install_models = [x for x in starter_models if x not in self.existing_models]
-        selections.remove_models = [x for x in self.starter_model_list if x in self.existing_models and x not in starter_models]
-
+        # TO DO - turn these into a dict so we don't have to hard-code the attributes
+        print(f'installed={[x for x in self.all_models if self.all_models[x].installed]}',file=f)
+        for section in [self.starter_pipelines, self.pipeline_models,
+                        self.controlnet_models, self.lora_models, self.ti_models]:
+            selected = set([section['models'][x] for x in section['models_selected'].value])
+            models_to_install = [x for x in selected if not self.all_models[x].installed]
+            models_to_remove = [x for x in section['models'] if x not in selected and self.all_models[x].installed]
+                            
         # "More" models
-        selections.import_model_paths = self.diffusers_models['download_ids'].value.split()
-        if diffusers_selected := self.diffusers_models.get('models_selected'):
+        selections.import_model_paths = self.pipeline_models['download_ids'].value.split()
+        if diffusers_selected := self.pipeline_models.get('models_selected'):
             selections.remove_models.extend([x
                                              for x in diffusers_selected.values
-                                             if self.installed_diffusers_models[x]
+                                             if self.installed_pipeline_models[x]
                                              and diffusers_selected.values.index(x) not in diffusers_selected.value
                                              ]
                                             )
@@ -659,9 +601,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             selections.install_ti_models.extend(additional_tis)
             
         # load directory and whether to scan on startup
-        selections.scan_directory = self.diffusers_models['autoload_directory'].value
-        selections.autoscan_on_startup = self.diffusers_models['autoscan_on_startup'].value
-
+        selections.scan_directory = self.pipeline_models['autoload_directory'].value
+        selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
 
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self,opt):
@@ -761,19 +702,19 @@ def process_and_execute(opt: Namespace,
     directory_to_scan = selections.scan_directory
     scan_at_startup = selections.autoscan_on_startup
     potential_models_to_install = selections.import_model_paths
+    name_map = selections.model_name_map
 
     install_requested_models(
-        diffusers = ModelInstallList(models_to_install, models_to_remove),
-        controlnet = ModelInstallList(selections.install_cn_models, selections.remove_cn_models),
-        lora = ModelInstallList(selections.install_lora_models, selections.remove_lora_models),
-        ti = ModelInstallList(selections.install_ti_models, selections.remove_ti_models),
+        diffusers = ModelInstallList(models_to_install, [name_map[ModelType.Pipeline][x] for x in models_to_remove]),
+        controlnet = ModelInstallList(selections.install_cn_models, [name_map[ModelType.ControlNet][x] for x in selections.remove_cn_models]),
+        lora = ModelInstallList(selections.install_lora_models, [name_map[ModelType.Lora][x] for x in selections.remove_lora_models]),
+        ti = ModelInstallList(selections.install_ti_models, [name_map[ModelType.TextualInversion][x] for x in selections.remove_ti_models]),
         scan_directory=Path(directory_to_scan) if directory_to_scan else None,
         external_models=potential_models_to_install,
         scan_at_startup=scan_at_startup,
         precision="float32"
         if opt.full_precision
         else choose_precision(torch.device(choose_torch_device())),
-        purge_deleted=selections.purge_deleted_models,
         config_file_path=Path(opt.config_file) if opt.config_file else config.model_conf_path,
         model_config_file_callback = lambda x: ask_user_for_config_file(x,conn_out)
     )
@@ -828,7 +769,6 @@ def select_and_download_models(opt: Namespace):
             ti=ModelInstallList(**{action:opt.textual_inversions or []}),
             lora=ModelInstallList(**{action:opt.loras or []}),
             precision=precision,
-            purge_deleted=True,
             model_config_file_callback=lambda x: ask_user_for_config_file(x),
         )
     elif opt.default_only:
