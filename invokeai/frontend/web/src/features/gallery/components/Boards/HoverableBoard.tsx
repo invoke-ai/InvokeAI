@@ -6,6 +6,7 @@ import {
   Flex,
   MenuItem,
   MenuList,
+  Text,
 } from '@chakra-ui/react';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -162,6 +163,22 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 }}
               />
             </Editable>
+            <Flex
+              sx={{
+                justifyContent: 'center',
+                alignItems: 'center',
+                pos: 'absolute',
+                color: 'base.900',
+                bg: 'accent.300',
+                borderRadius: 'full',
+                w: 4,
+                h: 4,
+                right: -1,
+                top: -1,
+              }}
+            >
+              <Text fontSize="2xs">{board.image_count}</Text>
+            </Flex>
           </Flex>
         )}
       </ContextMenu>
