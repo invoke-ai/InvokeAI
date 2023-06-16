@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import Union
+from typing import List, Union
 from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.board_record_storage import (
     BoardRecord,
@@ -132,11 +132,11 @@ class BoardImagesService(BoardImagesServiceABC):
 
 
 def board_record_to_dto(
-    board_record: BoardRecord, cover_image_url: str | None, image_count: int
+    board_record: BoardRecord, cover_image_name: str | None, image_count: int
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
-        **board_record.dict(),
-        cover_image_url=cover_image_url,
+        **board_record.dict(exclude={'cover_image_name'}),
+        cover_image_name=cover_image_name,
         image_count=image_count,
     )
