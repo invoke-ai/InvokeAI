@@ -1,28 +1,13 @@
-import { Select } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { NativeSelect } from '@mantine/core';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ModelInputFieldTemplate,
   ModelInputFieldValue,
 } from 'features/nodes/types/types';
-import { selectModelsIds } from 'features/system/store/modelSlice';
-import { isEqual } from 'lodash-es';
+import { modelSelector } from 'features/system/components/ModelSelect';
 import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
-
-const availableModelsSelector = createSelector(
-  [selectModelsIds],
-  (allModelNames) => {
-    return { allModelNames };
-    // return map(modelList, (_, name) => name);
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
 
 const ModelInputFieldComponent = (
   props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
@@ -31,7 +16,7 @@ const ModelInputFieldComponent = (
 
   const dispatch = useAppDispatch();
 
-  const { allModelNames } = useAppSelector(availableModelsSelector);
+  const { sd1ModelData, sd2ModelData } = useAppSelector(modelSelector);
 
   const handleValueChanged = (e: ChangeEvent<HTMLSelectElement>) => {
     dispatch(
@@ -44,14 +29,11 @@ const ModelInputFieldComponent = (
   };
 
   return (
-    <Select
+    <NativeSelect
       onChange={handleValueChanged}
-      value={field.value || allModelNames[0]}
-    >
-      {allModelNames.map((option) => (
-        <option key={option}>{option}</option>
-      ))}
-    </Select>
+      value={field.value || sd1ModelData[0].value}
+      data={sd1ModelData.concat(sd2ModelData)}
+    ></NativeSelect>
   );
 };
 
