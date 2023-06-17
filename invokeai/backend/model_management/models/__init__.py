@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .vae import VaeModel
@@ -40,10 +41,15 @@ def _get_all_model_configs():
 MODEL_CONFIGS = _get_all_model_configs()
 OPENAPI_MODEL_CONFIGS = list()
 
+class OpenAPIModelInfoBase(BaseModel):
+    name: str
+    base_model: BaseModelType
+    type: ModelType
+
 for cfg in MODEL_CONFIGS:
     model_name, cfg_name = cfg.__qualname__.split('.')[-2:]
     openapi_cfg_name = model_name + cfg_name
-    name_wrapper = type(openapi_cfg_name, (cfg,), {})
+    name_wrapper = type(openapi_cfg_name, (cfg, OpenAPIModelInfoBase), {})
 
     #globals()[name] = value
     vars()[openapi_cfg_name] = name_wrapper

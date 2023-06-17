@@ -530,6 +530,8 @@ class ModelManager(object):
 
             models[cur_base_model][cur_model_type][cur_model_name] = dict(
                 **model_config.dict(exclude_defaults=True),
+
+                # OpenAPIModelInfoBase
                 name=cur_model_name,
                 base_model=cur_base_model,
                 type=cur_model_type,
@@ -646,7 +648,7 @@ class ModelManager(object):
             model_class = MODEL_CLASSES[base_model][model_type]
             if model_class.save_to_config:
                 # TODO: or exclude_unset better fits here?
-                data_to_save[model_key] = model_config.dict(exclude_defaults=True)
+                data_to_save[model_key] = model_config.dict(exclude_defaults=True, exclude={"error"})
 
         yaml_str = OmegaConf.to_yaml(data_to_save)
         config_file_path = conf_file or self.config_path
