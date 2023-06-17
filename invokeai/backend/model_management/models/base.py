@@ -53,7 +53,7 @@ class ModelConfigBase(BaseModel):
     format: Optional[str] = Field(None)
     default: Optional[bool] = Field(False)
     # do not save to config
-    error: Optional[ModelError] = Field(None, exclude=True)
+    error: Optional[ModelError] = Field(None)
 
     class Config:
         use_enum_values = True
