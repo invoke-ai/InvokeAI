@@ -118,4 +118,3 @@ export type InpaintInvocation = {
    */
   inpaint_replace?: number;
 };
-

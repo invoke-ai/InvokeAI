@@ -38,4 +38,3 @@ export type ImagePasteInvocation = {
    */
   'y'?: number;
 };
-

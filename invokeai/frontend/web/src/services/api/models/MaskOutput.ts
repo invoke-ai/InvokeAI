@@ -22,4 +22,3 @@ export type MaskOutput = {
    */
   height?: number;
 };
-

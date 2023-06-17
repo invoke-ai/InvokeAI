@@ -24,4 +24,7 @@ export type ModelInfo = {
    */
   submodel?: SubModelType;
 };
+<<<<<<< HEAD
 
+=======
+>>>>>>> 76dd749b1 (chore: Rebuild API)

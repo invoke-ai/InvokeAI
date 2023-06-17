@@ -48,7 +48,11 @@ export type GraphExecutionState = {
   /**
    * The results of node executions
    */
+<<<<<<< HEAD
   results: Record<string, (ImageOutput | MaskOutput | ControlOutput | ModelLoaderOutput | LoraLoaderOutput | PromptOutput | PromptCollectionOutput | CompelOutput | IntOutput | FloatOutput | LatentsOutput | NoiseOutput | IntCollectionOutput | FloatCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+=======
+  results: Record<string, (IntCollectionOutput | FloatCollectionOutput | ModelLoaderOutput | LoraLoaderOutput | CompelOutput | ImageOutput | MaskOutput | ControlOutput | LatentsOutput | NoiseOutput | IntOutput | FloatOutput | PromptOutput | PromptCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+>>>>>>> 76dd749b1 (chore: Rebuild API)
   /**
    * Errors raised when executing nodes
    */
@@ -62,4 +66,3 @@ export type GraphExecutionState = {
    */
   source_prepared_mapping: Record<string, Array<string>>;
 };
-

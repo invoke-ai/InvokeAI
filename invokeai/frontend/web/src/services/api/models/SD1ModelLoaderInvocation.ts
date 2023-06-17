@@ -20,4 +20,7 @@ export type SD1ModelLoaderInvocation = {
    */
   model_name?: string;
 };
+<<<<<<< HEAD
 
+=======
+>>>>>>> 76dd749b1 (chore: Rebuild API)

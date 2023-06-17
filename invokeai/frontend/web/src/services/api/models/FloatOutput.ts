@@ -12,4 +12,3 @@ export type FloatOutput = {
    */
   param?: number;
 };
-

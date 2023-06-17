@@ -14,4 +14,3 @@ export type ControlOutput = {
    */
   control?: ControlField;
 };
-

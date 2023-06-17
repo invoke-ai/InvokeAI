@@ -30,4 +30,3 @@ export type ImageLerpInvocation = {
    */
   max?: number;
 };
-

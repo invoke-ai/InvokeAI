@@ -71,4 +71,3 @@ export type ImageDTO = {
    */
   board_id?: string;
 };
-

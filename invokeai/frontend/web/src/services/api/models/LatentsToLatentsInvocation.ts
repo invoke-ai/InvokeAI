@@ -61,4 +61,3 @@ export type LatentsToLatentsInvocation = {
    */
   strength?: number;
 };
-

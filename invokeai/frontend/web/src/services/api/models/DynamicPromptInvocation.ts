@@ -28,4 +28,3 @@ export type DynamicPromptInvocation = {
    */
   combinatorial?: boolean;
 };
-

@@ -38,4 +38,3 @@ export type MlsdImageProcessorInvocation = {
    */
   thr_d?: number;
 };
-

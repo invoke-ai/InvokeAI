@@ -24,4 +24,7 @@ export type ModelLoaderOutput = {
    */
   vae?: VaeField;
 };
+<<<<<<< HEAD
 
+=======
+>>>>>>> 76dd749b1 (chore: Rebuild API)

@@ -8,10 +8,13 @@ export type { OpenAPIConfig } from './core/OpenAPI';
 
 export type { AddInvocation } from './models/AddInvocation';
 export type { BaseModelType } from './models/BaseModelType';
+<<<<<<< HEAD
 export type { BoardChanges } from './models/BoardChanges';
 export type { BoardDTO } from './models/BoardDTO';
 export type { Body_create_board_image } from './models/Body_create_board_image';
 export type { Body_remove_board_image } from './models/Body_remove_board_image';
+=======
+>>>>>>> 76dd749b1 (chore: Rebuild API)
 export type { Body_upload_image } from './models/Body_upload_image';
 export type { CannyImageProcessorInvocation } from './models/CannyImageProcessorInvocation';
 export type { CkptModelInfo } from './models/CkptModelInfo';
@@ -25,6 +28,7 @@ export type { ConditioningField } from './models/ConditioningField';
 export type { ContentShuffleImageProcessorInvocation } from './models/ContentShuffleImageProcessorInvocation';
 export type { ControlField } from './models/ControlField';
 export type { ControlNetInvocation } from './models/ControlNetInvocation';
+export type { ControlNetModelConfig } from './models/ControlNetModelConfig';
 export type { ControlOutput } from './models/ControlOutput';
 export type { CreateModelRequest } from './models/CreateModelRequest';
 export type { CvInpaintInvocation } from './models/CvInpaintInvocation';
@@ -87,6 +91,10 @@ export type { LoadImageInvocation } from './models/LoadImageInvocation';
 export type { LoraInfo } from './models/LoraInfo';
 export type { LoraLoaderInvocation } from './models/LoraLoaderInvocation';
 export type { LoraLoaderOutput } from './models/LoraLoaderOutput';
+<<<<<<< HEAD
+=======
+export type { LoraModelConfig } from './models/LoraModelConfig';
+>>>>>>> 76dd749b1 (chore: Rebuild API)
 export type { MaskFromAlphaInvocation } from './models/MaskFromAlphaInvocation';
 export type { MaskOutput } from './models/MaskOutput';
 export type { MediapipeFaceProcessorInvocation } from './models/MediapipeFaceProcessorInvocation';
@@ -123,13 +131,25 @@ export type { SchedulerPredictionType } from './models/SchedulerPredictionType';
 export type { SD1ModelLoaderInvocation } from './models/SD1ModelLoaderInvocation';
 export type { SD2ModelLoaderInvocation } from './models/SD2ModelLoaderInvocation';
 export type { ShowImageInvocation } from './models/ShowImageInvocation';
+export type { StableDiffusion1CheckpointModelConfig } from './models/StableDiffusion1CheckpointModelConfig';
+export type { StableDiffusion1DiffusersModelConfig } from './models/StableDiffusion1DiffusersModelConfig';
+export type { StableDiffusion2CheckpointModelConfig } from './models/StableDiffusion2CheckpointModelConfig';
+export type { StableDiffusion2DiffusersModelConfig } from './models/StableDiffusion2DiffusersModelConfig';
 export type { StepParamEasingInvocation } from './models/StepParamEasingInvocation';
 export type { SubModelType } from './models/SubModelType';
 export type { SubtractInvocation } from './models/SubtractInvocation';
 export type { TextToLatentsInvocation } from './models/TextToLatentsInvocation';
+<<<<<<< HEAD
 export type { UNetField } from './models/UNetField';
 export type { UpscaleInvocation } from './models/UpscaleInvocation';
 export type { VaeField } from './models/VaeField';
+=======
+export type { TextualInversionModelConfig } from './models/TextualInversionModelConfig';
+export type { UNetField } from './models/UNetField';
+export type { UpscaleInvocation } from './models/UpscaleInvocation';
+export type { VaeField } from './models/VaeField';
+export type { VAEModelConfig } from './models/VAEModelConfig';
+>>>>>>> 76dd749b1 (chore: Rebuild API)
 export type { VaeRepo } from './models/VaeRepo';
 export type { ValidationError } from './models/ValidationError';
 export type { ZoeDepthImageProcessorInvocation } from './models/ZoeDepthImageProcessorInvocation';

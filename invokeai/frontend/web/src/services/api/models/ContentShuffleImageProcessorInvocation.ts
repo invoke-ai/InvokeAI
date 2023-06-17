@@ -42,4 +42,3 @@ export type ContentShuffleImageProcessorInvocation = {
    */
   'f'?: number;
 };
-
