@@ -1,5 +1,6 @@
 import os
 import torch
+import safetensors
 from pathlib import Path
 from typing import Optional, Union, Literal
 from .base import (
@@ -22,7 +23,7 @@ class VaeModel(ModelBase):
     #vae_class: Type
     #model_size: int
 
-    class Config(ModelConfigBase):
+    class VAEModelConfig(ModelConfigBase):
         format: Union[Literal["checkpoint"], Literal["diffusers"]]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
