@@ -5,13 +5,12 @@
 import type { ModelError } from './ModelError';
 import type { ModelVariantType } from './ModelVariantType';
 
-export type StableDiffusion1CheckpointModelConfig = {
+export type StableDiffusion1ModelDiffusersConfig = {
   path: string;
   description?: string;
-  format: 'checkpoint';
+  format: 'diffusers';
   default?: boolean;
   error?: ModelError;
   vae?: string;
-  config?: string;
   variant: ModelVariantType;
 };

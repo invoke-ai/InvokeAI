@@ -4,9 +4,8 @@
 
 import type { ModelError } from './ModelError';
 import type { ModelVariantType } from './ModelVariantType';
-import type { SchedulerPredictionType } from './SchedulerPredictionType';
 
-export type StableDiffusion2CheckpointModelConfig = {
+export type StableDiffusion1ModelCheckpointConfig = {
   path: string;
   description?: string;
   format: 'checkpoint';
@@ -15,6 +14,4 @@ export type StableDiffusion2CheckpointModelConfig = {
   vae?: string;
   config?: string;
   variant: ModelVariantType;
-  prediction_type: SchedulerPredictionType;
-  upcast_attention: boolean;
 };

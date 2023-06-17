@@ -4,7 +4,7 @@
 
 import type { ModelError } from './ModelError';
 
-export type LoraModelConfig = {
+export type LoRAModelConfig = {
   path: string;
   description?: string;
   format: ('lycoris' | 'diffusers');
