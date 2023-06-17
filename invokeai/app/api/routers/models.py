@@ -7,8 +7,8 @@ from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from ..dependencies import ApiDependencies
 from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_management.models import get_all_model_configs
-MODEL_CONFIGS = Union[tuple(get_all_model_configs())]
+from invokeai.backend.model_management.models import OPENAPI_MODEL_CONFIGS
+MODEL_CONFIGS = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 

@@ -23,7 +23,7 @@ class VaeModel(ModelBase):
     #vae_class: Type
     #model_size: int
 
-    class VAEModelConfig(ModelConfigBase):
+    class Config(ModelConfigBase):
         format: Union[Literal["checkpoint"], Literal["diffusers"]]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):

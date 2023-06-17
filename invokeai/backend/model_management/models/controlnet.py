@@ -18,7 +18,7 @@ class ControlNetModel(ModelBase):
     #model_class: Type
     #model_size: int
 
-    class ControlNetModelConfig(ModelConfigBase):
+    class Config(ModelConfigBase):
         format: Union[Literal["checkpoint"], Literal["diffusers"]]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
