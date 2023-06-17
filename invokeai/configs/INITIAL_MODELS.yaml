@@ -3,6 +3,7 @@ sd-1/pipeline/stable-diffusion-v1-5:
    description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
    recommended: True
+   default: True
 sd-1/pipeline/stable-diffusion-inpainting:
    description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
    repo_id: runwayml/stable-diffusion-inpainting
@@ -27,7 +28,7 @@ sd-1/pipeline/Dungeons-and-Diffusion:
    description: Dungeons & Dragons characters (2.13 GB)
    repo_id: 0xJustin/Dungeons-and-Diffusion
    recommended: False
-sd-1/pipeline/dreamlike-photoreal-2.0:
+sd-1/pipeline/dreamlike-photoreal-2:
    description: A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)
    repo_id: dreamlike-art/dreamlike-photoreal-2.0
    recommended: False

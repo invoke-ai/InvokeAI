@@ -17,8 +17,8 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 120
-MIN_LINES = 50
+MIN_COLS = 180
+MIN_LINES = 55
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int, launch_command: str=None):
@@ -384,7 +384,6 @@ def select_stable_diffusion_config_file(
         "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
         "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
         "Skip installation for now and come back later",
-        "Enter config file path manually",
     ]
 
     F = ConfirmCancelPopup(
@@ -406,35 +405,17 @@ def select_stable_diffusion_config_file(
     mlw.values = message
 
     choice = F.add(
-        SingleSelectWithChanged,
+        npyscreen.SelectOne,
         values = options,
         value = [0],
         max_height = len(options)+1,
         scroll_exit=True,
     )
-    file = F.add(
-        FileBox,
-        name='Path to config file',
-        max_height=3,
-        hidden=True,
-        must_exist=True,
-        scroll_exit=True
-    )
-
-    def toggle_visible(value):
-        value = value[0]
-        if value==3:
-            file.hidden=False
-        else:
-            file.hidden=True
-        F.display()
-        
-    choice.on_changed = toggle_visible
 
     F.editw = 1
     F.edit()
     if not F.value:
         return None
-    assert choice.value[0] in range(0,4),'invalid choice'
-    choices = ['epsilon','v','abort',file.value]
+    assert choice.value[0] in range(0,3),'invalid choice'
+    choices = ['epsilon','v','abort']
     return choices[choice.value[0]]

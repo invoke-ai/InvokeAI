@@ -56,11 +56,10 @@ from invokeai.frontend.install.widgets import (
 )
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
-    default_dataset,
-    download_from_hf,
+    hf_download_from_pretrained,
     hf_download_with_resume,
-    recommended_datasets,
-    UserSelections,
+    InstallSelections,
+    ModelInstall,
 )
 from invokeai.backend.model_management.model_probe import (
     ModelProbe, ModelType, BaseModelType, SchedulerPredictionType
@@ -198,8 +197,8 @@ def download_conversion_models():
         
         # sd-1
         repo_id = 'openai/clip-vit-large-patch14'
-        download_from_hf(CLIPTokenizer, repo_id, target_dir / 'clip-vit-large-patch14')
-        download_from_hf(CLIPTextModel, repo_id, target_dir / 'clip-vit-large-patch14')
+        hf_download_from_pretrained(CLIPTokenizer, repo_id, target_dir / 'clip-vit-large-patch14')
+        hf_download_from_pretrained(CLIPTextModel, repo_id, target_dir / 'clip-vit-large-patch14')
 
         # sd-2
         repo_id = "stabilityai/stable-diffusion-2"
@@ -275,8 +274,8 @@ def download_clipseg():
     logger.info("Installing clipseg model for text-based masking...")
     CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
     try:
-        download_from_hf(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-        download_from_hf(CLIPSegForImageSegmentation, CLIPSEG_MODEL,'models/core/misc/clipseg')
+        hf_download_from_pretrained(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
+        hf_download_from_pretrained(CLIPSegForImageSegmentation, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
     except Exception:
         logger.info("Error installing clipseg model:")
         logger.info(traceback.format_exc())
@@ -592,7 +591,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
         self.program_opts = program_opts
         self.invokeai_opts = invokeai_opts
         self.user_cancelled = False
-        self.user_selections = default_user_selections(program_opts)
+        self.install_selections = default_user_selections(program_opts)
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -627,18 +626,18 @@ def default_startup_options(init_file: Path) -> Namespace:
         opts.nsfw_checker = True
     return opts
 
-def default_user_selections(program_opts: Namespace) -> UserSelections:
-    return UserSelections(
-        install_models=default_dataset()
+def default_user_selections(program_opts: Namespace) -> InstallSelections:
+    installer = ModelInstall(config)
+    models = installer.all_models()
+    return InstallSelections(
+        install_models=[models[installer.default_model()].path or models[installer.default_model()].repo_id]
         if program_opts.default_only
-        else recommended_datasets()
+        else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
-        else dict(),
-        purge_deleted_models=False,
+        else list(),
         scan_directory=None,
         autoscan_on_startup=None,
     )
-
 
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
@@ -696,7 +695,7 @@ def run_console_ui(
     if editApp.user_cancelled:
         return (None, None)
     else:
-        return (editApp.new_opts, editApp.user_selections)
+        return (editApp.new_opts, editApp.install_selections)
 
 
 # -------------------------------------

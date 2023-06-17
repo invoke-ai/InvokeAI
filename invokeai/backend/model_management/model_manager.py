@@ -682,7 +682,7 @@ class ModelManager(object):
 
         for model_key, model_config in list(self.models.items()):
             model_name, base_model, model_type = self.parse_key(model_key)
-            model_path = str(self.globals.root / model_config.path)
+            model_path = str(self.globals.root_path / model_config.path)
             if not os.path.exists(model_path):
                 model_class = MODEL_CLASSES[base_model][model_type]
                 if model_class.save_to_config:
@@ -703,13 +703,14 @@ class ModelManager(object):
                 for entry_name in os.listdir(models_dir):
                     model_path = os.path.join(models_dir, entry_name)
                     if model_path not in loaded_files: # TODO: check
-                        model_name = Path(model_path).stem
+                        model_path = Path(model_path)
+                        model_name = model_path.name if model_path.is_dir else model_path.stem
                         model_key = self.create_key(model_name, base_model, model_type)
 
                         if model_key in self.models:
                             raise Exception(f"Model with key {model_key} added twice")
 
-                        model_config: ModelConfigBase = model_class.probe_config(model_path)
+                        model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                         self.models[model_key] = model_config
                         new_models_found = True
 

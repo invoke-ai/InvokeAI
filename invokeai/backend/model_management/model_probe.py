@@ -15,13 +15,13 @@ import invokeai.backend.util.logging as logger
 from .models import BaseModelType, ModelType, ModelVariantType, SchedulerPredictionType, SilenceWarnings
 
 @dataclass
-class ModelVariantInfo(object):
+class ModelProbeInfo(object):
     model_type: ModelType
     base_type: BaseModelType
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
     upcast_attention: bool
-    format: Literal['folder','checkpoint']
+    format: Literal['diffusers','checkpoint']
     image_size: int
 
 class ProbeBase(object):
@@ -31,7 +31,7 @@ class ProbeBase(object):
 class ModelProbe(object):
     
     PROBES = {
-        'folder': { },
+        'diffusers': { },
         'checkpoint': { },
     }
 
@@ -43,7 +43,7 @@ class ModelProbe(object):
     
     @classmethod
     def register_probe(cls,
-                       format: Literal['folder','file'],
+                       format: Literal['diffusers','checkpoint'],
                        model_type: ModelType,
                        probe_class: ProbeBase):
         cls.PROBES[format][model_type] = probe_class
@@ -51,8 +51,8 @@ class ModelProbe(object):
     @classmethod
     def heuristic_probe(cls,
                         model: Union[Dict, ModelMixin, Path],
-                        prediction_type_helper: Callable[[Path],BaseModelType]=None,
-                        )->ModelVariantInfo:
+                        prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                        )->ModelProbeInfo:
         if isinstance(model,Path):
             return cls.probe(model_path=model,prediction_type_helper=prediction_type_helper)
         elif isinstance(model,(dict,ModelMixin,ConfigMixin)):
@@ -64,7 +64,7 @@ class ModelProbe(object):
     def probe(cls,
               model_path: Path,
               model: Union[Dict, ModelMixin] = None,
-              prediction_type_helper: Callable[[Path],BaseModelType] = None)->ModelVariantInfo:
+              prediction_type_helper: Callable[[Path],SchedulerPredictionType] = None)->ModelProbeInfo:
         '''
         Probe the model at model_path and return sufficient information about it
         to place it somewhere in the models directory hierarchy. If the model is
@@ -74,14 +74,14 @@ class ModelProbe(object):
         between V2-Base and V2-768 SD models.
         '''
         if model_path:
-            format = 'folder' if model_path.is_dir() else 'checkpoint'
+            format = 'diffusers' if model_path.is_dir() else 'checkpoint'
         else:
-            format = 'folder' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
+            format = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
 
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
-                if format == 'folder' \
+                if format == 'diffusers' \
                    else cls.get_model_type_from_checkpoint(model_path, model)
             probe_class = cls.PROBES[format].get(model_type)
             if not probe_class:
@@ -90,7 +90,7 @@ class ModelProbe(object):
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
-            model_info = ModelVariantInfo(
+            model_info = ModelProbeInfo(
                 model_type = model_type,
                 base_type = base_type,
                 variant_type = variant_type,
@@ -196,7 +196,7 @@ class CheckpointProbeBase(ProbeBase):
     def __init__(self,
                  checkpoint_path: Path,
                  checkpoint: dict,
-                 helper: Callable[[Path],BaseModelType] = None
+                 helper: Callable[[Path],SchedulerPredictionType] = None
                  )->BaseModelType:
         self.checkpoint = checkpoint or ModelProbe._scan_and_load_checkpoint(checkpoint_path)
         self.checkpoint_path = checkpoint_path
@@ -405,11 +405,11 @@ class LoRAFolderProbe(FolderProbeBase):
     pass
 
 ############## register probe classes ######
-ModelProbe.register_probe('folder', ModelType.Pipeline,  PipelineFolderProbe)
-ModelProbe.register_probe('folder', ModelType.Vae, VaeFolderProbe)
-ModelProbe.register_probe('folder', ModelType.Lora, LoRAFolderProbe)
-ModelProbe.register_probe('folder', ModelType.TextualInversion, TextualInversionFolderProbe)
-ModelProbe.register_probe('folder', ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.Pipeline,  PipelineFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.Vae, VaeFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.Lora, LoRAFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.TextualInversion, TextualInversionFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Pipeline, PipelineCheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Lora, LoRACheckpointProbe)

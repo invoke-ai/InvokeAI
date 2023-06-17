@@ -154,7 +154,6 @@ class ModelBase(metaclass=ABCMeta):
     def create_config(cls, **kwargs) -> ModelConfigBase:
         if "format" not in kwargs:
             raise Exception("Field 'format' not found in model config")
-
         configs = cls._get_configs()
         return configs[kwargs["format"]](**kwargs)
 

@@ -11,7 +11,6 @@ The work is actually done in backend code in model_install_backend.py.
 
 import argparse
 import curses
-import os
 import sys
 import textwrap
 import traceback
@@ -20,27 +19,21 @@ from multiprocessing import Process
 from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import List
 
 import logging
 import npyscreen
 import torch
 from npyscreen import widget
-from omegaconf import OmegaConf
 
 from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
-    Dataset_path,  # most of these should go!!
-    default_config_file,
-    default_dataset,
-    install_requested_models,
-    recommended_datasets,
     ModelInstallList,
-    UserSelections,
-    ModelInstall
+    InstallSelections,
+    ModelInstall,
+    SchedulerPredictionType,
 )
-from invokeai.backend.model_management import ModelManager, BaseModelType, ModelType
+from invokeai.backend.model_management import ModelManager, ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.frontend.install.widgets import (
     CenteredTitleText,
@@ -133,7 +126,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         bottom_of_table = self.nextrely
 
         self.nextrely = top_of_table
-        self.pipeline_models = self.add_model_widgets(
+        self.pipeline_models = self.add_pipeline_widgets(
             model_type=ModelType.Pipeline,
             window_width=window_width,
             exclude = self.starter_models
@@ -210,11 +203,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         starters = self.starter_models
         starter_model_labels = self.model_labels
         
-        recommended_models = set([
-            x
-            for x in starters
-            if models[x].recommended
-        ])
         self.installed_models = sorted(
             [x for x in starters if models[x].installed]
         )
@@ -312,16 +300,18 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         return widgets
 
     ### Tab for arbitrary diffusers widgets ###
-    def add_diffusers_widgets(self,
-                              model_type: ModelType=ModelType.Pipeline,
-                              window_width: int=120,
-                              )->dict[str,npyscreen.widget]:
+    def add_pipeline_widgets(self,
+                             model_type: ModelType=ModelType.Pipeline,
+                             window_width: int=120,
+                             **kwargs,
+                             )->dict[str,npyscreen.widget]:
         '''Similar to add_model_widgets() but adds some additional widgets at the bottom
         to support the autoload directory'''
         widgets = self.add_model_widgets(
             model_type = model_type,
             window_width = window_width,
             install_prompt=f"Additional {model_type.value.title()} models already installed.",
+            **kwargs,
         )
 
         label = "Directory to scan for models to automatically import (<tab> autocompletes):"
@@ -428,7 +418,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             target = process_and_execute,
             kwargs=dict(
                 opt = app.program_opts,
-                selections = app.user_selections,
+                selections = app.install_selections,
                 conn_out = child_conn,
             )
         )
@@ -436,8 +426,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         child_conn.close()
         self.subprocess_connection = parent_conn
         self.subprocess = p
-        app.user_selections = UserSelections()
-        # process_and_execute(app.opt, app.user_selections)
+        app.install_selections = InstallSelections()
+        # process_and_execute(app.opt, app.install_selections)
 
     def on_back(self):
         self.parentApp.switchFormPrevious()
@@ -453,7 +443,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.parentApp.setNextForm(None)
         self.parentApp.user_cancelled = False
         self.editing = False
-
+        
     ########## This routine monitors the child process that is performing model installation and removal #####
     def while_waiting(self):
         '''Called during idle periods. Main task is to update the Log Messages box with messages
@@ -532,73 +522,24 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         .autoscan_on_startup:  True if invokeai should scan and import at startup time
         .import_model_paths:   list of URLs, repo_ids and file paths to import
         """
-        # we're using a global here rather than storing the result in the parentapp
-        # due to some bug in npyscreen that is causing attributes to be lost
-        selections = self.parentApp.user_selections
+        selections = self.parentApp.install_selections
+        all_models = self.all_models
 
-        # Starter models to install/remove
-        # TO DO - turn these into a dict so we don't have to hard-code the attributes
-        print(f'installed={[x for x in self.all_models if self.all_models[x].installed]}',file=f)
-        for section in [self.starter_pipelines, self.pipeline_models,
-                        self.controlnet_models, self.lora_models, self.ti_models]:
+        # Defined models (in INITIAL_CONFIG.yaml or models.yaml) to add/remove
+        ui_sections = [self.starter_pipelines, self.pipeline_models,
+                       self.controlnet_models, self.lora_models, self.ti_models]
+        for section in ui_sections:
             selected = set([section['models'][x] for x in section['models_selected'].value])
             models_to_install = [x for x in selected if not self.all_models[x].installed]
             models_to_remove = [x for x in section['models'] if x not in selected and self.all_models[x].installed]
-                            
-        # "More" models
-        selections.import_model_paths = self.pipeline_models['download_ids'].value.split()
-        if diffusers_selected := self.pipeline_models.get('models_selected'):
-            selections.remove_models.extend([x
-                                             for x in diffusers_selected.values
-                                             if self.installed_pipeline_models[x]
-                                             and diffusers_selected.values.index(x) not in diffusers_selected.value
-                                             ]
-                                            )
-                                        
-        # TODO: REFACTOR THIS REPETITIVE CODE
-        if cn_models_selected := self.controlnet_models.get('models_selected'):
-            selections.install_cn_models = [cn_models_selected.values[x]
-                                            for x in cn_models_selected.value
-                                            if not self.installed_cn_models[cn_models_selected.values[x]]
-                                            ]
-            selections.remove_cn_models = [x
-                                           for x in cn_models_selected.values
-                                           if self.installed_cn_models[x]
-                                           and cn_models_selected.values.index(x) not in cn_models_selected.value
-                                           ]
-        if (additional_cns := self.controlnet_models['download_ids'].value.split()):
-            valid_cns = [x for x in additional_cns if '/' in x]
-            selections.install_cn_models.extend(valid_cns)
+            selections.remove_models.extend(models_to_remove)
+            selections.install_models.extend(all_models[x].path or all_models[x].repo_id \
+                                             for x in models_to_install if all_models[x].path or all_models[x].repo_id)
 
-        # same thing, for LoRAs
-        if loras_selected := self.lora_models.get('models_selected'):
-            selections.install_lora_models = [loras_selected.values[x]
-                                              for x in loras_selected.value
-                                              if not self.installed_lora_models[loras_selected.values[x]]
-                                              ]
-            selections.remove_lora_models = [x
-                                             for x in loras_selected.values
-                                             if self.installed_lora_models[x]
-                                             and loras_selected.values.index(x) not in loras_selected.value
-                                             ]
-        if (additional_loras := self.lora_models['download_ids'].value.split()):
-            selections.install_lora_models.extend(additional_loras)
-
-        # same thing, for TIs
-        # TODO: refactor
-        if tis_selected := self.ti_models.get('models_selected'):
-            selections.install_ti_models = [tis_selected.values[x]
-                                            for x in tis_selected.value
-                                            if not self.installed_ti_models[tis_selected.values[x]]
-                                            ]
-            selections.remove_ti_models = [x
-                                           for x in tis_selected.values
-                                           if self.installed_ti_models[x]
-                                           and tis_selected.values.index(x) not in tis_selected.value
-                                           ]
-                
-        if (additional_tis := self.ti_models['download_ids'].value.split()):
-            selections.install_ti_models.extend(additional_tis)
+        # models located in the 'download_ids" section
+        for section in ui_sections:
+            if downloads := section.get('download_ids'):
+                selections.install_models.extend(downloads.value.split())
             
         # load directory and whether to scan on startup
         selections.scan_directory = self.pipeline_models['autoload_directory'].value
@@ -609,7 +550,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         super().__init__()
         self.program_opts = opt
         self.user_cancelled = False
-        self.user_selections = UserSelections()
+        self.install_selections = InstallSelections()
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -628,21 +569,17 @@ class StderrToMessage():
         pass
 
 # --------------------------------------------------------
-def ask_user_for_config_file(model_path: Path,
-                             tui_conn: Connection=None
-                             )->Path:
+def ask_user_for_prediction_type(model_path: Path,
+                                 tui_conn: Connection=None
+                                 )->Path:
     if tui_conn:
         logger.debug('Waiting for user response...')
-        return _ask_user_for_cf_tui(model_path, tui_conn)        
+        return _ask_user_for_pt_tui(model_path, tui_conn)        
     else:
-        return _ask_user_for_cf_cmdline(model_path)
+        return _ask_user_for_pt_cmdline(model_path)
 
-def _ask_user_for_cf_cmdline(model_path):
-    choices = [
-        config.legacy_conf_path / x
-        for x in ['v2-inference.yaml','v2-inference-v.yaml']
-    ]
-    choices.extend([None])
+def _ask_user_for_pt_cmdline(model_path):
+    choices = [SchedulerPredictionType.Epsilon, SchedulerPredictionType.VPrediction, None]
     print(
 f"""
 Please select the type of the V2 checkpoint named {model_path.name}:
@@ -664,7 +601,7 @@ Please select the type of the V2 checkpoint named {model_path.name}:
             return
     return choice
         
-def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
+def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection)->Path:
     try:
         tui_conn.send_bytes(f'*need v2 config for:{model_path}'.encode('utf-8'))
         # note that we don't do any status checking here
@@ -672,20 +609,20 @@ def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
         if response is None:
             return None
         elif response == 'epsilon':
-            return config.legacy_conf_path / 'v2-inference.yaml'
+            return SchedulerPredictionType.epsilon
         elif response == 'v':
-            return config.legacy_conf_path  / 'v2-inference-v.yaml'
+            return SchedulerPredictionType.VPrediction
         elif response == 'abort':
             logger.info('Conversion aborted')
             return None
         else:
-            return Path(response)
+            return response
     except:
         return None
         
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace,
-                        selections: UserSelections,
+                        selections: InstallSelections,
                         conn_out: Connection=None,
                         ):
     # set up so that stderr is sent to conn_out
@@ -696,33 +633,13 @@ def process_and_execute(opt: Namespace,
         logger = InvokeAILogger.getLogger()
         logger.handlers.clear()
         logger.addHandler(logging.StreamHandler(translator))
-    
-    models_to_install = selections.install_models
-    models_to_remove = selections.remove_models
-    directory_to_scan = selections.scan_directory
-    scan_at_startup = selections.autoscan_on_startup
-    potential_models_to_install = selections.import_model_paths
-    name_map = selections.model_name_map
 
-    install_requested_models(
-        diffusers = ModelInstallList(models_to_install, [name_map[ModelType.Pipeline][x] for x in models_to_remove]),
-        controlnet = ModelInstallList(selections.install_cn_models, [name_map[ModelType.ControlNet][x] for x in selections.remove_cn_models]),
-        lora = ModelInstallList(selections.install_lora_models, [name_map[ModelType.Lora][x] for x in selections.remove_lora_models]),
-        ti = ModelInstallList(selections.install_ti_models, [name_map[ModelType.TextualInversion][x] for x in selections.remove_ti_models]),
-        scan_directory=Path(directory_to_scan) if directory_to_scan else None,
-        external_models=potential_models_to_install,
-        scan_at_startup=scan_at_startup,
-        precision="float32"
-        if opt.full_precision
-        else choose_precision(torch.device(choose_torch_device())),
-        config_file_path=Path(opt.config_file) if opt.config_file else config.model_conf_path,
-        model_config_file_callback = lambda x: ask_user_for_config_file(x,conn_out)
-    )
+    installer = ModelInstall(config, prediction_type_helper=lambda x: ask_user_for_prediction_type(x,conn_out))
+    installer.install(selections)
 
     if conn_out:
         conn_out.send_bytes('*done*'.encode('utf-8'))
         conn_out.close()
-
 
 def do_listings(opt)->bool:
     """List installed models of various sorts, and return
@@ -754,38 +671,34 @@ def select_and_download_models(opt: Namespace):
         if opt.full_precision
         else choose_precision(torch.device(choose_torch_device()))
     )
-
-    if do_listings(opt):
-        pass
-    # this processes command line additions/removals
-    elif opt.diffusers or opt.controlnets or opt.textual_inversions or opt.loras:
-        action = 'remove_models' if opt.delete else 'install_models'
-        diffusers_args = {'diffusers':ModelInstallList(remove_models=opt.diffusers or [])} \
-                          if opt.delete \
-                          else {'external_models':opt.diffusers or []} 
-        install_requested_models(
-            **diffusers_args,
-            controlnet=ModelInstallList(**{action:opt.controlnets or []}),
-            ti=ModelInstallList(**{action:opt.textual_inversions or []}),
-            lora=ModelInstallList(**{action:opt.loras or []}),
-            precision=precision,
-            model_config_file_callback=lambda x: ask_user_for_config_file(x),
+    config.precision = precision
+    helper = lambda x: ask_user_for_prediction_type(x)
+    # if do_listings(opt):
+    # pass
+    
+    installer = ModelInstall(config, prediction_type_helper=helper)
+    if opt.add or opt.delete:
+        selections = InstallSelections(
+            install_models = opt.add or [],
+            remove_models = opt.delete or []
         )
+        installer.install(selections)
     elif opt.default_only:
-        install_requested_models(
-            diffusers=ModelInstallList(install_models=default_dataset()),
-            precision=precision,
+        selections = InstallSelections(
+            install_models = installer.default_model()
         )
+        installer.install(selections)
     elif opt.yes_to_all:
-        install_requested_models(
-            diffusers=ModelInstallList(install_models=recommended_datasets()),
-            precision=precision,
+        selections = InstallSelections(
+            install_models = installer.recommended_models()
         )
+        installer.install(selections)
 
     # this is where the TUI is called
     else:
         # needed because the torch library is loaded, even though we don't use it
-        torch.multiprocessing.set_start_method("spawn")
+        # currently commented out because it has started generating errors (?)
+        # torch.multiprocessing.set_start_method("spawn")
 
         # the third argument is needed in the Windows 11 environment in
         # order to launch and resize a console window running this program
@@ -801,35 +714,20 @@ def select_and_download_models(opt: Namespace):
                     installApp.main_form.subprocess.terminate()
                     installApp.main_form.subprocess = None
             raise e
-        process_and_execute(opt, installApp.user_selections)
+        process_and_execute(opt, installApp.install_selections)
 
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
     parser.add_argument(
-        "--diffusers",
+        "--add",
         nargs="*",
-        help="List of URLs or repo_ids of diffusers to install/delete",
-    )
-    parser.add_argument(
-        "--loras",
-        nargs="*",
-        help="List of URLs or repo_ids of LoRA/LyCORIS models to install/delete",
-    )
-    parser.add_argument(
-        "--controlnets",
-        nargs="*",
-        help="List of URLs or repo_ids of controlnet models to install/delete",
-    )
-    parser.add_argument(
-        "--textual-inversions",
-        nargs="*",
-        help="List of URLs or repo_ids of textual inversion embeddings to install/delete",
+        help="List of URLs, local paths or repo_ids of models to install",
     )
     parser.add_argument(
         "--delete",
-        action="store_true",
-        help="Delete models listed on command line rather than installing them",
+        nargs="*",
+        help="List of names of models to idelete",
     )
     parser.add_argument(
         "--full-precision",
@@ -849,7 +747,7 @@ def main():
     parser.add_argument(
         "--default_only",
         action="store_true",
-        help="only install the default model",
+        help="Only install the default model",
     )
     parser.add_argument(
         "--list-models",

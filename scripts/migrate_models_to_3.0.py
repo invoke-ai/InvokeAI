@@ -26,7 +26,7 @@ from transformers import (
 import invokeai.backend.util.logging as logger
 from invokeai.backend.model_management import ModelManager
 from invokeai.backend.model_management.model_probe import (
-    ModelProbe, ModelType, BaseModelType, SchedulerPredictionType, ModelVariantInfo
+    ModelProbe, ModelType, BaseModelType, SchedulerPredictionType, ModelProbeInfo
     )
 
 warnings.filterwarnings("ignore")
@@ -171,13 +171,13 @@ def migrate_tuning_models(dest: Path):
         logger.info(f'Scanning {subdir}')
         migrate_models(src, dest)
 
-def write_yaml(model_name: str, path:Path, info:ModelVariantInfo, dest_yaml: io.TextIOBase):
+def write_yaml(model_name: str, path:Path, info:ModelProbeInfo, dest_yaml: io.TextIOBase):
     name = unique_name(model_name, info)
     stanza = {
         f'{info.base_type.value}/{info.model_type.value}/{name}': {
             'name': model_name,
             'path': str(path),
-            'description': f'diffusers model {model_name}',
+            'description': f'A {info.base_type.value} {info.model_type.value} model',
             'format': 'diffusers',
             'image_size': info.image_size,
             'base': info.base_type.value,
@@ -266,7 +266,7 @@ def migrate_checkpoints(dest_dir: Path, dest_yaml: io.TextIOBase):
                     {
                         'name': model_name,
                         'path': str(weights),
-                        'description': f'checkpoint model {model_name}',
+                        'description': f'{info.base_type.value}-based checkpoint',
                         'format': 'checkpoint',
                         'image_size': info.image_size,
                         'base': info.base_type.value,

@@ -2,18 +2,18 @@
 Utility (backend) functions used by model_install.py
 """
 import os
-import re
 import shutil
 import sys
+import traceback
 import warnings
 from dataclasses import dataclass,field
 from pathlib import Path
-from tempfile import TemporaryFile
-from typing import List, Dict, Set, Callable
+from tempfile import TemporaryDirectory
+from typing import List, Dict, Callable, Union, Set
 
 import requests
-from diffusers import AutoencoderKL
-from huggingface_hub import hf_hub_url, HfFolder
+from diffusers import AutoencoderKL, StableDiffusionPipeline
+from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
@@ -21,7 +21,9 @@ from tqdm import tqdm
 import invokeai.configs as configs
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType
+from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType
+from invokeai.backend.model_management.model_probe import ModelProbe, SchedulerPredictionType, ModelProbeInfo
+from invokeai.backend.util import download_with_resume
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
 from ..util.logging import InvokeAILogger
 
@@ -29,18 +31,10 @@ warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
 config = InvokeAIAppConfig.get_config()
-
-Model_dir = "models"
-Weights_dir = "ldm/stable-diffusion-v1/"
+logger = InvokeAILogger.getLogger(name='InvokeAI')
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
 Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
-
-# initial models omegaconf
-Datasets = None
-
-# logger
-logger = InvokeAILogger.getLogger(name='InvokeAI')
 
 Config_preamble = """
 # This file describes the alternative machine learning models
@@ -52,6 +46,24 @@ Config_preamble = """
 # was trained on.
 """
 
+LEGACY_CONFIGS = {
+    BaseModelType.StableDiffusion1: {
+        ModelVariantType.Normal: 'v1-inference.yaml',
+        ModelVariantType.Inpaint: 'v1-inpainting-inference.yaml',
+    },
+
+    BaseModelType.StableDiffusion2: {
+        ModelVariantType.Normal: {
+            SchedulerPredictionType.Epsilon: 'v2-inference.yaml',
+            SchedulerPredictionType.VPrediction: 'v2-inference-v.yaml',
+        },
+        ModelVariantType.Inpaint: {
+            SchedulerPredictionType.Epsilon: 'v2-inpainting-inference.yaml',
+            SchedulerPredictionType.VPrediction: 'v2-inpainting-inference-v.yaml',
+        }
+    }
+}
+
 @dataclass
 class ModelInstallList:
     '''Class for listing models to be installed/removed'''
@@ -59,18 +71,11 @@ class ModelInstallList:
     remove_models: List[str] = field(default_factory=list)
 
 @dataclass
-class UserSelections():
+class InstallSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-    install_cn_models: List[str] = field(default_factory=list)
-    remove_cn_models: List[str] = field(default_factory=list)
-    install_lora_models: List[str] = field(default_factory=list)
-    remove_lora_models: List[str] = field(default_factory=list)
-    install_ti_models: List[str] = field(default_factory=list)
-    remove_ti_models: List[str] = field(default_factory=list)
     scan_directory: Path = None
     autoscan_on_startup: bool=False
-    import_model_paths: str=None
 
 @dataclass
 class ModelLoadInfo():
@@ -82,18 +87,30 @@ class ModelLoadInfo():
     description: str = ''
     installed: bool = False
     recommended: bool = False
-    
+    default: bool = False
+
 class ModelInstall(object):
-    def __init__(self,config:InvokeAIAppConfig):
+    def __init__(self,
+                 config:InvokeAIAppConfig,
+                 prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                 access_token:str = None):
         self.config = config
         self.mgr = ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
+        self.prediction_helper = prediction_type_helper
+        self.access_token = access_token or HfFolder.get_token()
+        self.reverse_paths = self._reverse_paths(self.datasets)
 
     def all_models(self)->Dict[str,ModelLoadInfo]:
         '''
-        Return dict of model_key=>ModelStatus
+        Return dict of model_key=>ModelLoadInfo objects.
+        This method consolidates and simplifies the entries in both
+        models.yaml and INITIAL_MODELS.yaml so that they can
+        be treated uniformly. It also sorts the models alphabetically
+        by their name, to improve the display somewhat.
         '''
         model_dict = dict()
+        
         # first populate with the entries in INITIAL_MODELS.yaml
         for key, value in self.datasets.items():
             name,base,model_type = ModelManager.parse_key(key)
@@ -128,102 +145,237 @@ class ModelInstall(object):
             if model_type==ModelType.Pipeline:
                 models.add(key)
         return models
+
+    def recommended_models(self)->Set[str]:
+        starters = self.starter_models()
+        return set([x for x in starters if self.datasets[x].get('recommended',False)])
+    
+    def default_model(self)->str:
+        starters = self.starter_models()
+        defaults = [x for x in starters if self.datasets[x].get('default',False)]
+        return defaults[0]
+
+    def install(self, selections: InstallSelections):
+        job = 1
+        jobs = len(selections.remove_models) + len(selections.install_models)
+        if selections.scan_directory:
+            jobs += 1
         
-        
-def default_config_file():
-    return config.model_conf_path
-
-def sd_configs():
-    return config.legacy_conf_path
-
-def initial_models():
-    global Datasets
-    if Datasets:
-        return Datasets
-    return (Datasets := OmegaConf.load(Dataset_path)['diffusers'])
-
-def add_models(model_manager, config_file_path: Path, models: List[tuple[str,str,str]]):
-    print(f'Installing {models}')
-
-def del_models(model_manager, config_file_path: Path, models: List[tuple[str,str,str]]):
-    for base, model_type, name in models:
-                logger.info(f"Deleting {name}...")
-                model_manager.del_model(name, base, model_type)
-    model_manager.commit(config_file_path)
-        
-def install_requested_models(
-        diffusers: ModelInstallList = None,
-        controlnet: ModelInstallList = None,
-        lora: ModelInstallList = None,
-        ti: ModelInstallList = None,
-        cn_model_map: Dict[str,str] = None, # temporary - move to model manager
-        scan_directory: Path = None,
-        external_models: List[str] = None,
-        scan_at_startup: bool = False,
-        precision: str = "float16",
-        config_file_path: Path = None,
-        model_config_file_callback:  Callable[[Path],Path] = None,
-):
-    """
-    Entry point for installing/deleting starter models, or installing external models.
-    """
-    access_token = HfFolder.get_token()
-    config_file_path = config_file_path or default_config_file()
-    if not config_file_path.exists():
-        open(config_file_path, "w")
-
-    # prevent circular import here
-    from ..model_management import ModelManager
-    model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
-
-    for x in [controlnet, lora, ti, diffusers]:
-        if x:
-            add_models(model_manager, config_file_path, x.install_models)
-            del_models(model_manager, config_file_path, x.remove_models)
+        # remove requested models
+        for key in selections.remove_models:
+            name,base,mtype = self.mgr.parse_key(key)
+            logger.info(f'Deleting {mtype} model {name} [{job}/{jobs}]')
+            self.mgr.del_model(name,base,mtype)
+            job += 1
             
-    # if diffusers:
+        # add requested models
+        for path in selections.install_models:
+            logger.info(f'Installing {path} [{job}/{jobs}]')
+            self.heuristic_install(path)
+            job += 1
 
-    #     if diffusers.install_models and len(diffusers.install_models) > 0:
-    #         logger.info("Installing requested models")
-    #         downloaded_paths = download_weight_datasets(
-    #             models=diffusers.install_models,
-    #             access_token=None,
-    #             precision=precision,
-    #         )
-    #         successful = {x:v for x,v in downloaded_paths.items() if v is not None}
-    #         if len(successful) > 0:
-    #             update_config_file(successful, config_file_path)
-    #         if len(successful) < len(diffusers.install_models):
-    #             unsuccessful = [x for x in downloaded_paths if downloaded_paths[x] is None]
-    #             logger.warning(f"Some of the model downloads were not successful: {unsuccessful}")
+        # import from the scan directory, if any
+        if path := selections.scan_directory:
+            logger.info(f'Scanning and importing models from directory {path} [{job}/{jobs}]')
+            self.heuristic_install(path)
 
-    # due to above, we have to reload the model manager because conf file
-    # was changed behind its back
-    model_manager = ModelManager(OmegaConf.load(config_file_path), precision=precision)
+        self.mgr.commit()
 
-    external_models = external_models or list()
-    if scan_directory:
-        external_models.append(str(scan_directory))
+        if selections.autoscan_on_startup and Path(selections.scan_directory).is_dir():
+            update_autoconvert_dir(selections.scan_directory)
+        else:
+            update_autoconvert_dir(None)
 
-    if len(external_models) > 0:
-        logger.info("INSTALLING EXTERNAL MODELS")
-        for path_url_or_repo in external_models:
-            logger.debug(path_url_or_repo)
-            try:
-                model_manager.heuristic_import(
-                    path_url_or_repo,
-                    commit_to_conf=config_file_path,
-                    config_file_callback = model_config_file_callback,
+    def heuristic_install(self, model_path_id_or_url: Union[str,Path]):
+        # A little hack to allow nested routines to retrieve info on the requested ID
+        self.current_id = model_path_id_or_url
+        
+        path = Path(model_path_id_or_url)
+
+        # checkpoint file, or similar
+        if path.is_file():
+            self._install_path(path)
+            return
+
+        # folders style or similar
+        if path.is_dir() and any([(path/x).exists() for x in ['config.json','model_index.json','learned_embeds.bin']]):
+            self._install_path(path)
+            return
+
+        # recursive scan
+        if path.is_dir():
+            for child in path.iterdir():
+                self.heuristic_install(child)
+            return
+
+        # huggingface repo
+        parts = str(path).split('/')
+        if len(parts) == 2:
+            self._install_repo(str(path))
+            return
+
+        # a URL
+        if model_path_id_or_url.startswith(("http:", "https:", "ftp:")):
+            self._install_url(model_path_id_or_url)
+            return
+
+        logger.warning(f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping')
+
+    # install a model from a local path. The optional info parameter is there to prevent
+    # the model from being probed twice in the event that it has already been probed.
+    def _install_path(self, path: Path, info: ModelProbeInfo=None):
+        try:
+            info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
+            if info.model_type == ModelType.Pipeline:
+                attributes = self._make_attributes(path,info)
+                self.mgr.add_model(model_name = path.stem if info.format=='checkpoint' else path.name,
+                                   base_model = info.base_type,
+                                   model_type = info.model_type,
+                                   model_attributes = attributes
+                                   )
+        except Exception as e:
+            logger.warning(f'{str(e)} Skipping registration.')
+
+    def _install_url(self, url: str):
+        # copy to a staging area, probe, import and delete
+        with TemporaryDirectory(dir=self.config.models_path) as staging:
+            location = download_with_resume(url,Path(staging))
+            if not location:
+                logger.error(f'Unable to download {url}. Skipping.')
+            info = ModelProbe().heuristic_probe(location)
+            dest = self.config.models_path / info.base_type.value / info.model_type.value / location.name
+            models_path = shutil.move(location,dest)
+
+        # staged version will be garbage-collected at this time
+        self._install_path(Path(models_path), info)
+
+    def _get_model_name(self,path_name: str, location: Path)->str:
+        '''
+        Calculate a name for the model - primitive implementation.
+        '''
+        if key := self.reverse_paths.get(path_name):
+            (name, base, mtype) = ModelManager.parse_key(key)
+            return name
+        else:
+            return location.stem
+
+    def _install_repo(self, repo_id: str):
+        hinfo = HfApi().model_info(repo_id)
+        
+        # we try to figure out how to download this most economically
+        # list all the files in the repo
+        files = [x.rfilename for x in hinfo.siblings]
+
+        with TemporaryDirectory(dir=self.config.models_path) as staging:
+            staging = Path(staging)
+            if 'model_index.json' in files:
+                location = self._download_hf_pipeline(repo_id, staging)   # pipeline
+                
+            elif 'pytorch_lora_weights.bin' in files:
+                location = self._download_hf_model(repo_id, ['pytorch_lora_weights.bin'], staging)  # LoRA
+                
+            elif self.config.precision=='float16' and 'diffusion_pytorch_model.fp16.safetensors' in files: # vae, controlnet or some other standalone
+                 files = ['config.json', 'diffusion_pytorch_model.fp16.safetensors']
+                 location = self._download_hf_model(repo_id, files, staging)
+
+            elif 'diffusion_pytorch_model.safetensors' in files:
+                 files = ['config.json', 'diffusion_pytorch_model.safetensors']
+                 location = self._download_hf_model(repo_id, files, staging)
+                 
+            elif 'learned_embeds.bin' in files:
+                location = self._download_hf_model(repo_id, ['learned_embeds.bin'], staging)
+
+            info = ModelProbe().heuristic_probe(location, self.prediction_helper)
+            dest = self.config.models_path / info.base_type.value / info.model_type.value / self._get_model_name(repo_id,location)
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(location,dest)
+            self._install_path(dest, info)
+
+    def _make_attributes(self, path: Path, info: ModelProbeInfo)->dict:
+
+        # convoluted way to retrieve the description from datasets
+        description = f'{info.base_type.value} {info.model_type.value} model'
+        if key := self.reverse_paths.get(self.current_id):
+            if key in self.datasets:
+                description = self.datasets[key]['description']
+                
+        attributes = dict(
+            path = str(path),
+            description = str(description),
+            format = info.format,
+            )
+        if info.model_type == ModelType.Pipeline:
+            attributes.update(
+                              dict(
+                                  variant = info.variant_type,
+                              )
+            )
+            if info.base_type == BaseModelType.StableDiffusion2:
+                attributes.update(
+                    dict(
+                        prediction_type = info.prediction_type,
+                        upcast_attention = info.prediction_type == SchedulerPredictionType.VPrediction,
+                    )
                 )
-            except KeyboardInterrupt:
-                sys.exit(-1)
-            except Exception:
-                pass
+            if info.format=="checkpoint":
+                try:
+                    legacy_conf = LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type] if BaseModelType.StableDiffusion2 \
+                        else LEGACY_CONFIGS[info.base_type][info.variant_type]
+                except KeyError:
+                    legacy_conf = 'v1-inference.yaml'  # best guess
+                    
+                attributes.update(
+                    dict(
+                        config = str(self.config.legacy_conf_path / legacy_conf)
+                    )
+                )
+        return attributes
 
-    if scan_at_startup and scan_directory.is_dir():
-        update_autoconvert_dir(scan_directory)
-    else:
-        update_autoconvert_dir(None)
+    def _download_hf_pipeline(self, repo_id: str, staging: Path)->Path:
+        '''
+        This retrieves a StableDiffusion model from cache or remote and then
+        does a save_pretrained() to the indicated staging area.
+        '''
+        _,name = repo_id.split("/")
+        revisions = ['fp16','main'] if self.config.precision=='float16' else ['main']
+        model = None
+        for revision in revisions:
+            try:
+                model = StableDiffusionPipeline.from_pretrained(repo_id,revision=revision,safety_checker=None)
+            except:  # most errors are due to fp16 not being present. Fix this to catch other errors
+                pass
+            if model:
+                break
+        if not model:
+            logger.error(f'Diffusers model {repo_id} could not be downloaded. Skipping.')
+            return None
+        model.save_pretrained(staging / name, safe_serialization=True)
+        return staging / name
+
+    def _download_hf_model(self, repo_id: str, files: List[str], staging: Path)->Path:
+        _,name = repo_id.split("/")
+        location = staging / name
+        paths = list()
+        for filename in files:
+            p = hf_download_with_resume(repo_id,
+                                        model_dir=location,
+                                        model_name=filename,
+                                        access_token = self.access_token
+                                        )
+            if p:
+                paths.append(p)
+            else:
+                logger.warning(f'Could not download {filename} from {repo_id}.')
+            
+        return location if len(paths)>0 else None
+
+    @classmethod
+    def _reverse_paths(cls,datasets)->dict:
+        '''
+        Reverse mapping from repo_id/path to destination name.
+        '''
+        return {v.get('path') or v.get('repo_id') : k for k, v in datasets.items()}
 
 def update_autoconvert_dir(autodir: Path):
     '''
@@ -249,89 +401,7 @@ def yes_or_no(prompt: str, default_yes=True):
         return response[0] in ("y", "Y")
 
 # ---------------------------------------------
-def recommended_datasets() -> List['str']:
-    datasets = set()
-    for ds in initial_models().keys():
-        if initial_models()[ds].get("recommended", False):
-            datasets.add(ds)
-    return list(datasets)
-
-# ---------------------------------------------
-def default_dataset() -> dict:
-    datasets = set()
-    for ds in initial_models().keys():
-        if initial_models()[ds].get("default", False):
-            datasets.add(ds)
-    return list(datasets)
-
-
-# ---------------------------------------------
-def all_datasets() -> dict:
-    datasets = dict()
-    for ds in initial_models().keys():
-        datasets[ds] = True
-    return datasets
-
-
-# ---------------------------------------------
-# look for legacy model.ckpt in models directory and offer to
-# normalize its name
-def migrate_models_ckpt():
-    model_path = os.path.join(config.root_dir, Model_dir, Weights_dir)
-    if not os.path.exists(os.path.join(model_path, "model.ckpt")):
-        return
-    new_name = initial_models()["stable-diffusion-1.4"]["file"]
-    logger.warning(
-        'The Stable Diffusion v4.1 "model.ckpt" is already installed. The name will be changed to {new_name} to avoid confusion.'
-    )
-    logger.warning(f"model.ckpt => {new_name}")
-    os.replace(
-        os.path.join(model_path, "model.ckpt"), os.path.join(model_path, new_name)
-    )
-
-
-# ---------------------------------------------
-def download_weight_datasets(
-    models: List[str], access_token: str, precision: str = "float32"
-):
-    migrate_models_ckpt()
-    successful = dict()
-    for mod in models:
-        logger.info(f"Downloading {mod}:")
-        successful[mod] = _download_repo_or_file(
-            initial_models()[mod], access_token, precision=precision
-        )
-    return successful
-
-
-def _download_repo_or_file(
-    mconfig: DictConfig, access_token: str, precision: str = "float32"
-) -> Path:
-    path = None
-    if mconfig["format"] == "ckpt":
-        path = _download_ckpt_weights(mconfig, access_token)
-    else:
-        path = _download_diffusion_weights(mconfig, access_token, precision=precision)
-        if "vae" in mconfig and "repo_id" in mconfig["vae"]:
-            _download_diffusion_weights(
-                mconfig["vae"], access_token, precision=precision
-            )
-    return path
-
-def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
-    repo_id = mconfig["repo_id"]
-    filename = mconfig["file"]
-    cache_dir = os.path.join(config.root_dir, Model_dir, Weights_dir)
-    return hf_download_with_resume(
-        repo_id=repo_id,
-        model_dir=cache_dir,
-        model_name=filename,
-        access_token=access_token,
-    )
-
-
-# ---------------------------------------------
-def download_from_hf(
+def hf_download_from_pretrained(
         model_class: object, model_name: str, destination: Path, **kwargs
 ):
     logger = InvokeAILogger.getLogger('InvokeAI')
@@ -344,35 +414,6 @@ def download_from_hf(
     )
     model.save_pretrained(destination, safe_serialization=True)
     return destination
-
-def _download_diffusion_weights(
-    mconfig: DictConfig, access_token: str, precision: str = "float32"
-):
-    repo_id = mconfig["repo_id"]
-    model_class = (
-        StableDiffusionGeneratorPipeline
-        if mconfig.get("format", None) == "diffusers"
-        else AutoencoderKL
-    )
-    extra_arg_list = [{"revision": "fp16"}, {}] if precision == "float16" else [{}]
-    path = None
-    for extra_args in extra_arg_list:
-        try:
-            path = download_from_hf(
-                model_class,
-                repo_id,
-                safety_checker=None,
-                **extra_args,
-            )
-        except OSError as e:
-            if 'Revision Not Found' in str(e):
-                pass
-            else:
-                logger.error(str(e))
-        if path:
-            break
-    return path
-
 
 # ---------------------------------------------
 def hf_download_with_resume(
@@ -432,128 +473,3 @@ def hf_download_with_resume(
     return model_dest
 
 
-# ---------------------------------------------
-def update_config_file(successfully_downloaded: dict, config_file: Path):
-    config_file = (
-        Path(config_file) if config_file is not None else default_config_file()
-    )
-
-    # In some cases (incomplete setup, etc), the default configs directory might be missing.
-    # Create it if it doesn't exist.
-    # this check is ignored if opt.config_file is specified - user is assumed to know what they
-    # are doing if they are passing a custom config file from elsewhere.
-    if config_file is default_config_file() and not config_file.parent.exists():
-        configs_src = Dataset_path.parent
-        configs_dest = default_config_file().parent
-        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
-
-    yaml = new_config_file_contents(successfully_downloaded, config_file)
-
-    try:
-        backup = None
-        if os.path.exists(config_file):
-            logger.warning(
-                f"{config_file.name} exists. Renaming to {config_file.stem}.yaml.orig"
-            )
-            backup = config_file.with_suffix(".yaml.orig")
-            ## Ugh. Windows is unable to overwrite an existing backup file, raises a WinError 183
-            if sys.platform == "win32" and backup.is_file():
-                backup.unlink()
-            config_file.rename(backup)
-
-        with TemporaryFile() as tmp:
-            tmp.write(Config_preamble.encode())
-            tmp.write(yaml.encode())
-
-            with open(str(config_file.expanduser().resolve()), "wb") as new_config:
-                tmp.seek(0)
-                new_config.write(tmp.read())
-
-    except Exception as e:
-        logger.error(f"Error creating config file {config_file}: {str(e)}")
-        if backup is not None:
-            logger.info("restoring previous config file")
-            ## workaround, for WinError 183, see above
-            if sys.platform == "win32" and config_file.is_file():
-                config_file.unlink()
-            backup.rename(config_file)
-        return
-    
-    logger.info(f"Successfully created new configuration file {config_file}")
-
-
-# ---------------------------------------------
-def new_config_file_contents(
-    successfully_downloaded: dict,
-    config_file: Path,
-) -> str:
-    if config_file.exists():
-        conf = OmegaConf.load(str(config_file.expanduser().resolve()))
-    else:
-        conf = OmegaConf.create()
-
-    default_selected = None
-    for model in successfully_downloaded:
-        # a bit hacky - what we are doing here is seeing whether a checkpoint
-        # version of the model was previously defined, and whether the current
-        # model is a diffusers (indicated with a path)
-        if conf.get(model) and Path(successfully_downloaded[model]).is_dir():
-            delete_weights(model, conf[model])
-
-        stanza = {}
-        mod = initial_models()[model]
-        stanza["description"] = mod["description"]
-        stanza["repo_id"] = mod["repo_id"]
-        stanza["format"] = mod["format"]
-        # diffusers don't need width and height (probably .ckpt doesn't either)
-        # so we no longer require these in INITIAL_MODELS.yaml
-        if "width" in mod:
-            stanza["width"] = mod["width"]
-        if "height" in mod:
-            stanza["height"] = mod["height"]
-        if "file" in mod:
-            stanza["weights"] = os.path.relpath(
-                successfully_downloaded[model], start=config.root_dir
-            )
-            stanza["config"] = os.path.normpath(
-                os.path.join(sd_configs(), mod["config"])
-            )
-        if "vae" in mod:
-            if "file" in mod["vae"]:
-                stanza["vae"] = os.path.normpath(
-                    os.path.join(Model_dir, Weights_dir, mod["vae"]["file"])
-                )
-            else:
-                stanza["vae"] = mod["vae"]
-        if mod.get("default", False):
-            stanza["default"] = True
-            default_selected = True
-
-        conf[model] = stanza
-
-    # if no default model was chosen, then we select the first
-    # one in the list
-    if not default_selected:
-        conf[list(successfully_downloaded.keys())[0]]["default"] = True
-
-    return OmegaConf.to_yaml(conf)
-
-
-# ---------------------------------------------
-def delete_weights(model_name: str, conf_stanza: dict):
-    if not (weights := conf_stanza.get("weights")):
-        return
-    if re.match("/VAE/", conf_stanza.get("config")):
-        return
-
-    logger.warning(
-        f"\nThe checkpoint version of {model_name} is superseded by the diffusers version. Deleting the original file {weights}?"
-    )
-
-    weights = Path(weights)
-    if not weights.is_absolute():
-        weights = config.root_dir / weights
-        try:
-            weights.unlink()
-        except OSError as e:
-            logger.error(str(e))
