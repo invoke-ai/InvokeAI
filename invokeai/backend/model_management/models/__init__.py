@@ -29,10 +29,22 @@ MODEL_CLASSES = {
     #},
 }
 
-def get_all_model_configs():
+def _get_all_model_configs():
     configs = set()
     for models in MODEL_CLASSES.values():
         for _, model in models.items():
             configs.update(model._get_configs().values())
     configs.discard(None)
-    return list(configs) # TODO: set, list or tuple
+    return list(configs)
+
+MODEL_CONFIGS = _get_all_model_configs()
+OPENAPI_MODEL_CONFIGS = list()
+
+for cfg in MODEL_CONFIGS:
+    model_name, cfg_name = cfg.__qualname__.split('.')[-2:]
+    openapi_cfg_name = model_name + cfg_name
+    name_wrapper = type(openapi_cfg_name, (cfg,), {})
+
+    #globals()[name] = value
+    vars()[openapi_cfg_name] = name_wrapper
+    OPENAPI_MODEL_CONFIGS.append(name_wrapper)
