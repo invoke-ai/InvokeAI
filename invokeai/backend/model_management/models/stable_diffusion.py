@@ -123,6 +123,7 @@ class StableDiffusion2Model(DiffusersModel):
     class DiffusersConfig(ModelConfigBase):
         format: Literal["diffusers"]
         vae: Optional[str] = Field(None)
+        variant: ModelVariantType
         prediction_type: SchedulerPredictionType
         upcast_attention: bool
 
@@ -130,6 +131,7 @@ class StableDiffusion2Model(DiffusersModel):
         format: Literal["checkpoint"]
         vae: Optional[str] = Field(None)
         config: Optional[str] = Field(None)
+        variant: ModelVariantType
         prediction_type: SchedulerPredictionType
         upcast_attention: bool
 
