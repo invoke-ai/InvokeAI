@@ -161,9 +161,7 @@ class Inpaint(Img2Img):
         im: Image.Image,
         seam_size: int,
         seam_blur: int,
-        prompt,
         seed,
-        sampler,
         steps,
         cfg_scale,
         ddim_eta,
@@ -177,8 +175,6 @@ class Inpaint(Img2Img):
         mask = self.mask_edge(hard_mask, seam_size, seam_blur)
 
         make_image = self.get_make_image(
-            prompt,
-            sampler,
             steps,
             cfg_scale,
             ddim_eta,
@@ -203,8 +199,6 @@ class Inpaint(Img2Img):
     @torch.no_grad()
     def get_make_image(
         self,
-        prompt,
-        sampler,
         steps,
         cfg_scale,
         ddim_eta,
@@ -306,7 +300,6 @@ class Inpaint(Img2Img):
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
-        pipeline.scheduler = sampler
 
         # todo: support cross-attention control
         uc, c, _ = conditioning
@@ -345,9 +338,7 @@ class Inpaint(Img2Img):
                     result,
                     seam_size,
                     seam_blur,
-                    prompt,
                     seed,
-                    sampler,
                     seam_steps,
                     cfg_scale,
                     ddim_eta,
@@ -360,8 +351,6 @@ class Inpaint(Img2Img):
 
                 # Restore original settings
                 self.get_make_image(
-                    prompt,
-                    sampler,
                     steps,
                     cfg_scale,
                     ddim_eta,

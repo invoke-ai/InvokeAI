@@ -21,7 +21,8 @@ from .image import ImageOutput
 import re
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from .model import UNetField, ClipField, VaeField
+from .model import UNetField, VaeField
+from .compel import ConditioningField
 from contextlib import contextmanager, ExitStack, ContextDecorator
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
@@ -63,19 +64,15 @@ class InpaintInvocation(BaseInvocation):
 
     type: Literal["inpaint"] = "inpaint"
 
-    prompt: Optional[str] = Field(description="The prompt to generate an image from")
+    positive_conditioning: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
+    negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     seed:        int = Field(ge=0, le=SEED_MAX, description="The seed to use (omit for random)", default_factory=get_random_seed)
     steps:       int = Field(default=30, gt=0, description="The number of steps to use to generate the image")
     width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
     height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
     cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
-    #model:       str = Field(default="", description="The model to use (currently ignored)")
-    #progress_images: bool = Field(default=False, description="Whether or not to produce progress images during generation",  )
-    #control_model: Optional[str] = Field(default=None, description="The control model to use")
-    #control_image: Optional[ImageField] = Field(default=None, description="The processed control image")
     unet: UNetField = Field(default=None, description="UNet model")
-    clip: ClipField = Field(default=None, description="Clip model")
     vae: VaeField = Field(default=None, description="Vae model")
 
     # Inputs
@@ -151,64 +148,34 @@ class InpaintInvocation(BaseInvocation):
             source_node_id=source_node_id,
         )
 
+    def get_conditioning(self, context):
+        c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
+        uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
+
+        return (uc, c, extra_conditioning_info)
+
     @contextmanager
-    def load_model_old_way(self, context):
+    def load_model_old_way(self, context, scheduler):
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
+        vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
+
+        #unet = unet_info.context.model
+        #vae = vae_info.context.model
+
         with ExitStack() as stack:
-            unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
-            tokenizer_info = context.services.model_manager.get_model(**self.clip.tokenizer.dict())
-            text_encoder_info = context.services.model_manager.get_model(**self.clip.text_encoder.dict())
-            vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
-
-            #unet = stack.enter_context(unet_info)
-            #tokenizer = stack.enter_context(tokenizer_info)
-            #text_encoder = stack.enter_context(text_encoder_info)
-            #vae = stack.enter_context(vae_info)
-            with vae_info as vae:
-                device = vae.device
-                dtype = vae.dtype
-
-            # not load models to gpu as it should be handled by pipeline
-            unet = unet_info.context.model
-            tokenizer = tokenizer_info.context.model
-            text_encoder = text_encoder_info.context.model
-            vae = vae_info.context.model
-
-            scheduler = get_scheduler(
-                context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
-            )
-
             loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
-            ti_list = []
-            for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
-                name = trigger[1:-1]
-                try:
-                    ti_list.append(
-                        stack.enter_context(
-                            context.services.model_manager.get_model(
-                                model_name=name,
-                                base_model=self.clip.text_encoder.base_model,
-                                model_type=ModelType.TextualInversion,
-                            )
-                        )
-                    )
-                except Exception:
-                    #print(e)
-                    #import traceback
-                    #print(traceback.format_exc())
-                    print(f"Warn: trigger: \"{trigger}\" not found")
 
+            with vae_info as vae,\
+                 unet_info as unet,\
+                 ModelPatcher.apply_lora_unet(unet, loras):
 
-            with ModelPatcher.apply_lora_unet(unet, loras),\
-                 ModelPatcher.apply_lora_text_encoder(text_encoder, loras),\
-                 ModelPatcher.apply_ti(tokenizer, text_encoder, ti_list) as (ti_tokenizer, ti_manager):
+                device = context.services.model_manager.mgr.cache.execution_device
+                dtype = context.services.model_manager.mgr.cache.precision
 
                 pipeline = StableDiffusionGeneratorPipeline(
-                    # TODO: ti_manager
                     vae=vae,
-                    text_encoder=text_encoder,
-                    tokenizer=ti_tokenizer,
+                    text_encoder=None,
+                    tokenizer=None,
                     unet=unet,
                     scheduler=scheduler,
                     safety_checker=None,
@@ -242,14 +209,22 @@ class InpaintInvocation(BaseInvocation):
         )
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        with self.load_model_old_way(context) as model:
+        conditioning = self.get_conditioning(context)
+        scheduler = get_scheduler(
+            context=context,
+            scheduler_info=self.unet.scheduler,
+            scheduler_name=self.scheduler,
+        )
+
+        with self.load_model_old_way(context, scheduler) as model:
             outputs = Inpaint(model).generate(
-                prompt=self.prompt,
+                conditioning=conditioning,
+                scheduler=scheduler,
                 init_image=image,
                 mask_image=mask,
                 step_callback=partial(self.dispatch_progress, context, source_node_id),
                 **self.dict(
-                    exclude={"prompt", "image", "mask"}
+                    exclude={"positive_conditioning", "negative_conditioning", "scheduler", "image", "mask"}
                 ),  # Shorthand for passing all of the parameters above manually
             )
 
