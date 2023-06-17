@@ -26,4 +26,3 @@ export type ImageMultiplyInvocation = {
    */
   image2?: ImageField;
 };
-

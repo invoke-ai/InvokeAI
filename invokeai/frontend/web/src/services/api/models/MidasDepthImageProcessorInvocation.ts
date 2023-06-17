@@ -30,4 +30,3 @@ export type MidasDepthImageProcessorInvocation = {
    */
   bg_th?: number;
 };
-

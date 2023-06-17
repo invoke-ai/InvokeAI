@@ -11,4 +11,3 @@ export type LatentsField = {
    */
   latents_name: string;
 };
-

@@ -20,4 +20,3 @@ export type ColorField = {
    */
   'a': number;
 };
-

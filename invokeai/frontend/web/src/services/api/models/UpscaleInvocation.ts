@@ -30,4 +30,3 @@ export type UpscaleInvocation = {
    */
   level?: 2 | 4;
 };
-

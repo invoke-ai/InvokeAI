@@ -27,4 +27,3 @@ export type InfillColorInvocation = {
    */
   color?: ColorField;
 };
-

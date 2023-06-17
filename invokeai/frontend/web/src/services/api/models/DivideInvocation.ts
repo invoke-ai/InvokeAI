@@ -24,4 +24,3 @@ export type DivideInvocation = {
    */
   'b'?: number;
 };
-

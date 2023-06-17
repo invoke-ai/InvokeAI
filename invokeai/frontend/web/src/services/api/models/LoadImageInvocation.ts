@@ -22,4 +22,3 @@ export type LoadImageInvocation = {
    */
   image?: ImageField;
 };
-

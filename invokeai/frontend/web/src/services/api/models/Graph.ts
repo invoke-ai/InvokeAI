@@ -38,6 +38,7 @@ import type { LatentsToLatentsInvocation } from './LatentsToLatentsInvocation';
 import type { LineartAnimeImageProcessorInvocation } from './LineartAnimeImageProcessorInvocation';
 import type { LineartImageProcessorInvocation } from './LineartImageProcessorInvocation';
 import type { LoadImageInvocation } from './LoadImageInvocation';
+import type { LoraLoaderInvocation } from './LoraLoaderInvocation';
 import type { MaskFromAlphaInvocation } from './MaskFromAlphaInvocation';
 import type { MediapipeFaceProcessorInvocation } from './MediapipeFaceProcessorInvocation';
 import type { MidasDepthImageProcessorInvocation } from './MidasDepthImageProcessorInvocation';
@@ -56,6 +57,8 @@ import type { RangeOfSizeInvocation } from './RangeOfSizeInvocation';
 import type { ResizeLatentsInvocation } from './ResizeLatentsInvocation';
 import type { RestoreFaceInvocation } from './RestoreFaceInvocation';
 import type { ScaleLatentsInvocation } from './ScaleLatentsInvocation';
+import type { SD1ModelLoaderInvocation } from './SD1ModelLoaderInvocation';
+import type { SD2ModelLoaderInvocation } from './SD2ModelLoaderInvocation';
 import type { ShowImageInvocation } from './ShowImageInvocation';
 import type { StepParamEasingInvocation } from './StepParamEasingInvocation';
 import type { SubtractInvocation } from './SubtractInvocation';
@@ -72,10 +75,9 @@ export type Graph = {
   /**
    * The nodes in this graph
    */
-  nodes?: Record<string, (LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | DynamicPromptInvocation | CompelInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | CvInpaintInvocation | RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | FloatLinearRangeInvocation | StepParamEasingInvocation | UpscaleInvocation | RestoreFaceInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageProcessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | LatentsToLatentsInvocation | ImageToImageInvocation | InpaintInvocation)>;
+  nodes?: Record<string, (RangeInvocation | RangeOfSizeInvocation | RandomRangeInvocation | SD1ModelLoaderInvocation | SD2ModelLoaderInvocation | LoraLoaderInvocation | CompelInvocation | LoadImageInvocation | ShowImageInvocation | ImageCropInvocation | ImagePasteInvocation | MaskFromAlphaInvocation | ImageMultiplyInvocation | ImageChannelInvocation | ImageConvertInvocation | ImageBlurInvocation | ImageResizeInvocation | ImageScaleInvocation | ImageLerpInvocation | ImageInverseLerpInvocation | ControlNetInvocation | ImageProcessorInvocation | CvInpaintInvocation | TextToImageInvocation | InfillColorInvocation | InfillTileInvocation | InfillPatchMatchInvocation | NoiseInvocation | TextToLatentsInvocation | LatentsToImageInvocation | ResizeLatentsInvocation | ScaleLatentsInvocation | ImageToLatentsInvocation | AddInvocation | SubtractInvocation | MultiplyInvocation | DivideInvocation | RandomIntInvocation | ParamIntInvocation | ParamFloatInvocation | FloatLinearRangeInvocation | StepParamEasingInvocation | DynamicPromptInvocation | RestoreFaceInvocation | UpscaleInvocation | GraphInvocation | IterateInvocation | CollectInvocation | CannyImageProcessorInvocation | HedImageProcessorInvocation | LineartImageProcessorInvocation | LineartAnimeImageProcessorInvocation | OpenposeImageProcessorInvocation | MidasDepthImageProcessorInvocation | NormalbaeImageProcessorInvocation | MlsdImageProcessorInvocation | PidiImageProcessorInvocation | ContentShuffleImageProcessorInvocation | ZoeDepthImageProcessorInvocation | MediapipeFaceProcessorInvocation | ImageToImageInvocation | LatentsToLatentsInvocation | InpaintInvocation)>;
   /**
    * The connections between nodes and their fields in this graph
    */
   edges?: Array<Edge>;
 };
-

@@ -38,4 +38,3 @@ export type ControlNetInvocation = {
    */
   end_step_percent?: number;
 };
-

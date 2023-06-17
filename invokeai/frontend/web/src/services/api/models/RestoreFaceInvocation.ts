@@ -26,4 +26,3 @@ export type RestoreFaceInvocation = {
    */
   strength?: number;
 };
-

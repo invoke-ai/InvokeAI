@@ -12,4 +12,3 @@ export type EdgeConnection = {
    */
   field: string;
 };
-
