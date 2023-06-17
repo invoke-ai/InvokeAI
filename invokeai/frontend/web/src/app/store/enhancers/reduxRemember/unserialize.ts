@@ -7,7 +7,8 @@ import { initialNodesState } from 'features/nodes/store/nodesSlice';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { initialPostprocessingState } from 'features/parameters/store/postprocessingSlice';
 import { initialConfigState } from 'features/system/store/configSlice';
-import { initialModelsState } from 'features/system/store/modelSlice';
+import { sd1InitialModelsState } from 'features/system/store/models/sd1ModelSlice';
+import { sd2InitialModelsState } from 'features/system/store/models/sd2ModelSlice';
 import { initialSystemState } from 'features/system/store/systemSlice';
 import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
 import { initialUIState } from 'features/ui/store/uiSlice';
@@ -21,7 +22,8 @@ const initialStates: {
   gallery: initialGalleryState,
   generation: initialGenerationState,
   lightbox: initialLightboxState,
-  models: initialModelsState,
+  sd1models: sd1InitialModelsState,
+  sd2models: sd2InitialModelsState,
   nodes: initialNodesState,
   postprocessing: initialPostprocessingState,
   system: initialSystemState,

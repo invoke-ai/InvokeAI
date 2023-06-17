@@ -5,34 +5,37 @@ import {
   configureStore,
 } from '@reduxjs/toolkit';
 
-import { rememberReducer, rememberEnhancer } from 'redux-remember';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
+import { rememberEnhancer, rememberReducer } from 'redux-remember';
 
 import canvasReducer from 'features/canvas/store/canvasSlice';
+import controlNetReducer from 'features/controlNet/store/controlNetSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
 import imagesReducer from 'features/gallery/store/imagesSlice';
 import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
-import controlNetReducer from 'features/controlNet/store/controlNetSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
 // import sessionReducer from 'features/system/store/sessionSlice';
-import configReducer from 'features/system/store/configSlice';
-import uiReducer from 'features/ui/store/uiSlice';
-import hotkeysReducer from 'features/ui/store/hotkeysSlice';
-import modelsReducer from 'features/system/store/modelSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import boardsReducer from 'features/gallery/store/boardSlice';
+import configReducer from 'features/system/store/configSlice';
+import hotkeysReducer from 'features/ui/store/hotkeysSlice';
+import uiReducer from 'features/ui/store/uiSlice';
 
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
-import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
+import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 
+// Model Reducers
+import sd1ModelReducer from 'features/system/store/models/sd1ModelSlice';
+import sd2ModelReducer from 'features/system/store/models/sd2ModelSlice';
+
+import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
-import { LOCALSTORAGE_PREFIX } from './constants';
 import { api } from 'services/apiSlice';
 
 const allReducers = {
@@ -40,7 +43,8 @@ const allReducers = {
   gallery: galleryReducer,
   generation: generationReducer,
   lightbox: lightboxReducer,
-  models: modelsReducer,
+  sd1models: sd1ModelReducer,
+  sd2models: sd2ModelReducer,
   nodes: nodesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,
@@ -63,7 +67,6 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'gallery',
   'generation',
   'lightbox',
-  // 'models',
   'nodes',
   'postprocessing',
   'system',

@@ -1,10 +1,11 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { Scheduler } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp, sortBy } from 'lodash-es';
 import { ImageDTO } from 'services/api';
 import { imageUrlsReceived } from 'services/thunks/image';
-import { receivedModels } from 'services/thunks/model';
+import { getModels } from 'services/thunks/model';
 import {
   CfgScaleParam,
   HeightParam,
@@ -17,7 +18,6 @@ import {
   StrengthParam,
   WidthParam,
 } from './parameterZodSchemas';
-import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 
 export interface GenerationState {
   cfgScale: CfgScaleParam;
@@ -220,7 +220,7 @@ export const generationSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(receivedModels.fulfilled, (state, action) => {
+    builder.addCase(getModels.fulfilled, (state, action) => {
       if (!state.model) {
         const firstModel = sortBy(action.payload, 'name')[0];
         state.model = firstModel.name;
