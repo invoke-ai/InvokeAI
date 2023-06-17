@@ -26,9 +26,13 @@ import type { VaeModelConfig } from './VaeModelConfig';
 
 export type ModelsList = {
 <<<<<<< HEAD
+<<<<<<< HEAD
   models: Record<string, Record<string, Record<string, (StableDiffusion2DiffusersModelConfig | ControlNetModelConfig | LoraModelConfig | StableDiffusion1CheckpointModelConfig | TextualInversionModelConfig | StableDiffusion1DiffusersModelConfig | StableDiffusion2CheckpointModelConfig | VAEModelConfig)>>>;
 >>>>>>> 76dd749b1 (chore: Rebuild API)
 =======
   models: Record<string, Record<string, Record<string, (StableDiffusion1ModelDiffusersConfig | StableDiffusion2ModelCheckpointConfig | TextualInversionModelConfig | ControlNetModelConfig | VaeModelConfig | StableDiffusion2ModelDiffusersConfig | LoRAModelConfig | StableDiffusion1ModelCheckpointConfig)>>>;
 >>>>>>> 0f3b7d2b3 (chore: Rebuild API with new Model API names)
+=======
+  models: Record<string, Record<string, Record<string, (TextualInversionModelConfig | StableDiffusion2ModelDiffusersConfig | ControlNetModelConfig | StableDiffusion2ModelCheckpointConfig | StableDiffusion1ModelCheckpointConfig | VaeModelConfig | StableDiffusion1ModelDiffusersConfig | LoRAModelConfig)>>>;
+>>>>>>> 24673fd85 (chore: Rebuild API - base_model and type added)
 };
