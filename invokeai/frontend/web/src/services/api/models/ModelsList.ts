@@ -12,5 +12,5 @@ import type { TextualInversionModelConfig } from './TextualInversionModelConfig'
 import type { VaeModelConfig } from './VaeModelConfig';
 
 export type ModelsList = {
-  models: Record<string, Record<string, Record<string, (StableDiffusion1ModelDiffusersConfig | StableDiffusion2ModelCheckpointConfig | TextualInversionModelConfig | ControlNetModelConfig | VaeModelConfig | StableDiffusion2ModelDiffusersConfig | LoRAModelConfig | StableDiffusion1ModelCheckpointConfig)>>>;
+  models: Record<string, Record<string, Record<string, (TextualInversionModelConfig | StableDiffusion2ModelDiffusersConfig | ControlNetModelConfig | StableDiffusion2ModelCheckpointConfig | StableDiffusion1ModelCheckpointConfig | VaeModelConfig | StableDiffusion1ModelDiffusersConfig | LoRAModelConfig)>>>;
 };
