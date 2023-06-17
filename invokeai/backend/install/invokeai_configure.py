@@ -671,7 +671,8 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
                                    }
                                   )
                         )
-
+    with open(root / 'invokeai.yaml','w') as f:
+        f.write('#empty invokeai.yaml initialization file')
 
 # -------------------------------------
 def run_console_ui(
@@ -827,8 +828,6 @@ def main():
     errors = set()
 
     try:
-        models_to_download = default_user_selections(opt)
-
         # We check for to see if the runtime directory is correctly initialized.
         old_init_file = config.root_path / 'invokeai.init'
         new_init_file = config.root_path / 'invokeai.yaml'
@@ -841,6 +840,7 @@ def main():
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root_path, opt.yes_to_all)
 
+        models_to_download = default_user_selections(opt)
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(
@@ -855,7 +855,7 @@ def main():
                     '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'
                 )
                 sys.exit(0)
-
+                
         if opt.skip_support_models:
             logger.info("SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST")
         else:

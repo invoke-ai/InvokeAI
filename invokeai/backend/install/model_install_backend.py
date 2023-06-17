@@ -95,6 +95,8 @@ class ModelInstall(object):
                  prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
                  access_token:str = None):
         self.config = config
+        with open('log.txt','w') as file:
+            print(config.model_conf_path,file=file)
         self.mgr = ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper

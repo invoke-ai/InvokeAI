@@ -173,13 +173,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 rely=-3,
                 when_pressed_function=self.on_back,
             )
-        self.ok_button = self.add_widget_intelligent(
-            npyscreen.ButtonPress,
-            name=done_label,
-            relx=(window_width - len(done_label)) // 2,
-            rely=-3,
-            when_pressed_function=self.on_execute
-        )
+        else:
+            self.ok_button = self.add_widget_intelligent(
+                npyscreen.ButtonPress,
+                name=done_label,
+                relx=(window_width - len(done_label)) // 2,
+                rely=-3,
+                when_pressed_function=self.on_execute
+            )
 
         label = "APPLY CHANGES & EXIT"
         self.done = self.add_widget_intelligent(
@@ -529,6 +530,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         ui_sections = [self.starter_pipelines, self.pipeline_models,
                        self.controlnet_models, self.lora_models, self.ti_models]
         for section in ui_sections:
+            if not 'models_selected' in section:
+                continue
             selected = set([section['models'][x] for x in section['models_selected'].value])
             models_to_install = [x for x in selected if not self.all_models[x].installed]
             models_to_remove = [x for x in section['models'] if x not in selected and self.all_models[x].installed]
@@ -540,7 +543,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         for section in ui_sections:
             if downloads := section.get('download_ids'):
                 selections.install_models.extend(downloads.value.split())
-            
+
         # load directory and whether to scan on startup
         selections.scan_directory = self.pipeline_models['autoload_directory'].value
         selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
