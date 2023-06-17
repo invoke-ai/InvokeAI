@@ -1,4 +1,5 @@
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   CompelInvocation,
   Graph,
@@ -7,11 +8,13 @@ import {
   NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
+  SD1ModelLoaderInvocation,
+  SD2ModelLoaderInvocation,
   TextToLatentsInvocation,
 } from 'services/api';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 
+const MODEL_LOADER = 'model_loader';
 const POSITIVE_CONDITIONING = 'positive_conditioning';
 const NEGATIVE_CONDITIONING = 'negative_conditioning';
 const TEXT_TO_LATENTS = 'text_to_latents';
@@ -26,9 +29,9 @@ const ITERATE = 'iterate';
  */
 export const buildTextToImageGraph = (state: RootState): Graph => {
   const {
+    model,
     positivePrompt,
     negativePrompt,
-    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -44,26 +47,30 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     edges: [],
   };
 
+  // Create the model loader node
+  const modelLoaderNode: SD1ModelLoaderInvocation | SD2ModelLoaderInvocation = {
+    id: MODEL_LOADER,
+    type: 'sd1_model_loader',
+    model_name: model,
+  };
+
   // Create the conditioning, t2l and l2i nodes
   const positiveConditioningNode: CompelInvocation = {
     id: POSITIVE_CONDITIONING,
     type: 'compel',
     prompt: positivePrompt,
-    model,
   };
 
   const negativeConditioningNode: CompelInvocation = {
     id: NEGATIVE_CONDITIONING,
     type: 'compel',
     prompt: negativePrompt,
-    model,
   };
 
   const textToLatentsNode: TextToLatentsInvocation = {
     id: TEXT_TO_LATENTS,
     type: 't2l',
     cfg_scale,
-    model,
     scheduler,
     steps,
   };
@@ -71,14 +78,47 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
   const latentsToImageNode: LatentsToImageInvocation = {
     id: LATENTS_TO_IMAGE,
     type: 'l2i',
-    model,
   };
 
   // Add to the graph
+  graph.nodes[MODEL_LOADER] = modelLoaderNode;
   graph.nodes[POSITIVE_CONDITIONING] = positiveConditioningNode;
   graph.nodes[NEGATIVE_CONDITIONING] = negativeConditioningNode;
   graph.nodes[TEXT_TO_LATENTS] = textToLatentsNode;
   graph.nodes[LATENTS_TO_IMAGE] = latentsToImageNode;
+
+  // Connect the model loader to the required nodes
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'clip' },
+    destination: {
+      node_id: POSITIVE_CONDITIONING,
+      field: 'clip',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'clip' },
+    destination: {
+      node_id: NEGATIVE_CONDITIONING,
+      field: 'clip',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'unet' },
+    destination: {
+      node_id: TEXT_TO_LATENTS,
+      field: 'unet',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'vae' },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'vae',
+    },
+  });
 
   // Connect them
   graph.edges.push({

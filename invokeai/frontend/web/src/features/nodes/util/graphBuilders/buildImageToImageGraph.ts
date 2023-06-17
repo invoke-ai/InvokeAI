@@ -1,4 +1,7 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
+import { set } from 'lodash-es';
 import {
   CompelInvocation,
   Graph,
@@ -10,14 +13,14 @@ import {
   NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
+  SD1ModelLoaderInvocation,
+  SD2ModelLoaderInvocation,
 } from 'services/api';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { log } from 'app/logging/useLogger';
-import { set } from 'lodash-es';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
+const MODEL_LOADER = 'model_loader';
 const POSITIVE_CONDITIONING = 'positive_conditioning';
 const NEGATIVE_CONDITIONING = 'negative_conditioning';
 const IMAGE_TO_LATENTS = 'image_to_latents';
@@ -60,12 +63,18 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     edges: [],
   };
 
+  // Create the model loader node
+  const modelLoaderNode: SD1ModelLoaderInvocation | SD2ModelLoaderInvocation = {
+    id: MODEL_LOADER,
+    type: 'sd1_model_loader',
+    model_name: model,
+  };
+
   // Create the positive conditioning (prompt) node
   const positiveConditioningNode: CompelInvocation = {
     id: POSITIVE_CONDITIONING,
     type: 'compel',
     prompt: positivePrompt,
-    model,
   };
 
   // Negative conditioning
@@ -73,7 +82,6 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     id: NEGATIVE_CONDITIONING,
     type: 'compel',
     prompt: negativePrompt,
-    model,
   };
 
   // This will encode the raster image to latents - but it may get its `image` from a resize node,
@@ -81,7 +89,6 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
   const imageToLatentsNode: ImageToLatentsInvocation = {
     id: IMAGE_TO_LATENTS,
     type: 'i2l',
-    model,
   };
 
   // This does the actual img2img inference
@@ -89,7 +96,6 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     id: LATENTS_TO_LATENTS,
     type: 'l2l',
     cfg_scale,
-    model,
     scheduler,
     steps,
     strength,
@@ -99,15 +105,56 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
   const latentsToImageNode: LatentsToImageInvocation = {
     id: LATENTS_TO_IMAGE,
     type: 'l2i',
-    model,
   };
 
   // Add all those nodes to the graph
+  graph.nodes[MODEL_LOADER] = modelLoaderNode;
   graph.nodes[POSITIVE_CONDITIONING] = positiveConditioningNode;
   graph.nodes[NEGATIVE_CONDITIONING] = negativeConditioningNode;
   graph.nodes[IMAGE_TO_LATENTS] = imageToLatentsNode;
   graph.nodes[LATENTS_TO_LATENTS] = latentsToLatentsNode;
   graph.nodes[LATENTS_TO_IMAGE] = latentsToImageNode;
+
+  // Connect the model loader to the required nodes
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'clip' },
+    destination: {
+      node_id: POSITIVE_CONDITIONING,
+      field: 'clip',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'clip' },
+    destination: {
+      node_id: NEGATIVE_CONDITIONING,
+      field: 'clip',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'vae' },
+    destination: {
+      node_id: IMAGE_TO_LATENTS,
+      field: 'vae',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'unet' },
+    destination: {
+      node_id: LATENTS_TO_LATENTS,
+      field: 'unet',
+    },
+  });
+
+  graph.edges.push({
+    source: { node_id: MODEL_LOADER, field: 'vae' },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'vae',
+    },
+  });
 
   // Connect the prompt nodes to the imageToLatents node
   graph.edges.push({
@@ -117,6 +164,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
       field: 'positive_conditioning',
     },
   });
+
   graph.edges.push({
     source: { node_id: NEGATIVE_CONDITIONING, field: 'conditioning' },
     destination: {
