@@ -6,7 +6,7 @@ import type { ModelError } from './ModelError';
 import type { ModelVariantType } from './ModelVariantType';
 import type { SchedulerPredictionType } from './SchedulerPredictionType';
 
-export type StableDiffusion2DiffusersModelConfig = {
+export type StableDiffusion2ModelDiffusersConfig = {
   path: string;
   description?: string;
   format: 'diffusers';

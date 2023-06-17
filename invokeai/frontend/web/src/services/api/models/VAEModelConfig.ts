@@ -4,7 +4,7 @@
 
 import type { ModelError } from './ModelError';
 
-export type VAEModelConfig = {
+export type VaeModelConfig = {
   path: string;
   description?: string;
   format: ('checkpoint' | 'diffusers');
