@@ -5,7 +5,8 @@ import {
   ModelInputFieldTemplate,
   ModelInputFieldValue,
 } from 'features/nodes/types/types';
-import { modelSelector } from 'features/system/components/ModelSelect';
+
+import { modelSelector } from 'features/system/store/modelSelectors';
 import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
@@ -16,7 +17,8 @@ const ModelInputFieldComponent = (
 
   const dispatch = useAppDispatch();
 
-  const { sd1ModelData, sd2ModelData } = useAppSelector(modelSelector);
+  const { sd1ModelDropDownData, sd2ModelDropdownData } =
+    useAppSelector(modelSelector);
 
   const handleValueChanged = (e: ChangeEvent<HTMLSelectElement>) => {
     dispatch(
@@ -31,8 +33,8 @@ const ModelInputFieldComponent = (
   return (
     <NativeSelect
       onChange={handleValueChanged}
-      value={field.value || sd1ModelData[0].value}
-      data={sd1ModelData.concat(sd2ModelData)}
+      value={field.value || sd1ModelDropDownData[0].value}
+      data={sd1ModelDropDownData.concat(sd2ModelDropdownData)}
     ></NativeSelect>
   );
 };
