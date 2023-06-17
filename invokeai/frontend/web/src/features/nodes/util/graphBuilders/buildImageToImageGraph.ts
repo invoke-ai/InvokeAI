@@ -40,6 +40,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     positivePrompt,
     negativePrompt,
     model,
+    currentModelType,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -66,7 +67,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
   // Create the model loader node
   const modelLoaderNode: SD1ModelLoaderInvocation | SD2ModelLoaderInvocation = {
     id: MODEL_LOADER,
-    type: 'sd1_model_loader',
+    type: currentModelType,
     model_name: model,
   };
 

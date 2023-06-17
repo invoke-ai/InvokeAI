@@ -30,6 +30,7 @@ const ITERATE = 'iterate';
 export const buildTextToImageGraph = (state: RootState): Graph => {
   const {
     model,
+    currentModelType,
     positivePrompt,
     negativePrompt,
     cfgScale: cfg_scale,
@@ -50,7 +51,7 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
   // Create the model loader node
   const modelLoaderNode: SD1ModelLoaderInvocation | SD2ModelLoaderInvocation = {
     id: MODEL_LOADER,
-    type: 'sd1_model_loader',
+    type: currentModelType,
     model_name: model,
   };
 
