@@ -176,13 +176,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         return Generator
 
 # ------------------------------------
-class Txt2Img(InvokeAIGenerator):
-    @classmethod
-    def _generator_class(cls):
-        from .txt2img import Txt2Img
-        return Txt2Img
-
-# ------------------------------------
 class Img2Img(InvokeAIGenerator):
     def generate(self,
                init_image: Image.Image | torch.FloatTensor,
@@ -234,24 +227,6 @@ class Inpaint(Img2Img):
     def _generator_class(cls):
         from .inpaint import Inpaint
         return Inpaint
-
-# ------------------------------------
-class Embiggen(Txt2Img):
-    def generate(
-            self,
-            embiggen: list=None,
-            embiggen_tiles: list = None,
-            strength: float=0.75,
-            **kwargs)->Iterator[InvokeAIGeneratorOutput]:
-        return super().generate(embiggen=embiggen,
-                                embiggen_tiles=embiggen_tiles,
-                                strength=strength,
-                                **kwargs)
-
-    @classmethod
-    def _generator_class(cls):
-        from .embiggen import Embiggen
-        return Embiggen
 
 class Generator:
     downsampling_factor: int

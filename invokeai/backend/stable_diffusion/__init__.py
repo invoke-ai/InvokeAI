@@ -1,7 +1,6 @@
 """
 Initialization file for the invokeai.backend.stable_diffusion package
 """
-from .concepts_lib import HuggingFaceConceptsLibrary
 from .diffusers_pipeline import (
     ConditioningData,
     PipelineIntermediateState,

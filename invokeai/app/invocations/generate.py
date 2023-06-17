@@ -12,7 +12,7 @@ from invokeai.app.models.image import (ColorField, ImageCategory, ImageField,
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
 
-from ...backend.generator import Img2Img, Inpaint, InvokeAIGenerator, Txt2Img
+from ...backend.generator import Inpaint, InvokeAIGenerator
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ..util.step_callback import stable_diffusion_step_callback
 from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext

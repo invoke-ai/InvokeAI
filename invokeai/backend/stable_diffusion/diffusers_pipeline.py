@@ -340,7 +340,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # control_model=control_model,
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(
-            self.unet, self._unet_forward, is_running_diffusers=True
+            self.unet, self._unet_forward
         )
 
         self._model_group = FullyLoadedModelGroup(execution_device or self.unet.device)
