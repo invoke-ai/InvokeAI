@@ -94,6 +94,11 @@ class ModelBase(metaclass=ABCMeta):
     def _hf_definition_to_type(self, subtypes: List[str]) -> Type:
         if len(subtypes) < 2:
             raise Exception("Invalid subfolder definition!")
+        if all(t is None for t in subtypes):
+            return None
+        elif any(t is None for t in subtypes):
+            raise Exception(f"Unsupported definition: {subtypes}")
+        
         if subtypes[0] in ["diffusers", "transformers"]:
             res_type = sys.modules[subtypes[0]]
             subtypes = subtypes[1:]
