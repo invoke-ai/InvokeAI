@@ -15,7 +15,7 @@ from ..lora import LoRAModel as LoRAModelRaw
 class LoRAModel(ModelBase):
     #model_size: int
 
-    class Config(ModelConfigBase):
+    class LoraModelConfig(ModelConfigBase):
         format: Union[Literal["lycoris"], Literal["diffusers"]]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):

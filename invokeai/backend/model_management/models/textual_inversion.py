@@ -14,7 +14,7 @@ from ..lora import TextualInversionModel as TextualInversionModelRaw
 class TextualInversionModel(ModelBase):
     #model_size: int
 
-    class Config(ModelConfigBase):
+    class TextualInversionModelConfig(ModelConfigBase):
         format: None
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):

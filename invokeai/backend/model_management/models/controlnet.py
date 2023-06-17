@@ -18,7 +18,7 @@ class ControlNetModel(ModelBase):
     #model_class: Type
     #model_size: int
 
-    class Config(ModelConfigBase):
+    class ControlNetModelConfig(ModelConfigBase):
         format: Union[Literal["checkpoint"], Literal["diffusers"]]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
@@ -82,6 +82,6 @@ class ControlNetModel(ModelBase):
         base_model: BaseModelType,
     ) -> str:
         if cls.detect_format(model_path) != "diffusers":
-            raise NotImlemetedError("Checkpoint controlnet models currently unsupported")
+            raise NotImplementedError("Checkpoint controlnet models currently unsupported")
         else:
             return model_path
