@@ -29,10 +29,16 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             '&:focus': {
               borderColor: 'var(--invokeai-colors-accent-600)',
             },
+            '&:focus-within': {
+              borderColor: 'var(--invokeai-colors-accent-600)',
+            },
           },
           value: {
             backgroundColor: 'var(--invokeai-colors-base-800)',
             color: 'var(--invokeai-colors-base-100)',
+            button: {
+              color: 'var(--invokeai-colors-base-100)',
+            },
             '&:hover': {
               backgroundColor: 'var(--invokeai-colors-base-700)',
               cursor: 'pointer',
@@ -68,7 +74,10 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
           },
           rightSection: {
             width: 24,
-            paddingRight: 20,
+            padding: 20,
+            button: {
+              color: 'var(--invokeai-colors-base-100)',
+            },
           },
         })}
         {...rest}
