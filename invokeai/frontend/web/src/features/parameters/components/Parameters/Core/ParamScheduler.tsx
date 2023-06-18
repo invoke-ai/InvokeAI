@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { SCHEDULER_SELECT_ITEMS } from 'app/constants';
+import { SCHEDULER_LABEL_MAP, SCHEDULER_NAMES } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
@@ -14,14 +14,15 @@ const selector = createSelector(
   [uiSelector, generationSelector],
   (ui, generation) => {
     const { scheduler } = generation;
-    const { enabledSchedulers } = ui;
+    const { favoriteSchedulers: enabledSchedulers } = ui;
 
-    const data = enabledSchedulers
-      .map(
-        (schedulerName) =>
-          SCHEDULER_SELECT_ITEMS[schedulerName as SchedulerParam]
-      )
-      .sort((a, b) => a.label.localeCompare(b.label));
+    const data = SCHEDULER_NAMES.map((schedulerName) => ({
+      value: schedulerName,
+      label: SCHEDULER_LABEL_MAP[schedulerName as SchedulerParam],
+      group: enabledSchedulers.includes(schedulerName)
+        ? 'Favorites'
+        : undefined,
+    })).sort((a, b) => a.label.localeCompare(b.label));
 
     return {
       scheduler,

@@ -1,4 +1,3 @@
-import { SelectItem } from '@mantine/core';
 import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 
 // zod needs the array to be `as const` to infer the type correctly
@@ -28,40 +27,25 @@ export const DEFAULT_SCHEDULER_NAME = 'euler';
 
 export const SCHEDULER_NAMES: SchedulerParam[] = [...SCHEDULER_NAMES_AS_CONST];
 
-export const SCHEDULER_SELECT_ITEMS: Record<
-  (typeof SCHEDULER_NAMES)[number],
-  SelectItem & { label: string; value: SchedulerParam; group: string }
-> = {
-  euler: { label: 'Euler', value: 'euler', group: 'Standard' },
-  deis: { label: 'DEIS', value: 'deis', group: 'Standard' },
-  ddim: { label: 'DDIM', value: 'ddim', group: 'Standard' },
-  ddpm: { label: 'DDPM', value: 'ddpm', group: 'Standard' },
-  dpmpp_2s: { label: 'DPM++ 2S', value: 'dpmpp_2s', group: 'Standard' },
-  dpmpp_2m: { label: 'DPM++ 2M', value: 'dpmpp_2m', group: 'Standard' },
-  heun: { label: 'Heun', value: 'heun', group: 'Standard' },
-  kdpm_2: { label: 'KDPM 2', value: 'kdpm_2', group: 'Standard' },
-  lms: { label: 'LMS', value: 'lms', group: 'Standard' },
-  pndm: { label: 'PNDM', value: 'pndm', group: 'Standard' },
-  unipc: { label: 'UniPC', value: 'unipc', group: 'Standard' },
-  euler_k: { label: 'Euler Karras', value: 'euler_k', group: 'Karras' },
-  dpmpp_2s_k: {
-    label: 'DPM++ 2S Karras',
-    value: 'dpmpp_2s_k',
-    group: 'Karras',
-  },
-  dpmpp_2m_k: {
-    label: 'DPM++ 2M Karras',
-    value: 'dpmpp_2m_k',
-    group: 'Karras',
-  },
-  heun_k: { label: 'Heun Karras', value: 'heun_k', group: 'Karras' },
-  lms_k: { label: 'LMS Karras', value: 'lms_k', group: 'Karras' },
-  euler_a: { label: 'Euler Ancestral', value: 'euler_a', group: 'Ancestral' },
-  kdpm_2_a: {
-    label: 'KDPM 2 Ancestral',
-    value: 'kdpm_2_a',
-    group: 'Ancestral',
-  },
+export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
+  euler: 'Euler',
+  deis: 'DEIS',
+  ddim: 'DDIM',
+  ddpm: 'DDPM',
+  dpmpp_2s: 'DPM++ 2S',
+  dpmpp_2m: 'DPM++ 2M',
+  heun: 'Heun',
+  kdpm_2: 'KDPM 2',
+  lms: 'LMS',
+  pndm: 'PNDM',
+  unipc: 'UniPC',
+  euler_k: 'Euler Karras',
+  dpmpp_2s_k: 'DPM++ 2S Karras',
+  dpmpp_2m_k: 'DPM++ 2M Karras',
+  heun_k: 'Heun Karras',
+  lms_k: 'LMS Karras',
+  euler_a: 'Euler Ancestral',
+  kdpm_2_a: 'KDPM 2 Ancestral',
 };
 
 export type Scheduler = (typeof SCHEDULER_NAMES)[number];

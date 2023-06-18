@@ -17,7 +17,6 @@ import {
   StrengthParam,
   WidthParam,
 } from './parameterZodSchemas';
-import { enabledSchedulersChanged } from 'features/ui/store/uiSlice';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 
 export interface GenerationState {
@@ -240,21 +239,6 @@ export const generationSlice = createSlice({
       if (state.initialImage?.image_name === image_name) {
         state.initialImage.image_url = image_url;
         state.initialImage.thumbnail_url = thumbnail_url;
-      }
-    });
-
-    builder.addCase(enabledSchedulersChanged, (state, action) => {
-      const enabledSchedulers = action.payload;
-
-      if (!action.payload.length) {
-        // This means the user cleared the enabled schedulers multi-select. We need to set the scheduler to the default
-        state.scheduler = DEFAULT_SCHEDULER_NAME;
-        return;
-      }
-
-      if (!enabledSchedulers.includes(state.scheduler)) {
-        // The current scheduler is now disabled, change it to the first enabled one
-        state.scheduler = action.payload[0];
       }
     });
   },
