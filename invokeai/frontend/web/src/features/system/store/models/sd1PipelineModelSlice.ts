@@ -5,7 +5,7 @@ import {
   StableDiffusion1ModelDiffusersConfig,
 } from 'services/api';
 
-import { getModels } from 'services/thunks/model';
+import { receivedModels } from 'services/thunks/model';
 
 export type SD1PipelineModelType = (
   | StableDiffusion1ModelCheckpointConfig
@@ -35,7 +35,7 @@ export const sd1PipelineModelsSlice = createSlice({
     /**
      * Received Models - FULFILLED
      */
-    builder.addCase(getModels.fulfilled, (state, action) => {
+    builder.addCase(receivedModels.fulfilled, (state, action) => {
       if (action.meta.arg.baseModel !== 'sd-1') return;
       sd1PipelineModelsAdapter.setAll(state, action.payload);
     });

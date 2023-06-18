@@ -5,7 +5,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { clamp, sortBy } from 'lodash-es';
 import { ImageDTO } from 'services/api';
 import { imageUrlsReceived } from 'services/thunks/image';
-import { getModels } from 'services/thunks/model';
+import { receivedModels } from 'services/thunks/model';
 import {
   CfgScaleParam,
   HeightParam,
@@ -224,7 +224,7 @@ export const generationSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(getModels.fulfilled, (state, action) => {
+    builder.addCase(receivedModels.fulfilled, (state, action) => {
       if (!state.model) {
         const firstModel = sortBy(action.payload, 'name')[0];
         state.model = firstModel.name;

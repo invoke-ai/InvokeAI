@@ -9,14 +9,14 @@ const models = log.child({ namespace: 'model' });
 
 export const IMAGES_PER_PAGE = 20;
 
-type getModelsArg = {
+type receivedModelsArg = {
   baseModel: BaseModelType | undefined;
   modelType: ModelType | undefined;
 };
 
-export const getModels = createAppAsyncThunk(
-  'models/getModels',
-  async (arg: getModelsArg) => {
+export const receivedModels = createAppAsyncThunk(
+  'models/receivedModels',
+  async (arg: receivedModelsArg) => {
     const response = await ModelsService.listModels(arg);
 
     let deserializedModels = {};
