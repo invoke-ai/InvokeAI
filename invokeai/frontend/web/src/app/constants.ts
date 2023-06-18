@@ -41,9 +41,9 @@ export const SCHEDULER_ITEMS = [
   'heun',
   'heun_k',
   'unipc',
-];
+] as const;
 
-export type Scheduler = typeof SCHEDULERS;
+export type Scheduler = (typeof SCHEDULER_ITEMS)[number];
 
 // Valid upscaling levels
 export const UPSCALING_LEVELS: Array<{ label: string; value: string }> = [

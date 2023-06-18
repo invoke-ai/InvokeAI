@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { Scheduler } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp, sortBy } from 'lodash-es';
 import { ImageDTO } from 'services/api';
@@ -132,7 +133,7 @@ export const generationSlice = createSlice({
     setWidth: (state, action: PayloadAction<number>) => {
       state.width = action.payload;
     },
-    setScheduler: (state, action: PayloadAction<string>) => {
+    setScheduler: (state, action: PayloadAction<Scheduler>) => {
       state.scheduler = action.payload;
     },
     setSeed: (state, action: PayloadAction<number>) => {
