@@ -28,7 +28,7 @@ const ParamScheduler = () => {
       dispatch(setSelectedSchedulers([...SCHEDULER_ITEMS]));
 
     const schedulerFound = activeSchedulers.find(
-      (activeSchedulers) => activeSchedulers.label === scheduler
+      (activeSchedulers) => activeSchedulers.value === scheduler
     );
     if (!schedulerFound)
       dispatch(setScheduler(activeSchedulers[0].value as Scheduler));
