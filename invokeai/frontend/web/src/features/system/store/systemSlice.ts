@@ -20,7 +20,7 @@ import {
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
 import { imageUploaded } from 'services/thunks/image';
-import { getModels } from 'services/thunks/model';
+import { receivedModels } from 'services/thunks/model';
 import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
@@ -380,7 +380,7 @@ export const systemSlice = createSlice({
     /**
      * Received available models from the backend
      */
-    builder.addCase(getModels.fulfilled, (state) => {
+    builder.addCase(receivedModels.fulfilled, (state) => {
       state.wereModelsReceived = true;
     });
 

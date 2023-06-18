@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { receivedPageOfImages } from 'services/thunks/image';
-import { getModels } from 'services/thunks/model';
+import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { startAppListening } from '../..';
 
@@ -30,11 +30,11 @@ export const addSocketConnectedEventListener = () => {
       }
 
       if (!sd1pipelinemodels.ids.length) {
-        dispatch(getModels({ baseModel: 'sd-1', modelType: 'pipeline' }));
+        dispatch(receivedModels({ baseModel: 'sd-1', modelType: 'pipeline' }));
       }
 
       if (!sd2pipelinemodels.ids.length) {
-        dispatch(getModels({ baseModel: 'sd-2', modelType: 'pipeline' }));
+        dispatch(receivedModels({ baseModel: 'sd-2', modelType: 'pipeline' }));
       }
 
       if (!nodes.schema && !disabledTabs.includes('nodes')) {
