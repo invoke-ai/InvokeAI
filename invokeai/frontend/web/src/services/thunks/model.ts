@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { SD1PipelineModelType } from 'features/system/store/models/sd1PipelineModelSlice';
-import { SD2PipelineModelType } from 'features/system/store/models/sd2PipelineModelSlice';
+import { SD1PipelineModel } from 'features/system/store/models/sd1PipelineModelSlice';
+import { SD2PipelineModel } from 'features/system/store/models/sd2PipelineModelSlice';
 import { reduce, size } from 'lodash-es';
 import { BaseModelType, ModelType, ModelsService } from 'services/api';
 
@@ -31,7 +31,7 @@ export const receivedModels = createAppAsyncThunk(
           modelsAccumulator[modelName] = { ...model, name: modelName };
           return modelsAccumulator;
         },
-        {} as Record<string, SD1PipelineModelType>
+        {} as Record<string, SD1PipelineModel>
       );
     }
 
@@ -42,7 +42,7 @@ export const receivedModels = createAppAsyncThunk(
           modelsAccumulator[modelName] = { ...model, name: modelName };
           return modelsAccumulator;
         },
-        {} as Record<string, SD2PipelineModelType>
+        {} as Record<string, SD2PipelineModel>
       );
     }
 
