@@ -24,14 +24,17 @@ const ParamScheduler = () => {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (selectedSchedulers.length === 0)
+    if (selectedSchedulers.length === 0) {
       dispatch(setSelectedSchedulers([...SCHEDULER_ITEMS]));
+    }
 
     const schedulerFound = activeSchedulers.find(
       (activeSchedulers) => activeSchedulers.value === scheduler
     );
-    if (!schedulerFound)
+
+    if (!schedulerFound) {
       dispatch(setScheduler(activeSchedulers[0].value as Scheduler));
+    }
   }, [dispatch, selectedSchedulers, scheduler, activeSchedulers]);
 
   const handleChange = useCallback(

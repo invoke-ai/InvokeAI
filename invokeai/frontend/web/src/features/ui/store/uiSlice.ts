@@ -99,13 +99,20 @@ export const uiSlice = createSlice({
     setSelectedSchedulers: (state, action: PayloadAction<string[]>) => {
       const selectedSchedulerData: SelectItem[] = [];
 
-      if (action.payload.length === 0) action.payload = [SCHEDULERS[0].value];
+      let selectedSchedulers = [...action.payload];
 
-      action.payload.forEach((item) => {
+      if (selectedSchedulers.length === 0) {
+        selectedSchedulers = [SCHEDULERS[0].value];
+      }
+
+      selectedSchedulers.forEach((item) => {
         const schedulerData = SCHEDULERS.find(
           (scheduler) => scheduler.value === item
         );
-        if (schedulerData) selectedSchedulerData.push(schedulerData);
+
+        if (schedulerData) {
+          selectedSchedulerData.push(schedulerData);
+        }
       });
 
       state.activeSchedulers = selectedSchedulerData;
