@@ -17,6 +17,11 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             color: 'var(--invokeai-colors-base-300)',
             fontWeight: 'normal',
           },
+          searchInput: {
+            '::placeholder': {
+              color: 'var(--invokeai-colors-base-700)',
+            },
+          },
           input: {
             backgroundColor: 'var(--invokeai-colors-base-900)',
             borderWidth: '2px',
