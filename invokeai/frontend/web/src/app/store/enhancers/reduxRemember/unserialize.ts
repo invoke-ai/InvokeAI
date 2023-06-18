@@ -7,8 +7,8 @@ import { initialNodesState } from 'features/nodes/store/nodesSlice';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { initialPostprocessingState } from 'features/parameters/store/postprocessingSlice';
 import { initialConfigState } from 'features/system/store/configSlice';
-import { sd1InitialModelsState } from 'features/system/store/models/sd1ModelSlice';
-import { sd2InitialModelsState } from 'features/system/store/models/sd2ModelSlice';
+import { sd1InitialPipelineModelsState } from 'features/system/store/models/sd1PipelineModelSlice';
+import { sd2InitialPipelineModelsState } from 'features/system/store/models/sd2PipelineModelSlice';
 import { initialSystemState } from 'features/system/store/systemSlice';
 import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
 import { initialUIState } from 'features/ui/store/uiSlice';
@@ -22,8 +22,8 @@ const initialStates: {
   gallery: initialGalleryState,
   generation: initialGenerationState,
   lightbox: initialLightboxState,
-  sd1models: sd1InitialModelsState,
-  sd2models: sd2InitialModelsState,
+  sd1pipelinemodels: sd1InitialPipelineModelsState,
+  sd2pipelinemodels: sd2InitialPipelineModelsState,
   nodes: initialNodesState,
   postprocessing: initialPostprocessingState,
   system: initialSystemState,

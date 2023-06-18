@@ -3,26 +3,30 @@ import { RootState } from 'app/store/store';
 import { IAISelectDataType } from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { isEqual } from 'lodash-es';
+
 import {
-  selectAllSD1Models,
-  selectByIdSD1Models,
-} from './models/sd1ModelSlice';
+  selectAllSD1PipelineModels,
+  selectByIdSD1PipelineModels,
+} from './models/sd1PipelineModelSlice';
+
 import {
-  selectAllSD2Models,
-  selectByIdSD2Models,
-} from './models/sd2ModelSlice';
+  selectAllSD2PipelineModels,
+  selectByIdSD2PipelineModels,
+} from './models/sd2PipelineModelSlice';
 
 export const modelSelector = createSelector(
   [(state: RootState) => state, generationSelector],
   (state, generation) => {
-    let selectedModel = selectByIdSD1Models(state, generation.model);
+    let selectedModel = selectByIdSD1PipelineModels(state, generation.model);
     if (selectedModel === undefined)
-      selectedModel = selectByIdSD2Models(state, generation.model);
+      selectedModel = selectByIdSD2PipelineModels(state, generation.model);
 
-    const sd1Models = selectAllSD1Models(state);
-    const sd2Models = selectAllSD2Models(state);
+    const sd1PipelineModels = selectAllSD1PipelineModels(state);
+    const sd2PipelineModels = selectAllSD2PipelineModels(state);
 
-    const sd1ModelDropDownData = selectAllSD1Models(state)
+    const allPipelineModels = sd1PipelineModels.concat(sd2PipelineModels);
+
+    const sd1PipelineModelDropDownData = selectAllSD1PipelineModels(state)
       .map<IAISelectDataType>((m) => ({
         value: m.name,
         label: m.name,
@@ -30,7 +34,7 @@ export const modelSelector = createSelector(
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    const sd2ModelDropdownData = selectAllSD2Models(state)
+    const sd2PipelineModelDropdownData = selectAllSD2PipelineModels(state)
       .map<IAISelectDataType>((m) => ({
         value: m.name,
         label: m.name,
@@ -40,10 +44,11 @@ export const modelSelector = createSelector(
 
     return {
       selectedModel,
-      sd1Models,
-      sd2Models,
-      sd1ModelDropDownData,
-      sd2ModelDropdownData,
+      allPipelineModels,
+      sd1PipelineModels,
+      sd2PipelineModels,
+      sd1PipelineModelDropDownData,
+      sd2PipelineModelDropdownData,
     };
   },
   {

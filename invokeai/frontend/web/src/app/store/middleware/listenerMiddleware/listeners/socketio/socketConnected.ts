@@ -15,7 +15,8 @@ export const addSocketConnectedEventListener = () => {
 
       moduleLog.debug({ timestamp }, 'Connected');
 
-      const { sd1models, sd2models, nodes, config, images } = getState();
+      const { sd1pipelinemodels, sd2pipelinemodels, nodes, config, images } =
+        getState();
 
       const { disabledTabs } = config;
 
@@ -23,11 +24,11 @@ export const addSocketConnectedEventListener = () => {
         dispatch(receivedPageOfImages());
       }
 
-      if (!sd1models.ids.length) {
+      if (!sd1pipelinemodels.ids.length) {
         dispatch(getModels({ baseModel: 'sd-1', modelType: 'pipeline' }));
       }
 
-      if (!sd2models.ids.length) {
+      if (!sd2pipelinemodels.ids.length) {
         dispatch(getModels({ baseModel: 'sd-2', modelType: 'pipeline' }));
       }
 
