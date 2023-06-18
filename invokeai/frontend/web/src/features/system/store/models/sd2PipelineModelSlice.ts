@@ -26,7 +26,7 @@ export const sd2InitialPipelineModelsState =
 export type SD2PipelineModelState = typeof sd2InitialPipelineModelsState;
 
 export const sd2PipelineModelsSlice = createSlice({
-  name: 'sd2models',
+  name: 'sd2PipelineModels',
   initialState: sd2InitialPipelineModelsState,
   reducers: {
     modelAdded: sd2PipelineModelsAdapater.upsertOne,
