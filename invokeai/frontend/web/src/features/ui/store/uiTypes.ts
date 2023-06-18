@@ -1,4 +1,4 @@
-import { SelectItem } from '@mantine/core';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
@@ -28,6 +28,5 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
-  activeSchedulers: SelectItem[];
-  selectedSchedulers: string[];
+  enabledSchedulers: SchedulerParam[];
 }

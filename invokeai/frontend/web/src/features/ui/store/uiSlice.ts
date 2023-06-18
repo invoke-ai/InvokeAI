@@ -1,11 +1,11 @@
-import { SelectItem } from '@mantine/core';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { SCHEDULERS } from 'app/constants';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
+import { DEFAULT_SCHEDULER_NAME, SCHEDULER_NAMES } from 'app/constants';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -21,8 +21,7 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  activeSchedulers: [],
-  selectedSchedulers: [],
+  enabledSchedulers: [],
 };
 
 export const uiSlice = createSlice({
@@ -96,27 +95,16 @@ export const uiSlice = createSlice({
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    setSelectedSchedulers: (state, action: PayloadAction<string[]>) => {
-      const selectedSchedulerData: SelectItem[] = [];
-
-      let selectedSchedulers = [...action.payload];
-
-      if (selectedSchedulers.length === 0) {
-        selectedSchedulers = [SCHEDULERS[0].value];
+    enabledSchedulersChanged: (
+      state,
+      action: PayloadAction<SchedulerParam[]>
+    ) => {
+      if (action.payload.length === 0) {
+        state.enabledSchedulers = [DEFAULT_SCHEDULER_NAME];
+        return;
       }
 
-      selectedSchedulers.forEach((item) => {
-        const schedulerData = SCHEDULERS.find(
-          (scheduler) => scheduler.value === item
-        );
-
-        if (schedulerData) {
-          selectedSchedulerData.push(schedulerData);
-        }
-      });
-
-      state.activeSchedulers = selectedSchedulerData;
-      state.selectedSchedulers = action.payload;
+      state.enabledSchedulers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -144,7 +132,7 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   setShouldShowProgressInViewer,
-  setSelectedSchedulers,
+  enabledSchedulersChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
