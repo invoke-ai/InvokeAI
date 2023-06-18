@@ -68,6 +68,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
           },
           rightSection: {
             width: 24,
+            paddingRight: 20,
           },
         })}
         {...rest}
