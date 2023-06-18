@@ -3,10 +3,12 @@
 export const SCHEDULERS = [
   'ddim',
   'lms',
+  'lms_k',
   'euler',
   'euler_k',
   'euler_a',
   'dpmpp_2s',
+  'dpmpp_2s_k',
   'dpmpp_2m',
   'dpmpp_2m_k',
   'kdpm_2',
