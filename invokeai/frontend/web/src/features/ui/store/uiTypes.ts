@@ -1,3 +1,5 @@
+import { SelectItem } from '@mantine/core';
+
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
 export type Coordinates = {
@@ -26,5 +28,6 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
-  schedulers: string[];
+  activeSchedulers: SelectItem[];
+  selectedSchedulers: string[];
 }

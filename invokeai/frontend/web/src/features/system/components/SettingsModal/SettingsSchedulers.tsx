@@ -1,47 +1,33 @@
-import {
-  Menu,
-  MenuButton,
-  MenuItemOption,
-  MenuList,
-  MenuOptionGroup,
-} from '@chakra-ui/react';
 import { SCHEDULERS } from 'app/constants';
-
 import { RootState } from 'app/store/store';
+
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import { setSchedulers } from 'features/ui/store/uiSlice';
-import { isArray } from 'lodash-es';
+import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import { setSelectedSchedulers } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
 
 export default function SettingsSchedulers() {
-  const schedulers = useAppSelector((state: RootState) => state.ui.schedulers);
-
   const dispatch = useAppDispatch();
+
+  const selectedSchedulers = useAppSelector(
+    (state: RootState) => state.ui.selectedSchedulers
+  );
+
   const { t } = useTranslation();
 
-  const schedulerSettingsHandler = (v: string | string[]) => {
-    if (isArray(v)) dispatch(setSchedulers(v.sort()));
+  const schedulerSettingsHandler = (v: string[]) => {
+    dispatch(setSelectedSchedulers(v));
   };
 
   return (
-    <Menu closeOnSelect={false}>
-      <MenuButton as={IAIButton}>
-        {t('settings.availableSchedulers')}
-      </MenuButton>
-      <MenuList maxHeight={64} overflowY="scroll">
-        <MenuOptionGroup
-          value={schedulers}
-          type="checkbox"
-          onChange={schedulerSettingsHandler}
-        >
-          {SCHEDULERS.map((scheduler) => (
-            <MenuItemOption key={scheduler} value={scheduler}>
-              {scheduler}
-            </MenuItemOption>
-          ))}
-        </MenuOptionGroup>
-      </MenuList>
-    </Menu>
+    <IAIMantineMultiSelect
+      label={t('settings.availableSchedulers')}
+      value={selectedSchedulers}
+      data={SCHEDULERS}
+      onChange={schedulerSettingsHandler}
+      clearable
+      searchable
+      maxSelectedValues={99}
+    />
   );
 }

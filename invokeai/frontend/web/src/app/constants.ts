@@ -1,6 +1,28 @@
-// TODO: use Enums?
+import { SelectItem } from '@mantine/core';
 
-export const SCHEDULERS = [
+// TODO: use Enums?
+export const SCHEDULERS: SelectItem[] = [
+  { label: 'euler', value: 'euler', group: 'Standard' },
+  { label: 'deis', value: 'deis', group: 'Standard' },
+  { label: 'ddim', value: 'ddim', group: 'Standard' },
+  { label: 'ddpm', value: 'ddpm', group: 'Standard' },
+  { label: 'dpmpp_2s', value: 'dpmpp_2s', group: 'Standard' },
+  { label: 'dpmpp_2m', value: 'dpmpp_2m', group: 'Standard' },
+  { label: 'heun', value: 'heun', group: 'Standard' },
+  { label: 'kdpm_2', value: 'kdpm_2', group: 'Standard' },
+  { label: 'lms', value: 'lms', group: 'Standard' },
+  { label: 'pndm', value: 'pndm', group: 'Standard' },
+  { label: 'unipc', value: 'unipc', group: 'Standard' },
+  { label: 'euler_k', value: 'euler_k', group: 'Karras' },
+  { label: 'dpmpp_2s_k', value: 'dpmpp_2s_k', group: 'Karras' },
+  { label: 'dpmpp_2m_k', value: 'dpmpp_2m_k', group: 'Karras' },
+  { label: 'heun_k', value: 'heun_k', group: 'Karras' },
+  { label: 'lms_k', value: 'lms_k', group: 'Karras' },
+  { label: 'euler_a', value: 'euler_a', group: 'Ancestral' },
+  { label: 'kdpm_2_a', value: 'kdpm_2_a', group: 'Ancestral' },
+];
+
+export const SCHEDULER_ITEMS = [
   'ddim',
   'lms',
   'lms_k',
@@ -19,9 +41,9 @@ export const SCHEDULERS = [
   'heun',
   'heun_k',
   'unipc',
-] as const;
+];
 
-export type Scheduler = (typeof SCHEDULERS)[number];
+export type Scheduler = typeof SCHEDULERS;
 
 // Valid upscaling levels
 export const UPSCALING_LEVELS: Array<{ label: string; value: string }> = [

@@ -1,10 +1,11 @@
+import { SelectItem } from '@mantine/core';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { SCHEDULERS } from 'app/constants';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { SCHEDULERS } from 'app/constants';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -20,7 +21,8 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  schedulers: SCHEDULERS,
+  activeSchedulers: [],
+  selectedSchedulers: [],
 };
 
 export const uiSlice = createSlice({
@@ -94,9 +96,20 @@ export const uiSlice = createSlice({
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    setSchedulers: (state, action: PayloadAction<string[]>) => {
-      state.schedulers = [];
-      state.schedulers = action.payload;
+    setSelectedSchedulers: (state, action: PayloadAction<string[]>) => {
+      const selectedSchedulerData: SelectItem[] = [];
+
+      if (action.payload.length === 0) action.payload = [SCHEDULERS[0].value];
+
+      action.payload.forEach((item) => {
+        const schedulerData = SCHEDULERS.find(
+          (scheduler) => scheduler.value === item
+        );
+        if (schedulerData) selectedSchedulerData.push(schedulerData);
+      });
+
+      state.activeSchedulers = selectedSchedulerData;
+      state.selectedSchedulers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -124,7 +137,7 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   setShouldShowProgressInViewer,
-  setSchedulers,
+  setSelectedSchedulers,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

@@ -1,43 +1,44 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { Scheduler } from 'app/constants';
+import { SCHEDULER_ITEMS } from 'app/constants';
+import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect, {
-  IAISelectDataType,
-} from 'common/components/IAIMantineSelect';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
-import { memo, useCallback } from 'react';
+import { setSelectedSchedulers } from 'features/ui/store/uiSlice';
+import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [uiSelector, generationSelector],
-  (ui, generation) => {
-    const allSchedulers: string[] = ui.schedulers
-      .slice()
-      .sort((a, b) => a.localeCompare(b));
-
-    return {
-      scheduler: generation.scheduler,
-      allSchedulers,
-    };
-  },
-  defaultSelectorOptions
-);
-
 const ParamScheduler = () => {
-  const { allSchedulers, scheduler } = useAppSelector(selector);
+  const scheduler = useAppSelector(
+    (state: RootState) => state.generation.scheduler
+  );
+
+  const selectedSchedulers = useAppSelector(
+    (state: RootState) => state.ui.selectedSchedulers
+  );
+
+  const activeSchedulers = useAppSelector(
+    (state: RootState) => state.ui.activeSchedulers
+  );
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (selectedSchedulers.length === 0)
+      dispatch(setSelectedSchedulers(SCHEDULER_ITEMS));
+
+    const schedulerFound = activeSchedulers.find(
+      (activeSchedulers) => activeSchedulers.label === scheduler
+    );
+    if (!schedulerFound) dispatch(setScheduler(activeSchedulers[0].value));
+  }, [dispatch, selectedSchedulers, scheduler, activeSchedulers]);
 
   const handleChange = useCallback(
     (v: string | null) => {
       if (!v) {
         return;
       }
-      dispatch(setScheduler(v as Scheduler));
+      dispatch(setScheduler(v));
     },
     [dispatch]
   );
@@ -46,7 +47,7 @@ const ParamScheduler = () => {
     <IAIMantineSelect
       label={t('parameters.scheduler')}
       value={scheduler}
-      data={allSchedulers}
+      data={activeSchedulers}
       onChange={handleChange}
     />
   );
