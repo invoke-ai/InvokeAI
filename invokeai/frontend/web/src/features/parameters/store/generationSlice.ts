@@ -1,5 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
+import { ModelLoaderTypes } from 'features/system/components/ModelSelect';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp, sortBy } from 'lodash-es';
 import { ImageDTO } from 'services/api';
@@ -17,7 +19,6 @@ import {
   StrengthParam,
   WidthParam,
 } from './parameterZodSchemas';
-import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 
 export interface GenerationState {
   cfgScale: CfgScaleParam;
@@ -49,6 +50,7 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   model: ModelParam;
+  currentModelType: ModelLoaderTypes;
   shouldUseSeamless: boolean;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -83,6 +85,7 @@ export const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   model: '',
+  currentModelType: 'sd1_model_loader',
   shouldUseSeamless: false,
   seamlessXAxis: true,
   seamlessYAxis: true,
@@ -217,6 +220,9 @@ export const generationSlice = createSlice({
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
     },
+    setCurrentModelType: (state, action: PayloadAction<ModelLoaderTypes>) => {
+      state.currentModelType = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedModels.fulfilled, (state, action) => {
@@ -277,6 +283,7 @@ export const {
   setVerticalSymmetrySteps,
   initialImageChanged,
   modelSelected,
+  setCurrentModelType,
   setShouldUseNoiseSettings,
   setSeamless,
   setSeamlessXAxis,
