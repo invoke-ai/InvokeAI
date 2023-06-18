@@ -21,7 +21,7 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  enabledSchedulers: [],
+  enabledSchedulers: SCHEDULER_NAMES,
 };
 
 export const uiSlice = createSlice({
