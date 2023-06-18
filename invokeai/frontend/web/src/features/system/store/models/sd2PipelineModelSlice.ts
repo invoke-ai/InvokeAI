@@ -7,18 +7,17 @@ import {
 
 import { receivedModels } from 'services/thunks/model';
 
-export type SD2PipelineModelType = (
+export type SD2PipelineModel = (
   | StableDiffusion2ModelCheckpointConfig
   | StableDiffusion2ModelDiffusersConfig
 ) & {
   name: string;
 };
 
-export const sd2PipelineModelsAdapater =
-  createEntityAdapter<SD2PipelineModelType>({
-    selectId: (model) => model.name,
-    sortComparer: (a, b) => a.name.localeCompare(b.name),
-  });
+export const sd2PipelineModelsAdapater = createEntityAdapter<SD2PipelineModel>({
+  selectId: (model) => model.name,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
+});
 
 export const sd2InitialPipelineModelsState =
   sd2PipelineModelsAdapater.getInitialState();
