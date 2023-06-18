@@ -16,6 +16,7 @@ const data = map(SCHEDULER_NAMES, (s) => ({
 
 export default function SettingsSchedulers() {
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const enabledSchedulers = useAppSelector(

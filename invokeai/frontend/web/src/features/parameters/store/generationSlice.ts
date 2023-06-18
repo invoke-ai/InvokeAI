@@ -1,6 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { Scheduler } from 'app/constants';
 import { ModelLoaderTypes } from 'features/system/components/ModelSelect';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp, sortBy } from 'lodash-es';
