@@ -1,10 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { clamp, sortBy } from 'lodash-es';
-import { receivedModels } from 'services/thunks/model';
-import { Scheduler } from 'app/constants';
-import { ImageDTO } from 'services/api';
 import { configChanged } from 'features/system/store/configSlice';
+import { clamp, sortBy } from 'lodash-es';
+import { ImageDTO } from 'services/api';
+import { imageUrlsReceived } from 'services/thunks/image';
+import { receivedModels } from 'services/thunks/model';
 import {
   CfgScaleParam,
   HeightParam,
@@ -17,7 +17,7 @@ import {
   StrengthParam,
   WidthParam,
 } from './parameterZodSchemas';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 
 export interface GenerationState {
   cfgScale: CfgScaleParam;
@@ -63,7 +63,7 @@ export const initialGenerationState: GenerationState = {
   perlin: 0,
   positivePrompt: '',
   negativePrompt: '',
-  scheduler: 'euler',
+  scheduler: DEFAULT_SCHEDULER_NAME,
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,
@@ -133,7 +133,7 @@ export const generationSlice = createSlice({
     setWidth: (state, action: PayloadAction<number>) => {
       state.width = action.payload;
     },
-    setScheduler: (state, action: PayloadAction<Scheduler>) => {
+    setScheduler: (state, action: PayloadAction<SchedulerParam>) => {
       state.scheduler = action.payload;
     },
     setSeed: (state, action: PayloadAction<number>) => {

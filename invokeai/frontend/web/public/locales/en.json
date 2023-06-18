@@ -547,7 +547,8 @@
         "general": "General",
         "generation": "Generation",
         "ui": "User Interface",
-        "availableSchedulers": "Available Schedulers"
+        "favoriteSchedulers": "Favorite Schedulers",
+        "favoriteSchedulersPlaceholder": "No schedulers favorited"
     },
     "toast": {
         "serverError": "Server Error",
