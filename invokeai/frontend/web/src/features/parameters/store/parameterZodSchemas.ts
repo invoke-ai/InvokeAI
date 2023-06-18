@@ -1,4 +1,4 @@
-import { NUMPY_RAND_MAX, SCHEDULER_ITEMS } from 'app/constants';
+import { NUMPY_RAND_MAX, SCHEDULER_NAMES_AS_CONST } from 'app/constants';
 import { z } from 'zod';
 
 /**
@@ -73,7 +73,7 @@ export const isValidCfgScale = (val: unknown): val is CfgScaleParam =>
 /**
  * Zod schema for scheduler parameter
  */
-export const zScheduler = z.enum(SCHEDULER_ITEMS);
+export const zScheduler = z.enum(SCHEDULER_NAMES_AS_CONST);
 /**
  * Type alias for scheduler parameter, inferred from its zod schema
  */

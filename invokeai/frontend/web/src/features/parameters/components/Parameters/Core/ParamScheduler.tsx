@@ -1,4 +1,4 @@
-import { SCHEDULER_ITEMS, Scheduler } from 'app/constants';
+import { SCHEDULER_NAMES, Scheduler } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
@@ -25,7 +25,7 @@ const ParamScheduler = () => {
 
   useEffect(() => {
     if (selectedSchedulers.length === 0) {
-      dispatch(setSelectedSchedulers([...SCHEDULER_ITEMS]));
+      dispatch(setSelectedSchedulers(SCHEDULER_NAMES));
     }
 
     const schedulerFound = activeSchedulers.find(

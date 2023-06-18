@@ -1,6 +1,5 @@
 import { SelectItem } from '@mantine/core';
 
-// TODO: use Enums?
 export const SCHEDULERS: SelectItem[] = [
   { label: 'Euler', value: 'euler', group: 'Standard' },
   { label: 'DEIS', value: 'deis', group: 'Standard' },
@@ -22,28 +21,31 @@ export const SCHEDULERS: SelectItem[] = [
   { label: 'KDPM 2 Ancestral', value: 'kdpm_2_a', group: 'Ancestral' },
 ];
 
-export const SCHEDULER_ITEMS = [
-  'ddim',
-  'lms',
-  'lms_k',
+// zod needs the array to be `as const` to infer the type correctly
+export const SCHEDULER_NAMES_AS_CONST = [
   'euler',
-  'euler_k',
-  'euler_a',
-  'dpmpp_2s',
-  'dpmpp_2s_k',
-  'dpmpp_2m',
-  'dpmpp_2m_k',
-  'kdpm_2',
-  'kdpm_2_a',
   'deis',
+  'ddim',
   'ddpm',
-  'pndm',
+  'dpmpp_2s',
+  'dpmpp_2m',
   'heun',
-  'heun_k',
+  'kdpm_2',
+  'lms',
+  'pndm',
   'unipc',
+  'euler_k',
+  'dpmpp_2s_k',
+  'dpmpp_2m_k',
+  'heun_k',
+  'lms_k',
+  'euler_a',
+  'kdpm_2_a',
 ] as const;
 
-export type Scheduler = (typeof SCHEDULER_ITEMS)[number];
+export const SCHEDULER_NAMES = [...SCHEDULER_NAMES_AS_CONST];
+
+export type Scheduler = (typeof SCHEDULER_NAMES)[number];
 
 // Valid upscaling levels
 export const UPSCALING_LEVELS: Array<{ label: string; value: string }> = [
