@@ -5,7 +5,6 @@ import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
 import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
-import { DEFAULT_SCHEDULER_NAME, SCHEDULER_NAMES } from 'app/constants';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -21,7 +20,7 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  enabledSchedulers: SCHEDULER_NAMES,
+  favoriteSchedulers: [],
 };
 
 export const uiSlice = createSlice({
@@ -95,16 +94,11 @@ export const uiSlice = createSlice({
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    enabledSchedulersChanged: (
+    favoriteSchedulersChanged: (
       state,
       action: PayloadAction<SchedulerParam[]>
     ) => {
-      if (action.payload.length === 0) {
-        state.enabledSchedulers = [DEFAULT_SCHEDULER_NAME];
-        return;
-      }
-
-      state.enabledSchedulers = action.payload;
+      state.favoriteSchedulers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -132,7 +126,7 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   setShouldShowProgressInViewer,
-  enabledSchedulersChanged,
+  favoriteSchedulersChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

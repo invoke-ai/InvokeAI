@@ -28,5 +28,5 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
-  enabledSchedulers: SchedulerParam[];
+  favoriteSchedulers: SchedulerParam[];
 }
