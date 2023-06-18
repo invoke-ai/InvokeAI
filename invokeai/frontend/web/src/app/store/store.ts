@@ -30,8 +30,8 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 
 // Model Reducers
-import sd1ModelReducer from 'features/system/store/models/sd1ModelSlice';
-import sd2ModelReducer from 'features/system/store/models/sd2ModelSlice';
+import sd1PipelineModelReducer from 'features/system/store/models/sd1PipelineModelSlice';
+import sd2PipelineModelReducer from 'features/system/store/models/sd2PipelineModelSlice';
 
 import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
@@ -43,8 +43,8 @@ const allReducers = {
   gallery: galleryReducer,
   generation: generationReducer,
   lightbox: lightboxReducer,
-  sd1models: sd1ModelReducer,
-  sd2models: sd2ModelReducer,
+  sd1pipelinemodels: sd1PipelineModelReducer,
+  sd2pipelinemodels: sd2PipelineModelReducer,
   nodes: nodesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,

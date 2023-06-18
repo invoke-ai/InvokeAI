@@ -1,9 +1,9 @@
-import { SD1ModelState } from './models/sd1ModelSlice';
-import { SD2ModelState } from './models/sd2ModelSlice';
+import { SD1PipelineModelState } from './models/sd1PipelineModelSlice';
+import { SD2PipelineModelState } from './models/sd2PipelineModelSlice';
 
 /**
  * Models slice persist denylist
  */
 export const modelsPersistDenylist:
-  | (keyof SD1ModelState)[]
-  | (keyof SD2ModelState)[] = ['entities', 'ids'];
+  | (keyof SD1PipelineModelState)[]
+  | (keyof SD2PipelineModelState)[] = ['entities', 'ids'];

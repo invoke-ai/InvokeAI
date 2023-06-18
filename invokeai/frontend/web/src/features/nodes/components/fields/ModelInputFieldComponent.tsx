@@ -17,7 +17,7 @@ const ModelInputFieldComponent = (
 
   const dispatch = useAppDispatch();
 
-  const { sd1ModelDropDownData, sd2ModelDropdownData } =
+  const { sd1PipelineModelDropDownData, sd2PipelineModelDropdownData } =
     useAppSelector(modelSelector);
 
   const handleValueChanged = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -33,8 +33,8 @@ const ModelInputFieldComponent = (
   return (
     <NativeSelect
       onChange={handleValueChanged}
-      value={field.value || sd1ModelDropDownData[0].value}
-      data={sd1ModelDropDownData.concat(sd2ModelDropdownData)}
+      value={field.value || sd1PipelineModelDropDownData[0].value}
+      data={sd1PipelineModelDropDownData.concat(sd2PipelineModelDropdownData)}
     ></NativeSelect>
   );
 };

@@ -20,8 +20,11 @@ const MODEL_LOADER_MAP = {
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { selectedModel, sd1ModelDropDownData, sd2ModelDropdownData } =
-    useAppSelector(modelSelector);
+  const {
+    selectedModel,
+    sd1PipelineModelDropDownData,
+    sd2PipelineModelDropdownData,
+  } = useAppSelector(modelSelector);
 
   useEffect(() => {
     if (selectedModel)
@@ -48,7 +51,7 @@ const ModelSelect = () => {
       label={t('modelManager.model')}
       value={selectedModel?.name ?? ''}
       placeholder="Pick one"
-      data={sd1ModelDropDownData.concat(sd2ModelDropdownData)}
+      data={sd1PipelineModelDropDownData.concat(sd2PipelineModelDropdownData)}
       onChange={handleChangeModel}
     />
   );
