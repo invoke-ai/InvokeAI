@@ -14,5 +14,5 @@ export const lightThemeColors: InvokeAIThemeColors = {
   okAlpha: generateColorPalette(122, 49, true, true),
   error: generateColorPalette(0, 50, true),
   errorAlpha: generateColorPalette(0, 50, true, true),
-  gridLineColor: 'rgba(0, 0, 0, 0.2)',
+  gridLineColor: 'rgba(0, 0, 0, 0.15)',
 };
