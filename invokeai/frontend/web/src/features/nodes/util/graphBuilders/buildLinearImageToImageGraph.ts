@@ -1,6 +1,5 @@
 import { RootState } from 'app/store/store';
 import {
-  Graph,
   ImageResizeInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
@@ -23,12 +22,15 @@ import {
 } from './constants';
 import { set } from 'lodash-es';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+
 const moduleLog = log.child({ namespace: 'nodes' });
 
 /**
  * Builds the Image to Image tab graph.
  */
-export const buildImageToImageGraph = (state: RootState): Graph => {
+export const buildLinearImageToImageGraph = (
+  state: RootState
+): NonNullableGraph => {
   const {
     positivePrompt,
     negativePrompt,
@@ -275,8 +277,8 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
         image_name: initialImage.image_name,
       },
       is_intermediate: true,
-      height,
       width,
+      height,
     };
 
     graph.nodes[RESIZE] = resizeNode;

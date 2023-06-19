@@ -4,7 +4,7 @@ import { log } from 'app/logging/useLogger';
 import { imageToImageGraphBuilt } from 'features/nodes/store/actions';
 import { userInvoked } from 'app/store/actions';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
-import { buildImageToImageGraph } from 'features/nodes/util/graphBuilders/buildImageToImageGraph';
+import { buildLinearImageToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearImageToImageGraph';
 
 const moduleLog = log.child({ namespace: 'invoke' });
 
@@ -15,7 +15,7 @@ export const addUserInvokedImageToImageListener = () => {
     effect: async (action, { getState, dispatch, take }) => {
       const state = getState();
 
-      const graph = buildImageToImageGraph(state);
+      const graph = buildLinearImageToImageGraph(state);
       dispatch(imageToImageGraphBuilt(graph));
       moduleLog.debug({ data: graph }, 'Image to Image graph built');
 

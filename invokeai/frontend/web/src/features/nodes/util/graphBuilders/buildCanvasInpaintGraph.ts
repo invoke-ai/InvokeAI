@@ -1,25 +1,33 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import {
-  Graph,
+  ImageDTO,
+  InpaintInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api';
+import { NonNullableGraph } from 'features/nodes/types/types';
+import { log } from 'app/logging/useLogger';
 import {
   ITERATE,
-  LATENTS_TO_IMAGE,
   MODEL_LOADER,
   NEGATIVE_CONDITIONING,
-  NOISE,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  TEXT_TO_IMAGE_GRAPH,
-  TEXT_TO_LATENTS,
+  INPAINT_GRAPH,
+  INPAINT,
 } from './constants';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 
-export const buildTextToImageGraph = (state: RootState): Graph => {
+const moduleLog = log.child({ namespace: 'nodes' });
+
+/**
+ * Builds the Canvas tab's Inpaint graph.
+ */
+export const buildCanvasInpaintGraph = (
+  state: RootState,
+  canvasInitImage: ImageDTO,
+  canvasMaskImage: ImageDTO
+): NonNullableGraph => {
   const {
     positivePrompt,
     negativePrompt,
@@ -27,26 +35,59 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     cfgScale: cfg_scale,
     scheduler,
     steps,
-    width,
-    height,
+    img2imgStrength: strength,
+    shouldFitToWidthHeight,
     iterations,
     seed,
     shouldRandomizeSeed,
+    seamSize,
+    seamBlur,
+    seamSteps,
+    seamStrength,
+    tileSize,
+    infillMethod,
   } = state.generation;
 
-  /**
-   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
-   * full graph here as a template. Then use the parameters from app state and set friendlier node
-   * ids.
-   *
-   * The only thing we need extra logic for is handling randomized seed, control net, and for img2img,
-   * the `fit` param. These are added to the graph at the end.
-   */
+  // The bounding box determines width and height, not the width and height params
+  const { width, height } = state.canvas.boundingBoxDimensions;
 
-  // copy-pasted graph from node editor, filled in with state values & friendly node ids
+  // We may need to set the inpaint width and height to scale the image
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
+
   const graph: NonNullableGraph = {
-    id: TEXT_TO_IMAGE_GRAPH,
+    id: INPAINT_GRAPH,
     nodes: {
+      [INPAINT]: {
+        type: 'inpaint',
+        id: INPAINT,
+        steps,
+        width,
+        height,
+        cfg_scale,
+        scheduler,
+        image: {
+          image_name: canvasInitImage.image_name,
+        },
+        strength,
+        fit: shouldFitToWidthHeight,
+        mask: {
+          image_name: canvasMaskImage.image_name,
+        },
+        seam_size: seamSize,
+        seam_blur: seamBlur,
+        seam_strength: seamStrength,
+        seam_steps: seamSteps,
+        tile_size: infillMethod === 'tile' ? tileSize : undefined,
+        infill_method: infillMethod as InpaintInvocation['infill_method'],
+        inpaint_width:
+          boundingBoxScaleMethod !== 'none'
+            ? scaledBoundingBoxDimensions.width
+            : undefined,
+        inpaint_height:
+          boundingBoxScaleMethod !== 'none'
+            ? scaledBoundingBoxDimensions.height
+            : undefined,
+      },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
@@ -57,34 +98,18 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
-      [RANGE_OF_SIZE]: {
-        type: 'range_of_size',
-        id: RANGE_OF_SIZE,
-        // start: 0, // seed - must be connected manually
-        size: iterations,
-        step: 1,
-      },
-      [NOISE]: {
-        type: 'noise',
-        id: NOISE,
-        width,
-        height,
-      },
-      [TEXT_TO_LATENTS]: {
-        type: 't2l',
-        id: TEXT_TO_LATENTS,
-        cfg_scale,
-        scheduler,
-        steps,
-      },
       [MODEL_LOADER]: {
         type: 'sd1_model_loader',
         id: MODEL_LOADER,
         model_name,
       },
-      [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
+      [RANGE_OF_SIZE]: {
+        type: 'range_of_size',
+        id: RANGE_OF_SIZE,
+        // seed - must be connected manually
+        // start: 0,
+        size: iterations,
+        step: 1,
       },
       [ITERATE]: {
         type: 'iterate',
@@ -98,7 +123,7 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: INPAINT,
           field: 'negative_conditioning',
         },
       },
@@ -108,7 +133,7 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: INPAINT,
           field: 'positive_conditioning',
         },
       },
@@ -138,18 +163,8 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
           field: 'unet',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: INPAINT,
           field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
         },
       },
       {
@@ -158,7 +173,7 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
           field: 'vae',
         },
         destination: {
-          node_id: LATENTS_TO_IMAGE,
+          node_id: INPAINT,
           field: 'vae',
         },
       },
@@ -178,18 +193,8 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
           field: 'item',
         },
         destination: {
-          node_id: NOISE,
+          node_id: INPAINT,
           field: 'seed',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'noise',
         },
       },
     ],
@@ -214,9 +219,6 @@ export const buildTextToImageGraph = (state: RootState): Graph => {
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
-
-  // add controlnet
-  addControlNetToLinearGraph(graph, TEXT_TO_LATENTS, state);
 
   return graph;
 };

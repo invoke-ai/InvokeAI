@@ -4,7 +4,7 @@ import { log } from 'app/logging/useLogger';
 import { textToImageGraphBuilt } from 'features/nodes/store/actions';
 import { userInvoked } from 'app/store/actions';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
-import { buildTextToImageGraph } from 'features/nodes/util/graphBuilders/buildTextToImageGraph';
+import { buildLinearTextToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearTextToImageGraph';
 
 const moduleLog = log.child({ namespace: 'invoke' });
 
@@ -15,7 +15,7 @@ export const addUserInvokedTextToImageListener = () => {
     effect: async (action, { getState, dispatch, take }) => {
       const state = getState();
 
-      const graph = buildTextToImageGraph(state);
+      const graph = buildLinearTextToImageGraph(state);
 
       dispatch(textToImageGraphBuilt(graph));
 
