@@ -16,7 +16,6 @@ from accelerate.utils import set_seed
 import psutil
 import torch
 import torchvision.transforms as T
-from compel import EmbeddingsProvider
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
@@ -48,7 +47,6 @@ from .diffusion import (
     PostprocessingSettings,
 )
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
-from .textual_inversion_manager import TextualInversionManager
 
 @dataclass
 class PipelineIntermediateState:
@@ -317,6 +315,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         requires_safety_checker: bool = False,
         precision: str = "float32",
         control_model: ControlNetModel = None,
+        execution_device: Optional[torch.device] = None,
     ):
         super().__init__(
             vae,
@@ -341,22 +340,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # control_model=control_model,
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(
-            self.unet, self._unet_forward, is_running_diffusers=True
-        )
-        use_full_precision = precision == "float32" or precision == "autocast"
-        self.textual_inversion_manager = TextualInversionManager(
-            tokenizer=self.tokenizer,
-            text_encoder=self.text_encoder,
-            full_precision=use_full_precision,
-        )
-        # InvokeAI's interface for text embeddings and whatnot
-        self.embeddings_provider = EmbeddingsProvider(
-            tokenizer=self.tokenizer,
-            text_encoder=self.text_encoder,
-            textual_inversion_manager=self.textual_inversion_manager,
+            self.unet, self._unet_forward
         )
 
-        self._model_group = FullyLoadedModelGroup(self.unet.device)
+        self._model_group = FullyLoadedModelGroup(execution_device or self.unet.device)
         self._model_group.install(*self._submodels)
         self.control_model = control_model
 
@@ -403,50 +390,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     self.enable_attention_slicing(slice_size="max")
                 else:
                     self.disable_attention_slicing()
-
-    def enable_offload_submodels(self, device: torch.device):
-        """
-        Offload each submodel when it's not in use.
-
-        Useful for low-vRAM situations where the size of the model in memory is a big chunk of
-        the total available resource, and you want to free up as much for inference as possible.
-
-        This requires more moving parts and may add some delay as the U-Net is swapped out for the
-        VAE and vice-versa.
-        """
-        models = self._submodels
-        if self._model_group is not None:
-            self._model_group.uninstall(*models)
-        group = LazilyLoadedModelGroup(device)
-        group.install(*models)
-        self._model_group = group
-
-    def disable_offload_submodels(self):
-        """
-        Leave all submodels loaded.
-
-        Appropriate for cases where the size of the model in memory is small compared to the memory
-        required for inference. Avoids the delay and complexity of shuffling the submodels to and
-        from the GPU.
-        """
-        models = self._submodels
-        if self._model_group is not None:
-            self._model_group.uninstall(*models)
-        group = FullyLoadedModelGroup(self._model_group.execution_device)
-        group.install(*models)
-        self._model_group = group
-
-    def offload_all(self):
-        """Offload all this pipeline's models to CPU."""
-        self._model_group.offload_current()
-
-    def ready(self):
-        """
-        Ready this pipeline's models.
-
-        i.e. preload them to the GPU if appropriate.
-        """
-        self._model_group.ready()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
@@ -990,25 +933,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.safety_checker is not None:
             device = self._model_group.device_for(self.safety_checker)
         return super().run_safety_checker(image, device, dtype)
-
-    @torch.inference_mode()
-    def get_learned_conditioning(
-        self, c: List[List[str]], *, return_tokens=True, fragment_weights=None
-    ):
-        """
-        Compatibility function for invokeai.models.diffusion.ddpm.LatentDiffusion.
-        """
-        return self.embeddings_provider.get_embeddings_for_weighted_prompt_fragments(
-            text_batch=c,
-            fragment_weights_batch=fragment_weights,
-            should_return_tokens=return_tokens,
-            device=self._model_group.device_for(self.unet),
-        )
-
-    @property
-    def channels(self) -> int:
-        """Compatible with DiffusionWrapper"""
-        return self.unet.config.in_channels
 
     def decode_latents(self, latents):
         # Explicit call to get the vae loaded, since `decode` isn't the forward method.

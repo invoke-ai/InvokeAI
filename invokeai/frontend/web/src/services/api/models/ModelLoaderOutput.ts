@@ -24,3 +24,4 @@ export type ModelLoaderOutput = {
    */
   vae?: VaeField;
 };
+

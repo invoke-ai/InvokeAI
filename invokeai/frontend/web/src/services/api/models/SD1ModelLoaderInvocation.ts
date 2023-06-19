@@ -20,3 +20,4 @@ export type SD1ModelLoaderInvocation = {
    */
   model_name?: string;
 };
+

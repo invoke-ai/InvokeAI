@@ -19,3 +19,4 @@ export type ClipField = {
    */
   loras: Array<LoraInfo>;
 };
+

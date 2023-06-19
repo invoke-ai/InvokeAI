@@ -24,3 +24,4 @@ export type ModelInfo = {
    */
   submodel?: SubModelType;
 };
+
