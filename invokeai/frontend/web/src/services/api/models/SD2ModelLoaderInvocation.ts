@@ -2,12 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ClipField } from './ClipField';
-
 /**
- * Parse prompt using compel package to conditioning.
+ * Loading submodels of selected model.
  */
-export type CompelInvocation = {
+export type SD2ModelLoaderInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -16,14 +14,10 @@ export type CompelInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'compel';
+  type?: 'sd2_model_loader';
   /**
-   * Prompt
+   * Model to load
    */
-  prompt?: string;
-  /**
-   * Clip to use
-   */
-  clip?: ClipField;
+  model_name?: string;
 };
 
