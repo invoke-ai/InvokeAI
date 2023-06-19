@@ -1,10 +1,10 @@
 import { startAppListening } from '..';
-import { buildTextToImageGraph } from 'features/nodes/util/graphBuilders/buildTextToImageGraph';
 import { sessionCreated } from 'services/thunks/session';
 import { log } from 'app/logging/useLogger';
 import { textToImageGraphBuilt } from 'features/nodes/store/actions';
 import { userInvoked } from 'app/store/actions';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { buildTextToImageGraph } from 'features/nodes/util/graphBuilders/buildTextToImageGraph';
 
 const moduleLog = log.child({ namespace: 'invoke' });
 

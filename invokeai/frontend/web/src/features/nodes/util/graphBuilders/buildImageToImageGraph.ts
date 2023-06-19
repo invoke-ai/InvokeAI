@@ -1,33 +1,29 @@
 import { RootState } from 'app/store/store';
 import {
-  CompelInvocation,
   Graph,
   ImageResizeInvocation,
-  ImageToLatentsInvocation,
-  IterateInvocation,
-  LatentsToImageInvocation,
-  LatentsToLatentsInvocation,
-  NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { log } from 'app/logging/useLogger';
+import {
+  ITERATE,
+  LATENTS_TO_IMAGE,
+  MODEL_LOADER,
+  NEGATIVE_CONDITIONING,
+  NOISE,
+  POSITIVE_CONDITIONING,
+  RANDOM_INT,
+  RANGE_OF_SIZE,
+  IMAGE_TO_IMAGE_GRAPH,
+  IMAGE_TO_LATENTS,
+  LATENTS_TO_LATENTS,
+  RESIZE,
+} from './constants';
 import { set } from 'lodash-es';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-
 const moduleLog = log.child({ namespace: 'nodes' });
-
-const POSITIVE_CONDITIONING = 'positive_conditioning';
-const NEGATIVE_CONDITIONING = 'negative_conditioning';
-const IMAGE_TO_LATENTS = 'image_to_latents';
-const LATENTS_TO_LATENTS = 'latents_to_latents';
-const LATENTS_TO_IMAGE = 'latents_to_image';
-const RESIZE = 'resize_image';
-const NOISE = 'noise';
-const RANDOM_INT = 'rand_int';
-const RANGE_OF_SIZE = 'range_of_size';
-const ITERATE = 'iterate';
 
 /**
  * Builds the Image to Image tab graph.
@@ -36,7 +32,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
   const {
     positivePrompt,
     negativePrompt,
-    model,
+    model: model_name,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -50,298 +46,221 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     shouldRandomizeSeed,
   } = state.generation;
 
+  /**
+   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
+   * full graph here as a template. Then use the parameters from app state and set friendlier node
+   * ids.
+   *
+   * The only thing we need extra logic for is handling randomized seed, control net, and for img2img,
+   * the `fit` param. These are added to the graph at the end.
+   */
+
   if (!initialImage) {
     moduleLog.error('No initial image found in state');
     throw new Error('No initial image found in state');
   }
 
+  // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    nodes: {},
-    edges: [],
-  };
-
-  // Create the positive conditioning (prompt) node
-  const positiveConditioningNode: CompelInvocation = {
-    id: POSITIVE_CONDITIONING,
-    type: 'compel',
-    prompt: positivePrompt,
-    model,
-  };
-
-  // Negative conditioning
-  const negativeConditioningNode: CompelInvocation = {
-    id: NEGATIVE_CONDITIONING,
-    type: 'compel',
-    prompt: negativePrompt,
-    model,
-  };
-
-  // This will encode the raster image to latents - but it may get its `image` from a resize node,
-  // so we do not set its `image` property yet
-  const imageToLatentsNode: ImageToLatentsInvocation = {
-    id: IMAGE_TO_LATENTS,
-    type: 'i2l',
-    model,
-  };
-
-  // This does the actual img2img inference
-  const latentsToLatentsNode: LatentsToLatentsInvocation = {
-    id: LATENTS_TO_LATENTS,
-    type: 'l2l',
-    cfg_scale,
-    model,
-    scheduler,
-    steps,
-    strength,
-  };
-
-  // Finally we decode the latents back to an image
-  const latentsToImageNode: LatentsToImageInvocation = {
-    id: LATENTS_TO_IMAGE,
-    type: 'l2i',
-    model,
-  };
-
-  // Add all those nodes to the graph
-  graph.nodes[POSITIVE_CONDITIONING] = positiveConditioningNode;
-  graph.nodes[NEGATIVE_CONDITIONING] = negativeConditioningNode;
-  graph.nodes[IMAGE_TO_LATENTS] = imageToLatentsNode;
-  graph.nodes[LATENTS_TO_LATENTS] = latentsToLatentsNode;
-  graph.nodes[LATENTS_TO_IMAGE] = latentsToImageNode;
-
-  // Connect the prompt nodes to the imageToLatents node
-  graph.edges.push({
-    source: { node_id: POSITIVE_CONDITIONING, field: 'conditioning' },
-    destination: {
-      node_id: LATENTS_TO_LATENTS,
-      field: 'positive_conditioning',
-    },
-  });
-  graph.edges.push({
-    source: { node_id: NEGATIVE_CONDITIONING, field: 'conditioning' },
-    destination: {
-      node_id: LATENTS_TO_LATENTS,
-      field: 'negative_conditioning',
-    },
-  });
-
-  // Connect the image-encoding node
-  graph.edges.push({
-    source: { node_id: IMAGE_TO_LATENTS, field: 'latents' },
-    destination: {
-      node_id: LATENTS_TO_LATENTS,
-      field: 'latents',
-    },
-  });
-
-  // Connect the image-decoding node
-  graph.edges.push({
-    source: { node_id: LATENTS_TO_LATENTS, field: 'latents' },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'latents',
-    },
-  });
-
-  /**
-   * Now we need to handle iterations and random seeds. There are four possible scenarios:
-   * - Single iteration, explicit seed
-   * - Single iteration, random seed
-   * - Multiple iterations, explicit seed
-   * - Multiple iterations, random seed
-   *
-   * They all have different graphs and connections.
-   */
-
-  // Single iteration, explicit seed
-  if (!shouldRandomizeSeed && iterations === 1) {
-    // Noise node using the explicit seed
-    const noiseNode: NoiseInvocation = {
-      id: NOISE,
-      type: 'noise',
-      seed: seed,
-    };
-
-    graph.nodes[NOISE] = noiseNode;
-
-    // Connect noise to l2l
-    graph.edges.push({
-      source: { node_id: NOISE, field: 'noise' },
-      destination: {
-        node_id: LATENTS_TO_LATENTS,
-        field: 'noise',
+    id: IMAGE_TO_IMAGE_GRAPH,
+    nodes: {
+      [POSITIVE_CONDITIONING]: {
+        type: 'compel',
+        id: POSITIVE_CONDITIONING,
+        prompt: positivePrompt,
       },
-    });
-  }
+      [NEGATIVE_CONDITIONING]: {
+        type: 'compel',
+        id: NEGATIVE_CONDITIONING,
+        prompt: negativePrompt,
+      },
+      [RANGE_OF_SIZE]: {
+        type: 'range_of_size',
+        id: RANGE_OF_SIZE,
+        // seed - must be connected manually
+        // start: 0,
+        size: iterations,
+        step: 1,
+      },
+      [NOISE]: {
+        type: 'noise',
+        id: NOISE,
+      },
+      [MODEL_LOADER]: {
+        type: 'sd1_model_loader',
+        id: MODEL_LOADER,
+        model_name,
+      },
+      [LATENTS_TO_IMAGE]: {
+        type: 'l2i',
+        id: LATENTS_TO_IMAGE,
+      },
+      [ITERATE]: {
+        type: 'iterate',
+        id: ITERATE,
+      },
+      [LATENTS_TO_LATENTS]: {
+        type: 'l2l',
+        id: LATENTS_TO_LATENTS,
+        cfg_scale,
+        scheduler,
+        steps,
+        strength,
+      },
+      [IMAGE_TO_LATENTS]: {
+        type: 'i2l',
+        id: IMAGE_TO_LATENTS,
+        // must be set manually later, bc `fit` parameter may require a resize node inserted
+        // image: {
+        //   image_name: initialImage.image_name,
+        // },
+      },
+    },
+    edges: [
+      {
+        source: {
+          node_id: MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: MODEL_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: RANGE_OF_SIZE,
+          field: 'collection',
+        },
+        destination: {
+          node_id: ITERATE,
+          field: 'collection',
+        },
+      },
+      {
+        source: {
+          node_id: ITERATE,
+          field: 'item',
+        },
+        destination: {
+          node_id: NOISE,
+          field: 'seed',
+        },
+      },
+      {
+        source: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: MODEL_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'negative_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'positive_conditioning',
+        },
+      },
+    ],
+  };
 
-  // Single iteration, random seed
-  if (shouldRandomizeSeed && iterations === 1) {
-    // Random int node to generate the seed
+  // handle seed
+  if (shouldRandomizeSeed) {
+    // Random int node to generate the starting seed
     const randomIntNode: RandomIntInvocation = {
       id: RANDOM_INT,
       type: 'rand_int',
     };
 
-    // Noise node without any seed
-    const noiseNode: NoiseInvocation = {
-      id: NOISE,
-      type: 'noise',
-    };
-
     graph.nodes[RANDOM_INT] = randomIntNode;
-    graph.nodes[NOISE] = noiseNode;
-
-    // Connect random int to the seed of the noise node
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'a' },
-      destination: {
-        node_id: NOISE,
-        field: 'seed',
-      },
-    });
-
-    // Connect noise to l2l
-    graph.edges.push({
-      source: { node_id: NOISE, field: 'noise' },
-      destination: {
-        node_id: LATENTS_TO_LATENTS,
-        field: 'noise',
-      },
-    });
-  }
-
-  // Multiple iterations, explicit seed
-  if (!shouldRandomizeSeed && iterations > 1) {
-    // Range of size node to generate `iterations` count of seeds - range of size generates a collection
-    // of ints from `start` to `start + size`. The `start` is the seed, and the `size` is the number of
-    // iterations.
-    const rangeOfSizeNode: RangeOfSizeInvocation = {
-      id: RANGE_OF_SIZE,
-      type: 'range_of_size',
-      start: seed,
-      size: iterations,
-    };
-
-    // Iterate node to iterate over the seeds generated by the range of size node
-    const iterateNode: IterateInvocation = {
-      id: ITERATE,
-      type: 'iterate',
-    };
-
-    // Noise node without any seed
-    const noiseNode: NoiseInvocation = {
-      id: NOISE,
-      type: 'noise',
-    };
-
-    // Adding to the graph
-    graph.nodes[RANGE_OF_SIZE] = rangeOfSizeNode;
-    graph.nodes[ITERATE] = iterateNode;
-    graph.nodes[NOISE] = noiseNode;
-
-    // Connect range of size to iterate
-    graph.edges.push({
-      source: { node_id: RANGE_OF_SIZE, field: 'collection' },
-      destination: {
-        node_id: ITERATE,
-        field: 'collection',
-      },
-    });
-
-    // Connect iterate to noise
-    graph.edges.push({
-      source: {
-        node_id: ITERATE,
-        field: 'item',
-      },
-      destination: {
-        node_id: NOISE,
-        field: 'seed',
-      },
-    });
-
-    // Connect noise to l2l
-    graph.edges.push({
-      source: { node_id: NOISE, field: 'noise' },
-      destination: {
-        node_id: LATENTS_TO_LATENTS,
-        field: 'noise',
-      },
-    });
-  }
-
-  // Multiple iterations, random seed
-  if (shouldRandomizeSeed && iterations > 1) {
-    // Random int node to generate the seed
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-    };
-
-    // Range of size node to generate `iterations` count of seeds - range of size generates a collection
-    const rangeOfSizeNode: RangeOfSizeInvocation = {
-      id: RANGE_OF_SIZE,
-      type: 'range_of_size',
-      size: iterations,
-    };
-
-    // Iterate node to iterate over the seeds generated by the range of size node
-    const iterateNode: IterateInvocation = {
-      id: ITERATE,
-      type: 'iterate',
-    };
-
-    // Noise node without any seed
-    const noiseNode: NoiseInvocation = {
-      id: NOISE,
-      type: 'noise',
-      width,
-      height,
-    };
-
-    // Adding to the graph
-    graph.nodes[RANDOM_INT] = randomIntNode;
-    graph.nodes[RANGE_OF_SIZE] = rangeOfSizeNode;
-    graph.nodes[ITERATE] = iterateNode;
-    graph.nodes[NOISE] = noiseNode;
 
     // Connect random int to the start of the range of size so the range starts on the random first seed
     graph.edges.push({
       source: { node_id: RANDOM_INT, field: 'a' },
       destination: { node_id: RANGE_OF_SIZE, field: 'start' },
     });
-
-    // Connect range of size to iterate
-    graph.edges.push({
-      source: { node_id: RANGE_OF_SIZE, field: 'collection' },
-      destination: {
-        node_id: ITERATE,
-        field: 'collection',
-      },
-    });
-
-    // Connect iterate to noise
-    graph.edges.push({
-      source: {
-        node_id: ITERATE,
-        field: 'item',
-      },
-      destination: {
-        node_id: NOISE,
-        field: 'seed',
-      },
-    });
-
-    // Connect noise to l2l
-    graph.edges.push({
-      source: { node_id: NOISE, field: 'noise' },
-      destination: {
-        node_id: LATENTS_TO_LATENTS,
-        field: 'noise',
-      },
-    });
+  } else {
+    // User specified seed, so set the start of the range of size to the seed
+    (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
 
+  // handle `fit`
   if (
     shouldFitToWidthHeight &&
     (initialImage.width !== width || initialImage.height !== height)
@@ -410,6 +329,7 @@ export const buildImageToImageGraph = (state: RootState): Graph => {
     });
   }
 
+  // add controlnet
   addControlNetToLinearGraph(graph, LATENTS_TO_LATENTS, state);
 
   return graph;
