@@ -1,11 +1,10 @@
 import { startAppListening } from '..';
 import { sessionCreated } from 'services/thunks/session';
-import { buildCanvasGraphComponents } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
+import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { log } from 'app/logging/useLogger';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { imageUpdated, imageUploaded } from 'services/thunks/image';
-import { v4 as uuidv4 } from 'uuid';
-import { Graph } from 'services/api';
+import { ImageDTO } from 'services/api';
 import {
   canvasSessionIdChanged,
   stagingAreaInitialized,
@@ -67,112 +66,106 @@ export const addUserInvokedCanvasListener = () => {
 
       moduleLog.debug(`Generation mode: ${generationMode}`);
 
-      // Build the canvas graph
-      const graphComponents = await buildCanvasGraphComponents(
-        state,
-        generationMode
-      );
+      // Temp placeholders for the init and mask images
+      let canvasInitImage: ImageDTO | undefined;
+      let canvasMaskImage: ImageDTO | undefined;
 
-      if (!graphComponents) {
-        moduleLog.error('Problem building graph');
-        return;
-      }
-
-      const { rangeNode, iterateNode, baseNode, edges } = graphComponents;
-
-      // Assemble! Note that this graph *does not have the init or mask image set yet!*
-      const nodes: Graph['nodes'] = {
-        [rangeNode.id]: rangeNode,
-        [iterateNode.id]: iterateNode,
-        [baseNode.id]: baseNode,
-      };
-
-      const graph = { nodes, edges };
-
-      dispatch(canvasGraphBuilt(graph));
-
-      moduleLog.debug({ data: graph }, 'Canvas graph built');
-
-      // If we are generating img2img or inpaint, we need to upload the init images
-      if (baseNode.type === 'img2img' || baseNode.type === 'inpaint') {
-        const baseFilename = `${uuidv4()}.png`;
-        dispatch(
+      // For img2img and inpaint/outpaint, we need to upload the init images
+      if (['img2img', 'inpaint', 'outpaint'].includes(generationMode)) {
+        // upload the image, saving the request id
+        const { requestId: initImageUploadedRequestId } = dispatch(
           imageUploaded({
             formData: {
-              file: new File([baseBlob], baseFilename, { type: 'image/png' }),
+              file: new File([baseBlob], 'canvasInitImage.png', {
+                type: 'image/png',
+              }),
             },
             imageCategory: 'general',
             isIntermediate: true,
           })
         );
 
-        // Wait for the image to be uploaded
-        const [{ payload: baseImageDTO }] = await take(
+        // Wait for the image to be uploaded, matching by request id
+        const [{ payload }] = await take(
           (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
             imageUploaded.fulfilled.match(action) &&
-            action.meta.arg.formData.file.name === baseFilename
+            action.meta.requestId === initImageUploadedRequestId
         );
 
-        // Update the base node with the image name and type
-        baseNode.image = {
-          image_name: baseImageDTO.image_name,
-        };
+        canvasInitImage = payload;
       }
 
-      // For inpaint, we also need to upload the mask layer
-      if (baseNode.type === 'inpaint') {
-        const maskFilename = `${uuidv4()}.png`;
-        dispatch(
+      // For inpaint/outpaint, we also need to upload the mask layer
+      if (['inpaint', 'outpaint'].includes(generationMode)) {
+        // upload the image, saving the request id
+        const { requestId: maskImageUploadedRequestId } = dispatch(
           imageUploaded({
             formData: {
-              file: new File([maskBlob], maskFilename, { type: 'image/png' }),
+              file: new File([maskBlob], 'canvasMaskImage.png', {
+                type: 'image/png',
+              }),
             },
             imageCategory: 'mask',
             isIntermediate: true,
           })
         );
 
-        // Wait for the mask to be uploaded
-        const [{ payload: maskImageDTO }] = await take(
+        // Wait for the image to be uploaded, matching by request id
+        const [{ payload }] = await take(
           (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
             imageUploaded.fulfilled.match(action) &&
-            action.meta.arg.formData.file.name === maskFilename
+            action.meta.requestId === maskImageUploadedRequestId
         );
 
-        // Update the base node with the image name and type
-        baseNode.mask = {
-          image_name: maskImageDTO.image_name,
-        };
+        canvasMaskImage = payload;
       }
 
-      // Create the session and wait for response
-      dispatch(sessionCreated({ graph }));
-      const [sessionCreatedAction] = await take(sessionCreated.fulfilled.match);
+      const graph = buildCanvasGraph(
+        state,
+        generationMode,
+        canvasInitImage,
+        canvasMaskImage
+      );
+
+      moduleLog.debug({ graph }, `Canvas graph built`);
+
+      // currently this action is just listened to for logging
+      dispatch(canvasGraphBuilt(graph));
+
+      // Create the session, store the request id
+      const { requestId: sessionCreatedRequestId } = dispatch(
+        sessionCreated({ graph })
+      );
+
+      // Take the session created action, matching by its request id
+      const [sessionCreatedAction] = await take(
+        (action): action is ReturnType<typeof sessionCreated.fulfilled> =>
+          sessionCreated.fulfilled.match(action) &&
+          action.meta.requestId === sessionCreatedRequestId
+      );
       const sessionId = sessionCreatedAction.payload.id;
 
       // Associate the init image with the session, now that we have the session ID
-      if (
-        (baseNode.type === 'img2img' || baseNode.type === 'inpaint') &&
-        baseNode.image
-      ) {
+      if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
         dispatch(
           imageUpdated({
-            imageName: baseNode.image.image_name,
+            imageName: canvasInitImage.image_name,
             requestBody: { session_id: sessionId },
           })
         );
       }
 
       // Associate the mask image with the session, now that we have the session ID
-      if (baseNode.type === 'inpaint' && baseNode.mask) {
+      if (['inpaint'].includes(generationMode) && canvasMaskImage) {
         dispatch(
           imageUpdated({
-            imageName: baseNode.mask.image_name,
+            imageName: canvasMaskImage.image_name,
             requestBody: { session_id: sessionId },
           })
         );
       }
 
+      // Prep the canvas staging area if it is not yet initialized
       if (!state.canvas.layerState.stagingArea.boundingBox) {
         dispatch(
           stagingAreaInitialized({

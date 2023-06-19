@@ -67,7 +67,7 @@ title: Home
 implementation of Stable Diffusion, the open source text-to-image and
 image-to-image generator. It provides a streamlined process with various new
 features and options to aid the image generation process. It runs on Windows,
-Mac and Linux machines, and runs on GPU cards with as little as 4 GB or RAM.
+Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 **Quick links**: [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>]
 [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a

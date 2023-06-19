@@ -29,7 +29,6 @@ import invokeai.backend.util.logging as logger
 from ..image_util import configure_model_padding
 from ..util.util import rand_perlin_2d
 from ..safety_checker import SafetyChecker
-from ..prompting.conditioning import get_uc_and_c_and_ec
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..stable_diffusion.schedulers import SCHEDULER_MAP
 
@@ -81,13 +80,15 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         self.params=params
         self.kwargs = kwargs
 
-    def generate(self,
-                 prompt: str='',
-                 callback: Optional[Callable]=None,
-                 step_callback: Optional[Callable]=None,
-                 iterations: int=1,
-                 **keyword_args,
-                 )->Iterator[InvokeAIGeneratorOutput]:
+    def generate(
+        self,
+        conditioning: tuple,
+        scheduler,
+        callback: Optional[Callable]=None,
+        step_callback: Optional[Callable]=None,
+        iterations: int=1,
+        **keyword_args,
+    )->Iterator[InvokeAIGeneratorOutput]:
         '''
         Return an iterator across the indicated number of generations.
         Each time the iterator is called it will return an InvokeAIGeneratorOutput
@@ -116,11 +117,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         model_name = model_info.name
         model_hash = model_info.hash
         with model_info.context as model:
-            scheduler: Scheduler = self.get_scheduler(
-                model=model,
-                scheduler_name=generator_args.get('scheduler')
-            )
-            uc, c, extra_conditioning_info = get_uc_and_c_and_ec(prompt,model=model)
             gen_class = self._generator_class()
             generator = gen_class(model, self.params.precision, **self.kwargs)
             if self.params.variation_amount > 0:
@@ -143,12 +139,12 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 
             iteration_count = range(iterations) if iterations else itertools.count(start=0, step=1)
             for i in iteration_count:
-                results = generator.generate(prompt,
-                                             conditioning=(uc, c, extra_conditioning_info),
-                                             step_callback=step_callback,
-                                             sampler=scheduler,
-                                             **generator_args,
-                                             )
+                results = generator.generate(
+                    conditioning=conditioning,
+                    step_callback=step_callback,
+                    sampler=scheduler,
+                    **generator_args,
+                )
                 output = InvokeAIGeneratorOutput(
                     image=results[0][0],
                     seed=results[0][1],
@@ -170,20 +166,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
     def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
         return generator_class(model, self.params.precision)
 
-    def get_scheduler(self, scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-        scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
-        
-        scheduler_config = model.scheduler.config
-        if "_backup" in scheduler_config:
-            scheduler_config = scheduler_config["_backup"]
-        scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
-        scheduler = scheduler_class.from_config(scheduler_config)
-        
-        # hack copied over from generate.py
-        if not hasattr(scheduler, 'uses_inpainting_model'):
-            scheduler.uses_inpainting_model = lambda: False
-        return scheduler
-
     @classmethod
     def _generator_class(cls)->Type[Generator]:
         '''
@@ -192,13 +174,6 @@ class InvokeAIGenerator(metaclass=ABCMeta):
         class, which nicely parallels the generator class names.
         '''
         return Generator
-
-# ------------------------------------
-class Txt2Img(InvokeAIGenerator):
-    @classmethod
-    def _generator_class(cls):
-        from .txt2img import Txt2Img
-        return Txt2Img
 
 # ------------------------------------
 class Img2Img(InvokeAIGenerator):
@@ -253,24 +228,6 @@ class Inpaint(Img2Img):
         from .inpaint import Inpaint
         return Inpaint
 
-# ------------------------------------
-class Embiggen(Txt2Img):
-    def generate(
-            self,
-            embiggen: list=None,
-            embiggen_tiles: list = None,
-            strength: float=0.75,
-            **kwargs)->Iterator[InvokeAIGeneratorOutput]:
-        return super().generate(embiggen=embiggen,
-                                embiggen_tiles=embiggen_tiles,
-                                strength=strength,
-                                **kwargs)
-
-    @classmethod
-    def _generator_class(cls):
-        from .embiggen import Embiggen
-        return Embiggen
-
 class Generator:
     downsampling_factor: int
     latent_channels: int
@@ -281,7 +238,7 @@ class Generator:
         self.model = model
         self.precision = precision
         self.seed = None
-        self.latent_channels = model.channels
+        self.latent_channels = model.unet.config.in_channels
         self.downsampling_factor = downsampling  # BUG: should come from model or config
         self.safety_checker = None
         self.perlin = 0.0
@@ -292,7 +249,7 @@ class Generator:
         self.free_gpu_mem = None
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
-    def get_make_image(self, prompt, **kwargs):
+    def get_make_image(self, **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
@@ -308,7 +265,6 @@ class Generator:
 
     def generate(
         self,
-        prompt,
         width,
         height,
         sampler,
@@ -333,7 +289,6 @@ class Generator:
             saver.get_stacked_maps_image()
         )
         make_image = self.get_make_image(
-            prompt,
             sampler=sampler,
             init_image=init_image,
             width=width,
