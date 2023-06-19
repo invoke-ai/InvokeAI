@@ -22,6 +22,10 @@ SAMPLER_CHOICES = [
     "dpmpp_2s_k",
     "dpmpp_2m",
     "dpmpp_2m_k",
+    "dpmpp_2m_sde",
+    "dpmpp_2m_sde_k",
+    "dpmpp_sde",
+    "dpmpp_sde_k",
     "unipc",
 ]
 
