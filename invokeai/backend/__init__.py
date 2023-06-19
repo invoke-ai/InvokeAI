@@ -5,7 +5,6 @@ from .generator import (
     InvokeAIGeneratorBasicParams,
     InvokeAIGenerator,
     InvokeAIGeneratorOutput,
-    Txt2Img,
     Img2Img,
     Inpaint
 )
