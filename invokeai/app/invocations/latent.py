@@ -7,7 +7,7 @@ import einops
 
 from pydantic import BaseModel, Field, validator
 import torch
-from diffusers import ControlNetModel
+from diffusers import ControlNetModel, DPMSolverMultistepScheduler
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
@@ -233,7 +233,17 @@ class TextToLatentsInvocation(BaseInvocation):
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(scheduler, eta=0.0)#ddim_eta)
+        )
+
+        conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
+            scheduler,
+
+            # for ddim scheduler
+            eta=0.0, #ddim_eta
+
+            # for ancestral and sde schedulers
+            generator=torch.Generator(device=uc.device).manual_seed(0),
+        )
         return conditioning_data
 
     def create_pipeline(self, unet, scheduler) -> StableDiffusionGeneratorPipeline:
