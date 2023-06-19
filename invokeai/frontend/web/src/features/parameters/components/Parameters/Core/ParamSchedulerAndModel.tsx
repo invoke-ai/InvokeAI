@@ -6,7 +6,7 @@ import ParamScheduler from './ParamScheduler';
 const ParamSchedulerAndModel = () => {
   return (
     <Flex gap={3} w="full">
-      <Box w="20rem">
+      <Box w="25rem">
         <ParamScheduler />
       </Box>
       <Box w="full">
