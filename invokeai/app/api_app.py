@@ -116,6 +116,22 @@ def custom_openapi():
 
         invoker_schema["output"] = outputs_ref
 
+    from invokeai.backend.model_management.models import get_model_config_enums
+    for model_config_format_enum in set(get_model_config_enums()):
+        name = model_config_format_enum.__qualname__
+
+        if name in openapi_schema["components"]["schemas"]:
+            # print(f"Config with name {name} already defined")
+            continue
+
+        # "BaseModelType":{"title":"BaseModelType","description":"An enumeration.","enum":["sd-1","sd-2"],"type":"string"}
+        openapi_schema["components"]["schemas"][name] = dict(
+            title=name,
+            description="An enumeration.",
+            type="string",
+            enum=list(v.value for v in model_config_format_enum),
+        )
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
