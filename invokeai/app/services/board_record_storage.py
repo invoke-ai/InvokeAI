@@ -5,10 +5,12 @@ import threading
 from typing import Optional, Union
 import uuid
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
+from invokeai.app.services.models.board_record import (
+    BoardRecord,
+    deserialize_board_record,
+)
 
 from pydantic import BaseModel, Field, Extra
-
 
 
 class BoardChanges(BaseModel, extra=Extra.forbid):
@@ -79,6 +81,13 @@ class BoardRecordStorageBase(ABC):
         limit: int = 10,
     ) -> OffsetPaginatedResults[BoardRecord]:
         """Gets many board records."""
+        pass
+
+    @abstractmethod
+    def get_all(
+        self,
+    ) -> list[BoardRecord]:
+        """Gets all board records."""
         pass
 
 
@@ -286,6 +295,32 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             return OffsetPaginatedResults[BoardRecord](
                 items=boards, offset=offset, limit=limit, total=count
             )
+
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise e
+        finally:
+            self._lock.release()
+
+    def get_all(
+        self,
+    ) -> list[BoardRecord]:
+        try:
+            self._lock.acquire()
+
+            # Get all the boards
+            self._cursor.execute(
+                """--sql
+                SELECT *
+                FROM boards
+                ORDER BY created_at DESC
+                """
+            )
+
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            boards = list(map(lambda r: deserialize_board_record(dict(r)), result))
+
+            return boards
 
         except sqlite3.Error as e:
             self._conn.rollback()

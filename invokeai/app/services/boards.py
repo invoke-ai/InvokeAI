@@ -61,6 +61,13 @@ class BoardServiceABC(ABC):
         """Gets many boards."""
         pass
 
+    @abstractmethod
+    def get_all(
+        self,
+    ) -> list[BoardDTO]:
+        """Gets all boards."""
+        pass
+
 
 class BoardServiceDependencies:
     """Service dependencies for the BoardService."""
@@ -101,8 +108,10 @@ class BoardService(BoardServiceABC):
 
     def get_dto(self, board_id: str) -> BoardDTO:
         board_record = self._services.board_records.get(board_id)
-        cover_image = self._services.image_records.get_most_recent_image_for_board(board_recordboard_id)
-        if (cover_image):
+        cover_image = self._services.image_records.get_most_recent_image_for_board(
+            board_record.board_id
+        )
+        if cover_image:
             cover_image_name = cover_image.image_name
         else:
             cover_image_name = None
@@ -117,12 +126,14 @@ class BoardService(BoardServiceABC):
         changes: BoardChanges,
     ) -> BoardDTO:
         board_record = self._services.board_records.update(board_id, changes)
-        cover_image = self._services.image_records.get_most_recent_image_for_board(board_record.board_id)
-        if (cover_image):
+        cover_image = self._services.image_records.get_most_recent_image_for_board(
+            board_record.board_id
+        )
+        if cover_image:
             cover_image_name = cover_image.image_name
         else:
             cover_image_name = None
-        
+
         image_count = self._services.board_image_records.get_image_count_for_board(
             board_id
         )
@@ -137,8 +148,10 @@ class BoardService(BoardServiceABC):
         board_records = self._services.board_records.get_many(offset, limit)
         board_dtos = []
         for r in board_records.items:
-            cover_image = self._services.image_records.get_most_recent_image_for_board(r.board_id)
-            if (cover_image):
+            cover_image = self._services.image_records.get_most_recent_image_for_board(
+                r.board_id
+            )
+            if cover_image:
                 cover_image_name = cover_image.image_name
             else:
                 cover_image_name = None
@@ -151,3 +164,22 @@ class BoardService(BoardServiceABC):
         return OffsetPaginatedResults[BoardDTO](
             items=board_dtos, offset=offset, limit=limit, total=len(board_dtos)
         )
+
+    def get_all(self) -> list[BoardDTO]:
+        board_records = self._services.board_records.get_all()
+        board_dtos = []
+        for r in board_records:
+            cover_image = self._services.image_records.get_most_recent_image_for_board(
+                r.board_id
+            )
+            if cover_image:
+                cover_image_name = cover_image.image_name
+            else:
+                cover_image_name = None
+
+            image_count = self._services.board_image_records.get_image_count_for_board(
+                r.board_id
+            )
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count))
+
+        return board_dtos
