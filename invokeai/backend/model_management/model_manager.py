@@ -445,38 +445,6 @@ class ModelManager(object):
             _cache = self.cache,
         )
 
-    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns the name of the default model, or None
-        if none is defined.
-        """
-        for model_key, model_config in self.models.items():
-            if model_config.default:
-                return self.parse_key(model_key)
-
-        for model_key, _ in self.models.items():
-            return self.parse_key(model_key)
-        else:
-            return None # TODO: or redo as (None, None, None)
-
-    def set_default_model(
-        self,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-    ) -> None:
-        """
-        Set the default model. The change will not take
-        effect until you call model_manager.commit()
-        """
-
-        model_key = self.model_key(model_name, base_model, model_type)
-        if model_key not in self.models:
-            raise Exception(f"Unknown model: {model_key}")
-
-        for cur_model_key, config in self.models.items():
-            config.default = cur_model_key == model_key
-
     def model_info(
         self,
         model_name: str,

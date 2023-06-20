@@ -70,19 +70,6 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns the name and typeof the default model, or None
-        if none is defined.
-        """
-        pass
-
-    @abstractmethod
-    def set_default_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType):
-        """Sets the default model to the indicated name."""
-        pass
-
-    @abstractmethod
     def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
@@ -269,17 +256,6 @@ class ModelManagerService(ModelManagerServiceBase):
             base_model,
             model_type,
         )
-
-    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns the name of the default model, or None
-        if none is defined.
-        """
-        return self.mgr.default_model()
-
-    def set_default_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType):
-        """Sets the default model to the indicated name."""
-        self.mgr.set_default_model(model_name, base_model, model_type)
 
     def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
