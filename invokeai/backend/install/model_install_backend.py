@@ -132,7 +132,7 @@ class ModelInstall(object):
                             name = name,
                             base_type = base,
                             model_type = model_type,
-                            description = value.get('description'),
+#                            description = value.get('description'),
                             path = value.get('path'),
                             installed = True,
                         )
