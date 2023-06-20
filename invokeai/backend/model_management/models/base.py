@@ -49,7 +49,7 @@ class ModelError(str, Enum):
 class ModelConfigBase(BaseModel):
     path: str # or Path
     description: Optional[str] = Field(None)
-    format: Optional[str] = Field(None)
+    model_format: Optional[str] = Field(None)
     # do not save to config
     error: Optional[ModelError] = Field(None)
 
@@ -125,20 +125,20 @@ class ModelBase(metaclass=ABCMeta):
                 continue
 
             fields = inspect.get_annotations(value)
-            if "format" not in fields:
-                raise Exception("Invalid config definition - format field not found")
+            if "model_format" not in fields:
+                raise Exception("Invalid config definition - model_format field not found")
 
-            format_type = typing.get_origin(fields["format"])
+            format_type = typing.get_origin(fields["model_format"])
             if format_type not in {None, Literal, Union}:
-                raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
+                raise Exception(f"Invalid config definition - unknown format type: {fields['model_format']}")
 
-            if format_type is Union and not all(typing.get_origin(v) in {None, Literal} for v in fields["format"].__args__):
-                raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
+            if format_type is Union and not all(typing.get_origin(v) in {None, Literal} for v in fields["model_format"].__args__):
+                raise Exception(f"Invalid config definition - unknown format type: {fields['model_format']}")
 
             if format_type == Union:
-                f_fields = fields["format"].__args__
+                f_fields = fields["model_format"].__args__
             else:
-                f_fields = (fields["format"],)
+                f_fields = (fields["model_format"],)
                     
 
             for field in f_fields:
@@ -155,17 +155,17 @@ class ModelBase(metaclass=ABCMeta):
 
     @classmethod
     def create_config(cls, **kwargs) -> ModelConfigBase:
-        if "format" not in kwargs:
-            raise Exception("Field 'format' not found in model config")
+        if "model_format" not in kwargs:
+            raise Exception("Field 'model_format' not found in model config")
 
         configs = cls._get_configs()
-        return configs[kwargs["format"]](**kwargs)
+        return configs[kwargs["model_format"]](**kwargs)
 
     @classmethod
     def probe_config(cls, path: str, **kwargs) -> ModelConfigBase:
         return cls.create_config(
             path=path,
-            format=cls.detect_format(path),
+            model_format=cls.detect_format(path),
         )
 
     @classmethod

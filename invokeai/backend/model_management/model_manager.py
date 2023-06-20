@@ -266,6 +266,8 @@ class ModelManager(object):
         for model_key, model_config in config.items():
             model_name, base_model, model_type = self.parse_key(model_key)
             model_class = MODEL_CLASSES[base_model][model_type]
+            # alias for config file
+            model_config["model_format"] = model_config.pop("format")
             self.models[model_key] = model_class.create_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
@@ -617,6 +619,8 @@ class ModelManager(object):
             if model_class.save_to_config:
                 # TODO: or exclude_unset better fits here?
                 data_to_save[model_key] = model_config.dict(exclude_defaults=True, exclude={"error"})
+                # alias for config file
+                data_to_save[model_key]["format"] = data_to_save[model_key].pop("model_format")
 
         yaml_str = OmegaConf.to_yaml(data_to_save)
         config_file_path = conf_file or self.config_path
