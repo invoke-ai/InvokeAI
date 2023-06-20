@@ -5,7 +5,6 @@ from .base import (
     InvokeAIGenerator,
     InvokeAIGeneratorBasicParams,
     InvokeAIGeneratorOutput,
-    Txt2Img,
     Img2Img,
     Inpaint,
     Generator,

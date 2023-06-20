@@ -42,7 +42,7 @@ dependencies = [
   "controlnet-aux>=0.0.4",
   "timm==0.6.13",           # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
-  "diffusers[torch]~=0.17.0",
+  "diffusers[torch]~=0.17.1",
   "dnspython==2.2.1",
   "dynamicprompts",
   "easing-functions",
@@ -83,6 +83,7 @@ dependencies = [
   "torch~=2.0.0",
   "torchvision>=0.14.1",
   "torchmetrics",
+  "torchsde==0.2.5",
   "transformers~=4.30",
   "uvicorn[standard]==0.21.1",
   "windows-curses; sys_platform=='win32'",
