@@ -378,7 +378,7 @@ def select_stable_diffusion_config_file(
         wrap:bool =True,
         model_name:str='Unknown',
 ):
-    message = "Please select the correct base model for the V2 checkpoint named {model_name}. Press <CANCEL> to skip installation."
+    message = f"Please select the correct base model for the V2 checkpoint named '{model_name}'. Press <CANCEL> to skip installation."
     title = "CONFIG FILE SELECTION"
     options=[
         "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",

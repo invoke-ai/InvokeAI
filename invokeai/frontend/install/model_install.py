@@ -131,6 +131,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             window_width=window_width,
             exclude = self.starter_models
         )
+        self.pipeline_models['autoload_pending'] = True
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
@@ -545,7 +546,9 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 selections.install_models.extend(downloads.value.split())
 
         # load directory and whether to scan on startup
-        selections.scan_directory = self.pipeline_models['autoload_directory'].value
+        if self.parentApp.autoload_pending:
+            selections.scan_directory = self.pipeline_models['autoload_directory'].value
+            self.parentApp.autoload_pending = False
         selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
 
 class AddModelApplication(npyscreen.NPSAppManaged):
@@ -553,6 +556,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         super().__init__()
         self.program_opts = opt
         self.user_cancelled = False
+        self.autoload_pending = True
         self.install_selections = InstallSelections()
 
     def onStart(self):

@@ -442,46 +442,46 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
             begin_entry_at=4,
             scroll_exit=True,
         )
-        self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
-            editable=False,
-            color="CONTROL",
-        )
-        self.embedding_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name=" Textual Inversion Embeddings:",
-            value=str(default_embedding_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=32,
-            scroll_exit=True,
-        )
-        self.lora_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="             LoRA and LyCORIS:",
-            value=str(default_lora_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=32,
-            scroll_exit=True,
-        )
-        self.controlnet_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="             ControlNets:",
-            value=str(default_controlnet_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=32,
-            scroll_exit=True,
-        )
+        # self.nextrely += 1
+        # self.add_widget_intelligent(
+        #     npyscreen.FixedText,
+        #     value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
+        #     editable=False,
+        #     color="CONTROL",
+        # )
+        # self.embedding_dir = self.add_widget_intelligent(
+        #     npyscreen.TitleFilename,
+        #     name=" Textual Inversion Embeddings:",
+        #     value=str(default_embedding_dir()),
+        #     select_dir=True,
+        #     must_exist=False,
+        #     use_two_lines=False,
+        #     labelColor="GOOD",
+        #     begin_entry_at=32,
+        #     scroll_exit=True,
+        # )
+        # self.lora_dir = self.add_widget_intelligent(
+        #     npyscreen.TitleFilename,
+        #     name="             LoRA and LyCORIS:",
+        #     value=str(default_lora_dir()),
+        #     select_dir=True,
+        #     must_exist=False,
+        #     use_two_lines=False,
+        #     labelColor="GOOD",
+        #     begin_entry_at=32,
+        #     scroll_exit=True,
+        # )
+        # self.controlnet_dir = self.add_widget_intelligent(
+        #     npyscreen.TitleFilename,
+        #     name="             ControlNets:",
+        #     value=str(default_controlnet_dir()),
+        #     select_dir=True,
+        #     must_exist=False,
+        #     use_two_lines=False,
+        #     labelColor="GOOD",
+        #     begin_entry_at=32,
+        #     scroll_exit=True,
+        # )
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -546,10 +546,10 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             bad_fields.append(
                 f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
             )
-        if not Path(opt.embedding_dir).parent.exists():
-            bad_fields.append(
-                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_dir).parent)} is an existing directory."
-            )
+        # if not Path(opt.embedding_dir).parent.exists():
+        #     bad_fields.append(
+        #         f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_dir).parent)} is an existing directory."
+        #     )
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:\n"
             for problem in bad_fields:
@@ -569,9 +569,9 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
                 "max_loaded_models",
                 "xformers_enabled",
                 "always_use_cpu",
-                "embedding_dir",
-                "lora_dir",
-                "controlnet_dir",
+#                "embedding_dir",
+#                "lora_dir",
+#                "controlnet_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
 
@@ -591,6 +591,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
         self.program_opts = program_opts
         self.invokeai_opts = invokeai_opts
         self.user_cancelled = False
+        self.autoload_pending = True
         self.install_selections = default_user_selections(program_opts)
 
     def onStart(self):
@@ -719,17 +720,17 @@ def write_opts(opts: Namespace, init_file: Path):
 def default_output_dir() -> Path:
     return config.root_path / "outputs"
 
-# -------------------------------------
-def default_embedding_dir() -> Path:
-    return config.root_path / "embeddings"
+# # -------------------------------------
+# def default_embedding_dir() -> Path:
+#     return config.root_path / "embeddings"
 
-# -------------------------------------
-def default_lora_dir() -> Path:
-    return config.root_path / "loras"
+# # -------------------------------------
+# def default_lora_dir() -> Path:
+#     return config.root_path / "loras"
 
-# -------------------------------------
-def default_controlnet_dir() -> Path:
-    return config.root_path / "controlnets"
+# # -------------------------------------
+# def default_controlnet_dir() -> Path:
+#     return config.root_path / "controlnets"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
@@ -755,7 +756,7 @@ def migrate_init_file(legacy_format:Path):
     new.nsfw_checker = old.safety_checker
     new.xformers_enabled = old.xformers
     new.conf_path = old.conf
-    new.embedding_dir = old.embedding_path
+#    new.embedding_dir = old.embedding_path
 
     invokeai_yaml = legacy_format.parent / 'invokeai.yaml'
     with open(invokeai_yaml,"w", encoding="utf-8") as outfile:

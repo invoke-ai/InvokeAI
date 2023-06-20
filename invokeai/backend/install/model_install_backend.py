@@ -227,10 +227,14 @@ class ModelInstall(object):
     # the model from being probed twice in the event that it has already been probed.
     def _install_path(self, path: Path, info: ModelProbeInfo=None):
         try:
+            logger.info(f'Probing {path}')
             info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
             if info.model_type == ModelType.Pipeline:
+                model_name = path.stem if info.format=='checkpoint' else path.name
+                if self.mgr.model_exists(model_name, info.base_type, info.model_type):
+                    raise Exception(f'A model named "{model_name}" is already installed.')
                 attributes = self._make_attributes(path,info)
-                self.mgr.add_model(model_name = path.stem if info.format=='checkpoint' else path.name,
+                self.mgr.add_model(model_name = model_name,
                                    base_model = info.base_type,
                                    model_type = info.model_type,
                                    model_attributes = attributes
@@ -322,7 +326,7 @@ class ModelInstall(object):
                 )
             if info.format=="checkpoint":
                 try:
-                    legacy_conf = LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type] if BaseModelType.StableDiffusion2 \
+                    legacy_conf = LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type] if info.base_type == BaseModelType.StableDiffusion2 \
                         else LEGACY_CONFIGS[info.base_type][info.variant_type]
                 except KeyError:
                     legacy_conf = 'v1-inference.yaml'  # best guess
