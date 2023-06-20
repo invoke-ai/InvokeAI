@@ -35,8 +35,6 @@ class BoardDTO(BoardRecord):
     """The number of images in the board."""
 
 
-
-
 def deserialize_board_record(board_dict: dict) -> BoardRecord:
     """Deserializes a board record."""
 
@@ -44,14 +42,16 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
 
     board_id = board_dict.get("board_id", "unknown")
     board_name = board_dict.get("board_name", "unknown")
+    cover_image_name = board_dict.get("cover_image_name", "unknown")
     created_at = board_dict.get("created_at", get_iso_timestamp())
     updated_at = board_dict.get("updated_at", get_iso_timestamp())
-    deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
+    # deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
 
     return BoardRecord(
         board_id=board_id,
         board_name=board_name,
+        cover_image_name=cover_image_name,
         created_at=created_at,
         updated_at=updated_at,
-        deleted_at=deleted_at,
+        # deleted_at=deleted_at,
     )
