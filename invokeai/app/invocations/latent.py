@@ -55,8 +55,8 @@ class LatentsOutput(BaseInvocationOutput):
 def build_latents_output(latents_name: str, latents: torch.Tensor):
       return LatentsOutput(
           latents=LatentsField(latents_name=latents_name),
-          width=latents.size()[3] * 8,
-          height=latents.size()[2] * 8,
+          width=latents.shape[3] * 8,
+          height=latents.shape[2] * 8,
       )
 
 class NoiseOutput(BaseInvocationOutput):

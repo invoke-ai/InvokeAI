@@ -11,6 +11,8 @@ from torch.utils.hooks import RemovableHandle
 
 from diffusers.models import UNet2DConditionModel
 from transformers import CLIPTextModel
+from onnx import numpy_helper
+import numpy as np
 
 from compel.embeddings_provider import BaseTextualInversionManager
 
@@ -70,7 +72,7 @@ class LoRALayerBase:
             op = torch.nn.functional.linear
             extra_args = {}
 
-        weight = self.get_weight(module)
+        weight = self.get_weight()
 
         bias = self.bias if self.bias is not None else 0
         scale = self.alpha / self.rank if (self.alpha and self.rank) else 1.0
@@ -81,7 +83,7 @@ class LoRALayerBase:
             **extra_args,
         ) * multiplier * scale
 
-    def get_weight(self, module: torch.nn.Module):
+    def get_weight(self):
         raise NotImplementedError()
 
     def calc_size(self) -> int:
@@ -122,7 +124,7 @@ class LoRALayer(LoRALayerBase):
 
         self.rank = self.down.shape[0]
 
-    def get_weight(self, module: torch.nn.Module):
+    def get_weight(self):
         if self.mid is not None:
             up = self.up.reshape(up.shape[0], up.shape[1])
             down = self.down.reshape(up.shape[0], up.shape[1])
@@ -185,7 +187,7 @@ class LoHALayer(LoRALayerBase):
 
         self.rank = self.w1_b.shape[0]
 
-    def get_weight(self, module: torch.nn.Module):
+    def get_weight(self):
         if self.t1 is None:
             weight = (self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b)
 
@@ -271,7 +273,7 @@ class LoKRLayer(LoRALayerBase):
         else:
             self.rank = None # unscaled
 
-    def get_weight(self, module: torch.nn.Module):
+    def get_weight(self):
         w1 = self.w1
         if w1 is None:
             w1 = self.w1_a @ self.w1_b
@@ -286,7 +288,7 @@ class LoKRLayer(LoRALayerBase):
         if len(w2.shape) == 4:
             w1 = w1.unsqueeze(2).unsqueeze(2)
         w2 = w2.contiguous()
-        weight = torch.kron(w1, w2).reshape(module.weight.shape) # TODO: can we remove reshape?
+        weight = torch.kron(w1, w2)#.reshape(module.weight.shape) # TODO: can we remove reshape?
 
         return weight
 
@@ -676,3 +678,212 @@ class TextualInversionManager(BaseTextualInversionManager):
 
         return new_token_ids
 
+
+class ONNXModelPatcher:
+
+    @classmethod
+    @contextmanager
+    def apply_lora_unet(
+        cls,
+        unet: OnnxRuntimeModel,
+        loras: List[Tuple[LoRAModel, float]],
+    ):
+        with cls.apply_lora(unet, loras, "lora_unet_"):
+            yield
+
+
+    @classmethod
+    @contextmanager
+    def apply_lora_text_encoder(
+        cls,
+        text_encoder: OnnxRuntimeModel,
+        loras: List[Tuple[LoRAModel, float]],
+    ):
+        with cls.apply_lora(text_encoder, loras, "lora_te_"):
+            yield
+
+
+    @classmethod
+    @contextmanager
+    def apply_lora(
+        cls,
+        model: IAIOnnxRuntimeModel,
+        loras: List[Tuple[LoraModel, float]],
+        prefix: str,
+    ):
+        from .models.base import IAIOnnxRuntimeModel
+        if not isinstance(model, IAIOnnxRuntimeModel):
+            raise Exception("Only IAIOnnxRuntimeModel models supported")
+
+        base_model = model.proto
+        orig_nodes = dict()
+
+        try:
+            blended_loras = dict()
+
+            for lora, lora_weight in loras:
+                for layer_key, layer in lora.layers.items():
+                    if not layer_key.startswith(prefix):
+                        continue
+
+                    layer_key = layer_key.replace(prefix, "")
+                    layer_weight = layer.get_weight().detach().cpu().numpy() * lora_weight
+                    if layer_key is blended_loras:
+                        blended_loras[layer_key] += layer_weight
+                    else:
+                        blended_loras[layer_key] = layer_weight
+
+            initializer_idx = dict()
+            for idx, init in enumerate(base_model.graph.initializer):
+                initializer_idx[init.name.replace(".", "_")] = idx
+
+            node_idx = dict()
+            for idx, node in enumerate(base_model.graph.node):
+                node_idx[node.name.replace("/", "_").replace(".", "_").lstrip("_")] = idx
+
+            for layer_key, weights in blended_loras.items():
+                conv_key = layer_key + "_Conv"
+                gemm_key = layer_key + "_Gemm"
+                matmul_key = layer_key + "_MatMul"
+
+                if conv_key in node_idx or gemm_key in node_idx:
+                    if conv_key in node_idx:
+                        conv_node = base_model.graph.node[node_idx[conv_key]]
+                    else:
+                        conv_node = base_model.graph.node[node_idx[gemm_key]]
+
+                    weight_name = [n for n in conv_node.input if ".weight" in n][0]
+                    weight_name = weight_name.replace(".", "_")
+
+                    weight_idx = initializer_idx[weight_name]
+                    weight_node = base_model.graph.initializer[weight_idx]
+
+                    orig_weights = numpy_helper.to_array(weight_node)
+
+                    if orig_weights.shape[-2:] == (1, 1):
+                        if weights.shape[-2:] == (1, 1):
+                            new_weights = orig_weights.squeeze((3, 2)) + weights.squeeze((3, 2))
+                        else:
+                            new_weights = orig_weights.squeeze((3, 2)) + weights
+
+                        new_weights = np.expand_dims(new_weights, (2, 3))
+                    else:
+                        if orig_weights.shape != weights.shape:
+                            new_weights = orig_weights + weights.reshape(orig_weights.shape)
+                        else:
+                            new_weights = orig_weights + weights
+
+                    new_node = numpy_helper.from_array(new_weights.astype(orig_weights.dtype), weight_node.name)
+                    orig_nodes[weight_idx] = base_model.graph.initializer[weight_idx]
+                    del base_model.graph.initializer[weight_idx]
+                    base_model.graph.initializer.insert(weight_idx, new_node)
+
+                elif matmul_key in node_idx:
+                    weight_node = base_model.graph.node[node_idx[matmul_key]]
+
+                    matmul_name = [n for n in weight_node.input if "MatMul" in n][0]
+
+                    matmul_idx = initializer_idx[matmul_name]
+                    matmul_node = base_model.graph.initializer[matmul_idx]
+
+                    orig_weights = numpy_helper.to_array(matmul_node)
+
+                    new_weights = orig_weights + weights.transpose()
+
+                    # replace the original initializer
+                    new_node = numpy_helper.from_array(new_weights.astype(orig_weights.dtype), matmul_node.name)
+                    orig_nodes[matmul_idx] = base_model.graph.initializer[matmul_idx]
+                    del base_model.graph.initializer[matmul_idx]
+                    base_model.graph.initializer.insert(matmul_idx, new_node)
+
+                else:
+                    # warn? err?
+                    pass
+
+            yield
+
+        finally:
+            # restore original weights
+            for idx, orig_node in orig_nodes.items():
+                del base_model.graph.initializer[idx]
+                base_model.graph.initializer.insert(idx, orig_node)
+
+
+
+    @classmethod
+    @contextmanager
+    def apply_ti(
+        cls,
+        tokenizer: CLIPTokenizer,
+        text_encoder: IAIOnnxRuntimeModel,
+        ti_list: List[Any],
+    ) -> Tuple[CLIPTokenizer, TextualInversionManager]:
+        from .models.base import IAIOnnxRuntimeModel
+        if not isinstance(text_encoder, IAIOnnxRuntimeModel):
+            raise Exception("Only IAIOnnxRuntimeModel models supported")
+
+        init_tokens_count = None
+        new_tokens_added = None
+
+        try:
+            ti_tokenizer = copy.deepcopy(tokenizer)
+            ti_manager = TextualInversionManager(ti_tokenizer)
+
+            def _get_trigger(ti, index):
+                trigger = ti.name
+                if index > 0:
+                    trigger += f"-!pad-{i}"
+                return f"<{trigger}>"
+
+            # modify tokenizer
+            new_tokens_added = 0
+            for ti in ti_list:
+                for i in range(ti.embedding.shape[0]):
+                    new_tokens_added += ti_tokenizer.add_tokens(_get_trigger(ti, i))
+
+            # modify text_encoder
+            for i in range(len(text_encoder.proto.graph.initializer)):
+                if text_encoder.proto.graph.initializer[i].name == "text_model.embeddings.token_embedding.weight":
+                    embeddings_node_idx = i
+                    break
+            else:
+                raise Exception("text_model.embeddings.token_embedding.weight node not found")
+
+            embeddings_node_orig = text_encoder.proto.graph.initializer[embeddings_node_idx]
+            base_weights = numpy_helper.to_array(embeddings_node_orig)
+
+            embedding_weights = np.concatenate((base_weights, np.zeros((new_tokens_added, base_weights.shape[1]))), axis=0)
+
+            for ti in ti_list:
+                ti_tokens = []
+                for i in range(ti.embedding.shape[0]):
+                    embedding = ti.embedding[i].detach().numpy()
+                    trigger = _get_trigger(ti, i)
+
+                    token_id = ti_tokenizer.convert_tokens_to_ids(trigger)
+                    if token_id == ti_tokenizer.unk_token_id:
+                        raise RuntimeError(f"Unable to find token id for token '{trigger}'")
+
+                    if embedding_weights[token_id].shape != embedding.shape:
+                        raise ValueError(
+                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {embedding_weights[token_id].shape[0]}."
+                        )
+
+                    embedding_weights[token_id] = embedding
+                    ti_tokens.append(token_id)
+
+                if len(ti_tokens) > 1:
+                    ti_manager.pad_tokens[ti_tokens[0]] = ti_tokens[1:]
+
+
+            new_embeddings_node = numpy_helper.from_array(embedding_weights.astype(base_weights.dtype), embeddings_node_orig.name)
+            del text_encoder.proto.graph.initializer[embeddings_node_idx]
+            text_encoder.proto.graph.initializer.insert(embeddings_node_idx, new_embeddings_node)
+
+            yield ti_tokenizer, ti_manager
+
+        finally:
+            # restore
+            if embeddings_node_orig is not None:
+                del text_encoder.proto.graph.initializer[embeddings_node_idx]
+                text_encoder.proto.graph.initializer.insert(embeddings_node_idx, embeddings_node_orig)

@@ -9,9 +9,12 @@ from .lora import LoRAModel
 from .controlnet import ControlNetModel # TODO:
 from .textual_inversion import TextualInversionModel
 
+from .stable_diffusion_onnx import ONNXStableDiffusion1Model, ONNXStableDiffusion2Model
+
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
         ModelType.Pipeline: StableDiffusion1Model,
+        ModelType.ONNX: ONNXStableDiffusion1Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
@@ -19,6 +22,7 @@ MODEL_CLASSES = {
     },
     BaseModelType.StableDiffusion2: {
         ModelType.Pipeline: StableDiffusion2Model,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
