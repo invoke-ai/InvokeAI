@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
 from invokeai.app.util.misc import get_iso_timestamp
 
+
 class BoardRecord(BaseModel):
     """Deserialized board record."""
 

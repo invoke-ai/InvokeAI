@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from invokeai.app.services.board_record_storage import BoardChanges
@@ -19,7 +20,7 @@ boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
     response_model=BoardDTO,
 )
 async def create_board(
-    board_name: str = Body(description="The name of the board to create"),
+    board_name: str = Query(description="The name of the board to create"),
 ) -> BoardDTO:
     """Creates a board"""
     try:
@@ -70,16 +71,25 @@ async def delete_board(
 @boards_router.get(
     "/",
     operation_id="list_boards",
-    response_model=OffsetPaginatedResults[BoardDTO],
+    response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
 async def list_boards(
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of boards per page"),
-) -> OffsetPaginatedResults[BoardDTO]:
+    all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
+    offset: Optional[int] = Query(default=None, description="The page offset"),
+    limit: Optional[int] = Query(
+        default=None, description="The number of boards per page"
+    ),
+) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards"""
-
-    results = ApiDependencies.invoker.services.boards.get_many(
-        offset,
-        limit,
-    )
-    return results
+    if all:
+        return ApiDependencies.invoker.services.boards.get_all()
+    elif offset is not None and limit is not None:
+        return ApiDependencies.invoker.services.boards.get_many(
+            offset,
+            limit,
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid request: Must provide either 'all' or both 'offset' and 'limit'",
+        )
