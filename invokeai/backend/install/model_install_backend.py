@@ -95,8 +95,6 @@ class ModelInstall(object):
                  prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
                  access_token:str = None):
         self.config = config
-        with open('log.txt','w') as file:
-            print(config.model_conf_path,file=file)
         self.mgr = ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
@@ -271,27 +269,36 @@ class ModelInstall(object):
         # we try to figure out how to download this most economically
         # list all the files in the repo
         files = [x.rfilename for x in hinfo.siblings]
+        location = None
 
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             staging = Path(staging)
             if 'model_index.json' in files:
                 location = self._download_hf_pipeline(repo_id, staging)   # pipeline
-                
-            elif 'pytorch_lora_weights.bin' in files:
-                location = self._download_hf_model(repo_id, ['pytorch_lora_weights.bin'], staging)  # LoRA
-                
-            elif self.config.precision=='float16' and 'diffusion_pytorch_model.fp16.safetensors' in files: # vae, controlnet or some other standalone
-                 files = ['config.json', 'diffusion_pytorch_model.fp16.safetensors']
-                 location = self._download_hf_model(repo_id, files, staging)
-
-            elif 'diffusion_pytorch_model.safetensors' in files:
-                 files = ['config.json', 'diffusion_pytorch_model.safetensors']
-                 location = self._download_hf_model(repo_id, files, staging)
-                 
-            elif 'learned_embeds.bin' in files:
-                location = self._download_hf_model(repo_id, ['learned_embeds.bin'], staging)
-
+            else:
+                for suffix in ['safetensors','bin']:
+                    if f'pytorch_lora_weights.{suffix}' in files:
+                        location = self._download_hf_model(repo_id, ['pytorch_lora_weights.bin'], staging)  # LoRA
+                        break
+                    elif self.config.precision=='float16' and f'diffusion_pytorch_model.fp16.{suffix}' in files: # vae, controlnet or some other standalone
+                        files = ['config.json', f'diffusion_pytorch_model.fp16.{suffix}']
+                        location = self._download_hf_model(repo_id, files, staging)
+                        break
+                    elif f'diffusion_pytorch_model.{suffix}' in files:
+                        files = ['config.json', f'diffusion_pytorch_model.{suffix}']
+                        location = self._download_hf_model(repo_id, files, staging)
+                        break
+                    elif f'learned_embeds.{suffix}' in files:
+                        location = self._download_hf_model(repo_id, [f'learned_embeds.suffix'], staging)
+                        break
+            if not location:
+                logger.warning(f'Could not determine type of repo {repo_id}. Skipping install.')
+                return
+            
             info = ModelProbe().heuristic_probe(location, self.prediction_helper)
+            if not info:
+                logger.warning(f'Could not probe {location}. Skipping install.')
+                return
             dest = self.config.models_path / info.base_type.value / info.model_type.value / self._get_model_name(repo_id,location)
             if dest.exists():
                 shutil.rmtree(dest)

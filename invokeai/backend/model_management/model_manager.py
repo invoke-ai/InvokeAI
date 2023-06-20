@@ -703,7 +703,7 @@ class ModelManager(object):
                     model_path = os.path.join(models_dir, entry_name)
                     if model_path not in loaded_files: # TODO: check
                         model_path = Path(model_path)
-                        model_name = model_path.name if model_path.is_dir else model_path.stem
+                        model_name = model_path.name if model_path.is_dir() else model_path.stem
                         model_key = self.create_key(model_name, base_model, model_type)
 
                         if model_key in self.models:

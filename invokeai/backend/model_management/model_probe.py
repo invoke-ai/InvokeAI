@@ -401,8 +401,16 @@ class ControlNetFolderProbe(FolderProbeBase):
                else BaseModelType.StableDiffusion2
 
 class LoRAFolderProbe(FolderProbeBase):
-    # I've never seen one of these in the wild, so this is a noop
-    pass
+    def get_base_type(self)->BaseModelType:
+        model_file = None
+        for suffix in ['safetensors','bin']:
+            base_file = self.folder_path / f'pytorch_lora_weights.{suffix}'
+            if base_file.exists():
+                model_file = base_file
+                break
+        if not model_file:
+            raise Exception('Unknown LoRA format encountered')
+        return LoRACheckpointProbe(model_file,None).get_base_type()
 
 ############## register probe classes ######
 ModelProbe.register_probe('diffusers', ModelType.Pipeline,  PipelineFolderProbe)
