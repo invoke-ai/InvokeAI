@@ -23,12 +23,12 @@ from omegaconf import OmegaConf
 class StableDiffusion1Model(DiffusersModel):
 
     class DiffusersConfig(ModelConfigBase):
-        format: Literal["diffusers"]
+        model_format: Literal["diffusers"]
         vae: Optional[str] = Field(None)
         variant: ModelVariantType
 
     class CheckpointConfig(ModelConfigBase):
-        format: Literal["checkpoint"]
+        model_format: Literal["checkpoint"]
         vae: Optional[str] = Field(None)
         config: Optional[str] = Field(None)
         variant: ModelVariantType
@@ -80,7 +80,7 @@ class StableDiffusion1Model(DiffusersModel):
 
         return cls.create_config(
             path=path,
-            format=model_format,
+            model_format=model_format,
 
             config=ckpt_config_path,
             variant=variant,
@@ -121,14 +121,14 @@ class StableDiffusion2Model(DiffusersModel):
 
     # TODO: check that configs overwriten properly
     class DiffusersConfig(ModelConfigBase):
-        format: Literal["diffusers"]
+        model_format: Literal["diffusers"]
         vae: Optional[str] = Field(None)
         variant: ModelVariantType
         prediction_type: SchedulerPredictionType
         upcast_attention: bool
 
     class CheckpointConfig(ModelConfigBase):
-        format: Literal["checkpoint"]
+        model_format: Literal["checkpoint"]
         vae: Optional[str] = Field(None)
         config: Optional[str] = Field(None)
         variant: ModelVariantType
@@ -191,7 +191,7 @@ class StableDiffusion2Model(DiffusersModel):
 
         return cls.create_config(
             path=path,
-            format=model_format,
+            model_format=model_format,
 
             config=ckpt_config_path,
             variant=variant,
