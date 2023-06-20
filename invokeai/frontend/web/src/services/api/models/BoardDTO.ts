@@ -23,13 +23,9 @@ export type BoardDTO = {
    */
   updated_at: string;
   /**
-   * The name of the cover image of the board.
+   * The name of the board's cover image.
    */
   cover_image_name?: string;
-  /**
-   * The URL of the thumbnail of the board's cover image.
-   */
-  cover_image_url?: string;
   /**
    * The number of images in the board.
    */

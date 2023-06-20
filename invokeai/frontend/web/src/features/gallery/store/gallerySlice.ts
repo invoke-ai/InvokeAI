@@ -7,7 +7,7 @@ import { imageUrlsReceived } from 'services/thunks/image';
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export interface GalleryState {
-  selectedImage?: ImageDTO;
+  selectedImage?: string;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
@@ -27,7 +27,7 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageSelected: (state, action: PayloadAction<ImageDTO | undefined>) => {
+    imageSelected: (state, action: PayloadAction<string | undefined>) => {
       state.selectedImage = action.payload;
       // TODO: if the user selects an image, disable the auto switch?
       // state.shouldAutoSwitchToNewImages = false;
@@ -63,17 +63,17 @@ export const gallerySlice = createSlice({
         state.shouldAutoSwitchToNewImages &&
         action.payload.image_category === 'general'
       ) {
-        state.selectedImage = action.payload;
+        state.selectedImage = action.payload.image_name;
       }
     });
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
+    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+    //   const { image_name, image_url, thumbnail_url } = action.payload;
 
-      if (state.selectedImage?.image_name === image_name) {
-        state.selectedImage.image_url = image_url;
-        state.selectedImage.thumbnail_url = thumbnail_url;
-      }
-    });
+    //   if (state.selectedImage?.image_name === image_name) {
+    //     state.selectedImage.image_url = image_url;
+    //     state.selectedImage.thumbnail_url = thumbnail_url;
+    //   }
+    // });
   },
 });
 

@@ -93,19 +93,11 @@ type ImageMetadataViewerProps = {
   image: ImageDTO;
 };
 
-// TODO: I don't know if this is needed.
-const memoEqualityCheck = (
-  prev: ImageMetadataViewerProps,
-  next: ImageMetadataViewerProps
-) => prev.image.image_name === next.image.image_name;
-
-// TODO: Show more interesting information in this component.
-
 /**
  * Image metadata viewer overlays currently selected image and provides
  * access to any of its metadata for use in processing.
  */
-const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
+const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   const dispatch = useAppDispatch();
   const {
     recallBothPrompts,
@@ -333,8 +325,6 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
       </Flex>
     </Flex>
   );
-}, memoEqualityCheck);
+};
 
-ImageMetadataViewer.displayName = 'ImageMetadataViewer';
-
-export default ImageMetadataViewer;
+export default memo(ImageMetadataViewer);

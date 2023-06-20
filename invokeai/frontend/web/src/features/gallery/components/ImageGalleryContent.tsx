@@ -201,12 +201,6 @@ const ImageGalleryContent = () => {
     dispatch(setGalleryView('boards'));
   }, [dispatch]);
 
-  const [newBoardName, setNewBoardName] = useState('');
-
-  const handleCreateNewBoard = () => {
-    dispatch(boardCreated({ requestBody: newBoardName }));
-  };
-
   return (
     <Flex
       sx={{
@@ -323,9 +317,7 @@ const ImageGalleryContent = () => {
                       <HoverableImage
                         key={`${item.image_name}-${item.thumbnail_url}`}
                         image={item}
-                        isSelected={
-                          selectedImage?.image_name === item?.image_name
-                        }
+                        isSelected={selectedImage === item?.image_name}
                       />
                     </Flex>
                   )}
@@ -344,9 +336,7 @@ const ImageGalleryContent = () => {
                     <HoverableImage
                       key={`${item.image_name}-${item.thumbnail_url}`}
                       image={item}
-                      isSelected={
-                        selectedImage?.image_name === item?.image_name
-                      }
+                      isSelected={selectedImage === item?.image_name}
                     />
                   )}
                 />

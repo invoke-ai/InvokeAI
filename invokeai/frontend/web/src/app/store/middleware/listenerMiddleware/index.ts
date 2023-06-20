@@ -73,6 +73,10 @@ import { addImageCategoriesChangedListener } from './listeners/imageCategoriesCh
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addUpdateImageUrlsOnConnectListener } from './listeners/updateImageUrlsOnConnect';
+import {
+  addImageAddedToBoardFulfilledListener,
+  addImageAddedToBoardRejectedListener,
+} from './listeners/imageAddedToBoard';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -183,3 +187,7 @@ addControlNetAutoProcessListener();
 
 // Update image URLs on connect
 addUpdateImageUrlsOnConnectListener();
+
+// Boards
+addImageAddedToBoardFulfilledListener();
+addImageAddedToBoardRejectedListener();

@@ -33,6 +33,7 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
 import { LOCALSTORAGE_PREFIX } from './constants';
+import { api } from 'services/apiSlice';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -49,6 +50,7 @@ const allReducers = {
   images: imagesReducer,
   controlNet: controlNetReducer,
   boards: boardsReducer,
+  [api.reducerPath]: api.reducer,
   // session: sessionReducer,
 };
 
@@ -87,6 +89,7 @@ export const store = configureStore({
       immutableCheck: false,
       serializableCheck: false,
     })
+      .concat(api.middleware)
       .concat(dynamicMiddlewares)
       .prepend(listenerMiddleware.middleware),
   devTools: {

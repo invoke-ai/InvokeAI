@@ -17,13 +17,18 @@ export class BoardsService {
   /**
    * List Boards
    * Gets a list of boards
-   * @returns OffsetPaginatedResults_BoardDTO_ Successful Response
+   * @returns any Successful Response
    * @throws ApiError
    */
   public static listBoards({
+    all,
     offset,
-    limit = 10,
+    limit,
   }: {
+    /**
+     * Whether to list all boards
+     */
+    all?: boolean,
     /**
      * The page offset
      */
@@ -32,11 +37,12 @@ export class BoardsService {
      * The number of boards per page
      */
     limit?: number,
-  }): CancelablePromise<OffsetPaginatedResults_BoardDTO_> {
+  }): CancelablePromise<(OffsetPaginatedResults_BoardDTO_ | Array<BoardDTO>)> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/boards/',
       query: {
+        'all': all,
         'offset': offset,
         'limit': limit,
       },
@@ -53,15 +59,19 @@ export class BoardsService {
    * @throws ApiError
    */
   public static createBoard({
-    requestBody,
+    boardName,
   }: {
-    requestBody: string,
+    /**
+     * The name of the board to create
+     */
+    boardName: string,
   }): CancelablePromise<BoardDTO> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/boards/',
-      body: requestBody,
-      mediaType: 'application/json',
+      query: {
+        'board_name': boardName,
+      },
       errors: {
         422: `Validation Error`,
       },
