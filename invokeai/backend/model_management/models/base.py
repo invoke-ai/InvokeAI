@@ -48,10 +48,8 @@ class ModelError(str, Enum):
 
 class ModelConfigBase(BaseModel):
     path: str # or Path
-    #name: str # not included as present in model key
     description: Optional[str] = Field(None)
     format: Optional[str] = Field(None)
-    default: Optional[bool] = Field(False)
     # do not save to config
     error: Optional[ModelError] = Field(None)
 
