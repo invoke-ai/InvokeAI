@@ -125,30 +125,24 @@ class ModelBase(metaclass=ABCMeta):
                 continue
 
             fields = inspect.get_annotations(value)
-            if "model_format" not in fields:
-                raise Exception("Invalid config definition - model_format field not found")
+            try:
+                field = fields["model_format"]
+            except:
+                raise Exception(f"Invalid config definition - format field not found({cls.__qualname__})")
 
-            format_type = typing.get_origin(fields["model_format"])
-            if format_type not in {None, Literal, Union}:
-                raise Exception(f"Invalid config definition - unknown format type: {fields['model_format']}")
+            if isinstance(field, type) and issubclass(field, str) and issubclass(field, Enum):
+                for model_format in field:
+                    configs[model_format.value] = value
 
-            if format_type is Union and not all(typing.get_origin(v) in {None, Literal} for v in fields["model_format"].__args__):
-                raise Exception(f"Invalid config definition - unknown format type: {fields['model_format']}")
+            elif typing.get_origin(field) is Literal and all(isinstance(arg, str) and isinstance(arg, Enum) for arg in field.__args__):
+                for model_format in field.__args__:
+                    configs[model_format.value] = value
 
-            if format_type == Union:
-                f_fields = fields["model_format"].__args__
+            elif field is None:
+                configs[None] = value
+
             else:
-                f_fields = (fields["model_format"],)
-                    
-
-            for field in f_fields:
-                if field is None:
-                    format_name = None
-                else:
-                    format_name = field.__args__[0]
-
-                configs[format_name] = value # TODO: error when override(multiple)?
-
+                raise Exception(f"Unsupported format definition in {cls.__qualname__}")
 
         cls.__configs = configs
         return cls.__configs
