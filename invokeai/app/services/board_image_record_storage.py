@@ -139,9 +139,10 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 INSERT INTO board_images (board_id, image_name)
-                VALUES (?, ?);
+                VALUES (?, ?)
+                ON CONFLICT (image_name) DO UPDATE SET board_id = ?;
                 """,
-                (board_id, image_name),
+                (board_id, image_name, board_id),
             )
             self._conn.commit()
         except sqlite3.Error as e:
