@@ -42,7 +42,7 @@ export const boardUpdated = createAppAsyncThunk(
 
 type ImageAddedToBoardArg = Parameters<
   (typeof BoardsService)['createBoardImage']
->[0];
+>[0]['requestBody'];
 
 export const imageAddedToBoard = createAppAsyncThunk(
   'api/imageAddedToBoard',

@@ -26,6 +26,10 @@ import IAIDndImage from '../../../../common/components/IAIDndImage';
 import { defaultSelectorOptions } from '../../../../app/store/util/defaultMemoizeOptions';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from '../../../../app/store/store';
+import {
+  useDeleteBoardMutation,
+  useUpdateBoardMutation,
+} from 'services/apiSlice';
 
 const coverImageSelector = (imageName: string | undefined) =>
   createSelector(
@@ -59,18 +63,19 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
     dispatch(boardIdSelected(board_id));
   }, [board_id, dispatch]);
 
-  const handleDeleteBoard = useCallback(() => {
-    dispatch(boardDeleted(board_id));
-  }, [board_id, dispatch]);
+  const [updateBoard, { isLoading: isUpdateBoardLoading }] =
+    useUpdateBoardMutation();
+
+  const [deleteBoard, { isLoading: isDeleteBoardLoading }] =
+    useDeleteBoardMutation();
 
   const handleUpdateBoardName = (newBoardName: string) => {
-    dispatch(
-      boardUpdated({
-        boardId: board_id,
-        requestBody: { board_name: newBoardName },
-      })
-    );
+    updateBoard({ board_id, changes: { board_name: newBoardName } });
   };
+
+  const handleDeleteBoard = useCallback(() => {
+    deleteBoard(board_id);
+  }, [board_id, deleteBoard]);
 
   const handleDrop = useCallback(
     (droppedImage: ImageDTO) => {

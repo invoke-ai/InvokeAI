@@ -13,6 +13,7 @@ import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { api } from 'services/apiSlice';
 
 const moduleLog = log.child({ namespace: 'addRequestedImageDeletionListener' });
 
@@ -22,7 +23,7 @@ const moduleLog = log.child({ namespace: 'addRequestedImageDeletionListener' });
 export const addRequestedImageDeletionListener = () => {
   startAppListening({
     actionCreator: requestedImageDeletion,
-    effect: (action, { dispatch, getState }) => {
+    effect: async (action, { dispatch, getState, condition }) => {
       const { image, imageUsage } = action.payload;
 
       const { image_name } = image;
@@ -30,7 +31,7 @@ export const addRequestedImageDeletionListener = () => {
       const state = getState();
       const selectedImage = state.gallery.selectedImage;
 
-      if (selectedImage && selectedImage.image_name === image_name) {
+      if (selectedImage && selectedImage === image_name) {
         const ids = selectImagesIds(state);
         const entities = selectImagesEntities(state);
 
@@ -51,7 +52,7 @@ export const addRequestedImageDeletionListener = () => {
         const newSelectedImage = entities[newSelectedImageId];
 
         if (newSelectedImageId) {
-          dispatch(imageSelected(newSelectedImage));
+          dispatch(imageSelected(newSelectedImageId));
         } else {
           dispatch(imageSelected());
         }
@@ -79,7 +80,19 @@ export const addRequestedImageDeletionListener = () => {
       dispatch(imageRemoved(image_name));
 
       // Delete from server
-      dispatch(imageDeleted({ imageName: image_name }));
+      const { requestId } = dispatch(imageDeleted({ imageName: image_name }));
+
+      // Wait for successful deletion, then trigger boards to re-fetch
+      const wasImageDeleted = await condition(
+        (action) => action.meta.requestId === requestId,
+        30000
+      );
+
+      if (wasImageDeleted) {
+        dispatch(
+          api.util.invalidateTags([{ type: 'Board', id: image.board_id }])
+        );
+      }
     },
   });
 };

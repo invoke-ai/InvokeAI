@@ -1,19 +1,20 @@
-import { Flex, Icon, Text } from '@chakra-ui/react';
+import { Flex, Icon, Spinner, Text } from '@chakra-ui/react';
 import { useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import { useAppDispatch } from '../../../../app/store/storeHooks';
-import { boardCreated } from '../../../../services/thunks/board';
+import { useCreateBoardMutation } from 'services/apiSlice';
+
+const DEFAULT_BOARD_NAME = 'My Board';
 
 const AddBoardButton = () => {
-  const dispatch = useAppDispatch();
+  const [createBoard, { isLoading }] = useCreateBoardMutation();
 
   const handleCreateBoard = useCallback(() => {
-    dispatch(boardCreated({ requestBody: 'My Board' }));
-  }, [dispatch]);
+    createBoard(DEFAULT_BOARD_NAME);
+  }, [createBoard]);
 
   return (
     <Flex
-      onClick={handleCreateBoard}
+      onClick={isLoading ? undefined : handleCreateBoard}
       sx={{
         flexDir: 'column',
         justifyContent: 'space-between',
@@ -36,7 +37,11 @@ const AddBoardButton = () => {
           aspectRatio: '1/1',
         }}
       >
-        <Icon boxSize={8} color="base.700" as={FaPlus} />
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Icon boxSize={8} color="base.700" as={FaPlus} />
+        )}
       </Flex>
       <Text sx={{ color: 'base.200', fontSize: 'xs' }}>New Board</Text>
     </Flex>

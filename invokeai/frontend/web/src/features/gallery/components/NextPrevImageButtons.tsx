@@ -42,7 +42,7 @@ export const nextPrevImageButtonsSelector = createSelector(
     }
 
     const currentImageIndex = filteredImageIds.findIndex(
-      (i) => i === selectedImage.image_name
+      (i) => i === selectedImage
     );
 
     const nextImageIndex = clamp(
@@ -71,6 +71,8 @@ export const nextPrevImageButtonsSelector = createSelector(
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
       nextImage,
       prevImage,
+      nextImageId,
+      prevImageId,
     };
   },
   {
@@ -84,7 +86,7 @@ const NextPrevImageButtons = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isOnFirstImage, isOnLastImage, nextImage, prevImage } =
+  const { isOnFirstImage, isOnLastImage, nextImageId, prevImageId } =
     useAppSelector(nextPrevImageButtonsSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
@@ -99,19 +101,19 @@ const NextPrevImageButtons = () => {
   }, []);
 
   const handlePrevImage = useCallback(() => {
-    dispatch(imageSelected(prevImage));
-  }, [dispatch, prevImage]);
+    dispatch(imageSelected(prevImageId));
+  }, [dispatch, prevImageId]);
 
   const handleNextImage = useCallback(() => {
-    dispatch(imageSelected(nextImage));
-  }, [dispatch, nextImage]);
+    dispatch(imageSelected(nextImageId));
+  }, [dispatch, nextImageId]);
 
   useHotkeys(
     'left',
     () => {
       handlePrevImage();
     },
-    [prevImage]
+    [prevImageId]
   );
 
   useHotkeys(
@@ -119,7 +121,7 @@ const NextPrevImageButtons = () => {
     () => {
       handleNextImage();
     },
-    [nextImage]
+    [nextImageId]
   );
 
   return (

@@ -3,6 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { PropsWithChildren, createContext, useCallback, useState } from 'react';
 import { ImageDTO } from 'services/api';
 import { imageAddedToBoard } from '../../services/thunks/board';
+import { useAddImageToBoardMutation } from 'services/apiSlice';
 
 export type ImageUsage = {
   isInitialImage: boolean;
@@ -43,6 +44,8 @@ export const AddImageToBoardContextProvider = (props: Props) => {
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
+  const [addImageToBoard, result] = useAddImageToBoardMutation();
+
   // Clean up after deleting or dismissing the modal
   const closeAndClearImageToDelete = useCallback(() => {
     setImageToMove(undefined);
@@ -63,18 +66,14 @@ export const AddImageToBoardContextProvider = (props: Props) => {
   const handleAddToBoard = useCallback(
     (boardId: string) => {
       if (imageToMove) {
-        dispatch(
-          imageAddedToBoard({
-            requestBody: {
-              board_id: boardId,
-              image_name: imageToMove.image_name,
-            },
-          })
-        );
+        addImageToBoard({
+          board_id: boardId,
+          image_name: imageToMove.image_name,
+        });
         closeAndClearImageToDelete();
       }
     },
-    [closeAndClearImageToDelete, dispatch, imageToMove]
+    [addImageToBoard, closeAndClearImageToDelete, imageToMove]
   );
 
   return (

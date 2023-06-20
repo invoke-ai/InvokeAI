@@ -9,6 +9,7 @@ import {
   Divider,
   Flex,
   Select,
+  Spinner,
   Text,
 } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
@@ -19,9 +20,11 @@ import { useSelector } from 'react-redux';
 import { selectBoardsAll } from '../../store/boardSlice';
 import IAISelect from '../../../../common/components/IAISelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { useListAllBoardsQuery } from 'services/apiSlice';
 
 const UpdateImageBoardModal = () => {
-  const boards = useSelector(selectBoardsAll);
+  // const boards = useSelector(selectBoardsAll);
+  const { data: boards, isFetching } = useListAllBoardsQuery();
   const { isOpen, onClose, handleAddToBoard, image } = useContext(
     AddImageToBoardContext
   );
@@ -29,9 +32,9 @@ const UpdateImageBoardModal = () => {
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  const currentBoard = boards.filter(
+  const currentBoard = boards?.find(
     (board) => board.board_id === image?.board_id
-  )[0];
+  );
 
   return (
     <AlertDialog
@@ -55,15 +58,19 @@ const UpdateImageBoardModal = () => {
                     <strong>{currentBoard.board_name}</strong> to
                   </Text>
                 )}
-                <IAIMantineSelect
-                  placeholder="Select Board"
-                  onChange={(v) => setSelectedBoard(v)}
-                  value={selectedBoard}
-                  data={boards.map((board) => ({
-                    label: board.board_name,
-                    value: board.board_id,
-                  }))}
-                />
+                {isFetching ? (
+                  <Spinner />
+                ) : (
+                  <IAIMantineSelect
+                    placeholder="Select Board"
+                    onChange={(v) => setSelectedBoard(v)}
+                    value={selectedBoard}
+                    data={(boards ?? []).map((board) => ({
+                      label: board.board_name,
+                      value: board.board_id,
+                    }))}
+                  />
+                )}
               </Flex>
             </Box>
           </AlertDialogBody>
@@ -73,7 +80,9 @@ const UpdateImageBoardModal = () => {
               isDisabled={!selectedBoard}
               colorScheme="accent"
               onClick={() => {
-                if (selectedBoard) handleAddToBoard(selectedBoard);
+                if (selectedBoard) {
+                  handleAddToBoard(selectedBoard);
+                }
               }}
               ml={3}
             >

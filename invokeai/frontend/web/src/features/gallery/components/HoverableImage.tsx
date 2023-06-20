@@ -72,17 +72,10 @@ interface HoverableImageProps {
   isSelected: boolean;
 }
 
-const memoEqualityCheck = (
-  prev: HoverableImageProps,
-  next: HoverableImageProps
-) =>
-  prev.image.image_name === next.image.image_name &&
-  prev.isSelected === next.isSelected;
-
 /**
  * Gallery image component with delete/use all/use seed buttons on hover.
  */
-const HoverableImage = memo((props: HoverableImageProps) => {
+const HoverableImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const {
     activeTabName,
@@ -121,7 +114,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleMouseOut = () => setIsHovered(false);
 
   const handleSelectImage = useCallback(() => {
-    dispatch(imageSelected(image));
+    dispatch(imageSelected(image.image_name));
   }, [image, dispatch]);
 
   // Recall parameters handlers
@@ -260,7 +253,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               </MenuItem>
             )}
             <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
-              Add to Board
+              {image.board_id ? 'Change Board' : 'Add to Board'}
             </MenuItem>
             <MenuItem
               sx={{ color: 'error.300' }}
@@ -357,8 +350,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       </ContextMenu>
     </Box>
   );
-}, memoEqualityCheck);
+};
 
-HoverableImage.displayName = 'HoverableImage';
-
-export default HoverableImage;
+export default memo(HoverableImage);

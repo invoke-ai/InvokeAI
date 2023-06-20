@@ -15,6 +15,8 @@ import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { RootState } from 'app/store/store';
+import { selectImagesById } from '../store/imagesSlice';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -29,7 +31,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      image: selectedImage,
+      selectedImage,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -45,11 +47,16 @@ export const imagesSelector = createSelector(
 const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
-    image,
+    selectedImage,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
+
+  const image = useAppSelector((state: RootState) =>
+    selectImagesById(state, selectedImage ?? '')
+  );
+
   const dispatch = useAppDispatch();
 
   const handleDrop = useCallback(
@@ -57,7 +64,7 @@ const CurrentImagePreview = () => {
       if (droppedImage.image_name === image?.image_name) {
         return;
       }
-      dispatch(imageSelected(droppedImage));
+      dispatch(imageSelected(droppedImage.image_name));
     },
     [dispatch, image?.image_name]
   );

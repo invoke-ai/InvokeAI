@@ -25,6 +25,7 @@ import { searchBoardsSelector } from '../../store/boardSelectors';
 import { useSelector } from 'react-redux';
 import IAICollapse from '../../../../common/components/IAICollapse';
 import { CloseIcon } from '@chakra-ui/icons';
+import { useListBoardsQuery } from 'services/apiSlice';
 
 const selector = createSelector(
   [selectBoardsAll, boardsSelector],
@@ -40,8 +41,16 @@ const selector = createSelector(
 const BoardsList = () => {
   const dispatch = useAppDispatch();
   const { selectedBoard, searchText } = useAppSelector(selector);
-  const filteredBoards = useSelector(searchBoardsSelector);
+  // const filteredBoards = useSelector(searchBoardsSelector);
   const { isOpen, onToggle } = useDisclosure();
+
+  const { data } = useListBoardsQuery({ offset: 0, limit: 8 });
+
+  const filteredBoards = searchText
+    ? data?.items.filter((board) =>
+        board.board_name.toLowerCase().includes(searchText.toLowerCase())
+      )
+    : data.items;
 
   const [searchMode, setSearchMode] = useState(false);
 
@@ -100,13 +109,14 @@ const BoardsList = () => {
                 <AllImagesBoard isSelected={!selectedBoard} />
               </>
             )}
-            {filteredBoards.map((board) => (
-              <HoverableBoard
-                key={board.board_id}
-                board={board}
-                isSelected={selectedBoard?.board_id === board.board_id}
-              />
-            ))}
+            {filteredBoards &&
+              filteredBoards.map((board) => (
+                <HoverableBoard
+                  key={board.board_id}
+                  board={board}
+                  isSelected={selectedBoard?.board_id === board.board_id}
+                />
+              ))}
           </Grid>
         </OverlayScrollbarsComponent>
       </>
