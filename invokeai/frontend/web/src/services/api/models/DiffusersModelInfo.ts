@@ -9,7 +9,15 @@ export type DiffusersModelInfo = {
    * A description of the model
    */
   description?: string;
-  format?: 'diffusers';
+  /**
+   * The name of the model
+   */
+  model_name: string;
+  /**
+   * The type of the model
+   */
+  model_type: string;
+  format?: 'folder';
   /**
    * The VAE repo to use for this model
    */

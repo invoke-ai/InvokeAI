@@ -1,10 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { SCHEDULERS } from 'app/constants';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -20,7 +20,7 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  schedulers: SCHEDULERS,
+  favoriteSchedulers: [],
 };
 
 export const uiSlice = createSlice({
@@ -94,9 +94,11 @@ export const uiSlice = createSlice({
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    setSchedulers: (state, action: PayloadAction<string[]>) => {
-      state.schedulers = [];
-      state.schedulers = action.payload;
+    favoriteSchedulersChanged: (
+      state,
+      action: PayloadAction<SchedulerParam[]>
+    ) => {
+      state.favoriteSchedulers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -124,7 +126,7 @@ export const {
   toggleParametersPanel,
   toggleGalleryPanel,
   setShouldShowProgressInViewer,
-  setSchedulers,
+  favoriteSchedulersChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

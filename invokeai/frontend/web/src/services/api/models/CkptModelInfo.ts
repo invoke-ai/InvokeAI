@@ -7,6 +7,14 @@ export type CkptModelInfo = {
    * A description of the model
    */
   description?: string;
+  /**
+   * The name of the model
+   */
+  model_name: string;
+  /**
+   * The type of the model
+   */
+  model_type: string;
   format?: 'ckpt';
   /**
    * The path to the model config

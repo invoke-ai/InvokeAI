@@ -22,7 +22,6 @@ class Img2Img(Generator):
 
     def get_make_image(
         self,
-        prompt,
         sampler,
         steps,
         cfg_scale,

@@ -2,6 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { ClipField } from './ClipField';
+
 /**
  * Parse prompt using compel package to conditioning.
  */
@@ -20,8 +22,8 @@ export type CompelInvocation = {
    */
   prompt?: string;
   /**
-   * Model to use
+   * Clip to use
    */
-  model?: string;
+  clip?: ClipField;
 };
 
