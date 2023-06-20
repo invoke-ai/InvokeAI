@@ -263,7 +263,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 """--sql
                 SELECT *
                 FROM boards
-                ORDER BY updated_at DESC
+                ORDER BY created_at DESC
                 LIMIT ? OFFSET ?;
                 """,
                 (limit, offset),
