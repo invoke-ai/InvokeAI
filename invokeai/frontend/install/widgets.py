@@ -84,7 +84,7 @@ def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=Non
     # did it work?
     term_cols, term_lines = get_terminal_size()
     if term_cols < cols or term_lines < lines:
-        print(f'This window is too small for optimal display. For best results, please enlarge it.')
+        print(f'This window is too small for optimal display. For best results please enlarge it.')
         input('After resizing, press any key to continue...')
 
 class IntSlider(npyscreen.Slider):
