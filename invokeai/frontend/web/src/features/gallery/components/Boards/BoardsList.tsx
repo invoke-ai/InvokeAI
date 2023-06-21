@@ -21,7 +21,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
 import { CloseIcon } from '@chakra-ui/icons';
-import { useListBoardsQuery } from 'services/apiSlice';
+import { useListAllBoardsQuery } from 'services/apiSlice';
 
 const selector = createSelector(
   [selectBoardsAll, boardsSelector],
@@ -44,15 +44,14 @@ const BoardsList = (props: Props) => {
   const { isOpen } = props;
   const dispatch = useAppDispatch();
   const { selectedBoardId, searchText } = useAppSelector(selector);
-  // const filteredBoards = useSelector(searchBoardsSelector);
 
-  const { data } = useListBoardsQuery({ offset: 0, limit: 8 });
+  const { data: boards } = useListAllBoardsQuery();
 
   const filteredBoards = searchText
-    ? data?.items.filter((board) =>
+    ? boards?.filter((board) =>
         board.board_name.toLowerCase().includes(searchText.toLowerCase())
       )
-    : data?.items;
+    : boards;
 
   const [searchMode, setSearchMode] = useState(false);
 
