@@ -211,17 +211,6 @@ const ImageGalleryContent = () => {
     dispatch(setGalleryView('assets'));
   }, [dispatch]);
 
-  useEffect(() => {
-    if (images.length < 20) {
-      dispatch(
-        receivedPageOfImages({
-          categories,
-          boardId: selectedBoardId,
-        })
-      );
-    }
-  }, [categories, dispatch, images.length, selectedBoardId]);
-
   return (
     <VStack
       sx={{

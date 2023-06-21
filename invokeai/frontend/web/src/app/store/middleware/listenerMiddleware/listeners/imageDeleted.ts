@@ -14,7 +14,7 @@ import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { api } from 'services/apiSlice';
 
-const moduleLog = log.child({ namespace: 'addRequestedImageDeletionListener' });
+const moduleLog = log.child({ namespace: 'image' });
 
 /**
  * Called when the user requests an image deletion
@@ -30,7 +30,7 @@ export const addRequestedImageDeletionListener = () => {
       const state = getState();
       const selectedImage = state.gallery.selectedImage;
 
-      if (selectedImage && selectedImage === image_name) {
+      if (selectedImage === image_name) {
         const ids = selectImagesIds(state);
 
         const deletedImageIndex = ids.findIndex(
