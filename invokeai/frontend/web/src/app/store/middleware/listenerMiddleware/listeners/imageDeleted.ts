@@ -6,7 +6,6 @@ import { clamp } from 'lodash-es';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
   imageRemoved,
-  selectImagesEntities,
   selectImagesIds,
 } from 'features/gallery/store/imagesSlice';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
@@ -33,7 +32,6 @@ export const addRequestedImageDeletionListener = () => {
 
       if (selectedImage && selectedImage === image_name) {
         const ids = selectImagesIds(state);
-        const entities = selectImagesEntities(state);
 
         const deletedImageIndex = ids.findIndex(
           (result) => result.toString() === image_name
@@ -49,10 +47,8 @@ export const addRequestedImageDeletionListener = () => {
 
         const newSelectedImageId = filteredIds[newSelectedImageIndex];
 
-        const newSelectedImage = entities[newSelectedImageId];
-
         if (newSelectedImageId) {
-          dispatch(imageSelected(newSelectedImageId));
+          dispatch(imageSelected(newSelectedImageId as string));
         } else {
           dispatch(imageSelected());
         }
@@ -84,7 +80,9 @@ export const addRequestedImageDeletionListener = () => {
 
       // Wait for successful deletion, then trigger boards to re-fetch
       const wasImageDeleted = await condition(
-        (action) => action.meta.requestId === requestId,
+        (action): action is ReturnType<typeof imageDeleted.fulfilled> =>
+          imageDeleted.fulfilled.match(action) &&
+          action.meta.requestId === requestId,
         30000
       );
 
