@@ -56,36 +56,39 @@ import {
   imageCategoriesChanged,
   selectImagesAll,
 } from '../store/imagesSlice';
-import { receivedPageOfImages } from 'services/thunks/image';
+import {
+  IMAGES_PER_PAGE,
+  receivedImages,
+  receivedPageOfImages,
+} from 'services/thunks/image';
 import BoardsList from './Boards/BoardsList';
-import { boardsSelector, selectBoardsById } from '../store/boardSlice';
+import { boardsSelector } from '../store/boardSlice';
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import { useListAllBoardsQuery } from 'services/apiSlice';
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { images, boards } = state;
-
-    const { categories } = images;
+    const { categories, total, isLoading } = state.images;
+    const { selectedBoardId } = state.boards;
 
     const allImages = selectImagesAll(state);
-    const items = allImages.filter((i) =>
-      categories.includes(i.image_category)
-    );
-    const areMoreAvailable = items.length < images.total;
-    const isLoading = images.isLoading;
 
-    const selectedBoard = boards.selectedBoardId
-      ? selectBoardsById(state, boards.selectedBoardId)
-      : undefined;
+    const images = allImages.filter((i) => {
+      const isInCategory = categories.includes(i.image_category);
+      const isInSelectedBoard = selectedBoardId
+        ? i.board_id === selectedBoardId
+        : true;
+      return isInCategory && isInSelectedBoard;
+    });
+
+    const areMoreAvailable = images.length < total;
 
     return {
-      items,
+      images,
       isLoading,
       areMoreAvailable,
-      categories: images.categories,
-      selectedBoard,
+      categories,
     };
   },
   defaultSelectorOptions
@@ -148,7 +151,7 @@ const ImageGalleryContent = () => {
     selectedBoardId,
   } = useAppSelector(mainSelector);
 
-  const { items, areMoreAvailable, isLoading, categories } =
+  const { images, areMoreAvailable, isLoading, categories } =
     useAppSelector(itemSelector);
 
   const { selectedBoard } = useListAllBoardsQuery(undefined, {
@@ -158,7 +161,7 @@ const ImageGalleryContent = () => {
   });
 
   const handleLoadMoreImages = useCallback(() => {
-    dispatch(receivedPageOfImages());
+    dispatch(receivedPageOfImages({}));
   }, [dispatch]);
 
   const handleEndReached = useMemo(() => {
@@ -207,6 +210,17 @@ const ImageGalleryContent = () => {
     dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
     dispatch(setGalleryView('assets'));
   }, [dispatch]);
+
+  useEffect(() => {
+    if (images.length < 20) {
+      dispatch(
+        receivedPageOfImages({
+          categories,
+          boardId: selectedBoardId,
+        })
+      );
+    }
+  }, [categories, dispatch, images.length, selectedBoardId]);
 
   return (
     <VStack
@@ -335,13 +349,13 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex direction="column" gap={2} h="full" w="full">
-        {items.length || areMoreAvailable ? (
+        {images.length || areMoreAvailable ? (
           <>
             <Box ref={rootRef} data-overlayscrollbars="" h="100%">
               {shouldUseSingleGalleryColumn ? (
                 <Virtuoso
                   style={{ height: '100%' }}
-                  data={items}
+                  data={images}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
                   itemContent={(index, item) => (
@@ -357,7 +371,7 @@ const ImageGalleryContent = () => {
               ) : (
                 <VirtuosoGrid
                   style={{ height: '100%' }}
-                  data={items}
+                  data={images}
                   endReached={handleEndReached}
                   components={{
                     Item: ItemContainer,
