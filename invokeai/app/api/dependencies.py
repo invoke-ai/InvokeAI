@@ -29,7 +29,6 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
-from ..services.boards import SqliteBoardStorage
 from .events import FastAPIEventService
 
 
