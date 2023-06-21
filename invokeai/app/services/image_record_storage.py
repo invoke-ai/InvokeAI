@@ -82,6 +82,7 @@ class ImageRecordStorageBase(ABC):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass
@@ -280,20 +281,42 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
 
             # Manually build two queries - one for the count, one for the records
 
-            count_query = f"""SELECT COUNT(*) FROM images WHERE 1=1\n"""
-            images_query = f"""SELECT * FROM images WHERE 1=1\n"""
+            # count_query = """--sql
+            # SELECT COUNT(*) FROM images WHERE 1=1
+            # """
+
+            count_query = """--sql
+            SELECT COUNT(*)
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1
+            """
+
+            images_query = """--sql
+            SELECT images.*
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1
+            """
+
+            # images_query = """--sql
+            # SELECT * FROM images WHERE 1=1
+            # """
 
             query_conditions = ""
             query_params = []
 
             if image_origin is not None:
-                query_conditions += f"""AND image_origin = ?\n"""
+                query_conditions += """--sql
+                AND images.image_origin = ?
+                """
                 query_params.append(image_origin.value)
 
             if categories is not None:
@@ -301,17 +324,31 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 category_strings = list(map(lambda c: c.value, set(categories)))
                 # Create the correct length of placeholders
                 placeholders = ",".join("?" * len(category_strings))
-                query_conditions += f"AND image_category IN ( {placeholders} )\n"
+
+                query_conditions += f"""--sql
+                AND images.image_category IN ( {placeholders} )
+                """
 
                 # Unpack the included categories into the query params
                 for c in category_strings:
                     query_params.append(c)
 
             if is_intermediate is not None:
-                query_conditions += f"""AND is_intermediate = ?\n"""
+                query_conditions += """--sql
+                AND images.is_intermediate = ?
+                """
+                
                 query_params.append(is_intermediate)
 
-            query_pagination = f"""ORDER BY created_at DESC LIMIT ? OFFSET ?\n"""
+            if board_id is not None:
+                query_conditions += """--sql
+                AND board_images.board_id = ?
+                """
+                query_params.append(board_id)
+
+            query_pagination = """--sql
+            ORDER BY images.created_at DESC LIMIT ? OFFSET ?
+            """
 
             # Final images query with pagination
             images_query += query_conditions + query_pagination + ";"
