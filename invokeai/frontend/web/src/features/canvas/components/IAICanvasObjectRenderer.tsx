@@ -39,14 +39,7 @@ const IAICanvasObjectRenderer = () => {
     <Group name="outpainting-objects" listening={false}>
       {objects.map((obj, i) => {
         if (isCanvasBaseImage(obj)) {
-          return (
-            <IAICanvasImage
-              key={i}
-              x={obj.x}
-              y={obj.y}
-              url={obj.image.image_url}
-            />
-          );
+          return <IAICanvasImage key={i} canvasImage={obj} />;
         } else if (isCanvasBaseLine(obj)) {
           const line = (
             <Line

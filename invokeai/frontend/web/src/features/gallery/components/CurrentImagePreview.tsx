@@ -17,6 +17,8 @@ import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
 import { RootState } from 'app/store/store';
 import { selectImagesById } from '../store/imagesSlice';
+import { useGetImageDTOQuery } from 'services/apiSlice';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -53,9 +55,16 @@ const CurrentImagePreview = () => {
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
-  const image = useAppSelector((state: RootState) =>
-    selectImagesById(state, selectedImage ?? '')
-  );
+  // const image = useAppSelector((state: RootState) =>
+  //   selectImagesById(state, selectedImage ?? '')
+  // );
+
+  const {
+    data: image,
+    isLoading,
+    isError,
+    isSuccess,
+  } = useGetImageDTOQuery(selectedImage ?? skipToken);
 
   const dispatch = useAppDispatch();
 

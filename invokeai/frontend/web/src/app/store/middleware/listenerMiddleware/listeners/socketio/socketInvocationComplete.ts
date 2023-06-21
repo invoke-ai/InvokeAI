@@ -10,6 +10,7 @@ import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
 import { imageAddedToBoard } from '../../../../../../services/thunks/board';
+import { api } from 'services/apiSlice';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -42,11 +43,9 @@ export const addInvocationCompleteEventListener = () => {
 
         if (boardIdToAddTo) {
           dispatch(
-            imageAddedToBoard({
-              requestBody: {
-                board_id: boardIdToAddTo,
-                image_name,
-              },
+            api.endpoints.addImageToBoard.initiate({
+              board_id: boardIdToAddTo,
+              image_name,
             })
           );
         }
