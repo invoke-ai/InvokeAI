@@ -273,7 +273,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordSaveException from e
         finally:
             self._lock.release()
-    
+
     def get_many(
         self,
         offset: int = 0,
@@ -287,11 +287,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._lock.acquire()
 
             # Manually build two queries - one for the count, one for the records
-
-            # count_query = """--sql
-            # SELECT COUNT(*) FROM images WHERE 1=1
-            # """
-
             count_query = """--sql
             SELECT COUNT(*)
             FROM images
@@ -306,10 +301,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             WHERE 1=1
             """
 
-            # images_query = """--sql
-            # SELECT * FROM images WHERE 1=1
-            # """
-
             query_conditions = ""
             query_params = []
 
@@ -320,7 +311,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_params.append(image_origin.value)
 
             if categories is not None:
-                ## Convert the enum values to unique list of strings
+                # Convert the enum values to unique list of strings
                 category_strings = list(map(lambda c: c.value, set(categories)))
                 # Create the correct length of placeholders
                 placeholders = ",".join("?" * len(category_strings))
@@ -337,13 +328,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_conditions += """--sql
                 AND images.is_intermediate = ?
                 """
-                
+
                 query_params.append(is_intermediate)
 
             if board_id is not None:
                 query_conditions += """--sql
                 AND board_images.board_id = ?
                 """
+
                 query_params.append(board_id)
 
             query_pagination = """--sql
@@ -457,7 +449,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_most_recent_image_for_board(self, board_id: str) -> Union[ImageRecord, None]:
+    def get_most_recent_image_for_board(
+        self, board_id: str
+    ) -> Union[ImageRecord, None]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -477,5 +471,5 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._lock.release()
         if result is None:
             return None
-        
+
         return deserialize_image_record(dict(result))
