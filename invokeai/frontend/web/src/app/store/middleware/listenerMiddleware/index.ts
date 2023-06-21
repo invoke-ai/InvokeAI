@@ -77,6 +77,7 @@ import {
   addImageAddedToBoardFulfilledListener,
   addImageAddedToBoardRejectedListener,
 } from './listeners/imageAddedToBoard';
+import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -191,3 +192,4 @@ addUpdateImageUrlsOnConnectListener();
 // Boards
 addImageAddedToBoardFulfilledListener();
 addImageAddedToBoardRejectedListener();
+addBoardIdSelectedListener();
