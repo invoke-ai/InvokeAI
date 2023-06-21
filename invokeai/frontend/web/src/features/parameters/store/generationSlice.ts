@@ -24,7 +24,7 @@ export interface GenerationState {
   height: HeightParam;
   img2imgStrength: StrengthParam;
   infillMethod: string;
-  initialImage?: ImageDTO;
+  initialImage?: string;
   iterations: number;
   perlin: number;
   positivePrompt: PositivePromptParam;
@@ -211,7 +211,7 @@ export const generationSlice = createSlice({
     setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
       state.shouldUseNoiseSettings = action.payload;
     },
-    initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
+    initialImageChanged: (state, action: PayloadAction<string>) => {
       state.initialImage = action.payload;
     },
     modelSelected: (state, action: PayloadAction<string>) => {
@@ -233,14 +233,14 @@ export const generationSlice = createSlice({
       }
     });
 
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
+    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+    //   const { image_name, image_url, thumbnail_url } = action.payload;
 
-      if (state.initialImage?.image_name === image_name) {
-        state.initialImage.image_url = image_url;
-        state.initialImage.thumbnail_url = thumbnail_url;
-      }
-    });
+    //   if (state.initialImage?.image_name === image_name) {
+    //     state.initialImage.image_url = image_url;
+    //     state.initialImage.thumbnail_url = thumbnail_url;
+    //   }
+    // });
   },
 });
 

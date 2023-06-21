@@ -1,8 +1,18 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import {
+  TagDescription,
+  createApi,
+  fetchBaseQuery,
+} from '@reduxjs/toolkit/query/react';
 import { BoardDTO } from './api/models/BoardDTO';
 import { OffsetPaginatedResults_BoardDTO_ } from './api/models/OffsetPaginatedResults_BoardDTO_';
 import { BoardChanges } from './api/models/BoardChanges';
 import { OffsetPaginatedResults_ImageDTO_ } from './api/models/OffsetPaginatedResults_ImageDTO_';
+import { ImageDTO } from './api/models/ImageDTO';
+import {
+  FullTagDescription,
+  TagTypesFrom,
+  TagTypesFromApi,
+} from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 
 type ListBoardsArg = { offset: number; limit: number };
 type UpdateBoardArg = { board_id: string; changes: BoardChanges };
@@ -10,10 +20,15 @@ type AddImageToBoardArg = { board_id: string; image_name: string };
 type RemoveImageFromBoardArg = { board_id: string; image_name: string };
 type ListBoardImagesArg = { board_id: string; offset: number; limit: number };
 
+const tagTypes = ['Board', 'Image'];
+type ApiFullTagDescription = FullTagDescription<(typeof tagTypes)[number]>;
+
+const LIST = 'LIST';
+
 export const api = createApi({
   baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:5173/api/v1/' }),
   reducerPath: 'api',
-  tagTypes: ['Board'],
+  tagTypes,
   endpoints: (build) => ({
     /**
      * Boards Queries
@@ -21,19 +36,20 @@ export const api = createApi({
     listBoards: build.query<OffsetPaginatedResults_BoardDTO_, ListBoardsArg>({
       query: (arg) => ({ url: 'boards/', params: arg }),
       providesTags: (result, error, arg) => {
-        if (!result) {
-          // Provide the broad 'Board' tag until there is a response
-          return ['Board'];
+        // any list of boards
+        const tags: ApiFullTagDescription[] = [{ id: 'Board', type: LIST }];
+
+        if (result) {
+          // and individual tags for each board
+          tags.push(
+            ...result.items.map(({ board_id }) => ({
+              type: 'Board' as const,
+              id: board_id,
+            }))
+          );
         }
 
-        // Provide the broad 'Board' tab, and individual tags for each board
-        return [
-          ...result.items.map(({ board_id }) => ({
-            type: 'Board' as const,
-            id: board_id,
-          })),
-          'Board',
-        ];
+        return tags;
       },
     }),
 
@@ -43,19 +59,20 @@ export const api = createApi({
         params: { all: true },
       }),
       providesTags: (result, error, arg) => {
-        if (!result) {
-          // Provide the broad 'Board' tag until there is a response
-          return ['Board'];
+        // any list of boards
+        const tags: ApiFullTagDescription[] = [{ id: 'Board', type: LIST }];
+
+        if (result) {
+          // and individual tags for each board
+          tags.push(
+            ...result.map(({ board_id }) => ({
+              type: 'Board' as const,
+              id: board_id,
+            }))
+          );
         }
 
-        // Provide the broad 'Board' tab, and individual tags for each board
-        return [
-          ...result.map(({ board_id }) => ({
-            type: 'Board' as const,
-            id: board_id,
-          })),
-          'Board',
-        ];
+        return tags;
       },
     }),
 
@@ -113,10 +130,10 @@ export const api = createApi({
         method: 'POST',
         body: { board_id, image_name },
       }),
-      invalidatesTags: ['Board'],
-      // invalidatesTags: (result, error, arg) => [
-      //   { type: 'Board', id: arg.board_id },
-      // ],
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Board', id: arg.board_id },
+        { type: 'Image', id: arg.image_name },
+      ],
     }),
 
     removeImageFromBoard: build.mutation<void, RemoveImageFromBoardArg>({
@@ -127,7 +144,22 @@ export const api = createApi({
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: arg.board_id },
+        { type: 'Image', id: arg.image_name },
       ],
+    }),
+
+    /**
+     * Image Queries
+     */
+    getImageDTO: build.query<ImageDTO, string>({
+      query: (image_name) => ({ url: `images/${image_name}/metadata` }),
+      providesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [{ type: 'Image', id: arg }];
+        if (result?.board_id) {
+          tags.push({ type: 'Board', id: result.board_id });
+        }
+        return tags;
+      },
     }),
   }),
 });
@@ -141,4 +173,5 @@ export const {
   useAddImageToBoardMutation,
   useRemoveImageFromBoardMutation,
   useListBoardImagesQuery,
+  useGetImageDTOQuery,
 } = api;

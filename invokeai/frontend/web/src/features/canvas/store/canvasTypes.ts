@@ -38,7 +38,7 @@ export type CanvasImage = {
   y: number;
   width: number;
   height: number;
-  image: ImageDTO;
+  imageName: string;
 };
 
 export type CanvasMaskLine = {

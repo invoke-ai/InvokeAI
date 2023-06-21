@@ -214,7 +214,7 @@ export type VaeInputFieldValue = FieldValueBase & {
 
 export type ImageInputFieldValue = FieldValueBase & {
   type: 'image';
-  value?: ImageDTO;
+  value?: string;
 };
 
 export type ModelInputFieldValue = FieldValueBase & {

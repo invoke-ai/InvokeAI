@@ -11,6 +11,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { useGetImageDTOQuery } from 'services/apiSlice';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
   [generationSelector],
@@ -27,14 +29,21 @@ const InitialImagePreview = () => {
   const { initialImage } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
+  const {
+    data: image,
+    isLoading,
+    isError,
+    isSuccess,
+  } = useGetImageDTOQuery(initialImage ?? skipToken);
+
   const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (droppedImage.image_name === initialImage?.image_name) {
+    ({ image_name }: ImageDTO) => {
+      if (image_name === initialImage) {
         return;
       }
-      dispatch(initialImageChanged(droppedImage));
+      dispatch(initialImageChanged(image_name));
     },
-    [dispatch, initialImage?.image_name]
+    [dispatch, initialImage]
   );
 
   const handleReset = useCallback(() => {
@@ -53,7 +62,7 @@ const InitialImagePreview = () => {
       }}
     >
       <IAIDndImage
-        image={initialImage}
+        image={image}
         onDrop={handleDrop}
         onReset={handleReset}
         fallback={<IAIImageFallback sx={{ bg: 'none' }} />}

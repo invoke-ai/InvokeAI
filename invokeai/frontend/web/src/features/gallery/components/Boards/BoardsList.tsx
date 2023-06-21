@@ -50,7 +50,7 @@ const BoardsList = () => {
     ? data?.items.filter((board) =>
         board.board_name.toLowerCase().includes(searchText.toLowerCase())
       )
-    : data.items;
+    : data?.items;
 
   const [searchMode, setSearchMode] = useState(false);
 
