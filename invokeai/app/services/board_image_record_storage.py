@@ -178,6 +178,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         offset: int = 0,
         limit: int = 10,
     ) -> OffsetPaginatedResults[ImageRecord]:
+        # TODO: this isn't paginated yet?
         try:
             self._lock.acquire()
             self._cursor.execute(
