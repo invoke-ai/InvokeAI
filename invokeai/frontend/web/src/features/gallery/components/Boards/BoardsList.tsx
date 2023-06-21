@@ -12,7 +12,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   boardsSelector,
-  selectBoardsAll,
   setBoardSearchText,
 } from 'features/gallery/store/boardSlice';
 import { memo, useState } from 'react';
@@ -24,12 +23,8 @@ import { CloseIcon } from '@chakra-ui/icons';
 import { useListAllBoardsQuery } from 'services/apiSlice';
 
 const selector = createSelector(
-  [selectBoardsAll, boardsSelector],
-  (boards, boardsState) => {
-    // const selectedBoard = boards.find(
-    //   (board) => board.board_id === boardsState.selectedBoardId
-    // );
-    // return { selectedBoard, searchText: boardsState.searchText };
+  [boardsSelector],
+  (boardsState) => {
     const { selectedBoardId, searchText } = boardsState;
     return { selectedBoardId, searchText };
   },
