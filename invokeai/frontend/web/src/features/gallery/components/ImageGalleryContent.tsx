@@ -69,7 +69,7 @@ import { useListAllBoardsQuery } from 'services/apiSlice';
 const itemSelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { categories, total, isLoading } = state.images;
+    const { categories, total: allImagesTotal, isLoading } = state.images;
     const { selectedBoardId } = state.boards;
 
     const allImages = selectImagesAll(state);
@@ -82,12 +82,10 @@ const itemSelector = createSelector(
       return isInCategory && isInSelectedBoard;
     });
 
-    const areMoreAvailable = images.length < total;
-
     return {
       images,
+      allImagesTotal,
       isLoading,
-      areMoreAvailable,
       categories,
     };
   },
@@ -151,14 +149,22 @@ const ImageGalleryContent = () => {
     selectedBoardId,
   } = useAppSelector(mainSelector);
 
-  const { images, areMoreAvailable, isLoading, categories } =
-    useAppSelector(itemSelector);
+  const { images, isLoading, allImagesTotal } = useAppSelector(itemSelector);
 
   const { selectedBoard } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => ({
       selectedBoard: data?.find((b) => b.board_id === selectedBoardId),
     }),
   });
+
+  const filteredImagesTotal = useMemo(
+    () => selectedBoard?.image_count ?? allImagesTotal,
+    [allImagesTotal, selectedBoard?.image_count]
+  );
+
+  const areMoreAvailable = useMemo(() => {
+    return images.length < filteredImagesTotal;
+  }, [images.length, filteredImagesTotal]);
 
   const handleLoadMoreImages = useCallback(() => {
     dispatch(receivedPageOfImages({}));
