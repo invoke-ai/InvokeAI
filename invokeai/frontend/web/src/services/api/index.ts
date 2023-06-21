@@ -7,6 +7,7 @@ export { OpenAPI } from './core/OpenAPI';
 export type { OpenAPIConfig } from './core/OpenAPI';
 
 export type { AddInvocation } from './models/AddInvocation';
+export type { BaseModelType } from './models/BaseModelType';
 export type { BoardChanges } from './models/BoardChanges';
 export type { BoardDTO } from './models/BoardDTO';
 export type { Body_create_board_image } from './models/Body_create_board_image';
