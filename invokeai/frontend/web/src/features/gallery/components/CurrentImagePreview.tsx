@@ -14,7 +14,7 @@ import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import { RootState } from 'app/store/store';
 import { selectImagesById } from '../store/imagesSlice';
 import { useGetImageDTOQuery } from 'services/apiSlice';
@@ -116,7 +116,7 @@ const CurrentImagePreview = () => {
           <IAIDndImage
             image={image}
             onDrop={handleDrop}
-            fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
+            fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
             isUploadDisabled={true}
           />
         </Flex>

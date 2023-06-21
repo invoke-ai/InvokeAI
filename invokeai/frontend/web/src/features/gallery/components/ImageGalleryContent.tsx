@@ -1,12 +1,15 @@
 import {
   Box,
+  Button,
   ButtonGroup,
   Flex,
   FlexProps,
   Grid,
   Icon,
   Text,
+  VStack,
   forwardRef,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -54,10 +57,10 @@ import {
   selectImagesAll,
 } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
-import { boardSelector } from '../store/boardSelectors';
-import { boardCreated } from '../../../services/thunks/board';
 import BoardsList from './Boards/BoardsList';
-import { selectBoardsById } from '../store/boardSlice';
+import { boardsSelector, selectBoardsById } from '../store/boardSlice';
+import { ChevronUpIcon } from '@chakra-ui/icons';
+import { useListAllBoardsQuery } from 'services/apiSlice';
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
@@ -89,7 +92,7 @@ const itemSelector = createSelector(
 );
 
 const mainSelector = createSelector(
-  [gallerySelector, uiSelector, boardSelector],
+  [gallerySelector, uiSelector, boardsSelector],
   (gallery, ui, boards) => {
     const {
       galleryImageMinimumWidth,
@@ -109,7 +112,7 @@ const mainSelector = createSelector(
       shouldUseSingleGalleryColumn,
       selectedImage,
       galleryView,
-      boards,
+      selectedBoardId: boards.selectedBoardId,
     };
   },
   defaultSelectorOptions
@@ -142,11 +145,17 @@ const ImageGalleryContent = () => {
     shouldUseSingleGalleryColumn,
     selectedImage,
     galleryView,
-    boards,
+    selectedBoardId,
   } = useAppSelector(mainSelector);
 
-  const { items, areMoreAvailable, isLoading, categories, selectedBoard } =
+  const { items, areMoreAvailable, isLoading, categories } =
     useAppSelector(itemSelector);
+
+  const { selectedBoard } = useListAllBoardsQuery(undefined, {
+    selectFromResult: ({ data }) => ({
+      selectedBoard: data?.find((b) => b.board_id === selectedBoardId),
+    }),
+  });
 
   const handleLoadMoreImages = useCallback(() => {
     dispatch(receivedPageOfImages());
@@ -158,6 +167,8 @@ const ImageGalleryContent = () => {
     }
     return undefined;
   }, [areMoreAvailable, handleLoadMoreImages, isLoading]);
+
+  const { isOpen: isBoardListOpen, onToggle } = useDisclosure();
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
@@ -197,50 +208,71 @@ const ImageGalleryContent = () => {
     dispatch(setGalleryView('assets'));
   }, [dispatch]);
 
-  const handleClickBoardsView = useCallback(() => {
-    dispatch(setGalleryView('boards'));
-  }, [dispatch]);
-
   return (
-    <Flex
+    <VStack
       sx={{
-        gap: 2,
         flexDirection: 'column',
         h: 'full',
         w: 'full',
         borderRadius: 'base',
       }}
     >
-      <Flex
-        ref={resizeObserverRef}
-        alignItems="center"
-        justifyContent="space-between"
-        gap={1}
-      >
-        <ButtonGroup isAttached>
-          <IAIIconButton
-            tooltip={t('gallery.images')}
-            aria-label={t('gallery.images')}
-            onClick={handleClickImagesCategory}
-            isChecked={galleryView === 'images'}
+      <Box sx={{ w: 'full' }}>
+        <Flex
+          ref={resizeObserverRef}
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          <ButtonGroup isAttached>
+            <IAIIconButton
+              tooltip={t('gallery.images')}
+              aria-label={t('gallery.images')}
+              onClick={handleClickImagesCategory}
+              isChecked={galleryView === 'images'}
+              size="sm"
+              icon={<FaImage />}
+            />
+            <IAIIconButton
+              tooltip={t('gallery.assets')}
+              aria-label={t('gallery.assets')}
+              onClick={handleClickAssetsCategory}
+              isChecked={galleryView === 'assets'}
+              size="sm"
+              icon={<FaServer />}
+            />
+          </ButtonGroup>
+          <Flex
+            as={Button}
+            onClick={onToggle}
             size="sm"
-            icon={<FaImage />}
-          />
-          <IAIIconButton
-            tooltip={t('gallery.assets')}
-            aria-label={t('gallery.assets')}
-            onClick={handleClickAssetsCategory}
-            isChecked={galleryView === 'assets'}
-            size="sm"
-            icon={<FaServer />}
-          />
-        </ButtonGroup>
-        <Flex>
-          <Text noOfLines={1}>
-            {selectedBoard ? selectedBoard.board_name : 'All Images'}
-          </Text>
-        </Flex>
-        <Flex gap={2}>
+            variant="ghost"
+            sx={{
+              w: 'full',
+              justifyContent: 'center',
+              alignItems: 'center',
+              px: 2,
+              _hover: {
+                bg: 'base.800',
+              },
+            }}
+          >
+            <Text
+              noOfLines={1}
+              sx={{ w: 'full', color: 'base.200', fontWeight: 600 }}
+            >
+              {selectedBoard ? selectedBoard.board_name : 'All Images'}
+            </Text>
+            <ChevronUpIcon
+              sx={{
+                transform: isBoardListOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+                transitionProperty: 'common',
+                transitionDuration: 'normal',
+              }}
+            />
+          </Flex>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -298,11 +330,11 @@ const ImageGalleryContent = () => {
             icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
           />
         </Flex>
-      </Flex>
-      <Box>
-        <BoardsList />
+        <Box>
+          <BoardsList isOpen={isBoardListOpen} />
+        </Box>
       </Box>
-      <Flex direction="column" gap={2} h="full">
+      <Flex direction="column" gap={2} h="full" w="full">
         {items.length || areMoreAvailable ? (
           <>
             <Box ref={rootRef} data-overlayscrollbars="" h="100%">
@@ -378,7 +410,7 @@ const ImageGalleryContent = () => {
           </Flex>
         )}
       </Flex>
-    </Flex>
+    </VStack>
   );
 };
 

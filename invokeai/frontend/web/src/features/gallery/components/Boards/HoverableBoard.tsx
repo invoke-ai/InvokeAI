@@ -1,31 +1,22 @@
 import {
+  Badge,
   Box,
   Editable,
   EditableInput,
   EditablePreview,
   Flex,
+  Image,
   MenuItem,
   MenuList,
-  Text,
 } from '@chakra-ui/react';
 
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
-import { FaTrash } from 'react-icons/fa';
+import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import { BoardDTO, ImageDTO } from 'services/api';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAINoImageFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/boardSlice';
-import {
-  boardDeleted,
-  boardUpdated,
-  imageAddedToBoard,
-} from '../../../../services/thunks/board';
-import { selectImagesAll, selectImagesById } from '../../store/imagesSlice';
-import IAIDndImage from '../../../../common/components/IAIDndImage';
-import { defaultSelectorOptions } from '../../../../app/store/util/defaultMemoizeOptions';
-import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from '../../../../app/store/store';
 import {
   useAddImageToBoardMutation,
   useDeleteBoardMutation,
@@ -33,21 +24,10 @@ import {
   useUpdateBoardMutation,
 } from 'services/apiSlice';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-
-const coverImageSelector = (imageName: string | undefined) =>
-  createSelector(
-    [(state: RootState) => state],
-    (state) => {
-      const coverImage = imageName
-        ? selectImagesById(state, imageName)
-        : undefined;
-
-      return {
-        coverImage,
-      };
-    },
-    defaultSelectorOptions
-  );
+import { useDroppable } from '@dnd-kit/core';
+import { AnimatePresence } from 'framer-motion';
+import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { SelectedItemOverlay } from '../SelectedItemOverlay';
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -94,6 +74,17 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
     [addImageToBoard, board_id]
   );
 
+  const {
+    isOver,
+    setNodeRef,
+    active: isDropActive,
+  } = useDroppable({
+    id: `board_droppable_${board_id}`,
+    data: {
+      handleDrop,
+    },
+  });
+
   return (
     <Box sx={{ touchAction: 'none' }}>
       <ContextMenu<HTMLDivElement>
@@ -112,7 +103,6 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
       >
         {(ref) => (
           <Flex
-            position="relative"
             key={board_id}
             userSelect="none"
             ref={ref}
@@ -123,69 +113,74 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               cursor: 'pointer',
               w: 'full',
               h: 'full',
-              gap: 1,
             }}
           >
             <Flex
+              ref={setNodeRef}
               onClick={handleSelectBoard}
               sx={{
+                position: 'relative',
                 justifyContent: 'center',
                 alignItems: 'center',
-                borderWidth: '1px',
                 borderRadius: 'base',
-                borderColor: isSelected ? 'base.500' : 'base.800',
                 w: 'full',
-                h: 'full',
                 aspectRatio: '1/1',
                 overflow: 'hidden',
               }}
             >
-              <IAIDndImage
-                image={
-                  board.cover_image_name && coverImage ? coverImage : undefined
-                }
-                onDrop={handleDrop}
-                fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
-                isUploadDisabled={true}
-              />
+              {board.cover_image_name && coverImage?.image_url && (
+                <Image src={coverImage?.image_url} draggable={false} />
+              )}
+              {!(board.cover_image_name && coverImage?.image_url) && (
+                <IAINoImageFallback iconProps={{ boxSize: 8 }} as={FaFolder} />
+              )}
+              <Flex
+                sx={{
+                  position: 'absolute',
+                  insetInlineEnd: 0,
+                  top: 0,
+                  p: 1,
+                }}
+              >
+                <Badge variant="solid">{board.image_count}</Badge>
+              </Flex>
+              <AnimatePresence>
+                {isSelected && <SelectedItemOverlay />}
+              </AnimatePresence>
+              <AnimatePresence>
+                {isDropActive && <IAIDropOverlay isOver={isOver} />}
+              </AnimatePresence>
             </Flex>
 
-            <Editable
-              defaultValue={board_name}
-              submitOnBlur={false}
-              onSubmit={(nextValue) => {
-                handleUpdateBoardName(nextValue);
-              }}
-            >
-              <EditablePreview
-                sx={{ color: 'base.200', fontSize: 'xs', textAlign: 'left' }}
-                noOfLines={1}
-              />
-              <EditableInput
-                sx={{
-                  color: 'base.200',
-                  fontSize: 'xs',
-                  textAlign: 'left',
-                  borderColor: 'base.500',
+            <Box sx={{ width: 'full' }}>
+              <Editable
+                defaultValue={board_name}
+                submitOnBlur={false}
+                onSubmit={(nextValue) => {
+                  handleUpdateBoardName(nextValue);
                 }}
-              />
-            </Editable>
-            <Flex
-              sx={{
-                justifyContent: 'center',
-                alignItems: 'center',
-                pos: 'absolute',
-                color: 'base.900',
-                bg: 'accent.300',
-                borderRadius: 'full',
-                w: 4,
-                h: 4,
-                right: -1,
-                top: -1,
-              }}
-            >
-              <Text fontSize="2xs">{board.image_count}</Text>
-            </Flex>
+              >
+                <EditablePreview
+                  sx={{
+                    color: isSelected ? 'base.50' : 'base.200',
+                    fontWeight: isSelected ? 600 : undefined,
+                    fontSize: 'xs',
+                    textAlign: 'center',
+                    p: 0,
+                  }}
+                  noOfLines={1}
+                />
+                <EditableInput
+                  sx={{
+                    color: 'base.50',
+                    fontSize: 'xs',
+                    borderColor: 'base.500',
+                    p: 0,
+                    outline: 0,
+                  }}
+                />
+              </Editable>
+            </Box>
           </Flex>
         )}
       </ContextMenu>
