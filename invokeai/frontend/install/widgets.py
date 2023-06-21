@@ -17,8 +17,8 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 180
-MIN_LINES = 55
+MIN_COLS = 130
+MIN_LINES = 40
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int, launch_command: str=None):
@@ -61,6 +61,12 @@ def _set_terminal_size_unix(width: int, height: int):
     import fcntl
     import termios
 
+    # These terminals accept the size command and report that the
+    # size changed, but they lie!!!
+    for bad_terminal in ['TERMINATOR_UUID', 'ALACRITTY_WINDOW_ID']:
+        if os.environ.get(bad_terminal):
+            return
+    
     winsize = struct.pack("HHHH", height, width, 0, 0)
     fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
     sys.stdout.write("\x1b[8;{height};{width}t".format(height=height, width=width))
@@ -74,6 +80,12 @@ def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=Non
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
     set_terminal_size(cols, lines, launch_command)
+
+    # did it work?
+    term_cols, term_lines = get_terminal_size()
+    if term_cols < cols or term_lines < lines:
+        print(f'This window is too small for optimal display. For best results, please enlarge it.')
+        input('After resizing, press any key to continue...')
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
