@@ -25,6 +25,7 @@ export class ImagesService {
     imageOrigin,
     categories,
     isIntermediate,
+    boardId,
     offset,
     limit = 10,
   }: {
@@ -41,6 +42,10 @@ export class ImagesService {
      */
     isIntermediate?: boolean,
     /**
+     * The board id to filter by
+     */
+    boardId?: string,
+    /**
      * The page offset
      */
     offset?: number,
@@ -56,6 +61,7 @@ export class ImagesService {
         'image_origin': imageOrigin,
         'categories': categories,
         'is_intermediate': isIntermediate,
+        'board_id': boardId,
         'offset': offset,
         'limit': limit,
       },
