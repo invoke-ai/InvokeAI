@@ -1,8 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { ImageDTO } from 'services/api';
 import { imageUpserted } from './imagesSlice';
-import { imageUrlsReceived } from 'services/thunks/image';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 

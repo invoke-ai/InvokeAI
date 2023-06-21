@@ -12,12 +12,16 @@ export const addImageCategoriesChangedListener = () => {
   startAppListening({
     actionCreator: imageCategoriesChanged,
     effect: (action, { getState, dispatch }) => {
-      const filteredImagesCount = selectFilteredImagesAsArray(
-        getState()
-      ).length;
+      const state = getState();
+      const filteredImagesCount = selectFilteredImagesAsArray(state).length;
 
       if (!filteredImagesCount) {
-        dispatch(receivedPageOfImages());
+        dispatch(
+          receivedPageOfImages({
+            categories: action.payload,
+            boardId: state.boards.selectedBoardId,
+          })
+        );
       }
     },
   });

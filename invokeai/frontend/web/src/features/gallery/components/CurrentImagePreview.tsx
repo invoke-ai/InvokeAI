@@ -9,14 +9,10 @@ import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { configSelector } from '../../system/store/configSelectors';
-import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
 import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { RootState } from 'app/store/store';
-import { selectImagesById } from '../store/imagesSlice';
 import { useGetImageDTOQuery } from 'services/apiSlice';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
@@ -114,14 +110,14 @@ const CurrentImagePreview = () => {
           }}
         >
           <IAIDndImage
-            image={image}
+            image={selectedImage && image ? image : undefined}
             onDrop={handleDrop}
             fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
             isUploadDisabled={true}
           />
         </Flex>
       )}
-      {shouldShowImageDetails && image && (
+      {shouldShowImageDetails && image && selectedImage && (
         <Box
           sx={{
             position: 'absolute',
@@ -135,7 +131,7 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && image && (
+      {!shouldShowImageDetails && image && selectedImage && (
         <Box
           sx={{
             position: 'absolute',
