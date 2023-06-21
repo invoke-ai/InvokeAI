@@ -27,9 +27,12 @@ import { defaultSelectorOptions } from '../../../../app/store/util/defaultMemoiz
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from '../../../../app/store/store';
 import {
+  useAddImageToBoardMutation,
   useDeleteBoardMutation,
+  useGetImageDTOQuery,
   useUpdateBoardMutation,
 } from 'services/apiSlice';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const coverImageSelector = (imageName: string | undefined) =>
   createSelector(
@@ -53,8 +56,9 @@ interface HoverableBoardProps {
 
 const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const dispatch = useAppDispatch();
-  const { coverImage } = useAppSelector(
-    coverImageSelector(board?.cover_image_name)
+
+  const { data: coverImage } = useGetImageDTOQuery(
+    board.cover_image_name ?? skipToken
   );
 
   const { board_name, board_id } = board;
@@ -69,6 +73,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const [deleteBoard, { isLoading: isDeleteBoardLoading }] =
     useDeleteBoardMutation();
 
+  const [addImageToBoard, { isLoading: isAddImageToBoardLoading }] =
+    useAddImageToBoardMutation();
+
   const handleUpdateBoardName = (newBoardName: string) => {
     updateBoard({ board_id, changes: { board_name: newBoardName } });
   };
@@ -82,16 +89,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
       if (droppedImage.board_id === board_id) {
         return;
       }
-      dispatch(
-        imageAddedToBoard({
-          requestBody: {
-            board_id,
-            image_name: droppedImage.image_name,
-          },
-        })
-      );
+      addImageToBoard({ board_id, image_name: droppedImage.image_name });
     },
-    [board_id, dispatch]
+    [addImageToBoard, board_id]
   );
 
   return (
@@ -141,7 +141,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               }}
             >
               <IAIDndImage
-                image={coverImage}
+                image={
+                  board.cover_image_name && coverImage ? coverImage : undefined
+                }
                 onDrop={handleDrop}
                 fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
                 isUploadDisabled={true}
