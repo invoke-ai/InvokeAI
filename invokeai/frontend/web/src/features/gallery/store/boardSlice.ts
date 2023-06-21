@@ -14,6 +14,7 @@ import {
   boardUpdated,
   receivedBoards,
 } from '../../../services/thunks/board';
+import { api } from 'services/apiSlice';
 
 export const boardsAdapter = createEntityAdapter<BoardDTO>({
   selectId: (board) => board.board_id,
@@ -92,6 +93,14 @@ const boardsSlice = createSlice({
       console.log({ boardId });
       boardsAdapter.removeOne(state, boardId);
     });
+    builder.addMatcher(
+      api.endpoints.deleteBoard.matchFulfilled,
+      (state, action) => {
+        if (action.meta.arg.originalArgs === state.selectedBoardId) {
+          state.selectedBoardId = undefined;
+        }
+      }
+    );
   },
 });
 
