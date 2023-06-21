@@ -1,6 +1,5 @@
-import { Flex, Icon, Spinner, Text } from '@chakra-ui/react';
+import IAIButton from 'common/components/IAIButton';
 import { useCallback } from 'react';
-import { FaPlus } from 'react-icons/fa';
 import { useCreateBoardMutation } from 'services/apiSlice';
 
 const DEFAULT_BOARD_NAME = 'My Board';
@@ -13,38 +12,15 @@ const AddBoardButton = () => {
   }, [createBoard]);
 
   return (
-    <Flex
-      onClick={isLoading ? undefined : handleCreateBoard}
-      sx={{
-        flexDir: 'column',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        cursor: 'pointer',
-        w: 'full',
-        h: 'full',
-        gap: 1,
-      }}
+    <IAIButton
+      isLoading={isLoading}
+      aria-label="Add Board"
+      onClick={handleCreateBoard}
+      size="sm"
+      sx={{ px: 4 }}
     >
-      <Flex
-        sx={{
-          justifyContent: 'center',
-          alignItems: 'center',
-          borderWidth: '1px',
-          borderRadius: 'base',
-          borderColor: 'base.800',
-          w: 'full',
-          h: 'full',
-          aspectRatio: '1/1',
-        }}
-      >
-        {isLoading ? (
-          <Spinner />
-        ) : (
-          <Icon boxSize={8} color="base.700" as={FaPlus} />
-        )}
-      </Flex>
-      <Text sx={{ color: 'base.200', fontSize: 'xs' }}>New Board</Text>
-    </Flex>
+      Add Board
+    </IAIButton>
   );
 };
 

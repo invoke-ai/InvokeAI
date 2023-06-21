@@ -10,7 +10,7 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import { useGetImageDTOQuery } from 'services/apiSlice';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
@@ -65,7 +65,7 @@ const InitialImagePreview = () => {
         image={image}
         onDrop={handleDrop}
         onReset={handleReset}
-        fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
+        fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
         postUploadAction={{ type: 'SET_INITIAL_IMAGE' }}
         withResetIcon
       />

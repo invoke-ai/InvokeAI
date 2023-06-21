@@ -1,12 +1,11 @@
 import {
-  Box,
-  Divider,
+  Collapse,
+  Flex,
   Grid,
+  IconButton,
   Input,
   InputGroup,
   InputRightElement,
-  Spacer,
-  useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -16,33 +15,36 @@ import {
   selectBoardsAll,
   setBoardSearchText,
 } from 'features/gallery/store/boardSlice';
-import { memo, useEffect, useState } from 'react';
+import { memo, useState } from 'react';
 import HoverableBoard from './HoverableBoard';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
-import { searchBoardsSelector } from '../../store/boardSelectors';
-import { useSelector } from 'react-redux';
-import IAICollapse from '../../../../common/components/IAICollapse';
 import { CloseIcon } from '@chakra-ui/icons';
 import { useListBoardsQuery } from 'services/apiSlice';
 
 const selector = createSelector(
   [selectBoardsAll, boardsSelector],
   (boards, boardsState) => {
-    const selectedBoard = boards.find(
-      (board) => board.board_id === boardsState.selectedBoardId
-    );
-    return { selectedBoard, searchText: boardsState.searchText };
+    // const selectedBoard = boards.find(
+    //   (board) => board.board_id === boardsState.selectedBoardId
+    // );
+    // return { selectedBoard, searchText: boardsState.searchText };
+    const { selectedBoardId, searchText } = boardsState;
+    return { selectedBoardId, searchText };
   },
   defaultSelectorOptions
 );
 
-const BoardsList = () => {
+type Props = {
+  isOpen: boolean;
+};
+
+const BoardsList = (props: Props) => {
+  const { isOpen } = props;
   const dispatch = useAppDispatch();
-  const { selectedBoard, searchText } = useAppSelector(selector);
+  const { selectedBoardId, searchText } = useAppSelector(selector);
   // const filteredBoards = useSelector(searchBoardsSelector);
-  const { isOpen, onToggle } = useDisclosure();
 
   const { data } = useListBoardsQuery({ offset: 0, limit: 8 });
 
@@ -64,9 +66,18 @@ const BoardsList = () => {
   };
 
   return (
-    <IAICollapse label="Select Board" isOpen={isOpen} onToggle={onToggle}>
-      <>
-        <Box marginBottom="1rem">
+    <Collapse in={isOpen} animateOpacity>
+      <Flex
+        sx={{
+          flexDir: 'column',
+          gap: 2,
+          bg: 'base.800',
+          borderRadius: 'base',
+          p: 2,
+          mt: 2,
+        }}
+      >
+        <Flex sx={{ gap: 2, alignItems: 'center' }}>
           <InputGroup>
             <Input
               placeholder="Search Boards..."
@@ -77,11 +88,18 @@ const BoardsList = () => {
             />
             {searchText && searchText.length && (
               <InputRightElement>
-                <CloseIcon onClick={clearBoardSearch} cursor="pointer" />
+                <IconButton
+                  onClick={clearBoardSearch}
+                  size="xs"
+                  variant="ghost"
+                  aria-label="Clear Search"
+                  icon={<CloseIcon boxSize={3} />}
+                />
               </InputRightElement>
             )}
           </InputGroup>
-        </Box>
+          <AddBoardButton />
+        </Flex>
         <OverlayScrollbarsComponent
           defer
           style={{ height: '100%', width: '100%' }}
@@ -98,29 +116,24 @@ const BoardsList = () => {
             className="list-container"
             sx={{
               gap: 2,
-              gridTemplateRows: '5rem 5rem',
+              gridTemplateRows: '5.5rem 5.5rem',
               gridAutoFlow: 'column dense',
               gridAutoColumns: '4rem',
             }}
           >
-            {!searchMode && (
-              <>
-                <AddBoardButton />
-                <AllImagesBoard isSelected={!selectedBoard} />
-              </>
-            )}
+            {!searchMode && <AllImagesBoard isSelected={!selectedBoardId} />}
             {filteredBoards &&
               filteredBoards.map((board) => (
                 <HoverableBoard
                   key={board.board_id}
                   board={board}
-                  isSelected={selectedBoard?.board_id === board.board_id}
+                  isSelected={selectedBoardId === board.board_id}
                 />
               ))}
           </Grid>
         </OverlayScrollbarsComponent>
-      </>
-    </IAICollapse>
+      </Flex>
+    </Collapse>
   );
 };
 

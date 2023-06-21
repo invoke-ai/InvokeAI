@@ -11,7 +11,7 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/apiSlice';
@@ -173,7 +173,7 @@ const ControlNetImagePreview = (props: Props) => {
             h: 'full',
           }}
         >
-          <IAIImageFallback />
+          <IAIImageLoadingFallback />
         </Box>
       )}
       {controlImage && (
