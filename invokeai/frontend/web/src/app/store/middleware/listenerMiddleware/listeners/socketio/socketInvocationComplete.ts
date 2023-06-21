@@ -41,15 +41,6 @@ export const addInvocationCompleteEventListener = () => {
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
         const { image_name } = result.image;
 
-        if (boardIdToAddTo) {
-          dispatch(
-            api.endpoints.addImageToBoard.initiate({
-              board_id: boardIdToAddTo,
-              image_name,
-            })
-          );
-        }
-
         // Get its metadata
         dispatch(
           imageMetadataReceived({
@@ -67,6 +58,15 @@ export const addInvocationCompleteEventListener = () => {
           getState().canvas.layerState.stagingArea.sessionId
         ) {
           dispatch(addImageToStagingArea(imageDTO));
+        }
+
+        if (boardIdToAddTo && !imageDTO.is_intermediate) {
+          dispatch(
+            api.endpoints.addImageToBoard.initiate({
+              board_id: boardIdToAddTo,
+              image_name,
+            })
+          );
         }
 
         dispatch(progressImageSet(null));
