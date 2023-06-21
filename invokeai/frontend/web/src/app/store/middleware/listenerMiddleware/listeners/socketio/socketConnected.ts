@@ -20,7 +20,12 @@ export const addSocketConnectedEventListener = () => {
       const { disabledTabs } = config;
 
       if (!images.ids.length) {
-        dispatch(receivedPageOfImages());
+        dispatch(
+          receivedPageOfImages({
+            categories: ['general'],
+            isIntermediate: false,
+          })
+        );
       }
 
       if (!models.ids.length) {

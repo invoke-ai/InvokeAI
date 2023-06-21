@@ -56,11 +56,7 @@ import {
   imageCategoriesChanged,
   selectImagesAll,
 } from '../store/imagesSlice';
-import {
-  IMAGES_PER_PAGE,
-  receivedImages,
-  receivedPageOfImages,
-} from 'services/thunks/image';
+import { receivedPageOfImages } from 'services/thunks/image';
 import BoardsList from './Boards/BoardsList';
 import { boardsSelector } from '../store/boardSlice';
 import { ChevronUpIcon } from '@chakra-ui/icons';
@@ -87,6 +83,7 @@ const itemSelector = createSelector(
       allImagesTotal,
       isLoading,
       categories,
+      selectedBoardId,
     };
   },
   defaultSelectorOptions
@@ -146,10 +143,10 @@ const ImageGalleryContent = () => {
     shouldUseSingleGalleryColumn,
     selectedImage,
     galleryView,
-    selectedBoardId,
   } = useAppSelector(mainSelector);
 
-  const { images, isLoading, allImagesTotal } = useAppSelector(itemSelector);
+  const { images, isLoading, allImagesTotal, categories, selectedBoardId } =
+    useAppSelector(itemSelector);
 
   const { selectedBoard } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => ({
@@ -167,8 +164,13 @@ const ImageGalleryContent = () => {
   }, [images.length, filteredImagesTotal]);
 
   const handleLoadMoreImages = useCallback(() => {
-    dispatch(receivedPageOfImages({}));
-  }, [dispatch]);
+    dispatch(
+      receivedPageOfImages({
+        categories,
+        boardId: selectedBoardId,
+      })
+    );
+  }, [categories, dispatch, selectedBoardId]);
 
   const handleEndReached = useMemo(() => {
     if (areMoreAvailable && !isLoading) {

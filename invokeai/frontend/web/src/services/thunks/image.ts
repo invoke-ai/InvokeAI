@@ -148,7 +148,11 @@ export const receivedPageOfImages = createAppAsyncThunk(
     let queryArg: ReceivedImagesArg = {};
 
     if (size(arg)) {
-      queryArg = { ...DEFAULT_IMAGES_LISTED_ARG, ...arg };
+      queryArg = {
+        ...DEFAULT_IMAGES_LISTED_ARG,
+        offset: images.length,
+        ...arg,
+      };
     } else {
       queryArg = {
         ...DEFAULT_IMAGES_LISTED_ARG,
