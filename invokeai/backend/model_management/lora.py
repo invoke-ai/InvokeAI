@@ -16,6 +16,8 @@ import numpy as np
 
 from compel.embeddings_provider import BaseTextualInversionManager
 
+# TODO: rename and split this file
+
 class LoRALayerBase:
     #rank: Optional[int]
     #alpha: Optional[float]
@@ -702,7 +704,8 @@ class ONNXModelPatcher:
         with cls.apply_lora(text_encoder, loras, "lora_te_"):
             yield
 
-
+    # based on
+    # https://github.com/ssube/onnx-web/blob/ca2e436f0623e18b4cfe8a0363fcfcf10508acf7/api/onnx_web/convert/diffusion/lora.py#L323
     @classmethod
     @contextmanager
     def apply_lora(

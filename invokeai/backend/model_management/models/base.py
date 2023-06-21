@@ -459,6 +459,7 @@ class IAIOnnxRuntimeModel(OnnxRuntimeModel):
         if self.session is None:
             #onnx.save(self.proto, "tmp.onnx")
             #onnx.save_model(self.proto, "tmp.onnx", save_as_external_data=True, all_tensors_to_one_file=True, location="tmp.onnx_data", size_threshold=1024, convert_attribute=False)
+            # TODO: something to be able to get weight when they already moved outside of model proto
             (trimmed_model, external_data) = buffer_external_data_tensors(self.proto)
             sess = SessionOptions()
             self._external_data.update(**external_data)

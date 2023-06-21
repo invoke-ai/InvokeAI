@@ -8,8 +8,7 @@ from .model import ClipField
 
 from ...backend.util.devices import torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.model_management import BaseModelType, ModelType, SubModelType
-from ...backend.model_management.lora import ModelPatcher
+from ...backend.model_management import BaseModelType, ModelType, SubModelType, ModelPatcher
 
 from compel import Compel
 from compel.prompt_parser import (

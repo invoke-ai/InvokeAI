@@ -14,7 +14,7 @@ from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from ...backend.model_management.lora import ONNXModelPatcher
+from ...backend.model_management import ONNXModelPatcher
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .compel import ConditioningField
@@ -24,6 +24,7 @@ from .model import ModelInfo, UNetField, VaeField
 
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
+from tqdm import tqdm
 from .model import ClipField
 from .latent import LatentsField, LatentsOutput, build_latents_output, get_scheduler, SAMPLER_NAME_VALUES
 from .compel import CompelOutput
@@ -88,6 +89,8 @@ class ONNXPromptInvocation(BaseInvocation):
 
                 text_encoder.create_session()
 
+                # copy from
+                # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L153
                 text_inputs = tokenizer(
                     self.prompt,
                     padding="max_length",
@@ -169,6 +172,8 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             },
         }
 
+    # based on
+    # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L375
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         c, _ = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
@@ -224,7 +229,6 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 )
                 timestep_dtype = ORT_TO_NP_TYPE[timestep_dtype]
 
-                from tqdm import tqdm
                 for i in tqdm(range(len(scheduler.timesteps))):
                     t = scheduler.timesteps[i]
                     # expand the latents if we are doing classifier free guidance
@@ -260,24 +264,6 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents)
 
-
-@staticmethod
-def numpy_to_pil(images):
-    """
-    Convert a numpy image or a batch of images to a PIL image.
-    """
-    if images.ndim == 3:
-        images = images[None, ...]
-    images = (images * 255).round().astype("uint8")
-    if images.shape[-1] == 1:
-        # special case for grayscale (single channel) images
-        pil_images = [Image.fromarray(image.squeeze(), mode="L") for image in images]
-    else:
-        pil_images = [Image.fromarray(image) for image in images]
-
-    return pil_images
-
-
 # Latent to image
 class ONNXLatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
@@ -311,9 +297,10 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
         torch.cuda.empty_cache()
 
         with vae_info as vae:
-
             vae.create_session()
 
+            # copied from
+            # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L427
             latents = 1 / 0.18215 * latents
             # image = self.vae_decoder(latent_sample=latents)[0]
             # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
@@ -323,12 +310,9 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
 
             image = np.clip(image / 2 + 0.5, 0, 1)
             image = image.transpose((0, 2, 3, 1))
-
             image = VaeImageProcessor.numpy_to_pil(image)[0]
 
             vae.release_session()
-
-            
 
         torch.cuda.empty_cache()
 

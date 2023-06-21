@@ -24,7 +24,7 @@ from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_torch_device, torch_dtype
-from ...backend.model_management.lora import ModelPatcher
+from ...backend.model_management import ModelPatcher
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .compel import ConditioningField
