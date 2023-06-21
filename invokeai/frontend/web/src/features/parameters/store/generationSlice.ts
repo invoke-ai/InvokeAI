@@ -24,7 +24,7 @@ export interface GenerationState {
   height: HeightParam;
   img2imgStrength: StrengthParam;
   infillMethod: string;
-  initialImage?: string;
+  initialImage?: { imageName: string; width: number; height: number };
   iterations: number;
   perlin: number;
   positivePrompt: PositivePromptParam;
@@ -211,8 +211,9 @@ export const generationSlice = createSlice({
     setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
       state.shouldUseNoiseSettings = action.payload;
     },
-    initialImageChanged: (state, action: PayloadAction<string>) => {
-      state.initialImage = action.payload;
+    initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
+      const { image_name, width, height } = action.payload;
+      state.initialImage = { imageName: image_name, width, height };
     },
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;

@@ -25,29 +25,29 @@ const selectAllUsedImages = createSelector(
     const allUsedImages: string[] = [];
 
     if (generation.initialImage) {
-      allUsedImages.push(generation.initialImage);
+      allUsedImages.push(generation.initialImage.imageName);
     }
 
     canvas.layerState.objects.forEach((obj) => {
       if (obj.kind === 'image') {
-        allUsedImages.push(obj.image.image_name);
+        allUsedImages.push(obj.imageName);
       }
     });
 
     nodes.nodes.forEach((node) => {
       forEach(node.data.inputs, (input) => {
         if (input.type === 'image' && input.value) {
-          allUsedImages.push(input.value.image_name);
+          allUsedImages.push(input.value);
         }
       });
     });
 
     forEach(controlNet.controlNets, (c) => {
       if (c.controlImage) {
-        allUsedImages.push(c.controlImage.image_name);
+        allUsedImages.push(c.controlImage);
       }
       if (c.processedControlImage) {
-        allUsedImages.push(c.processedControlImage.image_name);
+        allUsedImages.push(c.processedControlImage);
       }
     });
 

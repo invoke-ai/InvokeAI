@@ -46,7 +46,12 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'SET_CONTROLNET_IMAGE') {
         const { controlNetId } = postUploadAction;
-        dispatch(controlNetImageChanged({ controlNetId, controlImage: image }));
+        dispatch(
+          controlNetImageChanged({
+            controlNetId,
+            controlImage: image.image_name,
+          })
+        );
         return;
       }
 
