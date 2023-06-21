@@ -34,14 +34,14 @@ const InitialImagePreview = () => {
     isLoading,
     isError,
     isSuccess,
-  } = useGetImageDTOQuery(initialImage ?? skipToken);
+  } = useGetImageDTOQuery(initialImage?.imageName ?? skipToken);
 
   const handleDrop = useCallback(
-    ({ image_name }: ImageDTO) => {
-      if (image_name === initialImage) {
+    (droppedImage: ImageDTO) => {
+      if (droppedImage.image_name === initialImage?.imageName) {
         return;
       }
-      dispatch(initialImageChanged(image_name));
+      dispatch(initialImageChanged(droppedImage));
     },
     [dispatch, initialImage]
   );

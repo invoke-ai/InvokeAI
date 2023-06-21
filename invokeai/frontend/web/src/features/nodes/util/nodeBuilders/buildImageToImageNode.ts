@@ -57,7 +57,7 @@ export const buildImg2ImgNode = (
     }
 
     imageToImageNode.image = {
-      image_name: initialImage,
+      image_name: initialImage.imageName,
     };
   }
 
