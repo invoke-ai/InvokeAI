@@ -79,6 +79,32 @@ export class BoardsService {
   }
 
   /**
+   * Get Board
+   * Gets a board
+   * @returns BoardDTO Successful Response
+   * @throws ApiError
+   */
+  public static getBoard({
+    boardId,
+  }: {
+    /**
+     * The id of board to get
+     */
+    boardId: string,
+  }): CancelablePromise<BoardDTO> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/boards/{board_id}',
+      path: {
+        'board_id': boardId,
+      },
+      errors: {
+        422: `Validation Error`,
+      },
+    });
+  }
+
+  /**
    * Delete Board
    * Deletes a board
    * @returns any Successful Response
