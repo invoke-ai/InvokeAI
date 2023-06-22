@@ -42,7 +42,7 @@ const getModelId = ({ base_model, type, name }: ModelConfig) =>
   `${base_model}/${type}/${name}`;
 
 export const api = createApi({
-  baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:5173/api/v1/' }),
+  baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:9090/api/v1/' }),
   reducerPath: 'api',
   tagTypes,
   endpoints: (build) => ({
