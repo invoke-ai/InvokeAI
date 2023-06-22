@@ -3,16 +3,16 @@
 /* eslint-disable */
 
 import type { BaseModelType } from './BaseModelType';
+import type { ControlNetModelFormat } from './ControlNetModelFormat';
 import type { ModelError } from './ModelError';
-import type { ModelType } from './ModelType';
 
 export type ControlNetModelConfig = {
   name: string;
   base_model: BaseModelType;
-  type: ModelType;
+  type: 'controlnet';
   path: string;
   description?: string;
-  format: ('checkpoint' | 'diffusers');
-  default?: boolean;
+  model_format: ControlNetModelFormat;
   error?: ModelError;
 };
+

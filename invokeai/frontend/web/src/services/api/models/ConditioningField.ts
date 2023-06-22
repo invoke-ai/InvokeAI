@@ -8,3 +8,4 @@ export type ConditioningField = {
    */
   conditioning_name: string;
 };
+

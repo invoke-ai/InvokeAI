@@ -4,15 +4,15 @@
 
 import type { BaseModelType } from './BaseModelType';
 import type { ModelError } from './ModelError';
-import type { ModelType } from './ModelType';
+import type { VaeModelFormat } from './VaeModelFormat';
 
-export type LoRAModelConfig = {
+export type VaeModelConfig = {
   name: string;
   base_model: BaseModelType;
-  type: ModelType;
+  type: 'vae';
   path: string;
   description?: string;
-  format: ('lycoris' | 'diffusers');
-  default?: boolean;
+  model_format: VaeModelFormat;
   error?: ModelError;
 };
+

@@ -22,3 +22,4 @@ export type LatentsOutput = {
    */
   height: number;
 };
+

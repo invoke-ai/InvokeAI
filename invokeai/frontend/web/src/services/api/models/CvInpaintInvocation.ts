@@ -26,3 +26,4 @@ export type CvInpaintInvocation = {
    */
   mask?: ImageField;
 };
+

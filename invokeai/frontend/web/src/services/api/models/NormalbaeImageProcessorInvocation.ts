@@ -30,3 +30,4 @@ export type NormalbaeImageProcessorInvocation = {
    */
   image_resolution?: number;
 };
+

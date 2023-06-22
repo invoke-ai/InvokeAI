@@ -26,3 +26,4 @@ export type CompelInvocation = {
    */
   clip?: ClipField;
 };
+

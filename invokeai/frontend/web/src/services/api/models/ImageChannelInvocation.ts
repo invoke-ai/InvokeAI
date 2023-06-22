@@ -26,3 +26,4 @@ export type ImageChannelInvocation = {
    */
   channel?: 'A' | 'R' | 'G' | 'B';
 };
+

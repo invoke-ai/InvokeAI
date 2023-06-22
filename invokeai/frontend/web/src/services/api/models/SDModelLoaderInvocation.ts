@@ -2,12 +2,12 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ImageField } from './ImageField';
+import type { PipelineModelField } from './PipelineModelField';
 
 /**
- * Restores faces in an image.
+ * Loading submodels of selected model.
  */
-export type RestoreFaceInvocation = {
+export type SDModelLoaderInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -16,14 +16,10 @@ export type RestoreFaceInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'restore_face';
+  type?: 'sd_model_loader';
   /**
-   * The input image
+   * The model to load
    */
-  image?: ImageField;
-  /**
-   * The strength of the restoration
-   */
-  strength?: number;
+  model: PipelineModelField;
 };
 

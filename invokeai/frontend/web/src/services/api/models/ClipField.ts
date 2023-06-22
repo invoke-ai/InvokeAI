@@ -19,7 +19,4 @@ export type ClipField = {
    */
   loras: Array<LoraInfo>;
 };
-<<<<<<< HEAD
 
-=======
->>>>>>> 76dd749b1 (chore: Rebuild API)

@@ -53,3 +53,4 @@ export type TextToLatentsInvocation = {
    */
   control?: (ControlField | Array<ControlField>);
 };
+

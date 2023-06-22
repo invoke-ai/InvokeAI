@@ -12,3 +12,4 @@ export type CollectInvocationOutput = {
    */
   collection: Array<any>;
 };
+

@@ -20,3 +20,4 @@ export type ParamIntInvocation = {
    */
   'a'?: number;
 };
+

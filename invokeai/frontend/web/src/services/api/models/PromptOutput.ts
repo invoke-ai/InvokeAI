@@ -12,3 +12,4 @@ export type PromptOutput = {
    */
   prompt: string;
 };
+

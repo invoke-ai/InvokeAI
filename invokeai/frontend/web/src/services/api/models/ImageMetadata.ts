@@ -78,3 +78,4 @@ export type ImageMetadata = {
    */
   extra?: string;
 };
+

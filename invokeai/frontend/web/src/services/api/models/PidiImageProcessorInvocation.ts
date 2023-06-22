@@ -38,3 +38,4 @@ export type PidiImageProcessorInvocation = {
    */
   scribble?: boolean;
 };
+

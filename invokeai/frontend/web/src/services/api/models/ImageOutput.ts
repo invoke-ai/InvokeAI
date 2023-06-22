@@ -22,3 +22,4 @@ export type ImageOutput = {
    */
   height: number;
 };
+

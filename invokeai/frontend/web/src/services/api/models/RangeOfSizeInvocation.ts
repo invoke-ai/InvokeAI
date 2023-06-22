@@ -28,3 +28,4 @@ export type RangeOfSizeInvocation = {
    */
   step?: number;
 };
+

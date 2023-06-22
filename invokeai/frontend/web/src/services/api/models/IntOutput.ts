@@ -12,3 +12,4 @@ export type IntOutput = {
    */
   'a'?: number;
 };
+

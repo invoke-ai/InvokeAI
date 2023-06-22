@@ -30,3 +30,4 @@ export type LineartAnimeImageProcessorInvocation = {
    */
   image_resolution?: number;
 };
+

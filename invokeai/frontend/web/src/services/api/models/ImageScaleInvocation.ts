@@ -30,3 +30,4 @@ export type ImageScaleInvocation = {
    */
   resample_mode?: 'nearest' | 'box' | 'bilinear' | 'hamming' | 'bicubic' | 'lanczos';
 };
+

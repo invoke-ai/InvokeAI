@@ -31,3 +31,4 @@ export type DiffusersModelInfo = {
    */
   path?: string;
 };
+

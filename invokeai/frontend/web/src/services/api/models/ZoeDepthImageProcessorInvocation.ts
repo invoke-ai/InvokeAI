@@ -22,3 +22,4 @@ export type ZoeDepthImageProcessorInvocation = {
    */
   image?: ImageField;
 };
+

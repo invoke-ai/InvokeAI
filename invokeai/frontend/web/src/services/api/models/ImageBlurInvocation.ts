@@ -30,3 +30,4 @@ export type ImageBlurInvocation = {
    */
   blur_type?: 'gaussian' | 'box';
 };
+

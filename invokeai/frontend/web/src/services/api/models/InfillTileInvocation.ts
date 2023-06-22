@@ -30,3 +30,4 @@ export type InfillTileInvocation = {
    */
   seed?: number;
 };
+

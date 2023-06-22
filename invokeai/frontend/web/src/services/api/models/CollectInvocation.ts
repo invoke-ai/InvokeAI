@@ -24,3 +24,4 @@ export type CollectInvocation = {
    */
   collection?: Array<any>;
 };
+

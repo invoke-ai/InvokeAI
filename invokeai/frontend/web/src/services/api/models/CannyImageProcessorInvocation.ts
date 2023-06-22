@@ -30,3 +30,4 @@ export type CannyImageProcessorInvocation = {
    */
   high_threshold?: number;
 };
+

@@ -24,3 +24,4 @@ export type SubtractInvocation = {
    */
   'b'?: number;
 };
+

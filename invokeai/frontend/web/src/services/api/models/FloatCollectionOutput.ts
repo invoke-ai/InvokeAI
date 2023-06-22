@@ -12,3 +12,4 @@ export type FloatCollectionOutput = {
    */
   collection?: Array<number>;
 };
+

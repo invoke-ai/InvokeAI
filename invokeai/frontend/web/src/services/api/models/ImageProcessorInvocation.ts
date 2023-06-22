@@ -22,3 +22,4 @@ export type ImageProcessorInvocation = {
    */
   image?: ImageField;
 };
+

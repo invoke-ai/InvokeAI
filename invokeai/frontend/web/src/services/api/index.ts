@@ -8,13 +8,10 @@ export type { OpenAPIConfig } from './core/OpenAPI';
 
 export type { AddInvocation } from './models/AddInvocation';
 export type { BaseModelType } from './models/BaseModelType';
-<<<<<<< HEAD
 export type { BoardChanges } from './models/BoardChanges';
 export type { BoardDTO } from './models/BoardDTO';
 export type { Body_create_board_image } from './models/Body_create_board_image';
 export type { Body_remove_board_image } from './models/Body_remove_board_image';
-=======
->>>>>>> 76dd749b1 (chore: Rebuild API)
 export type { Body_upload_image } from './models/Body_upload_image';
 export type { CannyImageProcessorInvocation } from './models/CannyImageProcessorInvocation';
 export type { CkptModelInfo } from './models/CkptModelInfo';
@@ -29,6 +26,7 @@ export type { ContentShuffleImageProcessorInvocation } from './models/ContentShu
 export type { ControlField } from './models/ControlField';
 export type { ControlNetInvocation } from './models/ControlNetInvocation';
 export type { ControlNetModelConfig } from './models/ControlNetModelConfig';
+export type { ControlNetModelFormat } from './models/ControlNetModelFormat';
 export type { ControlOutput } from './models/ControlOutput';
 export type { CreateModelRequest } from './models/CreateModelRequest';
 export type { CvInpaintInvocation } from './models/CvInpaintInvocation';
@@ -71,14 +69,6 @@ export type { InfillTileInvocation } from './models/InfillTileInvocation';
 export type { InpaintInvocation } from './models/InpaintInvocation';
 export type { IntCollectionOutput } from './models/IntCollectionOutput';
 export type { IntOutput } from './models/IntOutput';
-export type { invokeai__backend__model_management__models__controlnet__ControlNetModel__Config } from './models/invokeai__backend__model_management__models__controlnet__ControlNetModel__Config';
-export type { invokeai__backend__model_management__models__lora__LoRAModel__Config } from './models/invokeai__backend__model_management__models__lora__LoRAModel__Config';
-export type { invokeai__backend__model_management__models__stable_diffusion__StableDiffusion1Model__CheckpointConfig } from './models/invokeai__backend__model_management__models__stable_diffusion__StableDiffusion1Model__CheckpointConfig';
-export type { invokeai__backend__model_management__models__stable_diffusion__StableDiffusion1Model__DiffusersConfig } from './models/invokeai__backend__model_management__models__stable_diffusion__StableDiffusion1Model__DiffusersConfig';
-export type { invokeai__backend__model_management__models__stable_diffusion__StableDiffusion2Model__CheckpointConfig } from './models/invokeai__backend__model_management__models__stable_diffusion__StableDiffusion2Model__CheckpointConfig';
-export type { invokeai__backend__model_management__models__stable_diffusion__StableDiffusion2Model__DiffusersConfig } from './models/invokeai__backend__model_management__models__stable_diffusion__StableDiffusion2Model__DiffusersConfig';
-export type { invokeai__backend__model_management__models__textual_inversion__TextualInversionModel__Config } from './models/invokeai__backend__model_management__models__textual_inversion__TextualInversionModel__Config';
-export type { invokeai__backend__model_management__models__vae__VaeModel__Config } from './models/invokeai__backend__model_management__models__vae__VaeModel__Config';
 export type { IterateInvocation } from './models/IterateInvocation';
 export type { IterateInvocationOutput } from './models/IterateInvocationOutput';
 export type { LatentsField } from './models/LatentsField';
@@ -91,14 +81,8 @@ export type { LoadImageInvocation } from './models/LoadImageInvocation';
 export type { LoraInfo } from './models/LoraInfo';
 export type { LoraLoaderInvocation } from './models/LoraLoaderInvocation';
 export type { LoraLoaderOutput } from './models/LoraLoaderOutput';
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-export type { LoraModelConfig } from './models/LoraModelConfig';
->>>>>>> 76dd749b1 (chore: Rebuild API)
-=======
 export type { LoRAModelConfig } from './models/LoRAModelConfig';
->>>>>>> 0f3b7d2b3 (chore: Rebuild API with new Model API names)
+export type { LoRAModelFormat } from './models/LoRAModelFormat';
 export type { MaskFromAlphaInvocation } from './models/MaskFromAlphaInvocation';
 export type { MaskOutput } from './models/MaskOutput';
 export type { MediapipeFaceProcessorInvocation } from './models/MediapipeFaceProcessorInvocation';
@@ -121,6 +105,7 @@ export type { PaginatedResults_GraphExecutionState_ } from './models/PaginatedRe
 export type { ParamFloatInvocation } from './models/ParamFloatInvocation';
 export type { ParamIntInvocation } from './models/ParamIntInvocation';
 export type { PidiImageProcessorInvocation } from './models/PidiImageProcessorInvocation';
+export type { PipelineModelField } from './models/PipelineModelField';
 export type { PromptCollectionOutput } from './models/PromptCollectionOutput';
 export type { PromptOutput } from './models/PromptOutput';
 export type { RandomIntInvocation } from './models/RandomIntInvocation';
@@ -134,30 +119,24 @@ export type { ScaleLatentsInvocation } from './models/ScaleLatentsInvocation';
 export type { SchedulerPredictionType } from './models/SchedulerPredictionType';
 export type { SD1ModelLoaderInvocation } from './models/SD1ModelLoaderInvocation';
 export type { SD2ModelLoaderInvocation } from './models/SD2ModelLoaderInvocation';
+export type { SDModelLoaderInvocation } from './models/SDModelLoaderInvocation';
 export type { ShowImageInvocation } from './models/ShowImageInvocation';
 export type { StableDiffusion1ModelCheckpointConfig } from './models/StableDiffusion1ModelCheckpointConfig';
 export type { StableDiffusion1ModelDiffusersConfig } from './models/StableDiffusion1ModelDiffusersConfig';
+export type { StableDiffusion1ModelFormat } from './models/StableDiffusion1ModelFormat';
 export type { StableDiffusion2ModelCheckpointConfig } from './models/StableDiffusion2ModelCheckpointConfig';
 export type { StableDiffusion2ModelDiffusersConfig } from './models/StableDiffusion2ModelDiffusersConfig';
+export type { StableDiffusion2ModelFormat } from './models/StableDiffusion2ModelFormat';
 export type { StepParamEasingInvocation } from './models/StepParamEasingInvocation';
 export type { SubModelType } from './models/SubModelType';
 export type { SubtractInvocation } from './models/SubtractInvocation';
 export type { TextToLatentsInvocation } from './models/TextToLatentsInvocation';
-<<<<<<< HEAD
-export type { UNetField } from './models/UNetField';
-export type { UpscaleInvocation } from './models/UpscaleInvocation';
-export type { VaeField } from './models/VaeField';
-=======
 export type { TextualInversionModelConfig } from './models/TextualInversionModelConfig';
 export type { UNetField } from './models/UNetField';
 export type { UpscaleInvocation } from './models/UpscaleInvocation';
 export type { VaeField } from './models/VaeField';
-<<<<<<< HEAD
-export type { VAEModelConfig } from './models/VAEModelConfig';
->>>>>>> 76dd749b1 (chore: Rebuild API)
-=======
 export type { VaeModelConfig } from './models/VaeModelConfig';
->>>>>>> 0f3b7d2b3 (chore: Rebuild API with new Model API names)
+export type { VaeModelFormat } from './models/VaeModelFormat';
 export type { VaeRepo } from './models/VaeRepo';
 export type { ValidationError } from './models/ValidationError';
 export type { ZoeDepthImageProcessorInvocation } from './models/ZoeDepthImageProcessorInvocation';

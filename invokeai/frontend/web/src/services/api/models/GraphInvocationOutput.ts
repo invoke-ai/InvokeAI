@@ -8,3 +8,4 @@
 export type GraphInvocationOutput = {
   type: 'graph_output';
 };
+

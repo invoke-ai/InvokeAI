@@ -15,3 +15,4 @@ export type CreateModelRequest = {
    */
   info: (CkptModelInfo | DiffusersModelInfo);
 };
+

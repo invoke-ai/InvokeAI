@@ -34,3 +34,4 @@ export type ScaleLatentsInvocation = {
    */
   antialias?: boolean;
 };
+

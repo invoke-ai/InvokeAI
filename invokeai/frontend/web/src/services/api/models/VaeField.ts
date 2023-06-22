@@ -10,7 +10,4 @@ export type VaeField = {
    */
   vae: ModelInfo;
 };
-<<<<<<< HEAD
 
-=======
->>>>>>> 76dd749b1 (chore: Rebuild API)

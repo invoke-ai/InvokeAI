@@ -22,3 +22,4 @@ export type InfillPatchMatchInvocation = {
    */
   image?: ImageField;
 };
+

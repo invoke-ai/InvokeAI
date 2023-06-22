@@ -26,3 +26,4 @@ export type ImageConvertInvocation = {
    */
   mode?: 'L' | 'RGB' | 'RGBA' | 'CMYK' | 'YCbCr' | 'LAB' | 'HSV' | 'I' | 'F';
 };
+

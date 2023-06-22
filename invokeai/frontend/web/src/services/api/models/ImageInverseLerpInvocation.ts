@@ -30,3 +30,4 @@ export type ImageInverseLerpInvocation = {
    */
   max?: number;
 };
+

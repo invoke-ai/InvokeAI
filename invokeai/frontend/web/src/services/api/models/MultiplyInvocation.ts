@@ -24,3 +24,4 @@ export type MultiplyInvocation = {
    */
   'b'?: number;
 };
+

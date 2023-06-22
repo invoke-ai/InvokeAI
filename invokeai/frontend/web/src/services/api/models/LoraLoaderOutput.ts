@@ -19,7 +19,4 @@ export type LoraLoaderOutput = {
    */
   clip?: ClipField;
 };
-<<<<<<< HEAD
 
-=======
->>>>>>> 76dd749b1 (chore: Rebuild API)

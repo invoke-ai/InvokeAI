@@ -25,3 +25,4 @@ export type OffsetPaginatedResults_ImageDTO_ = {
    */
   total: number;
 };
+

@@ -26,3 +26,4 @@ export type MaskFromAlphaInvocation = {
    */
   invert?: boolean;
 };
+

@@ -37,3 +37,4 @@ export type CkptModelInfo = {
    */
   height?: number;
 };
+

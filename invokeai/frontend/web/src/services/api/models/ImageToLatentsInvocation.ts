@@ -31,3 +31,4 @@ export type ImageToLatentsInvocation = {
    */
   tiled?: boolean;
 };
+
