@@ -57,12 +57,11 @@ from invokeai.frontend.install.widgets import (
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
     hf_download_from_pretrained,
-    hf_download_with_resume,
     InstallSelections,
     ModelInstall,
 )
 from invokeai.backend.model_management.model_probe import (
-    ModelProbe, ModelType, BaseModelType, SchedulerPredictionType
+    ModelType, BaseModelType
     )
 
 warnings.filterwarnings("ignore")
@@ -442,46 +441,6 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
             begin_entry_at=4,
             scroll_exit=True,
         )
-        # self.nextrely += 1
-        # self.add_widget_intelligent(
-        #     npyscreen.FixedText,
-        #     value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
-        #     editable=False,
-        #     color="CONTROL",
-        # )
-        # self.embedding_dir = self.add_widget_intelligent(
-        #     npyscreen.TitleFilename,
-        #     name=" Textual Inversion Embeddings:",
-        #     value=str(default_embedding_dir()),
-        #     select_dir=True,
-        #     must_exist=False,
-        #     use_two_lines=False,
-        #     labelColor="GOOD",
-        #     begin_entry_at=32,
-        #     scroll_exit=True,
-        # )
-        # self.lora_dir = self.add_widget_intelligent(
-        #     npyscreen.TitleFilename,
-        #     name="             LoRA and LyCORIS:",
-        #     value=str(default_lora_dir()),
-        #     select_dir=True,
-        #     must_exist=False,
-        #     use_two_lines=False,
-        #     labelColor="GOOD",
-        #     begin_entry_at=32,
-        #     scroll_exit=True,
-        # )
-        # self.controlnet_dir = self.add_widget_intelligent(
-        #     npyscreen.TitleFilename,
-        #     name="             ControlNets:",
-        #     value=str(default_controlnet_dir()),
-        #     select_dir=True,
-        #     must_exist=False,
-        #     use_two_lines=False,
-        #     labelColor="GOOD",
-        #     begin_entry_at=32,
-        #     scroll_exit=True,
-        # )
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -756,14 +715,42 @@ def migrate_init_file(legacy_format:Path):
     new.nsfw_checker = old.safety_checker
     new.xformers_enabled = old.xformers
     new.conf_path = old.conf
-#    new.embedding_dir = old.embedding_path
+    new.root = legacy_format.parent.resolve()
 
     invokeai_yaml = legacy_format.parent / 'invokeai.yaml'
     with open(invokeai_yaml,"w", encoding="utf-8") as outfile:
         outfile.write(new.to_yaml())
 
-    legacy_format.replace(legacy_format.parent / 'invokeai.init.old')
+    legacy_format.replace(legacy_format.parent / 'invokeai.init.orig')
 
+# -------------------------------------
+def migrate_models(root: Path):
+    from invokeai.backend.install.migrate_to_3 import do_migrate
+    do_migrate(root, root)
+
+def migrate_if_needed(opt: Namespace, root: Path)->bool:
+    # We check for to see if the runtime directory is correctly initialized.
+    old_init_file = root / 'invokeai.init'
+    new_init_file = root / 'invokeai.yaml'
+    old_hub = root / 'models/hub'
+    migration_needed =  old_init_file.exists() and not new_init_file.exists() or old_hub.exists()
+    
+    if migration_needed:
+        if opt.yes_to_all or \
+            yes_or_no(f'{str(config.root_path)} appears to be a 2.3 format root directory. Convert to version 3.0?'):
+
+            logger.info('** Migrating invokeai.init to invokeai.yaml')
+            migrate_init_file(old_init_file)
+            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
+
+            if old_hub.exists():
+                migrate_models(config.root_path)
+        else:
+            print('Cannot continue without conversion. Aborting.')
+    
+    return migration_needed
+
+    
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
@@ -829,19 +816,16 @@ def main():
     errors = set()
 
     try:
-        # We check for to see if the runtime directory is correctly initialized.
-        old_init_file = config.root_path / 'invokeai.init'
-        new_init_file = config.root_path / 'invokeai.yaml'
-        if old_init_file.exists() and not new_init_file.exists():
-            logger.info('** Migrating invokeai.init to invokeai.yaml')
-            migrate_init_file(old_init_file)
-            # Load new init file into config
-            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
+        # if we do a root migration/upgrade, then we are keeping previous
+        # configuration and we are done.
+        if migrate_if_needed(opt, config.root_path):
+            sys.exit(0)
 
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root_path, opt.yes_to_all)
 
         models_to_download = default_user_selections(opt)
+        new_init_file = config.root_path / 'invokeai.yaml'
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(

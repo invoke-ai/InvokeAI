@@ -408,7 +408,32 @@ def get_legacy_embeddings(root: Path) -> ModelPaths:
     path = root / 'invokeai.yaml'
     if path.exists():
         return _parse_legacy_yamlfile(root, path)
-        
+
+def do_migrate(src_directory: Path, dest_directory: Path):
+    
+    dest_models = dest_directory / 'models-3.0'
+    dest_yaml = dest_directory / 'configs/models.yaml-3.0'
+
+    paths = get_legacy_embeddings(src_directory)
+
+    with open(dest_yaml,'w') as yaml_file:
+        migrator = MigrateTo3(src_directory,
+                              dest_models,
+                              yaml_file,
+                              src_paths = paths,
+                              )
+        migrator.migrate()
+
+    (dest_directory / 'models').replace(dest_directory / 'models.orig')
+    dest_models.replace(dest_directory / 'models')
+
+    (dest_directory /'configs/models.yaml').replace(dest_directory / 'configs/models.yaml.orig')
+    dest_yaml.replace(dest_directory / 'configs/models.yaml')
+    print(f"""Migration successful.
+Original models directory moved to {dest_directory}/models.orig
+Original models.yaml file moved to {dest_directory}/configs/models.yaml.orig
+""")
+
 def main():
     parser = argparse.ArgumentParser(prog="invokeai-migrate3",
                                      description="""
@@ -446,28 +471,7 @@ script, which will perform a full upgrade in place."""
     assert (dest_directory / 'models').is_dir(), f"{dest_directory} does not contain a 'models' subdirectory"
     assert (dest_directory / 'invokeai.yaml').exists(), f"{dest_directory} does not contain an InvokeAI init file."
 
-    dest_models = dest_directory / 'models-3.0'
-    dest_yaml = dest_directory / 'configs/models.yaml-3.0'
-
-    paths = get_legacy_embeddings(root_directory)
-
-    with open(dest_yaml,'w') as yaml_file:
-        migrator = MigrateTo3(root_directory,
-                              dest_models,
-                              yaml_file,
-                              src_paths = paths,
-                              )
-        migrator.migrate()
-
-    (dest_directory / 'models').replace(dest_directory / 'models.orig')
-    dest_models.replace(dest_directory / 'models')
-
-    (dest_directory /'configs/models.yaml').replace(dest_directory / 'configs/models.yaml.orig')
-    dest_yaml.replace(dest_directory / 'configs/models.yaml')
-    print(f"""Migration successful.
-Original models directory moved to {dest_directory}/models.orig
-Original models.yaml file moved to {dest_directory}/configs/models.yaml.orig
-""")
+    do_migrate(root_directory,dest_directory)
 
 if __name__ == '__main__':
     main()
