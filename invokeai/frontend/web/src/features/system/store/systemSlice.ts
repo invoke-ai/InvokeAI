@@ -20,7 +20,6 @@ import {
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
 import { imageUploaded } from 'services/thunks/image';
-import { receivedModels } from 'services/thunks/model';
 import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
@@ -93,6 +92,7 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
+  boardIdToAddTo?: string;
 }
 
 export const initialSystemState: SystemState = {
@@ -223,6 +223,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
+      state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
@@ -231,6 +232,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
+      state.boardIdToAddTo = undefined;
     });
 
     /**
@@ -372,13 +374,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
       );
-    });
-
-    /**
-     * Received available models from the backend
-     */
-    builder.addCase(receivedModels.fulfilled, (state) => {
-      state.wereModelsReceived = true;
     });
 
     /**

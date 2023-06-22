@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Union, Callable, List, Tuple, types, TYPE_CHECKING
+from typing import Optional, Union, Callable, List, Tuple, types, TYPE_CHECKING
 from dataclasses import dataclass
 
 from invokeai.backend.model_management.model_manager import (
@@ -273,21 +273,10 @@ class ModelManagerService(ModelManagerServiceBase):
         self,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None
-    ) -> dict:
+    ) -> list[dict]:
+    # ) -> dict:
         """
-        Return a dict of models in the format:
-        { model_type1:
-          { model_name1: {'status': 'active'|'cached'|'not loaded',
-                         'model_name' : name,
-                         'model_type' : SDModelType,
-                         'description': description,
-                         'format': 'folder'|'safetensors'|'ckpt'
-                         },
-            model_name2: { etc }
-          },
-          model_type2:
-            { model_name_n: etc
-        }
+        Return a list of models.
         """
         return self.mgr.list_models(base_model, model_type)
 

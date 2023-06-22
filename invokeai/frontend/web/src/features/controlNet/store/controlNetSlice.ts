@@ -39,8 +39,8 @@ export type ControlNetConfig = {
   weight: number;
   beginStepPct: number;
   endStepPct: number;
-  controlImage: ImageDTO | null;
-  processedControlImage: ImageDTO | null;
+  controlImage: string | null;
+  processedControlImage: string | null;
   processorType: ControlNetProcessorType;
   processorNode: RequiredControlNetProcessorNode;
   shouldAutoConfig: boolean;
@@ -80,7 +80,7 @@ export const controlNetSlice = createSlice({
     },
     controlNetAddedFromImage: (
       state,
-      action: PayloadAction<{ controlNetId: string; controlImage: ImageDTO }>
+      action: PayloadAction<{ controlNetId: string; controlImage: string }>
     ) => {
       const { controlNetId, controlImage } = action.payload;
       state.controlNets[controlNetId] = {
@@ -108,7 +108,7 @@ export const controlNetSlice = createSlice({
       state,
       action: PayloadAction<{
         controlNetId: string;
-        controlImage: ImageDTO | null;
+        controlImage: string | null;
       }>
     ) => {
       const { controlNetId, controlImage } = action.payload;
@@ -125,7 +125,7 @@ export const controlNetSlice = createSlice({
       state,
       action: PayloadAction<{
         controlNetId: string;
-        processedControlImage: ImageDTO | null;
+        processedControlImage: string | null;
       }>
     ) => {
       const { controlNetId, processedControlImage } = action.payload;
@@ -260,30 +260,30 @@ export const controlNetSlice = createSlice({
       // Preemptively remove the image from the gallery
       const { imageName } = action.meta.arg;
       forEach(state.controlNets, (c) => {
-        if (c.controlImage?.image_name === imageName) {
+        if (c.controlImage === imageName) {
           c.controlImage = null;
           c.processedControlImage = null;
         }
-        if (c.processedControlImage?.image_name === imageName) {
+        if (c.processedControlImage === imageName) {
           c.processedControlImage = null;
         }
       });
     });
 
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
+    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+    //   const { image_name, image_url, thumbnail_url } = action.payload;
 
-      forEach(state.controlNets, (c) => {
-        if (c.controlImage?.image_name === image_name) {
-          c.controlImage.image_url = image_url;
-          c.controlImage.thumbnail_url = thumbnail_url;
-        }
-        if (c.processedControlImage?.image_name === image_name) {
-          c.processedControlImage.image_url = image_url;
-          c.processedControlImage.thumbnail_url = thumbnail_url;
-        }
-      });
-    });
+    //   forEach(state.controlNets, (c) => {
+    //     if (c.controlImage?.image_name === image_name) {
+    //       c.controlImage.image_url = image_url;
+    //       c.controlImage.thumbnail_url = thumbnail_url;
+    //     }
+    //     if (c.processedControlImage?.image_name === image_name) {
+    //       c.processedControlImage.image_url = image_url;
+    //       c.processedControlImage.thumbnail_url = thumbnail_url;
+    //     }
+    //   });
+    // });
 
     builder.addCase(appSocketInvocationError, (state, action) => {
       state.pendingControlImages = [];

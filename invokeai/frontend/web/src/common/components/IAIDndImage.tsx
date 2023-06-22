@@ -9,7 +9,7 @@ import {
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useCombinedRefs } from '@dnd-kit/utilities';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { AnimatePresence } from 'framer-motion';
 import { ReactElement, SyntheticEvent, useCallback } from 'react';
@@ -53,7 +53,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     isDropDisabled = false,
     isDragDisabled = false,
     isUploadDisabled = false,
-    fallback = <IAIImageFallback />,
+    fallback = <IAIImageLoadingFallback />,
     payloadImage,
     minSize = 24,
     postUploadAction,

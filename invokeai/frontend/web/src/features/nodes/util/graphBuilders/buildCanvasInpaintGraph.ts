@@ -17,6 +17,7 @@ import {
   INPAINT_GRAPH,
   INPAINT,
 } from './constants';
+import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -31,7 +32,7 @@ export const buildCanvasInpaintGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: model_name,
+    model: modelId,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -53,6 +54,8 @@ export const buildCanvasInpaintGraph = (
 
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
+
+  const model = modelIdToPipelineModelField(modelId);
 
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
@@ -99,9 +102,9 @@ export const buildCanvasInpaintGraph = (
         prompt: negativePrompt,
       },
       [MODEL_LOADER]: {
-        type: 'sd1_model_loader',
+        type: 'pipeline_model_loader',
         id: MODEL_LOADER,
-        model_name,
+        model,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',

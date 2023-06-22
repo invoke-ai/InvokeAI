@@ -1,9 +1,10 @@
 import { Graph } from 'services/api';
 import { v4 as uuidv4 } from 'uuid';
-import { cloneDeep, forEach, omit, reduce, values } from 'lodash-es';
+import { cloneDeep, omit, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';
 import { InputFieldValue } from 'features/nodes/types/types';
 import { AnyInvocation } from 'services/events/types';
+import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 /**
  * We need to do special handling for some fields
@@ -21,6 +22,12 @@ export const parseFieldValue = (field: InputFieldValue) => {
 
       Object.assign(clonedValue, transformedColor);
       return clonedValue;
+    }
+  }
+
+  if (field.type === 'model') {
+    if (field.value) {
+      return modelIdToPipelineModelField(field.value);
     }
   }
 

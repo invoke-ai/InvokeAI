@@ -1,12 +1,9 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
-import { ModelLoaderTypes } from 'features/system/components/ModelSelect';
 import { configChanged } from 'features/system/store/configSlice';
-import { clamp, sortBy } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api';
-import { imageUrlsReceived } from 'services/thunks/image';
-import { receivedModels } from 'services/thunks/model';
 import {
   CfgScaleParam,
   HeightParam,
@@ -25,7 +22,7 @@ export interface GenerationState {
   height: HeightParam;
   img2imgStrength: StrengthParam;
   infillMethod: string;
-  initialImage?: ImageDTO;
+  initialImage?: { imageName: string; width: number; height: number };
   iterations: number;
   perlin: number;
   positivePrompt: PositivePromptParam;
@@ -50,7 +47,6 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   model: ModelParam;
-  currentModelType: ModelLoaderTypes;
   shouldUseSeamless: boolean;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -85,7 +81,6 @@ export const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   model: '',
-  currentModelType: 'sd1_model_loader',
   shouldUseSeamless: false,
   seamlessXAxis: true,
   seamlessYAxis: true,
@@ -215,36 +210,18 @@ export const generationSlice = createSlice({
       state.shouldUseNoiseSettings = action.payload;
     },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
-      state.initialImage = action.payload;
+      const { image_name, width, height } = action.payload;
+      state.initialImage = { imageName: image_name, width, height };
     },
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
     },
-    setCurrentModelType: (state, action: PayloadAction<ModelLoaderTypes>) => {
-      state.currentModelType = action.payload;
-    },
   },
   extraReducers: (builder) => {
-    builder.addCase(receivedModels.fulfilled, (state, action) => {
-      if (!state.model) {
-        const firstModel = sortBy(action.payload, 'name')[0];
-        state.model = firstModel.name;
-      }
-    });
-
     builder.addCase(configChanged, (state, action) => {
       const defaultModel = action.payload.sd?.defaultModel;
       if (defaultModel && !state.model) {
         state.model = defaultModel;
-      }
-    });
-
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
-
-      if (state.initialImage?.image_name === image_name) {
-        state.initialImage.image_url = image_url;
-        state.initialImage.thumbnail_url = thumbnail_url;
       }
     });
   },
@@ -283,7 +260,6 @@ export const {
   setVerticalSymmetrySteps,
   initialImageChanged,
   modelSelected,
-  setCurrentModelType,
   setShouldUseNoiseSettings,
   setSeamless,
   setSeamlessXAxis,

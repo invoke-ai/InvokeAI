@@ -2,8 +2,17 @@
 
 from logging import Logger
 import os
+from invokeai.app.services.board_image_record_storage import (
+    SqliteBoardImageRecordStorage,
+)
+from invokeai.app.services.board_images import (
+    BoardImagesService,
+    BoardImagesServiceDependencies,
+)
+from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
+from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
-from invokeai.app.services.images import ImageService
+from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
@@ -57,7 +66,7 @@ class ApiDependencies:
 
         # TODO: build a file/path manager?
         db_location = config.db_path
-        db_location.parent.mkdir(parents=True,exist_ok=True)
+        db_location.parent.mkdir(parents=True, exist_ok=True)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
@@ -72,14 +81,40 @@ class ApiDependencies:
             DiskLatentsStorage(f"{output_folder}/latents")
         )
 
+        board_record_storage = SqliteBoardRecordStorage(db_location)
+        board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+
+        boards = BoardService(
+            services=BoardServiceDependencies(
+                board_image_record_storage=board_image_record_storage,
+                board_record_storage=board_record_storage,
+                image_record_storage=image_record_storage,
+                url=urls,
+                logger=logger,
+            )
+        )
+
+        board_images = BoardImagesService(
+            services=BoardImagesServiceDependencies(
+                board_image_record_storage=board_image_record_storage,
+                board_record_storage=board_record_storage,
+                image_record_storage=image_record_storage,
+                url=urls,
+                logger=logger,
+            )
+        )
+
         images = ImageService(
-            image_record_storage=image_record_storage,
-            image_file_storage=image_file_storage,
-            metadata=metadata,
-            url=urls,
-            logger=logger,
-            names=names,
-            graph_execution_manager=graph_execution_manager,
+            services=ImageServiceDependencies(
+                board_image_record_storage=board_image_record_storage,
+                image_record_storage=image_record_storage,
+                image_file_storage=image_file_storage,
+                metadata=metadata,
+                url=urls,
+                logger=logger,
+                names=names,
+                graph_execution_manager=graph_execution_manager,
+            )
         )
 
         services = InvocationServices(
@@ -87,6 +122,8 @@ class ApiDependencies:
             events=events,
             latents=latents,
             images=images,
+            boards=boards,
+            board_images=board_images,
             queue=MemoryInvocationQueue(),
             graph_library=SqliteItemStorage[LibraryGraph](
                 filename=db_location, table_name="graphs"

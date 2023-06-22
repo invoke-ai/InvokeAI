@@ -154,3 +154,17 @@ export type StrengthParam = z.infer<typeof zStrength>;
  */
 export const isValidStrength = (val: unknown): val is StrengthParam =>
   zStrength.safeParse(val).success;
+
+// /**
+//  * Zod schema for BaseModelType
+//  */
+// export const zBaseModelType = z.enum(['sd-1', 'sd-2']);
+// /**
+//  * Type alias for base model type, inferred from its zod schema. Should be identical to the type alias from OpenAPI.
+//  */
+// export type BaseModelType = z.infer<typeof zBaseModelType>;
+// /**
+//  * Validates/type-guards a value as a base model type
+//  */
+// export const isValidBaseModelType = (val: unknown): val is BaseModelType =>
+//   zBaseModelType.safeParse(val).success;

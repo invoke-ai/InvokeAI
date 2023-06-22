@@ -43,12 +43,19 @@ class ModelLoaderOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class SD1ModelLoaderInvocation(BaseInvocation):
-    """Loading submodels of selected model."""
+class PipelineModelField(BaseModel):
+    """Pipeline model field"""
 
-    type: Literal["sd1_model_loader"] = "sd1_model_loader"
+    model_name: str = Field(description="Name of the model")
+    base_model: BaseModelType = Field(description="Base model")
 
-    model_name: str = Field(default="", description="Model to load")
+
+class PipelineModelLoaderInvocation(BaseInvocation):
+    """Loads a pipeline model, outputting its submodels."""
+
+    type: Literal["pipeline_model_loader"] = "pipeline_model_loader"
+
+    model: PipelineModelField = Field(description="The model to load")
     # TODO: precision?
 
     # Schema customisation
@@ -57,22 +64,24 @@ class SD1ModelLoaderInvocation(BaseInvocation):
             "ui": {
                 "tags": ["model", "loader"],
                 "type_hints": {
-                  "model_name": "model" # TODO: rename to model_name?
+                  "model": "model"
                 }
             },
         }
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
 
-        base_model = BaseModelType.StableDiffusion1 # TODO:
+        base_model = self.model.base_model
+        model_name = self.model.model_name
+        model_type = ModelType.Pipeline
 
         # TODO: not found exceptions
         if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
+            model_name=model_name,
             base_model=base_model,
-            model_type=ModelType.Pipeline,
+            model_type=model_type,
         ):
-            raise Exception(f"Unkown model name: {self.model_name}!")
+            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
 
         """
         if not context.services.model_manager.model_exists(
@@ -107,142 +116,39 @@ class SD1ModelLoaderInvocation(BaseInvocation):
         return ModelLoaderOutput(
             unet=UNetField(
                 unet=ModelInfo(
-                    model_name=self.model_name,
+                    model_name=model_name,
                     base_model=base_model,
-                    model_type=ModelType.Pipeline,
+                    model_type=model_type,
                     submodel=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
-                    model_name=self.model_name,
+                    model_name=model_name,
                     base_model=base_model,
-                    model_type=ModelType.Pipeline,
+                    model_type=model_type,
                     submodel=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
-                    model_name=self.model_name,
+                    model_name=model_name,
                     base_model=base_model,
-                    model_type=ModelType.Pipeline,
+                    model_type=model_type,
                     submodel=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
-                    model_name=self.model_name,
+                    model_name=model_name,
                     base_model=base_model,
-                    model_type=ModelType.Pipeline,
+                    model_type=model_type,
                     submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
             ),
             vae=VaeField(
                 vae=ModelInfo(
-                    model_name=self.model_name,
+                    model_name=model_name,
                     base_model=base_model,
-                    model_type=ModelType.Pipeline,
-                    submodel=SubModelType.Vae,
-                ),
-            )
-        )
-
-# TODO: optimize(less code copy)
-class SD2ModelLoaderInvocation(BaseInvocation):
-    """Loading submodels of selected model."""
-
-    type: Literal["sd2_model_loader"] = "sd2_model_loader"
-
-    model_name: str = Field(default="", description="Model to load")
-    # TODO: precision?
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["model", "loader"],
-                "type_hints": {
-                  "model_name": "model" # TODO: rename to model_name?
-                }
-            },
-        }
-
-    def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
-
-        base_model = BaseModelType.StableDiffusion2 # TODO:
-
-        # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            base_model=base_model,
-            model_type=ModelType.Pipeline,
-        ):
-            raise Exception(f"Unkown model name: {self.model_name}!")
-
-        """
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
-            submodel=SDModelType.Tokenizer,
-        ):
-            raise Exception(
-                f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
-            )
-
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
-            submodel=SDModelType.TextEncoder,
-        ):
-            raise Exception(
-                f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
-            )
-
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
-            submodel=SDModelType.UNet,
-        ):
-            raise Exception(
-                f"Failed to find unet submodel from {self.model_name}! Check if model corrupted"
-            )
-        """
-
-
-        return ModelLoaderOutput(
-            unet=UNetField(
-                unet=ModelInfo(
-                    model_name=self.model_name,
-                    base_model=base_model,
-                    model_type=ModelType.Pipeline,
-                    submodel=SubModelType.UNet,
-                ),
-                scheduler=ModelInfo(
-                    model_name=self.model_name,
-                    base_model=base_model,
-                    model_type=ModelType.Pipeline,
-                    submodel=SubModelType.Scheduler,
-                ),
-                loras=[],
-            ),
-            clip=ClipField(
-                tokenizer=ModelInfo(
-                    model_name=self.model_name,
-                    base_model=base_model,
-                    model_type=ModelType.Pipeline,
-                    submodel=SubModelType.Tokenizer,
-                ),
-                text_encoder=ModelInfo(
-                    model_name=self.model_name,
-                    base_model=base_model,
-                    model_type=ModelType.Pipeline,
-                    submodel=SubModelType.TextEncoder,
-                ),
-                loras=[],
-            ),
-            vae=VaeField(
-                vae=ModelInfo(
-                    model_name=self.model_name,
-                    base_model=base_model,
-                    model_type=ModelType.Pipeline,
+                    model_type=model_type,
                     submodel=SubModelType.Vae,
                 ),
             )

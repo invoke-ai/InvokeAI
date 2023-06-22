@@ -73,6 +73,15 @@ import { addImageCategoriesChangedListener } from './listeners/imageCategoriesCh
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addUpdateImageUrlsOnConnectListener } from './listeners/updateImageUrlsOnConnect';
+import {
+  addImageAddedToBoardFulfilledListener,
+  addImageAddedToBoardRejectedListener,
+} from './listeners/imageAddedToBoard';
+import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
+import {
+  addImageRemovedFromBoardFulfilledListener,
+  addImageRemovedFromBoardRejectedListener,
+} from './listeners/imageRemovedFromBoard';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -91,6 +100,12 @@ export type AppListenerEffect = ListenerEffect<
   RootState,
   AppDispatch
 >;
+
+/**
+ * The RTK listener middleware is a lightweight alternative sagas/observables.
+ *
+ * Most side effect logic should live in a listener.
+ */
 
 // Image uploaded
 addImageUploadedFulfilledListener();
@@ -183,3 +198,10 @@ addControlNetAutoProcessListener();
 
 // Update image URLs on connect
 addUpdateImageUrlsOnConnectListener();
+
+// Boards
+addImageAddedToBoardFulfilledListener();
+addImageAddedToBoardRejectedListener();
+addImageRemovedFromBoardFulfilledListener();
+addImageRemovedFromBoardRejectedListener();
+addBoardIdSelectedListener();

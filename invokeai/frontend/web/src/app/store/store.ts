@@ -18,6 +18,7 @@ import postprocessingReducer from 'features/parameters/store/postprocessingSlice
 import systemReducer from 'features/system/store/systemSlice';
 // import sessionReducer from 'features/system/store/sessionSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
+import boardsReducer from 'features/gallery/store/boardSlice';
 import configReducer from 'features/system/store/configSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
@@ -27,22 +28,16 @@ import { listenerMiddleware } from './middleware/listenerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
-
-// Model Reducers
-import sd1PipelineModelReducer from 'features/system/store/models/sd1PipelineModelSlice';
-import sd2PipelineModelReducer from 'features/system/store/models/sd2PipelineModelSlice';
-
 import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
+import { api } from 'services/apiSlice';
 
 const allReducers = {
   canvas: canvasReducer,
   gallery: galleryReducer,
   generation: generationReducer,
   lightbox: lightboxReducer,
-  sd1pipelinemodels: sd1PipelineModelReducer,
-  sd2pipelinemodels: sd2PipelineModelReducer,
   nodes: nodesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,
@@ -51,7 +46,9 @@ const allReducers = {
   hotkeys: hotkeysReducer,
   images: imagesReducer,
   controlNet: controlNetReducer,
+  boards: boardsReducer,
   // session: sessionReducer,
+  [api.reducerPath]: api.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -68,6 +65,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'system',
   'ui',
   'controlNet',
+  // 'boards',
   // 'hotkeys',
   // 'config',
 ];
@@ -87,6 +85,7 @@ export const store = configureStore({
       immutableCheck: false,
       serializableCheck: false,
     })
+      .concat(api.middleware)
       .concat(dynamicMiddlewares)
       .prepend(listenerMiddleware.middleware),
   devTools: {

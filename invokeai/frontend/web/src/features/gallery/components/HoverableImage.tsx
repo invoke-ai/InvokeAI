@@ -2,7 +2,14 @@ import { Box, Flex, Icon, Image, MenuItem, MenuList } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useContext, useState } from 'react';
-import { FaCheck, FaExpand, FaImage, FaShare, FaTrash } from 'react-icons/fa';
+import {
+  FaCheck,
+  FaExpand,
+  FaFolder,
+  FaImage,
+  FaShare,
+  FaTrash,
+} from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import {
   resizeAndScaleCanvas,
@@ -27,6 +34,8 @@ import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
 import { useDraggable } from '@dnd-kit/core';
 import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
+import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
+import { useRemoveImageFromBoardMutation } from 'services/apiSlice';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -62,17 +71,10 @@ interface HoverableImageProps {
   isSelected: boolean;
 }
 
-const memoEqualityCheck = (
-  prev: HoverableImageProps,
-  next: HoverableImageProps
-) =>
-  prev.image.image_name === next.image.image_name &&
-  prev.isSelected === next.isSelected;
-
 /**
  * Gallery image component with delete/use all/use seed buttons on hover.
  */
-const HoverableImage = memo((props: HoverableImageProps) => {
+const HoverableImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const {
     activeTabName,
@@ -93,6 +95,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
 
   const { onDelete } = useContext(DeleteImageContext);
+  const { onClickAddToBoard } = useContext(AddImageToBoardContext);
   const handleDelete = useCallback(() => {
     onDelete(image);
   }, [image, onDelete]);
@@ -106,11 +109,13 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     },
   });
 
+  const [removeFromBoard] = useRemoveImageFromBoardMutation();
+
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
 
   const handleSelectImage = useCallback(() => {
-    dispatch(imageSelected(image));
+    dispatch(imageSelected(image.image_name));
   }, [image, dispatch]);
 
   // Recall parameters handlers
@@ -167,6 +172,17 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     // dispatch(setCurrentImage(image));
     // dispatch(setIsLightboxOpen(true));
   };
+
+  const handleAddToBoard = useCallback(() => {
+    onClickAddToBoard(image);
+  }, [image, onClickAddToBoard]);
+
+  const handleRemoveFromBoard = useCallback(() => {
+    if (!image.board_id) {
+      return;
+    }
+    removeFromBoard({ board_id: image.board_id, image_name: image.image_name });
+  }, [image.board_id, image.image_name, removeFromBoard]);
 
   const handleOpenInNewTab = () => {
     window.open(image.image_url, '_blank');
@@ -242,6 +258,17 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                 id="send-to-canvas"
               >
                 {t('parameters.sendToUnifiedCanvas')}
+              </MenuItem>
+            )}
+            <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
+              {image.board_id ? 'Change Board' : 'Add to Board'}
+            </MenuItem>
+            {image.board_id && (
+              <MenuItem
+                icon={<FaFolder />}
+                onClickCapture={handleRemoveFromBoard}
+              >
+                Remove from Board
               </MenuItem>
             )}
             <MenuItem
@@ -339,8 +366,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       </ContextMenu>
     </Box>
   );
-}, memoEqualityCheck);
+};
 
-HoverableImage.displayName = 'HoverableImage';
-
-export default HoverableImage;
+export default memo(HoverableImage);

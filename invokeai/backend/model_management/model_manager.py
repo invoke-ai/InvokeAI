@@ -473,9 +473,9 @@ class ModelManager(object):
         self,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> list[dict]:
         """
-        Return a dict of models, in format [base_model][model_type][model_name]
+        Return a list of models.
 
         Please use model_manager.models() to get all the model names,
         model_manager.model_info('model-name') to get the stanza for the model
@@ -483,7 +483,7 @@ class ModelManager(object):
         object derived from models.yaml
         """
 
-        models = dict()
+        models = []
         for model_key in sorted(self.models, key=str.casefold):
             model_config = self.models[model_key]
 
@@ -493,19 +493,15 @@ class ModelManager(object):
             if model_type is not None and cur_model_type != model_type:
                 continue
 
-            if cur_base_model not in models:
-                models[cur_base_model] = dict()
-            if cur_model_type not in models[cur_base_model]:
-                models[cur_base_model][cur_model_type] = dict()
-
-            models[cur_base_model][cur_model_type][cur_model_name] = dict(
+            model_dict = dict(
                 **model_config.dict(exclude_defaults=True),
-
                 # OpenAPIModelInfoBase
                 name=cur_model_name,
                 base_model=cur_base_model,
                 type=cur_model_type,
             )
+
+            models.append(model_dict)
 
         return models
 
