@@ -1,13 +1,12 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { isEqual } from 'lodash-es';
 
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { gallerySelector } from '../store/gallerySelectors';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 export const currentImageDisplaySelector = createSelector(
   [systemSelector, gallerySelector],
@@ -43,24 +42,8 @@ const CurrentImageDisplay = () => {
         justifyContent: 'center',
       }}
     >
-      <Flex
-        flexDirection="column"
-        sx={{
-          w: 'full',
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4,
-          position: 'absolute',
-        }}
-      >
-        <CurrentImagePreview />
-      </Flex>
-      {hasSelectedImage && (
-        <Box sx={{ position: 'absolute', top: 0 }}>
-          <CurrentImageButtons />
-        </Box>
-      )}
+      {hasSelectedImage && <CurrentImageButtons />}
+      <CurrentImagePreview />
     </Flex>
   );
 };

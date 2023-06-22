@@ -4,17 +4,17 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { memo, useCallback } from 'react';
+import { ImageDTO } from 'services/api';
+import { useGetImageDTOQuery } from 'services/apiSlice';
 import { gallerySelector } from '../store/gallerySelectors';
+import { imageSelected } from '../store/gallerySlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { memo, useCallback } from 'react';
-import { systemSelector } from 'features/system/store/systemSelectors';
-import { imageSelected } from '../store/gallerySlice';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
-import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { useGetImageDTOQuery } from 'services/apiSlice';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -78,7 +78,7 @@ const CurrentImagePreview = () => {
     <Flex
       sx={{
         width: 'full',
-        height: 'full',
+        height: 'calc(100vh - 10rem)',
         position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
