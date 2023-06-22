@@ -2,14 +2,17 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { BaseModelType } from './BaseModelType';
 import type { ModelError } from './ModelError';
 import type { ModelVariantType } from './ModelVariantType';
 
-export type invokeai__backend__model_management__models__stable_diffusion__StableDiffusion1Model__DiffusersConfig = {
+export type StableDiffusion1ModelDiffusersConfig = {
+  name: string;
+  base_model: BaseModelType;
+  type: 'pipeline';
   path: string;
   description?: string;
-  format: 'diffusers';
-  default?: boolean;
+  model_format: 'diffusers';
   error?: ModelError;
   vae?: string;
   variant: ModelVariantType;

@@ -24,6 +24,7 @@ import Toaster from './Toaster';
 import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
+import { useListModelsQuery } from 'services/apiSlice';
 
 const DEFAULT_CONFIG = {};
 
@@ -45,6 +46,18 @@ const App = ({
   const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
   const isApplicationReady = useIsApplicationReady();
+
+  const { data: pipelineModels } = useListModelsQuery({
+    model_type: 'pipeline',
+  });
+  const { data: controlnetModels } = useListModelsQuery({
+    model_type: 'controlnet',
+  });
+  const { data: vaeModels } = useListModelsQuery({ model_type: 'vae' });
+  const { data: loraModels } = useListModelsQuery({ model_type: 'lora' });
+  const { data: embeddingModels } = useListModelsQuery({
+    model_type: 'embedding',
+  });
 
   const [loadingOverridden, setLoadingOverridden] = useState(false);
 

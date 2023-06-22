@@ -13,23 +13,68 @@ import {
   TagTypesFrom,
   TagTypesFromApi,
 } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
+import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
+import { BaseModelType } from './api/models/BaseModelType';
+import { ModelType } from './api/models/ModelType';
+import { ModelsList } from './api/models/ModelsList';
+import { keyBy } from 'lodash-es';
 
 type ListBoardsArg = { offset: number; limit: number };
 type UpdateBoardArg = { board_id: string; changes: BoardChanges };
 type AddImageToBoardArg = { board_id: string; image_name: string };
 type RemoveImageFromBoardArg = { board_id: string; image_name: string };
 type ListBoardImagesArg = { board_id: string; offset: number; limit: number };
+type ListModelsArg = { base_model?: BaseModelType; model_type?: ModelType };
 
-const tagTypes = ['Board', 'Image'];
+type ModelConfig = ModelsList['models'][number];
+
+const tagTypes = ['Board', 'Image', 'Model'];
 type ApiFullTagDescription = FullTagDescription<(typeof tagTypes)[number]>;
 
 const LIST = 'LIST';
+
+const modelsAdapter = createEntityAdapter<ModelConfig>({
+  selectId: (model) => getModelId(model),
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
+});
+
+const getModelId = ({ base_model, type, name }: ModelConfig) =>
+  `${base_model}/${type}/${name}`;
 
 export const api = createApi({
   baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:5173/api/v1/' }),
   reducerPath: 'api',
   tagTypes,
   endpoints: (build) => ({
+    /**
+     * Models Queries
+     */
+
+    listModels: build.query<EntityState<ModelConfig>, ListModelsArg>({
+      query: (arg) => ({ url: 'models/', params: arg }),
+      providesTags: (result, error, arg) => {
+        // any list of boards
+        const tags: ApiFullTagDescription[] = [{ id: 'Model', type: LIST }];
+
+        if (result) {
+          // and individual tags for each board
+          tags.push(
+            ...result.ids.map((id) => ({
+              type: 'Model' as const,
+              id,
+            }))
+          );
+        }
+
+        return tags;
+      },
+      transformResponse: (response: ModelsList, meta, arg) => {
+        return modelsAdapter.addMany(
+          modelsAdapter.getInitialState(),
+          keyBy(response.models, getModelId)
+        );
+      },
+    }),
     /**
      * Boards Queries
      */
@@ -174,4 +219,5 @@ export const {
   useRemoveImageFromBoardMutation,
   useListBoardImagesQuery,
   useGetImageDTOQuery,
+  useListModelsQuery,
 } = api;

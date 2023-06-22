@@ -2,15 +2,18 @@
 /* tslint:disable */
 /* eslint-disable */
 
+import type { BaseModelType } from './BaseModelType';
 import type { ModelError } from './ModelError';
 import type { ModelVariantType } from './ModelVariantType';
 import type { SchedulerPredictionType } from './SchedulerPredictionType';
 
-export type invokeai__backend__model_management__models__stable_diffusion__StableDiffusion2Model__CheckpointConfig = {
+export type StableDiffusion2ModelCheckpointConfig = {
+  name: string;
+  base_model: BaseModelType;
+  type: 'pipeline';
   path: string;
   description?: string;
-  format: 'checkpoint';
-  default?: boolean;
+  model_format: 'checkpoint';
   error?: ModelError;
   vae?: string;
   config?: string;

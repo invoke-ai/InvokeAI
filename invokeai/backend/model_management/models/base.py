@@ -48,12 +48,10 @@ class ModelError(str, Enum):
 
 class ModelConfigBase(BaseModel):
     path: str # or Path
-    #name: str # not included as present in model key
     description: Optional[str] = Field(None)
-    format: Optional[str] = Field(None)
-    default: Optional[bool] = Field(False)
+    model_format: Optional[str] = Field(None)
     # do not save to config
-    error: Optional[ModelError] = Field(None, exclude=True)
+    error: Optional[ModelError] = Field(None)
 
     class Config:
         use_enum_values = True
@@ -94,6 +92,11 @@ class ModelBase(metaclass=ABCMeta):
     def _hf_definition_to_type(self, subtypes: List[str]) -> Type:
         if len(subtypes) < 2:
             raise Exception("Invalid subfolder definition!")
+        if all(t is None for t in subtypes):
+            return None
+        elif any(t is None for t in subtypes):
+            raise Exception(f"Unsupported definition: {subtypes}")
+        
         if subtypes[0] in ["diffusers", "transformers"]:
             res_type = sys.modules[subtypes[0]]
             subtypes = subtypes[1:]
@@ -122,47 +125,41 @@ class ModelBase(metaclass=ABCMeta):
                 continue
 
             fields = inspect.get_annotations(value)
-            if "format" not in fields:
-                raise Exception("Invalid config definition - format field not found")
+            try:
+                field = fields["model_format"]
+            except:
+                raise Exception(f"Invalid config definition - format field not found({cls.__qualname__})")
 
-            format_type = typing.get_origin(fields["format"])
-            if format_type not in {None, Literal, Union}:
-                raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
+            if isinstance(field, type) and issubclass(field, str) and issubclass(field, Enum):
+                for model_format in field:
+                    configs[model_format.value] = value
 
-            if format_type is Union and not all(typing.get_origin(v) in {None, Literal} for v in fields["format"].__args__):
-                raise Exception(f"Invalid config definition - unknown format type: {fields['format']}")
+            elif typing.get_origin(field) is Literal and all(isinstance(arg, str) and isinstance(arg, Enum) for arg in field.__args__):
+                for model_format in field.__args__:
+                    configs[model_format.value] = value
 
-            if format_type == Union:
-                f_fields = fields["format"].__args__
+            elif field is None:
+                configs[None] = value
+
             else:
-                f_fields = (fields["format"],)
-                    
-
-            for field in f_fields:
-                if field is None:
-                    format_name = None
-                else:
-                    format_name = field.__args__[0]
-
-                configs[format_name] = value # TODO: error when override(multiple)?
-
+                raise Exception(f"Unsupported format definition in {cls.__qualname__}")
 
         cls.__configs = configs
         return cls.__configs
 
     @classmethod
     def create_config(cls, **kwargs) -> ModelConfigBase:
-        if "format" not in kwargs:
-            raise Exception("Field 'format' not found in model config")
+        if "model_format" not in kwargs:
+            raise Exception("Field 'model_format' not found in model config")
 
         configs = cls._get_configs()
-        return configs[kwargs["format"]](**kwargs)
+        return configs[kwargs["model_format"]](**kwargs)
 
     @classmethod
     def probe_config(cls, path: str, **kwargs) -> ModelConfigBase:
         return cls.create_config(
             path=path,
-            format=cls.detect_format(path),
+            model_format=cls.detect_format(path),
         )
 
     @classmethod

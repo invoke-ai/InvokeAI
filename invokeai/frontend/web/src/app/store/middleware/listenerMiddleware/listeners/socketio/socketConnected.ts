@@ -1,9 +1,8 @@
-import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { receivedPageOfImages } from 'services/thunks/image';
-import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { startAppListening } from '../..';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 
@@ -15,7 +14,7 @@ export const addSocketConnectedEventListener = () => {
 
       moduleLog.debug({ timestamp }, 'Connected');
 
-      const { models, nodes, config, images } = getState();
+      const { nodes, config, images } = getState();
 
       const { disabledTabs } = config;
 
@@ -26,10 +25,6 @@ export const addSocketConnectedEventListener = () => {
             isIntermediate: false,
           })
         );
-      }
-
-      if (!models.ids.length) {
-        dispatch(receivedModels());
       }
 
       if (!nodes.schema && !disabledTabs.includes('nodes')) {

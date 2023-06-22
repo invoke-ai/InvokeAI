@@ -266,6 +266,8 @@ class ModelManager(object):
         for model_key, model_config in config.items():
             model_name, base_model, model_type = self.parse_key(model_key)
             model_class = MODEL_CLASSES[base_model][model_type]
+            # alias for config file
+            model_config["model_format"] = model_config.pop("format")
             self.models[model_key] = model_class.create_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
@@ -445,38 +447,6 @@ class ModelManager(object):
             _cache = self.cache,
         )
 
-    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns the name of the default model, or None
-        if none is defined.
-        """
-        for model_key, model_config in self.models.items():
-            if model_config.default:
-                return self.parse_key(model_key)
-
-        for model_key, _ in self.models.items():
-            return self.parse_key(model_key)
-        else:
-            return None # TODO: or redo as (None, None, None)
-
-    def set_default_model(
-        self,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-    ) -> None:
-        """
-        Set the default model. The change will not take
-        effect until you call model_manager.commit()
-        """
-
-        model_key = self.model_key(model_name, base_model, model_type)
-        if model_key not in self.models:
-            raise Exception(f"Unknown model: {model_key}")
-
-        for cur_model_key, config in self.models.items():
-            config.default = cur_model_key == model_key
-
     def model_info(
         self,
         model_name: str,
@@ -503,9 +473,9 @@ class ModelManager(object):
         self,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> list[dict]:
         """
-        Return a dict of models, in format [base_model][model_type][model_name]
+        Return a list of models.
 
         Please use model_manager.models() to get all the model names,
         model_manager.model_info('model-name') to get the stanza for the model
@@ -513,7 +483,7 @@ class ModelManager(object):
         object derived from models.yaml
         """
 
-        models = dict()
+        models = []
         for model_key in sorted(self.models, key=str.casefold):
             model_config = self.models[model_key]
 
@@ -523,17 +493,15 @@ class ModelManager(object):
             if model_type is not None and cur_model_type != model_type:
                 continue
 
-            if cur_base_model not in models:
-                models[cur_base_model] = dict()
-            if cur_model_type not in models[cur_base_model]:
-                models[cur_base_model][cur_model_type] = dict()
-
-            models[cur_base_model][cur_model_type][cur_model_name] = dict(
+            model_dict = dict(
                 **model_config.dict(exclude_defaults=True),
+                # OpenAPIModelInfoBase
                 name=cur_model_name,
                 base_model=cur_base_model,
                 type=cur_model_type,
             )
+
+            models.append(model_dict)
 
         return models
 
@@ -646,7 +614,9 @@ class ModelManager(object):
             model_class = MODEL_CLASSES[base_model][model_type]
             if model_class.save_to_config:
                 # TODO: or exclude_unset better fits here?
-                data_to_save[model_key] = model_config.dict(exclude_defaults=True)
+                data_to_save[model_key] = model_config.dict(exclude_defaults=True, exclude={"error"})
+                # alias for config file
+                data_to_save[model_key]["format"] = data_to_save[model_key].pop("model_format")
 
         yaml_str = OmegaConf.to_yaml(data_to_save)
         config_file_path = conf_file or self.config_path

@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Union, Callable, List, Tuple, types, TYPE_CHECKING
+from typing import Optional, Union, Callable, List, Tuple, types, TYPE_CHECKING
 from dataclasses import dataclass
 
 from invokeai.backend.model_management.model_manager import (
@@ -67,19 +67,6 @@ class ModelManagerServiceBase(ABC):
         base_model: BaseModelType,
         model_type: ModelType,
     ) -> bool:
-        pass
-
-    @abstractmethod
-    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns the name and typeof the default model, or None
-        if none is defined.
-        """
-        pass
-
-    @abstractmethod
-    def set_default_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType):
-        """Sets the default model to the indicated name."""
         pass
 
     @abstractmethod
@@ -270,17 +257,6 @@ class ModelManagerService(ModelManagerServiceBase):
             model_type,
         )
 
-    def default_model(self) -> Optional[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns the name of the default model, or None
-        if none is defined.
-        """
-        return self.mgr.default_model()
-
-    def set_default_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType):
-        """Sets the default model to the indicated name."""
-        self.mgr.set_default_model(model_name, base_model, model_type)
-
     def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
@@ -297,21 +273,10 @@ class ModelManagerService(ModelManagerServiceBase):
         self,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None
-    ) -> dict:
+    ) -> list[dict]:
+    # ) -> dict:
         """
-        Return a dict of models in the format:
-        { model_type1:
-          { model_name1: {'status': 'active'|'cached'|'not loaded',
-                         'model_name' : name,
-                         'model_type' : SDModelType,
-                         'description': description,
-                         'format': 'folder'|'safetensors'|'ckpt'
-                         },
-            model_name2: { etc }
-          },
-          model_type2:
-            { model_name_n: etc
-        }
+        Return a list of models.
         """
         return self.mgr.list_models(base_model, model_type)
 

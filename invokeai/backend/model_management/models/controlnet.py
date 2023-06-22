@@ -1,5 +1,6 @@
 import os
 import torch
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Union, Literal
 from .base import (
@@ -14,12 +15,16 @@ from .base import (
     classproperty,
 )
 
+class ControlNetModelFormat(str, Enum):
+    Checkpoint = "checkpoint"
+    Diffusers = "diffusers"
+
 class ControlNetModel(ModelBase):
     #model_class: Type
     #model_size: int
 
     class Config(ModelConfigBase):
-        format: Union[Literal["checkpoint"], Literal["diffusers"]]
+        model_format: ControlNetModelFormat
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.ControlNet
@@ -69,9 +74,9 @@ class ControlNetModel(ModelBase):
     @classmethod
     def detect_format(cls, path: str):
         if os.path.isdir(path):
-            return "diffusers"
+            return ControlNetModelFormat.Diffusers
         else:
-            return "checkpoint"
+            return ControlNetModelFormat.Checkpoint
 
     @classmethod
     def convert_if_required(
@@ -81,7 +86,7 @@ class ControlNetModel(ModelBase):
         config: ModelConfigBase, # empty config or config of parent model
         base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) != "diffusers":
-            raise NotImlemetedError("Checkpoint controlnet models currently unsupported")
+        if cls.detect_format(model_path) != ControlNetModelFormat.Diffusers:
+            raise NotImplementedError("Checkpoint controlnet models currently unsupported")
         else:
             return model_path

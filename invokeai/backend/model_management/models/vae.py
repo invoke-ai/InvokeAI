@@ -1,5 +1,7 @@
 import os
 import torch
+import safetensors
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Union, Literal
 from .base import (
@@ -18,12 +20,16 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from diffusers.utils import is_safetensors_available
 from omegaconf import OmegaConf
 
+class VaeModelFormat(str, Enum):
+    Checkpoint = "checkpoint"
+    Diffusers = "diffusers"
+
 class VaeModel(ModelBase):
     #vae_class: Type
     #model_size: int
 
     class Config(ModelConfigBase):
-        format: Union[Literal["checkpoint"], Literal["diffusers"]]
+        model_format: VaeModelFormat
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.Vae
@@ -70,9 +76,9 @@ class VaeModel(ModelBase):
     @classmethod
     def detect_format(cls, path: str):
         if os.path.isdir(path):
-            return "diffusers"
+            return VaeModelFormat.Diffusers
         else:
-            return "checkpoint"
+            return VaeModelFormat.Checkpoint
 
     @classmethod
     def convert_if_required(
@@ -82,7 +88,7 @@ class VaeModel(ModelBase):
         config: ModelConfigBase, # empty config or config of parent model
         base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) != "diffusers":
+        if cls.detect_format(model_path) == VaeModelFormat.Checkpoint:
             return _convert_vae_ckpt_and_cache(
                 weights_path=model_path,
                 output_path=output_path,

@@ -1,6 +1,10 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { RandomIntInvocation, RangeOfSizeInvocation } from 'services/api';
+import {
+  BaseModelType,
+  RandomIntInvocation,
+  RangeOfSizeInvocation,
+} from 'services/api';
 import {
   ITERATE,
   LATENTS_TO_IMAGE,
@@ -14,6 +18,7 @@ import {
   TEXT_TO_LATENTS,
 } from './constants';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 type TextToImageGraphOverrides = {
   width: number;
@@ -27,7 +32,7 @@ export const buildLinearTextToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: model_name,
+    model: modelId,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -37,6 +42,8 @@ export const buildLinearTextToImageGraph = (
     seed,
     shouldRandomizeSeed,
   } = state.generation;
+
+  const model = modelIdToPipelineModelField(modelId);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -82,9 +89,9 @@ export const buildLinearTextToImageGraph = (
         steps,
       },
       [MODEL_LOADER]: {
-        type: 'sd1_model_loader',
+        type: 'pipeline_model_loader',
         id: MODEL_LOADER,
-        model_name,
+        model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
