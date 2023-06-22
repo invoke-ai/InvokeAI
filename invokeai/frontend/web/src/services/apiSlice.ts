@@ -86,7 +86,7 @@ export const api = createApi({
         method: 'POST',
         params: { board_name },
       }),
-      invalidatesTags: ['Board'],
+      invalidatesTags: [{ id: 'Board', type: LIST }],
     }),
 
     updateBoard: build.mutation<BoardDTO, UpdateBoardArg>({
