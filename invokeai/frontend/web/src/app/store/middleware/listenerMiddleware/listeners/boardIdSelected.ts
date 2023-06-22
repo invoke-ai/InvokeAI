@@ -43,7 +43,6 @@ export const addBoardIdSelectedListener = () => {
         return;
       }
 
-      console.log('setting image');
       dispatch(imageSelected(board.cover_image_name));
 
       // if we haven't loaded one full page of images from this board, load more
