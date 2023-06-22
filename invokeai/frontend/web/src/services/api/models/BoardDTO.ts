@@ -23,6 +23,10 @@ export type BoardDTO = {
    */
   updated_at: string;
   /**
+   * The deleted timestamp of the board.
+   */
+  deleted_at?: string;
+  /**
    * The name of the board's cover image.
    */
   cover_image_name?: string;
