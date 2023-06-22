@@ -30,6 +30,19 @@ async def create_board(
         raise HTTPException(status_code=500, detail="Failed to create board")
 
 
+@boards_router.get("/{board_id}", operation_id="get_board", response_model=BoardDTO)
+async def get_board(
+    board_id: str = Path(description="The id of board to get"),
+) -> BoardDTO:
+    """Gets a board"""
+
+    try:
+        result = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+
 @boards_router.patch(
     "/{board_id}",
     operation_id="update_board",
