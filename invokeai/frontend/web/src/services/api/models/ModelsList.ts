@@ -12,6 +12,6 @@ import type { TextualInversionModelConfig } from './TextualInversionModelConfig'
 import type { VaeModelConfig } from './VaeModelConfig';
 
 export type ModelsList = {
-  models: Array<(StableDiffusion1ModelDiffusersConfig | StableDiffusion1ModelCheckpointConfig | VaeModelConfig | LoRAModelConfig | ControlNetModelConfig | TextualInversionModelConfig | StableDiffusion2ModelDiffusersConfig | StableDiffusion2ModelCheckpointConfig)>;
+  models: Array<(StableDiffusion1ModelCheckpointConfig | StableDiffusion1ModelDiffusersConfig | VaeModelConfig | LoRAModelConfig | ControlNetModelConfig | TextualInversionModelConfig | StableDiffusion2ModelCheckpointConfig | StableDiffusion2ModelDiffusersConfig)>;
 };
 

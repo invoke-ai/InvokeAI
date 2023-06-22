@@ -5,9 +5,9 @@
 import type { PipelineModelField } from './PipelineModelField';
 
 /**
- * Loading submodels of selected model.
+ * Loads a pipeline model, outputting its submodels.
  */
-export type SDModelLoaderInvocation = {
+export type PipelineModelLoaderInvocation = {
   /**
    * The id of this node. Must be unique among all nodes.
    */
@@ -16,7 +16,7 @@ export type SDModelLoaderInvocation = {
    * Whether or not this node is an intermediate node.
    */
   is_intermediate?: boolean;
-  type?: 'sd_model_loader';
+  type?: 'pipeline_model_loader';
   /**
    * The model to load
    */
