@@ -262,6 +262,70 @@ const ImageGalleryContent = () => {
               icon={<FaServer />}
             />
           </ButtonGroup>
+          <Flex gap={2}>
+            <IAIPopover
+              triggerComponent={
+                <IAIIconButton
+                  tooltip={t('gallery.gallerySettings')}
+                  aria-label={t('gallery.gallerySettings')}
+                  size="sm"
+                  icon={<FaWrench />}
+                />
+              }
+            >
+              <Flex direction="column" gap={2}>
+                <IAISlider
+                  value={galleryImageMinimumWidth}
+                  onChange={handleChangeGalleryImageMinimumWidth}
+                  min={32}
+                  max={256}
+                  hideTooltip={true}
+                  label={t('gallery.galleryImageSize')}
+                  withReset
+                  handleReset={() => dispatch(setGalleryImageMinimumWidth(64))}
+                />
+                <IAISimpleCheckbox
+                  label={t('gallery.maintainAspectRatio')}
+                  isChecked={galleryImageObjectFit === 'contain'}
+                  onChange={() =>
+                    dispatch(
+                      setGalleryImageObjectFit(
+                        galleryImageObjectFit === 'contain'
+                          ? 'cover'
+                          : 'contain'
+                      )
+                    )
+                  }
+                />
+                <IAISimpleCheckbox
+                  label={t('gallery.autoSwitchNewImages')}
+                  isChecked={shouldAutoSwitchToNewImages}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldAutoSwitchToNewImages(e.target.checked))
+                  }
+                />
+                <IAISimpleCheckbox
+                  label={t('gallery.singleColumnLayout')}
+                  isChecked={shouldUseSingleGalleryColumn}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldUseSingleGalleryColumn(e.target.checked))
+                  }
+                />
+              </Flex>
+            </IAIPopover>
+            <IAIIconButton
+              size="sm"
+              aria-label={t('gallery.pinGallery')}
+              tooltip={`${t('gallery.pinGallery')} (Shift+G)`}
+              onClick={handleSetShouldPinGallery}
+              icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
+            />
+          </Flex>
+        </Flex>
+        <Box
+          mb={isBoardListOpen ? 2 : 0}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <Flex
             as={Button}
             onClick={onToggle}
@@ -279,7 +343,11 @@ const ImageGalleryContent = () => {
           >
             <Text
               noOfLines={1}
-              sx={{ w: 'full', color: 'base.200', fontWeight: 600 }}
+              sx={{
+                w: 'full',
+                color: 'base.200',
+                fontWeight: 600,
+              }}
             >
               {selectedBoard ? selectedBoard.board_name : 'All Images'}
             </Text>
@@ -291,64 +359,6 @@ const ImageGalleryContent = () => {
               }}
             />
           </Flex>
-          <IAIPopover
-            triggerComponent={
-              <IAIIconButton
-                tooltip={t('gallery.gallerySettings')}
-                aria-label={t('gallery.gallerySettings')}
-                size="sm"
-                icon={<FaWrench />}
-              />
-            }
-          >
-            <Flex direction="column" gap={2}>
-              <IAISlider
-                value={galleryImageMinimumWidth}
-                onChange={handleChangeGalleryImageMinimumWidth}
-                min={32}
-                max={256}
-                hideTooltip={true}
-                label={t('gallery.galleryImageSize')}
-                withReset
-                handleReset={() => dispatch(setGalleryImageMinimumWidth(64))}
-              />
-              <IAISimpleCheckbox
-                label={t('gallery.maintainAspectRatio')}
-                isChecked={galleryImageObjectFit === 'contain'}
-                onChange={() =>
-                  dispatch(
-                    setGalleryImageObjectFit(
-                      galleryImageObjectFit === 'contain' ? 'cover' : 'contain'
-                    )
-                  )
-                }
-              />
-              <IAISimpleCheckbox
-                label={t('gallery.autoSwitchNewImages')}
-                isChecked={shouldAutoSwitchToNewImages}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldAutoSwitchToNewImages(e.target.checked))
-                }
-              />
-              <IAISimpleCheckbox
-                label={t('gallery.singleColumnLayout')}
-                isChecked={shouldUseSingleGalleryColumn}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldUseSingleGalleryColumn(e.target.checked))
-                }
-              />
-            </Flex>
-          </IAIPopover>
-
-          <IAIIconButton
-            size="sm"
-            aria-label={t('gallery.pinGallery')}
-            tooltip={`${t('gallery.pinGallery')} (Shift+G)`}
-            onClick={handleSetShouldPinGallery}
-            icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
-          />
-        </Flex>
-        <Box mb={isBoardListOpen ? 2 : 0}>
           <BoardsList isOpen={isBoardListOpen} />
         </Box>
       </Box>
