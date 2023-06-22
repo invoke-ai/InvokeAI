@@ -50,10 +50,7 @@ const dynamicBaseQuery: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
-  let baseUrl = '/api/v1';
-  if (OpenAPI.BASE) {
-    baseUrl = OpenAPI.BASE;
-  }
+  const baseUrl = OpenAPI.BASE || '';
 
   const rawBaseQuery = fetchBaseQuery({
     baseUrl: `${baseUrl}/api/v1`,
