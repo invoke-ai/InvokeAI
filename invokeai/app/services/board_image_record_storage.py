@@ -93,10 +93,10 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- enforce one-to-many relationship between boards and images using PK
-                -- (we can extend this to many-to-many later)
                 -- Soft delete, currently unused
                 deleted_at DATETIME,
+                -- enforce one-to-many relationship between boards and images using PK
+                -- (we can extend this to many-to-many later)
                 PRIMARY KEY (image_name),
                 FOREIGN KEY (board_id) REFERENCES boards (board_id) ON DELETE CASCADE,
                 FOREIGN KEY (image_name) REFERENCES images (image_name) ON DELETE CASCADE
