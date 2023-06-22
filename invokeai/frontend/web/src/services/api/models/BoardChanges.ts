@@ -12,4 +12,3 @@ export type BoardChanges = {
    */
   cover_image_name?: string;
 };
-

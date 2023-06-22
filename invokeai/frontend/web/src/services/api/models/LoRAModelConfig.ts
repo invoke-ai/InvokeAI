@@ -15,4 +15,3 @@ export type LoRAModelConfig = {
   model_format: LoRAModelFormat;
   error?: ModelError;
 };
-

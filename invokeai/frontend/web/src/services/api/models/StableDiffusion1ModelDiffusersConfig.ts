@@ -17,4 +17,3 @@ export type StableDiffusion1ModelDiffusersConfig = {
   vae?: string;
   variant: ModelVariantType;
 };
-

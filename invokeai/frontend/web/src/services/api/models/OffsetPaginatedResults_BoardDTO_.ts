@@ -25,4 +25,3 @@ export type OffsetPaginatedResults_BoardDTO_ = {
    */
   total: number;
 };
-

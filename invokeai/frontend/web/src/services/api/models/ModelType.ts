@@ -5,4 +5,4 @@
 /**
  * An enumeration.
  */
-export type ModelType = 'pipeline' | 'vae' | 'lora' | 'controlnet' | 'embedding';
+export type ModelType = 'onnx' | 'pipeline' | 'vae' | 'lora' | 'controlnet' | 'embedding';

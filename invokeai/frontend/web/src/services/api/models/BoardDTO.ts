@@ -35,4 +35,3 @@ export type BoardDTO = {
    */
   image_count: number;
 };
-

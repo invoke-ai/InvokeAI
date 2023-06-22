@@ -15,4 +15,3 @@ export type ControlNetModelConfig = {
   model_format: ControlNetModelFormat;
   error?: ModelError;
 };
-

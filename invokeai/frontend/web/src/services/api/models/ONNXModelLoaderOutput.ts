@@ -9,8 +9,8 @@ import type { VaeField } from './VaeField';
 /**
  * Model loader output
  */
-export type ModelLoaderOutput = {
-  type?: 'model_loader_output';
+export type ONNXModelLoaderOutput = {
+  type?: 'model_loader_output_onnx';
   /**
    * UNet submodel
    */
@@ -22,5 +22,9 @@ export type ModelLoaderOutput = {
   /**
    * Vae submodel
    */
-  vae?: VaeField;
+  vae_decoder?: VaeField;
+  /**
+   * Vae submodel
+   */
+  vae_encoder?: VaeField;
 };

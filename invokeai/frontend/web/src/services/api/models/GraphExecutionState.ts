@@ -18,6 +18,7 @@ import type { LoraLoaderOutput } from './LoraLoaderOutput';
 import type { MaskOutput } from './MaskOutput';
 import type { ModelLoaderOutput } from './ModelLoaderOutput';
 import type { NoiseOutput } from './NoiseOutput';
+import type { ONNXModelLoaderOutput } from './ONNXModelLoaderOutput';
 import type { PromptCollectionOutput } from './PromptCollectionOutput';
 import type { PromptOutput } from './PromptOutput';
 
@@ -48,7 +49,7 @@ export type GraphExecutionState = {
   /**
    * The results of node executions
    */
-  results: Record<string, (ImageOutput | MaskOutput | ControlOutput | ModelLoaderOutput | LoraLoaderOutput | PromptOutput | PromptCollectionOutput | CompelOutput | IntOutput | FloatOutput | LatentsOutput | NoiseOutput | IntCollectionOutput | FloatCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
+  results: Record<string, (IntCollectionOutput | FloatCollectionOutput | ModelLoaderOutput | LoraLoaderOutput | CompelOutput | ImageOutput | MaskOutput | ControlOutput | LatentsOutput | NoiseOutput | IntOutput | FloatOutput | ONNXModelLoaderOutput | PromptOutput | PromptCollectionOutput | GraphInvocationOutput | IterateInvocationOutput | CollectInvocationOutput)>;
   /**
    * Errors raised when executing nodes
    */
@@ -62,4 +63,3 @@ export type GraphExecutionState = {
    */
   source_prepared_mapping: Record<string, Array<string>>;
 };
-

@@ -15,4 +15,3 @@ export type VaeModelConfig = {
   model_format: VaeModelFormat;
   error?: ModelError;
 };
-

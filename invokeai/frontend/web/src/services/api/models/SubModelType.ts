@@ -5,4 +5,4 @@
 /**
  * An enumeration.
  */
-export type SubModelType = 'unet' | 'text_encoder' | 'tokenizer' | 'vae' | 'scheduler' | 'safety_checker';
+export type SubModelType = 'unet' | 'text_encoder' | 'tokenizer' | 'vae' | 'vae_decoder' | 'vae_encoder' | 'scheduler' | 'safety_checker';

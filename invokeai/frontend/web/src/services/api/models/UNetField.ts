@@ -19,4 +19,3 @@ export type UNetField = {
    */
   loras: Array<LoraInfo>;
 };
-

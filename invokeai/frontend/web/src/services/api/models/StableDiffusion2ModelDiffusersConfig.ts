@@ -20,4 +20,3 @@ export type StableDiffusion2ModelDiffusersConfig = {
   prediction_type: SchedulerPredictionType;
   upcast_attention: boolean;
 };
-

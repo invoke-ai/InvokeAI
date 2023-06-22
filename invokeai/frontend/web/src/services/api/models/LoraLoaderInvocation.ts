@@ -35,4 +35,3 @@ export type LoraLoaderInvocation = {
    */
   clip?: ClipField;
 };
-

@@ -21,4 +21,3 @@ export type StableDiffusion2ModelCheckpointConfig = {
   prediction_type: SchedulerPredictionType;
   upcast_attention: boolean;
 };
-

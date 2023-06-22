@@ -21,23 +21,23 @@ export class BoardsService {
    * @throws ApiError
    */
   public static listBoards({
-    all,
-    offset,
-    limit,
-  }: {
-    /**
-     * Whether to list all boards
-     */
-    all?: boolean,
-    /**
-     * The page offset
-     */
-    offset?: number,
-    /**
-     * The number of boards per page
-     */
-    limit?: number,
-  }): CancelablePromise<(OffsetPaginatedResults_BoardDTO_ | Array<BoardDTO>)> {
+all,
+offset,
+limit,
+}: {
+/**
+ * Whether to list all boards
+ */
+all?: boolean,
+/**
+ * The page offset
+ */
+offset?: number,
+/**
+ * The number of boards per page
+ */
+limit?: number,
+}): CancelablePromise<(OffsetPaginatedResults_BoardDTO_ | Array<BoardDTO>)> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/boards/',
@@ -59,13 +59,13 @@ export class BoardsService {
    * @throws ApiError
    */
   public static createBoard({
-    boardName,
-  }: {
-    /**
-     * The name of the board to create
-     */
-    boardName: string,
-  }): CancelablePromise<BoardDTO> {
+boardName,
+}: {
+/**
+ * The name of the board to create
+ */
+boardName: string,
+}): CancelablePromise<BoardDTO> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/boards/',
@@ -85,13 +85,13 @@ export class BoardsService {
    * @throws ApiError
    */
   public static getBoard({
-    boardId,
-  }: {
-    /**
-     * The id of board to get
-     */
-    boardId: string,
-  }): CancelablePromise<BoardDTO> {
+boardId,
+}: {
+/**
+ * The id of board to get
+ */
+boardId: string,
+}): CancelablePromise<BoardDTO> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/boards/{board_id}',
@@ -111,13 +111,13 @@ export class BoardsService {
    * @throws ApiError
    */
   public static deleteBoard({
-    boardId,
-  }: {
-    /**
-     * The id of board to delete
-     */
-    boardId: string,
-  }): CancelablePromise<any> {
+boardId,
+}: {
+/**
+ * The id of board to delete
+ */
+boardId: string,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/boards/{board_id}',
@@ -137,15 +137,15 @@ export class BoardsService {
    * @throws ApiError
    */
   public static updateBoard({
-    boardId,
-    requestBody,
-  }: {
-    /**
-     * The id of board to update
-     */
-    boardId: string,
-    requestBody: BoardChanges,
-  }): CancelablePromise<BoardDTO> {
+boardId,
+requestBody,
+}: {
+/**
+ * The id of board to update
+ */
+boardId: string,
+requestBody: BoardChanges,
+}): CancelablePromise<BoardDTO> {
     return __request(OpenAPI, {
       method: 'PATCH',
       url: '/api/v1/boards/{board_id}',
@@ -167,10 +167,10 @@ export class BoardsService {
    * @throws ApiError
    */
   public static createBoardImage({
-    requestBody,
-  }: {
-    requestBody: Body_create_board_image,
-  }): CancelablePromise<any> {
+requestBody,
+}: {
+requestBody: Body_create_board_image,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/board_images/',
@@ -189,10 +189,10 @@ export class BoardsService {
    * @throws ApiError
    */
   public static removeBoardImage({
-    requestBody,
-  }: {
-    requestBody: Body_remove_board_image,
-  }): CancelablePromise<any> {
+requestBody,
+}: {
+requestBody: Body_remove_board_image,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/board_images/',
@@ -211,23 +211,23 @@ export class BoardsService {
    * @throws ApiError
    */
   public static listBoardImages({
-    boardId,
-    offset,
-    limit = 10,
-  }: {
-    /**
-     * The id of the board
-     */
-    boardId: string,
-    /**
-     * The page offset
-     */
-    offset?: number,
-    /**
-     * The number of boards per page
-     */
-    limit?: number,
-  }): CancelablePromise<OffsetPaginatedResults_ImageDTO_> {
+boardId,
+offset,
+limit = 10,
+}: {
+/**
+ * The id of the board
+ */
+boardId: string,
+/**
+ * The page offset
+ */
+offset?: number,
+/**
+ * The number of boards per page
+ */
+limit?: number,
+}): CancelablePromise<OffsetPaginatedResults_ImageDTO_> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/board_images/{board_id}',

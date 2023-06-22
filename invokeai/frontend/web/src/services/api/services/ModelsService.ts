@@ -19,18 +19,18 @@ export class ModelsService {
    * @throws ApiError
    */
   public static listModels({
-    baseModel,
-    modelType,
-  }: {
-    /**
-     * Base model
-     */
-    baseModel?: BaseModelType,
-    /**
-     * The type of model to get
-     */
-    modelType?: ModelType,
-  }): CancelablePromise<ModelsList> {
+baseModel,
+modelType,
+}: {
+/**
+ * Base model
+ */
+baseModel?: BaseModelType,
+/**
+ * The type of model to get
+ */
+modelType?: ModelType,
+}): CancelablePromise<ModelsList> {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/models/',
@@ -51,10 +51,10 @@ export class ModelsService {
    * @throws ApiError
    */
   public static updateModel({
-    requestBody,
-  }: {
-    requestBody: CreateModelRequest,
-  }): CancelablePromise<any> {
+requestBody,
+}: {
+requestBody: CreateModelRequest,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/api/v1/models/',
@@ -73,10 +73,10 @@ export class ModelsService {
    * @throws ApiError
    */
   public static delModel({
-    modelName,
-  }: {
-    modelName: string,
-  }): CancelablePromise<any> {
+modelName,
+}: {
+modelName: string,
+}): CancelablePromise<any> {
     return __request(OpenAPI, {
       method: 'DELETE',
       url: '/api/v1/models/{model_name}',

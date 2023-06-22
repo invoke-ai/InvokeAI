@@ -12,4 +12,3 @@ export type Body_create_board_image = {
    */
   image_name: string;
 };
-

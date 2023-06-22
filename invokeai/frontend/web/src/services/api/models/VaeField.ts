@@ -10,4 +10,3 @@ export type VaeField = {
    */
   vae: ModelInfo;
 };
-

@@ -14,4 +14,3 @@ export type TextualInversionModelConfig = {
   model_format: null;
   error?: ModelError;
 };
-

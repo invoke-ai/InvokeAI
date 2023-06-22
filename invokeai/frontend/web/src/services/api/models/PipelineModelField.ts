@@ -17,4 +17,3 @@ export type PipelineModelField = {
    */
   base_model: BaseModelType;
 };
-

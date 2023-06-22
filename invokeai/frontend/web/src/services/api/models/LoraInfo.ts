@@ -28,4 +28,3 @@ export type LoraInfo = {
    */
   weight: number;
 };
-
