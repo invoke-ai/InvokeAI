@@ -13,17 +13,17 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
 import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
+  setGalleryView,
   setShouldAutoSwitchToNewImages,
   setShouldUseSingleGalleryColumn,
-  setGalleryView,
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
@@ -44,23 +44,23 @@ import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
 import { MdPhotoLibrary } from 'react-icons/md';
 import HoverableImage from './HoverableImage';
 
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { ChevronUpIcon } from '@chakra-ui/icons';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { uiSelector } from 'features/ui/store/uiSelectors';
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
+import { useListAllBoardsQuery } from 'services/apiSlice';
+import { receivedPageOfImages } from 'services/thunks/image';
+import { boardsSelector } from '../store/boardSlice';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
   imageCategoriesChanged,
   selectImagesAll,
 } from '../store/imagesSlice';
-import { receivedPageOfImages } from 'services/thunks/image';
 import BoardsList from './Boards/BoardsList';
-import { boardsSelector } from '../store/boardSlice';
-import { ChevronUpIcon } from '@chakra-ui/icons';
-import { useListAllBoardsQuery } from 'services/apiSlice';
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
@@ -228,7 +228,14 @@ const ImageGalleryContent = () => {
         borderRadius: 'base',
       }}
     >
-      <Box sx={{ w: 'full' }}>
+      <Box
+        sx={{
+          w: 'full',
+          display: 'flex',
+          flexDirection: 'column',
+          rowGap: 2,
+        }}
+      >
         <Flex
           ref={resizeObserverRef}
           sx={{
@@ -341,7 +348,7 @@ const ImageGalleryContent = () => {
             icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
           />
         </Flex>
-        <Box>
+        <Box mb={isBoardListOpen ? 2 : 0}>
           <BoardsList isOpen={isBoardListOpen} />
         </Box>
       </Box>

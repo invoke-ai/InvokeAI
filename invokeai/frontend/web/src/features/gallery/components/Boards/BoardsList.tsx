@@ -1,3 +1,4 @@
+import { CloseIcon } from '@chakra-ui/icons';
 import {
   Collapse,
   Flex,
@@ -14,13 +15,12 @@ import {
   boardsSelector,
   setBoardSearchText,
 } from 'features/gallery/store/boardSlice';
-import { memo, useState } from 'react';
-import HoverableBoard from './HoverableBoard';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import { memo, useState } from 'react';
+import { useListAllBoardsQuery } from 'services/apiSlice';
 import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
-import { CloseIcon } from '@chakra-ui/icons';
-import { useListAllBoardsQuery } from 'services/apiSlice';
+import HoverableBoard from './HoverableBoard';
 
 const selector = createSelector(
   [boardsSelector],
@@ -68,7 +68,6 @@ const BoardsList = (props: Props) => {
           bg: 'base.800',
           borderRadius: 'base',
           p: 2,
-          mt: 2,
         }}
       >
         <Flex sx={{ gap: 2, alignItems: 'center' }}>
