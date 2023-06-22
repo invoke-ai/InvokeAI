@@ -9,7 +9,6 @@ import { imageMetadataReceived } from 'services/thunks/image';
 import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import { imageAddedToBoard } from '../../../../../../services/thunks/board';
 import { api } from 'services/apiSlice';
 
 const moduleLog = log.child({ namespace: 'socketio' });
