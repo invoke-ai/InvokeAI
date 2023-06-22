@@ -1,7 +1,9 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 import InitialImagePreview from './InitialImagePreview';
 
 const InitialImageDisplay = () => {
+  const { t } = useTranslation();
   return (
     <Flex
       sx={{
@@ -11,24 +13,25 @@ const InitialImageDisplay = () => {
         width: '100%',
         rowGap: 4,
         borderRadius: 'base',
-        alignItems: 'center',
-        justifyContent: 'center',
         bg: 'base.850',
         p: 4,
       }}
     >
-      <Flex
-        flexDirection="column"
+      <Text
         sx={{
-          w: 'full',
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4,
+          px: 4,
+          py: 2,
+          color: 'base.300',
+          backgroundColor: 'base.750',
+          borderRadius: 4,
+          fontSize: 14,
+          fontWeight: 600,
+          textAlign: 'center',
         }}
       >
-        <InitialImagePreview />
-      </Flex>
+        {t('parameters.initialImage')}
+      </Text>
+      <InitialImagePreview />
     </Flex>
   );
 };

@@ -1,18 +1,18 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import {
   clearInitialImage,
   initialImageChanged,
 } from 'features/parameters/store/generationSlice';
 import { useCallback } from 'react';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
-import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import { useGetImageDTOQuery } from 'services/apiSlice';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
   [generationSelector],
@@ -55,10 +55,8 @@ const InitialImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
-        position: 'absolute',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 4,
       }}
     >
       <IAIDndImage
