@@ -1,4 +1,7 @@
 import {
+  BaseQueryFn,
+  FetchArgs,
+  FetchBaseQueryError,
   TagDescription,
   createApi,
   fetchBaseQuery,
@@ -18,6 +21,7 @@ import { BaseModelType } from './api/models/BaseModelType';
 import { ModelType } from './api/models/ModelType';
 import { ModelsList } from './api/models/ModelsList';
 import { keyBy } from 'lodash-es';
+import { OpenAPI } from './api/core/OpenAPI';
 
 type ListBoardsArg = { offset: number; limit: number };
 type UpdateBoardArg = { board_id: string; changes: BoardChanges };
@@ -41,8 +45,30 @@ const modelsAdapter = createEntityAdapter<ModelConfig>({
 const getModelId = ({ base_model, type, name }: ModelConfig) =>
   `${base_model}/${type}/${name}`;
 
+const dynamicBaseQuery: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  let baseUrl = '/api/v1';
+  if (OpenAPI.BASE) {
+    baseUrl = OpenAPI.BASE;
+  }
+
+  const rawBaseQuery = fetchBaseQuery({
+    baseUrl: `${baseUrl}/api/v1`,
+    prepareHeaders: (headers, { getState }) => {
+      if (OpenAPI.TOKEN)
+        headers.set('Authorization', `Bearer ${OpenAPI.TOKEN}`);
+      return headers;
+    },
+  });
+
+  return rawBaseQuery(args, api, extraOptions);
+};
+
 export const api = createApi({
-  baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:5173/api/v1/' }),
+  baseQuery: dynamicBaseQuery,
   reducerPath: 'api',
   tagTypes,
   endpoints: (build) => ({
