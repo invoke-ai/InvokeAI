@@ -1,7 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { receivedPageOfImages } from 'services/thunks/image';
-import { receivedModels } from 'services/thunks/model';
 import { receivedOpenAPISchema } from 'services/thunks/schema';
 import { startAppListening } from '../..';
 
@@ -15,8 +14,7 @@ export const addSocketConnectedEventListener = () => {
 
       moduleLog.debug({ timestamp }, 'Connected');
 
-      const { sd1pipelinemodels, sd2pipelinemodels, nodes, config, images } =
-        getState();
+      const { nodes, config, images } = getState();
 
       const { disabledTabs } = config;
 
@@ -27,14 +25,6 @@ export const addSocketConnectedEventListener = () => {
             isIntermediate: false,
           })
         );
-      }
-
-      if (!sd1pipelinemodels.ids.length) {
-        dispatch(receivedModels({ baseModel: 'sd-1', modelType: 'pipeline' }));
-      }
-
-      if (!sd2pipelinemodels.ids.length) {
-        dispatch(receivedModels({ baseModel: 'sd-2', modelType: 'pipeline' }));
       }
 
       if (!nodes.schema && !disabledTabs.includes('nodes')) {

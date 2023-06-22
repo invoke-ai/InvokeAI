@@ -28,11 +28,6 @@ import { listenerMiddleware } from './middleware/listenerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
-
-// Model Reducers
-import sd1PipelineModelReducer from 'features/system/store/models/sd1PipelineModelSlice';
-import sd2PipelineModelReducer from 'features/system/store/models/sd2PipelineModelSlice';
-
 import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
@@ -43,8 +38,6 @@ const allReducers = {
   gallery: galleryReducer,
   generation: generationReducer,
   lightbox: lightboxReducer,
-  sd1pipelinemodels: sd1PipelineModelReducer,
-  sd2pipelinemodels: sd2PipelineModelReducer,
   nodes: nodesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,
@@ -54,8 +47,8 @@ const allReducers = {
   images: imagesReducer,
   controlNet: controlNetReducer,
   boards: boardsReducer,
-  [api.reducerPath]: api.reducer,
   // session: sessionReducer,
+  [api.reducerPath]: api.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);

@@ -20,7 +20,6 @@ import {
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
 import { imageUploaded } from 'services/thunks/image';
-import { receivedModels } from 'services/thunks/model';
 import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
@@ -375,13 +374,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
       );
-    });
-
-    /**
-     * Received available models from the backend
-     */
-    builder.addCase(receivedModels.fulfilled, (state) => {
-      state.wereModelsReceived = true;
     });
 
     /**

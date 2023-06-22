@@ -23,6 +23,7 @@ import {
 } from './constants';
 import { set } from 'lodash-es';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -36,7 +37,7 @@ export const buildCanvasImageToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: model_name,
+    model: modelId,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -48,6 +49,8 @@ export const buildCanvasImageToImageGraph = (
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
+
+  const model = modelIdToPipelineModelField(modelId);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -85,9 +88,9 @@ export const buildCanvasImageToImageGraph = (
         id: NOISE,
       },
       [MODEL_LOADER]: {
-        type: 'sd1_model_loader',
+        type: 'pipeline_model_loader',
         id: MODEL_LOADER,
-        model_name,
+        model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',

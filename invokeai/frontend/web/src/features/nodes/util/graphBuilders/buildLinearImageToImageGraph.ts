@@ -22,6 +22,7 @@ import {
 } from './constants';
 import { set } from 'lodash-es';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -34,7 +35,7 @@ export const buildLinearImageToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: model_name,
+    model: modelId,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -61,6 +62,8 @@ export const buildLinearImageToImageGraph = (
     moduleLog.error('No initial image found in state');
     throw new Error('No initial image found in state');
   }
+
+  const model = modelIdToPipelineModelField(modelId);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -89,9 +92,9 @@ export const buildLinearImageToImageGraph = (
         id: NOISE,
       },
       [MODEL_LOADER]: {
-        type: 'sd1_model_loader',
+        type: 'pipeline_model_loader',
         id: MODEL_LOADER,
-        model_name,
+        model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
