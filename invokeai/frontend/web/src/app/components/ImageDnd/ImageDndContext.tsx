@@ -9,12 +9,12 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { PropsWithChildren, memo, useCallback, useState } from 'react';
-import OverlayDragImage from './OverlayDragImage';
-import { ImageDTO } from 'services/api';
-import { isImageDTO } from 'services/types/guards';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { AnimatePresence, motion } from 'framer-motion';
+import { PropsWithChildren, memo, useCallback, useState } from 'react';
+import { ImageDTO } from 'services/api';
+import { isImageDTO } from 'services/types/guards';
+import OverlayDragImage from './OverlayDragImage';
 
 type ImageDndContextProps = PropsWithChildren;
 
@@ -40,11 +40,11 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   );
 
   const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: { delay: 150, tolerance: 5 },
+    activationConstraint: { delay: 100, tolerance: 5 },
   });
 
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 150, tolerance: 5 },
+    activationConstraint: { delay: 100, tolerance: 5 },
   });
   // TODO: Use KeyboardSensor - needs composition of multiple collisionDetection algos
   // Alternatively, fix `rectIntersection` collection detection to work with the drag overlay
