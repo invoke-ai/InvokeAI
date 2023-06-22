@@ -6,9 +6,7 @@ import {
   AlertDialogHeader,
   AlertDialogOverlay,
   Box,
-  Divider,
   Flex,
-  Select,
   Spinner,
   Text,
 } from '@chakra-ui/react';
@@ -16,9 +14,6 @@ import IAIButton from 'common/components/IAIButton';
 
 import { memo, useContext, useRef, useState } from 'react';
 import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
-import { useSelector } from 'react-redux';
-import { selectBoardsAll } from '../../store/boardSlice';
-import IAISelect from '../../../../common/components/IAISelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { useListAllBoardsQuery } from 'services/apiSlice';
 
@@ -46,7 +41,7 @@ const UpdateImageBoardModal = () => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Move Image to Board
+            {currentBoard ? 'Move Image to Board' : 'Add Image to Board'}
           </AlertDialogHeader>
 
           <AlertDialogBody>
@@ -86,7 +81,7 @@ const UpdateImageBoardModal = () => {
               }}
               ml={3}
             >
-              Add to Board
+              {currentBoard ? 'Move' : 'Add'}
             </IAIButton>
           </AlertDialogFooter>
         </AlertDialogContent>

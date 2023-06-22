@@ -1,8 +1,6 @@
 import { useDisclosure } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { PropsWithChildren, createContext, useCallback, useState } from 'react';
 import { ImageDTO } from 'services/api';
-import { imageAddedToBoard } from '../../services/thunks/board';
 import { useAddImageToBoardMutation } from 'services/apiSlice';
 
 export type ImageUsage = {
@@ -41,7 +39,6 @@ type Props = PropsWithChildren;
 
 export const AddImageToBoardContextProvider = (props: Props) => {
   const [imageToMove, setImageToMove] = useState<ImageDTO>();
-  const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [addImageToBoard, result] = useAddImageToBoardMutation();
