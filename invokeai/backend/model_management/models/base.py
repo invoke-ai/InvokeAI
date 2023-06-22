@@ -426,27 +426,127 @@ class SilenceWarnings(object):
         diffusers_logging.set_verbosity(self.diffusers_verbosity)
         warnings.simplefilter('default')
 
-def buffer_external_data_tensors(model):
-    external_data = dict()
-    for tensor in model.graph.initializer:
-        name = tensor.name
-
-        if tensor.HasField("raw_data"):
-            npt = numpy_helper.to_array(tensor)
-            orv = OrtValue.ortvalue_from_numpy(npt)
-            external_data[name] = orv
-            set_external_data(tensor, location="tmp.bin")
-            tensor.name = name
-            tensor.ClearField("raw_data")
-
-    return (model, external_data)
-
 ONNX_WEIGHTS_NAME = "model.onnx"
-class IAIOnnxRuntimeModel(OnnxRuntimeModel):
-    def __init__(self, model: tuple, **kwargs):
-        self.proto, self.provider, self.sess_options = model
+class IAIOnnxRuntimeModel:
+    class _tensor_access:
+
+        def __init__(self, model):
+            self.model = model
+            self.indexes = dict()
+            for idx, obj in enumerate(self.model.proto.graph.initializer):
+                self.indexes[obj.name] = idx
+
+        def __getitem__(self, key: str):
+            return self.model.data[key].numpy()
+
+        def __setitem__(self, key: str, value: np.ndarray):
+            new_node = numpy_helper.from_array(value)
+            set_external_data(new_node, location="in-memory-location")
+            new_node.name = key
+            new_node.ClearField("raw_data")
+            del self.model.proto.graph.initializer[self.indexes[key]]
+            self.model.proto.graph.initializer.insert(self.indexes[key], new_node)
+            self.model.data[key] = OrtValue.ortvalue_from_numpy(value)
+
+        # __delitem__
+
+        def __contains__(self, key: str):
+            return key in self.model.data
+
+        def items(self):
+            raise NotImplementedError("tensor.items")
+            #return [(obj.name, obj) for obj in self.raw_proto]
+
+        def keys(self):
+            return self.model.data.keys()
+
+        def values(self):
+            raise NotImplementedError("tensor.values")
+            #return [obj for obj in self.raw_proto]
+
+
+
+    class _access_helper:
+        def __init__(self, raw_proto):
+            self.indexes = dict()
+            self.raw_proto = raw_proto
+            for idx, obj in enumerate(raw_proto):
+                self.indexes[obj.name] = idx
+
+        def __getitem__(self, key: str):
+            return self.raw_proto[self.indexes[key]]
+
+        def __setitem__(self, key: str, value):
+            index = self.indexes[key]
+            del self.raw_proto[index]
+            self.raw_proto.insert(index, value)
+
+        # __delitem__
+
+        def __contains__(self, key: str):
+            return key in self.indexes
+
+        def items(self):
+            return [(obj.name, obj) for obj in self.raw_proto]
+
+        def keys(self):
+            return self.indexes.keys()
+
+        def values(self):
+            return [obj for obj in self.raw_proto]
+    
+    def __init__(self, model_path: str, provider: Optional[str]):
+        self.path = model_path
         self.session = None
-        self._external_data = dict()
+        self.provider = provider or "CPUExecutionProvider"
+        """
+        self.data_path = self.path + "_data"
+        if not os.path.exists(self.data_path):
+            print(f"Moving model tensors to separate file: {self.data_path}")
+            tmp_proto = onnx.load(model_path, load_external_data=True)
+            onnx.save_model(tmp_proto, self.path, save_as_external_data=True, all_tensors_to_one_file=True, location=os.path.basename(self.data_path), size_threshold=1024, convert_attribute=False)
+            del tmp_proto
+            gc.collect()
+
+        self.proto = onnx.load(model_path, load_external_data=False)
+        """
+
+        self.proto = onnx.load(model_path, load_external_data=True)
+        self.data = dict()
+        for tensor in self.proto.graph.initializer:
+            name = tensor.name
+
+            if tensor.HasField("raw_data"):
+                npt = numpy_helper.to_array(tensor)
+                orv = OrtValue.ortvalue_from_numpy(npt)
+                self.data[name] = orv
+                set_external_data(tensor, location="in-memory-location")
+                tensor.name = name
+                tensor.ClearField("raw_data")
+
+        self.nodes = self._access_helper(self.proto.graph.node)
+        self.initializers = self._access_helper(self.proto.graph.initializer)
+
+        self.tensors = self._tensor_access(self)
+
+    # TODO: integrate with model manager/cache
+    def create_session(self):
+        if self.session is None:
+            #onnx.save(self.proto, "tmp.onnx")
+            #onnx.save_model(self.proto, "tmp.onnx", save_as_external_data=True, all_tensors_to_one_file=True, location="tmp.onnx_data", size_threshold=1024, convert_attribute=False)
+            # TODO: something to be able to get weight when they already moved outside of model proto
+            #(trimmed_model, external_data) = buffer_external_data_tensors(self.proto)
+            sess = SessionOptions()
+            #self._external_data.update(**external_data)
+            sess.add_external_initializers(list(self.data.keys()), list(self.data.values()))
+            self.session = InferenceSession(self.proto.SerializeToString(), providers=[self.provider], sess_options=sess)
+            #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
+
+    def release_session(self):
+        self.session = None
+        import gc
+        gc.collect()
+
 
     def __call__(self, **kwargs):
         if self.session is None:
@@ -455,63 +555,32 @@ class IAIOnnxRuntimeModel(OnnxRuntimeModel):
         inputs = {k: np.array(v) for k, v in kwargs.items()}
         return self.session.run(None, inputs)
 
-    def create_session(self):
-        if self.session is None:
-            #onnx.save(self.proto, "tmp.onnx")
-            #onnx.save_model(self.proto, "tmp.onnx", save_as_external_data=True, all_tensors_to_one_file=True, location="tmp.onnx_data", size_threshold=1024, convert_attribute=False)
-            # TODO: something to be able to get weight when they already moved outside of model proto
-            (trimmed_model, external_data) = buffer_external_data_tensors(self.proto)
-            sess = SessionOptions()
-            self._external_data.update(**external_data)
-            sess.add_external_initializers(list(self._external_data.keys()), list(self._external_data.values()))
-            self.session = InferenceSession(trimmed_model.SerializeToString(), providers=[self.provider], sess_options=sess)
-            #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
-
-    def release_session(self):
-        self.session = None
-        import gc
-        gc.collect()
-
-    @staticmethod
-    def load_model(path: Union[str, Path], provider=None, sess_options=None):
-        """
-        Loads an ONNX Inference session with an ExecutionProvider. Default provider is `CPUExecutionProvider`
-
-        Arguments:
-            path (`str` or `Path`):
-                Directory from which to load
-            provider(`str`, *optional*):
-                Onnxruntime execution provider to use for loading the model, defaults to `CPUExecutionProvider`
-        """
-        if provider is None:
-            #logger.info("No onnxruntime provider specified, using CPUExecutionProvider")
-            print("No onnxruntime provider specified, using CPUExecutionProvider")
-            provider = "CPUExecutionProvider"
-
-        # TODO: check that provider available?
-        return (onnx.load(path), provider, sess_options)
-
+    # compatability with diffusers load code
     @classmethod
-    def _from_pretrained(
+    def from_pretrained(
         cls,
         model_id: Union[str, Path],
-        use_auth_token: Optional[Union[bool, str, None]] = None,
-        revision: Optional[Union[str, None]] = None,
-        force_download: bool = False,
-        cache_dir: Optional[str] = None,
+        subfolder: Union[str, Path] = None,
         file_name: Optional[str] = None,
         provider: Optional[str] = None,
         sess_options: Optional["SessionOptions"] = None,
         **kwargs,
     ):
-        model_file_name = file_name if file_name is not None else ONNX_WEIGHTS_NAME
+        file_name = file_name or ONNX_WEIGHTS_NAME
+
+        if os.path.isdir(model_id):
+            model_path = model_id
+            if subfolder is not None:
+                model_path = os.path.join(model_path, subfolder)
+            model_path = os.path.join(model_path, file_name)
+
+        else:
+            model_path = model_id
+
         # load model from local directory
-        if not os.path.isdir(model_id):
-            raise Exception(f"Model not found: {model_id}")
-        model = IAIOnnxRuntimeModel.load_model(
-            os.path.join(model_id, model_file_name), provider=provider, sess_options=sess_options
-        )
+        if not os.path.isfile(model_path):
+            raise Exception(f"Model not found: {model_path}")
 
-        return cls(model=model, **kwargs)
-
+        # TODO: session options
+        return cls(model_path, provider=provider)
 
