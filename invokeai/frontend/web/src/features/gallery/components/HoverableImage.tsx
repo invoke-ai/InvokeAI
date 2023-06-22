@@ -34,9 +34,8 @@ import { useAppToaster } from 'app/components/Toaster';
 import { ImageDTO } from 'services/api';
 import { useDraggable } from '@dnd-kit/core';
 import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
-import { imageAddedToBoard } from '../../../services/thunks/board';
-import { setUpdateBoardModalOpen } from '../store/boardSlice';
 import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
+import { useRemoveImageFromBoardMutation } from 'services/apiSlice';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],
@@ -110,6 +109,8 @@ const HoverableImage = (props: HoverableImageProps) => {
     },
   });
 
+  const [removeFromBoard] = useRemoveImageFromBoardMutation();
+
   const handleMouseOver = () => setIsHovered(true);
   const handleMouseOut = () => setIsHovered(false);
 
@@ -175,6 +176,13 @@ const HoverableImage = (props: HoverableImageProps) => {
   const handleAddToBoard = useCallback(() => {
     onClickAddToBoard(image);
   }, [image, onClickAddToBoard]);
+
+  const handleRemoveFromBoard = useCallback(() => {
+    if (!image.board_id) {
+      return;
+    }
+    removeFromBoard({ board_id: image.board_id, image_name: image.image_name });
+  }, [image.board_id, image.image_name, removeFromBoard]);
 
   const handleOpenInNewTab = () => {
     window.open(image.image_url, '_blank');
@@ -255,6 +263,14 @@ const HoverableImage = (props: HoverableImageProps) => {
             <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
               {image.board_id ? 'Change Board' : 'Add to Board'}
             </MenuItem>
+            {image.board_id && (
+              <MenuItem
+                icon={<FaFolder />}
+                onClickCapture={handleRemoveFromBoard}
+              >
+                Remove from Board
+              </MenuItem>
+            )}
             <MenuItem
               sx={{ color: 'error.300' }}
               icon={<FaTrash />}
