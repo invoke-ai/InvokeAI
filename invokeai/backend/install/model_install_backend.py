@@ -93,9 +93,10 @@ class ModelInstall(object):
     def __init__(self,
                  config:InvokeAIAppConfig,
                  prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                 model_manager: ModelManager = None,
                  access_token:str = None):
         self.config = config
-        self.mgr = ModelManager(config.model_conf_path)
+        self.mgr = model_manager or ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
         self.access_token = access_token or HfFolder.get_token()

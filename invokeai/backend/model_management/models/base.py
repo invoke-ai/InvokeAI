@@ -56,7 +56,6 @@ class ModelConfigBase(BaseModel):
     class Config:
         use_enum_values = True
 
-
 class EmptyConfigLoader(ConfigMixin):
     @classmethod
     def load_config(cls, *args, **kwargs):

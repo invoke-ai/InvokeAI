@@ -45,6 +45,7 @@ sd-1/pipeline/portraitplus:
    repo_id: wavymulder/portraitplus
    recommended: False
 sd-1/pipeline/seek.art_MEGA:
+   repo_id: coreco/seek.art_MEGA
    description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
    recommended: False
 sd-1/pipeline/trinart_stable_diffusion_v2:

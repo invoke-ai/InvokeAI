@@ -151,13 +151,11 @@ import os
 import hashlib
 import textwrap
 from dataclasses import dataclass
-from packaging import version
 from pathlib import Path
-from typing import Dict, Optional, List, Tuple, Union, types
+from typing import Optional, List, Tuple, Union, Set, Callable, types
 from shutil import rmtree
 
 import torch
-from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
@@ -165,9 +163,13 @@ from pydantic import BaseModel
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import CUDA_DEVICE, download_with_resume
+from invokeai.backend.util import CUDA_DEVICE
 from .model_cache import ModelCache, ModelLocker
-from .models import BaseModelType, ModelType, SubModelType, ModelError, MODEL_CLASSES
+from .models import (
+    BaseModelType, ModelType, SubModelType,
+    ModelError, SchedulerPredictionType, MODEL_CLASSES,
+    ModelConfigBase,
+    )
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
@@ -686,3 +688,34 @@ class ModelManager(object):
 
         if new_models_found and self.config_path:
             self.commit()
+
+
+    def heuristic_import(self,
+                         items_to_import: Set[str],
+                         prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                         )->Set[str]:
+        '''
+        Import a list of paths, repo_ids or URLs. Returns the 
+        set of successfully imported items. The prediction_type_helper
+        is a callback that receives the Path of a checkpoint or diffusers
+        model and returns a SchedulerPredictionType (or None).
+        '''
+        # avoid circular import here
+        from invokeai.backend.install.model_install_backend import ModelInstall
+        successfully_installed = set()
+        
+        installer = ModelInstall(config = self.globals,
+                                 prediction_type_helper = prediction_type_helper,
+                                 model_manager = self)
+        for thing in items_to_import:
+            try:
+                installer.heuristic_install(thing)
+                successfully_installed.add(thing)
+            except Exception as e:
+                self.logger.warning(f'{thing} could not be imported: {str(e)}')
+                
+        self.commit()                
+        return successfully_installed
+                
+        
+        

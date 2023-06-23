@@ -1,17 +1,14 @@
 import json
-import traceback
 import torch
 import safetensors.torch
 
 from dataclasses import dataclass
-from enum import Enum
 
-from diffusers import ModelMixin, ConfigMixin, StableDiffusionPipeline, AutoencoderKL, ControlNetModel
+from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
 from typing import Callable, Literal, Union, Dict
 from picklescan.scanner import scan_file_path
 
-import invokeai.backend.util.logging as logger
 from .models import BaseModelType, ModelType, ModelVariantType, SchedulerPredictionType, SilenceWarnings
 
 @dataclass
@@ -102,7 +99,7 @@ class ModelProbe(object):
                                      and prediction_type==SchedulerPredictionType.VPrediction \
                                      ) else 512,
             )
-        except Exception as e:
+        except Exception:
             return None
 
         return model_info
@@ -115,6 +112,9 @@ class ModelProbe(object):
             return ModelType.TextualInversion
         checkpoint = checkpoint or cls._scan_and_load_checkpoint(model_path)
         state_dict = checkpoint.get("state_dict") or checkpoint
+        
+        if len(checkpoint) < 10 and all(isinstance(v, torch.Tensor) for v in checkpoint.values()):
+            return ModelType.TextualInversion
         if any([x.startswith("model.diffusion_model") for x in state_dict.keys()]):
             return ModelType.Pipeline
         if any([x.startswith("encoder.conv_in") for x in state_dict.keys()]):
@@ -326,13 +326,9 @@ class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
         if self.model:
             unet_conf = self.model.unet.config
-            scheduler_conf = self.model.scheduler.config
         else:
             with open(self.folder_path / 'unet' / 'config.json','r') as file:
                 unet_conf = json.load(file)
-            with open(self.folder_path / 'scheduler' / 'scheduler_config.json','r') as file:
-                scheduler_conf = json.load(file)
-            
         if unet_conf['cross_attention_dim'] == 768:
             return BaseModelType.StableDiffusion1  
         elif unet_conf['cross_attention_dim'] == 1024:
