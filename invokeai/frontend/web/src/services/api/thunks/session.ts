@@ -41,7 +41,7 @@ export const sessionCreated = createAppAsyncThunk<
     body: graph,
   });
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
@@ -81,14 +81,12 @@ export const sessionInvoked = createAppAsyncThunk<
     }
   );
 
-  if (error || !data) {
+  if (error) {
     if (isErrorWithStatus(error) && error.status === 403) {
       return rejectWithValue({ arg, error: (error as any).body.detail });
     }
     return rejectWithValue({ arg, error });
   }
-
-  return data;
 });
 
 type CancelSessionArg =
@@ -123,7 +121,7 @@ export const sessionCanceled = createAppAsyncThunk<
     }
   );
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
@@ -157,7 +155,7 @@ export const listedSessions = createAppAsyncThunk<
     params,
   });
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 

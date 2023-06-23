@@ -38,7 +38,7 @@ export const imageUrlsReceived = createAppAsyncThunk<
     }
   );
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
@@ -73,7 +73,7 @@ export const imageMetadataReceived = createAppAsyncThunk<
     }
   );
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
@@ -163,10 +163,11 @@ export const imageUploaded = createAppAsyncThunk<
     },
     // TODO: Proper handling of `multipart/form-data` is coming soon, will fix type issues
     // https://github.com/drwpow/openapi-typescript/issues/1123
+    // @ts-ignore
     body: formData,
   });
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
@@ -202,11 +203,9 @@ export const imageDeleted = createAppAsyncThunk<
     },
   });
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
-
-  return data;
 });
 
 type UpdateImageArg =
@@ -244,7 +243,7 @@ export const imageUpdated = createAppAsyncThunk<
     },
   });
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
@@ -313,7 +312,7 @@ export const receivedPageOfImages = createAppAsyncThunk<
     },
   });
 
-  if (error || !data) {
+  if (error) {
     return rejectWithValue({ arg, error });
   }
 
