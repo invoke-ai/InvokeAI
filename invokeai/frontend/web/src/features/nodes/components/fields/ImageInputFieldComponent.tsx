@@ -26,11 +26,11 @@ const ImageInputFieldComponent = (
     isLoading,
     isError,
     isSuccess,
-  } = useGetImageDTOQuery(field.value ?? skipToken);
+  } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
 
   const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (field.value === droppedImage.image_name) {
+    ({ image_name }: ImageDTO) => {
+      if (field.value?.image_name === image_name) {
         return;
       }
 
@@ -38,7 +38,7 @@ const ImageInputFieldComponent = (
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: droppedImage.image_name,
+          value: { image_name },
         })
       );
     },

@@ -11,14 +11,13 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageDTO } from 'services/api/types';
+import { ImageField } from 'services/api/types';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
-import { forEach, size } from 'lodash-es';
+import { size } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
-import { imageUrlsReceived } from 'services/api/thunks/image';
 import { RootState } from 'app/store/store';
 
 export type NodesState = {
@@ -66,7 +65,7 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value: string | number | boolean | ImageDTO | RgbaColor | undefined;
+        value: string | number | boolean | ImageField | RgbaColor | undefined;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;
