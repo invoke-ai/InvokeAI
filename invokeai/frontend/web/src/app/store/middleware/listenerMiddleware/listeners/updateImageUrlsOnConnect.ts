@@ -22,15 +22,15 @@ const selectAllUsedImages = createSelector(
     selectImagesEntities,
   ],
   (generation, canvas, nodes, controlNet, imageEntities) => {
-    const allUsedImages: ImageDTO[] = [];
+    const allUsedImages: string[] = [];
 
     if (generation.initialImage) {
-      allUsedImages.push(generation.initialImage);
+      allUsedImages.push(generation.initialImage.imageName);
     }
 
     canvas.layerState.objects.forEach((obj) => {
       if (obj.kind === 'image') {
-        allUsedImages.push(obj.image);
+        allUsedImages.push(obj.imageName);
       }
     });
 
@@ -53,7 +53,7 @@ const selectAllUsedImages = createSelector(
 
     forEach(imageEntities, (image) => {
       if (image) {
-        allUsedImages.push(image);
+        allUsedImages.push(image.image_name);
       }
     });
 
@@ -80,7 +80,7 @@ export const addUpdateImageUrlsOnConnectListener = () => {
         `Fetching new image URLs for ${allUsedImages.length} images`
       );
 
-      allUsedImages.forEach(({ image_name }) => {
+      allUsedImages.forEach((image_name) => {
         dispatch(
           imageUrlsReceived({
             imageName: image_name,

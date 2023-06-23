@@ -556,8 +556,8 @@ class ModelPatcher:
         new_tokens_added = None
 
         try:
-            ti_manager = TextualInversionManager()
             ti_tokenizer = copy.deepcopy(tokenizer)
+            ti_manager = TextualInversionManager(ti_tokenizer)
             init_tokens_count = text_encoder.resize_token_embeddings(None).num_embeddings
 
             def _get_trigger(ti, index):
@@ -650,21 +650,23 @@ class TextualInversionModel:
 
 class TextualInversionManager(BaseTextualInversionManager):
     pad_tokens: Dict[int, List[int]]
+    tokenizer: CLIPTokenizer
 
-    def __init__(self):
+    def __init__(self, tokenizer: CLIPTokenizer):
         self.pad_tokens = dict()
+        self.tokenizer = tokenizer
 
     def expand_textual_inversion_token_ids_if_necessary(
         self, token_ids: list[int]
     ) -> list[int]:
 
-        #if token_ids[0] == self.tokenizer.bos_token_id:
-        #    raise ValueError("token_ids must not start with bos_token_id")
-        #if token_ids[-1] == self.tokenizer.eos_token_id:
-        #    raise ValueError("token_ids must not end with eos_token_id")
-
         if len(self.pad_tokens) == 0:
             return token_ids
+
+        if token_ids[0] == self.tokenizer.bos_token_id:
+            raise ValueError("token_ids must not start with bos_token_id")
+        if token_ids[-1] == self.tokenizer.eos_token_id:
+            raise ValueError("token_ids must not end with eos_token_id")
 
         new_token_ids = []
         for token_id in token_ids:

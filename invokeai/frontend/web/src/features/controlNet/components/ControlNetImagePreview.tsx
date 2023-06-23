@@ -11,9 +11,11 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaUndo } from 'react-icons/fa';
+import { useGetImageDTOQuery } from 'services/apiSlice';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
   controlNetSelector,
@@ -31,24 +33,45 @@ type Props = {
 
 const ControlNetImagePreview = (props: Props) => {
   const { imageSx } = props;
-  const { controlNetId, controlImage, processedControlImage, processorType } =
-    props.controlNet;
+  const {
+    controlNetId,
+    controlImage: controlImageName,
+    processedControlImage: processedControlImageName,
+    processorType,
+  } = props.controlNet;
   const dispatch = useAppDispatch();
   const { pendingControlImages } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
+  const {
+    data: controlImage,
+    isLoading: isLoadingControlImage,
+    isError: isErrorControlImage,
+    isSuccess: isSuccessControlImage,
+  } = useGetImageDTOQuery(controlImageName ?? skipToken);
+
+  const {
+    data: processedControlImage,
+    isLoading: isLoadingProcessedControlImage,
+    isError: isErrorProcessedControlImage,
+    isSuccess: isSuccessProcessedControlImage,
+  } = useGetImageDTOQuery(processedControlImageName ?? skipToken);
+
   const handleDrop = useCallback(
     (droppedImage: ImageDTO) => {
-      if (controlImage?.image_name === droppedImage.image_name) {
+      if (controlImageName === droppedImage.image_name) {
         return;
       }
       setIsMouseOverImage(false);
       dispatch(
-        controlNetImageChanged({ controlNetId, controlImage: droppedImage })
+        controlNetImageChanged({
+          controlNetId,
+          controlImage: droppedImage.image_name,
+        })
       );
     },
-    [controlImage, controlNetId, dispatch]
+    [controlImageName, controlNetId, dispatch]
   );
 
   const handleResetControlImage = useCallback(() => {
@@ -150,7 +173,7 @@ const ControlNetImagePreview = (props: Props) => {
             h: 'full',
           }}
         >
-          <IAIImageFallback />
+          <IAIImageLoadingFallback />
         </Box>
       )}
       {controlImage && (

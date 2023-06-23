@@ -8,8 +8,6 @@ from pathlib import Path
 os.environ['INVOKEAI_ROOT']='/tmp'
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.invocations.generate import TextToImageInvocation
-
 
 init1 = OmegaConf.create(
 '''
@@ -37,13 +35,13 @@ def test_use_init():
     # sys.argv respectively.
     conf1 = InvokeAIAppConfig.get_config()
     assert conf1
-    conf1.parse_args(conf=init1)
+    conf1.parse_args(conf=init1,argv=[])
     assert conf1.max_loaded_models==5
     assert not conf1.nsfw_checker
 
     conf2 = InvokeAIAppConfig.get_config()
     assert conf2
-    conf2.parse_args(conf=init2)
+    conf2.parse_args(conf=init2,argv=[])
     assert conf2.nsfw_checker
     assert conf2.max_loaded_models==2
     assert not hasattr(conf2,'invalid_attribute')
@@ -67,7 +65,7 @@ def test_env_override():
     # environment variables should be case insensitive
     os.environ['InvokeAI_Max_Loaded_Models'] = '15'
     conf = InvokeAIAppConfig()
-    conf.parse_args(conf=init1)
+    conf.parse_args(conf=init1,argv=[])
     assert conf.max_loaded_models == 15
 
     conf = InvokeAIAppConfig()

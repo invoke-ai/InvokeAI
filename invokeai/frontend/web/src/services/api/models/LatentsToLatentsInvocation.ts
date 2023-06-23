@@ -5,6 +5,7 @@
 import type { ConditioningField } from './ConditioningField';
 import type { ControlField } from './ControlField';
 import type { LatentsField } from './LatentsField';
+import type { UNetField } from './UNetField';
 
 /**
  * Generates latents using latents as base image.
@@ -42,11 +43,11 @@ export type LatentsToLatentsInvocation = {
   /**
    * The scheduler to use
    */
-  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'lms_k' | 'pndm' | 'heun' | 'heun_k' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2s_k' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'unipc';
+  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'lms_k' | 'pndm' | 'heun' | 'heun_k' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2s_k' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'dpmpp_2m_sde' | 'dpmpp_2m_sde_k' | 'dpmpp_sde' | 'dpmpp_sde_k' | 'unipc';
   /**
-   * The model to use (currently ignored)
+   * UNet submodel
    */
-  model?: string;
+  unet?: UNetField;
   /**
    * The control to use
    */

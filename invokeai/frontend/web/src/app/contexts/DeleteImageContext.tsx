@@ -35,25 +35,23 @@ export const selectImageUsage = createSelector(
     (state: RootState, image_name?: string) => image_name,
   ],
   (generation, canvas, nodes, controlNet, image_name) => {
-    const isInitialImage = generation.initialImage?.image_name === image_name;
+    const isInitialImage = generation.initialImage?.imageName === image_name;
 
     const isCanvasImage = canvas.layerState.objects.some(
-      (obj) => obj.kind === 'image' && obj.image.image_name === image_name
+      (obj) => obj.kind === 'image' && obj.imageName === image_name
     );
 
     const isNodesImage = nodes.nodes.some((node) => {
       return some(
         node.data.inputs,
-        (input) =>
-          input.type === 'image' && input.value?.image_name === image_name
+        (input) => input.type === 'image' && input.value === image_name
       );
     });
 
     const isControlNetImage = some(
       controlNet.controlNets,
       (c) =>
-        c.controlImage?.image_name === image_name ||
-        c.processedControlImage?.image_name === image_name
+        c.controlImage === image_name || c.processedControlImage === image_name
     );
 
     const imageUsage: ImageUsage = {

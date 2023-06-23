@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 import type { ImageField } from './ImageField';
+import type { VaeField } from './VaeField';
 
 /**
  * Encodes an image into latents.
@@ -22,8 +23,12 @@ export type ImageToLatentsInvocation = {
    */
   image?: ImageField;
   /**
-   * The model to use
+   * Vae submodel
    */
-  model?: string;
+  vae?: VaeField;
+  /**
+   * Encode latents by overlaping tiles(less memory consumption)
+   */
+  tiled?: boolean;
 };
 

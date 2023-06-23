@@ -1,5 +1,6 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { selectImagesAll } from 'features/gallery/store/imagesSlice';
+import { size } from 'lodash-es';
 import { ImagesService } from 'services/api';
 
 type imageUrlsReceivedArg = Parameters<
@@ -121,25 +122,61 @@ type ImagesListedArg = Parameters<
 
 export const IMAGES_PER_PAGE = 20;
 
+const DEFAULT_IMAGES_LISTED_ARG = {
+  isIntermediate: false,
+  limit: IMAGES_PER_PAGE,
+};
+
 /**
  * `ImagesService.listImagesWithMetadata()` thunk
  */
 export const receivedPageOfImages = createAppAsyncThunk(
   'api/receivedPageOfImages',
-  async (_, { getState }) => {
+  async (arg: ImagesListedArg, { getState }) => {
     const state = getState();
     const { categories } = state.images;
+    const { selectedBoardId } = state.boards;
 
-    const totalImagesInFilter = selectImagesAll(state).filter((i) =>
-      categories.includes(i.image_category)
-    ).length;
-
-    const response = await ImagesService.listImagesWithMetadata({
-      categories,
-      isIntermediate: false,
-      offset: totalImagesInFilter,
-      limit: IMAGES_PER_PAGE,
+    const images = selectImagesAll(state).filter((i) => {
+      const isInCategory = categories.includes(i.image_category);
+      const isInSelectedBoard = selectedBoardId
+        ? i.board_id === selectedBoardId
+        : true;
+      return isInCategory && isInSelectedBoard;
     });
+
+    let queryArg: ReceivedImagesArg = {};
+
+    if (size(arg)) {
+      queryArg = {
+        ...DEFAULT_IMAGES_LISTED_ARG,
+        offset: images.length,
+        ...arg,
+      };
+    } else {
+      queryArg = {
+        ...DEFAULT_IMAGES_LISTED_ARG,
+        categories,
+        offset: images.length,
+      };
+    }
+
+    const response = await ImagesService.listImagesWithMetadata(queryArg);
+    return response;
+  }
+);
+
+type ReceivedImagesArg = Parameters<
+  (typeof ImagesService)['listImagesWithMetadata']
+>[0];
+
+/**
+ * `ImagesService.listImagesWithMetadata()` thunk
+ */
+export const receivedImages = createAppAsyncThunk(
+  'api/receivedImages',
+  async (arg: ReceivedImagesArg, { getState }) => {
+    const response = await ImagesService.listImagesWithMetadata(arg);
     return response;
   }
 );

@@ -11,7 +11,6 @@ import { dateComparator } from 'common/util/dateComparator';
 import { keyBy } from 'lodash-es';
 import {
   imageDeleted,
-  imageMetadataReceived,
   imageUrlsReceived,
   receivedPageOfImages,
 } from 'services/thunks/image';
@@ -74,11 +73,21 @@ const imagesSlice = createSlice({
     });
     builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
       state.isLoading = false;
+      const { boardId, categories, imageOrigin, isIntermediate } =
+        action.meta.arg;
+
       const { items, offset, limit, total } = action.payload;
+      imagesAdapter.upsertMany(state, items);
+
+      if (!categories?.includes('general') || boardId) {
+        // need to skip updating the total images count if the images recieved were for a specific board
+        // TODO: this doesn't work when on the Asset tab/category...
+        return;
+      }
+
       state.offset = offset;
       state.limit = limit;
       state.total = total;
-      imagesAdapter.upsertMany(state, items);
     });
     builder.addCase(imageDeleted.pending, (state, action) => {
       // Image deleted
@@ -154,3 +163,16 @@ export const selectFilteredImagesIds = createSelector(
       .map((i) => i.image_name);
   }
 );
+
+// export const selectImageById = createSelector(
+//   (state: RootState, imageId) => state,
+//   (state) => {
+//     const {
+//       images: { categories },
+//     } = state;
+
+//     return selectImagesAll(state)
+//       .filter((i) => categories.includes(i.image_category))
+//       .map((i) => i.image_name);
+//   }
+// );

@@ -2,8 +2,7 @@ import { RootState } from 'app/store/store';
 import { filter, forEach, size } from 'lodash-es';
 import { CollectInvocation, ControlNetInvocation } from 'services/api';
 import { NonNullableGraph } from '../types/types';
-
-const CONTROL_NET_COLLECT = 'control_net_collect';
+import { CONTROL_NET_COLLECT } from './graphBuilders/constants';
 
 export const addControlNetToLinearGraph = (
   graph: NonNullableGraph,
@@ -37,7 +36,7 @@ export const addControlNetToLinearGraph = (
       });
     }
 
-    forEach(controlNets, (controlNet, index) => {
+    forEach(controlNets, (controlNet) => {
       const {
         controlNetId,
         isEnabled,
@@ -66,15 +65,13 @@ export const addControlNetToLinearGraph = (
 
       if (processedControlImage && processorType !== 'none') {
         // We've already processed the image in the app, so we can just use the processed image
-        const { image_name } = processedControlImage;
         controlNetNode.image = {
-          image_name,
+          image_name: processedControlImage,
         };
       } else if (controlImage) {
         // The control image is preprocessed
-        const { image_name } = controlImage;
         controlNetNode.image = {
-          image_name,
+          image_name: controlImage,
         };
       } else {
         // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly

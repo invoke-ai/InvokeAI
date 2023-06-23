@@ -3,7 +3,10 @@
 /* eslint-disable */
 
 import type { ColorField } from './ColorField';
+import type { ConditioningField } from './ConditioningField';
 import type { ImageField } from './ImageField';
+import type { UNetField } from './UNetField';
+import type { VaeField } from './VaeField';
 
 /**
  * Generates an image using inpaint.
@@ -19,9 +22,13 @@ export type InpaintInvocation = {
   is_intermediate?: boolean;
   type?: 'inpaint';
   /**
-   * The prompt to generate an image from
+   * Positive conditioning for generation
    */
-  prompt?: string;
+  positive_conditioning?: ConditioningField;
+  /**
+   * Negative conditioning for generation
+   */
+  negative_conditioning?: ConditioningField;
   /**
    * The seed to use (omit for random)
    */
@@ -45,23 +52,15 @@ export type InpaintInvocation = {
   /**
    * The scheduler to use
    */
-  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'lms_k' | 'pndm' | 'heun' | 'heun_k' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2s_k' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'unipc';
+  scheduler?: 'ddim' | 'ddpm' | 'deis' | 'lms' | 'lms_k' | 'pndm' | 'heun' | 'heun_k' | 'euler' | 'euler_k' | 'euler_a' | 'kdpm_2' | 'kdpm_2_a' | 'dpmpp_2s' | 'dpmpp_2s_k' | 'dpmpp_2m' | 'dpmpp_2m_k' | 'dpmpp_2m_sde' | 'dpmpp_2m_sde_k' | 'dpmpp_sde' | 'dpmpp_sde_k' | 'unipc';
   /**
-   * The model to use (currently ignored)
+   * UNet model
    */
-  model?: string;
+  unet?: UNetField;
   /**
-   * Whether or not to produce progress images during generation
+   * Vae model
    */
-  progress_images?: boolean;
-  /**
-   * The control model to use
-   */
-  control_model?: string;
-  /**
-   * The processed control image
-   */
-  control_image?: ImageField;
+  vae?: VaeField;
   /**
    * The input image
    */
