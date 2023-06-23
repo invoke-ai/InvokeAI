@@ -121,21 +121,21 @@ class ModelInstall(object):
 
         # supplement with entries in models.yaml
         installed_models = self.mgr.list_models()
-        for base in installed_models.keys():
-            for model_type in installed_models[base].keys():
-                for name, value in installed_models[base][model_type].items():
-                    key = ModelManager.create_key(name, base, model_type)
-                    if key in model_dict:
-                        model_dict[key].installed = True
-                    else:
-                        model_dict[key] = ModelLoadInfo(
-                            name = name,
-                            base_type = base,
-                            model_type = model_type,
-#                            description = value.get('description'),
-                            path = value.get('path'),
-                            installed = True,
-                        )
+        for md in installed_models:
+            base = md['base_model']
+            model_type = md['type']
+            name = md['name']
+            key = ModelManager.create_key(name, base, model_type)
+            if key in model_dict:
+                model_dict[key].installed = True
+            else:
+                model_dict[key] = ModelLoadInfo(
+                    name = name,
+                    base_type = base,
+                    model_type = model_type,
+                    path = value.get('path'),
+                    installed = True,
+                )
         return {x : model_dict[x] for x in sorted(model_dict.keys(),key=lambda y: model_dict[y].name.lower())}
 
     def starter_models(self)->Set[str]:
@@ -316,7 +316,7 @@ class ModelInstall(object):
         attributes = dict(
             path = str(path),
             description = str(description),
-            format = info.format,
+            model_format = info.format,
             )
         if info.model_type == ModelType.Pipeline:
             attributes.update(
