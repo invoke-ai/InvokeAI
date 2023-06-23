@@ -384,7 +384,8 @@ class ModelManager(object):
         # if it known model check that target path exists (if manualy deleted)
         else:
             # logic repeated twice(in rescan too) any way to optimize?
-            if not os.path.exists(self.models[model_key].path):
+            model_path = self.globals.root_path / self.models[model_key].path
+            if not model_path.exists():
                 if model_class.save_to_config:
                     self.models[model_key].error = ModelError.NotFound
                     raise Exception(f"Files for model \"{model_key}\" not found")
@@ -395,13 +396,13 @@ class ModelManager(object):
 
             # reset model errors?
 
-
-
         model_config = self.models[model_key]
 
         # /models/{base_model}/{model_type}/{name}.ckpt or .safentesors
         # /models/{base_model}/{model_type}/{name}/
-        model_path = model_config.path
+        # massage relative paths into absolute ones
+        model_path = model_path or self.globals.root_path / model_config.path 
+        model_config.path = model_path
 
         # vae/movq override
         # TODO: 
@@ -415,7 +416,7 @@ class ModelManager(object):
 
         # TODO: path
         # TODO: is it accurate to use path as id
-        dst_convert_path = self.globals.models_dir / ".cache" / hashlib.md5(model_path.encode()).hexdigest()
+        dst_convert_path = self.globals.models_dir / ".cache" / hashlib.md5(str(model_path).encode()).hexdigest()
         model_path = model_class.convert_if_required(
             base_model=base_model,
             model_path=model_path,
