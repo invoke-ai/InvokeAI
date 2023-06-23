@@ -7,7 +7,7 @@ import type { ImageMetadata } from './ImageMetadata';
 import type { ResourceOrigin } from './ResourceOrigin';
 
 /**
- * Deserialized image record, enriched for the frontend with URLs.
+ * Deserialized image record, enriched for the frontend.
  */
 export type ImageDTO = {
   /**
@@ -66,5 +66,9 @@ export type ImageDTO = {
    * A limited subset of the image's generation metadata. Retrieve the image's session for full metadata.
    */
   metadata?: ImageMetadata;
+  /**
+   * The id of the board the image belongs to, if one exists.
+   */
+  board_id?: string;
 };
 

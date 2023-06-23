@@ -1,44 +1,59 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect, {
-  IAISelectDataType,
-} from 'common/components/IAIMantineSelect';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { modelSelected } from 'features/parameters/store/generationSlice';
-import { selectModelsAll, selectModelsById } from '../store/modelSlice';
 
-const selector = createSelector(
-  [(state: RootState) => state, generationSelector],
-  (state, generation) => {
-    const selectedModel = selectModelsById(state, generation.model);
+import { forEach, isString } from 'lodash-es';
+import { SelectItem } from '@mantine/core';
+import { RootState } from 'app/store/store';
+import { useListModelsQuery } from 'services/apiSlice';
 
-    const modelData = selectModelsAll(state)
-      .map<IAISelectDataType>((m) => ({
-        value: m.name,
-        label: m.name,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return {
-      selectedModel,
-      modelData,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+export const MODEL_TYPE_MAP = {
+  'sd-1': 'Stable Diffusion 1.x',
+  'sd-2': 'Stable Diffusion 2.x',
+};
 
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { selectedModel, modelData } = useAppSelector(selector);
+
+  const selectedModelId = useAppSelector(
+    (state: RootState) => state.generation.model
+  );
+
+  const { data: pipelineModels } = useListModelsQuery({
+    model_type: 'pipeline',
+  });
+
+  const data = useMemo(() => {
+    if (!pipelineModels) {
+      return [];
+    }
+
+    const data: SelectItem[] = [];
+
+    forEach(pipelineModels.entities, (model, id) => {
+      if (!model) {
+        return;
+      }
+
+      data.push({
+        value: id,
+        label: model.name,
+        group: MODEL_TYPE_MAP[model.base_model],
+      });
+    });
+
+    return data;
+  }, [pipelineModels]);
+
+  const selectedModel = useMemo(
+    () => pipelineModels?.entities[selectedModelId],
+    [pipelineModels?.entities, selectedModelId]
+  );
+
   const handleChangeModel = useCallback(
     (v: string | null) => {
       if (!v) {
@@ -49,13 +64,27 @@ const ModelSelect = () => {
     [dispatch]
   );
 
+  useEffect(() => {
+    if (selectedModelId && pipelineModels?.ids.includes(selectedModelId)) {
+      return;
+    }
+
+    const firstModel = pipelineModels?.ids[0];
+
+    if (!isString(firstModel)) {
+      return;
+    }
+
+    handleChangeModel(firstModel);
+  }, [handleChangeModel, pipelineModels?.ids, selectedModelId]);
+
   return (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
-      value={selectedModel?.name ?? ''}
+      value={selectedModelId}
       placeholder="Pick one"
-      data={modelData}
+      data={data}
       onChange={handleChangeModel}
     />
   );

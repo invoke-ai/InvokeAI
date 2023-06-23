@@ -1,28 +1,18 @@
-import { Select } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { SelectItem } from '@mantine/core';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ModelInputFieldTemplate,
   ModelInputFieldValue,
 } from 'features/nodes/types/types';
-import { selectModelsIds } from 'features/system/store/modelSlice';
-import { isEqual } from 'lodash-es';
-import { ChangeEvent, memo } from 'react';
-import { FieldComponentProps } from './types';
 
-const availableModelsSelector = createSelector(
-  [selectModelsIds],
-  (allModelNames) => {
-    return { allModelNames };
-    // return map(modelList, (_, name) => name);
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import { memo, useCallback, useEffect, useMemo } from 'react';
+import { FieldComponentProps } from './types';
+import { forEach, isString } from 'lodash-es';
+import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { useTranslation } from 'react-i18next';
+import { useListModelsQuery } from 'services/apiSlice';
 
 const ModelInputFieldComponent = (
   props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
@@ -30,28 +20,82 @@ const ModelInputFieldComponent = (
   const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
-  const { allModelNames } = useAppSelector(availableModelsSelector);
+  const { data: pipelineModels } = useListModelsQuery({
+    model_type: 'pipeline',
+  });
 
-  const handleValueChanged = (e: ChangeEvent<HTMLSelectElement>) => {
-    dispatch(
-      fieldValueChanged({
-        nodeId,
-        fieldName: field.name,
-        value: e.target.value,
-      })
-    );
-  };
+  const data = useMemo(() => {
+    if (!pipelineModels) {
+      return [];
+    }
+
+    const data: SelectItem[] = [];
+
+    forEach(pipelineModels.entities, (model, id) => {
+      if (!model) {
+        return;
+      }
+
+      data.push({
+        value: id,
+        label: model.name,
+        group: BASE_MODEL_NAME_MAP[model.base_model],
+      });
+    });
+
+    return data;
+  }, [pipelineModels]);
+
+  const selectedModel = useMemo(
+    () => pipelineModels?.entities[field.value ?? pipelineModels.ids[0]],
+    [pipelineModels?.entities, pipelineModels?.ids, field.value]
+  );
+
+  const handleValueChanged = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+
+      dispatch(
+        fieldValueChanged({
+          nodeId,
+          fieldName: field.name,
+          value: v,
+        })
+      );
+    },
+    [dispatch, field.name, nodeId]
+  );
+
+  useEffect(() => {
+    if (field.value && pipelineModels?.ids.includes(field.value)) {
+      return;
+    }
+
+    const firstModel = pipelineModels?.ids[0];
+
+    if (!isString(firstModel)) {
+      return;
+    }
+
+    handleValueChanged(firstModel);
+  }, [field.value, handleValueChanged, pipelineModels?.ids]);
 
   return (
-    <Select
+    <IAIMantineSelect
+      tooltip={selectedModel?.description}
+      label={
+        selectedModel?.base_model &&
+        BASE_MODEL_NAME_MAP[selectedModel?.base_model]
+      }
+      value={field.value}
+      placeholder="Pick one"
+      data={data}
       onChange={handleValueChanged}
-      value={field.value || allModelNames[0]}
-    >
-      {allModelNames.map((option) => (
-        <option key={option}>{option}</option>
-      ))}
-    </Select>
+    />
   );
 };
 

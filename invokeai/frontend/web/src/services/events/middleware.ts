@@ -85,6 +85,7 @@ export const socketMiddleware = () => {
           socketSubscribed({
             sessionId: sessionId,
             timestamp: getTimestamp(),
+            boardId: getState().boards.selectedBoardId,
           })
         );
       }

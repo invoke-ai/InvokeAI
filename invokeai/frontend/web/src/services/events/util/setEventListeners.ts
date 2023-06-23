@@ -44,6 +44,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         socketSubscribed({
           sessionId,
           timestamp: getTimestamp(),
+          boardId: getState().boards.selectedBoardId,
         })
       );
     }

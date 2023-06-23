@@ -101,21 +101,6 @@ const nodesSlice = createSlice({
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
     });
-
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
-
-      state.nodes.forEach((node) => {
-        forEach(node.data.inputs, (input) => {
-          if (input.type === 'image') {
-            if (input.value?.image_name === image_name) {
-              input.value.image_url = image_url;
-              input.value.thumbnail_url = thumbnail_url;
-            }
-          }
-        });
-      });
-    });
   },
 });
 

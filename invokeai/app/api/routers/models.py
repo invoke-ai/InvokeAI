@@ -7,8 +7,8 @@ from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from ..dependencies import ApiDependencies
 from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_management.models import get_all_model_configs
-MODEL_CONFIGS = Union[tuple(get_all_model_configs())]
+from invokeai.backend.model_management.models import OPENAPI_MODEL_CONFIGS
+MODEL_CONFIGS = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -62,8 +62,7 @@ class ConvertedModelResponse(BaseModel):
     info: DiffusersModelInfo = Field(description="The converted model info")
 
 class ModelsList(BaseModel):
-    models: Dict[BaseModelType, Dict[ModelType, Dict[str, MODEL_CONFIGS]]] # TODO: debug/discuss with frontend
-    #models: dict[SDModelType, dict[str, Annotated[Union[(DiffusersModelInfo,CkptModelInfo,SafetensorsModelInfo)], Field(discriminator="format")]]]
+    models: list[MODEL_CONFIGS]
 
 
 @models_router.get(
@@ -72,10 +71,10 @@ class ModelsList(BaseModel):
     responses={200: {"model": ModelsList }},
 )
 async def list_models(
-    base_model: BaseModelType = Query(
+    base_model: Optional[BaseModelType] = Query(
         default=None, description="Base model"
     ),
-    model_type: ModelType = Query(
+    model_type: Optional[ModelType] = Query(
         default=None, description="The type of model to get"
     ),
 ) -> ModelsList:

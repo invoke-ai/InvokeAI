@@ -1,12 +1,15 @@
 import {
   Box,
+  Button,
   ButtonGroup,
   Flex,
   FlexProps,
   Grid,
   Icon,
   Text,
+  VStack,
   forwardRef,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -20,6 +23,7 @@ import {
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
   setShouldUseSingleGalleryColumn,
+  setGalleryView,
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
@@ -53,41 +57,51 @@ import {
   selectImagesAll,
 } from '../store/imagesSlice';
 import { receivedPageOfImages } from 'services/thunks/image';
+import BoardsList from './Boards/BoardsList';
+import { boardsSelector } from '../store/boardSlice';
+import { ChevronUpIcon } from '@chakra-ui/icons';
+import { useListAllBoardsQuery } from 'services/apiSlice';
 
-const categorySelector = createSelector(
+const itemSelector = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { images } = state;
-    const { categories } = images;
+    const { categories, total: allImagesTotal, isLoading } = state.images;
+    const { selectedBoardId } = state.boards;
 
     const allImages = selectImagesAll(state);
-    const filteredImages = allImages.filter((i) =>
-      categories.includes(i.image_category)
-    );
+
+    const images = allImages.filter((i) => {
+      const isInCategory = categories.includes(i.image_category);
+      const isInSelectedBoard = selectedBoardId
+        ? i.board_id === selectedBoardId
+        : true;
+      return isInCategory && isInSelectedBoard;
+    });
 
     return {
-      images: filteredImages,
-      isLoading: images.isLoading,
-      areMoreImagesAvailable: filteredImages.length < images.total,
-      categories: images.categories,
+      images,
+      allImagesTotal,
+      isLoading,
+      categories,
+      selectedBoardId,
     };
   },
   defaultSelectorOptions
 );
 
 const mainSelector = createSelector(
-  [gallerySelector, uiSelector],
-  (gallery, ui) => {
+  [gallerySelector, uiSelector, boardsSelector],
+  (gallery, ui, boards) => {
     const {
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldAutoSwitchToNewImages,
       shouldUseSingleGalleryColumn,
       selectedImage,
+      galleryView,
     } = gallery;
 
     const { shouldPinGallery } = ui;
-
     return {
       shouldPinGallery,
       galleryImageMinimumWidth,
@@ -95,6 +109,8 @@ const mainSelector = createSelector(
       shouldAutoSwitchToNewImages,
       shouldUseSingleGalleryColumn,
       selectedImage,
+      galleryView,
+      selectedBoardId: boards.selectedBoardId,
     };
   },
   defaultSelectorOptions
@@ -126,21 +142,44 @@ const ImageGalleryContent = () => {
     shouldAutoSwitchToNewImages,
     shouldUseSingleGalleryColumn,
     selectedImage,
+    galleryView,
   } = useAppSelector(mainSelector);
 
-  const { images, areMoreImagesAvailable, isLoading, categories } =
-    useAppSelector(categorySelector);
+  const { images, isLoading, allImagesTotal, categories, selectedBoardId } =
+    useAppSelector(itemSelector);
+
+  const { selectedBoard } = useListAllBoardsQuery(undefined, {
+    selectFromResult: ({ data }) => ({
+      selectedBoard: data?.find((b) => b.board_id === selectedBoardId),
+    }),
+  });
+
+  const filteredImagesTotal = useMemo(
+    () => selectedBoard?.image_count ?? allImagesTotal,
+    [allImagesTotal, selectedBoard?.image_count]
+  );
+
+  const areMoreAvailable = useMemo(() => {
+    return images.length < filteredImagesTotal;
+  }, [images.length, filteredImagesTotal]);
 
   const handleLoadMoreImages = useCallback(() => {
-    dispatch(receivedPageOfImages());
-  }, [dispatch]);
+    dispatch(
+      receivedPageOfImages({
+        categories,
+        boardId: selectedBoardId,
+      })
+    );
+  }, [categories, dispatch, selectedBoardId]);
 
   const handleEndReached = useMemo(() => {
-    if (areMoreImagesAvailable && !isLoading) {
+    if (areMoreAvailable && !isLoading) {
       return handleLoadMoreImages;
     }
     return undefined;
-  }, [areMoreImagesAvailable, handleLoadMoreImages, isLoading]);
+  }, [areMoreAvailable, handleLoadMoreImages, isLoading]);
+
+  const { isOpen: isBoardListOpen, onToggle } = useDisclosure();
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
@@ -172,46 +211,79 @@ const ImageGalleryContent = () => {
 
   const handleClickImagesCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
+    dispatch(setGalleryView('images'));
   }, [dispatch]);
 
   const handleClickAssetsCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
+    dispatch(setGalleryView('assets'));
   }, [dispatch]);
 
   return (
-    <Flex
+    <VStack
       sx={{
-        gap: 2,
         flexDirection: 'column',
         h: 'full',
         w: 'full',
         borderRadius: 'base',
       }}
     >
-      <Flex
-        ref={resizeObserverRef}
-        alignItems="center"
-        justifyContent="space-between"
-      >
-        <ButtonGroup isAttached>
-          <IAIIconButton
-            tooltip={t('gallery.images')}
-            aria-label={t('gallery.images')}
-            onClick={handleClickImagesCategory}
-            isChecked={categories === IMAGE_CATEGORIES}
+      <Box sx={{ w: 'full' }}>
+        <Flex
+          ref={resizeObserverRef}
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          <ButtonGroup isAttached>
+            <IAIIconButton
+              tooltip={t('gallery.images')}
+              aria-label={t('gallery.images')}
+              onClick={handleClickImagesCategory}
+              isChecked={galleryView === 'images'}
+              size="sm"
+              icon={<FaImage />}
+            />
+            <IAIIconButton
+              tooltip={t('gallery.assets')}
+              aria-label={t('gallery.assets')}
+              onClick={handleClickAssetsCategory}
+              isChecked={galleryView === 'assets'}
+              size="sm"
+              icon={<FaServer />}
+            />
+          </ButtonGroup>
+          <Flex
+            as={Button}
+            onClick={onToggle}
             size="sm"
-            icon={<FaImage />}
-          />
-          <IAIIconButton
-            tooltip={t('gallery.assets')}
-            aria-label={t('gallery.assets')}
-            onClick={handleClickAssetsCategory}
-            isChecked={categories === ASSETS_CATEGORIES}
-            size="sm"
-            icon={<FaServer />}
-          />
-        </ButtonGroup>
-        <Flex gap={2}>
+            variant="ghost"
+            sx={{
+              w: 'full',
+              justifyContent: 'center',
+              alignItems: 'center',
+              px: 2,
+              _hover: {
+                bg: 'base.800',
+              },
+            }}
+          >
+            <Text
+              noOfLines={1}
+              sx={{ w: 'full', color: 'base.200', fontWeight: 600 }}
+            >
+              {selectedBoard ? selectedBoard.board_name : 'All Images'}
+            </Text>
+            <ChevronUpIcon
+              sx={{
+                transform: isBoardListOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+                transitionProperty: 'common',
+                transitionDuration: 'normal',
+              }}
+            />
+          </Flex>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -269,9 +341,12 @@ const ImageGalleryContent = () => {
             icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
           />
         </Flex>
-      </Flex>
-      <Flex direction="column" gap={2} h="full">
-        {images.length || areMoreImagesAvailable ? (
+        <Box>
+          <BoardsList isOpen={isBoardListOpen} />
+        </Box>
+      </Box>
+      <Flex direction="column" gap={2} h="full" w="full">
+        {images.length || areMoreAvailable ? (
           <>
             <Box ref={rootRef} data-overlayscrollbars="" h="100%">
               {shouldUseSingleGalleryColumn ? (
@@ -280,14 +355,12 @@ const ImageGalleryContent = () => {
                   data={images}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
-                  itemContent={(index, image) => (
+                  itemContent={(index, item) => (
                     <Flex sx={{ pb: 2 }}>
                       <HoverableImage
-                        key={`${image.image_name}-${image.thumbnail_url}`}
-                        image={image}
-                        isSelected={
-                          selectedImage?.image_name === image?.image_name
-                        }
+                        key={`${item.image_name}-${item.thumbnail_url}`}
+                        image={item}
+                        isSelected={selectedImage === item?.image_name}
                       />
                     </Flex>
                   )}
@@ -302,13 +375,11 @@ const ImageGalleryContent = () => {
                     List: ListContainer,
                   }}
                   scrollerRef={setScroller}
-                  itemContent={(index, image) => (
+                  itemContent={(index, item) => (
                     <HoverableImage
-                      key={`${image.image_name}-${image.thumbnail_url}`}
-                      image={image}
-                      isSelected={
-                        selectedImage?.image_name === image?.image_name
-                      }
+                      key={`${item.image_name}-${item.thumbnail_url}`}
+                      image={item}
+                      isSelected={selectedImage === item?.image_name}
                     />
                   )}
                 />
@@ -316,12 +387,12 @@ const ImageGalleryContent = () => {
             </Box>
             <IAIButton
               onClick={handleLoadMoreImages}
-              isDisabled={!areMoreImagesAvailable}
+              isDisabled={!areMoreAvailable}
               isLoading={isLoading}
               loadingText="Loading"
               flexShrink={0}
             >
-              {areMoreImagesAvailable
+              {areMoreAvailable
                 ? t('gallery.loadMore')
                 : t('gallery.allImagesLoaded')}
             </IAIButton>
@@ -350,7 +421,7 @@ const ImageGalleryContent = () => {
           </Flex>
         )}
       </Flex>
-    </Flex>
+    </VStack>
   );
 };
 

@@ -1,5 +1,6 @@
 import os
 import json
+from enum import Enum
 from pydantic import Field
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -19,16 +20,19 @@ from .base import (
 from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
 
+class StableDiffusion1ModelFormat(str, Enum):
+    Checkpoint = "checkpoint"
+    Diffusers = "diffusers"
 
 class StableDiffusion1Model(DiffusersModel):
 
     class DiffusersConfig(ModelConfigBase):
-        format: Literal["diffusers"]
+        model_format: Literal[StableDiffusion1ModelFormat.Diffusers]
         vae: Optional[str] = Field(None)
         variant: ModelVariantType
 
     class CheckpointConfig(ModelConfigBase):
-        format: Literal["checkpoint"]
+        model_format: Literal[StableDiffusion1ModelFormat.Checkpoint]
         vae: Optional[str] = Field(None)
         config: Optional[str] = Field(None)
         variant: ModelVariantType
@@ -47,7 +51,7 @@ class StableDiffusion1Model(DiffusersModel):
     def probe_config(cls, path: str, **kwargs):
         model_format = cls.detect_format(path)
         ckpt_config_path = kwargs.get("config", None)
-        if model_format == "checkpoint":
+        if model_format == StableDiffusion1ModelFormat.Checkpoint:
             if ckpt_config_path:
                 ckpt_config = OmegaConf.load(ckpt_config_path)
                 ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
@@ -57,7 +61,7 @@ class StableDiffusion1Model(DiffusersModel):
                 checkpoint = checkpoint.get('state_dict', checkpoint)
                 in_channels = checkpoint["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
 
-        elif model_format == "diffusers":
+        elif model_format == StableDiffusion1ModelFormat.Diffusers:
             unet_config_path = os.path.join(path, "unet", "config.json")
             if os.path.exists(unet_config_path):
                 with open(unet_config_path, "r") as f:
@@ -80,7 +84,7 @@ class StableDiffusion1Model(DiffusersModel):
 
         return cls.create_config(
             path=path,
-            format=model_format,
+            model_format=model_format,
 
             config=ckpt_config_path,
             variant=variant,
@@ -93,9 +97,9 @@ class StableDiffusion1Model(DiffusersModel):
     @classmethod
     def detect_format(cls, model_path: str):
         if os.path.isdir(model_path):
-            return "diffusers"
+            return StableDiffusion1ModelFormat.Diffusers
         else:
-            return "checkpoint"
+            return StableDiffusion1ModelFormat.Checkpoint
 
     @classmethod
     def convert_if_required(
@@ -116,19 +120,22 @@ class StableDiffusion1Model(DiffusersModel):
         else:
             return model_path
 
+class StableDiffusion2ModelFormat(str, Enum):
+    Checkpoint = "checkpoint"
+    Diffusers = "diffusers"
 
 class StableDiffusion2Model(DiffusersModel):
 
     # TODO: check that configs overwriten properly
     class DiffusersConfig(ModelConfigBase):
-        format: Literal["diffusers"]
+        model_format: Literal[StableDiffusion2ModelFormat.Diffusers]
         vae: Optional[str] = Field(None)
         variant: ModelVariantType
         prediction_type: SchedulerPredictionType
         upcast_attention: bool
 
     class CheckpointConfig(ModelConfigBase):
-        format: Literal["checkpoint"]
+        model_format: Literal[StableDiffusion2ModelFormat.Checkpoint]
         vae: Optional[str] = Field(None)
         config: Optional[str] = Field(None)
         variant: ModelVariantType
@@ -149,7 +156,7 @@ class StableDiffusion2Model(DiffusersModel):
     def probe_config(cls, path: str, **kwargs):
         model_format = cls.detect_format(path)
         ckpt_config_path = kwargs.get("config", None)
-        if model_format == "checkpoint":
+        if model_format == StableDiffusion2ModelFormat.Checkpoint:
             if ckpt_config_path:
                 ckpt_config = OmegaConf.load(ckpt_config_path)
                 ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
@@ -159,7 +166,7 @@ class StableDiffusion2Model(DiffusersModel):
                 checkpoint = checkpoint.get('state_dict', checkpoint)
                 in_channels = checkpoint["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
 
-        elif model_format == "diffusers":
+        elif model_format == StableDiffusion2ModelFormat.Diffusers:
             unet_config_path = os.path.join(path, "unet", "config.json")
             if os.path.exists(unet_config_path):
                 with open(unet_config_path, "r") as f:
@@ -191,7 +198,7 @@ class StableDiffusion2Model(DiffusersModel):
 
         return cls.create_config(
             path=path,
-            format=model_format,
+            model_format=model_format,
 
             config=ckpt_config_path,
             variant=variant,
@@ -206,9 +213,9 @@ class StableDiffusion2Model(DiffusersModel):
     @classmethod
     def detect_format(cls, model_path: str):
         if os.path.isdir(model_path):
-            return "diffusers"
+            return StableDiffusion2ModelFormat.Diffusers
         else:
-            return "checkpoint"
+            return StableDiffusion2ModelFormat.Checkpoint
 
     @classmethod
     def convert_if_required(
@@ -281,8 +288,8 @@ def _convert_ckpt_and_cache(
         prediction_type = SchedulerPredictionType.Epsilon
 
     elif version == BaseModelType.StableDiffusion2:
-        upcast_attention = config.upcast_attention
-        prediction_type = config.prediction_type
+        upcast_attention = model_config.upcast_attention
+        prediction_type = model_config.prediction_type
 
     else:
         raise Exception(f"Unknown model provided: {version}")

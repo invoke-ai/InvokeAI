@@ -11,6 +11,7 @@ import {
   LatentsOutput,
   ResourceOrigin,
   ImageDTO,
+  BoardDTO,
 } from 'services/api';
 
 export const isImageDTO = (obj: unknown): obj is ImageDTO => {
@@ -26,6 +27,16 @@ export const isImageDTO = (obj: unknown): obj is ImageDTO => {
     isString(obj?.image_origin) &&
     'created_at' in obj &&
     isString(obj?.created_at)
+  );
+};
+
+export const isBoardDTO = (obj: unknown): obj is BoardDTO => {
+  return (
+    isObject(obj) &&
+    'board_id' in obj &&
+    isString(obj?.board_id) &&
+    'board_name' in obj &&
+    isString(obj?.board_name)
   );
 };
 

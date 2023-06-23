@@ -9,6 +9,7 @@ import { imageMetadataReceived } from 'services/thunks/image';
 import { sessionCanceled } from 'services/thunks/session';
 import { isImageOutput } from 'services/types/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
+import { api } from 'services/apiSlice';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -24,7 +25,8 @@ export const addInvocationCompleteEventListener = () => {
 
       const sessionId = action.payload.data.graph_execution_state_id;
 
-      const { cancelType, isCancelScheduled } = getState().system;
+      const { cancelType, isCancelScheduled, boardIdToAddTo } =
+        getState().system;
 
       // Handle scheduled cancelation
       if (cancelType === 'scheduled' && isCancelScheduled) {
@@ -55,6 +57,15 @@ export const addInvocationCompleteEventListener = () => {
           getState().canvas.layerState.stagingArea.sessionId
         ) {
           dispatch(addImageToStagingArea(imageDTO));
+        }
+
+        if (boardIdToAddTo && !imageDTO.is_intermediate) {
+          dispatch(
+            api.endpoints.addImageToBoard.initiate({
+              board_id: boardIdToAddTo,
+              image_name,
+            })
+          );
         }
 
         dispatch(progressImageSet(null));
