@@ -24,7 +24,7 @@ logger = InvokeAILogger.getLogger(config=app_config)
 import invokeai.frontend.web as web_dir
 
 from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images
+from .api.routers import sessions, models, images, boards, board_images
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
 
@@ -78,6 +78,10 @@ app.include_router(models.models_router, prefix="/api")
 
 app.include_router(images.images_router, prefix="/api")
 
+app.include_router(boards.boards_router, prefix="/api")
+
+app.include_router(board_images.board_images_router, prefix="/api")
+
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?
 def custom_openapi():
@@ -115,6 +119,22 @@ def custom_openapi():
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
 
         invoker_schema["output"] = outputs_ref
+
+    from invokeai.backend.model_management.models import get_model_config_enums
+    for model_config_format_enum in set(get_model_config_enums()):
+        name = model_config_format_enum.__qualname__
+
+        if name in openapi_schema["components"]["schemas"]:
+            # print(f"Config with name {name} already defined")
+            continue
+
+        # "BaseModelType":{"title":"BaseModelType","description":"An enumeration.","enum":["sd-1","sd-2"],"type":"string"}
+        openapi_schema["components"]["schemas"][name] = dict(
+            title=name,
+            description="An enumeration.",
+            type="string",
+            enum=list(v.value for v in model_config_format_enum),
+        )
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

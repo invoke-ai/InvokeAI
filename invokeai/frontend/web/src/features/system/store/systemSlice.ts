@@ -1,20 +1,12 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
 
-import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../../../app/components/Toaster';
-import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
-import { receivedModels } from 'services/thunks/model';
-import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
-import { LogLevelName } from 'roarr';
 import { InvokeLogLevel } from 'app/logging/useLogger';
-import { TFuncKey } from 'i18next';
-import { t } from 'i18next';
 import { userInvoked } from 'app/store/actions';
-import { LANGUAGES } from '../components/LanguagePicker';
-import { imageUploaded } from 'services/thunks/image';
+import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
+import { TFuncKey, t } from 'i18next';
+import { LogLevelName } from 'roarr';
 import {
   appSocketConnected,
   appSocketDisconnected,
@@ -26,6 +18,11 @@ import {
   appSocketSubscribed,
   appSocketUnsubscribed,
 } from 'services/events/actions';
+import { ProgressImage } from 'services/events/types';
+import { imageUploaded } from 'services/thunks/image';
+import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
+import { makeToast } from '../../../app/components/Toaster';
+import { LANGUAGES } from '../components/LanguagePicker';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -95,6 +92,7 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
+  boardIdToAddTo?: string;
 }
 
 export const initialSystemState: SystemState = {
@@ -225,6 +223,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
+      state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
@@ -233,6 +232,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
+      state.boardIdToAddTo = undefined;
     });
 
     /**
@@ -374,13 +374,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
       );
-    });
-
-    /**
-     * Received available models from the backend
-     */
-    builder.addCase(receivedModels.fulfilled, (state) => {
-      state.wereModelsReceived = true;
     });
 
     /**

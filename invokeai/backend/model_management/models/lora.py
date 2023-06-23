@@ -1,5 +1,6 @@
 import os
 import torch
+from enum import Enum
 from typing import Optional, Union, Literal
 from .base import (
     ModelBase,
@@ -12,11 +13,15 @@ from .base import (
 # TODO: naming
 from ..lora import LoRAModel as LoRAModelRaw
 
+class LoRAModelFormat(str, Enum):
+    LyCORIS = "lycoris"
+    Diffusers = "diffusers"
+
 class LoRAModel(ModelBase):
     #model_size: int
 
     class Config(ModelConfigBase):
-        format: Union[Literal["lycoris"], Literal["diffusers"]]
+        model_format: LoRAModelFormat # TODO:
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.Lora
@@ -52,9 +57,9 @@ class LoRAModel(ModelBase):
     @classmethod
     def detect_format(cls, path: str):
         if os.path.isdir(path):
-            return "diffusers"
+            return LoRAModelFormat.Diffusers
         else:
-            return "lycoris"
+            return LoRAModelFormat.LyCORIS
 
     @classmethod
     def convert_if_required(
@@ -64,7 +69,7 @@ class LoRAModel(ModelBase):
         config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) == "diffusers":
+        if cls.detect_format(model_path) == LoRAModelFormat.Diffusers:
             # TODO: add diffusers lora when it stabilizes a bit
             raise NotImplementedError("Diffusers lora not supported")
         else:

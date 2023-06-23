@@ -59,11 +59,7 @@ const IAICanvasStagingArea = (props: Props) => {
   return (
     <Group {...rest}>
       {shouldShowStagingImage && currentStagingAreaImage && (
-        <IAICanvasImage
-          url={currentStagingAreaImage.image.image_url}
-          x={x}
-          y={y}
-        />
+        <IAICanvasImage canvasImage={currentStagingAreaImage} />
       )}
       {shouldShowStagingOutline && (
         <Group>

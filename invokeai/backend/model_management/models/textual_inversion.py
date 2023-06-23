@@ -16,7 +16,7 @@ class TextualInversionModel(ModelBase):
     #model_size: int
 
     class Config(ModelConfigBase):
-        format: None
+        model_format: None
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.TextualInversion

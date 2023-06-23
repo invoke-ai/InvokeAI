@@ -9,12 +9,12 @@ import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { configSelector } from '../../system/store/configSelectors';
-import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { ImageDTO } from 'services/api';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
+import { useGetImageDTOQuery } from 'services/apiSlice';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -29,7 +29,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      image: selectedImage,
+      selectedImage,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -45,11 +45,23 @@ export const imagesSelector = createSelector(
 const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
-    image,
+    selectedImage,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
+
+  // const image = useAppSelector((state: RootState) =>
+  //   selectImagesById(state, selectedImage ?? '')
+  // );
+
+  const {
+    data: image,
+    isLoading,
+    isError,
+    isSuccess,
+  } = useGetImageDTOQuery(selectedImage ?? skipToken);
+
   const dispatch = useAppDispatch();
 
   const handleDrop = useCallback(
@@ -57,7 +69,7 @@ const CurrentImagePreview = () => {
       if (droppedImage.image_name === image?.image_name) {
         return;
       }
-      dispatch(imageSelected(droppedImage));
+      dispatch(imageSelected(droppedImage.image_name));
     },
     [dispatch, image?.image_name]
   );
@@ -98,14 +110,14 @@ const CurrentImagePreview = () => {
           }}
         >
           <IAIDndImage
-            image={image}
+            image={selectedImage && image ? image : undefined}
             onDrop={handleDrop}
-            fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
+            fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
             isUploadDisabled={true}
           />
         </Flex>
       )}
-      {shouldShowImageDetails && image && (
+      {shouldShowImageDetails && image && selectedImage && (
         <Box
           sx={{
             position: 'absolute',
@@ -119,7 +131,7 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && image && (
+      {!shouldShowImageDetails && image && selectedImage && (
         <Box
           sx={{
             position: 'absolute',
