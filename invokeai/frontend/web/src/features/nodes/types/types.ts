@@ -1,6 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { Graph, ImageDTO } from 'services/api/types';
+import { Graph, ImageDTO, ImageField } from 'services/api/types';
 import { AnyInvocationType } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
@@ -214,7 +214,7 @@ export type VaeInputFieldValue = FieldValueBase & {
 
 export type ImageInputFieldValue = FieldValueBase & {
   type: 'image';
-  value?: string;
+  value?: ImageField;
 };
 
 export type ModelInputFieldValue = FieldValueBase & {
