@@ -158,7 +158,6 @@ def _convert_vae_ckpt_and_cache(
         checkpoint = checkpoint,
         vae_config = config,
         image_size = image_size,
-        model_root = app_config.models_path,
     )
     vae_model.save_pretrained(
         output_path,
