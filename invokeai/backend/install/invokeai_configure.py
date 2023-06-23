@@ -631,8 +631,8 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
                                    }
                                   )
                         )
-    with open(root / 'invokeai.yaml','w') as f:
-        f.write('#empty invokeai.yaml initialization file')
+#    with open(root / 'invokeai.yaml','w') as f:
+#        f.write('#empty invokeai.yaml initialization file')
 
 # -------------------------------------
 def run_console_ui(

@@ -3,8 +3,6 @@ Utility (backend) functions used by model_install.py
 """
 import os
 import shutil
-import sys
-import traceback
 import warnings
 from dataclasses import dataclass,field
 from pathlib import Path
@@ -12,10 +10,9 @@ from tempfile import TemporaryDirectory
 from typing import List, Dict, Callable, Union, Set
 
 import requests
-from diffusers import AutoencoderKL, StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
-from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
 
 import invokeai.configs as configs
@@ -24,7 +21,6 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType
 from invokeai.backend.model_management.model_probe import ModelProbe, SchedulerPredictionType, ModelProbeInfo
 from invokeai.backend.util import download_with_resume
-from ..stable_diffusion import StableDiffusionGeneratorPipeline
 from ..util.logging import InvokeAILogger
 
 warnings.filterwarnings("ignore")
@@ -290,7 +286,7 @@ class ModelInstall(object):
                         location = self._download_hf_model(repo_id, files, staging)
                         break
                     elif f'learned_embeds.{suffix}' in files:
-                        location = self._download_hf_model(repo_id, [f'learned_embeds.suffix'], staging)
+                        location = self._download_hf_model(repo_id, ['learned_embeds.suffix'], staging)
                         break
             if not location:
                 logger.warning(f'Could not determine type of repo {repo_id}. Skipping install.')
@@ -307,7 +303,6 @@ class ModelInstall(object):
             self._install_path(dest, info)
 
     def _make_attributes(self, path: Path, info: ModelProbeInfo)->dict:
-
         # convoluted way to retrieve the description from datasets
         description = f'{info.base_type.value} {info.model_type.value} model'
         if key := self.reverse_paths.get(self.current_id):
@@ -320,18 +315,7 @@ class ModelInstall(object):
             model_format = info.format,
             )
         if info.model_type == ModelType.Pipeline:
-            attributes.update(
-                              dict(
-                                  variant = info.variant_type,
-                              )
-            )
-            if info.base_type == BaseModelType.StableDiffusion2:
-                attributes.update(
-                    dict(
-                        prediction_type = info.prediction_type,
-                        upcast_attention = info.prediction_type == SchedulerPredictionType.VPrediction,
-                    )
-                )
+            attributes.update(dict(variant = info.variant_type,))
             if info.format=="checkpoint":
                 try:
                     legacy_conf = LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type] if info.base_type == BaseModelType.StableDiffusion2 \

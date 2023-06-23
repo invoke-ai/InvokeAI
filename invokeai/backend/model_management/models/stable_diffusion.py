@@ -131,17 +131,12 @@ class StableDiffusion2Model(DiffusersModel):
         model_format: Literal[StableDiffusion2ModelFormat.Diffusers]
         vae: Optional[str] = Field(None)
         variant: ModelVariantType
-        prediction_type: SchedulerPredictionType
-        upcast_attention: bool
 
     class CheckpointConfig(ModelConfigBase):
         model_format: Literal[StableDiffusion2ModelFormat.Checkpoint]
         vae: Optional[str] = Field(None)
-        config: Optional[str] = Field(None)
+        config: str
         variant: ModelVariantType
-        prediction_type: SchedulerPredictionType
-        upcast_attention: bool
-
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion2
