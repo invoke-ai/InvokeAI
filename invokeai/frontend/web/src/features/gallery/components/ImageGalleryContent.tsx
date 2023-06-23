@@ -56,11 +56,11 @@ import {
   imageCategoriesChanged,
   selectImagesAll,
 } from '../store/imagesSlice';
-import { receivedPageOfImages } from 'services/thunks/image';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 import BoardsList from './Boards/BoardsList';
 import { boardsSelector } from '../store/boardSlice';
 import { ChevronUpIcon } from '@chakra-ui/icons';
-import { useListAllBoardsQuery } from 'services/apiSlice';
+import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
@@ -167,7 +167,7 @@ const ImageGalleryContent = () => {
     dispatch(
       receivedPageOfImages({
         categories,
-        boardId: selectedBoardId,
+        board_id: selectedBoardId,
       })
     );
   }, [categories, dispatch, selectedBoardId]);

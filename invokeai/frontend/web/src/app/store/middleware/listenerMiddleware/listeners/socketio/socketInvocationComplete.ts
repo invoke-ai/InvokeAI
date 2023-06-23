@@ -5,11 +5,11 @@ import {
   appSocketInvocationComplete,
   socketInvocationComplete,
 } from 'services/events/actions';
-import { imageMetadataReceived } from 'services/thunks/image';
-import { sessionCanceled } from 'services/thunks/session';
-import { isImageOutput } from 'services/types/guards';
+import { imageMetadataReceived } from 'services/api/thunks/image';
+import { sessionCanceled } from 'services/api/thunks/session';
+import { isImageOutput } from 'services/api/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import { api } from 'services/apiSlice';
+import { api } from 'services/api';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -19,18 +19,18 @@ export const addInvocationCompleteEventListener = () => {
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState, take }) => {
       moduleLog.debug(
-        action.payload,
+        { data: action.payload },
         `Invocation complete (${action.payload.data.node.type})`
       );
 
-      const sessionId = action.payload.data.graph_execution_state_id;
+      const session_id = action.payload.data.graph_execution_state_id;
 
       const { cancelType, isCancelScheduled, boardIdToAddTo } =
         getState().system;
 
       // Handle scheduled cancelation
       if (cancelType === 'scheduled' && isCancelScheduled) {
-        dispatch(sessionCanceled({ sessionId }));
+        dispatch(sessionCanceled({ session_id }));
       }
 
       const { data } = action.payload;
@@ -43,7 +43,7 @@ export const addInvocationCompleteEventListener = () => {
         // Get its metadata
         dispatch(
           imageMetadataReceived({
-            imageName: image_name,
+            image_name,
           })
         );
 

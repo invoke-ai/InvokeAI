@@ -3,7 +3,7 @@ import {
   ImageResizeInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
-} from 'services/api';
+} from 'services/api/types';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { log } from 'app/logging/useLogger';
 import {

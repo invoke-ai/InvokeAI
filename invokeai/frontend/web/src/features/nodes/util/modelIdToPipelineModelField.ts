@@ -1,4 +1,4 @@
-import { BaseModelType, PipelineModelField } from 'services/api';
+import { BaseModelType, PipelineModelField } from 'services/api/types';
 
 /**
  * Crudely converts a model id to a pipeline model field

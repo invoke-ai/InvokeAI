@@ -2,9 +2,12 @@ import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
 import { boardIdSelected } from 'features/gallery/store/boardSlice';
 import { selectImagesAll } from 'features/gallery/store/imagesSlice';
-import { IMAGES_PER_PAGE, receivedPageOfImages } from 'services/thunks/image';
-import { api } from 'services/apiSlice';
+import {
+  IMAGES_PER_PAGE,
+  receivedPageOfImages,
+} from 'services/api/thunks/image';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { boardsApi } from 'services/api/endpoints/boards';
 
 const moduleLog = log.child({ namespace: 'boards' });
 
@@ -12,14 +15,14 @@ export const addBoardIdSelectedListener = () => {
   startAppListening({
     actionCreator: boardIdSelected,
     effect: (action, { getState, dispatch }) => {
-      const boardId = action.payload;
+      const board_id = action.payload;
 
       // we need to check if we need to fetch more images
 
       const state = getState();
       const allImages = selectImagesAll(state);
 
-      if (!boardId) {
+      if (!board_id) {
         // a board was unselected
         dispatch(imageSelected(allImages[0]?.image_name));
         return;
@@ -29,13 +32,14 @@ export const addBoardIdSelectedListener = () => {
 
       const filteredImages = allImages.filter((i) => {
         const isInCategory = categories.includes(i.image_category);
-        const isInSelectedBoard = boardId ? i.board_id === boardId : true;
+        const isInSelectedBoard = board_id ? i.board_id === board_id : true;
         return isInCategory && isInSelectedBoard;
       });
 
       // get the board from the cache
-      const { data: boards } = api.endpoints.listAllBoards.select()(state);
-      const board = boards?.find((b) => b.board_id === boardId);
+      const { data: boards } =
+        boardsApi.endpoints.listAllBoards.select()(state);
+      const board = boards?.find((b) => b.board_id === board_id);
 
       if (!board) {
         // can't find the board in cache...
@@ -50,7 +54,7 @@ export const addBoardIdSelectedListener = () => {
         filteredImages.length < board.image_count &&
         filteredImages.length < IMAGES_PER_PAGE
       ) {
-        dispatch(receivedPageOfImages({ categories, boardId }));
+        dispatch(receivedPageOfImages({ categories, board_id }));
       }
     },
   });
@@ -60,13 +64,13 @@ export const addBoardIdSelected_changeSelectedImage_listener = () => {
   startAppListening({
     actionCreator: boardIdSelected,
     effect: (action, { getState, dispatch }) => {
-      const boardId = action.payload;
+      const board_id = action.payload;
 
       const state = getState();
 
       // we need to check if we need to fetch more images
 
-      if (!boardId) {
+      if (!board_id) {
         // a board was unselected - we don't need to do anything
         return;
       }
@@ -75,13 +79,14 @@ export const addBoardIdSelected_changeSelectedImage_listener = () => {
 
       const filteredImages = selectImagesAll(state).filter((i) => {
         const isInCategory = categories.includes(i.image_category);
-        const isInSelectedBoard = boardId ? i.board_id === boardId : true;
+        const isInSelectedBoard = board_id ? i.board_id === board_id : true;
         return isInCategory && isInSelectedBoard;
       });
 
       // get the board from the cache
-      const { data: boards } = api.endpoints.listAllBoards.select()(state);
-      const board = boards?.find((b) => b.board_id === boardId);
+      const { data: boards } =
+        boardsApi.endpoints.listAllBoards.select()(state);
+      const board = boards?.find((b) => b.board_id === board_id);
       if (!board) {
         // can't find the board in cache...
         return;
@@ -92,7 +97,7 @@ export const addBoardIdSelected_changeSelectedImage_listener = () => {
         filteredImages.length < board.image_count &&
         filteredImages.length < IMAGES_PER_PAGE
       ) {
-        dispatch(receivedPageOfImages({ categories, boardId }));
+        dispatch(receivedPageOfImages({ categories, board_id }));
       }
     },
   });

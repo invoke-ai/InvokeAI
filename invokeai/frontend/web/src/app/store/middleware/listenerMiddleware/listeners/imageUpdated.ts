@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { imageUpdated } from 'services/thunks/image';
+import { imageUpdated } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
 
 const moduleLog = log.child({ namespace: 'image' });

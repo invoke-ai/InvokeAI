@@ -31,11 +31,11 @@ import { useRecallParameters } from 'features/parameters/hooks/useRecallParamete
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { useDraggable } from '@dnd-kit/core';
 import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
 import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
-import { useRemoveImageFromBoardMutation } from 'services/apiSlice';
+import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
 
 export const selector = createSelector(
   [gallerySelector, systemSelector, lightboxSelector, activeTabNameSelector],

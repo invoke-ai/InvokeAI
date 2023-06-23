@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { filter, forEach, size } from 'lodash-es';
-import { CollectInvocation, ControlNetInvocation } from 'services/api';
+import { CollectInvocation, ControlNetInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../types/types';
 import { CONTROL_NET_COLLECT } from './graphBuilders/constants';
 

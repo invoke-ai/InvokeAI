@@ -12,7 +12,7 @@ import {
   OpenposeImageProcessorInvocation,
   PidiImageProcessorInvocation,
   ZoeDepthImageProcessorInvocation,
-} from 'services/api';
+} from 'services/api/types';
 import { O } from 'ts-toolbelt';
 
 /**

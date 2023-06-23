@@ -14,15 +14,16 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import { BoardDTO, ImageDTO } from 'services/api';
+import { BoardDTO, ImageDTO } from 'services/api/types';
 import { IAINoImageFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/boardSlice';
+import { useAddImageToBoardMutation } from 'services/api/endpoints/boardImages';
 import {
-  useAddImageToBoardMutation,
   useDeleteBoardMutation,
-  useGetImageDTOQuery,
   useUpdateBoardMutation,
-} from 'services/apiSlice';
+} from 'services/api/endpoints/boards';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useDroppable } from '@dnd-kit/core';
 import { AnimatePresence } from 'framer-motion';
@@ -37,7 +38,7 @@ interface HoverableBoardProps {
 const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const dispatch = useAppDispatch();
 
-  const { data: coverImage } = useGetImageDTOQuery(
+  const { currentData: coverImage } = useGetImageDTOQuery(
     board.cover_image_name ?? skipToken
   );
 

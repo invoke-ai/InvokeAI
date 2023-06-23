@@ -1,6 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { sessionCanceled } from 'services/thunks/session';
+import { sessionCanceled } from 'services/api/thunks/session';
 import { serializeError } from 'serialize-error';
 
 const moduleLog = log.child({ namespace: 'session' });
@@ -18,10 +18,10 @@ export const addSessionCanceledFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.fulfilled,
     effect: (action, { getState, dispatch }) => {
-      const { sessionId } = action.meta.arg;
+      const { session_id } = action.meta.arg;
       moduleLog.debug(
-        { data: { sessionId } },
-        `Session canceled (${sessionId})`
+        { data: { session_id } },
+        `Session canceled (${session_id})`
       );
     },
   });

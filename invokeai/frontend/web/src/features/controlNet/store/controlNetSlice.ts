@@ -1,7 +1,7 @@
 import { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import {
   ControlNetProcessorType,
   RequiredCannyImageProcessorInvocation,
@@ -13,9 +13,9 @@ import {
   ControlNetModelName,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
-import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
+import { imageDeleted, imageUrlsReceived } from 'services/api/thunks/image';
 import { forEach } from 'lodash-es';
-import { isAnySessionRejected } from 'services/thunks/session';
+import { isAnySessionRejected } from 'services/api/thunks/session';
 import { appSocketInvocationError } from 'services/events/actions';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
@@ -258,13 +258,13 @@ export const controlNetSlice = createSlice({
 
     builder.addCase(imageDeleted.pending, (state, action) => {
       // Preemptively remove the image from the gallery
-      const { imageName } = action.meta.arg;
+      const { image_name } = action.meta.arg;
       forEach(state.controlNets, (c) => {
-        if (c.controlImage === imageName) {
+        if (c.controlImage === image_name) {
           c.controlImage = null;
           c.processedControlImage = null;
         }
-        if (c.processedControlImage === imageName) {
+        if (c.processedControlImage === image_name) {
           c.processedControlImage = null;
         }
       });

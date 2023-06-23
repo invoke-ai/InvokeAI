@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
-import { receivedPageOfImages } from 'services/thunks/image';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { receivedPageOfImages } from 'services/api/thunks/image';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { startAppListening } from '../..';
 
 const moduleLog = log.child({ namespace: 'socketio' });
@@ -22,7 +22,7 @@ export const addSocketConnectedEventListener = () => {
         dispatch(
           receivedPageOfImages({
             categories: ['general'],
-            isIntermediate: false,
+            is_intermediate: false,
           })
         );
       }

@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from 'react';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import {
   ControlNetConfig,
   controlNetImageChanged,
@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaUndo } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/apiSlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
@@ -45,14 +45,14 @@ const ControlNetImagePreview = (props: Props) => {
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
   const {
-    data: controlImage,
+    currentData: controlImage,
     isLoading: isLoadingControlImage,
     isError: isErrorControlImage,
     isSuccess: isSuccessControlImage,
   } = useGetImageDTOQuery(controlImageName ?? skipToken);
 
   const {
-    data: processedControlImage,
+    currentData: processedControlImage,
     isLoading: isLoadingProcessedControlImage,
     isError: isErrorProcessedControlImage,
     isSuccess: isSuccessProcessedControlImage,

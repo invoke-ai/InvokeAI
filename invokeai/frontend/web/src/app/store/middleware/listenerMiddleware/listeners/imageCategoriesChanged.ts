@@ -1,6 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { receivedPageOfImages } from 'services/thunks/image';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 import {
   imageCategoriesChanged,
   selectFilteredImagesAsArray,
@@ -19,7 +19,7 @@ export const addImageCategoriesChangedListener = () => {
         dispatch(
           receivedPageOfImages({
             categories: action.payload,
-            boardId: state.boards.selectedBoardId,
+            board_id: state.boards.selectedBoardId,
           })
         );
       }

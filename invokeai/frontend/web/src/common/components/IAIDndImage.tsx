@@ -15,10 +15,10 @@ import { AnimatePresence } from 'framer-motion';
 import { ReactElement, SyntheticEvent, useCallback } from 'react';
 import { memo, useRef } from 'react';
 import { FaImage, FaTimes, FaUndo, FaUpload } from 'react-icons/fa';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
-import { PostUploadAction, imageUploaded } from 'services/thunks/image';
+import { PostUploadAction, imageUploaded } from 'services/api/thunks/image';
 import { useDropzone } from 'react-dropzone';
 import { useAppDispatch } from 'app/store/storeHooks';
 
@@ -96,9 +96,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 
       dispatch(
         imageUploaded({
-          formData: { file },
-          imageCategory: 'user',
-          isIntermediate: false,
+          file,
+          image_category: 'user',
+          is_intermediate: false,
           postUploadAction,
         })
       );

@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
 import { serializeError } from 'serialize-error';
-import { receivedPageOfImages } from 'services/thunks/image';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 

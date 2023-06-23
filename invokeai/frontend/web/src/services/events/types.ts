@@ -1,4 +1,5 @@
-import { Graph, GraphExecutionState, InvokeAIMetadata } from '../api';
+import { O } from 'ts-toolbelt';
+import { Graph, GraphExecutionState } from '../api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -9,18 +10,19 @@ export type ProgressImage = {
   height: number;
 };
 
-export type AnyInvocationType = NonNullable<
-  NonNullable<Graph['nodes']>[string]['type']
->;
+export type AnyInvocationType = O.Required<
+  NonNullable<NonNullable<Graph['nodes']>[string]>,
+  'type'
+>['type'];
 
-export type AnyInvocation = NonNullable<Graph['nodes']>[string];
+export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
 
-export type AnyResult = GraphExecutionState['results'][string];
+export type AnyResult = NonNullable<GraphExecutionState['results'][string]>;
 
 export type BaseNode = {
   id: string;
   type: string;
-  [key: string]: NonNullable<InvokeAIMetadata['node']>[string];
+  [key: string]: AnyInvocation[keyof AnyInvocation];
 };
 
 /**

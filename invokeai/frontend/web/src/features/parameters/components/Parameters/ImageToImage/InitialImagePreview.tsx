@@ -9,9 +9,9 @@ import { useCallback } from 'react';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { useGetImageDTOQuery } from 'services/apiSlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
@@ -30,7 +30,7 @@ const InitialImagePreview = () => {
   const dispatch = useAppDispatch();
 
   const {
-    data: image,
+    currentData: image,
     isLoading,
     isError,
     isSuccess,

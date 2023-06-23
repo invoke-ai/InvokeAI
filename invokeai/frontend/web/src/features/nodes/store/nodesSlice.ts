@@ -11,14 +11,14 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageDTO } from 'services/api';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { ImageDTO } from 'services/api/types';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
 import { forEach, size } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { imageUrlsReceived } from 'services/api/thunks/image';
 import { RootState } from 'app/store/store';
 
 export type NodesState = {

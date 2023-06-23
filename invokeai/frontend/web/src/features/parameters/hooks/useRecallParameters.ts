@@ -13,10 +13,10 @@ import {
   setSteps,
   setWidth,
 } from '../store/generationSlice';
-import { isImageField } from 'services/types/guards';
+import { isImageField } from 'services/api/guards';
 import { initialImageSelected } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import {
   isValidCfgScale,
   isValidHeight,

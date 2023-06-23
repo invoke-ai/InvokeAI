@@ -1,7 +1,7 @@
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
-import { imageUpdated } from 'services/thunks/image';
+import { imageUpdated } from 'services/api/thunks/image';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';
 import { addToast } from 'features/system/store/systemSlice';
 
