@@ -307,7 +307,7 @@ class MigrateTo3(object):
 
         # handle relative paths
         dest_dir = self.dest_models
-        location = self.src_paths.models / location
+        location = self.root_directory / location
         
         info = ModelProbe().heuristic_probe(location)
         if not info:
