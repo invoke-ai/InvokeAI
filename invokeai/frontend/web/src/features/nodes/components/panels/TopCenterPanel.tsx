@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
 import { Panel } from 'reactflow';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import NodeInvokeButton from '../ui/NodeInvokeButton';
 
 const TopCenterPanel = () => {

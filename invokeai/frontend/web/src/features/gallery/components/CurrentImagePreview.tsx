@@ -11,9 +11,9 @@ import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { useGetImageDTOQuery } from 'services/apiSlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
@@ -56,7 +56,7 @@ const CurrentImagePreview = () => {
   // );
 
   const {
-    data: image,
+    currentData: image,
     isLoading,
     isError,
     isSuccess,
@@ -110,14 +110,14 @@ const CurrentImagePreview = () => {
           }}
         >
           <IAIDndImage
-            image={selectedImage && image ? image : undefined}
+            image={image}
             onDrop={handleDrop}
             fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
             isUploadDisabled={true}
           />
         </Flex>
       )}
-      {shouldShowImageDetails && image && selectedImage && (
+      {shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',
@@ -131,7 +131,7 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && image && selectedImage && (
+      {!shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',

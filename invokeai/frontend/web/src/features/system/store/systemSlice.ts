@@ -19,8 +19,11 @@ import {
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { imageUploaded } from 'services/thunks/image';
-import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
+import { imageUploaded } from 'services/api/thunks/image';
+import {
+  isAnySessionRejected,
+  sessionCanceled,
+} from 'services/api/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
 
@@ -362,7 +365,7 @@ export const systemSlice = createSlice({
      * Session Canceled - FULFILLED
      */
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
-      state.canceledSession = action.meta.arg.sessionId;
+      state.canceledSession = action.meta.arg.session_id;
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;

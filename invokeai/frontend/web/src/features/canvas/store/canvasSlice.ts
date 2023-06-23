@@ -28,13 +28,13 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
-import { ImageDTO } from 'services/api';
-import { sessionCanceled } from 'services/thunks/session';
+import { ImageDTO } from 'services/api/types';
+import { sessionCanceled } from 'services/api/thunks/session';
 import {
   setActiveTab,
   setShouldUseCanvasBetaLayout,
 } from 'features/ui/store/uiSlice';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { imageUrlsReceived } from 'services/api/thunks/image';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],

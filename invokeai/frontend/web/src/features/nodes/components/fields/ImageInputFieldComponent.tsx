@@ -9,9 +9,9 @@ import { memo, useCallback } from 'react';
 
 import { FieldComponentProps } from './types';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { Flex } from '@chakra-ui/react';
-import { useGetImageDTOQuery } from 'services/apiSlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const ImageInputFieldComponent = (
@@ -22,7 +22,7 @@ const ImageInputFieldComponent = (
   const dispatch = useAppDispatch();
 
   const {
-    data: image,
+    currentData: image,
     isLoading,
     isError,
     isSuccess,

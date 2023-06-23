@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { imageUploaded } from 'services/thunks/image';
+import { imageUploaded } from 'services/api/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
 import { log } from 'app/logging/useLogger';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';

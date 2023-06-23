@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { RandomIntInvocation, RangeOfSizeInvocation } from 'services/api';
+import { RandomIntInvocation, RangeOfSizeInvocation } from 'services/api/types';
 import {
   ITERATE,
   LATENTS_TO_IMAGE,

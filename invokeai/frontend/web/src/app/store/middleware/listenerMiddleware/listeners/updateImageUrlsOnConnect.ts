@@ -5,9 +5,8 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { nodesSelecter } from 'features/nodes/store/nodesSlice';
 import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
-import { ImageDTO } from 'services/api';
 import { forEach, uniqBy } from 'lodash-es';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { imageUrlsReceived } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { selectImagesEntities } from 'features/gallery/store/imagesSlice';
 
@@ -83,7 +82,7 @@ export const addUpdateImageUrlsOnConnectListener = () => {
       allUsedImages.forEach((image_name) => {
         dispatch(
           imageUrlsReceived({
-            imageName: image_name,
+            image_name,
           })
         );
       });

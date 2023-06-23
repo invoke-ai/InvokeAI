@@ -1,6 +1,6 @@
 import IAIButton from 'common/components/IAIButton';
 import { useCallback } from 'react';
-import { useCreateBoardMutation } from 'services/apiSlice';
+import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
 const DEFAULT_BOARD_NAME = 'My Board';
 

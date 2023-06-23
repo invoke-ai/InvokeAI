@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { imageUploaded } from 'services/thunks/image';
+import { imageUploaded } from 'services/api/thunks/image';
 import ImageUploadOverlay from './ImageUploadOverlay';
 import { useAppToaster } from 'app/components/Toaster';
 import { createSelector } from '@reduxjs/toolkit';
@@ -62,9 +62,9 @@ const ImageUploader = (props: ImageUploaderProps) => {
     async (file: File) => {
       dispatch(
         imageUploaded({
-          formData: { file },
-          imageCategory: 'user',
-          isIntermediate: false,
+          file,
+          image_category: 'user',
+          is_intermediate: false,
           postUploadAction: { type: 'TOAST_UPLOADED' },
         })
       );

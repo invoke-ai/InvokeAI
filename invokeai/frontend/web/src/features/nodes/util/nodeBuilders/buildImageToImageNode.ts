@@ -4,7 +4,7 @@ import {
   Edge,
   ImageToImageInvocation,
   TextToImageInvocation,
-} from 'services/api';
+} from 'services/api/types';
 import { O } from 'ts-toolbelt';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 

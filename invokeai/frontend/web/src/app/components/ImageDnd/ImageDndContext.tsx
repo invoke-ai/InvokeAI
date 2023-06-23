@@ -11,8 +11,8 @@ import {
 } from '@dnd-kit/core';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import OverlayDragImage from './OverlayDragImage';
-import { ImageDTO } from 'services/api';
-import { isImageDTO } from 'services/types/guards';
+import { ImageDTO } from 'services/api/types';
+import { isImageDTO } from 'services/api/guards';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { AnimatePresence, motion } from 'framer-motion';
 

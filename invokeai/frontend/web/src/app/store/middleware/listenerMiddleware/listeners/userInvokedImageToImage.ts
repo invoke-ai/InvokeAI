@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { sessionCreated } from 'services/thunks/session';
+import { sessionCreated } from 'services/api/thunks/session';
 import { log } from 'app/logging/useLogger';
 import { imageToImageGraphBuilt } from 'features/nodes/store/actions';
 import { userInvoked } from 'app/store/actions';

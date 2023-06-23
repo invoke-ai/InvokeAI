@@ -20,7 +20,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
 import { CloseIcon } from '@chakra-ui/icons';
-import { useListAllBoardsQuery } from 'services/apiSlice';
+import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const selector = createSelector(
   [boardsSelector],

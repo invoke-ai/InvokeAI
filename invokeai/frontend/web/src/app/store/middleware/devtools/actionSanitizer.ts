@@ -1,7 +1,7 @@
 import { AnyAction } from '@reduxjs/toolkit';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
 import { forEach } from 'lodash-es';
-import { Graph } from 'services/api';
+import { Graph } from 'services/api/types';
 
 export const actionSanitizer = <A extends AnyAction>(action: A): A => {
   if (isAnyGraphBuilt(action)) {

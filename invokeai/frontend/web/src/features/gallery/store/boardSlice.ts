@@ -1,6 +1,6 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { api } from 'services/apiSlice';
+import { api } from 'services/api';
 
 type BoardsState = {
   searchText: string;

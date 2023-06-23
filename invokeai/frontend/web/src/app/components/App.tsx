@@ -24,7 +24,7 @@ import Toaster from './Toaster';
 import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
-import { useListModelsQuery } from 'services/apiSlice';
+import { useListModelsQuery } from 'services/api/endpoints/models';
 
 const DEFAULT_CONFIG = {};
 

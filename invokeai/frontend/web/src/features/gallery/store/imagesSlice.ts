@@ -6,14 +6,14 @@ import {
   createSlice,
 } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { ImageCategory, ImageDTO } from 'services/api';
+import { ImageCategory, ImageDTO } from 'services/api/types';
 import { dateComparator } from 'common/util/dateComparator';
 import { keyBy } from 'lodash-es';
 import {
   imageDeleted,
   imageUrlsReceived,
   receivedPageOfImages,
-} from 'services/thunks/image';
+} from 'services/api/thunks/image';
 
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
@@ -73,13 +73,13 @@ const imagesSlice = createSlice({
     });
     builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
       state.isLoading = false;
-      const { boardId, categories, imageOrigin, isIntermediate } =
+      const { board_id, categories, image_origin, is_intermediate } =
         action.meta.arg;
 
       const { items, offset, limit, total } = action.payload;
       imagesAdapter.upsertMany(state, items);
 
-      if (!categories?.includes('general') || boardId) {
+      if (!categories?.includes('general') || board_id) {
         // need to skip updating the total images count if the images recieved were for a specific board
         // TODO: this doesn't work when on the Asset tab/category...
         return;
@@ -91,8 +91,8 @@ const imagesSlice = createSlice({
     });
     builder.addCase(imageDeleted.pending, (state, action) => {
       // Image deleted
-      const { imageName } = action.meta.arg;
-      imagesAdapter.removeOne(state, imageName);
+      const { image_name } = action.meta.arg;
+      imagesAdapter.removeOne(state, image_name);
     });
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
       const { image_name, image_url, thumbnail_url } = action.payload;
