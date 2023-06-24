@@ -22,46 +22,47 @@ class InvocationServices:
     """Services that can be used by invocations"""
 
     # TODO: Just forward-declared everything due to circular dependencies. Fix structure.
-    events: "EventServiceBase"
-    latents: "LatentsStorageBase"
-    queue: "InvocationQueueABC"
-    model_manager: "ModelManager"
-    restoration: "RestorationServices"
-    configuration: "InvokeAISettings"
-    images: "ImageServiceABC"
-    boards: "BoardServiceABC"
     board_images: "BoardImagesServiceABC"
-    graph_library: "ItemStorageABC"["LibraryGraph"]
+    boards: "BoardServiceABC"
+    configuration: "InvokeAISettings"
+    events: "EventServiceBase"
     graph_execution_manager: "ItemStorageABC"["GraphExecutionState"]
+    graph_library: "ItemStorageABC"["LibraryGraph"]
+    images: "ImageServiceABC"
+    latents: "LatentsStorageBase"
+    logger: "Logger"
+    model_manager: "ModelManager"
     processor: "InvocationProcessorABC"
+    queue: "InvocationQueueABC"
+    restoration: "RestorationServices"
 
     def __init__(
         self,
-        model_manager: "ModelManager",
-        events: "EventServiceBase",
-        logger: "Logger",
-        latents: "LatentsStorageBase",
-        images: "ImageServiceABC",
-        boards: "BoardServiceABC",
         board_images: "BoardImagesServiceABC",
-        queue: "InvocationQueueABC",
-        graph_library: "ItemStorageABC"["LibraryGraph"],
-        graph_execution_manager: "ItemStorageABC"["GraphExecutionState"],
-        processor: "InvocationProcessorABC",
-        restoration: "RestorationServices",
+        boards: "BoardServiceABC",
         configuration: "InvokeAISettings",
+        events: "EventServiceBase",
+        graph_execution_manager: "ItemStorageABC"["GraphExecutionState"],
+        graph_library: "ItemStorageABC"["LibraryGraph"],
+        images: "ImageServiceABC",
+        latents: "LatentsStorageBase",
+        logger: "Logger",
+        model_manager: "ModelManager",
+        processor: "InvocationProcessorABC",
+        queue: "InvocationQueueABC",
+        restoration: "RestorationServices",
     ):
-        self.model_manager = model_manager
-        self.events = events
-        self.logger = logger
-        self.latents = latents
-        self.images = images
-        self.boards = boards
         self.board_images = board_images
-        self.queue = queue
-        self.graph_library = graph_library
-        self.graph_execution_manager = graph_execution_manager
-        self.processor = processor
-        self.restoration = restoration
-        self.configuration = configuration
         self.boards = boards
+        self.boards = boards
+        self.configuration = configuration
+        self.events = events
+        self.graph_execution_manager = graph_execution_manager
+        self.graph_library = graph_library
+        self.images = images
+        self.latents = latents
+        self.logger = logger
+        self.model_manager = model_manager
+        self.processor = processor
+        self.queue = queue
+        self.restoration = restoration
