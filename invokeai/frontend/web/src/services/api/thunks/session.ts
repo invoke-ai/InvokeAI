@@ -1,13 +1,10 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { GraphExecutionState } from 'services/api/types';
 import { log } from 'app/logging/useLogger';
 import { isObject } from 'lodash-es';
 import { isAnyOf } from '@reduxjs/toolkit';
 import { paths } from 'services/api/schema';
 import { $client } from 'services/api/client';
 import { O } from 'ts-toolbelt';
-
-const { get, post, put, patch, del } = $client.get();
 
 const sessionLog = log.child({ namespace: 'session' });
 
@@ -37,6 +34,7 @@ export const sessionCreated = createAppAsyncThunk<
   CreateSessionThunkConfig
 >('api/sessionCreated', async (arg, { rejectWithValue }) => {
   const { graph } = arg;
+  const { post } = $client.get();
   const { data, error, response } = await post('/api/v1/sessions/', {
     body: graph,
   });
@@ -74,6 +72,7 @@ export const sessionInvoked = createAppAsyncThunk<
   InvokedSessionThunkConfig
 >('api/sessionInvoked', async (arg, { rejectWithValue }) => {
   const { session_id } = arg;
+  const { put } = $client.get();
   const { data, error, response } = await put(
     '/api/v1/sessions/{session_id}/invoke',
     {
@@ -111,7 +110,7 @@ export const sessionCanceled = createAppAsyncThunk<
   CancelSessionThunkConfig
 >('api/sessionCanceled', async (arg, { rejectWithValue }) => {
   const { session_id } = arg;
-
+  const { del } = $client.get();
   const { data, error, response } = await del(
     '/api/v1/sessions/{session_id}/invoke',
     {
@@ -151,6 +150,7 @@ export const listedSessions = createAppAsyncThunk<
   ListSessionsThunkConfig
 >('api/listSessions', async (arg, { rejectWithValue }) => {
   const { params } = arg;
+  const { get } = $client.get();
   const { data, error, response } = await get('/api/v1/sessions/', {
     params,
   });
