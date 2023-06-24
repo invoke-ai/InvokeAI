@@ -6,7 +6,7 @@ import {
   controlNetSelector,
 } from '../store/controlNetSlice';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Box, ChakraProps, Flex } from '@chakra-ui/react';
+import { Box, Flex, SystemStyleObject } from '@chakra-ui/react';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -27,11 +27,11 @@ const selector = createSelector(
 
 type Props = {
   controlNet: ControlNetConfig;
-  imageSx?: ChakraProps['sx'];
+  height: SystemStyleObject['h'];
 };
 
 const ControlNetImagePreview = (props: Props) => {
-  const { imageSx } = props;
+  const { height } = props;
   const {
     controlNetId,
     controlImage: controlImageName,
@@ -84,10 +84,6 @@ const ControlNetImagePreview = (props: Props) => {
     setIsMouseOverImage(false);
   }, []);
 
-  const shouldShowProcessedImageBackdrop =
-    Number(controlImage?.width) > Number(processedControlImage?.width) ||
-    Number(controlImage?.height) > Number(processedControlImage?.height);
-
   const shouldShowProcessedImage =
     controlImage &&
     processedControlImage &&
@@ -96,54 +92,51 @@ const ControlNetImagePreview = (props: Props) => {
     processorType !== 'none';
 
   return (
-    <Box
+    <Flex
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      sx={{ position: 'relative', w: 'full', h: 'full' }}
+      sx={{
+        position: 'relative',
+        w: 'full',
+        h: height,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       <IAIDndImage
         image={controlImage}
         onDrop={handleDrop}
-        isDropDisabled={shouldShowProcessedImage}
+        isDropDisabled={!shouldShowProcessedImage}
         isUploadDisabled={Boolean(controlImage)}
         postUploadAction={{ type: 'SET_CONTROLNET_IMAGE', controlNetId }}
         imageSx={{
-          pointerEvents: shouldShowProcessedImage ? 'none' : 'auto',
-          ...imageSx,
+          w: 'full',
+          h: 'full',
         }}
       />
-      {shouldShowProcessedImage && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            insetInlineStart: 0,
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          insetInlineStart: 0,
+          w: 'full',
+          h: 'full',
+          opacity: shouldShowProcessedImage ? 1 : 0,
+          transitionProperty: 'common',
+          transitionDuration: 'normal',
+        }}
+      >
+        <IAIDndImage
+          image={processedControlImage}
+          onDrop={handleDrop}
+          payloadImage={controlImage}
+          isUploadDisabled={true}
+          imageSx={{
             w: 'full',
             h: 'full',
           }}
-        >
-          {shouldShowProcessedImageBackdrop && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                insetInlineStart: 0,
-                w: 'full',
-                h: 'full',
-                bg: 'base.900',
-                opacity: 0.7,
-              }}
-            />
-          )}
-          <IAIDndImage
-            image={processedControlImage}
-            onDrop={handleDrop}
-            payloadImage={controlImage}
-            isUploadDisabled={true}
-            imageSx={imageSx}
-          />
-        </Box>
-      )}
+        />
+      </Box>
       {pendingControlImages.includes(controlNetId) && (
         <Box
           sx={{
@@ -173,7 +166,7 @@ const ControlNetImagePreview = (props: Props) => {
           />
         </Flex>
       )}
-    </Box>
+    </Flex>
   );
 };
 
