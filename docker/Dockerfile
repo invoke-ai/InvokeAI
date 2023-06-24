@@ -4,7 +4,7 @@ ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
 ##################
-FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
+FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim-bullseye AS python-base
 
 LABEL org.opencontainers.image.authors="mauwii@outlook.de"
 
