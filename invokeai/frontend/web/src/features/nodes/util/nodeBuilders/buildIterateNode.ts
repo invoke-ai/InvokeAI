@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { IterateInvocation } from 'services/api';
+import { IterateInvocation } from 'services/api/types';
 
 export const buildIterateNode = (): IterateInvocation => {
   const nodeId = uuidv4();

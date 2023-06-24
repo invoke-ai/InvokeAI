@@ -8,7 +8,7 @@ import { modelSelected } from 'features/parameters/store/generationSlice';
 import { forEach, isString } from 'lodash-es';
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
-import { useListModelsQuery } from 'services/apiSlice';
+import { useListModelsQuery } from 'services/api/endpoints/models';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',

@@ -11,9 +11,9 @@ import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { useGetImageDTOQuery } from 'services/apiSlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
@@ -51,12 +51,8 @@ const CurrentImagePreview = () => {
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
-  // const image = useAppSelector((state: RootState) =>
-  //   selectImagesById(state, selectedImage ?? '')
-  // );
-
   const {
-    data: image,
+    currentData: image,
     isLoading,
     isError,
     isSuccess,
@@ -79,9 +75,9 @@ const CurrentImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
-        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
@@ -101,23 +97,15 @@ const CurrentImagePreview = () => {
           }}
         />
       ) : (
-        <Flex
-          sx={{
-            width: 'full',
-            height: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IAIDndImage
-            image={selectedImage && image ? image : undefined}
-            onDrop={handleDrop}
-            fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
-            isUploadDisabled={true}
-          />
-        </Flex>
+        <IAIDndImage
+          image={image}
+          onDrop={handleDrop}
+          fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
+          isUploadDisabled={true}
+          fitContainer
+        />
       )}
-      {shouldShowImageDetails && image && selectedImage && (
+      {shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',
@@ -131,7 +119,7 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && image && selectedImage && (
+      {!shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',

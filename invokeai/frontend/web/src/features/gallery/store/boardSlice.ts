@@ -1,6 +1,6 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { api } from 'services/apiSlice';
+import { boardsApi } from 'services/api/endpoints/boards';
 
 type BoardsState = {
   searchText: string;
@@ -29,7 +29,7 @@ const boardsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(
-      api.endpoints.deleteBoard.matchFulfilled,
+      boardsApi.endpoints.deleteBoard.matchFulfilled,
       (state, action) => {
         if (action.meta.arg.originalArgs === state.selectedBoardId) {
           state.selectedBoardId = undefined;

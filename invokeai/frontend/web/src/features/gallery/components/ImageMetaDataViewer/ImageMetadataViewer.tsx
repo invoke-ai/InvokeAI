@@ -17,7 +17,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 
 type MetadataItemProps = {
   isLink?: boolean;

@@ -6,8 +6,8 @@ import { IAINoImageFallback } from 'common/components/IAIImageFallback';
 import { AnimatePresence } from 'framer-motion';
 import { SelectedItemOverlay } from '../SelectedItemOverlay';
 import { useCallback } from 'react';
-import { ImageDTO } from 'services/api';
-import { useRemoveImageFromBoardMutation } from 'services/apiSlice';
+import { ImageDTO } from 'services/api/types';
+import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
 import { useDroppable } from '@dnd-kit/core';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
 

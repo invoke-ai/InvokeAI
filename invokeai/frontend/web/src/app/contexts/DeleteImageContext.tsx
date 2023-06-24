@@ -11,7 +11,7 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { RootState } from 'app/store/store';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';

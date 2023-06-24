@@ -1,5 +1,5 @@
 import { RootState } from 'app/store/store';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { log } from 'app/logging/useLogger';
 import { forEach } from 'lodash-es';
 import { buildCanvasInpaintGraph } from './buildCanvasInpaintGraph';

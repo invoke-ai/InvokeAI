@@ -1,4 +1,4 @@
-import { Graph } from 'services/api';
+import { Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 import { cloneDeep, omit, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';

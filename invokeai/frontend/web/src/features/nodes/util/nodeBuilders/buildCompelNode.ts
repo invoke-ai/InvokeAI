@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from 'app/store/store';
-import { CompelInvocation } from 'services/api';
+import { CompelInvocation } from 'services/api/types';
 import { O } from 'ts-toolbelt';
 
 export const buildCompelNode = (

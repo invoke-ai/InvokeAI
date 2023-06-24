@@ -8,10 +8,11 @@ import {
 import { socketSubscribed, socketUnsubscribed } from './actions';
 import { AppThunkDispatch, RootState } from 'app/store/store';
 import { getTimestamp } from 'common/util/getTimestamp';
-import { sessionCreated } from 'services/thunks/session';
-import { OpenAPI } from 'services/api';
+import { sessionCreated } from 'services/api/thunks/session';
+// import { OpenAPI } from 'services/api/types';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { log } from 'app/logging/useLogger';
+import { $authToken, $baseUrl } from 'services/api/client';
 
 const socketioLog = log.child({ namespace: 'socketio' });
 
@@ -28,14 +29,16 @@ export const socketMiddleware = () => {
 
   // if building in package mode, replace socket url with open api base url minus the http protocol
   if (['nodes', 'package'].includes(import.meta.env.MODE)) {
-    if (OpenAPI.BASE) {
+    const baseUrl = $baseUrl.get();
+    if (baseUrl) {
       //eslint-disable-next-line
-      socketUrl = OpenAPI.BASE.replace(/^https?\:\/\//i, '');
+      socketUrl = baseUrl.replace(/^https?\:\/\//i, '');
     }
 
-    if (OpenAPI.TOKEN) {
+    const authToken = $authToken.get();
+    if (authToken) {
       // TODO: handle providing jwt to socket.io
-      socketOptions.auth = { token: OpenAPI.TOKEN };
+      socketOptions.auth = { token: authToken };
     }
 
     socketOptions.transports = ['websocket', 'polling'];

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 
 import { RootState } from 'app/store/store';
-import { RandomRangeInvocation, RangeInvocation } from 'services/api';
+import { RandomRangeInvocation, RangeInvocation } from 'services/api/types';
 
 export const buildRangeNode = (
   state: RootState

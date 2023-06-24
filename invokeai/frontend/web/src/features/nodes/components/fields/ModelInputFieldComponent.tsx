@@ -12,7 +12,7 @@ import { forEach, isString } from 'lodash-es';
 import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { useTranslation } from 'react-i18next';
-import { useListModelsQuery } from 'services/apiSlice';
+import { useListModelsQuery } from 'services/api/endpoints/models';
 
 const ModelInputFieldComponent = (
   props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>

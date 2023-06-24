@@ -1,5 +1,5 @@
 import { createAction, isAnyOf } from '@reduxjs/toolkit';
-import { Graph } from 'services/api';
+import { Graph } from 'services/api/types';
 
 export const textToImageGraphBuilt = createAction<Graph>(
   'nodes/textToImageGraphBuilt'

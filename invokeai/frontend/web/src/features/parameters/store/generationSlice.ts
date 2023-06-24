@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import {
   CfgScaleParam,
   HeightParam,

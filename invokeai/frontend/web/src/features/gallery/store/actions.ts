@@ -1,6 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { ImageUsage } from 'app/contexts/DeleteImageContext';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 
 export type RequestedImageDeletionArg = {
   image: ImageDTO;

@@ -4,7 +4,7 @@ import {
   BaseModelType,
   RandomIntInvocation,
   RangeOfSizeInvocation,
-} from 'services/api';
+} from 'services/api/types';
 import {
   ITERATE,
   LATENTS_TO_IMAGE,

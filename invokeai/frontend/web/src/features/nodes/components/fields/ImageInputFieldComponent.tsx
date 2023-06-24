@@ -9,9 +9,9 @@ import { memo, useCallback } from 'react';
 
 import { FieldComponentProps } from './types';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { Flex } from '@chakra-ui/react';
-import { useGetImageDTOQuery } from 'services/apiSlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const ImageInputFieldComponent = (
@@ -22,15 +22,15 @@ const ImageInputFieldComponent = (
   const dispatch = useAppDispatch();
 
   const {
-    data: image,
+    currentData: image,
     isLoading,
     isError,
     isSuccess,
-  } = useGetImageDTOQuery(field.value ?? skipToken);
+  } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
 
   const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (field.value === droppedImage.image_name) {
+    ({ image_name }: ImageDTO) => {
+      if (field.value?.image_name === image_name) {
         return;
       }
 
@@ -38,7 +38,7 @@ const ImageInputFieldComponent = (
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: droppedImage.image_name,
+          value: { image_name },
         })
       );
     },

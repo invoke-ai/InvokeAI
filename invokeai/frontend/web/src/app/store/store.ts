@@ -31,7 +31,7 @@ import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
-import { api } from 'services/apiSlice';
+import { api } from 'services/api';
 
 const allReducers = {
   canvas: canvasReducer,

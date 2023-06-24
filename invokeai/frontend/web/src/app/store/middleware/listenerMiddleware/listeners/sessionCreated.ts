@@ -1,6 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { sessionCreated } from 'services/thunks/session';
+import { sessionCreated } from 'services/api/thunks/session';
 import { serializeError } from 'serialize-error';
 
 const moduleLog = log.child({ namespace: 'session' });
