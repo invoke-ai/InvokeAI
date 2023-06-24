@@ -54,7 +54,9 @@ export const addBoardIdSelectedListener = () => {
         filteredImages.length < board.image_count &&
         filteredImages.length < IMAGES_PER_PAGE
       ) {
-        dispatch(receivedPageOfImages({ categories, board_id }));
+        dispatch(
+          receivedPageOfImages({ categories, board_id, is_intermediate: false })
+        );
       }
     },
   });
@@ -97,7 +99,9 @@ export const addBoardIdSelected_changeSelectedImage_listener = () => {
         filteredImages.length < board.image_count &&
         filteredImages.length < IMAGES_PER_PAGE
       ) {
-        dispatch(receivedPageOfImages({ categories, board_id }));
+        dispatch(
+          receivedPageOfImages({ categories, board_id, is_intermediate: false })
+        );
       }
     },
   });

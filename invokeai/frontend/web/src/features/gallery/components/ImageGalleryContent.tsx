@@ -168,6 +168,7 @@ const ImageGalleryContent = () => {
       receivedPageOfImages({
         categories,
         board_id: selectedBoardId,
+        is_intermediate: false,
       })
     );
   }, [categories, dispatch, selectedBoardId]);

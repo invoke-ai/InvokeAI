@@ -20,6 +20,7 @@ export const addImageCategoriesChangedListener = () => {
           receivedPageOfImages({
             categories: action.payload,
             board_id: state.boards.selectedBoardId,
+            is_intermediate: false,
           })
         );
       }

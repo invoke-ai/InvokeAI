@@ -256,7 +256,6 @@ export const imageUpdated = createAppAsyncThunk<
 export const IMAGES_PER_PAGE = 20;
 
 const DEFAULT_IMAGES_LISTED_ARG = {
-  isIntermediate: false,
   limit: IMAGES_PER_PAGE,
 };
 
