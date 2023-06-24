@@ -11,14 +11,12 @@ export const addStagingAreaImageSavedListener = () => {
   startAppListening({
     actionCreator: stagingAreaImageSaved,
     effect: async (action, { dispatch, getState, take }) => {
-      const { image_name } = action.payload;
+      const { imageName } = action.payload;
 
       dispatch(
         imageUpdated({
-          imageName: image_name,
-          requestBody: {
-            is_intermediate: false,
-          },
+          image_name: imageName,
+          is_intermediate: false,
         })
       );
 
@@ -26,7 +24,7 @@ export const addStagingAreaImageSavedListener = () => {
         (action) =>
           (imageUpdated.fulfilled.match(action) ||
             imageUpdated.rejected.match(action)) &&
-          action.meta.arg.imageName === image_name
+          action.meta.arg.image_name === imageName
       );
 
       if (imageUpdated.rejected.match(imageUpdatedAction)) {
