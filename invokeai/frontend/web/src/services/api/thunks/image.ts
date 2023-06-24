@@ -4,8 +4,6 @@ import { size } from 'lodash-es';
 import { paths } from 'services/api/schema';
 import { $client } from 'services/api/client';
 
-const { get, post, patch, del } = $client.get();
-
 type GetImageUrlsArg =
   paths['/api/v1/images/{image_name}/urls']['get']['parameters']['path'];
 
@@ -27,6 +25,7 @@ export const imageUrlsReceived = createAppAsyncThunk<
   GetImageUrlsThunkConfig
 >('api/imageUrlsReceived', async (arg, { rejectWithValue }) => {
   const { image_name } = arg;
+  const { get } = $client.get();
   const { data, error, response } = await get(
     '/api/v1/images/{image_name}/urls',
     {
@@ -64,6 +63,7 @@ export const imageMetadataReceived = createAppAsyncThunk<
   GetImageMetadataThunkConfig
 >('api/imageMetadataReceived', async (arg, { rejectWithValue }) => {
   const { image_name } = arg;
+  const { get } = $client.get();
   const { data, error, response } = await get(
     '/api/v1/images/{image_name}/metadata',
     {
@@ -151,6 +151,7 @@ export const imageUploaded = createAppAsyncThunk<
     is_intermediate,
     session_id,
   } = arg;
+  const { post } = $client.get();
   const formData = new FormData();
   formData.append('file', file);
   const { data, error, response } = await post('/api/v1/images/', {
@@ -195,6 +196,7 @@ export const imageDeleted = createAppAsyncThunk<
   DeleteImageThunkConfig
 >('api/imageDeleted', async (arg, { rejectWithValue }) => {
   const { image_name } = arg;
+  const { del } = $client.get();
   const { data, error, response } = await del('/api/v1/images/{image_name}', {
     params: {
       path: {
@@ -230,6 +232,7 @@ export const imageUpdated = createAppAsyncThunk<
   UpdateImageThunkConfig
 >('api/imageUpdated', async (arg, { rejectWithValue }) => {
   const { image_name, image_category, is_intermediate, session_id } = arg;
+  const { patch } = $client.get();
   const { data, error, response } = await patch('/api/v1/images/{image_name}', {
     params: {
       path: {
@@ -278,6 +281,8 @@ export const receivedPageOfImages = createAppAsyncThunk<
   ListImagesArg,
   ListImagesThunkConfig
 >('api/receivedPageOfImages', async (arg, { getState, rejectWithValue }) => {
+  const { get } = $client.get();
+
   const state = getState();
   const { categories } = state.images;
   const { selectedBoardId } = state.boards;
