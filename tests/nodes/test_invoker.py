@@ -1,4 +1,4 @@
-from .test_nodes import ErrorInvocation, ImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation, TestEventService, create_edge, wait_until
+from .test_nodes import ErrorInvocation, TextToImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation, TestEventService, create_edge, wait_until
 from invokeai.app.services.processor import DefaultInvocationProcessor
 from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from invokeai.app.services.invocation_queue import MemoryInvocationQueue
@@ -13,7 +13,7 @@ import pytest
 def simple_graph():
     g = Graph()
     g.add_node(PromptTestInvocation(id = "1", prompt = "Banana sushi"))
-    g.add_node(ImageTestInvocation(id = "2"))
+    g.add_node(TextToImageTestInvocation(id = "2"))
     g.add_edge(create_edge("1", "prompt", "2", "prompt"))
     return g
 

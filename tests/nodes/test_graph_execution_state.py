@@ -1,5 +1,5 @@
 from .test_invoker import create_edge
-from .test_nodes import ImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation
+from .test_nodes import TextToImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation, PromptCollectionTestInvocation
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
@@ -15,7 +15,7 @@ import pytest
 def simple_graph():
     g = Graph()
     g.add_node(PromptTestInvocation(id = "1", prompt = "Banana sushi"))
-    g.add_node(ImageTestInvocation(id = "2"))
+    g.add_node(TextToImageTestInvocation(id = "2"))
     g.add_edge(create_edge("1", "prompt", "2", "prompt"))
     return g
 
