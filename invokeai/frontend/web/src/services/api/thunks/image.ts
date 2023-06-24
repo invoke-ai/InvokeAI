@@ -1,3 +1,4 @@
+import queryString from 'query-string';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { selectImagesAll } from 'features/gallery/store/imagesSlice';
 import { size } from 'lodash-es';
@@ -314,6 +315,7 @@ export const receivedPageOfImages = createAppAsyncThunk<
     params: {
       query,
     },
+    querySerializer: (q) => queryString.stringify(q, { arrayFormat: 'none' }),
   });
 
   if (error) {
