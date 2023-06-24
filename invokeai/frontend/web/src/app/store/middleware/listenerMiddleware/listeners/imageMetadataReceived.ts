@@ -19,8 +19,8 @@ export const addImageMetadataReceivedFulfilledListener = () => {
       ) {
         dispatch(
           imageUpdated({
-            imageName: image.image_name,
-            requestBody: { is_intermediate: false },
+            image_name: image.image_name,
+            is_intermediate: image.is_intermediate,
           })
         );
       } else if (image.is_intermediate) {
