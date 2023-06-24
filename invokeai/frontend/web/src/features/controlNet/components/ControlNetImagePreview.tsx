@@ -107,7 +107,6 @@ const ControlNetImagePreview = (props: Props) => {
         image={controlImage}
         onDrop={handleDrop}
         isDropDisabled={shouldShowProcessedImage}
-        isUploadDisabled={shouldShowProcessedImage}
         postUploadAction={{ type: 'SET_CONTROLNET_IMAGE', controlNetId }}
         imageSx={{
           w: 'full',
@@ -124,6 +123,7 @@ const ControlNetImagePreview = (props: Props) => {
           opacity: shouldShowProcessedImage ? 1 : 0,
           transitionProperty: 'common',
           transitionDuration: 'normal',
+          pointerEvents: 'none',
         }}
       >
         <IAIDndImage
