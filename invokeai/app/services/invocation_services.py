@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_images import BoardImagesServiceABC
     from invokeai.app.services.boards import BoardServiceABC
     from invokeai.app.services.images import ImageServiceABC
-    from invokeai.backend import ModelManager
+    from invokeai.app.services.model_manager_service import ModelManagerServiceBase
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.latent_storage import LatentsStorageBase
     from invokeai.app.services.restoration_services import RestorationServices
@@ -31,7 +31,7 @@ class InvocationServices:
     images: "ImageServiceABC"
     latents: "LatentsStorageBase"
     logger: "Logger"
-    model_manager: "ModelManager"
+    model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
     queue: "InvocationQueueABC"
     restoration: "RestorationServices"
@@ -47,7 +47,7 @@ class InvocationServices:
         images: "ImageServiceABC",
         latents: "LatentsStorageBase",
         logger: "Logger",
-        model_manager: "ModelManager",
+        model_manager: "ModelManagerServiceBase",
         processor: "InvocationProcessorABC",
         queue: "InvocationQueueABC",
         restoration: "RestorationServices",
