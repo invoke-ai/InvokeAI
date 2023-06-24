@@ -9,7 +9,7 @@ import { imageMetadataReceived } from 'services/api/thunks/image';
 import { sessionCanceled } from 'services/api/thunks/session';
 import { isImageOutput } from 'services/api/guards';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import { api } from 'services/api';
+import { boardImagesApi } from 'services/api/endpoints/boardImages';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -61,7 +61,7 @@ export const addInvocationCompleteEventListener = () => {
 
         if (boardIdToAddTo && !imageDTO.is_intermediate) {
           dispatch(
-            api.endpoints.addImageToBoard.initiate({
+            boardImagesApi.endpoints.addImageToBoard.initiate({
               board_id: boardIdToAddTo,
               image_name,
             })
