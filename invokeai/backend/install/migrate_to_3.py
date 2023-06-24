@@ -478,7 +478,7 @@ def _parse_legacy_initfile(root: Path, initfile: Path)->ModelPaths:
         models = root / 'models',
         embeddings = root / str(opt.embedding_path).strip('"'),
         loras = root / str(opt.lora_path).strip('"'),
-        controlnets = None
+        controlnets = root / 'controlnets',
     )
 
 def _parse_legacy_yamlfile(root: Path, initfile: Path)->ModelPaths:

@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Callable, Literal, Union, Dict
 from picklescan.scanner import scan_file_path
 
-from .models import BaseModelType, ModelType, ModelVariantType, SchedulerPredictionType, SilenceWarnings
+from .models import (
+    BaseModelType, ModelType, ModelVariantType,
+    SchedulerPredictionType, SilenceWarnings,
+)
+from .models.base import read_checkpoint_meta
 
 @dataclass
 class ModelProbeInfo(object):
@@ -105,29 +109,34 @@ class ModelProbe(object):
         return model_info
 
     @classmethod
-    def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict)->ModelType:
-        if model_path.suffix not in ('.bin','.pt','.ckpt','.safetensors'):
+    def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict) -> ModelType:
+        if model_path.suffix not in ('.bin','.pt','.ckpt','.safetensors','.pth'):
             return None
-        if model_path.name=='learned_embeds.bin':
+
+        if model_path.name == "learned_embeds.bin":
             return ModelType.TextualInversion
-        checkpoint = checkpoint or cls._scan_and_load_checkpoint(model_path)
-        state_dict = checkpoint.get("state_dict") or checkpoint
+
+        checkpoint = checkpoint or read_checkpoint_meta(model_path, scan=True)
+        checkpoint = checkpoint.get("state_dict", checkpoint)
+
+        for key in checkpoint.keys():
+            if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
+                return ModelType.Main
+            elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
+                return ModelType.Vae
+            elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
+                return ModelType.Lora
+            elif any(key.startswith(v) for v in {"control_model", "input_blocks"}):
+                return ModelType.ControlNet
+            elif key in {"emb_params", "string_to_param"}:
+                return ModelType.TextualInversion
+
+        else:
+            # diffusers-ti
+            if len(checkpoint) < 10 and all(isinstance(v, torch.Tensor) for v in checkpoint.values()):
+                return ModelType.TextualInversion
         
-        if len(checkpoint) < 10 and all(isinstance(v, torch.Tensor) for v in checkpoint.values()):
-            return ModelType.TextualInversion
-        if any([x.startswith("model.diffusion_model") for x in state_dict.keys()]):
-            return ModelType.Main
-        if any([x.startswith("encoder.conv_in") for x in state_dict.keys()]):
-            return ModelType.Vae
-        if "string_to_token" in state_dict or "emb_params" in state_dict:
-            return ModelType.TextualInversion
-        if any([x.startswith("lora") for x in state_dict.keys()]):
-            return ModelType.Lora
-        if any([x.startswith("control_model") for x in state_dict.keys()]):
-            return ModelType.ControlNet
-        if any([x.startswith("input_blocks") for x in state_dict.keys()]):
-            return ModelType.ControlNet
-        return None # give up
+        raise ValueError("Unable to determine model type")
 
     @classmethod
     def get_model_type_from_folder(cls, folder_path: Path, model: ModelMixin)->ModelType:
