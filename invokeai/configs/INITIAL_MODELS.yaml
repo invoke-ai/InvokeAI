@@ -1,58 +1,58 @@
 # This file predefines a few models that the user may want to install.
-sd-1/pipeline/stable-diffusion-v1-5:
+sd-1/main/stable-diffusion-v1-5:
    description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
    recommended: True
    default: True
-sd-1/pipeline/stable-diffusion-inpainting:
+sd-1/main/stable-diffusion-inpainting:
    description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
    repo_id: runwayml/stable-diffusion-inpainting
    recommended: True
-sd-2/pipeline/stable-diffusion-2-1:
+sd-2/main/stable-diffusion-2-1:
    description: Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-1
    recommended: True
-sd-2/pipeline/stable-diffusion-2-inpainting:
+sd-2/main/stable-diffusion-2-inpainting:
    description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-inpainting
    recommended: False
-sd-1/pipeline/Analog-Diffusion:
+sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
    repo_id: wavymulder/Analog-Diffusion
    recommended: false
-sd-1/pipeline/Deliberate:
+sd-1/main/Deliberate:
    description: Versatile model that produces detailed images up to 768px (4.27 GB)
    repo_id: XpucT/Deliberate
    recommended: False
-sd-1/pipeline/Dungeons-and-Diffusion:
+sd-1/main/Dungeons-and-Diffusion:
    description: Dungeons & Dragons characters (2.13 GB)
    repo_id: 0xJustin/Dungeons-and-Diffusion
    recommended: False
-sd-1/pipeline/dreamlike-photoreal-2:
+sd-1/main/dreamlike-photoreal-2:
    description: A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)
    repo_id: dreamlike-art/dreamlike-photoreal-2.0
    recommended: False
-sd-1/pipeline/Inkpunk-Diffusion:
+sd-1/main/Inkpunk-Diffusion:
    description: Stylized illustrations inspired by Gorillaz, FLCL and Shinkawa; prompt with "nvinkpunk" (4.27 GB)
    repo_id: Envvi/Inkpunk-Diffusion
    recommended: False
-sd-1/pipeline/openjourney:
+sd-1/main/openjourney:
    description: An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)
    repo_id: prompthero/openjourney
    recommended: False
-sd-1/pipeline/portraitplus:
+sd-1/main/portraitplus:
    description: An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)
    repo_id: wavymulder/portraitplus
    recommended: False
-sd-1/pipeline/seek.art_MEGA:
+sd-1/main/seek.art_MEGA:
    repo_id: coreco/seek.art_MEGA
    description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
    recommended: False
-sd-1/pipeline/trinart_stable_diffusion_v2:
+sd-1/main/trinart_stable_diffusion_v2:
    description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
    repo_id: naclbit/trinart_stable_diffusion_v2
    recommended: False
-sd-1/pipeline/waifu-diffusion:
+sd-1/main/waifu-diffusion:
    description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
    repo_id: hakurei/waifu-diffusion
    recommended: False

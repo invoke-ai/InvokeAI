@@ -94,7 +94,7 @@ class MigrateTo3(object):
         Create the basic directory structure for the models folder.
         '''
         for model_base in [BaseModelType.StableDiffusion1,BaseModelType.StableDiffusion2]:
-            for model_type in [ModelType.Pipeline, ModelType.Vae, ModelType.Lora,
+            for model_type in [ModelType.Main, ModelType.Vae, ModelType.Lora,
                                ModelType.ControlNet,ModelType.TextualInversion]:
                 path = self.dest_models / model_base.value / model_type.value
                 path.mkdir(parents=True, exist_ok=True)

@@ -127,7 +127,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         self.nextrely = top_of_table
         self.pipeline_models = self.add_pipeline_widgets(
-            model_type=ModelType.Pipeline,
+            model_type=ModelType.Main,
             window_width=window_width,
             exclude = self.starter_models
         )
@@ -303,7 +303,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
     ### Tab for arbitrary diffusers widgets ###
     def add_pipeline_widgets(self,
-                             model_type: ModelType=ModelType.Pipeline,
+                             model_type: ModelType=ModelType.Main,
                              window_width: int=120,
                              **kwargs,
                              )->dict[str,npyscreen.widget]:

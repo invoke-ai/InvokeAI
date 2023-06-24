@@ -33,7 +33,7 @@ class ModelProbe(object):
     }
 
     CLASS2TYPE = {
-        'StableDiffusionPipeline' : ModelType.Pipeline,
+        'StableDiffusionPipeline' : ModelType.Main,
         'AutoencoderKL' : ModelType.Vae,
         'ControlNetModel' : ModelType.ControlNet,
     }
@@ -116,7 +116,7 @@ class ModelProbe(object):
         if len(checkpoint) < 10 and all(isinstance(v, torch.Tensor) for v in checkpoint.values()):
             return ModelType.TextualInversion
         if any([x.startswith("model.diffusion_model") for x in state_dict.keys()]):
-            return ModelType.Pipeline
+            return ModelType.Main
         if any([x.startswith("encoder.conv_in") for x in state_dict.keys()]):
             return ModelType.Vae
         if "string_to_token" in state_dict or "emb_params" in state_dict:
@@ -207,7 +207,7 @@ class CheckpointProbeBase(ProbeBase):
 
     def get_variant_type(self)-> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.checkpoint_path,self.checkpoint)
-        if model_type != ModelType.Pipeline:
+        if model_type != ModelType.Main:
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get('state_dict') or self.checkpoint
         in_channels = state_dict[
@@ -409,12 +409,12 @@ class LoRAFolderProbe(FolderProbeBase):
         return LoRACheckpointProbe(model_file,None).get_base_type()
 
 ############## register probe classes ######
-ModelProbe.register_probe('diffusers', ModelType.Pipeline,  PipelineFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.Main,  PipelineFolderProbe)
 ModelProbe.register_probe('diffusers', ModelType.Vae, VaeFolderProbe)
 ModelProbe.register_probe('diffusers', ModelType.Lora, LoRAFolderProbe)
 ModelProbe.register_probe('diffusers', ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe('diffusers', ModelType.ControlNet, ControlNetFolderProbe)
-ModelProbe.register_probe('checkpoint', ModelType.Pipeline, PipelineCheckpointProbe)
+ModelProbe.register_probe('checkpoint', ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.TextualInversion, TextualInversionCheckpointProbe)

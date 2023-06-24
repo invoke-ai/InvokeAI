@@ -139,7 +139,7 @@ class ModelInstall(object):
         models = set()
         for key, value in self.datasets.items():
             name,base,model_type = ModelManager.parse_key(key)
-            if model_type==ModelType.Pipeline:
+            if model_type==ModelType.Main:
                 models.add(key)
         return models
 
@@ -224,7 +224,7 @@ class ModelInstall(object):
         try:
             logger.info(f'Probing {path}')
             info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
-            if info.model_type == ModelType.Pipeline:
+            if info.model_type == ModelType.Main:
                 model_name = path.stem if info.format=='checkpoint' else path.name
                 if self.mgr.model_exists(model_name, info.base_type, info.model_type):
                     raise Exception(f'A model named "{model_name}" is already installed.')
@@ -314,7 +314,7 @@ class ModelInstall(object):
             description = str(description),
             model_format = info.format,
             )
-        if info.model_type == ModelType.Pipeline:
+        if info.model_type == ModelType.Main:
             attributes.update(dict(variant = info.variant_type,))
             if info.format=="checkpoint":
                 try:

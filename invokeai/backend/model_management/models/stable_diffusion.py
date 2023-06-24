@@ -40,11 +40,11 @@ class StableDiffusion1Model(DiffusersModel):
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
-        assert model_type == ModelType.Pipeline
+        assert model_type == ModelType.Main
         super().__init__(
             model_path=model_path,
             base_model=BaseModelType.StableDiffusion1,
-            model_type=ModelType.Pipeline,
+            model_type=ModelType.Main,
         )
 
     @classmethod
@@ -140,11 +140,11 @@ class StableDiffusion2Model(DiffusersModel):
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion2
-        assert model_type == ModelType.Pipeline
+        assert model_type == ModelType.Main
         super().__init__(
             model_path=model_path,
             base_model=BaseModelType.StableDiffusion2,
-            model_type=ModelType.Pipeline,
+            model_type=ModelType.Main,
         )
 
     @classmethod

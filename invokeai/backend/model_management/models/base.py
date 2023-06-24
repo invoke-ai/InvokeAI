@@ -18,7 +18,7 @@ class BaseModelType(str, Enum):
     #Kandinsky2_1 = "kandinsky-2.1"
 
 class ModelType(str, Enum):
-    Pipeline = "pipeline"
+    Main = "main"
     Vae = "vae"
     Lora = "lora"
     ControlNet = "controlnet" # used by model_probe

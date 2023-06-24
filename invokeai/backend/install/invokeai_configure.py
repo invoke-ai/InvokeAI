@@ -618,7 +618,7 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
 
     dest = root / 'models'
     for model_base in [BaseModelType.StableDiffusion1,BaseModelType.StableDiffusion2]:
-        for model_type in [ModelType.Pipeline, ModelType.Vae, ModelType.Lora,
+        for model_type in [ModelType.Main, ModelType.Vae, ModelType.Lora,
                            ModelType.ControlNet,ModelType.TextualInversion]:
             path = dest / model_base.value / model_type.value
             path.mkdir(parents=True, exist_ok=True)
