@@ -77,6 +77,7 @@ const CurrentImagePreview = () => {
         height: 'full',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
