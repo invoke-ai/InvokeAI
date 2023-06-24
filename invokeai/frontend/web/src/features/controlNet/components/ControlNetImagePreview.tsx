@@ -10,7 +10,6 @@ import { Box, ChakraProps, Flex } from '@chakra-ui/react';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { AnimatePresence, motion } from 'framer-motion';
 import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaUndo } from 'react-icons/fa';
@@ -105,64 +104,46 @@ const ControlNetImagePreview = (props: Props) => {
       <IAIDndImage
         image={controlImage}
         onDrop={handleDrop}
-        isDropDisabled={Boolean(
-          processedControlImage && processorType !== 'none'
-        )}
+        isDropDisabled={shouldShowProcessedImage}
         isUploadDisabled={Boolean(controlImage)}
         postUploadAction={{ type: 'SET_CONTROLNET_IMAGE', controlNetId }}
-        imageSx={imageSx}
+        imageSx={{
+          pointerEvents: shouldShowProcessedImage ? 'none' : 'auto',
+          ...imageSx,
+        }}
       />
-      <AnimatePresence>
-        {shouldShowProcessedImage && (
-          <motion.div
-            style={{ width: '100%' }}
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.1 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.1 },
-            }}
-          >
-            <>
-              {shouldShowProcessedImageBackdrop && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    insetInlineStart: 0,
-                    w: 'full',
-                    h: 'full',
-                    bg: 'base.900',
-                    opacity: 0.7,
-                  }}
-                />
-              )}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  insetInlineStart: 0,
-                  w: 'full',
-                  h: 'full',
-                }}
-              >
-                <IAIDndImage
-                  image={processedControlImage}
-                  onDrop={handleDrop}
-                  payloadImage={controlImage}
-                  isUploadDisabled={true}
-                  imageSx={imageSx}
-                />
-              </Box>
-            </>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {shouldShowProcessedImage && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            insetInlineStart: 0,
+            w: 'full',
+            h: 'full',
+          }}
+        >
+          {shouldShowProcessedImageBackdrop && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                insetInlineStart: 0,
+                w: 'full',
+                h: 'full',
+                bg: 'base.900',
+                opacity: 0.7,
+              }}
+            />
+          )}
+          <IAIDndImage
+            image={processedControlImage}
+            onDrop={handleDrop}
+            payloadImage={controlImage}
+            isUploadDisabled={true}
+            imageSx={imageSx}
+          />
+        </Box>
+      )}
       {pendingControlImages.includes(controlNetId) && (
         <Box
           sx={{

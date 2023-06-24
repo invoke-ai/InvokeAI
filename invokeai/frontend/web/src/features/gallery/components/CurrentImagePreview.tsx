@@ -51,10 +51,6 @@ const CurrentImagePreview = () => {
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
-  // const image = useAppSelector((state: RootState) =>
-  //   selectImagesById(state, selectedImage ?? '')
-  // );
-
   const {
     currentData: image,
     isLoading,
@@ -79,7 +75,6 @@ const CurrentImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
-        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -101,21 +96,13 @@ const CurrentImagePreview = () => {
           }}
         />
       ) : (
-        <Flex
-          sx={{
-            width: 'full',
-            height: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IAIDndImage
-            image={image}
-            onDrop={handleDrop}
-            fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
-            isUploadDisabled={true}
-          />
-        </Flex>
+        <IAIDndImage
+          image={image}
+          onDrop={handleDrop}
+          fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
+          isUploadDisabled={true}
+          fitContainer
+        />
       )}
       {shouldShowImageDetails && image && (
         <Box
