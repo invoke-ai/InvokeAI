@@ -14,7 +14,7 @@ import { invokeAIThemeColors } from 'theme/colors/invokeAI';
 import { lightThemeColors } from 'theme/colors/lightTheme';
 import { oceanBlueColors } from 'theme/colors/oceanBlue';
 
-import '@fontsource/inter/variable.css';
+import '@fontsource-variable/inter';
 import { MantineProvider } from '@mantine/core';
 import { mantineTheme } from 'mantine-theme/theme';
 import 'overlayscrollbars/overlayscrollbars.css';
