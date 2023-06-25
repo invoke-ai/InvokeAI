@@ -30,7 +30,7 @@ from controlnet_aux import (
     ZoeDetector,
     MediapipeFaceDetector,
     SamDetector,
-    LeresDetector,
+    # LeresDetector,
 )
 
 from controlnet_aux.util import ade_palette
@@ -461,27 +461,27 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
         processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
         return processed_image
 
-class LeresImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
-    """Applies leres processing to image"""
-    # fmt: off
-    type: Literal["leres_image_processor"] = "leres_image_processor"
-    # Inputs
-    thr_a: float = Field(default=0, description="Leres parameter `thr_a`")
-    thr_b: float = Field(default=0, description="Leres parameter `thr_b`")
-    boost: bool = Field(default=False, description="Whether to use boost mode")
-    detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
-    image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
-    # fmt: on
-
-    def run_processor(self, image):
-        leres_processor = LeresDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = leres_processor(image,
-                                          thr_a=self.thr_a,
-                                          thr_b=self.thr_b,
-                                          boost=self.boost,
-                                          detect_resolution=self.detect_resolution,
-                                          image_resolution=self.image_resolution)
-        return processed_image
+# class LeresImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+#     """Applies leres processing to image"""
+#     # fmt: off
+#     type: Literal["leres_image_processor"] = "leres_image_processor"
+#     # Inputs
+#     thr_a: float = Field(default=0, description="Leres parameter `thr_a`")
+#     thr_b: float = Field(default=0, description="Leres parameter `thr_b`")
+#     boost: bool = Field(default=False, description="Whether to use boost mode")
+#     detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
+#     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
+#     # fmt: on
+#
+#     def run_processor(self, image):
+#         leres_processor = LeresDetector.from_pretrained("lllyasviel/Annotators")
+#         processed_image = leres_processor(image,
+#                                           thr_a=self.thr_a,
+#                                           thr_b=self.thr_b,
+#                                           boost=self.boost,
+#                                           detect_resolution=self.detect_resolution,
+#                                           image_resolution=self.image_resolution)
+#         return processed_image
 
 class SegmentAnythingProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies segment anything processing to image"""
