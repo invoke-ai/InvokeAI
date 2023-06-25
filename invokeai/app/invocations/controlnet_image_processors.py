@@ -485,18 +485,12 @@ class SamDetectorReproducibleColors(SamDetector):
         sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
         h, w = anns[0]['segmentation'].shape
         final_img = Image.fromarray(np.zeros((h, w, 3), dtype=np.uint8), mode="RGB")
-        print("number of annotations: ", len(sorted_anns))
-        print("type of annotations: ", type(sorted_anns))
         palette = ade_palette()
         for i, ann in enumerate(sorted_anns):
             m = ann['segmentation']
             img = np.empty((m.shape[0], m.shape[1], 3), dtype=np.uint8)
             # doing modulo just in case number of annotated regions exceeds number of colors in palette
             ann_color = palette[i % len(palette)]
-            print(ann_color)
-            img[:, :, 0] = ann_color[0]
-            img[:, :, 1] = ann_color[1]
-            img[:, :, 2] = ann_color[2]
+            img[:, :] = ann_color
             final_img.paste(Image.fromarray(img, mode="RGB"), (0, 0), Image.fromarray(np.uint8(m * 255)))
-
         return np.array(final_img, dtype=np.uint8)
