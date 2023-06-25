@@ -29,6 +29,7 @@ from controlnet_aux import (
     ContentShuffleDetector,
     ZoeDetector,
     MediapipeFaceDetector,
+    SamDetector,
 )
 
 from .image import ImageOutput, PILInvocationConfig
@@ -454,4 +455,16 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     def run_processor(self, image):
         mediapipe_face_processor = MediapipeFaceDetector()
         processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
+        return processed_image
+
+
+class SegmentAnythingProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
+    """Applies segment anything processing to image"""
+    # fmt: off
+    type: Literal["segment_anything_processor"] = "segment_anything_processor"
+    # fmt: on
+
+    def run_processor(self, image):
+        segment_anything_processor = SamDetector.from_pretrained("ybelkada/segment-anything", subfolder="checkpoints")
+        processed_image = segment_anything_processor(image)
         return processed_image
